@@ -214,6 +214,14 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Access keys per user",
     text: "Keys one user may make for /mcp. 0 turns it off.",
   },
+  externalTaskDays: {
+    label: "Delete closed tasks",
+    text: "Days a done or dropped external task is kept.",
+  },
+  externalTaskIdleHours: {
+    label: "Release idle claims",
+    text: "Hours without a report before a claimed task opens again.",
+  },
 };
 
 // thousands: typed in whole thousands as the agent's window is, a
@@ -239,6 +247,8 @@ export function displayOf(row: LimitRow): Display {
       return { word: "days", factor: 1 };
     case "minutes":
       return { word: "min", factor: 1 };
+    case "hours":
+      return { word: "h", factor: 1 };
     default:
       return { word: "", factor: 1 };
   }

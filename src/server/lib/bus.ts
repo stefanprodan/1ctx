@@ -8,6 +8,7 @@
 
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import type { AutomationDraft } from "../../shared/contracts/automation-draft.ts";
+import type { ExternalTaskRow } from "../../shared/contracts/external-task.ts";
 import type { KnowledgeFile } from "../../shared/contracts/knowledge.ts";
 import type {
   ChildOf,
@@ -67,6 +68,8 @@ export type BusEvents = {
     projectId: string;
     automation: AutomationSummary;
   };
+  "externalTask.changed": { projectId: string; task: ExternalTaskRow };
+  "externalTask.deleted": { projectId: string; taskId: string };
   // an automation's alert opened: once per open alert, at the run that
   // opened it, never for a run that joins it. The one place a
   // notification will be sent from; nothing listens yet

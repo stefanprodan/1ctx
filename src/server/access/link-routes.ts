@@ -30,6 +30,7 @@ import type { LinkStore } from "./link-store.ts";
 import type { Links } from "./links.ts";
 import { isLinkToken, parseLinkAsk, parseLinkUse } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
+import type { TaskClaimsPort } from "./task-claims.ts";
 
 export type UsersPort = {
   byId(id: string): UserRow | null;
@@ -43,6 +44,7 @@ export type LinkRoutesDeps = {
   auth: Auth;
   logins: LoginStore;
   keys: AccessKeyStore;
+  taskClaims: Pick<TaskClaimsPort, "endForKeys">;
   store: LinkStore;
   links: Links;
   users: UsersPort;
@@ -145,7 +147,10 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
             deps.logins.deleteForUser(user.id);
             revokedKeys = deps.keys.deleteForUser(user.id);
             deps.links.revoke(user.id);
-            events.push(loginRevoked(user.id, null));
+            events.push(
+              loginRevoked(user.id, null),
+              ...deps.taskClaims.endForKeys(revokedKeys.map((key) => key.id)),
+            );
           }
           const current = deps.users.byId(user.id)!;
           const { setCookie } = deps.auth.open(current);

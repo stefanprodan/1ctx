@@ -48,6 +48,12 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
   usage: ["usage", "decision_usage"],
   skills: ["skills", "skill_files", "agent_skills"],
   memory: ["memory_notes", "memory_views"],
+  external: [
+    "external_tasks",
+    "external_task_files",
+    "external_task_claims",
+    "external_task_entries",
+  ],
   config: [
     "users",
     "logins",
@@ -81,6 +87,7 @@ export type StorageLimits = {
   scratchIdleDays: number;
   knowledgeHistoryDays: number;
   archivedDeleteDays: number;
+  externalTaskDays: number;
 };
 
 const LARGEST = 10;
@@ -315,16 +322,20 @@ function retention(
   const table = (name: string) =>
     result.pages.find((row) => row.kind === "table" && row.name === name)
       ?.bytes ?? 0;
+  const external = result.pages
+    .filter((row) => STORAGE_TABLES.external.includes(row.table))
+    .reduce((sum, row) => sum + row.bytes, 0);
   const kept: Record<RetentionKept, number> = {
     chats: 0,
     knowledge: 0,
     uploads: 0,
     mcp: 0,
     usage: table("usage"),
-    rest: 0,
+    rest: external - result.externalTasks.closed,
   };
   const cleaned: Record<RetentionCleaned, number> = {
     archived: 0,
+    externalTasks: result.externalTasks.closed,
     runs: 0,
     scratch: 0,
     history: 0,
@@ -359,6 +370,7 @@ function retention(
   const runDays = retentions.size === 1 ? [...retentions][0]! : null;
   const cleanedDays: Record<RetentionCleaned, number | null> = {
     archived: limits.archivedDeleteDays,
+    externalTasks: limits.externalTaskDays,
     runs: runDays,
     scratch: limits.scratchIdleDays,
     history: limits.knowledgeHistoryDays,

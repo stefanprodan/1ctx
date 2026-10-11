@@ -115,6 +115,15 @@ export class KnowledgeStore extends KnowledgeVersions {
     }
   }
 
+  file(projectId: string, id: string): KnowledgeFile | null {
+    const raw = this.db
+      .query<FileRaw, [string, string]>(
+        `select ${FILE_COLUMNS} from knowledge_files where project_id = ? and id = ?`,
+      )
+      .get(projectId, id);
+    return raw === null ? null : fileOf(raw);
+  }
+
   byId(projectId: string, id: string): KnowledgeRow | null {
     const raw = this.db
       .query<FullRaw, [string, string]>(

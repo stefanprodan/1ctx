@@ -6,7 +6,13 @@ import type {
   KnowledgeSearchResponse,
   KnowledgeVersionsResponse,
 } from "../../shared/api/knowledge.ts";
+import type {
+  ExternalTaskDetail,
+  ExternalTaskEntry,
+  ExternalTaskRow,
+} from "../../shared/contracts/external-task.ts";
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
+import type { AgentEntryKind, ExternalTaskState } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { KnowledgeEdit } from "../knowledge/index.ts";
 import type { Principal, Via } from "../lib/http.ts";
@@ -106,12 +112,65 @@ export type SessionsPort = {
   ): SessionListPage;
 };
 
+// the key an agent calls through; claims and entries carry its id and
+// name
+export type TaskKey = { userId: string; keyId: string; keyName: string };
+
+// a task as the agent reads it; answered marks a claim of the calling key
+// whose task has an answer after the claim's last entry
+export type TaskListRow = ExternalTaskRow & {
+  answered: boolean;
+  // resumes after this row when the tool cuts a page to its byte budget
+  cursor: string;
+};
+
+export type TaskShow = {
+  task: ExternalTaskDetail;
+  entries: ExternalTaskEntry[];
+  // the entry id to ask before, null at the first
+  next: string | null;
+  idleHours: number;
+};
+
+// access is the caller's: the tool checks the key reaches the task's
+// project (projectOf) before show, claim or report, and passes only
+// reachable projects to list. A refusal throws HttpError with the
+// state's words; a stale or ended claim answers 409, a missing task 404
+export type TasksPort = {
+  projectOf(taskId: string): string | null;
+  // projectIds already narrowed to the key's; held keeps only the
+  // key's open claims and ignores states. Rows carry no brief text;
+  // after is the cursor of the row before, latest move first
+  list(input: {
+    projectIds: string[];
+    states: ExternalTaskState[];
+    held: TaskKey | null;
+    after: string | null;
+    limit: number;
+  }): { rows: TaskListRow[]; next: string | null };
+  show(taskId: string, before: string | null): TaskShow | null;
+  // open to claimed; the same key holding it answers that claim again
+  claim(key: TaskKey, taskId: string): TaskShow & { claimId: string };
+  // the claim must belong to taskId; a live retry must repeat both the
+  // claim's and task's last entry. A result or release retry answers
+  // the original end even after later task entries
+  report(
+    key: TaskKey,
+    taskId: string,
+    claimId: string,
+    kind: AgentEntryKind,
+    text: string,
+    links: string[],
+  ): { entry: ExternalTaskEntry; task: ExternalTaskRow };
+};
+
 export type McpServerDeps = {
   db: Db;
   access: AccessPort;
   knowledge: KnowledgePort;
   projects: ProjectsPort;
   sessions: SessionsPort;
+  tasks: TasksPort;
   clock(): number;
   log: Log;
   version: string;

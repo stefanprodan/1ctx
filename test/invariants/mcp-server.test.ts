@@ -243,9 +243,21 @@ describe("the composed inbound MCP endpoint", () => {
       expect(await ping.text()).toContain('"result":{}');
 
       const writeTools = await mcp(chat, writeKey.token).rpc("tools/list");
+      expect(
+        writeTools.result.tools.map((tool: { name: string }) => tool.name),
+      ).toEqual(["projects", "knowledge", "sessions", "tasks"]);
       const writeKnowledge = writeTools.result.tools.find(
         (tool: { name: string }) => tool.name === "knowledge",
       );
+      const writeTasks = writeTools.result.tools.find(
+        (tool: { name: string }) => tool.name === "tasks",
+      );
+      expect(writeTasks.inputSchema.properties.action.enum).toEqual([
+        "list",
+        "show",
+        "claim",
+        "report",
+      ]);
       expect(writeKnowledge.inputSchema.properties.action.enum).toContain(
         "delete",
       );

@@ -29,6 +29,10 @@ import {
   smtpSender,
 } from "./email/index.ts";
 import {
+  type ExternalTasks,
+  externalTasksArea,
+} from "./external-tasks/index.ts";
+import {
   acquireProcess,
   type KnowledgeArea,
   knowledgeArea,
@@ -144,6 +148,7 @@ export type App = {
   automations: Automations["store"];
   automationDrafts: Automations["drafts"];
   automationScheduler: Automations["scheduler"];
+  externalTasks: ExternalTasks;
   usage: UsageStore;
   catalogs: Catalogs;
   chat: Providers["chat"];
@@ -207,6 +212,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   let automations!: Automations;
   let agents!: Agents;
   let repos!: Repos;
+  let externalTasks!: ExternalTasks;
   const users = usersArea({
     db,
     secret: (name) => secret("user-", name),
@@ -318,6 +324,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     access: { project: (principal, id) => access.project(principal, id) },
     users,
+    taskClaims: {
+      endForUser: (userId, projectIds) =>
+        externalTasks.endForUser(userId, projectIds),
+    },
     sessions: {
       count: (projectId) => sessions.store.count(projectId),
       running: (projectId) => sessions.store.running(projectId),
@@ -355,6 +365,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
     accessKeysPerUser: () => limits.current().accessKeysPerUser,
     users,
     projects,
+    taskClaims: {
+      endForKeys: (keyIds) => externalTasks.endForKeys(keyIds),
+      endForUser: (userId, projectIds) =>
+        externalTasks.endForUser(userId, projectIds),
+    },
     usage: {
       projectTotal,
       activeProjects: (ids, since, until) =>
@@ -451,6 +466,19 @@ export async function compose(options: ComposeOptions): Promise<App> {
         automations.draftLifecycle.expireSession(id, now),
       expired: (now, limit) => automations.drafts.expired(now, limit),
       expire: (id, now) => automations.draftLifecycle.expire(id, now),
+    },
+  });
+  externalTasks = externalTasksArea({
+    db,
+    clock,
+    access,
+    externalTaskIdleHours: () => limits.current().externalTaskIdleHours,
+    externalTaskDays: () => limits.current().externalTaskDays,
+    knowledge: {
+      file: (projectId, fileId) => knowledge.store.file(projectId, fileId),
+      deletedName: (projectId, fileId) =>
+        knowledge.store.versions(projectId, fileId).find((row) => row.deleted)
+          ?.name ?? null,
     },
   });
   const configuredTools = toolsArea({
@@ -686,6 +714,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       search: (projectId, q, after) => sessions.search(projectId, q, after),
       list: (projectId, since, after) => sessions.list(projectId, since, after),
     },
+    tasks: externalTasks,
   });
   let repaired = 0;
   let reconciled = 0;
@@ -718,6 +747,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...knowledge.routes,
     ...repos.routes,
     ...sessions.routes,
+    ...externalTasks.routes,
     ...(tools.routes ?? []),
     ...runner.routes,
     ...automations.routes,
@@ -779,6 +809,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     automations: automations.store,
     automationDrafts: automations.drafts,
     automationScheduler: automations.scheduler,
+    externalTasks,
     usage: usage.store,
     catalogs: providers.catalogs,
     chat: providers.chat,
@@ -806,6 +837,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
         if (chats.chats_archived > 0) runner.queue.wake();
         const notSent = sessions.sweepNotSent(now);
         const emailRows = email.sweep(now);
+        const externalAccessGone = externalTasks.endClaims(() =>
+          access.unavailableKeys(
+            externalTasks.store.openClaims().map((claim) => claim.key_id),
+          ),
+        );
+        const externalIdle = externalTasks.releaseIdle(now);
+        const externalDeleted = externalTasks.deleteClosed(now);
         const removed =
           logins +
           links +
@@ -814,8 +852,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
           scratchRows +
           digests +
           notSent +
-          emailRows;
-        if (removed > 0 || Object.values(chats).some((n) => n > 0)) {
+          emailRows +
+          externalDeleted;
+        if (
+          removed > 0 ||
+          externalAccessGone > 0 ||
+          externalIdle > 0 ||
+          Object.values(chats).some((n) => n > 0)
+        ) {
           sweepLog.info("sweep", {
             logins,
             links,
@@ -825,6 +869,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
             digests,
             not_sent: notSent,
             emails: emailRows,
+            external_access_gone: externalAccessGone,
+            external_idle: externalIdle,
+            external_deleted: externalDeleted,
             removed,
             ...chats,
           });

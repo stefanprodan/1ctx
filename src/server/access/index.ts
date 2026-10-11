@@ -48,6 +48,7 @@ import {
   routes,
 } from "./routes.ts";
 import { LoginStore } from "./store.ts";
+import type { TaskClaimsPort } from "./task-claims.ts";
 import {
   type UsersPort as AdminUsersPort,
   type UsersProjectsPort,
@@ -86,9 +87,11 @@ export type AccessDeps = {
   // a closure, the socket is built after access
   presence: PresencePort;
   email: EmailPort;
+  taskClaims: TaskClaimsPort;
 };
 
 export type Access = Auth & {
+  unavailableKeys(ids: readonly string[]): string[];
   // drop the visits past every window; how many went
   sweepVisits(): number;
   // drop the links past their expiry, used or not; how many went
@@ -128,6 +131,8 @@ export function accessArea(deps: AccessDeps): Access {
   const guard = loginGuard(deps.clock, deps.log);
   return {
     ...built,
+    unavailableKeys: (ids) =>
+      keys.unavailable(ids, deps.clock(), deps.accessKeysPerUser()),
     sweepVisits: () => visits.deleteBefore(deps.clock() - VISIT_RETENTION_MS),
     sweepLinks: () => linkStore.sweep(deps.clock()),
     settled: () => links.settled(),
@@ -147,6 +152,7 @@ export function accessArea(deps: AccessDeps): Access {
         auth: built,
         logins,
         keys,
+        taskClaims: deps.taskClaims,
         store: linkStore,
         links,
         users: deps.users,
@@ -168,6 +174,7 @@ export function accessArea(deps: AccessDeps): Access {
         db: deps.db,
         logins,
         keys,
+        taskClaims: deps.taskClaims,
         log: deps.log,
         visits,
         users: deps.users,
@@ -180,6 +187,7 @@ export function accessArea(deps: AccessDeps): Access {
       ...keyRoutes({
         db: deps.db,
         keys,
+        taskClaims: deps.taskClaims,
         logins,
         users: deps.users,
         auth: built,

@@ -73,6 +73,7 @@ export type ScanResult = {
   projects: ProjectRow[];
   automations: AutomationRow[];
   knowledge: KnowledgeSum[];
+  externalTasks: { closed: number };
   // stored bytes and rows added per quarter hour of UTC since the
   // input's cut
   slots: Slot[];
@@ -364,6 +365,21 @@ function slots(db: Db, since: number): Slot[] {
 const total = (db: Db, sql: string): number =>
   db.query<{ bytes: number | null }, []>(sql).get()?.bytes ?? 0;
 
+function externalTasks(db: Db): ScanResult["externalTasks"] {
+  return {
+    closed: total(
+      db,
+      `select sum(octet_length(t.title) + octet_length(t.text)
+        + coalesce(octet_length(t.part), 0)
+        + coalesce((select sum(octet_length(text) + octet_length(links))
+            from external_task_entries where task_id = t.id), 0)
+        + coalesce((select sum(octet_length(last_task))
+            from external_task_claims where task_id = t.id), 0)) as bytes
+      from external_tasks t where t.state in ('done', 'dropped')`,
+    ),
+  };
+}
+
 export function scan(db: Db, input: ScanInput): ScanResult {
   return snapshot(db, () => read(db, input));
 }
@@ -384,6 +400,7 @@ function read(db: Db, input: ScanInput): ScanResult {
       )
       .all(),
     knowledge: knowledge(db),
+    externalTasks: externalTasks(db),
     slots: slots(db, input.since),
     staging: total(db, "select sum(bytes) as bytes from upload_staged_files"),
     digests: total(

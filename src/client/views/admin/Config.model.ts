@@ -80,8 +80,8 @@ export const LIMITS_CARDS: readonly LimitsGroup[] = [
   },
   {
     title: "External tasks",
-    line: "Access keys for agents you run outside 1ctx.",
-    names: ["accessKeysPerUser"],
+    line: "Access keys, claims and closed tasks.",
+    names: ["accessKeysPerUser", "externalTaskIdleHours", "externalTaskDays"],
   },
 ];
 

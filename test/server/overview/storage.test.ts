@@ -5,11 +5,14 @@
 // schema, the scan's pages, the stored sums against the rows, the days
 // of a zone, and what a personal project never gives away.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { SLOT_MS } from "../../../src/server/overview/read.ts";
 import { MESSAGE_BYTES, scan } from "../../../src/server/overview/scan.ts";
-import { STORAGE_TABLES } from "../../../src/server/overview/storage.ts";
+import {
+  STORAGE_TABLES,
+  storageResponse,
+} from "../../../src/server/overview/storage.ts";
 import type {
   StorageAreaKey,
   StorageResponse,
@@ -77,6 +80,76 @@ describe("the storage area map", () => {
 });
 
 describe("the storage scan", () => {
+  test("sums only closed external task text, entries and saved claim responses", async () => {
+    const chat = await chatApp();
+    const { externalTasks: tasks, db } = chat.app;
+    const key = { userId: chat.memberId, keyId: "key", keyName: "terminal" };
+    let closed = 0;
+    for (const state of ["open", "claimed", "blocked", "done", "dropped"]) {
+      const made = tasks.create(chat.memberId, chat.projectId, {
+        title: state,
+        text: "Brief \u00e9",
+        part: "Part",
+        fileIds: [],
+      });
+      const id = made.task.task.id;
+      if (state === "open") continue;
+      const { claimId } = tasks.claim(key, id);
+      tasks.report(
+        key,
+        id,
+        claimId,
+        state === "done"
+          ? "result"
+          : state === "blocked"
+            ? "question"
+            : "progress",
+        "Report \u00e9",
+        ["https://example.test/result"],
+      );
+      if (state === "dropped")
+        tasks.drop(chat.memberId, id, { state: "claimed" });
+      if (state !== "done" && state !== "dropped") continue;
+      const detail = tasks.show(id, null)!;
+      closed += Buffer.byteLength(
+        state +
+          detail.task.text +
+          "Part" +
+          detail.entries
+            .map((entry) => entry.text + JSON.stringify(entry.links))
+            .join("") +
+          tasks.store.claimById(claimId)!.last_task!,
+      );
+    }
+    const query = spyOn(db, "query");
+    try {
+      const result = scan(db, { now: chat.app.now.value, since: 0 });
+      expect(result.externalTasks).toEqual({ closed });
+      const [sql] = query.mock.calls
+        .map(([sql]) => sql)
+        .filter(
+          (sql) =>
+            sql.includes("as bytes") &&
+            sql.includes("from external_task_claims"),
+        );
+      expect(sql).toBeDefined();
+      const detail = db
+        .query<{ detail: string }, []>(`explain query plan ${sql}`)
+        .all()
+        .map((row) => row.detail);
+      for (const table of ["external_task_entries", "external_task_claims"]) {
+        expect(
+          detail.some((line) => line.startsWith(`SEARCH ${table} USING INDEX`)),
+        ).toBe(true);
+        expect(detail.some((line) => line.startsWith(`SCAN ${table}`))).toBe(
+          false,
+        );
+      }
+    } finally {
+      query.mockRestore();
+    }
+  });
+
   test("answers bytes per table and index from dbstat", async () => {
     const app = await testApp();
     const result = scan(app.db, { now: app.now.value, since: 0 });
@@ -230,6 +303,25 @@ describe("the storage scan", () => {
 });
 
 describe("the storage answer", () => {
+  test("external table and index overhead is kept, apart from closed task text", async () => {
+    const app = await testApp();
+    const result = scan(app.db, { now: app.now.value, since: 0 });
+    const rest = () =>
+      storageResponse(result, "UTC", DEFAULT_LIMITS).retention.kept.find(
+        (row) => row.key === "rest",
+      )!.bytes;
+    const before = rest();
+    const pages = result.pages.filter((row) =>
+      STORAGE_TABLES.external.includes(row.table),
+    );
+    expect(pages.some((row) => row.kind === "index")).toBe(true);
+    expect(pages.some((row) => row.table === "external_task_files")).toBe(true);
+    for (const page of pages) page.bytes += 4096;
+    expect(rest()).toBe(before + pages.length * 4096);
+    result.externalTasks = { closed: 30 };
+    expect(rest()).toBe(before + pages.length * 4096 - 30);
+  });
+
   test("groups areas largest first with their indexes and rows", async () => {
     const chat = await chatApp();
     await settledChat(chat);

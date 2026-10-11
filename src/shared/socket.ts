@@ -12,6 +12,7 @@ import {
   type AutomationDraft,
   isAutomationDraft,
 } from "./contracts/automation-draft.ts";
+import type { ExternalTaskRow } from "./contracts/external-task.ts";
 import type { KnowledgeFile } from "./contracts/knowledge.ts";
 import type {
   ChildOf,
@@ -27,7 +28,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 18;
+export const PROTOCOL = 19;
 
 export type DraftFrame =
   | { type: "draft"; sessionId: string; draft: AutomationDraft }
@@ -124,6 +125,9 @@ export type SocketEvent =
       file: KnowledgeFile;
       deleted: boolean;
     }
+  // an external task's row after any change, by the revision rule
+  | { type: "externalTask"; projectId: string; task: ExternalTaskRow }
+  | { type: "externalTaskDeleted"; projectId: string; taskId: string }
   // the project's deleted files and their history are gone
   | { type: "knowledgeEmptied"; projectId: string }
   // the connection may now see the project

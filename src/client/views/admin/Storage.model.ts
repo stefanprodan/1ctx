@@ -31,6 +31,7 @@ export const AREA_NAMES: Record<StorageAreaKey, string> = {
   skills: "Skills",
   memory: "Memory",
   config: "Config",
+  external: "External tasks",
 };
 
 function areaTotals(areas: StorageArea[]) {
@@ -232,7 +233,7 @@ const KEPT: Record<RetentionKept, [string, string]> = {
   uploads: ["Uploads", "with their chat"],
   mcp: ["MCP results", "with their chat"],
   usage: ["Usage", "one row per round"],
-  rest: ["Skills, memory, config", "until removed"],
+  rest: ["Skills, memory, config, open external tasks", "until removed"],
 };
 
 export function keptLine(key: RetentionKept) {
@@ -246,6 +247,11 @@ export function cleanedLine(key: RetentionCleaned, days: number | null) {
     case "archived":
       return {
         name: "Archived chats",
+        sub: d ? `after ${d}` : "when expired",
+      };
+    case "externalTasks":
+      return {
+        name: "Closed external tasks",
         sub: d ? `after ${d}` : "when expired",
       };
     case "runs":

@@ -12,6 +12,7 @@ export type {
   McpServerDeps,
   ProjectsPort,
   SessionsPort,
+  TasksPort,
 } from "./ports.ts";
 export { MCP_MESSAGES_PER_MINUTE } from "./routes.ts";
 

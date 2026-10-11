@@ -8,10 +8,14 @@ import type {
   RouteDescriptor,
 } from "../../../src/server/lib/http.ts";
 import { type Log, silent } from "../../../src/server/lib/log.ts";
-import {
-  type McpServerDeps,
-  mcpServerArea,
-} from "../../../src/server/mcp-server/index.ts";
+import { mcpServerArea } from "../../../src/server/mcp-server/index.ts";
+import type {
+  McpServerDeps,
+  TaskKey,
+  TaskListRow,
+  TaskShow,
+  TasksPort,
+} from "../../../src/server/mcp-server/ports.ts";
 import type {
   ExportRow,
   SessionListPage,
@@ -21,6 +25,11 @@ import type {
   KnowledgeListResponse,
   KnowledgeSearchResponse,
 } from "../../../src/shared/api/knowledge.ts";
+import type {
+  ExternalTaskDetail,
+  ExternalTaskEntry,
+  ExternalTaskRow,
+} from "../../../src/shared/contracts/external-task.ts";
 import type {
   KnowledgeFileView,
   KnowledgeVersion,
@@ -77,6 +86,67 @@ export const file = (text = "hello"): KnowledgeFileView => ({
   code: null,
 });
 
+export const externalTaskRow = (
+  overrides: Partial<ExternalTaskRow> = {},
+): ExternalTaskRow => ({
+  id: "task00000001",
+  projectId: project.id,
+  title: "Review the proposal",
+  part: "MCP tool",
+  state: "open",
+  revision: 1,
+  editRevision: 1,
+  claim: null,
+  last: null,
+  entries: 0,
+  attentionAt: null,
+  createdBy: { id: "user00000001", username: "casey" },
+  createdAt: 100,
+  movedAt: 200,
+  ...overrides,
+});
+
+export const externalTaskEntry = (
+  overrides: Partial<ExternalTaskEntry> = {},
+): ExternalTaskEntry => ({
+  id: "entry0000001",
+  kind: "progress",
+  text: "Started the review.",
+  links: [],
+  by: { id: "user00000001", username: "casey" },
+  keyName: "laptop",
+  claimId: "claim0000001",
+  claimEnd: null,
+  at: 300,
+  ...overrides,
+});
+
+export const externalTaskDetail = (
+  row: ExternalTaskRow = externalTaskRow(),
+): ExternalTaskDetail => ({
+  task: row,
+  text: "Read the proposal and report the findings.",
+  files: [
+    {
+      fileId: "file00000001",
+      name: "notes/readme.md",
+      revision: 7,
+      deleted: false,
+    },
+  ],
+  briefAt: 100,
+  chatId: null,
+});
+
+export const externalTaskShow = (
+  row: ExternalTaskRow = externalTaskRow(),
+): TaskShow => ({
+  task: externalTaskDetail(row),
+  entries: [externalTaskEntry()],
+  next: null,
+  idleHours: 24,
+});
+
 export const session = {
   id: "session00001",
   projectId: project.id,
@@ -118,6 +188,21 @@ export const row = (id: string, content: string): ExportRow => ({
   finishedAt: 0,
 });
 
+type TaskCall =
+  | { action: "projectOf"; taskId: string }
+  | { action: "list"; input: Parameters<TasksPort["list"]>[0] }
+  | { action: "show"; taskId: string; before: string | null }
+  | { action: "claim"; key: TaskKey; taskId: string }
+  | {
+      action: "report";
+      key: TaskKey;
+      taskId: string;
+      claimId: string;
+      kind: string;
+      text: string;
+      links: string[];
+    };
+
 type State = {
   now: number;
   text: string;
@@ -143,6 +228,15 @@ type State = {
   readError: Error | null;
   checked: number;
   writes: { action: string; author: unknown }[];
+  taskProjects: Record<string, string>;
+  taskList: {
+    rows: (Omit<TaskListRow, "cursor"> & { cursor?: string })[];
+    next: string | null;
+  };
+  taskShow: TaskShow | null;
+  taskClaimId: string;
+  taskReport: { entry: ExternalTaskEntry; task: ExternalTaskRow };
+  taskCalls: TaskCall[];
 };
 
 export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
@@ -165,6 +259,15 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
     readError: null,
     checked: 0,
     writes: [],
+    taskProjects: { task00000001: project.id },
+    taskList: { rows: [{ ...externalTaskRow(), answered: false }], next: null },
+    taskShow: externalTaskShow(),
+    taskClaimId: "claim0000001",
+    taskReport: {
+      entry: externalTaskEntry({ kind: "result", claimEnd: "done" }),
+      task: externalTaskRow({ state: "done", revision: 2 }),
+    },
+    taskCalls: [],
   };
   const deps: McpServerDeps = {
     db: memoryDb(),
@@ -197,6 +300,43 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
       list: (projectId, since, after) => {
         state.sessionCalls.push({ action: "list", projectId, since, after });
         return state.sessionList;
+      },
+    },
+    tasks: {
+      projectOf: (taskId) => {
+        state.taskCalls.push({ action: "projectOf", taskId });
+        return state.taskProjects[taskId] ?? null;
+      },
+      list: (input) => {
+        state.taskCalls.push({ action: "list", input });
+        return {
+          rows: state.taskList.rows.map((row) => ({
+            ...row,
+            cursor: row.cursor ?? `${row.movedAt}.${row.id}`,
+          })),
+          next: state.taskList.next,
+        };
+      },
+      show: (taskId, before) => {
+        state.taskCalls.push({ action: "show", taskId, before });
+        return state.taskShow;
+      },
+      claim: (taskKey, taskId) => {
+        state.taskCalls.push({ action: "claim", key: taskKey, taskId });
+        if (state.taskShow === null) throw new NotFound();
+        return { ...state.taskShow, claimId: state.taskClaimId };
+      },
+      report: (taskKey, taskId, claimId, kind, text, links) => {
+        state.taskCalls.push({
+          action: "report",
+          key: taskKey,
+          taskId,
+          claimId,
+          kind,
+          text,
+          links,
+        });
+        return state.taskReport;
       },
     },
     knowledge: {

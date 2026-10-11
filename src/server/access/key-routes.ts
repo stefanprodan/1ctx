@@ -21,10 +21,12 @@ import {
 } from "./key-store.ts";
 import { parseAccessKey } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
+import type { TaskClaimsPort } from "./task-claims.ts";
 
 export type KeyRoutesDeps = {
   db: Db;
   keys: AccessKeyStore;
+  taskClaims: Pick<TaskClaimsPort, "endForKeys">;
   logins: LoginStore;
   users: { byId(id: string): UserRow | null };
   auth: Pick<Auth, "project">;
@@ -44,7 +46,10 @@ export function keyRoutes(deps: KeyRoutesDeps): RouteDescriptor[] {
       const owner = user(userId);
       const key = deps.keys.delete(userId, keyId);
       if (key === null) throw new NotFound("no such access key");
-      return { result: { owner, key } };
+      return {
+        result: { owner, key },
+        events: deps.taskClaims.endForKeys([key.id]),
+      };
     });
     logRevokedKeys(deps.log, found.owner.username, [found.key]);
     return new Response(null, { status: 204 });
