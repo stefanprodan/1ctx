@@ -1,5 +1,5 @@
 /* The automation pages: the icons and the run length the rows hold,
-   the automation page's actions and brief, and the editor's task box,
+   the automation page's actions and summary, and the editor's task box,
    schedule builder and its next run. */
 
 @layer tokens, base, owners;
@@ -8,7 +8,7 @@
   .automations-agent {
     color: var(--brand);
   }
-  /* a deleted agent in the brief */
+  /* a deleted agent in the summary */
   .automations-agent-gone {
     color: var(--faint);
   }
@@ -29,7 +29,7 @@
   }
 
   /* the automation page */
-  /* its open alert, over the brief */
+  /* its open alert, over the summary */
   .automations-open {
     display: flex;
     align-items: flex-start;
@@ -66,33 +66,33 @@
     margin-left: auto;
   }
 
-  .automations-brief {
+  .automations-summary {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
     padding: var(--space-4);
   }
-  .automations-brief-line,
-  .automations-brief-next {
+  .automations-summary-line,
+  .automations-summary-next {
     margin: 0;
     font-size: var(--text-ui);
   }
-  .automations-brief-line {
+  .automations-summary-line {
     color: var(--dim);
   }
-  .automations-brief-next {
+  .automations-summary-next {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     color: var(--faint);
   }
   /* the padding sits on the box, so the cut falls on a line's edge */
-  .automations-brief-text {
+  .automations-summary-text {
     padding: var(--space-3);
     border-radius: var(--radius);
     background: var(--inset);
   }
-  .automations-brief-body {
+  .automations-summary-body {
     --clamp: 6;
     margin: 0;
     font-size: var(--text-input);
@@ -102,7 +102,7 @@
   }
 
   /* the state line under the instructions */
-  .automations-brief-foot {
+  .automations-summary-foot {
     display: flex;
     align-items: center;
     gap: var(--space-3);

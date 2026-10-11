@@ -47,6 +47,11 @@ export type SessionsPort = {
   dropQueued(projectId: string, userId: string): BusEvent[];
 };
 
+// The caller's transaction keeps membership and claims together.
+export type TaskClaimsPort = {
+  endForUser(userId: string, projectIds: readonly string[]): BusEvent[];
+};
+
 // the knowledge base's counts for the detail, an area built later
 export type KnowledgePort = {
   counts(projectId: string): KnowledgeCounts;
@@ -63,6 +68,7 @@ export type RoutesDeps = {
   access: AccessPort;
   users: UsersPort;
   sessions: SessionsPort;
+  taskClaims: TaskClaimsPort;
   knowledge: KnowledgePort;
   usage: UsagePort;
   clock: Clock;
@@ -286,7 +292,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const project = transact(deps.db, () => {
           const current = findTeam(ctx.params.id);
-          if (deps.users.byId(ctx.params.userId) === null) {
+          const user = deps.users.byId(ctx.params.userId);
+          if (user === null) {
             throw new NotFound("userId does not name a user");
           }
           if (!deps.store.removeMember(current.id, ctx.params.userId)) {
@@ -297,6 +304,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             events: [
               ...deps.sessions.dropQueued(current.id, ctx.params.userId),
               accessChanged([ctx.params.userId]),
+              ...(user.role === "admin"
+                ? []
+                : deps.taskClaims.endForUser(user.id, [current.id])),
             ],
           };
         });

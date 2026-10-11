@@ -11,6 +11,7 @@
 import type { ComponentChildren } from "preact";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import { automationCount } from "../../data/automations.ts";
+import { externalTaskCount } from "../../data/external-tasks.ts";
 import { knowledgeCount, knowledgeOf } from "../../data/knowledge.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgentCount } from "../../data/sessions.ts";
@@ -35,7 +36,14 @@ export function Frame({
   children,
 }: {
   id: string;
-  tab: "feed" | "automations" | "memory" | "knowledge" | "members" | "settings";
+  tab:
+    | "feed"
+    | "automations"
+    | "external-tasks"
+    | "memory"
+    | "knowledge"
+    | "members"
+    | "settings";
   children: (shown: ProjectDetail) => ComponentChildren;
 }) {
   const row = project.value;
@@ -47,6 +55,7 @@ export function Frame({
     kind,
     settledCounts(kind, {
       automations: automationCount(id),
+      externalTasks: externalTaskCount(id),
       knowledge: knowledgeCount(id),
       members: shown === null ? null : shown.members.length,
       agents: projectAgentCount(id),

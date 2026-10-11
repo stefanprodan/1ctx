@@ -53,8 +53,8 @@ export const DAYS_OPTIONS: { value: AccessKeyDays; label: string }[] = [
 
 export const scopeHint = (scope: AccessKeyScope): string =>
   scope === "read"
-    ? "Lists projects and reads their knowledge, chats and runs."
-    : "Also creates, edits, renames and deletes knowledge files.";
+    ? "Lists projects and reads their knowledge, chats, runs and external tasks."
+    : "Also writes knowledge files and claims and reports on external tasks.";
 
 export const reachHint = (reach: KeyReach): string =>
   reach === "all"
@@ -114,6 +114,10 @@ export const claudeLine = (origin: string, token: string): string =>
   `claude mcp add --transport http 1ctx "${mcpUrl(origin)}" --header "Authorization: Bearer ${token}"`;
 
 export const CODEX_ENV = "ONECTX_ACCESS_KEY";
+
+// the skill an agent installs to work external tasks
+export const SKILL_URL =
+  "https://github.com/stefanprodan/1ctx/tree/main/skills/external-tasks";
 
 export const codexBlock = (origin: string): string =>
   [

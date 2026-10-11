@@ -44,6 +44,14 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
   newest first, optionally since an ISO 8601 time. Children carry their
   parent's id; take any row's session id, including a child's, to `read` its
   Markdown transcript. Page routes still do not open a child by its id.
+- `tasks` lists work handed to the agent, open by default or filtered by state.
+  On a write key, `held=true` keeps this key's claims and marks one answered
+  when a member answered after its last report. `show` reads the current brief, linked file
+  revisions and newest entries. A write key also gets `claim` and `report`;
+  report takes the task and claim ids, an agent entry kind, text and optional
+  HTTP(S) links. Claim and show say after how many idle hours a silent claim is
+  released. In a live session the agent asks its user directly; only an
+  unattended agent reports a question, ends its run and checks next run.
 
 The schemas are JSON Schema adapted by `fromJsonSchema()` with a
 permissive validator. The area's hand-written parsers decide accepted
@@ -59,7 +67,7 @@ same port; hidden and missing sessions both answer `no such chat`. This MCP
 lookup does not widen the page's root-only `visible()`. A list starts from
 `reachableProjectIds()`. Hidden and missing objects have the same answer.
 
-A file, version or session id is unique across projects, so a call that
+A file, version, session or task id is unique across projects, so a call that
 names one takes `projectId` as optional: the server reads the project from
 the row and answers a row the key cannot reach as missing. A `projectId`
 that is given and differs from the row's answers the same.
@@ -68,6 +76,17 @@ A knowledge write uses the key's user as author, with origin `key` and a
 copy of the key name. Its outer transaction calls `checkKey()` before the
 knowledge area's create, edit, replace, rename or revisioned remove. The
 answer holds only the file id, name and new revision.
+
+A task list passes only `reachableProjectIds()`, or one project resolved by the
+access port, to the task store. Show, claim and report resolve the task's
+project before reading or writing it; hidden and missing tasks both answer
+`not found`. Claim and report call `checkKey()` in the transaction and carry
+the key's user, id and copied name. Report kinds are `progress`, `question`,
+`result` and `release`; text is at most 16 KiB and it accepts at most five
+HTTP(S) links of at most 2 KiB each.
+`skills/external-tasks/` teaches an outside agent this loop, and the profile's
+key panel links it. Change it in the same commit as the tool; a test checks
+every action and kind it names.
 
 ## Results
 
@@ -106,6 +125,18 @@ needs only version id and offset. An offset past the end is refused clearly. A
 stored line that cannot fit with the required header, fence and footer is the
 sole exception: it is sent whole on its own page and the header says so. A live
 read past line 1 needs the revision, and its refusal says where to take it from.
+
+Task lists page by the store's opaque row cursor; show pages entries newest
+first by entry id. Brief text, each entry's text and its links use backtick
+fences longer than every backtick run in the rendered data. A zero-width space
+breaks stored runs longer than 63 backticks so fences and pages stay bounded.
+The rendered value is not byte-exact when this happens. When a maximum brief leaves no
+room for the first entry, the continuation names `before="newest"`: the newest
+entries without the brief. Any other `before` omits the brief too; a null or
+absent one is the first page with it, since strict clients send null for unset
+fields. The result footer is always
+last. Report answers are compact receipts; the caller already has the text and
+links it sent.
 
 A transcript continuation pins its message and UTF-16 `position`. Its one-part
 header names the title, id and text position; its footer carries the next

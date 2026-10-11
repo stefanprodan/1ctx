@@ -209,6 +209,10 @@ describe("storage words", () => {
     expect(cleanedLine("scratch", 7).sub).toBe("idle 7 days");
     expect(cleanedLine("runs", null).sub).toBe("by each task's retention");
     expect(cleanedLine("history", 90).sub).toBe("after 90 days");
+    expect(cleanedLine("externalTasks", 365)).toEqual({
+      name: "Closed external tasks",
+      sub: "after 365 days",
+    });
     expect(cleanedLine("archived", 365)).toEqual({
       name: "Archived chats",
       sub: "after 365 days",

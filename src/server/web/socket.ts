@@ -26,6 +26,7 @@ import {
   type RouteDescriptor,
 } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { externalTaskFrame } from "./external-task-frames.ts";
 
 // a frame could not be delivered: the client reconnects and reconciles
 export const CLOSE_DROPPED = 1013;
@@ -258,7 +259,8 @@ export function socketArea(deps: SocketDeps): Socket {
     });
   };
 
-  const onBus = (event: BusEvent): void => {
+  const unsubscribe = subscribe((event: BusEvent): void => {
+    if (externalTaskFrame(event, toProject)) return;
     switch (event.type) {
       case "session.changed":
         toProject(event.data.projectId, () => ({
@@ -372,8 +374,7 @@ export function socketArea(deps: SocketDeps): Socket {
         }
         break;
     }
-  };
-  const unsubscribe = subscribe(onBus, deps.log);
+  }, deps.log);
 
   return {
     route: {

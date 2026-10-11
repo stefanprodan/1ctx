@@ -107,7 +107,13 @@ export type RepoCaps = {
 
 // the access keys one user may hold, read on every /mcp call and key
 // made; 0 is the endpoint off
-export type ExternalCaps = { accessKeysPerUser: number };
+export type ExternalCaps = {
+  accessKeysPerUser: number;
+  // a closed external task is deleted this long after its close
+  externalTaskDays: number;
+  // a claim with no entry or answer this long is released as idle
+  externalTaskIdleHours: number;
+};
 
 export type Limits = LoopLimits &
   ToolCaps &
@@ -195,6 +201,9 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   repoCacheBytes: limit(10 * GiB, GiB, 1024 * GiB, "bytes", "repos"),
   // 0 turns /mcp off; the keys stay and come back when it is raised
   accessKeysPerUser: limit(5, 0, 10, "count", "external"),
+  externalTaskDays: limit(365, 30, 1825, "days", "external"),
+  // the floor is the hourly sweep's own lateness
+  externalTaskIdleHours: limit(24, 1, 168, "hours", "external"),
 };
 
 // the table on the given cores; only the process cap's default moves

@@ -37,6 +37,7 @@ export const LAYERS = [
   "repos",
   "bash",
   "sessions",
+  "external-tasks",
   "tools",
   "runner",
   "automations",

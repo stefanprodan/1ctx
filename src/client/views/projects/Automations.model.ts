@@ -53,7 +53,7 @@ const onceAt = (fire: number, now: number, tz: string) => {
   return /^to(day|morrow) /.test(label) ? label : `on ${label}`;
 };
 
-// "Next run tomorrow 09:00, in 14h", the brief's and the editor's; a
+// "Next run tomorrow 09:00, in 14h", the summary's and the editor's; a
 // task that runs once names its one fire's date with the year, "Runs
 // once on Sun Oct 11 2026 09:00, in 3d"
 export const nextRunWords = (
@@ -66,7 +66,7 @@ export const nextRunWords = (
     ? `Runs once ${onceAt(fire, now, tz)}, ${until(fire, now)}`
     : `Next run ${fireLabel(fire, now, tz, true)}, ${until(fire, now)}`;
 
-// the brief's foot: "Waiting since 09:00", the day
+// the summary's foot: "Waiting since 09:00", the day
 // named when not today, or the next run and how far off it is
 export function nextLine(
   a: Pick<AutomationSummary, "suspendedAt" | "nextAt" | "tz" | "once">,
@@ -82,7 +82,7 @@ export function nextLine(
 
 // The page's next runs: the preview's fires still ahead. A task that
 // runs once has one, and while its fire waits for a slot that fire is
-// it, said as the brief says a wait, since the next occurrence never
+// it, said as the summary says a wait, since the next occurrence never
 // comes once the waiting one runs.
 export function nextRunsOf(
   a: Pick<AutomationSummary, "suspendedAt" | "nextAt" | "tz" | "once">,

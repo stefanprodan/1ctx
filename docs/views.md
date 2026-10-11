@@ -280,7 +280,7 @@ Flagged.
 - **Create defaults come from `shared/automation-defaults.ts`,** shared
   with the chat's task proposals; `draftOf()` only maps them to fields.
 
-- **An open alert sits over the brief** (`OpenAttention.tsx`): the
+- **An open alert sits over the summary** (`OpenAttention.tsx`): the
   feed line's words, the latest reason and Dismiss. The Runs list's
   filters are Manual and Flagged (the marked runs). A row adds the
   agent's reason (`markReason()`), never the runner's.
@@ -321,3 +321,19 @@ Flagged.
   Decider while the list's `deciderOn` is false, with a hint saying
   why. A saved pick stays shown. The words on when are kept
   while the mode is off, so turning it on again brings them back.
+
+## External tasks
+
+- **The words are external task, brief, claim, report and answer,**
+  never ticket, issue, job or reply.
+- **The list loads whole, then frames keep it** by revision
+  (`data/external-tasks.ts`): blocked, claimed, open, latest move first.
+  The highest revision seen per task keeps an older list read from
+  bringing a closed one back. Done and dropped page on unfold. Home's
+  card reads `?attention=1`, drawn as Not sent while a task is marked.
+- **The task's page clears its mark with `seen`** once its read lands
+  marked. A frame adding an entry or editing the brief reads it again,
+  keeping older entries.
+- **A move names what the page showed:** a box keeps the state and the
+  claim from when it opened. An edit sends what changed and the edit
+  revision the form opened on.

@@ -55,6 +55,7 @@ function build() {
     log: logs.logFactory("access"),
     secureCookie: false,
     accessKeysPerUser: () => cap.value,
+    taskClaims: { endForKeys: () => [], endForUser: () => [] },
     users,
     projects,
     usage: {
@@ -355,6 +356,42 @@ describe("the key policy", () => {
 });
 
 describe("key visibility and in-transaction checks", () => {
+  test("the resolver, write check and sweep agree at positive and zero caps and expiry", () => {
+    const b = build();
+    try {
+      const keys = ["older", "newer"].map((name) =>
+        b.keys.create(b.user.id, { ...KEY_REQUEST, name }, b.now.value),
+      );
+      const ids = keys.map(({ key }) => key.id);
+      const principals = keys.map(({ token }) => b.principal(token));
+      const projectId = b.projects.personal(b.user.id)!.id;
+      b.cap.value = 1;
+      expect(b.access.unavailableKeys(ids)).toEqual([]);
+      for (const { token } of keys) {
+        expect(b.principal(token)).not.toBeNull();
+        expect(() =>
+          b.access.checkKey(b.principal(token), projectId),
+        ).not.toThrow();
+      }
+      b.cap.value = 0;
+      expect(b.access.unavailableKeys(ids)).toEqual(ids);
+      for (const principal of principals)
+        expect(() => b.access.checkKey(principal, projectId)).toThrow(NotFound);
+      for (const { token } of keys)
+        expect(() => b.principal(token)).toThrow(NotFound);
+      b.cap.value = 1;
+      b.now.value = keys[0]!.key.expiresAt;
+      expect(b.access.unavailableKeys(ids)).toEqual(ids);
+      for (const principal of principals)
+        expect(() => b.access.checkKey(principal, projectId)).toThrow(
+          Unauthorized,
+        );
+      for (const { token } of keys) expect(b.principal(token)).toBeNull();
+    } finally {
+      b.db.close();
+    }
+  });
+
   test("intersects picks with current membership and role, for one project and for lists", () => {
     const b = build();
     try {

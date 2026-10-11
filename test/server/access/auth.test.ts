@@ -47,6 +47,7 @@ function build(secureCookie: boolean) {
     log: silent,
     secureCookie,
     accessKeysPerUser: () => 5,
+    taskClaims: { endForKeys: () => [], endForUser: () => [] },
     users,
     projects: {
       byId: () => null,

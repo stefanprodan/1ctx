@@ -84,6 +84,12 @@ admin's attention, the server's load), Usage by month and Storage.
   sorter.
 - **A new table needs an entry in `STORAGE_TABLES`.** A test checks
   the map against the schema both ways.
+- **External task tables form the `external` area.** Retention counts
+  closed task text under `externalTasks`, with `externalTaskDays`;
+  unfinished task text stays in kept storage. Both include entries
+  and saved claim responses, never knowledge files linked by id.
+  The area's remaining table and index pages, including file links,
+  count under kept `rest`, without counting closed text twice.
 - **`cache.ts` keeps one read in flight per key.** Storage keeps its
   answer `KEEP_MS`, overview and month `BOARD_KEEP_MS`, under the
   pages' 30 second poll. A failed read keeps nothing, logs a warning

@@ -13,6 +13,16 @@ import type { Log } from "../lib/log.ts";
 
 export type AccessKeyRow = AccessKey & { userId: string };
 
+export const keysEnabled = (cap: number): boolean => cap !== 0;
+
+export function keyAvailable(
+  key: AccessKeyRow | null,
+  now: number,
+  cap: number,
+): key is AccessKeyRow {
+  return keysEnabled(cap) && key !== null && key.expiresAt > now;
+}
+
 type Raw = {
   id: string;
   user_id: string;
@@ -113,6 +123,12 @@ export class AccessKeyStore {
          and (last_used_at is null or last_used_at <= ?)`,
       )
       .run(now, id, now - MINUTE_MS);
+  }
+
+  unavailable(ids: readonly string[], now: number, cap: number): string[] {
+    return [...new Set(ids)].filter(
+      (id) => !keyAvailable(this.byId(id), now, cap),
+    );
   }
 
   delete(userId: string, id: string): AccessKeyRow | null {

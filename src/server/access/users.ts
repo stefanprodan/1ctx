@@ -37,6 +37,7 @@ import {
 import type { Links } from "./links.ts";
 import { parseNewUser, parseUserPassword, parseUserPatch } from "./parse.ts";
 import type { LoginStore } from "./store.ts";
+import type { TaskClaimsPort } from "./task-claims.ts";
 import type { VisitStore } from "./visits.ts";
 
 export type UsersPort = {
@@ -71,6 +72,7 @@ export type UsersRoutesDeps = {
   db: Db;
   logins: LoginStore;
   keys: AccessKeyStore;
+  taskClaims: TaskClaimsPort;
   log: Log;
   visits: VisitStore;
   users: UsersPort;
@@ -268,6 +270,13 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
               deps.links.revoke(user.id);
             }
           }
+          let lostProjects: string[] = [];
+          if (roleChanged && user.role === "admin") {
+            const memberOf = new Set(deps.projects.memberProjectIds(user.id));
+            lostProjects = deps.projects
+              .teamProjectIds()
+              .filter((id) => !memberOf.has(id));
+          }
           return {
             result: { user: find(user.id), revokedKeys },
             events: [
@@ -275,6 +284,8 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
               ...(disabledChanged && patch.disabled === true
                 ? [loginRevoked(user.id, null)]
                 : []),
+              ...deps.taskClaims.endForKeys(revokedKeys.map((key) => key.id)),
+              ...deps.taskClaims.endForUser(user.id, lostProjects),
             ],
           };
         });
@@ -320,6 +331,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             result: { user, revokedKeys },
             events: [
               loginRevoked(user.id, null),
+              ...deps.taskClaims.endForKeys(revokedKeys.map((key) => key.id)),
               ...deps.links.notice(user, "admin-reset", ctx.address),
             ],
           };

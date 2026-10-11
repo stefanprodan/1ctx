@@ -10,7 +10,7 @@ import { newToken, sha256 } from "../lib/ids.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
 import { daysWindow, zoneOrUtc } from "../usage/index.ts";
 import type { UserRow } from "../users/index.ts";
-import type { AccessKeyStore } from "./key-store.ts";
+import { type AccessKeyStore, keyAvailable, keysEnabled } from "./key-store.ts";
 import type { Login, LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
 
@@ -149,14 +149,15 @@ export function auth(deps: AuthDeps): Auth {
   return {
     resolve(req, policy) {
       if (policy === "key") {
-        if (deps.accessKeysPerUser() === 0) throw new NotFound();
+        const cap = deps.accessKeysPerUser();
+        if (!keysEnabled(cap)) throw new NotFound();
         const bearer = /^Bearer +(1ctx_[A-Za-z0-9_-]{43})$/i.exec(
           req.headers.get("authorization") ?? "",
         );
         if (bearer === null) return nobody;
         const key = deps.keys.byTokenHash(sha256(bearer[1]!));
         const now = deps.clock();
-        if (key === null || key.expiresAt <= now) return nobody;
+        if (!keyAvailable(key, now, cap)) return nobody;
         const principal = current(key.userId, {
           kind: "key",
           id: key.id,
@@ -237,11 +238,12 @@ export function auth(deps: AuthDeps): Auth {
     checkKey(principal, projectId) {
       const via = principal.via;
       if (via.kind !== "key") return;
+      const cap = deps.accessKeysPerUser();
+      if (!keysEnabled(cap)) throw new NotFound();
       const key = deps.keys.byId(via.id);
       if (
-        key === null ||
-        key.userId !== principal.userId ||
-        key.expiresAt <= deps.clock()
+        !keyAvailable(key, deps.clock(), cap) ||
+        key.userId !== principal.userId
       ) {
         throw new Unauthorized("access key is no longer valid");
       }

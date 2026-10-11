@@ -19,6 +19,67 @@ export type AuthCase = {
 
 export const AUTH_CASES: AuthCase[] = [
   {
+    method: "GET",
+    path: "/api/projects/:id/external-tasks",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/external-tasks",
+    expect: { anonymous: 401, member: 400, admin: 400 },
+  },
+  {
+    method: "GET",
+    path: "/api/external-tasks/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/external-tasks",
+    body: { title: "Check the work", text: "", fileIds: [] },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/external-tasks/:id",
+    body: { editRevision: 0, title: "Check the work" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/external-tasks/:id/answer",
+    body: { state: "blocked", text: "Go ahead." },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/external-tasks/:id/release",
+    body: { state: "claimed", claimId: "none", text: "Try later." },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/external-tasks/:id/drop",
+    body: { state: "open" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/external-tasks/:id/reopen",
+    body: { state: "done", text: "Try again." },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/external-tasks/:id/seen",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/external-tasks/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
     method: "POST",
     path: "/mcp",
     body: {

@@ -15,6 +15,7 @@ export const STORAGE_AREAS = [
   "usage",
   "skills",
   "memory",
+  "external",
   "config",
 ] as const;
 export type StorageAreaKey = (typeof STORAGE_AREAS)[number];
@@ -99,6 +100,7 @@ export type RetentionKept =
   | "rest";
 export type RetentionCleaned =
   | "archived"
+  | "externalTasks"
   | "runs"
   | "scratch"
   | "history"
