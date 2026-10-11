@@ -803,6 +803,19 @@ describe("runRound retries", () => {
     expect(r.send.round!.upstream).toBeNull();
   });
 
+  test("a connection dropped after only alive events is asked again", async () => {
+    const alive: ChatEvent = { kind: "alive", thinking: true };
+    const dropped: ChatEvent = {
+      kind: "error",
+      message: "azure failed: ECONNRESET",
+      unanswered: true,
+    };
+    const r = round([[alive, dropped], answer]);
+    await r.run;
+    expect(r.asked()).toBe(2);
+    expect(r.sleeps).toEqual([1000]);
+  });
+
   test("the first token is timed from the round's start, waits included", async () => {
     const r = round([[busy], answer]);
     await r.run;

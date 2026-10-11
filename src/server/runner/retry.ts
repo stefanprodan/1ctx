@@ -4,8 +4,8 @@
 // Whether a round's failed request is asked again, and after how long.
 // Only a request that failed before its stream started is: a busy or
 // failing server (429, 5xx, Anthropic's overloaded 529), a connection
-// that failed, or a headers wait that ran out, the last only once since
-// each costs two minutes.
+// that failed or dropped before its first event, or a headers wait
+// that ran out, the last only once since each costs two minutes.
 
 import type { ChatEvent } from "../providers/index.ts";
 

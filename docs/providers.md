@@ -137,11 +137,12 @@ Completions shape, about one token a tool under the azure one.
   nothing.
 - **A round is asked again only before anything reached the page.**
   `retryWait()` in `runner/retry.ts`: status 429, 500, 502, 503, 504 or
-  529 (Anthropic's overloaded), or no response, retried at most three
-  times with backoff from 1 s, jitter and `Retry-After` (past 30 s fails
-  the round). A headers timeout is retried once, since each costs two
-  minutes. A `served` event does not count as started. No wait passes
-  the turn's deadline (the memory phase's own window in that phase).
+  529 (Anthropic's overloaded), no response, or a stream that dropped
+  before its first event, retried at most three times with backoff from
+  1 s, jitter and `Retry-After` (past 30 s fails the round). A headers
+  timeout is retried once, since each costs two minutes. A `served`
+  event does not count as started. No wait passes the turn's deadline
+  (the memory phase's own window in that phase).
 - **Only a send's rounds retry.** Deciders, catalogs and MCP calls are
   never retried here. The exceptions are the refusals the azure and
   anthropic wires adapt, inside the wire, never a 429 or 5xx.
