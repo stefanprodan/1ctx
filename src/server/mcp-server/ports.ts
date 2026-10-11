@@ -93,7 +93,7 @@ export type KnowledgePort = {
 export type ProjectsPort = { byId(id: string): ProjectRow | null };
 
 export type SessionsPort = {
-  visible(principal: Principal, id: string): SessionRow;
+  byId(id: string): SessionRow | null;
   exportRows(sessionId: string): ExportRow[];
   // access is the caller's: the project is checked before either
   search(projectId: string, q: string, after: string | null): SessionSearchPage;

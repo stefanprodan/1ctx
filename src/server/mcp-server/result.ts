@@ -97,6 +97,7 @@ export const jsonLine = (value: unknown): string => JSON.stringify(value);
 export function cappedLines(
   lines: readonly string[],
   continuation: (next: number) => string,
+  maxBytes = MCP_PAGE_BYTES,
 ): string {
   const out: string[] = [];
   let used = 0;
@@ -106,7 +107,7 @@ export function cappedLines(
     const tail = index + 1 < lines.length ? continuation(index + 1) : "";
     const cost =
       separator + Buffer.byteLength(line) + Buffer.byteLength(tail) + 1;
-    if (out.length > 0 && used + cost > MCP_PAGE_BYTES) {
+    if (out.length > 0 && used + cost > maxBytes) {
       out.push(continuation(index));
       break;
     }

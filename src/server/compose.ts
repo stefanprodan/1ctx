@@ -680,7 +680,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     projects,
     sessions: {
-      visible: (principal, id) => sessions.visible(principal, id),
+      byId: (id) => sessions.store.byId(id),
       exportRows: (id) => sessions.store.exportRows(id),
       search: (projectId, q, after) => sessions.search(projectId, q, after),
       list: (projectId, since, after) => sessions.list(projectId, since, after),
