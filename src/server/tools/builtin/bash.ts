@@ -246,6 +246,7 @@ export function makeBashTool({
           name: actor.agentName,
           sessionId: actor.sessionId,
           origin: actor.origin,
+          keyName: null,
         },
         args.command,
         ctx.web === null

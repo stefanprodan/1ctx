@@ -124,6 +124,7 @@ describe("bash", () => {
               name: "coder",
               sessionId: "session",
               origin: "chat",
+              keyName: null,
             });
             expect(command).toBe("sed -i 's/hello/world/' docs/x.md");
             expect(caps).toEqual({

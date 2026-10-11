@@ -46,6 +46,7 @@ function build(secureCookie: boolean) {
     clock: () => 0,
     log: silent,
     secureCookie,
+    accessKeysPerUser: () => 5,
     users,
     projects: {
       byId: () => null,
@@ -94,9 +95,11 @@ describe("access", () => {
     const { setCookie } = access.open(user);
     const req = () =>
       new Request("http://x", { headers: { cookie: setCookie.split(";")[0] } });
-    expect(access.resolve(req()).principal?.username).toBe("u");
+    expect(access.resolve(req(), "authenticated").principal?.username).toBe(
+      "u",
+    );
     db.query("delete from users where id = ?").run(user.id);
-    expect(access.resolve(req()).principal).toBeNull();
+    expect(access.resolve(req(), "authenticated").principal).toBeNull();
   });
 
   test("a disabled user resolves and refreshes to nobody", () => {
@@ -105,9 +108,9 @@ describe("access", () => {
     const req = new Request("http://x", {
       headers: { cookie: setCookie.split(";")[0] },
     });
-    const principal = access.resolve(req).principal!;
+    const principal = access.resolve(req, "authenticated").principal!;
     users.setDisabled(user.id, true);
-    expect(access.resolve(req).principal).toBeNull();
+    expect(access.resolve(req, "authenticated").principal).toBeNull();
     expect(access.refresh(principal)).toBeNull();
   });
 
@@ -155,7 +158,7 @@ describe("access", () => {
       const req = new Request("http://x", {
         headers: { cookie: setCookie.split(";")[0] },
       });
-      expect(access.resolve(req).principal).toBeNull();
+      expect(access.resolve(req, "authenticated").principal).toBeNull();
     } finally {
       unsubscribe();
     }

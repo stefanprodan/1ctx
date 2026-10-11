@@ -39,6 +39,7 @@ import type { RouteDescriptor } from "./lib/http.ts";
 import { errorFields, type LogFactory, scrubErrors } from "./lib/log.ts";
 import { limitsArea } from "./limits/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
+import { mcpServerArea } from "./mcp-server/index.ts";
 import {
   type MemoryArea,
   type MemoryStore,
@@ -351,6 +352,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     log: log("access"),
     secureCookie: options.secureCookie,
+    accessKeysPerUser: () => limits.current().accessKeysPerUser,
     users,
     projects,
     usage: {
@@ -664,6 +666,24 @@ export async function compose(options: ComposeOptions): Promise<App> {
     // built here, at the compile root, so the binary finds its entry
     worker: new URL("./overview/scan.worker.ts", import.meta.url),
   });
+  const inboundMcp = mcpServerArea({
+    db,
+    clock,
+    log: log("mcp-server"),
+    version: options.version,
+    access,
+    knowledge: {
+      ...knowledge,
+      rawFile: (projectId, fileId) => knowledge.store.byId(projectId, fileId),
+      rawVersion: (projectId, versionId) =>
+        knowledge.store.version(projectId, versionId),
+    },
+    projects,
+    sessions: {
+      visible: (principal, id) => sessions.visible(principal, id),
+      exportRows: (id) => sessions.store.exportRows(id),
+    },
+  });
   let repaired = 0;
   let reconciled = 0;
   let repoCache: App["repoCache"] = null;
@@ -699,12 +719,13 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...runner.routes,
     ...automations.routes,
     ...overview.routes,
+    ...inboundMcp.routes,
     socket.route,
     ...healthRoutes(options.version, () => draining),
   ];
   const handle = router({
     routes,
-    resolve: (req) => access.resolve(req),
+    resolve: (req, policy) => access.resolve(req, policy),
     trustProxy: options.trustProxy,
     log: log("router"),
   });
@@ -834,7 +855,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       skills.close();
       const result = await runner.shutdown(async () => {
         bash.close();
-        await mcp.close();
+        await Promise.all([mcp.close(), inboundMcp.close()]);
       });
       automations.stop();
       automations.dispose();

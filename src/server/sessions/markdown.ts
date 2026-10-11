@@ -9,6 +9,7 @@ import type { MessageKind, MessageStatus } from "../../shared/words.ts";
 import { localMinute } from "../lib/clock.ts";
 
 export type ExportRow = {
+  id: string;
   sendId: string;
   round: number;
   memoryRound: number | null;
@@ -26,28 +27,48 @@ export type ExportRow = {
   finishedAt: number | null;
 };
 
+export type MarkdownPart = { messageId: string | null; text: string };
+
+export function chatMarkdownParts(
+  title: string,
+  rows: ExportRow[],
+  timeZone: string,
+): MarkdownPart[] {
+  const stamp = localMinute(timeZone);
+  const parts: MarkdownPart[] = [
+    { messageId: null, text: `# ${escapeInline(title)}` },
+  ];
+  for (const turn of sends(rows)) {
+    for (const user of turn.filter((row) => row.kind === "user")) {
+      const text = [
+        heading(user.author ?? "someone", user.createdAt, stamp),
+        body(user.content),
+      ];
+      if (user.uploads?.length)
+        text.push(escapeInline(attachedLine(user.uploads)));
+      parts.push({
+        messageId: user.id,
+        text: text.join("\n\n"),
+      });
+    }
+    const agent = agentTurn(turn);
+    if (agent === null) continue;
+    const text = [heading(agent.author, agent.at, stamp)];
+    if (agent.content !== "") text.push(agent.content);
+    if (agent.cut !== null) text.push(`_${escapeInline(agent.cut)}_`);
+    parts.push({ messageId: agent.id, text: text.join("\n\n") });
+  }
+  return parts;
+}
+
 export function chatMarkdown(
   title: string,
   rows: ExportRow[],
   timeZone: string,
 ): string {
-  const stamp = localMinute(timeZone);
-  const parts = [`# ${escapeInline(title)}`];
-  for (const turn of sends(rows)) {
-    for (const user of turn.filter((row) => row.kind === "user")) {
-      parts.push(heading(user.author ?? "someone", user.createdAt, stamp));
-      parts.push(body(user.content));
-      if (user.uploads?.length) {
-        parts.push(escapeInline(attachedLine(user.uploads)));
-      }
-    }
-    const agent = agentTurn(turn);
-    if (agent === null) continue;
-    parts.push(heading(agent.author, agent.at, stamp));
-    if (agent.content !== "") parts.push(agent.content);
-    if (agent.cut !== null) parts.push(`_${escapeInline(agent.cut)}_`);
-  }
-  return `${parts.join("\n\n")}\n`;
+  return `${chatMarkdownParts(title, rows, timeZone)
+    .map((part) => part.text)
+    .join("\n\n")}\n`;
 }
 
 function sends(rows: ExportRow[]): ExportRow[][] {
@@ -64,6 +85,7 @@ function sends(rows: ExportRow[]): ExportRow[][] {
 // answer, the reason it was cut, and the time the turn ended. Null for
 // a send still running, and for a compact send, which has no turn
 function agentTurn(turn: ExportRow[]): {
+  id: string;
   author: string;
   content: string;
   cut: string | null;
@@ -83,6 +105,7 @@ function agentTurn(turn: ExportRow[]): {
   const ended = answer ?? endedBy(agentRows);
   const last = agentRows[agentRows.length - 1]!;
   return {
+    id: answer?.id ?? last.id,
     author:
       agentRows.find((row) => row.kind === "reply" && row.author !== null)
         ?.author ?? "agent",

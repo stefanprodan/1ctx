@@ -18,6 +18,7 @@ const author = {
   name: "sre",
   sessionId: null,
   origin: null,
+  keyName: null,
 };
 
 const file = {

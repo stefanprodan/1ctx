@@ -50,6 +50,7 @@ function file(id: string): KnowledgeFile {
       name: "reader",
       sessionId: null,
       origin: null,
+      keyName: null,
     },
     createdAt: 1,
     updatedAt: 1,

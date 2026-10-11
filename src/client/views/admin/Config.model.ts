@@ -78,6 +78,11 @@ export const LIMITS_CARDS: readonly LimitsGroup[] = [
     line: "How long runs take.",
     names: ["runDeadlineMs", "memoryPhaseMs", "memoryPhaseRounds"],
   },
+  {
+    title: "External tasks",
+    line: "Access keys for agents you run outside 1ctx.",
+    names: ["accessKeysPerUser"],
+  },
 ];
 
 export const STORAGE_CARDS: readonly LimitsGroup[] = [

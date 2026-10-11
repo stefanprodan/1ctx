@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { AccessKey } from "../contracts/access-key.ts";
 import type { UserAccount } from "../contracts/user.ts";
 import type { Role } from "../words.ts";
 
@@ -36,3 +37,8 @@ export type UpdateUserRequest = {
   disabled?: boolean;
 };
 export type ResetPasswordRequest = { password: string };
+
+// GET /api/users/:id/keys: an admin sees a user's access keys and
+// revokes one with DELETE /api/users/:id/keys/:keyId; no route makes
+// one for someone else
+export type UserAccessKeysResponse = { keys: AccessKey[] };

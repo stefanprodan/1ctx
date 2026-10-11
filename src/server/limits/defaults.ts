@@ -105,13 +105,18 @@ export type RepoCaps = {
   repoCacheBytes: number;
 };
 
+// the access keys one user may hold, read on every /mcp call and key
+// made; 0 is the endpoint off
+export type ExternalCaps = { accessKeysPerUser: number };
+
 export type Limits = LoopLimits &
   ToolCaps &
   KnowledgeCaps &
   SendCaps &
   QueueCaps &
   ChatCaps &
-  RepoCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  RepoCaps &
+  ExternalCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -188,6 +193,8 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   repoFiles: limit(50_000, 100, 500_000, "count", "repos"),
   repoFileBytes: limit(4 * MiB, 64 * KiB, 64 * MiB, "bytes", "repos"),
   repoCacheBytes: limit(10 * GiB, GiB, 1024 * GiB, "bytes", "repos"),
+  // 0 turns /mcp off; the keys stay and come back when it is raised
+  accessKeysPerUser: limit(5, 0, 10, "count", "external"),
 };
 
 // the table on the given cores; only the process cap's default moves

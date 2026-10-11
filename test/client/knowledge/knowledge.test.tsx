@@ -73,6 +73,7 @@ const byUser: KnowledgeAuthor = {
   name: "casey",
   sessionId: null,
   origin: null,
+  keyName: null,
 };
 
 const byAgent: KnowledgeAuthor = {
@@ -81,6 +82,7 @@ const byAgent: KnowledgeAuthor = {
   name: "sre",
   sessionId: "s1",
   origin: "automation",
+  keyName: null,
 };
 
 function file(changes: Partial<KnowledgeFile> = {}): KnowledgeFile {

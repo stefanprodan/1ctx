@@ -18,8 +18,25 @@ bash. An upload adds files to it, or attaches them to a chat message.
 - **Names form a mountable tree.** No live name is a path prefix of
   another (`checkNames()`), on every write path: create, rename,
   uploads and a command's commit.
-- **A replace or rename carries its revision.** A stale one is a 409,
-  so a restore never overwrites a newer edit.
+- **A replace, rename or edit carries its revision.** A stale one is a
+  409, so a restore never overwrites a newer edit. `remove()` takes an
+  optional one, checked in its transaction, so an access key never
+  deletes a file changed since it was read; the page's delete names
+  none.
+- **An access key writes as its user with the key's name.** Origin
+  `key` and `key_name` go on the file row and its version (a write
+  reads the live file back before the version), copied so a revoked
+  key's history still reads. Every other origin's name is null.
+- **`edit()` is exact replacement on the text at its revision.** 1 to
+  `MAX_EDITS` pairs of `old` and `new`; each `old` is non-empty and
+  matches exactly once in that text, every one before any applies, so
+  pair order never changes the result and no `old` matches another
+  pair's `new`. No two overlap; all apply or none. A refusal names the
+  pair from 1: `edit 2: no match`, `edit 2: matches more than once`
+  (it stops at a second match, never counting them), `edit 2: overlaps
+  edit 1`. `applyEdits()` is pure; its text passes `parseText()` as
+  a page replace's does, then `replace`'s caps, history and event, so
+  nothing new is stored. The answer is the file row, never the text.
 - **Every change lands in one transaction with its history, eviction
   and event.** Uploads and a command's commit go through
   `commitKnowledge()`, which opens no transaction of its own and

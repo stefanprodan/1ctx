@@ -46,6 +46,14 @@ test("the manifest's icons are served beside the page", async () => {
     const other = await fetch(`${origin}/icon-1024.png`);
     expect(other.headers.get("content-type")).toStartWith("text/html");
     await other.text();
+    for (const path of ["/mcp/", "/mcp/other"]) {
+      const response = await fetch(`${origin}${path}`);
+      expect(response.status).toBe(404);
+      expect(response.headers.get("content-type")).toStartWith(
+        "application/json",
+      );
+      expect(await response.json()).toEqual({ error: "not found" });
+    }
   } finally {
     await listener.stop();
     await app.shutdown();

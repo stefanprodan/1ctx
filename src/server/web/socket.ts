@@ -19,7 +19,12 @@ import {
   type SocketEvent,
 } from "../../shared/socket.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
-import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import {
+  json,
+  loginOf,
+  type Principal,
+  type RouteDescriptor,
+} from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 
 // a frame could not be delivered: the client reconnects and reconciles
@@ -100,7 +105,7 @@ function signedOut(
 ): boolean {
   return (
     principal.userId === revoked.userId &&
-    (revoked.loginId === null || principal.loginId === revoked.loginId)
+    (revoked.loginId === null || loginOf(principal) === revoked.loginId)
   );
 }
 

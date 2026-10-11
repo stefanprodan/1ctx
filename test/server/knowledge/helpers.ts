@@ -104,6 +104,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     name: user.username,
     sessionId: null,
     origin: null,
+    keyName: null,
   };
   const agent: KnowledgeAuthor = {
     kind: "agent",
@@ -111,6 +112,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     name: coder.name,
     sessionId: session.id,
     origin: "chat",
+    keyName: null,
   };
   const caps = { ...DEFAULT_LIMITS, ...overrides };
   const area = knowledgeArea({

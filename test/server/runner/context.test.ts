@@ -515,6 +515,7 @@ describe("knowledge in a send", () => {
         name: "casey",
         sessionId: null,
         origin: null,
+        keyName: null,
       };
       const file = chat.app.knowledge.create(
         chat.projectId,
@@ -605,6 +606,7 @@ describe("knowledge in a send", () => {
               name: "casey",
               sessionId: null,
               origin: null,
+              keyName: null,
             },
             "docs/hidden.md",
             "Private file text.",

@@ -16,6 +16,7 @@ export const sre: KnowledgeAuthor = {
   name: "sre",
   sessionId: "s1",
   origin: "chat",
+  keyName: null,
 };
 
 export function fileView(

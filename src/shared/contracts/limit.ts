@@ -61,6 +61,7 @@ export const LIMIT_NAMES = [
   "repoFiles",
   "repoFileBytes",
   "repoCacheBytes",
+  "accessKeysPerUser",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 
@@ -84,6 +85,7 @@ export const LIMIT_SCOPES = [
   "visuals",
   "chats",
   "repos",
+  "external",
 ] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 

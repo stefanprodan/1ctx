@@ -12,6 +12,7 @@ import type {
 } from "../../shared/api/access.ts";
 import type {
   ChangePasswordRequest,
+  CreateAccessKeyRequest,
   EmailSettingsRequest,
   UpdateProfileRequest,
 } from "../../shared/api/profile.ts";
@@ -20,6 +21,10 @@ import type {
   ResetPasswordRequest,
   UpdateUserRequest,
 } from "../../shared/api/users.ts";
+import {
+  ACCESS_KEY_DAYS,
+  ACCESS_KEY_SCOPES,
+} from "../../shared/contracts/access-key.ts";
 import {
   isAbout,
   isEmail,
@@ -157,6 +162,33 @@ export function parsePasswordChange(body: unknown): ChangePasswordRequest {
     current: password(b.current, "current password"),
     next: password(b.next, "new password", MIN_PASSWORD),
   };
+}
+
+export function parseAccessKey(body: unknown): CreateAccessKeyRequest {
+  const b = fields(body, ["name", "scope", "projectIds", "days"]);
+  if (!isFullName(b.name)) {
+    throw new BadRequest(
+      "name must be 1 to 64 characters on one line, no leading or trailing spaces",
+    );
+  }
+  const scope = ACCESS_KEY_SCOPES.find((value) => value === b.scope);
+  if (scope === undefined) throw new BadRequest("scope must be read or write");
+  const days = ACCESS_KEY_DAYS.find((value) => value === b.days);
+  if (days === undefined) throw new BadRequest("days must be 30, 90 or 365");
+  const ids = b.projectIds;
+  if (
+    ids !== null &&
+    (!Array.isArray(ids) ||
+      ids.length === 0 ||
+      !ids.every(
+        (id): id is string =>
+          typeof id === "string" && /^[0-9a-z]{1,32}$/.test(id),
+      ) ||
+      new Set(ids).size !== ids.length)
+  ) {
+    throw new BadRequest("projectIds must be null or distinct project ids");
+  }
+  return { name: b.name, scope, projectIds: ids, days };
 }
 
 export function parseNewUser(body: unknown): CreateUserRequest {

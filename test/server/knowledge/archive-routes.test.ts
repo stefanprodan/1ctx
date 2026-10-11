@@ -246,6 +246,7 @@ for (const transport of ["composed", "listener"] as const) {
             name: "writer",
             sessionId: null,
             origin: null,
+            keyName: null,
           });
         }
       } finally {

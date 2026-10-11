@@ -9,7 +9,7 @@ import { listOrNull } from "./rows.ts";
 export function exportRows(db: Db, sessionId: string): ExportRow[] {
   return db
     .query<Omit<ExportRow, "uploads"> & { uploads: string | null }, [string]>(
-      `select messages.send_id as sendId, messages.round,
+      `select messages.id, messages.send_id as sendId, messages.round,
          sends.memory_round as memoryRound, messages.kind, messages.slot,
          messages.status, messages.error, messages.uploads,
          messages.finish_reason as finishReason,

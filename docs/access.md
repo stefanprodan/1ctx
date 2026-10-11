@@ -8,13 +8,24 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 - **Every non-GET is same-origin:** the same host, and the scheme never
   downgraded. `--trust-proxy` reads the scheme and the client address
   from the last value of the proxy's `X-Forwarded-*`.
+- **Every route declares its policy:** `public`, `authenticated`,
+  `admin`, `webhook` or `key`. Cookie policies ignore Authorization;
+  `key` reads only the bearer, never the cookie. Webhooks check their
+  signature in the handler.
+- **A `key` route checks Origin on GET too.** No Origin passes, even
+  with `sec-fetch-site`; a present Origin must exactly match the
+  server's scheme and host, using the trusted proxy's last scheme.
+  Cookie writes without Origin pass only without `sec-fetch-site`;
+  their existing no-downgrade rule is unchanged.
 - **Every body and parameter goes through a hand-written parser** that
   throws a 400 on anything unexpected. A body is read through
   `readBody()` or `readBytes()` with the route's own cap, never
   `req.json()`. The listener's ceiling is `MAX_REQUEST_BYTES` (32 MiB).
 - **The access matrix is checked against the composed route list,**
   health and ready included.
-- **Only `/api/*` goes through the router.** The page, its bundle and
+- **Only `/api/*`, `/mcp` and `/mcp/*` go through the router.** `/mcp` is the
+  access-key endpoint in `docs/mcp-server.md`; its subpaths reach the router
+  and do not match a route. The page, its bundle and
   the files `serve()` takes by a fixed path (the manifest's icons) are
   public static files outside it, with no row in the matrix.
 
@@ -50,6 +61,39 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   held to the password bounds of `shared/words.ts`.
 - **Passwords are argon2id through `Bun.password`.** The cost is a
   compose option a test lowers.
+
+## Access keys
+
+- **Access keys authenticate a user's external agent at `/mcp`.**
+- **An access key is a row, not a secret file.** `access_keys` keeps
+  only the sha256 of `1ctx_` plus 32 random bytes as base64url. The
+  create response shows the token once; lists and logs never do.
+  The secrets rules below govern files, not these login-like credentials.
+- **Only the owner mints a key.** `GET/POST /api/profile/keys` list and
+  create; `DELETE /api/profile/keys/:id` revokes. A name is 1..64
+  characters on one line with no edge spaces, unique per user (409
+  when taken). Scope is `read` or `write`, lifetime 30, 90 or 365 days.
+  `projectIds` is null for all visible projects, or a non-empty distinct
+  list the owner sees now. Admins list and revoke through
+  `GET /api/users/:id/keys` and `DELETE /api/users/:id/keys/:keyId`,
+  never mint for someone else.
+- **The live `accessKeysPerUser` cap governs creation and key routes.**
+  Default 5, maximum 10; at 0 every key route answers 404 before looking
+  at the bearer or Origin. Creation at the cap is a 409; all retained
+  rows count, expired ones included. Lowering it deletes nothing; raising
+  it lets retained unexpired keys work again.
+- **A missing, malformed, unknown or expired bearer is a plain 401,**
+  without `WWW-Authenticate`, so clients do not start OAuth. A disabled
+  user cannot resolve; a must-change user's key gets 403. Last used
+  is written at most once a minute and never extends expiry.
+- **Disable and every reset delete keys with logins in one transaction.**
+  This includes an admin's typed reset and a reset or invite link used.
+  The owner's password change keeps keys. A key created or revoked logs
+  its user, id and scope, never its token.
+- **Writes call `checkKey()` inside their transaction.** It re-reads
+  the key by id and the user: gone or expired is 401; disabled or
+  must-change is 403; the project the write lands in no longer
+  reachable is 404. A login principal passes unchanged.
 
 ## Links by email
 
@@ -120,7 +164,8 @@ from `emailOn` in `GET /api/me`.
 - **Email from agents is the user's own switch.** Only `PUT
   /api/profile/email` sets it, off by default; no admin route or
   provisioned field does (`docs/email.md`).
-- **A disable deletes the user's logins and keeps every other row.**
+- **A disable deletes the user's logins, keys and live links,**
+  keeping their work.
 - **The email is unique and lowercased; the zone is required.** An
   admin picks the zone on create, never guessed; the first admin starts
   in `UTC`. `isEmail()` takes only a dot-atom `local@host` (no quotes,
@@ -152,6 +197,10 @@ from `emailOn` in `GET /api/me`.
   check) and the name is reserved for team projects.
 - **A handler gets a project through `access.project()`.** It answers
   the same 404 whether the project is missing or hidden.
+- **Key access is the intersection of current visibility and its picks.**
+  `access.project()` narrows one project and `reachableProjectIds()`
+  narrows lists. Visibility is read per call, never saved on the key;
+  leaving a team or losing the admin role takes effect at once.
 - **Aggregates may cross personal projects only unnamed.** An agent's,
   a decider's and a user's page count across every project as one
   series. An admin sees a user's usage as their personal project's

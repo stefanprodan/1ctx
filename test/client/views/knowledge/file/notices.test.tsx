@@ -18,6 +18,7 @@ const sre: KnowledgeAuthor = {
   name: "sre",
   sessionId: "s1",
   origin: "chat",
+  keyName: null,
 };
 const admin: KnowledgeAuthor = {
   kind: "user",
@@ -25,6 +26,7 @@ const admin: KnowledgeAuthor = {
   name: "admin",
   sessionId: null,
   origin: null,
+  keyName: null,
 };
 
 test("another writer's word says who, what and when", () => {

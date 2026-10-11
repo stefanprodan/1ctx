@@ -51,11 +51,16 @@ export class KnowledgeVersions {
        order by written_at desc, rowid desc`,
       )
       .all(projectId, projectId)
-      .map((raw) => ({
-        ...(JSON.parse(raw.file_snapshot) as KnowledgeFile),
-        deletedBy: authorOf(raw),
-        deletedAt: raw.written_at,
-      }));
+      .map((raw) => {
+        const file = JSON.parse(raw.file_snapshot) as KnowledgeFile;
+        return {
+          ...file,
+          // a snapshot from before keys has no key name
+          author: { ...file.author, keyName: file.author.keyName ?? null },
+          deletedBy: authorOf(raw),
+          deletedAt: raw.written_at,
+        };
+      });
   }
 
   insert(
@@ -68,9 +73,9 @@ export class KnowledgeVersions {
       .query(
         `insert into knowledge_versions
        (id, file_id, project_id, name, revision, text, bytes, lines,
-        author_kind, author_id, author_name, session_id, origin, written_at,
-        deleted, file_snapshot)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        author_kind, author_id, author_name, session_id, origin, key_name,
+        written_at, deleted, file_snapshot)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         newId(),
@@ -86,6 +91,7 @@ export class KnowledgeVersions {
         file.author.name,
         file.author.sessionId,
         file.author.origin,
+        file.author.keyName,
         file.updatedAt,
         deleted ? 1 : 0,
         snapshot === null ? null : JSON.stringify(snapshot),

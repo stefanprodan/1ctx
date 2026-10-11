@@ -11,11 +11,21 @@ import { jsonBody } from "../lib/body.ts";
 import { type BusEvent, loginRevoked } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
-import { json, type RouteContext, type RouteDescriptor } from "../lib/http.ts";
+import {
+  json,
+  loginOf,
+  type RouteContext,
+  type RouteDescriptor,
+} from "../lib/http.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import { meOf, type UserRow } from "../users/index.ts";
 import type { Auth } from "./auth.ts";
+import {
+  type AccessKeyRow,
+  type AccessKeyStore,
+  logRevokedKeys,
+} from "./key-store.ts";
 import type { LinkStore } from "./link-store.ts";
 import type { Links } from "./links.ts";
 import { isLinkToken, parseLinkAsk, parseLinkUse } from "./parse.ts";
@@ -32,6 +42,7 @@ export type LinkRoutesDeps = {
   db: Db;
   auth: Auth;
   logins: LoginStore;
+  keys: AccessKeyStore;
   store: LinkStore;
   links: Links;
   users: UsersPort;
@@ -121,15 +132,18 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
           if (used === null) return { result: null };
           const user = deps.users.byId(used.userId)!;
           const events: BusEvent[] = [];
+          let revokedKeys: AccessKeyRow[] = [];
           // the tab's login is replaced, never kept beside the new one
-          if (principal !== null) {
-            deps.auth.close(principal.loginId);
-            events.push(loginRevoked(principal.userId, principal.loginId));
+          const loginId = principal === null ? null : loginOf(principal);
+          if (principal !== null && loginId !== null) {
+            deps.auth.close(loginId);
+            events.push(loginRevoked(principal.userId, loginId));
           }
           if (hash !== null) {
             deps.users.setPasswordHash(user.id, hash);
             deps.users.setMustChangePassword(user.id, false);
             deps.logins.deleteForUser(user.id);
+            revokedKeys = deps.keys.deleteForUser(user.id);
             deps.links.revoke(user.id);
             events.push(loginRevoked(user.id, null));
           }
@@ -145,11 +159,17 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
             );
           }
           return {
-            result: { user: current, purpose: used.purpose, setCookie },
+            result: {
+              user: current,
+              purpose: used.purpose,
+              setCookie,
+              revokedKeys,
+            },
             events,
           };
         });
         if (opened === null) return gone();
+        logRevokedKeys(deps.log, opened.user.username, opened.revokedKeys);
         deps.log.info("link used", {
           user: opened.user.username,
           purpose: opened.purpose,

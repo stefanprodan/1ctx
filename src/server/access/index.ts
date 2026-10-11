@@ -26,6 +26,8 @@ import {
   type UsersPort as DirectoryUsersPort,
   directoryRoutes,
 } from "./directory.ts";
+import { keyRoutes } from "./key-routes.ts";
+import { AccessKeyStore } from "./key-store.ts";
 import {
   type UsersPort as LinkRoutesUsersPort,
   linkRoutes,
@@ -68,6 +70,7 @@ export type AccessDeps = {
   log: Log;
   // the Secure attribute: on when the app is served over TLS
   secureCookie: boolean;
+  accessKeysPerUser(): number;
   users: AuthUsersPort &
     LoginUsersPort &
     ProfileUsersPort &
@@ -100,11 +103,14 @@ export type Access = Auth & {
 
 export function accessArea(deps: AccessDeps): Access {
   const logins = new LoginStore(deps.db);
+  const keys = new AccessKeyStore(deps.db);
   const visits = new VisitStore(deps.db);
   const linkStore = new LinkStore(deps.db);
   const built = auth({
     db: deps.db,
     logins,
+    keys,
+    accessKeysPerUser: deps.accessKeysPerUser,
     visits,
     users: deps.users,
     projects: deps.projects,
@@ -140,6 +146,7 @@ export function accessArea(deps: AccessDeps): Access {
         db: deps.db,
         auth: built,
         logins,
+        keys,
         store: linkStore,
         links,
         users: deps.users,
@@ -160,6 +167,8 @@ export function accessArea(deps: AccessDeps): Access {
       ...usersRoutes({
         db: deps.db,
         logins,
+        keys,
+        log: deps.log,
         visits,
         users: deps.users,
         projects: deps.projects,
@@ -167,6 +176,16 @@ export function accessArea(deps: AccessDeps): Access {
         clock: deps.clock,
         email: deps.email,
         links,
+      }),
+      ...keyRoutes({
+        db: deps.db,
+        keys,
+        logins,
+        users: deps.users,
+        auth: built,
+        accessKeysPerUser: deps.accessKeysPerUser,
+        clock: deps.clock,
+        log: deps.log,
       }),
       ...boardRoutes({
         visits,
@@ -187,3 +206,5 @@ export function accessArea(deps: AccessDeps): Access {
     ],
   };
 }
+
+export { RateLimit } from "./ratelimit.ts";

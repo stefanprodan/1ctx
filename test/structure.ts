@@ -43,6 +43,7 @@ export const LAYERS = [
   "overview",
   "provision",
   "service",
+  "mcp-server",
   "web",
 ] as const;
 

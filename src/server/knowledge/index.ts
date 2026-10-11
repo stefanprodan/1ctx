@@ -21,12 +21,19 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { upload } from "./archive.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
 import { type Change, commitKnowledge } from "./commit.ts";
+import { applyEdits } from "./edit.ts";
 import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
+import { parseText } from "./parse.ts";
 import { RenderCache, rendered } from "./render.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
 import { oneAtATime, search } from "./search.ts";
 import { stage } from "./stage.ts";
-import { KnowledgeStore, type MountedDoc, summary } from "./store.ts";
+import {
+  type KnowledgeRow,
+  KnowledgeStore,
+  type MountedDoc,
+  summary,
+} from "./store.ts";
 import {
   type MountedUploads,
   type RestageUploads,
@@ -112,6 +119,26 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       };
       return { result: file, events: [event] };
     });
+  // the page's replace, which an edit's text goes through too
+  const replaced = (
+    current: KnowledgeRow,
+    author: KnowledgeAuthor,
+    text: string,
+    caps: KnowledgeCaps,
+  ) => {
+    const bytes = Buffer.byteLength(text);
+    checkFile(current.name, bytes, current.bytes, caps);
+    const before = store.totals(current.projectId);
+    checkTotals(
+      before,
+      { files: before.files, bytes: before.bytes - current.bytes + bytes },
+      caps,
+    );
+    return {
+      file: store.replace(current, author, text, deps.clock()),
+      deleted: false,
+    };
+  };
   const capability: KnowledgeCapability = {
     checkUploads: (userId, projectId, ids) =>
       uploads.check(userId, projectId, ids, deps.clock()),
@@ -239,26 +266,10 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         };
       });
     },
-    replace(projectId, author, fileId, text, revision) {
-      return write(projectId, (caps) => {
-        const current = atRevision(projectId, fileId, revision);
-        const bytes = Buffer.byteLength(text);
-        checkFile(current.name, bytes, current.bytes, caps);
-        const before = store.totals(projectId);
-        checkTotals(
-          before,
-          {
-            files: before.files,
-            bytes: before.bytes - current.bytes + bytes,
-          },
-          caps,
-        );
-        return {
-          file: store.replace(current, author, text, deps.clock()),
-          deleted: false,
-        };
-      });
-    },
+    replace: (projectId, author, fileId, text, revision) =>
+      write(projectId, (caps) =>
+        replaced(atRevision(projectId, fileId, revision), author, text, caps),
+      ),
     rename(projectId, author, fileId, name, revision) {
       return write(projectId, () => {
         const current = atRevision(projectId, fileId, revision);
@@ -294,16 +305,24 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
           after,
         ),
       ),
-    remove(projectId, author, fileId) {
-      return write(projectId, () => ({
-        file: store.remove(
-          summary(required(projectId, fileId)),
-          author,
-          deps.clock(),
-        ),
-        deleted: true,
-      }));
-    },
+    remove: (projectId, author, fileId, revision) =>
+      write(projectId, () => {
+        const current =
+          revision === undefined
+            ? required(projectId, fileId)
+            : atRevision(projectId, fileId, revision);
+        return {
+          file: store.remove(summary(current), author, deps.clock()),
+          deleted: true,
+        };
+      }),
+    edit: (projectId, author, fileId, revision, edits) =>
+      write(projectId, (caps) => {
+        const current = atRevision(projectId, fileId, revision);
+        // the check and BOM strip a page replace's text gets in its parser
+        const text = parseText(applyEdits(current.text, edits));
+        return replaced(current, author, text, caps);
+      }),
     emptyBin(projectId) {
       return transact(deps.db, () => {
         const files = store.purge(projectId);
@@ -337,7 +356,20 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
 
 export { checkFile, checkNames, checkTotals } from "./check.ts";
 export type { Change } from "./commit.ts";
-export { PROCESS_SLOTS } from "./limits.ts";
+export { type KnowledgeEdit, MAX_EDITS } from "./edit.ts";
+export {
+  MAX_KNOWLEDGE_BODY,
+  PROCESS_SLOTS,
+} from "./limits.ts";
+export {
+  parseCreate,
+  parseId,
+  parseName,
+  parseRename,
+  parseReplace,
+  parseSearch,
+  parseText,
+} from "./parse.ts";
 export { acquireProcess } from "./queue.ts";
 export type { MountedDoc } from "./store.ts";
 export type { MountedUploads } from "./uploads.ts";

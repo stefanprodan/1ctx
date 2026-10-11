@@ -21,8 +21,8 @@ export const MEMORY_EDIT_FAILED_ROUNDS = 2;
 export type MemoryTag = "project-memory" | "automation-memory";
 
 // drops the C0 controls except tab and line feed, the C1 block and the
-// bidi embeddings, overrides and isolates, then trims
-export function sanitize(text: string): string {
+// bidi embeddings, overrides and isolates
+export function stripControls(text: string): string {
   let out = "";
   for (const char of text) {
     const code = char.codePointAt(0) ?? 0;
@@ -33,7 +33,11 @@ export function sanitize(text: string): string {
       (code >= 0x2066 && code <= 0x2069);
     if (!control) out += char;
   }
-  return out.trim();
+  return out;
+}
+
+export function sanitize(text: string): string {
+  return stripControls(text).trim();
 }
 
 // a topic is one line, so it reads as a heading

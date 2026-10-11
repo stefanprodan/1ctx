@@ -20,6 +20,7 @@ import { LimitStore } from "./store.ts";
 export {
   type ChatCaps,
   DEFAULT_LIMITS,
+  type ExternalCaps,
   type KnowledgeCaps,
   LIMIT_DEFINITIONS,
   type Limits,

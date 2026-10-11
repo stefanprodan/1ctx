@@ -20,6 +20,32 @@ export type AuthCase = {
 export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
+    path: "/mcp",
+    body: {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        clientInfo: { name: "matrix", version: "1" },
+      },
+    },
+    // Access-key cases live with the inbound MCP area. Cookies do not reach it.
+    expect: { anonymous: 401, member: 401, admin: 401 },
+  },
+  {
+    method: "GET",
+    path: "/mcp",
+    expect: { anonymous: 401, member: 401, admin: 401 },
+  },
+  {
+    method: "DELETE",
+    path: "/mcp",
+    expect: { anonymous: 401, member: 401, admin: 401 },
+  },
+  {
+    method: "POST",
     path: "/api/projects/:id/uploads",
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
@@ -121,6 +147,32 @@ export const AUTH_CASES: AuthCase[] = [
     method: "GET",
     path: "/api/users",
     expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/profile/keys",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/profile/keys",
+    body: { name: "matrix", scope: "read", projectIds: null, days: 30 },
+    expect: { anonymous: 401, member: 201, admin: 201 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/profile/keys/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/users/:id/keys",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/users/:id/keys/:keyId",
+    expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
     method: "POST",

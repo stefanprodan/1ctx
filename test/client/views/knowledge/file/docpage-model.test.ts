@@ -33,6 +33,7 @@ const agent: KnowledgeAuthor = {
   name: "sre",
   sessionId: "s1",
   origin: "chat",
+  keyName: null,
 };
 
 const version = (revision: number, deleted = false): KnowledgeVersion => ({
