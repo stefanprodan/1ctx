@@ -77,17 +77,19 @@ export class KnowledgeStore extends KnowledgeVersions {
     );
   }
 
-  // names are ASCII, so SQLite's lower() folds them as JavaScript does
+  // names are ASCII, so SQLite's lower() folds them as JavaScript does;
+  // the name holds every term
   named(
     projectId: string,
     after: string | null,
-    query: string,
+    terms: readonly string[],
   ): Generator<KnowledgeFile> {
+    const holds = terms.map(() => " and instr(lower(name), ?) > 0").join("");
     return this.stream(
       `select ${FILE_COLUMNS} from knowledge_files
-       where project_id = ? and name > ? and instr(lower(name), ?) > 0
+       where project_id = ? and name > ?${holds}
        order by name`,
-      [projectId, after ?? "", query],
+      [projectId, after ?? "", ...terms],
     );
   }
 

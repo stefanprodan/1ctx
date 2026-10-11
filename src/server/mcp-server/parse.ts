@@ -28,11 +28,64 @@ const stamp = (value: unknown): string | null => {
   }
   return value;
 };
+
+export type Since = { iso: string; at: number };
+
+const isoTime = (value: unknown, field: string): Since | null => {
+  if (value === undefined || value === null) return null;
+  const parts =
+    typeof value === "string"
+      ? value.match(
+          /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/,
+        )
+      : null;
+  if (parts === null) {
+    throw new BadRequest(`${field} must be an ISO 8601 time`);
+  }
+  const year = Number(parts[1]);
+  const month = Number(parts[2]);
+  const day = Number(parts[3]);
+  const hour = Number(parts[4]);
+  const minute = Number(parts[5]);
+  const second = Number(parts[6]);
+  const millisecond = Number((parts[7] ?? "").slice(0, 3).padEnd(3, "0"));
+  const local = new Date(0);
+  local.setUTCFullYear(year, month - 1, day);
+  local.setUTCHours(hour, minute, second, millisecond);
+  const normalized = `${parts[1]}-${parts[2]}-${parts[3]}T${parts[4]}:${parts[5]}:${parts[6]}.${String(millisecond).padStart(3, "0")}${parts[8]}`;
+  const at = Date.parse(normalized);
+  if (
+    !Number.isFinite(at) ||
+    local.getUTCFullYear() !== year ||
+    local.getUTCMonth() !== month - 1 ||
+    local.getUTCDate() !== day ||
+    local.getUTCHours() !== hour ||
+    local.getUTCMinutes() !== minute ||
+    local.getUTCSeconds() !== second ||
+    local.getUTCMilliseconds() !== millisecond
+  ) {
+    throw new BadRequest(`${field} must be an ISO 8601 time`);
+  }
+  return { iso: new Date(at).toISOString(), at };
+};
+
+const since = (value: unknown): Since | null => isoTime(value, "since");
+
 const optionalString = (value: unknown, field: string): string | null => {
   if (value === undefined || value === null) return null;
   if (typeof value !== "string")
     throw new BadRequest(`${field} must be a string`);
   return value;
+};
+
+const prefix = (value: unknown): string | null => {
+  const picked = optionalString(value, "prefix");
+  if (picked === null) return null;
+  if (!picked.endsWith("/") || picked.length === 1) {
+    throw new BadRequest("prefix must be a knowledge folder ending in /");
+  }
+  parseName(picked.slice(0, -1));
+  return picked;
 };
 
 const offset = (value: unknown): number => {
@@ -69,6 +122,9 @@ export type KnowledgeInput =
       projectId: string;
       after: string | null;
       stamp: string | null;
+      prefix: string | null;
+      since: Since | null;
+      readAt: Since | null;
     }
   | {
       action: "search";
@@ -154,6 +210,9 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     "projectId",
     "after",
     "stamp",
+    "prefix",
+    "since",
+    "readAt",
     "q",
     "fileId",
     "versionId",
@@ -176,7 +235,15 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
   ] as const);
   const projectId = parseId(head.projectId, "projectId");
   if (picked === "list") {
-    fields(value, ["action", "projectId", "after", "stamp"]);
+    fields(value, [
+      "action",
+      "projectId",
+      "after",
+      "stamp",
+      "prefix",
+      "since",
+      "readAt",
+    ]);
     const after =
       head.after === undefined || head.after === null
         ? null
@@ -188,7 +255,22 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     if (after === null && listStamp !== null) {
       throw new BadRequest("stamp requires after");
     }
-    return { action: picked, projectId, after, stamp: listStamp };
+    const readAt = isoTime(head.readAt, "readAt");
+    if (after !== null && readAt === null) {
+      throw new BadRequest("readAt is required with after");
+    }
+    if (after === null && readAt !== null) {
+      throw new BadRequest("readAt requires after");
+    }
+    return {
+      action: picked,
+      projectId,
+      after,
+      stamp: listStamp,
+      prefix: prefix(head.prefix),
+      since: since(head.since),
+      readAt,
+    };
   }
   if (picked === "search") {
     fields(value, ["action", "projectId", "q", "after"]);
@@ -281,22 +363,76 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
   return { action: picked, projectId, fileId, revision: rev };
 }
 
-export type SessionsInput = {
-  action: "read";
-  sessionId: string;
-  messageId: string | null;
-  offset: number;
-};
+export type SessionsInput =
+  | {
+      action: "search";
+      projectId: string;
+      q: string;
+      after: string | null;
+    }
+  | {
+      action: "list";
+      projectId: string;
+      since: Since | null;
+      after: string | null;
+      readAt: Since | null;
+    }
+  | {
+      action: "read";
+      sessionId: string;
+      messageId: string | null;
+      offset: number;
+    };
 
 export function parseSessions(value: unknown): SessionsInput {
-  const body = fields(value, ["action", "sessionId", "messageId", "offset"]);
+  const head = fields(value, [
+    "action",
+    "projectId",
+    "q",
+    "since",
+    "after",
+    "readAt",
+    "sessionId",
+    "messageId",
+    "offset",
+  ]);
+  const picked = action(head.action, ["search", "list", "read"] as const);
+  if (picked === "read") {
+    fields(value, ["action", "sessionId", "messageId", "offset"]);
+    return {
+      action: picked,
+      sessionId: parseId(head.sessionId, "sessionId"),
+      messageId:
+        head.messageId === undefined || head.messageId === null
+          ? null
+          : parseId(head.messageId, "messageId"),
+      offset: offset(head.offset),
+    };
+  }
+  const projectId = parseId(head.projectId, "projectId");
+  const after = optionalString(head.after, "after");
+  if (picked === "search") {
+    fields(value, ["action", "projectId", "q", "after"]);
+    const q = optionalString(head.q, "q");
+    if (q === null) throw new BadRequest("q must be a string");
+    const url = new URL("http://mcp/sessions");
+    url.searchParams.set("q", q);
+    const parsed = parseSearch(url);
+    return { action: picked, projectId, q: parsed.q, after };
+  }
+  fields(value, ["action", "projectId", "since", "after", "readAt"]);
+  const readAt = isoTime(head.readAt, "readAt");
+  if (after !== null && readAt === null) {
+    throw new BadRequest("readAt is required with after");
+  }
+  if (after === null && readAt !== null) {
+    throw new BadRequest("readAt requires after");
+  }
   return {
-    action: action(body.action, ["read"] as const),
-    sessionId: parseId(body.sessionId, "sessionId"),
-    messageId:
-      body.messageId === undefined || body.messageId === null
-        ? null
-        : parseId(body.messageId, "messageId"),
-    offset: offset(body.offset),
+    action: picked,
+    projectId,
+    since: since(head.since),
+    after,
+    readAt,
   };
 }

@@ -105,7 +105,11 @@ const resultBytes = (result: McpResult): number =>
 
 function quotedText(result: McpResult): string {
   // the transcript is last; a read-on line, when there is one, comes first
-  const text = (result.content.at(-1) as { text: string }).text;
+  const answer = (result.content.at(-1) as { text: string }).text;
+  const ending = "\nSession transcript ends.\n";
+  const text = answer.endsWith(ending)
+    ? answer.slice(0, -ending.length)
+    : answer;
   const marker = text.indexOf("text\n");
   expect(marker).toBeGreaterThan(0);
   const fence = text.slice(text.lastIndexOf("\n", marker - 1) + 1, marker);
@@ -217,6 +221,17 @@ describe("the composed inbound MCP endpoint", () => {
       expect(readKnowledge.inputSchema.properties).not.toHaveProperty("name");
       expect(readKnowledge.inputSchema.properties).not.toHaveProperty("text");
       expect(readKnowledge.inputSchema.properties).not.toHaveProperty("edits");
+      const readSessions = readTools.result.tools.find(
+        (tool: { name: string }) => tool.name === "sessions",
+      );
+      expect(readSessions.inputSchema.properties.action.enum).toEqual([
+        "search",
+        "list",
+        "read",
+      ]);
+      expect(readSessions.description).toContain(
+        "Take sessionId from a row to read",
+      );
       const forged = await read.tool("knowledge", {
         action: "rename",
         projectId: chat.projectId,
@@ -563,6 +578,56 @@ describe("the composed inbound MCP endpoint", () => {
       const sessionId = (await started.json()).session.id;
       (await pending).reply("private answer");
       await settle(chat, sessionId);
+
+      const startIn = async (projectId: string, message: string) => {
+        const reply = chat.scripted.next();
+        const response = await chat.member.call("POST", "/api/sessions", {
+          body: { projectId, agentId: chat.agentId, message },
+        });
+        expect(response.status).toBe(201);
+        const id = (await response.json()).session.id as string;
+        (await reply).reply(`answer to ${message}`);
+        await settle(chat, id);
+        return id;
+      };
+      const teamSession = await startIn(team.id, "scope marker team");
+      const otherSession = await startIn(other.id, "scope marker other");
+      const searched = resultText(
+        await client.tool("sessions", {
+          action: "search",
+          projectId: team.id,
+          q: "scope marker",
+        }),
+      );
+      expect(searched).toContain(teamSession);
+      expect(searched).not.toContain(otherSession);
+      expect(searched).not.toContain(sessionId);
+      const sessions = resultText(
+        await client.tool("sessions", {
+          action: "list",
+          projectId: team.id,
+        }),
+      );
+      expect(sessions).toContain(teamSession);
+      expect(sessions).not.toContain(otherSession);
+      expect(sessions).not.toContain(sessionId);
+      for (const action of ["search", "list"] as const) {
+        const argumentsOf = (projectId: string) => ({
+          action,
+          projectId,
+          ...(action === "search" ? { q: "scope marker" } : {}),
+        });
+        const hiddenProject = await client.tool(
+          "sessions",
+          argumentsOf(other.id),
+        );
+        const missingProject = await client.tool(
+          "sessions",
+          argumentsOf("missing00001"),
+        );
+        expect(hiddenProject).toEqual(missingProject);
+      }
+
       const hiddenSession = await client.tool("sessions", {
         action: "read",
         sessionId,
@@ -674,10 +739,11 @@ describe("the composed inbound MCP endpoint", () => {
         projectId: chat.projectId,
       });
       const continuation = resultText(first).match(
-        /after=("[^"]+"), stamp=([0-9a-f]{64})\./,
+        /after=("[^"]+"), stamp=([0-9a-f]{64}), readAt=("[^"]+")\./,
       )!;
       const after = JSON.parse(continuation[1]!);
       const stamp = continuation[2]!;
+      const readAt = JSON.parse(continuation[3]!);
       const unread = chat.app.knowledge
         .list(chat.projectId)
         .files.find((file) => file.name > after)!;
@@ -693,6 +759,7 @@ describe("the composed inbound MCP endpoint", () => {
         projectId: chat.projectId,
         after,
         stamp,
+        readAt,
       });
       expect(changed.isError).toBe(true);
       expect(resultText(changed)).toContain(
@@ -905,6 +972,15 @@ describe("the composed inbound MCP endpoint", () => {
         projectId: chat.projectId,
         fileId: "missing00004",
       });
+      await client.tool("sessions", {
+        action: "search",
+        projectId: chat.projectId,
+        q: "argument-query-marker",
+      });
+      await client.tool("sessions", {
+        action: "list",
+        projectId: chat.projectId,
+      });
       const mismatch = await client.raw(
         {
           jsonrpc: "2.0",
@@ -927,8 +1003,16 @@ describe("the composed inbound MCP endpoint", () => {
       expect(mismatch.status).toBe(400);
       const events = logs.events.slice(before);
       expect(events.filter((event) => event.msg === "mcp call")).toHaveLength(
-        2,
+        4,
       );
+      expect(
+        events
+          .filter(
+            (event) =>
+              event.msg === "mcp call" && event.fields.tool === "sessions",
+          )
+          .map((event) => event.fields.action),
+      ).toEqual(["search", "list"]);
       expect(events.filter((event) => event.msg === "mcp error")).toHaveLength(
         1,
       );
@@ -940,6 +1024,7 @@ describe("the composed inbound MCP endpoint", () => {
       expect(serialized).not.toContain("key-name-marker");
       expect(serialized).not.toContain("argument-name-marker");
       expect(serialized).not.toContain("argument-text-marker");
+      expect(serialized).not.toContain("argument-query-marker");
       expect(serialized).not.toContain(key.token);
     } finally {
       await chat.app.shutdown();

@@ -13,6 +13,7 @@ import {
   dataLabel,
   jsonLine,
   MCP_FILE_BYTES,
+  MCP_PAGE_BYTES,
   type McpResult,
   mimeType,
   textResult,
@@ -25,6 +26,8 @@ const metadata = (file: {
   bytes: number;
   lines: number;
   revision: number;
+  author: KnowledgeAuthor;
+  updatedAt: number;
 }) => ({
   id: file.id,
   name: file.name,
@@ -32,12 +35,20 @@ const metadata = (file: {
   bytes: file.bytes,
   lines: file.lines,
   revision: file.revision,
+  by: byWords(file.author),
+  sessionId: file.author.sessionId,
+  updatedAt: new Date(file.updatedAt).toISOString(),
 });
 
-// what decides a list's order and members: an edit to a file already
-// read never refuses the next page
-const listStamp = (rows: readonly { id: string; name: string }[]): string =>
-  sha256(JSON.stringify(rows.map((row) => [row.id, row.name])));
+export const byWords = (writer: KnowledgeAuthor): string =>
+  `@${writer.name}${writer.origin === "key" ? ` via ${writer.keyName ?? "an access key"}` : ""}`;
+
+// stamp only matching rows, so another folder's write does not interrupt
+// paging while a change to this result cannot move between pages
+const listStamp = (
+  rows: readonly { id: string; name: string; revision: number }[],
+): string =>
+  sha256(JSON.stringify(rows.map((row) => [row.id, row.name, row.revision])));
 
 const versionsStamp = (
   rows: readonly { id: string; name: string; revision: number }[],
@@ -76,7 +87,7 @@ function wholeFile(fields: {
     content: [
       {
         type: "text",
-        text: `${dataLabel("Knowledge file")} Revision ${fields.revision}${fields.deleted ? " deletes the file" : ""}.`,
+        text: `${dataLabel("Knowledge file")} Revision ${fields.revision}${fields.deleted ? " deletes the file" : ""}.\n`,
       },
       {
         type: "resource",
@@ -117,19 +128,39 @@ export function knowledgeTool(
   const project = deps.access.project(principal, input.projectId);
   if (input.action === "list") {
     const all = deps.knowledge.list(project.id).files;
-    const stamp = listStamp(all);
+    const selected = all.filter(
+      (file) =>
+        (input.prefix === null || file.name.startsWith(input.prefix)) &&
+        (input.since === null || file.updatedAt >= input.since.at),
+    );
+    const stamp = listStamp(selected);
     if (input.stamp !== null && input.stamp !== stamp) {
       throw new Conflict("the file list changed; read from the start");
     }
-    const files = all.filter(
+    const files = selected.filter(
       (file) => input.after === null || file.name > input.after,
     );
+    const readAt = input.readAt?.iso ?? new Date(deps.clock()).toISOString();
+    const footer = `List read at ${readAt}. Next time pass since=${JSON.stringify(readAt)}.`;
+    const room = MCP_PAGE_BYTES - Buffer.byteLength(footer) - 1;
+    const lines = files.map((file) =>
+      jsonLine({
+        ...metadata(file),
+        ...(input.since === null
+          ? {}
+          : {
+              change: file.createdAt > input.since.at ? "new" : "changed",
+            }),
+      }),
+    );
+    const page = cappedLines(
+      lines,
+      (next) =>
+        `Read on with knowledge action=list, projectId=${project.id}, prefix=${JSON.stringify(input.prefix)}, since=${JSON.stringify(input.since?.iso ?? null)}, after=${JSON.stringify(files[next - 1]!.name)}, stamp=${stamp}, readAt=${JSON.stringify(readAt)}.\n`,
+      room,
+    );
     return textResult(
-      cappedLines(
-        files.map((file) => jsonLine(metadata(file))),
-        (next) =>
-          `Read on with knowledge action=list, projectId=${project.id}, after=${JSON.stringify(files[next - 1]!.name)}, stamp=${stamp}.`,
-      ),
+      `${page}${page === "" || page.endsWith("\n") ? "" : "\n"}${footer}\n`,
     );
   }
   if (input.action === "search") {
@@ -157,7 +188,12 @@ export function knowledgeTool(
     ];
     if (found.next !== null) {
       lines.push(
-        `Read on with knowledge action=search, projectId=${project.id}, q=${JSON.stringify(input.q)}, after=${JSON.stringify(found.next)}.`,
+        `Read on with knowledge action=search, projectId=${project.id}, q=${JSON.stringify(input.q)}, after=${JSON.stringify(found.next)}.\n`,
+      );
+    }
+    if (lines.length === 0) {
+      lines.push(
+        `No file name or line holds every word of ${JSON.stringify(input.q)}.`,
       );
     }
     return textResult(
@@ -198,12 +234,14 @@ export function knowledgeTool(
             revision: version.revision,
             bytes: version.bytes,
             lines: version.lines,
-            writtenAt: version.writtenAt,
+            by: byWords(version.author),
+            sessionId: version.author.sessionId,
+            writtenAt: new Date(version.writtenAt).toISOString(),
             deleted: version.deleted,
           }),
         ),
         (next) =>
-          `Read on with knowledge action=versions, projectId=${project.id}, fileId=${input.fileId}, after=${versions[next - 1]!.id}, stamp=${stamp}.`,
+          `Read on with knowledge action=versions, projectId=${project.id}, fileId=${input.fileId}, after=${versions[next - 1]!.id}, stamp=${stamp}.\n`,
       ),
     );
   }

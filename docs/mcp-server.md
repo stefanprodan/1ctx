@@ -32,12 +32,14 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
 - `projects` lists id, name and whether each reachable project is personal
   or team, paging by id with `after` when needed.
 - `knowledge` reads with `list`, `search`, `read`, `versions` and
-  `version`. A write key also gets `create`, `edit`, `replace`, `rename`
-  and `delete`; a read key's schema omits those actions and forged writes
-  are refused.
-- `sessions read` returns a chat or run in the Markdown form used by the
-  session export route. Its id comes from that chat's or run's page URL; the
-  tool has no session list.
+  `version`. List may filter a folder with `prefix` and files updated at or
+  after an ISO 8601 `since`; matching rows say `new` or `changed`. A write key
+  also gets `create`, `edit`, `replace`, `rename` and `delete`; a read key's
+  schema omits those actions and forged writes are refused.
+- `sessions` searches a project's chats and runs by words and lists them
+  newest first, optionally since an ISO 8601 time. Children carry their
+  parent's id; take any row's session id, including a child's, to `read` its
+  Markdown transcript. Page routes still do not open a child by its id.
 
 The schemas are JSON Schema adapted by `fromJsonSchema()` with a
 permissive validator. The area's hand-written parsers decide accepted
@@ -47,9 +49,11 @@ same words the page uses.
 
 ## Access and writes
 
-Every project, file and session read resolves through the access port. A
-list starts from `reachableProjectIds()`. Hidden and missing objects have
-the same answer.
+Every project and file read resolves through the access port. A session read
+finds roots and children, then resolves the session's project through that
+same port; hidden and missing sessions both answer `no such chat`. This MCP
+lookup does not widen the page's root-only `visible()`. A list starts from
+`reachableProjectIds()`. Hidden and missing objects have the same answer.
 
 A knowledge write uses the key's user as author, with origin `key` and a
 copy of the key name. Its outer transaction calls `checkKey()` before the
@@ -65,11 +69,23 @@ of 1 MiB or more is refused; there is no paging and no download route. A
 client keeps a result past its own output cap on disk. Lists and transcripts
 page at 48 KiB, under Claude Code's 25,000-token and OpenCode's 50 KiB
 defaults, and do not follow `resultBytes`. Knowledge file and version list
-continuations carry a snapshot stamp; when their list changes they say to read
-from the start. Session pages pin the message and offset, with the read-on line
-first so a cut page still shows it; a removed continuation message says the
-session changed and to read from the start. Search pages by `after`; one
-underlying search page already fits below the cap.
+continuations carry a snapshot stamp; a filtered file list stamps its matching
+rows, so an unrelated folder does not invalidate it. When the stamped list
+changes they say to read from the start. Knowledge and session list
+continuations also carry the first page's `readAt`; every page repeats that
+same time in its footer, and the client uses it as `since` only after the
+whole chain. Knowledge `since` is inclusive, so a write in that exact
+millisecond may repeat but cannot be missed. Knowledge list rows and search
+file metadata carry `by` in the page's `@name` words, the author's `sessionId`
+when a chat or run wrote it and null otherwise, and `updatedAt` as ISO 8601
+UTC; `change` appears only with `since`. Version rows carry the same `by` and
+`sessionId` and an ISO 8601 UTC `writtenAt`. Session pages pin the message and
+offset, with the read-on line first and newline-terminated so a client joining
+blocks cannot run it into the data label. The last page says the transcript
+ends; a removed continuation message says the session changed and to read
+from the start. Knowledge continuations are newline-terminated too. Search
+pages by `after`, explicitly say when nothing matched, and one underlying
+search page already fits below the cap.
 
 Knowledge `read` and `version` return an embedded resource with a
 `1ctx://` URI naming the project, path and revision, the file kind's MIME

@@ -6,6 +6,15 @@ import type { Db } from "../db/index.ts";
 import type { ExportRow } from "./markdown.ts";
 import { listOrNull } from "./rows.ts";
 
+// the rows whose text a transcript shows, over messages joined to their
+// send: user messages and each send's answer before its memory phase.
+// Session search reads the same rows, so every hit is a message a
+// transcript can be read from
+export const SHOWN = `(messages.kind = 'user'
+  or (messages.kind = 'reply' and messages.slot = 'answer'
+    and (sends.memory_round is null
+      or messages.round < sends.memory_round)))`;
+
 export function exportRows(db: Db, sessionId: string): ExportRow[] {
   return db
     .query<Omit<ExportRow, "uploads"> & { uploads: string | null }, [string]>(
@@ -15,9 +24,7 @@ export function exportRows(db: Db, sessionId: string): ExportRow[] {
          messages.finish_reason as finishReason,
          messages.native_finish as nativeFinish,
          coalesce(users.username, agents.name) as author,
-         case when messages.kind = 'user'
-             or (messages.kind = 'reply' and messages.slot = 'answer')
-           then messages.content else '' end as content,
+         case when ${SHOWN} then messages.content else '' end as content,
          messages.created_at as createdAt,
          messages.finished_at as finishedAt
        from messages

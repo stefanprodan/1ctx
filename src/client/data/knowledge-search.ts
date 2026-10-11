@@ -17,6 +17,7 @@ import type {
   KnowledgeFile,
   KnowledgeSearchHit,
 } from "../../shared/contracts/knowledge.ts";
+import { searchTerms } from "../../shared/search.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
@@ -54,10 +55,11 @@ export const searches = signal<ReadonlyMap<string, KnowledgeSearch>>(new Map());
 export const searchOf = (projectId: string): KnowledgeSearch =>
   searches.value.get(projectId) ?? SEARCH_IDLE;
 
-// the query the box's text asks, or null when too short to ask
+// the query the box's text asks, or null when too short or holding no
+// word to ask
 export function searchQuery(text: string): string | null {
   const q = text.trim().slice(0, SEARCH_MAX);
-  return q.length < SEARCH_MIN ? null : q;
+  return q.length < SEARCH_MIN || searchTerms(q).length === 0 ? null : q;
 }
 
 // a new query keeps the rows of the last one on screen while it loads,

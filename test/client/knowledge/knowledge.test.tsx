@@ -44,6 +44,7 @@ import {
   listOf,
   marked,
   namesWords,
+  noMatchWords,
   pathParts,
   restoredHref,
   revisionHref,
@@ -287,6 +288,22 @@ describe("the knowledge words", () => {
       { text: "aa", mark: true },
       { text: "a", mark: false },
     ]);
+    expect(marked("Run the plan, then RUNNING", "run plan")).toEqual([
+      { text: "Run", mark: true },
+      { text: " the ", mark: false },
+      { text: "plan", mark: true },
+      { text: ", then ", mark: false },
+      { text: "RUN", mark: true },
+      { text: "NING", mark: false },
+    ]);
+    expect(marked("read on, read", '"read on"')).toEqual([
+      { text: "read on", mark: true },
+      { text: ", read", mark: false },
+    ]);
+    expect(noMatchWords("plan")).toBe("No file names or lines hold “plan”.");
+    expect(noMatchWords("plan tasks")).toBe(
+      "No file holds every word of “plan tasks”.",
+    );
     expect(pathParts("plans/x/y.md")).toEqual({
       dir: "plans/x/",
       base: "y.md",

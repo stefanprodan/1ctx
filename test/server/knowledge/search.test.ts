@@ -4,7 +4,6 @@
 import { describe, expect, test } from "bun:test";
 import { parseSearch } from "../../../src/server/knowledge/parse.ts";
 import {
-  matchText,
   oneAtATime,
   type SearchSource,
   search,
@@ -15,6 +14,10 @@ import {
   SEARCH_NAMES,
   SEARCH_PAGE,
 } from "../../../src/shared/api/knowledge.ts";
+import {
+  matchText as matchTerms,
+  searchTerms,
+} from "../../../src/shared/search.ts";
 import { type Setup, setup } from "./helpers.ts";
 
 // the store's rows, counting the text bytes it loads
@@ -23,7 +26,7 @@ function source(s: Setup) {
   const store = s.area.store;
   const counted: SearchSource = {
     files: (after) => store.after(s.projectId, after),
-    named: (after, query) => store.named(s.projectId, after, query),
+    named: (after, terms) => store.named(s.projectId, after, terms),
     text(fileId) {
       const text = store.text(s.projectId, fileId);
       loaded.bytes += Buffer.byteLength(text);
@@ -33,6 +36,8 @@ function source(s: Setup) {
   };
   return Object.assign(counted, { loaded });
 }
+
+const matchText = (text: string, q: string) => matchTerms(text, searchTerms(q));
 
 const url = (query: string) =>
   new URL(`http://x/api/projects/p/knowledge/search?${query}`);
@@ -55,7 +60,7 @@ describe("knowledge search", () => {
     expect(matchText("one two\r\nthree", "two")?.lines).toEqual([
       { line: 1, text: "one two", cutStart: false, cutEnd: false },
     ]);
-    expect(matchText("one\ntwo", "one\ntwo")).toBeNull();
+    expect(matchText("one\ntwo", '"one\ntwo"')).toBeNull();
   });
 
   test("cuts a long line round the first match", () => {
@@ -190,6 +195,34 @@ describe("knowledge search", () => {
     }
   });
 
+  test("a file matches when it holds every word, a name when it does", () => {
+    const s = setup();
+    try {
+      s.area.create(
+        s.projectId,
+        s.author,
+        "a.md",
+        "the plan\nexternal tasks\n",
+      );
+      s.area.create(s.projectId, s.author, "b.md", "the plan\nexternal work\n");
+      s.area.create(s.projectId, s.author, "plan/external-tasks.md", "x\n");
+      s.area.create(s.projectId, s.author, "plan/other.md", "x\n");
+      const page = s.area.search(s.projectId, "u", "plan External tasks", null);
+      expect(page.files.map((hit) => hit.file.name)).toEqual(["a.md"]);
+      expect(page.files[0]!.count).toBe(2);
+      expect(page.names.map((file) => file.name)).toEqual([
+        "plan/external-tasks.md",
+      ]);
+      const phrase = s.area.search(s.projectId, "u", '"plan external"', null);
+      expect(phrase.files).toEqual([]);
+      expect(() => s.area.search(s.projectId, "u", '""', null)).toThrow(
+        new BadRequest("q must hold a word"),
+      );
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("runs one scan per user at a time", () => {
     const running = new Set<string>();
     const inner = () =>
@@ -224,6 +257,8 @@ describe("knowledge search", () => {
     ["q=%20a%20", "q must be 2 to 100 characters"],
     [`q=${"x".repeat(101)}`, "q must be 2 to 100 characters"],
     ["q=a%0Ab", "q must be one line of text"],
+    ["q=%22%22", "q must hold a word"],
+    ["q=%22%20%22", "q must hold a word"],
     ["q=ab&after=x&after=y", "after must appear once"],
     ["q=ab&after=../x", "after must be a file name"],
     ["q=ab&after=", "after must be a file name"],

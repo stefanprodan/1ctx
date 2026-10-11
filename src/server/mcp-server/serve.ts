@@ -32,6 +32,9 @@ const readProperties = {
   projectId: { type: "string" },
   after: { type: ["string", "null"] },
   stamp: { type: ["string", "null"] },
+  prefix: { type: ["string", "null"] },
+  since: { type: ["string", "null"], format: "date-time" },
+  readAt: { type: ["string", "null"], format: "date-time" },
   q: { type: "string" },
   fileId: { type: "string" },
   versionId: { type: "string" },
@@ -74,7 +77,7 @@ const READ_ACTIONS = ["list", "search", "read", "versions", "version"];
 const WRITE_ACTIONS = ["create", "edit", "replace", "rename", "delete"];
 
 const READ_DESCRIPTION =
-  "List uses projectId, then after and stamp to continue. Search uses projectId, q and after. Read uses projectId and fileId and answers the whole file with its revision. Versions uses projectId and fileId, then after and stamp to continue. Version uses projectId and versionId.";
+  "List uses projectId, optional folder prefix and optional ISO 8601 since, then after, stamp and readAt to continue. Search uses projectId, q and after; a match needs every word, and double quotes make a phrase. Read uses projectId and fileId and answers the whole file with its revision. Versions uses projectId and fileId, then after and stamp to continue. Version uses projectId and versionId.";
 
 const WRITE_DESCRIPTION = `${READ_DESCRIPTION} Create uses projectId, name and text. Edit changes part of an existing file with projectId, fileId, revision and 1 to ${MAX_EDITS} old/new pairs; every old must match exactly once in the text at that revision, and all pairs apply or none. Replace uses projectId, fileId, revision and the whole text after reading the file in full. Rename uses projectId, fileId, revision and name. Delete uses projectId, fileId and revision. Every change to an existing file names the revision read.`;
 
@@ -179,9 +182,14 @@ function server(deps: McpServerDeps, principal: KeyPrincipal): McpServer {
     "sessions",
     {
       description:
-        "Read a chat or run transcript as Markdown. Take sessionId from the chat or run URL in 1ctx; there is no list. Use messageId and offset from the continuation to page.",
-      inputSchema: schema(["read"], {
+        "Search finds chats and runs with projectId, q and after; a match needs every word, and double quotes make a phrase. List is newest first with projectId, optional ISO 8601 since, then after and readAt. Children carry parentSessionId. Take sessionId from a row to read its Markdown transcript; use messageId and offset to continue.",
+      inputSchema: schema(["search", "list", "read"], {
         action: { type: "string" },
+        projectId: { type: "string" },
+        q: { type: "string" },
+        since: { type: ["string", "null"], format: "date-time" },
+        readAt: { type: ["string", "null"], format: "date-time" },
+        after: { type: ["string", "null"] },
         sessionId: { type: "string" },
         messageId: { type: ["string", "null"] },
         offset: { type: "integer", minimum: 0 },

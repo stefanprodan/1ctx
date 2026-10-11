@@ -66,6 +66,7 @@ import { m0057 } from "./0057-automation-tool.ts";
 import { m0058 } from "./0058-automation-drafts.ts";
 import { m0059 } from "./0059-access-keys.ts";
 import { m0060 } from "./0060-knowledge-keys.ts";
+import { m0061 } from "./0061-session-activity.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -128,4 +129,5 @@ export const MIGRATIONS: Migration[] = [
   m0058,
   m0059,
   m0060,
+  m0061,
 ];
