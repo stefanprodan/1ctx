@@ -81,10 +81,11 @@ const schema = (
 const READ_ACTIONS = ["list", "search", "read", "versions", "version"];
 const WRITE_ACTIONS = ["create", "edit", "replace", "rename", "delete"];
 
+// a read key's text never names a write action
 const READ_DESCRIPTION =
-  "List uses projectId, optional folder prefix and optional ISO 8601 since, then after, stamp and readAt to continue. Search uses projectId and q, or q and fileId for every hit line in one file, then after and skip from the footer. A match needs every word; double quotes make a phrase. Read uses fileId, optional offset and limit for lines, or outline=true and its skip footer for Markdown headings; a read past line 1 also needs the file's revision, from a row, the outline or the page before. Versions uses fileId, then after and stamp. Version uses versionId, with optional offset and limit. A call that names a fileId or versionId needs no projectId.";
+  "A project's shared files: plans, docs, notes. list: files with id, revision, author and time; prefix keeps one folder, since keeps files changed after a time. search: files holding every word of q (quotes make a phrase); with fileId, every matching line of that file. read: a file's text by fileId; offset and limit pick lines; outline=true lists Markdown headings with line numbers. Reading past line 1 needs the file's revision. versions: a file's history; version: an old revision's text. A fileId or versionId finds its project, so projectId is needed only for list and for search without fileId. A result that does not fit ends with the exact next call.";
 
-const WRITE_DESCRIPTION = `${READ_DESCRIPTION} Create uses projectId, name and text. Edit changes part of a file with fileId, revision and 1 to ${MAX_EDITS} old/new pairs; every old must match exactly once, and all pairs apply or none. Replace sends the whole text only when the current file fits one read page; use edit for a larger file. Rename uses fileId, revision and name. Delete uses fileId and revision. Every change to an existing file names the revision read.`;
+const WRITE_DESCRIPTION = `${READ_DESCRIPTION} create: a new file from projectId, name and text. edit: up to ${MAX_EDITS} old/new pairs, each old matching exactly once; the way to change a file. replace: the whole new text, only for a file that fits one read. rename, delete. A change names the revision read and is refused if the file changed since.`;
 
 function principalOf(authInfo: unknown): KeyPrincipal {
   const principal = (authInfo as { extra?: { principal?: Principal } })?.extra
@@ -163,7 +164,7 @@ function server(deps: McpServerDeps, principal: KeyPrincipal): McpServer {
     "projects",
     {
       description:
-        "List reachable projects with their descriptions. Use after from the continuation to page.",
+        "List the projects this key can reach, with id, name, kind and description.",
       inputSchema: schema(["list"], {
         action: { type: "string" },
         after: { type: ["string", "null"] },
@@ -187,7 +188,7 @@ function server(deps: McpServerDeps, principal: KeyPrincipal): McpServer {
     "sessions",
     {
       description:
-        "Search finds chats and runs with projectId, q and after; a match needs every word, and double quotes make a phrase. List is newest first with projectId, optional ISO 8601 since, then after and readAt. Children carry parentSessionId. Take sessionId from a row to read its Markdown transcript, projectId optional, then use the footer's messageId and position to continue.",
+        "A project's chats and scheduled runs. search: sessions whose messages hold every word of q (quotes make a phrase), newest first, with matching lines. list: sessions newest first, optionally since a time; a delegated chat names its parent. read: a session's transcript as Markdown by sessionId. A result that does not fit ends with the exact next call.",
       inputSchema: schema(["search", "list", "read"], {
         action: { type: "string" },
         projectId: { type: "string" },

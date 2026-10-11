@@ -252,12 +252,13 @@ describe("the composed inbound MCP endpoint", () => {
       expect(writeKnowledge.inputSchema.properties.revision.type).toBe(
         "integer",
       );
-      expect(writeKnowledge.description).toContain(
-        "every old must match exactly once",
-      );
-      expect(writeKnowledge.description).toContain(
-        "current file fits one read page",
-      );
+      for (const words of [
+        "each old matching exactly once; the way to change a file",
+        "only for a file that fits one read",
+        "refused if the file changed since",
+      ]) {
+        expect(writeKnowledge.description).toContain(words);
+      }
 
       const foreign = await read.raw(
         { jsonrpc: "2.0", id: 3, method: "ping" },
