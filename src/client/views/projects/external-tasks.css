@@ -1,0 +1,138 @@
+/* The external task pages: the tab's note, the brief and its form,
+   the member's moves and their boxes, and the timeline's entries. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .external-tasks-note {
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  /* the brief */
+  .external-tasks-brief {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  .external-tasks-brief-line {
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+  /* the idle release and the chat it was made in, phone width too */
+  .external-tasks-brief-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  /* the padding sits on the box, so the cut falls on a line's edge */
+  .external-tasks-brief-text {
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: var(--inset);
+  }
+  .external-tasks-brief-body {
+    --clamp: 8;
+    margin: 0;
+    font-size: var(--text-input);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* the form */
+  .external-tasks-form {
+    display: flex;
+    flex-direction: column;
+  }
+  .external-tasks-pick {
+    display: flex;
+    margin-top: var(--space-2);
+  }
+  .external-tasks-foot {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
+  }
+
+  /* the moves */
+  .external-tasks-actions,
+  .external-tasks-actions-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .external-tasks-actions-end {
+    margin-left: auto;
+  }
+  .external-tasks-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  /* the open question over the answer box */
+  .external-tasks-question {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+  .external-tasks-question-text {
+    --clamp: 6;
+    margin: 0;
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* an entry of the timeline */
+  .external-tasks-entry {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+    flex: 1 1 0;
+  }
+  .external-tasks-entry-head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin: 0;
+    min-width: 0;
+    font-size: var(--text-small);
+    color: var(--dim);
+  }
+  /* a question or a result wears its state's colour */
+  .external-tasks-kind {
+    flex-shrink: 0;
+    font-weight: 500;
+  }
+  .external-tasks-when {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--faint);
+  }
+  .external-tasks-entry-text {
+    --clamp: 6;
+    margin: 0;
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .external-tasks-link,
+  .external-tasks-link-text {
+    display: block;
+    font-size: var(--text-small);
+  }
+  .external-tasks-link {
+    color: var(--brand);
+  }
+}

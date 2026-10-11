@@ -29,6 +29,8 @@ export function listedProjects<T extends Pick<ProjectSummary, "kind" | "name">>(
 // what the tabs count; null while it is not known yet
 type TabCounts = {
   automations: number | null;
+  // the unfinished external tasks
+  externalTasks: number | null;
   // the files of the project's knowledge base
   knowledge: number | null;
   // the users and the agents a team tab lists
@@ -38,6 +40,7 @@ type TabCounts = {
 
 const NO_COUNTS: TabCounts = {
   automations: null,
+  externalTasks: null,
   knowledge: null,
   members: null,
   agents: null,
@@ -51,13 +54,14 @@ const counted = (n: number | null) => (n === null ? {} : { count: n });
 export function settledCounts(kind: ProjectKind, counts: TabCounts): TabCounts {
   const shown = [
     counts.automations,
+    counts.externalTasks,
     counts.knowledge,
     ...(kind === "team" ? [counts.members, counts.agents] : []),
   ];
   return shown.every((n) => n !== null) ? counts : NO_COUNTS;
 }
 
-// every project has automations and Settings; a team's users are its
+// every project has automations, external tasks and Settings; a team's users are its
 // Members, and a personal project has one user. Members counts the
 // users and the agents the tab lists
 export function tabsOf(
@@ -75,6 +79,11 @@ export function tabsOf(
       label: "Automations",
       href: `/projects/${id}/automations`,
       ...counted(counts.automations),
+    },
+    {
+      label: "External tasks",
+      href: `/projects/${id}/external-tasks`,
+      ...counted(counts.externalTasks),
     },
     { label: "Memory", href: `/projects/${id}/memory` },
     {

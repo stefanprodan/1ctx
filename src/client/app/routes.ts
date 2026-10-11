@@ -39,9 +39,12 @@ import {
   loadUserDays,
   loadUserPage,
 } from "../data/directory.ts";
+import { loadExternalTask } from "../data/external-task.ts";
+import { loadExternalTasks } from "../data/external-tasks.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadLink } from "../data/links.ts";
+import { loadMarkedTasks } from "../data/marked-tasks.ts";
 import {
   loadAllUsage,
   loadMcp,
@@ -122,6 +125,7 @@ const frame = (id: string) => [
   loadProject(id),
   loadProjectAgents(id),
   loadAutomations(id),
+  loadExternalTasks(id),
   loadRecentDays(),
 ];
 const framed = async (params: Params) => {
@@ -251,6 +255,7 @@ export const ROUTES: Route[] = [
       const rows = loadList({ project: null, q, ...pick });
       const spent = loadWeek();
       const unsent = loadNotSent();
+      const marked = loadMarkedTasks();
       const listed = loadProjects();
       if (projects.value === null) await listed;
       const target = composeProjectOf(projects.value, homeProjectId.value);
@@ -259,6 +264,7 @@ export const ROUTES: Route[] = [
         rows,
         spent,
         unsent,
+        marked,
         target === null ? Promise.resolve() : loadProjectAgents(target.id),
         // the files staged for the composer's draft, and the limits a
         // pick is judged with
@@ -345,6 +351,17 @@ export const ROUTES: Route[] = [
     load: framed,
   },
   {
+    path: "/projects/:id/external-tasks",
+    view: lazy(() =>
+      import("../views/projects/ExternalTasks.tsx").then(
+        (m) => m.ExternalTasks,
+      ),
+    ),
+    title: () => "External tasks",
+    role: "authenticated",
+    load: framed,
+  },
+  {
     path: "/projects/:id/memory",
     view: lazy(() =>
       import("../views/projects/Memory.tsx").then((m) => m.Memory),
@@ -416,6 +433,34 @@ export const ROUTES: Route[] = [
         loadAutomations(params.id),
       ]);
     },
+  },
+  {
+    path: "/projects/:id/external-tasks/new",
+    view: lazy(() =>
+      import("../views/projects/ExternalTaskForm.tsx").then(
+        (m) => m.NewExternalTask,
+      ),
+    ),
+    title: () => "New external task",
+    role: "authenticated",
+    // the project's files are the ones a brief links; the list for the
+    // tab's count
+    load: async (params) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadKnowledge(params.id),
+        loadExternalTasks(params.id),
+      ]);
+    },
+  },
+  {
+    path: "/external-tasks/:id",
+    view: lazy(() =>
+      import("../views/projects/ExternalTask.tsx").then((m) => m.ExternalTask),
+    ),
+    title: () => "External task",
+    role: "authenticated",
+    load: (params) => loadExternalTask(params.id),
   },
   {
     path: "/automations/:id",

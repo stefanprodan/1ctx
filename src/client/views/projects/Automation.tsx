@@ -1,14 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An automation's page. The brief reads as one sentence: when, in which
+// An automation's page. The summary reads as one sentence: when, in which
 // zone, which agent is asked, then the instructions as the agent gets
 // them, cut to a few lines. An automation whose agent was deleted names
 // it with a tag and says it is paused until an edit picks another.
 // Suspend or Resume, Run now, Edit and Delete, which anyone in the
 // project presses, sit over two tabs. Runs is a log of RunRow.tsx rows,
 // a page at a time, filtered to the manual or the flagged runs. An open
-// alert sits over the brief with Dismiss. Memory is the automation's
+// alert sits over the summary with Dismiss. Memory is the automation's
 // own note.
 // The aside has the next fires, the tally of the kept runs and the
 // setup. The words are Automations.model.ts and Schedule.model.ts.
@@ -91,7 +91,7 @@ function Instructions({
   const { el, open, long } = useCut<HTMLParagraphElement>([text]);
   return (
     <>
-      <div class="automations-brief-text">
+      <div class="automations-summary-text">
         <Fold
           cut={long.value && !open.value}
           onOpen={() => {
@@ -101,13 +101,13 @@ function Instructions({
         >
           <p
             ref={el}
-            class={`automations-brief-body${open.value ? "" : " clamp"}`}
+            class={`automations-summary-body${open.value ? "" : " clamp"}`}
           >
             {text}
           </p>
         </Fold>
       </div>
-      <div class="automations-brief-foot">{foot}</div>
+      <div class="automations-summary-foot">{foot}</div>
     </>
   );
 }
@@ -157,7 +157,7 @@ function NextRuns({
 }
 
 // Both tabs' routes name this one view, so a tab change keeps the page
-// mounted: the brief, the aside and the runs stay while only the tab's
+// mounted: the summary, the aside and the runs stay while only the tab's
 // content changes.
 export function Automation({ params }: { params: Params }) {
   const id = params.id ?? "";
@@ -267,8 +267,8 @@ export function Automation({ params }: { params: Params }) {
           {row.alert !== null && (
             <OpenAttention id={row.id} alert={row.alert} now={now} />
           )}
-          <section class="card automations-brief">
-            <p class="automations-brief-line">
+          <section class="card automations-summary">
+            <p class="automations-summary-line">
               <span class="automations-strong">
                 {scheduleTitle(row.schedule)}
               </span>
@@ -292,7 +292,7 @@ export function Automation({ params }: { params: Params }) {
               text={row.instructions}
               foot={
                 row.agentRetired || row.suspendedAt !== null ? (
-                  <p class="automations-brief-next">
+                  <p class="automations-summary-next">
                     <Icon name="pause" size={14} />
                     {/* the run that spent it says how it went */}
                     {!row.agentRetired &&
@@ -306,7 +306,7 @@ export function Automation({ params }: { params: Params }) {
                     )}
                   </p>
                 ) : row.nextAt !== null ? (
-                  <p class="automations-brief-next">
+                  <p class="automations-summary-next">
                     <Icon name="arrow-right" size={14} />
                     {nextLine(row, now)}
                   </p>

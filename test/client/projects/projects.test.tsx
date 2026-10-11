@@ -390,9 +390,16 @@ describe("Project.model", () => {
   });
 
   test("the tab counts show together once every one is known", () => {
-    const counts = { automations: 2, knowledge: 5, members: 3, agents: null };
+    const counts = {
+      automations: 2,
+      externalTasks: 1,
+      knowledge: 5,
+      members: 3,
+      agents: null,
+    };
     const none = {
       automations: null,
+      externalTasks: null,
       knowledge: null,
       members: null,
       agents: null,
@@ -407,24 +414,29 @@ describe("Project.model", () => {
     expect(settledCounts("personal", { ...counts, knowledge: null })).toEqual(
       none,
     );
+    expect(
+      settledCounts("personal", { ...counts, externalTasks: null }),
+    ).toEqual(none);
   });
 
   test("a team has Members before Settings, a personal project Settings", () => {
     expect(tabsOf("p1", "team").map((t) => t.label)).toEqual([
       "Feed",
       "Automations",
+      "External tasks",
       "Memory",
       "Knowledge",
       "Members",
       "Settings",
     ]);
-    expect(tabsOf("p1", "team")[5]).toEqual({
+    expect(tabsOf("p1", "team")[6]).toEqual({
       label: "Settings",
       href: "/projects/p1/settings",
     });
     expect(tabsOf("p1", "personal").map((t) => t.label)).toEqual([
       "Feed",
       "Automations",
+      "External tasks",
       "Memory",
       "Knowledge",
       "Settings",
@@ -434,24 +446,35 @@ describe("Project.model", () => {
       href: "/projects/p1/automations",
     });
     expect(tabsOf("p1", "personal")[2]).toEqual({
+      label: "External tasks",
+      href: "/projects/p1/external-tasks",
+    });
+    expect(tabsOf("p1", "personal")[3]).toEqual({
       label: "Memory",
       href: "/projects/p1/memory",
     });
-    expect(tabsOf("p1", "personal")[3]).toEqual({
+    expect(tabsOf("p1", "personal")[4]).toEqual({
       label: "Knowledge",
       href: "/projects/p1/knowledge",
     });
-    expect(tabsOf("p1", "personal")[4]).toEqual({
+    expect(tabsOf("p1", "personal")[5]).toEqual({
       label: "Settings",
       href: "/projects/p1/settings",
     });
   });
 
-  test("Automations, Knowledge and Members count their rows", () => {
-    const counts = { automations: 3, knowledge: 6, members: 4, agents: 5 };
+  test("Automations, External tasks, Knowledge and Members count their rows", () => {
+    const counts = {
+      automations: 3,
+      externalTasks: 2,
+      knowledge: 6,
+      members: 4,
+      agents: 5,
+    };
     expect(tabsOf("p1", "team", counts).map((t) => t.count)).toEqual([
       undefined,
       3,
+      2,
       undefined,
       6,
       9,
@@ -461,6 +484,7 @@ describe("Project.model", () => {
     expect(tabsOf("p1", "personal", counts).map((t) => t.count)).toEqual([
       undefined,
       3,
+      2,
       undefined,
       6,
       undefined,
@@ -469,6 +493,7 @@ describe("Project.model", () => {
     expect(
       tabsOf("p1", "team", {
         automations: null,
+        externalTasks: null,
         knowledge: null,
         members: 4,
         agents: null,
@@ -480,10 +505,14 @@ describe("Project.model", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
     ]);
     expect(tabsOf("p1", "team", { ...counts, automations: 0 })[1]?.count).toBe(
       0,
     );
+    expect(
+      tabsOf("p1", "team", { ...counts, externalTasks: 0 })[2]?.count,
+    ).toBe(0);
   });
 
   test("the About line is the description, or says what a personal one is", () => {

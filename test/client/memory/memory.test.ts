@@ -3,7 +3,7 @@
 //
 // The client's memory logic without a DOM: a run's transcript split at
 // the memory round, the fold's words, the note card's words and the
-// automation brief's line.
+// automation summary's line.
 
 import { describe, expect, test } from "bun:test";
 import { endedBy, groupRows } from "../../../src/client/transcript/rows.ts";

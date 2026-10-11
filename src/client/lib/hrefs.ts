@@ -103,6 +103,17 @@ export function automationHref(id: string): string {
   return `/automations/${encodeURIComponent(id)}`;
 }
 
+export function externalTaskHref(id: string): string {
+  return `/external-tasks/${encodeURIComponent(id)}`;
+}
+
+// a project's External tasks tab, and its New page
+export function externalTasksHref(projectId: string): string {
+  return `/projects/${encodeURIComponent(projectId)}/external-tasks`;
+}
+export const newExternalTaskHref = (projectId: string): string =>
+  `${externalTasksHref(projectId)}/new`;
+
 // the chat as a Markdown file: a link the browser saves, never a fetch,
 // so the cookie and the server's filename do the work. The times are
 // in the browser's zone
