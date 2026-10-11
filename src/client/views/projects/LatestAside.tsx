@@ -23,25 +23,29 @@ export function LatestAside({
   if (files.length === 0) return null;
   return (
     <AsideSection label="Latest knowledge">
-      {files.map((file) => (
-        <div key={file.id} class="split-line">
-          <span class="split-stack">
-            <a
-              class="split-name split-name-link cut"
-              href={fileHref(projectId, file.id)}
-              title={file.name}
-            >
-              {file.name.slice(file.name.lastIndexOf("/") + 1)}
-            </a>
-            <span class="split-faint cut">
-              <a class="split-link" href={authorOf(file.author).href}>
-                <RowsHandle name={file.author.name} />
-              </a>{" "}
-              · {ago(file.updatedAt, now)}
+      {files.map((file) => {
+        const by = authorOf(file.author);
+        return (
+          <div key={file.id} class="split-line">
+            <span class="split-stack">
+              <a
+                class="split-name split-name-link cut"
+                href={fileHref(projectId, file.id)}
+                title={file.name}
+              >
+                {file.name.slice(file.name.lastIndexOf("/") + 1)}
+              </a>
+              <span class="split-faint cut">
+                <a class="split-link" href={by.href}>
+                  <RowsHandle name={by.name} />
+                </a>
+                {by.via !== null && ` via ${by.via}`} ·{" "}
+                {ago(file.updatedAt, now)}
+              </span>
             </span>
-          </span>
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </AsideSection>
   );
 }

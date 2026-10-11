@@ -78,17 +78,20 @@ export function folderParam(query: string): string | null {
 }
 
 // who wrote a file and from where: the name as it was at the write, its
-// page, and the chat or the run it was written from
+// page, and the chat or the run it was written from, or the access key
+// a user's own agent wrote with: "@stefan via laptop-claude"
 export type AuthorWords = {
   name: string;
   href: string;
   where: string | null;
   whereHref: string | null;
+  via: string | null;
 };
 
 export function authorOf(author: KnowledgeAuthor): AuthorWords {
   return {
     name: author.name,
+    via: author.origin === "key" ? (author.keyName ?? "an access key") : null,
     href:
       author.kind === "user" ? userHref(author.name) : agentHref(author.name),
     where:

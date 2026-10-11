@@ -229,8 +229,25 @@ Flagged.
   a field another admin changed since is never sent back. A row gone
   from the list closes its form.
 
+## Access keys
+
+- **A key's token lives in the view alone.** `createAccessKey()` hands
+  the answer to the caller and `data/access-keys.ts` keeps only the
+  key, so the shown-once box goes on Done or on leaving the profile.
+- **At a cap of 0 the profile's section says keys are off** and offers
+  no form; kept keys still list with Revoke. Until the password changes
+  the route loads neither keys nor projects.
+- **An admin's user page lists a user's keys from `userKeys`,** read
+  again after a revoke (whatever its answer), a reset and a disable,
+  which delete them. No admin page makes a key. A profile revoke that
+  answers 404 drops the row.
+- **A key's row is `views/keys/`,** shared by both pages, so neither
+  view imports the other.
+
 ## Knowledge
 
+- **A write over an access key reads `@user via <key name>`** through
+  `authorOf()`'s `via`, wherever an author is named.
 - **A run's write lands on the open tab.** `data/knowledge.ts` applies
   a `knowledge` frame to the list by revision, with no read.
 - **The uploader reloads the list once at the end, Stop included.**

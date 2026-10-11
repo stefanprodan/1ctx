@@ -7,6 +7,11 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import {
+  loadUserKeys,
+  revokeUserKey,
+  userKeys,
+} from "../../../src/client/data/access-keys.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
 import {
@@ -533,6 +538,78 @@ describe("the pages", () => {
       } finally {
         emailOn.value = false;
       }
+    },
+  );
+
+  test.serial(
+    "a user's page lists their access keys with Revoke and never a New",
+    async () => {
+      users.value = [root, casey];
+      projects.value = [];
+      const day = 86_400_000;
+      answer = () =>
+        Response.json({
+          keys: [
+            {
+              id: "k1",
+              name: "laptop-claude",
+              scope: "write",
+              projectIds: null,
+              createdAt: NOW - 10 * day,
+              expiresAt: Date.now() + 80 * day,
+              lastUsedAt: null,
+            },
+          ],
+        });
+      expect(render(<UserPage params={{ username: "casey" }} />)).toContain(
+        ">Access keys<",
+      );
+      await loadUserKeys("u2");
+      const html = render(<UserPage params={{ username: "casey" }} />);
+      expect(html).toContain(">laptop-claude<");
+      expect(html).toContain("Read and write · Never used");
+      expect(html).toContain("Expires ");
+      expect(html).toContain(">Revoke<");
+      expect(html).not.toContain("New access key");
+      // the reset and the disable say they take the keys too
+      expect(html).toContain(
+        "Signs Casey Doe out everywhere and deletes their access keys.",
+      );
+      expect(html).toContain(
+        "Signs them out, blocks sign-in and deletes their access keys.",
+      );
+      // revoking reads the list again
+      const calls: string[] = [];
+      answer = (url, init) => {
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        return init?.method === "DELETE"
+          ? new Response(null, { status: 204 })
+          : Response.json({ keys: [] });
+      };
+      await revokeUserKey("u2", "k1");
+      expect(calls).toEqual([
+        "DELETE /api/users/u2/keys/k1",
+        "GET /api/users/u2/keys",
+      ]);
+      expect(userKeys.valueFor("u2")).toEqual([]);
+      // a refused revoke reads the list again too
+      calls.length = 0;
+      answer = (url, init) => {
+        calls.push(`${init?.method ?? "GET"} ${url}`);
+        return init?.method === "DELETE"
+          ? Response.json({ error: "no such access key" }, { status: 404 })
+          : Response.json({ keys: [] });
+      };
+      await expect(revokeUserKey("u2", "k1")).rejects.toThrow(
+        "no such access key",
+      );
+      expect(calls).toEqual([
+        "DELETE /api/users/u2/keys/k1",
+        "GET /api/users/u2/keys",
+      ]);
+      expect(render(<UserPage params={{ username: "casey" }} />)).toContain(
+        "No access keys.",
+      );
     },
   );
 

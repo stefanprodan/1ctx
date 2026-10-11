@@ -105,6 +105,10 @@ export function AskDelete({
   words,
   wordsClass,
   label = "Delete",
+  ask = "Delete",
+  action = "delete",
+  going = "Deleting",
+  small,
   onAsk,
   onDelete,
 }: {
@@ -114,6 +118,12 @@ export function AskDelete({
   words?: string;
   wordsClass?: string;
   label?: string;
+  // the first button's words, and the act's name and words while it runs
+  ask?: string;
+  action?: string;
+  going?: string;
+  // in a row's end, beside its other small buttons
+  small?: boolean;
   // it never throws
   onAsk?: () => Promise<void>;
   onDelete: () => void;
@@ -127,18 +137,19 @@ export function AskDelete({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [asking.value]);
+  const btn = small ? "btn btn-small" : "btn";
   if (!asking.value) {
     return (
       <button
         type="button"
-        class="btn"
+        class={btn}
         disabled={busy}
         onClick={async () => {
           await onAsk?.();
           asking.value = true;
         }}
       >
-        Delete
+        {ask}
       </button>
     );
   }
@@ -147,15 +158,15 @@ export function AskDelete({
       {words !== undefined && <span class={wordsClass}>{words}</span>}
       <button
         type="button"
-        class="btn btn-danger"
+        class={`${btn} btn-danger`}
         disabled={busy}
         onClick={onDelete}
       >
-        {save.pending.value === "delete" ? "Deleting" : label}
+        {save.pending.value === action ? going : label}
       </button>
       <button
         type="button"
-        class="btn"
+        class={btn}
         disabled={busy}
         onClick={() => {
           asking.value = false;

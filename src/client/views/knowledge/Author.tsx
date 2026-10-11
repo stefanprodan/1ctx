@@ -3,7 +3,8 @@
 //
 // Who wrote a file and from where, as a row or a band says it, a user
 // and an agent alike as a handle: linked
-// where the line is not itself a link, as words where it is.
+// where the line is not itself a link, as words where it is. A write
+// over an access key adds "via" and the key's name.
 
 import { RowsHandle } from "../../ui/Rows.tsx";
 import type { AuthorWords } from "./Knowledge.model.ts";
@@ -16,6 +17,7 @@ export function Author({ words }: { words: AuthorWords }) {
       <a class="knowledge-link" href={words.href}>
         <RowsHandle name={words.name} />
       </a>
+      {words.via !== null && ` via ${words.via}`}
       {words.where !== null && words.whereHref !== null && (
         <>
           {" "}
@@ -33,6 +35,7 @@ export function AuthorText({ words }: { words: AuthorWords }) {
   return (
     <>
       <RowsHandle name={words.name} />
+      {words.via !== null && ` via ${words.via}`}
       {words.where !== null && ` ${words.where}`}
     </>
   );

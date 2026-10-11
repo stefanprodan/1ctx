@@ -41,11 +41,13 @@ export function AddProject({
   teams,
   value,
   disabled,
+  empty = "Every team project is added",
   onChange,
 }: {
   teams: { id: string; name: string }[];
   value: string[];
   disabled: boolean;
+  empty?: string;
   onChange: (projectIds: string[]) => void;
 }) {
   return (
@@ -59,7 +61,7 @@ export function AddProject({
       mono
       placeholder="Find a project"
       none="No project matches"
-      empty="Every team project is added"
+      empty={empty}
       onPick={(id) => onChange(toggledId(value, id))}
     />
   );

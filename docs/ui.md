@@ -131,13 +131,16 @@ open row's body or a meta. The shared shapes are below.
 - **A refusal that names a field is shown at that field.** That is a
   check pinned with `at(field, ...)` or a server word the form's
   `fieldOf` maps. The control gets `aria-invalid`, `ui/FieldError.tsx`
-  replaces its hint, and `useFocusField()` focuses it by `name`.
+  replaces its hint, and `useFocusField()` focuses it by `name`. A
+  control that is no input (a `Seg`, a picker) is labelled by
+  `ui/Labelled.tsx`, which does the same.
 - **Any other refusal is the `Foot` notice** over the buttons, or
   inline in a `DraftFoot`'s line. A page that saves from its head
   shows it in `Page`'s `notice`. No form shows a refusal elsewhere.
 - **A delete starts with `AskDelete`** from `ui/Foot.tsx`, never a
   view's own confirm pair. An admin card uses `SettingDelete`, which
-  wraps it.
+  wraps it. A revoke is one too, renamed through `ask`, `action` and
+  `going`; `small` fits it in a row's end.
 - **An action outside a form is `useAction()`:** a switch or pick
   that writes at once.
 - **The first field takes the focus on arrival** through

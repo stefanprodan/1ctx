@@ -4,6 +4,7 @@
 import { type Signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { AdminUser } from "../../../shared/api/users.ts";
+import { loadUserKeys } from "../../data/access-keys.ts";
 import { me } from "../../data/me.ts";
 import {
   resetPassword,
@@ -32,6 +33,8 @@ export function PasswordCard({ user, saving }: CardProps) {
       const password = next.value;
       await holding(saving, () => resetPassword(user.id, { password }));
       next.value = "";
+      // a reset deletes the user's access keys
+      void loadUserKeys(user.id);
     },
     (message) => (message.startsWith("password") ? "next" : undefined),
   );
@@ -42,7 +45,7 @@ export function PasswordCard({ user, saving }: CardProps) {
     >
       <Setting
         title="Reset password"
-        line={`Signs ${user.fullName} out everywhere. Hand them the new one.`}
+        line={`Signs ${user.fullName} out everywhere and deletes their access keys. Hand them the new one.`}
         foot={
           <Foot
             save={save}
@@ -140,7 +143,7 @@ export function SwitchCard({ user, saving }: CardProps) {
         lock ??
         (user.disabled
           ? "They cannot sign in."
-          : "Signs them out and blocks sign-in.")
+          : "Signs them out, blocks sign-in and deletes their access keys.")
       }
       foot={
         <Foot save={save} inline>
@@ -149,11 +152,13 @@ export function SwitchCard({ user, saving }: CardProps) {
             class={`btn${user.disabled ? "" : " btn-danger"}`}
             disabled={save.busy || lock !== null || saving.value}
             onClick={() =>
-              void save.act(action, () =>
-                holding(saving, () =>
+              void save.act(action, async () => {
+                await holding(saving, () =>
                   updateUser(user.id, { disabled: !user.disabled }),
-                ),
-              )
+                );
+                // a disable deletes the user's access keys
+                if (action === "disable") void loadUserKeys(user.id);
+              })
             }
           >
             {user.disabled

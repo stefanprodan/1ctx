@@ -196,6 +196,52 @@ describe("AskDelete", () => {
     );
     expect(busy).not.toContain("Delete with 3 chats");
   });
+
+  test("renamed and small for a row's revoke", () => {
+    const idle = render(
+      <AskDelete
+        save={save}
+        asking={signal(false)}
+        busy={false}
+        small
+        ask="Revoke"
+        action="revoke"
+        going="Revoking"
+        label="Revoke"
+        onDelete={noop}
+      />,
+    );
+    expect(idle).toMatch(/class="btn btn-small"[^>]*>Revoke<\/button>/);
+    const revoking = { pending: signal<string | null>("revoke"), touch: noop };
+    const busy = render(
+      <AskDelete
+        save={revoking}
+        asking={signal(true)}
+        busy
+        small
+        ask="Revoke"
+        action="revoke"
+        going="Revoking"
+        label="Revoke"
+        onDelete={noop}
+      />,
+    );
+    expect(busy).toMatch(/class="btn btn-small btn-danger"[^>]*>Revoking</);
+    expect(busy).toMatch(/class="btn btn-small"[^>]*>Keep</);
+    // another act's pending name is not this one's
+    const other = render(
+      <AskDelete
+        save={{ pending: signal<string | null>("delete"), touch: noop }}
+        asking={signal(true)}
+        busy
+        action="revoke"
+        going="Revoking"
+        label="Revoke"
+        onDelete={noop}
+      />,
+    );
+    expect(other).toMatch(/btn-danger"[^>]*>Revoke</);
+  });
 });
 
 describe("Foot", () => {
