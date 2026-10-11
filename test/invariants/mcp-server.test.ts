@@ -598,6 +598,49 @@ describe("the composed inbound MCP endpoint", () => {
           });
         expect(await alone(hiddenFile.id)).toEqual(await alone("missing00002"));
       }
+      const hiddenVersionId = (
+        await (
+          await chat.member.call(
+            "GET",
+            `/api/projects/${other.id}/knowledge/files/${hiddenFile.id}/versions`,
+          )
+        ).json()
+      ).versions[0].id as string;
+      const versionAlone = (versionId: string) =>
+        client.tool("knowledge", { action: "version", versionId });
+      expect(await versionAlone(hiddenVersionId)).toEqual(
+        await versionAlone("missing00004"),
+      );
+      const searchAlone = (fileId: string) =>
+        client.tool("knowledge", { action: "search", q: "hidden", fileId });
+      expect(await searchAlone(hiddenFile.id)).toEqual(
+        await searchAlone("missing00002"),
+      );
+      const gone = await createFile(chat, other.id, "gone.md", "gone");
+      expect(
+        (
+          await chat.member.call(
+            "DELETE",
+            `/api/projects/${other.id}/knowledge/files/${gone.id}`,
+          )
+        ).status,
+      ).toBe(204);
+      const readAlone = (fileId: string) =>
+        client.tool("knowledge", { action: "read", fileId });
+      expect(await readAlone(gone.id)).toEqual(await readAlone("missing00002"));
+      const unseen = await createTeam(chat.admin, "gamma");
+      const unseenFile = (
+        await (
+          await chat.admin.call(
+            "POST",
+            `/api/projects/${unseen.id}/knowledge`,
+            { body: { name: "unseen.md", text: "unseen" } },
+          )
+        ).json()
+      ).file as { id: string };
+      expect(await readAlone(unseenFile.id)).toEqual(
+        await readAlone("missing00002"),
+      );
 
       const pending = chat.scripted.next();
       const started = await chat.member.call("POST", "/api/sessions", {
