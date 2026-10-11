@@ -36,8 +36,13 @@ const readProperties = {
   since: { type: ["string", "null"], format: "date-time" },
   readAt: { type: ["string", "null"], format: "date-time" },
   q: { type: "string" },
+  skip: { type: "integer", minimum: 0 },
   fileId: { type: "string" },
   versionId: { type: "string" },
+  revision: { type: ["integer", "null"], minimum: 1 },
+  offset: { type: "integer", minimum: 1 },
+  limit: { type: "integer", minimum: 1 },
+  outline: { type: "boolean" },
 };
 
 const changeProperties = {
@@ -77,9 +82,9 @@ const READ_ACTIONS = ["list", "search", "read", "versions", "version"];
 const WRITE_ACTIONS = ["create", "edit", "replace", "rename", "delete"];
 
 const READ_DESCRIPTION =
-  "List uses projectId, optional folder prefix and optional ISO 8601 since, then after, stamp and readAt to continue. Search uses projectId, q and after; a match needs every word, and double quotes make a phrase. Read uses projectId and fileId and answers the whole file with its revision. Versions uses projectId and fileId, then after and stamp to continue. Version uses projectId and versionId.";
+  "List uses projectId, optional folder prefix and optional ISO 8601 since, then after, stamp and readAt to continue. Search uses projectId and q, optional fileId for every hit line in one file, then after and skip from the footer. A match needs every word; double quotes make a phrase. Read uses projectId and fileId, optional offset and limit for lines, or outline=true and its skip footer for Markdown headings. A continued live read also uses revision. Versions uses projectId and fileId, then after and stamp. Version uses projectId and versionId, with optional offset and limit.";
 
-const WRITE_DESCRIPTION = `${READ_DESCRIPTION} Create uses projectId, name and text. Edit changes part of an existing file with projectId, fileId, revision and 1 to ${MAX_EDITS} old/new pairs; every old must match exactly once in the text at that revision, and all pairs apply or none. Replace uses projectId, fileId, revision and the whole text after reading the file in full. Rename uses projectId, fileId, revision and name. Delete uses projectId, fileId and revision. Every change to an existing file names the revision read.`;
+const WRITE_DESCRIPTION = `${READ_DESCRIPTION} Create uses projectId, name and text. Edit changes part of a file with projectId, fileId, revision and 1 to ${MAX_EDITS} old/new pairs; every old must match exactly once, and all pairs apply or none. Replace sends the whole text only when the current file fits one read page; use edit for a larger file. Rename uses projectId, fileId, revision and name. Delete uses projectId, fileId and revision. Every change to an existing file names the revision read.`;
 
 function principalOf(authInfo: unknown): KeyPrincipal {
   const principal = (authInfo as { extra?: { principal?: Principal } })?.extra
@@ -182,7 +187,7 @@ function server(deps: McpServerDeps, principal: KeyPrincipal): McpServer {
     "sessions",
     {
       description:
-        "Search finds chats and runs with projectId, q and after; a match needs every word, and double quotes make a phrase. List is newest first with projectId, optional ISO 8601 since, then after and readAt. Children carry parentSessionId. Take sessionId from a row to read its Markdown transcript; use messageId and offset to continue.",
+        "Search finds chats and runs with projectId, q and after; a match needs every word, and double quotes make a phrase. List is newest first with projectId, optional ISO 8601 since, then after and readAt. Children carry parentSessionId. Take sessionId from a row to read its Markdown transcript, then use the footer's messageId and position to continue.",
       inputSchema: schema(["search", "list", "read"], {
         action: { type: "string" },
         projectId: { type: "string" },
@@ -192,7 +197,7 @@ function server(deps: McpServerDeps, principal: KeyPrincipal): McpServer {
         after: { type: ["string", "null"] },
         sessionId: { type: "string" },
         messageId: { type: ["string", "null"] },
-        offset: { type: "integer", minimum: 0 },
+        position: { type: "integer", minimum: 0 },
       }),
     },
     (input) => call(deps, principal, "sessions", input),

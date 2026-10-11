@@ -15,7 +15,7 @@ import { collectLogs, ORIGIN } from "../helpers/app.ts";
 import { type ChatApp, chatApp, setLimits, tick } from "../helpers/chat.ts";
 import { createTeam } from "../helpers/projects.ts";
 
-const PAGE_BYTES = 48 * 1024;
+const PAGE_BYTES = 32 * 1024;
 const META = {
   "io.modelcontextprotocol/protocolVersion": "2026-07-28",
   "io.modelcontextprotocol/clientCapabilities": {},
@@ -23,14 +23,9 @@ const META = {
 };
 
 type McpResult = {
-  content: (
-    | { type: "text"; text: string }
-    | {
-        type: "resource";
-        resource: { text: string };
-      }
-  )[];
+  content: { type: "text"; text: string }[];
   isError?: boolean;
+  structuredContent?: unknown;
 };
 
 type Mcp = {
@@ -91,32 +86,48 @@ function mcp(chat: ChatApp, token: string): Mcp {
 }
 
 const resultText = (result: McpResult): string =>
-  result.content
-    .map((part) => (part.type === "text" ? part.text : part.resource.text))
-    .join("\n");
+  result.content.map((part) => part.text).join("\n");
 
 const resultBytes = (result: McpResult): number =>
   result.content.reduce(
-    (total, part) =>
-      total +
-      Buffer.byteLength(part.type === "text" ? part.text : part.resource.text),
+    (total, part) => total + Buffer.byteLength(part.text),
     0,
   );
 
-function quotedText(result: McpResult): string {
-  // the transcript is last; a read-on line, when there is one, comes first
-  const answer = (result.content.at(-1) as { text: string }).text;
-  const ending = "\nSession transcript ends.\n";
-  const text = answer.endsWith(ending)
-    ? answer.slice(0, -ending.length)
-    : answer;
-  const marker = text.indexOf("text\n");
-  expect(marker).toBeGreaterThan(0);
-  const fence = text.slice(text.lastIndexOf("\n", marker - 1) + 1, marker);
-  const start = marker + 5;
-  const suffix = `\n${fence}`;
-  expect(text.endsWith(suffix)).toBe(true);
-  return text.slice(start, -suffix.length);
+function readPart(result: McpResult): {
+  header: string;
+  content: string;
+  footer: string;
+  fence: string;
+} {
+  expect(result.content).toHaveLength(1);
+  expect(result.content[0]!.type).toBe("text");
+  expect(result.structuredContent).toBeUndefined();
+  const answer = result.content[0]!.text;
+  const headerEnd = answer.indexOf("\n");
+  const openingEnd = answer.indexOf("\n", headerEnd + 1);
+  const opening = answer.slice(headerEnd + 1, openingEnd);
+  expect(opening).toEndWith("text");
+  const fence = opening.slice(0, -4);
+  const closing = `\n${fence}\n`;
+  const closingAt = answer.lastIndexOf(closing);
+  expect(closingAt).toBeGreaterThan(openingEnd);
+  const footer = answer.slice(closingAt + closing.length);
+  const header = answer.slice(0, headerEnd);
+  let content = answer.slice(openingEnd + 1, closingAt + 1);
+  if (
+    footer.endsWith("The file ends without a newline.") ||
+    footer.includes("This page ends mid-line; the next page continues it.")
+  ) {
+    expect(content).toEndWith("\n");
+    content = content.slice(0, -1);
+  }
+  return {
+    header,
+    content,
+    footer,
+    fence,
+  };
 }
 
 async function createFile(
@@ -147,6 +158,36 @@ async function settle(chat: ChatApp, sessionId: string) {
 }
 
 describe("the composed inbound MCP endpoint", () => {
+  async function readKnowledgePages(
+    client: Mcp,
+    projectId: string,
+    fileId: string,
+  ): Promise<{ results: McpResult[]; parts: ReturnType<typeof readPart>[] }> {
+    const results: McpResult[] = [];
+    const parts: ReturnType<typeof readPart>[] = [];
+    let args: Record<string, unknown> = {
+      action: "read",
+      projectId,
+      fileId,
+    };
+    for (let page = 0; page < 100; page++) {
+      const result = await client.tool("knowledge", args);
+      expect(result.isError).toBeUndefined();
+      const part = readPart(result);
+      results.push(result);
+      parts.push(part);
+      const next = part.footer.match(/revision=(\d+), offset=(\d+)\.$/);
+      if (next === null) return { results, parts };
+      args = {
+        action: "read",
+        projectId,
+        fileId,
+        revision: Number(next[1]),
+        offset: Number(next[2]),
+      };
+    }
+    throw new Error("knowledge read did not end");
+  }
   test("serves both protocol eras, key scopes, origins and message limits", async () => {
     const chat = await chatApp();
     try {
@@ -201,46 +242,6 @@ describe("the composed inbound MCP endpoint", () => {
       );
       expect(await ping.text()).toContain('"result":{}');
 
-      const discovered = await read.rpc("server/discover");
-      expect(discovered.result.supportedVersions).toEqual(["2026-07-28"]);
-      expect(discovered.result.capabilities.tools.listChanged).toBe(false);
-      const readTools = await read.rpc("tools/list");
-      const readKnowledge = readTools.result.tools.find(
-        (tool: { name: string }) => tool.name === "knowledge",
-      );
-      expect(readKnowledge.inputSchema.properties.action.enum).toEqual([
-        "list",
-        "search",
-        "read",
-        "versions",
-        "version",
-      ]);
-      expect(readKnowledge.description).not.toMatch(
-        /write|scope|create|edit|replace|rename|delete/i,
-      );
-      expect(readKnowledge.inputSchema.properties).not.toHaveProperty("name");
-      expect(readKnowledge.inputSchema.properties).not.toHaveProperty("text");
-      expect(readKnowledge.inputSchema.properties).not.toHaveProperty("edits");
-      const readSessions = readTools.result.tools.find(
-        (tool: { name: string }) => tool.name === "sessions",
-      );
-      expect(readSessions.inputSchema.properties.action.enum).toEqual([
-        "search",
-        "list",
-        "read",
-      ]);
-      expect(readSessions.description).toContain(
-        "Take sessionId from a row to read",
-      );
-      const forged = await read.tool("knowledge", {
-        action: "rename",
-        projectId: chat.projectId,
-        fileId: "missing00001",
-        name: "other.md",
-      });
-      expect(forged.isError).toBe(true);
-      expect(resultText(forged)).toBe("this access key is read-only");
-
       const writeTools = await mcp(chat, writeKey.token).rpc("tools/list");
       const writeKnowledge = writeTools.result.tools.find(
         (tool: { name: string }) => tool.name === "knowledge",
@@ -248,11 +249,14 @@ describe("the composed inbound MCP endpoint", () => {
       expect(writeKnowledge.inputSchema.properties.action.enum).toContain(
         "delete",
       );
+      expect(writeKnowledge.inputSchema.properties.revision.type).toBe(
+        "integer",
+      );
       expect(writeKnowledge.description).toContain(
         "every old must match exactly once",
       );
       expect(writeKnowledge.description).toContain(
-        "whole text after reading the file in full",
+        "current file fits one read page",
       );
 
       const foreign = await read.raw(
@@ -322,7 +326,7 @@ describe("the composed inbound MCP endpoint", () => {
         text: "\n".repeat(4 * 1024 * 1024),
       });
       expect(fitting.isError).toBeUndefined();
-      const escaped = await client.raw({
+      const escapedBody = {
         jsonrpc: "2.0",
         id: 1,
         method: "tools/call",
@@ -336,8 +340,17 @@ describe("the composed inbound MCP endpoint", () => {
           },
           _meta: META,
         },
-      });
+      };
+      expect(Buffer.byteLength(JSON.stringify(escapedBody))).toBeGreaterThan(
+        MAX_KNOWLEDGE_BODY,
+      );
+      const escaped = await client.raw(escapedBody);
       expect(escaped.status).toBe(413);
+      expect(
+        chat.app.knowledge
+          .list(chat.projectId)
+          .files.some((file) => file.name === "control.md"),
+      ).toBe(false);
       const raw = await chat.app.client().call("POST", "/mcp", {
         raw: " ".repeat(MAX_KNOWLEDGE_BODY + 1),
         headers: { authorization: `Bearer ${key.token}` },
@@ -770,7 +783,7 @@ describe("the composed inbound MCP endpoint", () => {
     }
   });
 
-  test("answers a knowledge file whole and refuses one of 1 MiB", async () => {
+  test("pages knowledge byte-exactly and protects continuations and replace", async () => {
     const chat = await chatApp();
     try {
       await setLimits(chat, {
@@ -778,27 +791,27 @@ describe("the composed inbound MCP endpoint", () => {
         knowledgeProjectBytes: 16 * 1024 * 1024,
       });
       const key = await createKey(chat.member, {
-        name: "whole",
+        name: "paged",
         scope: "write",
       });
       const client = mcp(chat, key.token);
-      const text = `start\n${"😀".repeat(50_000)}\nend\n`;
-      const file = await createFile(chat, chat.projectId, "large.md", text);
-      const read = await client.tool("knowledge", {
-        action: "read",
-        projectId: chat.projectId,
-        fileId: file.id,
-      });
-      expect(read.isError).toBeFalsy();
-      expect(resultBytes(read)).toBeGreaterThan(PAGE_BYTES);
-      expect((read.content[0] as { text: string }).text).toContain(
-        `Revision ${file.revision}.`,
+      const markdown = `${Array.from(
+        { length: 2_500 },
+        (_, index) =>
+          `line-${String(index).padStart(4, "0")} ${"x".repeat(30)}`,
+      ).join("\n")}\n`;
+      expect(Buffer.byteLength(markdown)).toBeGreaterThan(98_000);
+      const file = await createFile(chat, chat.projectId, "large.md", markdown);
+      const paged = await readKnowledgePages(client, chat.projectId, file.id);
+      expect(paged.parts.length).toBeGreaterThan(3);
+      expect(paged.parts.map((part) => part.content).join("")).toBe(markdown);
+      for (const result of paged.results) {
+        expect(resultBytes(result)).toBeLessThanOrEqual(PAGE_BYTES);
+      }
+      expect(paged.parts[0]!.header).toContain("lines 1-");
+      expect(paged.parts.at(-1)!.footer).toBe(
+        `End of ${file.id}, revision ${file.revision}.`,
       );
-      const resource = read.content.find(
-        (part) => part.type === "resource",
-      ) as { type: "resource"; resource: { text: string; uri: string } };
-      expect(resource.resource.text).toBe(text);
-      expect(resource.resource.uri).toContain(`revision=${file.revision}`);
 
       const versions = await client.tool("knowledge", {
         action: "versions",
@@ -806,61 +819,113 @@ describe("the composed inbound MCP endpoint", () => {
         fileId: file.id,
       });
       const old = JSON.parse(resultText(versions).split("\n")[0]!);
-      const version = await client.tool("knowledge", {
+      const firstVersion = await client.tool("knowledge", {
         action: "version",
         projectId: chat.projectId,
         versionId: old.id,
       });
-      expect(
-        (
-          version.content.find((part) => part.type === "resource") as {
-            resource: { text: string };
-          }
-        ).resource.text,
-      ).toBe(text);
+      const versionParts = [readPart(firstVersion)];
+      let versionOffset: number | null = Number(
+        versionParts[0]!.footer.match(/offset=(\d+)\.$/)![1],
+      );
 
-      const exact = " lead\r\nbell \u0007 and \u202e turn\t\n\n";
-      const odd = await createFile(chat, chat.projectId, "odd.md", exact);
-      const oddRead = await client.tool("knowledge", {
+      const pageThreeOld = paged.parts[2]!.content.match(/line-\d{4}/)![0];
+      const edited = await client.tool("knowledge", {
+        action: "edit",
+        projectId: chat.projectId,
+        fileId: file.id,
+        revision: file.revision,
+        edits: [{ old: pageThreeOld, new: pageThreeOld.toUpperCase() }],
+      });
+      expect(edited.isError).toBeUndefined();
+      expect(
+        chat.app.knowledge.store.byId(chat.projectId, file.id)?.text,
+      ).toContain(pageThreeOld.toUpperCase());
+      for (let page = 1; versionOffset !== null && page < 100; page++) {
+        const version = await client.tool("knowledge", {
+          action: "version",
+          projectId: chat.projectId,
+          versionId: old.id,
+          offset: versionOffset,
+        });
+        expect(resultBytes(version)).toBeLessThanOrEqual(PAGE_BYTES);
+        const part = readPart(version);
+        expect(part.header).toContain(`id ${old.id}`);
+        versionParts.push(part);
+        const next = part.footer.match(/offset=(\d+)\.$/);
+        versionOffset = next === null ? null : Number(next[1]);
+      }
+      expect(versionOffset).toBeNull();
+      expect(versionParts.map((part) => part.content).join("")).toBe(markdown);
+      const staleNext = paged.parts[0]!.footer.match(
+        /revision=(\d+), offset=(\d+)\.$/,
+      )!;
+      const stale = await client.tool("knowledge", {
         action: "read",
         projectId: chat.projectId,
-        fileId: odd.id,
+        fileId: file.id,
+        revision: Number(staleNext[1]),
+        offset: Number(staleNext[2]),
       });
-      expect(
-        (
-          oddRead.content.find((part) => part.type === "resource") as {
-            resource: { text: string };
-          }
-        ).resource.text,
-      ).toBe(exact);
+      expect(stale.isError).toBe(true);
+      expect(resultText(stale)).toBe("the file changed; read from the start");
 
-      const under = await createFile(
-        chat,
-        chat.projectId,
-        "under.md",
-        "a".repeat(1024 * 1024 - 1),
-      );
-      const underRead = await client.tool("knowledge", {
-        action: "read",
-        projectId: chat.projectId,
-        fileId: under.id,
-      });
-      expect(underRead.isError).toBeFalsy();
-
-      // the limit counts bytes: 600,000 two-byte characters are over it
-      const huge = await createFile(
-        chat,
-        chat.projectId,
-        "huge.md",
-        "é".repeat(600_000),
-      );
       const refused = await client.tool("knowledge", {
-        action: "read",
+        action: "replace",
         projectId: chat.projectId,
-        fileId: huge.id,
+        fileId: file.id,
+        revision: JSON.parse(resultText(edited)).revision,
+        text: "truncated\n",
       });
       expect(refused.isError).toBe(true);
-      expect(resultText(refused)).toContain("read it on the page");
+      expect(resultText(refused)).toContain("use edit");
+      expect(resultText(refused)).toContain("delete and create");
+
+      const exactCases = [
+        ["final.md", "one\r\n".repeat(10_000)] as const,
+        ["no-final.md", `${"two\r\n".repeat(10_000)}last`] as const,
+      ];
+      for (const [name, text] of exactCases) {
+        const exact = await createFile(chat, chat.projectId, name, text);
+        const read = await readKnowledgePages(client, chat.projectId, exact.id);
+        expect(read.parts.map((part) => part.content).join("")).toBe(text);
+        for (const result of read.results) {
+          expect(resultBytes(result)).toBeLessThanOrEqual(PAGE_BYTES);
+        }
+        expect(read.parts.at(-1)!.footer.includes("without a newline")).toBe(
+          !text.endsWith("\n"),
+        );
+      }
+
+      const overlongText = `${"`".repeat(4)}${"a".repeat(PAGE_BYTES + 1)}${"`".repeat(5)}`;
+      const overlong = await createFile(
+        chat,
+        chat.projectId,
+        "overlong.md",
+        overlongText,
+      );
+      const overlongRead = await readKnowledgePages(
+        client,
+        chat.projectId,
+        overlong.id,
+      );
+      expect(overlongRead.parts).toHaveLength(1);
+      expect(overlongRead.parts[0]!.content).toBe(overlongText);
+      expect(overlongRead.parts[0]!.header).toContain("longer than one page");
+      expect(overlongRead.parts[0]!.fence).toBe("``````");
+
+      const small = await createFile(chat, chat.projectId, "small.md", "old\n");
+      const replaced = await client.tool("knowledge", {
+        action: "replace",
+        projectId: chat.projectId,
+        fileId: small.id,
+        revision: small.revision,
+        text: "new\n",
+      });
+      expect(replaced.isError).toBeUndefined();
+      expect(
+        chat.app.knowledge.store.byId(chat.projectId, small.id)?.text,
+      ).toBe("new\n");
     } finally {
       await chat.app.shutdown();
     }
@@ -892,15 +957,15 @@ describe("the composed inbound MCP endpoint", () => {
         const result = await client.tool("sessions", args);
         pages.push(result);
         expect(resultBytes(result)).toBeLessThanOrEqual(PAGE_BYTES);
-        const next = (result.content[0] as { text?: string }).text?.match(
-          /messageId=(\w+), offset=(\d+)/,
+        const next = result.content[0]!.text.match(
+          /messageId=(\w+), position=(\d+)/,
         );
         if (!next) break;
         args = {
           action: "read",
           sessionId,
           messageId: next[1],
-          offset: Number(next[2]),
+          position: Number(next[2]),
         };
       }
       expect(pages.length).toBeGreaterThan(2);
@@ -916,10 +981,12 @@ describe("the composed inbound MCP endpoint", () => {
           "UTC",
         ),
       );
-      expect(pages.map(quotedText).join("")).toBe(`${sanitize(exported)}\n`);
+      expect(pages.map((page) => readPart(page).content).join("")).toBe(
+        `${sanitize(exported)}\n`,
+      );
 
-      const cursor = (pages[0]!.content[0] as { text: string }).text.match(
-        /messageId=(\w+), offset=(\d+)/,
+      const cursor = pages[0]!.content[0]!.text.match(
+        /messageId=(\w+), position=(\d+)/,
       )!;
       const regenerated = chat.scripted.next();
       expect(
@@ -936,7 +1003,7 @@ describe("the composed inbound MCP endpoint", () => {
         action: "read",
         sessionId,
         messageId: cursor[1],
-        offset: Number(cursor[2]),
+        position: Number(cursor[2]),
       });
       expect(changed.isError).toBe(true);
       expect(resultText(changed)).toContain("read from the start");

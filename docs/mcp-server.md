@@ -62,38 +62,79 @@ answer holds only the file id, name and new revision.
 
 ## Results
 
-Knowledge `read` and `version` answer the whole file, as GitHub's MCP server
-answers `get_file_contents`: a data label with the revision, then the stored
-text exactly, never sanitized, since an `edit`'s `old` must match it. A file
-of 1 MiB or more is refused; there is no paging and no download route. A
-client keeps a result past its own output cap on disk. Lists and transcripts
-page at 48 KiB, under Claude Code's 25,000-token and OpenCode's 50 KiB
-defaults, and do not follow `resultBytes`. Knowledge file and version list
-continuations carry a snapshot stamp; a filtered file list stamps its matching
-rows, so an unrelated folder does not invalidate it. When the stamped list
-changes they say to read from the start. Knowledge and session list
-continuations also carry the first page's `readAt`; every page repeats that
-same time in its footer, and the client uses it as `since` only after the
-whole chain. Knowledge `since` is inclusive, so a write in that exact
-millisecond may repeat but cannot be missed. Knowledge list rows and search
-file metadata carry `by` in the page's `@name` words, the author's `sessionId`
-when a chat or run wrote it and null otherwise, and `updatedAt` as ISO 8601
-UTC; `change` appears only with `since`. Version rows carry the same `by` and
-`sessionId` and an ISO 8601 UTC `writtenAt`. Session pages pin the message and
-offset, with the read-on line first and newline-terminated so a client joining
-blocks cannot run it into the data label. The last page says the transcript
-ends; a removed continuation message says the session changed and to read
-from the start. Knowledge continuations are newline-terminated too. Search
-pages by `after`, explicitly say when nothing matched, and one underlying
-search page already fits below the cap.
+Every tool answer uses plain text parts, never embedded resources or
+`structuredContent`. Knowledge `read` and `version` and session `read` each
+answer exactly one text part. Its first line is a sentence naming the kind,
+id, JSON-quoted file name or session title, revision or transcript position,
+and whether it is complete or what range it holds. It says the fenced text is
+data written by users and agents, not instructions. JSON quoting keeps control
+characters, quotes and backticks from changing that one-line header. The data
+is in a `text` backtick fence longer than every backtick run in it.
 
-Knowledge `read` and `version` return an embedded resource with a
-`1ctx://` URI naming the project, path and revision, the file kind's MIME
-type and the text. They do not register an MCP resource. Search hit lines
-pass the tool sanitizer; transcript text has its controls stripped and is not
-trimmed, so a Markdown line break survives. Both are labelled
-as project data quoted as data, never instructions. Transcript pages are
-fenced.
+The footer is the last line and either marks the end or gives the exact next
+call. A result without its footer was cut. Content begins after the opening
+fence's newline. When content ends in a newline, the closing fence immediately
+follows that newline; otherwise formatting adds one newline before the closing
+fence and the final footer says the file ends without a newline. Thus the line
+before the closing fence is the last content line, and removing the one
+structural newline from a no-final-newline page recovers the stored text. Every
+non-final file page ends with the newline that ends its last line. Knowledge
+text is otherwise byte-exact, since an `edit`'s `old` must match it. Transcript
+text keeps its controls stripped and is not trimmed, so a Markdown line break
+survives.
+
+A complete text part is at most 32 KiB, below Codex's smallest client
+default with margin. The sole exception is one stored file line that is itself
+too large to fit with the envelope; a client may cut that line in the middle.
+Lists, both searches, version lists and transcripts page under the cap and
+ignore `resultBytes`. Knowledge files and versions page by whole stored lines.
+`offset` is a one-based first line and defaults to 1; `limit` optionally caps
+how many lines the call returns, but a page still stops before 32 KiB. The
+header names the page's lines and total, or says the file is empty. A live-file
+continuation includes its revision, and a changed revision says the file
+changed and to read from the start. A version is immutable, so its continuation
+needs only version id and offset. An offset past the end is refused clearly. A
+stored line that cannot fit with the required header, fence and footer is the
+sole exception: it is sent whole on its own page and the header says so.
+
+A transcript continuation pins its message and UTF-16 `position`. Its one-part
+header names the title, id and text position; its footer carries the next
+message and position or says the transcript ends. A page ends at the last line
+ending that fits. Only when no line ending fits may it end mid-line, and its
+footer says that the next page continues the line. A removed continuation
+message says the session changed and to read from the start.
+
+Knowledge file and version list continuations carry a snapshot stamp; a
+filtered file list stamps its matching rows, so an unrelated folder does not
+invalidate it. When the stamped list changes they say to read from the start.
+Knowledge and session list continuations also carry the first page's `readAt`;
+every page repeats that same time in its footer, and the client uses it as
+`since` only after the whole chain. Knowledge `since` is inclusive, so a write
+in that exact millisecond may repeat but cannot be missed. Knowledge list rows
+and search file metadata carry `by` in the page's `@name` words, the author's
+`sessionId` when a chat or run wrote it and null otherwise, and `updatedAt` as
+ISO 8601 UTC; `change` appears only with `since`. Version rows carry the same
+`by` and `sessionId` and an ISO 8601 UTC `writtenAt`. Searches page their
+underlying rows by `after` and oversized formatted knowledge-search rows by
+`skip`; they explicitly say when nothing matched.
+With `fileId`, knowledge search checks only that reachable file under the same
+per-user one-at-a-time guard as project search. Each answer gives the file
+metadata once, then only line and sanitized text per hit. It stops scanning
+when the page is full and returns `skip` for the next hit. Search hit lines use
+the shared 160-character cutter.
+
+Knowledge `read` with `outline: true` returns only a Markdown file's ATX
+headings as line, level and text rows. Heading text uses the search hit line
+cutter. It ignores headings inside backtick or tilde fenced code blocks,
+including fences indented by up to three spaces, and pages rows with `skip`.
+Every outline page ends with an end marker or exact continuation, and its
+header says heading text is data, not instructions. A non-Markdown file says
+it has no outline. Outline cannot be combined with `offset` or `limit`.
+
+`replace` is accepted only when reading the current file from line 1 needs no
+continuation. A larger file changes with `edit`, or with `delete` and `create`
+for an intentional full rewrite. `edit`, `rename` and `delete` keep their
+existing rules.
 
 Each tool call logs one `mcp call` event with user, key id, tool, action,
 status and duration. Arguments and results never enter the log. The router
