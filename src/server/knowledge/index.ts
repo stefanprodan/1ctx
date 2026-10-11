@@ -50,6 +50,7 @@ export type KnowledgeDeps = {
   access: AccessPort;
 };
 export type KnowledgeCapability = KnowledgePort & {
+  oneAtATime<T>(userId: string, scan: () => T): T;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   claimUploads(
     projectId: string,
@@ -139,7 +140,11 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       deleted: false,
     };
   };
+  function guardedSearch<T>(userId: string, scan: () => T): T {
+    return oneAtATime(searching, userId, scan);
+  }
   const capability: KnowledgeCapability = {
+    oneAtATime: guardedSearch,
     checkUploads: (userId, projectId, ids) =>
       uploads.check(userId, projectId, ids, deps.clock()),
     claimUploads: (projectId, sessionId, claims) =>
@@ -294,7 +299,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       });
     },
     search: (projectId, userId, q, after) =>
-      oneAtATime(searching, userId, () =>
+      guardedSearch(userId, () =>
         search(
           {
             files: (from) => store.after(projectId, from),

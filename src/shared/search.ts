@@ -57,8 +57,18 @@ export function searchTerms(q: string): string[] {
 // terms as searchTerms gives them
 export function holdsAll(text: string, terms: readonly string[]): boolean {
   if (terms.length === 0) return false;
-  const lower = text.toLowerCase();
-  return terms.every((term) => lower.includes(term));
+  const held = new Set<string>();
+  let start = 0;
+  while (start <= text.length && held.size < terms.length) {
+    let end = text.indexOf("\n", start);
+    if (end < 0) end = text.length;
+    const line = text.slice(start, end).toLowerCase();
+    start = end + 1;
+    for (const term of terms) {
+      if (!held.has(term) && line.includes(term)) held.add(term);
+    }
+  }
+  return held.size === terms.length;
 }
 
 // null when the text misses a term
@@ -92,7 +102,7 @@ export function matchLines(
     if (lines.length < max) {
       // a word folded in context (a final sigma) may not map back
       const at = termRanges(line, terms)[0] ?? { from: 0, to: 0 };
-      lines.push(cut(line, number, at));
+      lines.push(cutSearchLine(line, number, at));
     }
   }
   return { count, lines };
@@ -154,7 +164,11 @@ function toSource(
   return { from: source[from]!, to: last + lastWidth };
 }
 
-function cut(line: string, number: number, at: SearchRange): SearchLine {
+export function cutSearchLine(
+  line: string,
+  number: number,
+  at: SearchRange,
+): SearchLine {
   const text = line.endsWith("\r") ? line.slice(0, -1) : line;
   if (text.length <= SEARCH_LINE_CHARS) {
     return { line: number, text, cutStart: false, cutEnd: false };
