@@ -154,8 +154,12 @@ export function sessionsTool(
         })),
       }),
     );
-    if (lines.length === 0 && found.next === null) {
-      lines.push(`No session holds every word of ${JSON.stringify(input.q)}.`);
+    if (found.next === null) {
+      lines.push(
+        lines.length === 0
+          ? `No session holds every word of ${JSON.stringify(input.q)}.`
+          : `End of search results for ${JSON.stringify(input.q)}.`,
+      );
     }
     const page = sessionLines(
       lines,
@@ -196,7 +200,12 @@ export function sessionsTool(
     );
   }
   const session = deps.sessions.byId(input.sessionId);
-  if (session === null) throw new NotFound("no such chat");
+  if (
+    session === null ||
+    (input.projectId !== null && input.projectId !== session.projectId)
+  ) {
+    throw new NotFound("no such chat");
+  }
   try {
     deps.access.project(principal, session.projectId);
   } catch (error) {

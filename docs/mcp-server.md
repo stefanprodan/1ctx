@@ -23,14 +23,18 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
   before its body is read. Every member of an admitted batch counts. The
   fixed window is held per key id.
 - The factory makes one server per request. It identifies itself as
-  `1ctx` at the build version, has no instructions, registers tools only,
-  and advertises `tools.listChanged: false`. It advertises no resources,
-  prompts, sampling or subscriptions.
+  `1ctx` at the build version, registers tools only, and advertises
+  `tools.listChanged: false`. It advertises no resources, prompts,
+  sampling or subscriptions.
+- Its instructions say what 1ctx is and when to use the tools, since a
+  client's tool search reads them to decide whether to load the tools; a
+  read key's never name a write. What one call needs stays in that tool's
+  description, for clients that drop instructions.
 
 ## Tools
 
-- `projects` lists id, name and whether each reachable project is personal
-  or team, paging by id with `after` when needed.
+- `projects` lists id, name, whether each reachable project is personal
+  or team, and its description, paging by id with `after` when needed.
 - `knowledge` reads with `list`, `search`, `read`, `versions` and
   `version`. List may filter a folder with `prefix` and files updated at or
   after an ISO 8601 `since`; matching rows say `new` or `changed`. A write key
@@ -54,6 +58,11 @@ finds roots and children, then resolves the session's project through that
 same port; hidden and missing sessions both answer `no such chat`. This MCP
 lookup does not widen the page's root-only `visible()`. A list starts from
 `reachableProjectIds()`. Hidden and missing objects have the same answer.
+
+A file, version or session id is unique across projects, so a call that
+names one takes `projectId` as optional: the server reads the project from
+the row and answers a row the key cannot reach as missing. A `projectId`
+that is given and differs from the row's answers the same.
 
 A knowledge write uses the key's user as author, with origin `key` and a
 copy of the key name. Its outer transaction calls `checkKey()` before the
@@ -95,7 +104,8 @@ continuation includes its revision, and a changed revision says the file
 changed and to read from the start. A version is immutable, so its continuation
 needs only version id and offset. An offset past the end is refused clearly. A
 stored line that cannot fit with the required header, fence and footer is the
-sole exception: it is sent whole on its own page and the header says so.
+sole exception: it is sent whole on its own page and the header says so. A live
+read past line 1 needs the revision, and its refusal says where to take it from.
 
 A transcript continuation pins its message and UTF-16 `position`. Its one-part
 header names the title, id and text position; its footer carries the next
@@ -116,7 +126,9 @@ and search file metadata carry `by` in the page's `@name` words, the author's
 ISO 8601 UTC; `change` appears only with `since`. Version rows carry the same
 `by` and `sessionId` and an ISO 8601 UTC `writtenAt`. Searches page their
 underlying rows by `after` and oversized formatted knowledge-search rows by
-`skip`; they explicitly say when nothing matched.
+`skip`; they explicitly say when nothing matched. A search, version list or
+project list page ends with the exact next call or an end line, as a read
+does; a knowledge or session list page ends with its `List read at` line.
 With `fileId`, knowledge search checks only that reachable file under the same
 per-user one-at-a-time guard as project search. Each answer gives the file
 metadata once, then only line and sanitized text per hit. It stops scanning

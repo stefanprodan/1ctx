@@ -29,6 +29,20 @@ describe("the inbound MCP project boundary", () => {
     await area.close();
   });
 
+  test("ends the project list with an end line", async () => {
+    const { area, send } = fixture();
+    const answer = await toolCall(send, "projects", { action: "list" });
+    const text = answer.result.content[0].text as string;
+    expect(JSON.parse(text.split("\n")[0]!)).toEqual({
+      id: project.id,
+      name: project.name,
+      kind: project.kind,
+      description: project.description,
+    });
+    expect(text).toEndWith("\nEnd of projects.");
+    await area.close();
+  });
+
   test("MCP reads a found child only through its project", async () => {
     const chat = await subagentApp();
     try {
@@ -98,6 +112,19 @@ describe("the inbound MCP project boundary", () => {
       expect(found.content[0].text).toContain(`"id":"${childId}"`);
       const read = await call({ action: "read", sessionId: childId });
       expect(read.isError).toBeUndefined();
+      const named = await call({
+        action: "read",
+        projectId: chat.projectId,
+        sessionId: childId,
+      });
+      expect(named.content).toEqual(read.content);
+      const elsewhere = await call({
+        action: "read",
+        projectId: hiddenProject.id,
+        sessionId: childId,
+      });
+      expect(elsewhere.isError).toBe(true);
+      expect(elsewhere.content[0].text).toBe("no such chat");
       expect(read.content.at(-1).text).toContain(
         "zebrafeedback: the child found three things",
       );

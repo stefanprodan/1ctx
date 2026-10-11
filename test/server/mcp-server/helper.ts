@@ -210,6 +210,10 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
         totals: { files: 1, bytes: state.text.length, tokens: 1 },
         limits: { fileBytes: 1, files: 1, projectBytes: 1, historyDays: 1 },
       }),
+      projectOf: (kind, id) =>
+        id === (kind === "file" ? "file00000001" : "version00001")
+          ? project.id
+          : null,
       rawFile: (_projectId, id) => {
         if (state.readError !== null) throw state.readError;
         return id === "file00000001"

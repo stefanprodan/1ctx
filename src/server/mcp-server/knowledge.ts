@@ -9,8 +9,9 @@ import {
   termRanges,
 } from "../../shared/search.ts";
 import { transact } from "../db/index.ts";
-import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
+import { BadRequest, Conflict, HttpError, NotFound } from "../lib/errors.ts";
 import { sha256 } from "../lib/ids.ts";
+import { outlineRows } from "./outline.ts";
 import type { KnowledgeInput } from "./parse.ts";
 import type { KeyPrincipal, McpServerDeps } from "./ports.ts";
 import {
@@ -197,42 +198,35 @@ function fileSearch(
     rows.push(
       `No line in file ${file.id} holds every word of ${JSON.stringify(q)}.`,
     );
+  } else {
+    // shorter than the continuation each row left room for
+    rows.push(`End of hits in ${file.id}, revision ${file.revision}.`);
   }
   return textResult(`${prefix}\n${rows.join("\n")}`);
 }
 
-type OutlineRow = { line: number; level: number; text: string };
-
-function outlineRows(text: string): OutlineRow[] {
-  const rows: OutlineRow[] = [];
-  let fence: { marker: string; length: number } | null = null;
-  for (const [index, line] of text.split("\n").entries()) {
-    if (fence !== null) {
-      const close = line.match(/^ {0,3}(`+|~+)[ \t]*\r?$/);
-      if (
-        close !== null &&
-        close[1]![0] === fence.marker &&
-        close[1]!.length >= fence.length
-      ) {
-        fence = null;
-      }
-      continue;
-    }
-    const opening = line.match(/^ {0,3}(`{3,}|~{3,})/);
-    if (opening !== null) {
-      fence = { marker: opening[1]![0]!, length: opening[1]!.length };
-      continue;
-    }
-    const heading = line.match(/^(#{1,6})(?:[ \t]+(.*)|[ \t]*)\r?$/);
-    if (heading === null) continue;
-    const headingText = (heading[2] ?? "").replace(/[ \t]+#+[ \t]*$/, "");
-    rows.push({
-      line: index + 1,
-      level: heading[1]!.length,
-      text: cutSearchLine(headingText, index + 1, { from: 0, to: 0 }).text,
-    });
+// a file or version the key cannot reach answers as a missing one
+function projectOf(
+  deps: McpServerDeps,
+  principal: KeyPrincipal,
+  input: KnowledgeInput,
+) {
+  if (input.projectId !== null) {
+    return deps.access.project(principal, input.projectId);
   }
-  return rows;
+  const owner =
+    input.action === "version"
+      ? deps.knowledge.projectOf("version", input.versionId)
+      : "fileId" in input && input.fileId !== null
+        ? deps.knowledge.projectOf("file", input.fileId)
+        : null;
+  if (owner === null) throw new NotFound();
+  try {
+    return deps.access.project(principal, owner);
+  } catch (error) {
+    if (error instanceof HttpError) throw new NotFound();
+    throw error;
+  }
 }
 
 export function knowledgeTool(
@@ -240,7 +234,7 @@ export function knowledgeTool(
   principal: KeyPrincipal,
   input: KnowledgeInput,
 ): McpResult {
-  const project = deps.access.project(principal, input.projectId);
+  const project = projectOf(deps, principal, input);
   if (input.action === "list") {
     const all = deps.knowledge.list(project.id).files;
     const selected = all.filter(
@@ -313,19 +307,19 @@ export function knowledgeTool(
         }),
       ),
     ];
-    if (found.next !== null) {
-      lines.push(
-        `Read on with knowledge action=search, projectId=${project.id}, q=${JSON.stringify(input.q)}, after=${JSON.stringify(found.next)}.\n`,
-      );
-    }
-    if (lines.length === 0) {
-      lines.push(
-        `No file name or line holds every word of ${JSON.stringify(input.q)}.`,
-      );
-    }
-    if (input.skip >= lines.length) {
+    // a skip may land on the next-call line, which can outgrow the row
+    // before it, but never on the shorter end line
+    const reachable = lines.length + (found.next === null ? 0 : 1);
+    if (input.skip > 0 && input.skip >= reachable) {
       throw new Conflict("the search changed; read from the start");
     }
+    lines.push(
+      found.next !== null
+        ? `Read on with knowledge action=search, projectId=${project.id}, q=${JSON.stringify(input.q)}, after=${JSON.stringify(found.next)}.\n`
+        : lines.length > 0
+          ? `End of search results for ${JSON.stringify(input.q)}.`
+          : `No file name or line holds every word of ${JSON.stringify(input.q)}.`,
+    );
     const label = dataLabel("Knowledge search results");
     const page = cappedLines(
       lines.slice(input.skip),
@@ -398,20 +392,23 @@ export function knowledgeTool(
     const versions = all.slice(start);
     return textResult(
       cappedLines(
-        versions.map((version) =>
-          jsonLine({
-            id: version.id,
-            fileId: version.fileId,
-            name: version.name,
-            revision: version.revision,
-            bytes: version.bytes,
-            lines: version.lines,
-            by: byWords(version.author),
-            sessionId: version.author.sessionId,
-            writtenAt: new Date(version.writtenAt).toISOString(),
-            deleted: version.deleted,
-          }),
-        ),
+        [
+          ...versions.map((version) =>
+            jsonLine({
+              id: version.id,
+              fileId: version.fileId,
+              name: version.name,
+              revision: version.revision,
+              bytes: version.bytes,
+              lines: version.lines,
+              by: byWords(version.author),
+              sessionId: version.author.sessionId,
+              writtenAt: new Date(version.writtenAt).toISOString(),
+              deleted: version.deleted,
+            }),
+          ),
+          `End of versions of ${input.fileId}.`,
+        ],
         (next) =>
           `Read on with knowledge action=versions, projectId=${project.id}, fileId=${input.fileId}, after=${versions[next - 1]!.id}, stamp=${stamp}.\n`,
       ),

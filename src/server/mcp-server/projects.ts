@@ -20,13 +20,17 @@ export function projectsTool(
     .sort((left, right) => left.id.localeCompare(right.id));
   return textResult(
     cappedLines(
-      projects.map((project) =>
-        jsonLine({
-          id: project.id,
-          name: project.name,
-          kind: project.kind,
-        }),
-      ),
+      [
+        ...projects.map((project) =>
+          jsonLine({
+            id: project.id,
+            name: project.name,
+            kind: project.kind,
+            description: project.description,
+          }),
+        ),
+        "End of projects.",
+      ],
       (next) =>
         `Read on with projects action=list, after=${projects[next - 1]!.id}.`,
     ),
