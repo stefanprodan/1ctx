@@ -68,6 +68,7 @@ import {
   SCOPE_OPTIONS,
   SECTION_TEXT,
   SHOWN_ONCE,
+  SKILL_URL,
   scopeHint,
 } from "./AccessKeys.model.ts";
 import "./profile.css";
@@ -325,6 +326,11 @@ export function ShownKey({
         label="Codex"
         text={codexBlock(origin)}
         hint={`In ~/.codex/config.toml. Set ${CODEX_ENV} to the key.`}
+      />
+      <Snippet
+        label="Skill"
+        text={SKILL_URL}
+        hint="Teaches an agent to claim and report on external tasks."
       />
       <div class="profile-key-done">
         <button type="button" class="btn btn-primary" onClick={onDone}>
