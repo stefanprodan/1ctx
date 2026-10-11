@@ -23,9 +23,13 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
   before its body is read. Every member of an admitted batch counts. The
   fixed window is held per key id.
 - The factory makes one server per request. It identifies itself as
-  `1ctx` at the build version, has no instructions, registers tools only,
-  and advertises `tools.listChanged: false`. It advertises no resources,
-  prompts, sampling or subscriptions.
+  `1ctx` at the build version, registers tools only, and advertises
+  `tools.listChanged: false`. It advertises no resources, prompts,
+  sampling or subscriptions.
+- Its instructions say what 1ctx is and when to use the tools, since a
+  client's tool search reads them to decide whether to load the tools; a
+  read key's never name a write. What one call needs stays in that tool's
+  description, for clients that drop instructions.
 
 ## Tools
 
@@ -95,14 +99,13 @@ Lists, both searches, version lists and transcripts page under the cap and
 ignore `resultBytes`. Knowledge files and versions page by whole stored lines.
 `offset` is a one-based first line and defaults to 1; `limit` optionally caps
 how many lines the call returns, but a page still stops before 32 KiB. The
-header names the page's lines and total, or says the file is empty. A
-live-file continuation includes its revision, and a changed revision says the
-file changed and to read from the start. A live read past line 1 needs that
-revision, and its refusal says where to take it from. A version is immutable,
-so its continuation needs only version id and offset. An offset past the end
-is refused clearly. A stored line that cannot fit with the required header,
-fence and footer is the sole exception: it is sent whole on its own page and
-the header says so.
+header names the page's lines and total, or says the file is empty. A live-file
+continuation includes its revision, and a changed revision says the file
+changed and to read from the start. A version is immutable, so its continuation
+needs only version id and offset. An offset past the end is refused clearly. A
+stored line that cannot fit with the required header, fence and footer is the
+sole exception: it is sent whole on its own page and the header says so. A live
+read past line 1 needs the revision, and its refusal says where to take it from.
 
 A transcript continuation pins its message and UTF-16 `position`. Its one-part
 header names the title, id and text position; its footer carries the next
