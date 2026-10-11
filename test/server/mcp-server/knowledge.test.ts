@@ -296,6 +296,15 @@ describe("the inbound MCP knowledge tool", () => {
     expect(result).toContain("matchline");
     expect(result).not.toContain("skip=");
     expect(result).toEndWith('\nEnd of search results for "match".');
+    const stale = await toolCall(send, "knowledge", {
+      action: "search",
+      projectId: project.id,
+      q: "match",
+      skip: 2,
+    });
+    expect(stale.result.content[0].text).toBe(
+      "the search changed; read from the start",
+    );
 
     const refused = await toolCall(send, "knowledge", {
       action: "search",
@@ -323,6 +332,13 @@ describe("the inbound MCP knowledge tool", () => {
       projectId: project.id,
     });
     expect(noFile.result.content[0].text).toBe("fileId is required");
+    const noVersion = await toolCall(send, "knowledge", {
+      action: "version",
+      projectId: project.id,
+    });
+    expect(noVersion.result.content[0].text).toBe("versionId is required");
+    const noSession = await toolCall(send, "sessions", { action: "read" });
+    expect(noSession.result.content[0].text).toBe("sessionId is required");
     const badId = await toolCall(send, "knowledge", {
       action: "read",
       projectId: "no",
@@ -337,7 +353,7 @@ describe("the inbound MCP knowledge tool", () => {
     });
     expect(jump.result.isError).toBe(true);
     expect(jump.result.content[0].text).toBe(
-      "revision is required with offset; take it from the outline, a list row, a search hit or the page before",
+      "revision is required with offset; take it from a list row, a search hit, the outline or the page before",
     );
     await area.close();
   });

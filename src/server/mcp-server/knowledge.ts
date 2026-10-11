@@ -283,21 +283,19 @@ export function knowledgeTool(
         }),
       ),
     ];
-    if (found.next !== null) {
-      lines.push(
-        `Read on with knowledge action=search, projectId=${project.id}, q=${JSON.stringify(input.q)}, after=${JSON.stringify(found.next)}.\n`,
-      );
-    } else if (lines.length > 0) {
-      lines.push(`End of search results for ${JSON.stringify(input.q)}.`);
-    }
-    if (lines.length === 0) {
-      lines.push(
-        `No file name or line holds every word of ${JSON.stringify(input.q)}.`,
-      );
-    }
-    if (input.skip >= lines.length) {
+    // a skip may land on the next-call line, which can outgrow the row
+    // before it, but never on the shorter end line
+    const reachable = lines.length + (found.next === null ? 0 : 1);
+    if (input.skip > 0 && input.skip >= reachable) {
       throw new Conflict("the search changed; read from the start");
     }
+    lines.push(
+      found.next !== null
+        ? `Read on with knowledge action=search, projectId=${project.id}, q=${JSON.stringify(input.q)}, after=${JSON.stringify(found.next)}.\n`
+        : lines.length > 0
+          ? `End of search results for ${JSON.stringify(input.q)}.`
+          : `No file name or line holds every word of ${JSON.stringify(input.q)}.`,
+    );
     const label = dataLabel("Knowledge search results");
     const page = cappedLines(
       lines.slice(input.skip),

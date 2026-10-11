@@ -331,7 +331,7 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
         : revision(head.revision);
     if (start > 1 && pinned === null) {
       throw new BadRequest(
-        "revision is required with offset; take it from the outline, a list row, a search hit or the page before",
+        "revision is required with offset; take it from a list row, a search hit, the outline or the page before",
       );
     }
     return {
