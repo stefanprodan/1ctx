@@ -107,6 +107,40 @@ asserts only that both paths match the same files.
 
 Before: its 4.8M evaluations passed 5 s once on a busy CI runner.
 
+### suite-platform: tests that depend on the machine are skipped there
+Files: `src/network/allow-list/dns-rebinding-integration.test.ts`,
+  `src/fs/read-write-fs/read-write-fs.mode-and-copy.test.ts`,
+  `src/fs/read-write-fs/read-write-fs.special-files.test.ts`,
+  `src/security/sandbox/information-disclosure.test.ts`,
+  `src/fs/overlay-fs/overlay-fs.security.test.ts`
+Upstream: not reported
+Tests: none, it makes `make vendor-test` answer the same on Linux and
+  macOS
+
+Now:
+
+- **Real DNS.** the real DNS suite is skipped everywhere.
+- **macOS realpath.** the write-only and mode-000 file tests and the
+  Unix socket test of `ReadWriteFs` are skipped on macOS.
+- **No USER.** the username test is skipped when `USER` is unset.
+- **Linux backslash.** the Windows-style `readdir` test of `OverlayFs`
+  is skipped on Linux.
+
+Before:
+
+- **Real DNS.** its answers depend on the machine's resolver and
+  network.
+- **macOS realpath.** Bun's `realpathSync` on macOS opens the path, so
+  it fails with `EACCES` on a file the user cannot read and
+  `EOPNOTSUPP` on a socket, and `ReadWriteFs` refuses the path as
+  outside the root. Node's does not open it, nor does Bun's on Linux.
+- **No USER.** the test asserts the output does not contain
+  `process.env.USER || ""`, which fails in a container with no `USER`.
+- **Linux backslash.** Bun's `realpathSync` on Linux reads `\` as a
+  separator, so `\..\..\etc` resolves above the root, `OverlayFs`
+  refuses it and `readdir` answers `[]` where the test expects a throw.
+  It fails closed; macOS reads `\` as a name and throws `ENOENT`.
+
 ## Interpreter
 
 ### command-not-found: a name that does not resolve is not found

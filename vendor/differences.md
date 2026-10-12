@@ -335,6 +335,13 @@ a read-only Linux mount:
   where ripgrep says `File system loop found`.
 - The glob walk counts toward `maxGlobOperations`, not the traversal
   limits.
+- On Linux, Bun's `realpathSync` reads a `\` in a name as a
+  separator, so `OverlayFs` may resolve a name holding one to another
+  path: `\..\..\etc` lands above the root and is refused as outside
+  it, and `readdir` answers an empty list where macOS reads the `\`
+  as part of the name and fails with `ENOENT`. It fails closed, with no
+  way out of the root; the test that holds the macOS answer is skipped
+  on Linux (`suite-platform` in `vendor/changes.md`).
 
 ## Where our mktemp and yes still differ from GNU coreutils
 

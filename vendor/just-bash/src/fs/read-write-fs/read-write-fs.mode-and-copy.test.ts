@@ -102,7 +102,8 @@ describe("ReadWriteFs replacement mode and copy behavior", () => {
     },
   );
 
-  it.skipIf(process.platform === "win32")(
+  // (1ctx suite-platform) Bun's realpath on macOS opens the file, refused
+  it.skipIf(process.platform === "win32" || process.platform === "darwin")(
     "appends to a private write-only regular file",
     async () => {
       const target = path.join(root, "write-only.log");
@@ -119,7 +120,8 @@ describe("ReadWriteFs replacement mode and copy behavior", () => {
     },
   );
 
-  it.skipIf(process.platform === "win32")(
+  // (1ctx suite-platform) Bun's realpath on macOS opens the file, refused
+  it.skipIf(process.platform === "win32" || process.platform === "darwin")(
     "changes metadata on a private mode-000 regular file",
     async () => {
       const target = path.join(root, "private.txt");

@@ -131,12 +131,19 @@ it beyond the exports of `network-exports`.
 
 `make vendor-test` (`scripts/vendor-test.sh`) runs upstream's vitest
 suite under `bun test`, which accepts vitest's imports, with
-`src/vitest-setup.ts` preloaded, and runs in CI after `make test`. Some
+`src/vitest-setup.ts` preloaded. Every file runs in a fresh global
+(`--isolate`), so static state such as `ReadWriteFs`'s mutation queue
+or a module mock never crosses files. Locally the files run one by one;
+CI's `vendor-test` job passes `ARGS=--parallel`, a process per worker. Some
 tests fail upstream under Bun as well:
 
 - the `bundle` tests: they need the built `dist/`;
 - browser mode;
-- the host-disk file systems `ReadWriteFs` and `OverlayFs`.
+- the host-disk file systems `ReadWriteFs` and `OverlayFs`, among them
+  `ReadWriteFs`'s hard-link tests: Bun's `fs.promises.open` makes a
+  `FinalizationRegistry`, which the defense-in-depth box refuses;
+- the files that call `describe.runIf` or `it.runIf`, missing in Bun's
+  vitest, which load none of their tests.
 
 Others fail because of the trim: the removed commands, the documents
 and the fixtures; `defense-in-depth-trusted-settlement.test.ts` needs
@@ -154,27 +161,26 @@ unquoted where GNU findutils 4.11 quotes it.
 
 The network browser build test needs esbuild; the DNS guarded-path
 suite needs `vi.resetModules`, missing in Bun's vitest. Both fail
-before their tests run. The latter leaves its empty DNS mock installed
-across the single-process vendor suite, so the DNS-rebinding and
-private-range e2e cases fail there but pass alone with real DNS
-lookups and their own `_fetch` mock, without HTTP requests.
+before their tests run. The tests that depend on the machine, real DNS
+and the platform's `realpath`, are skipped where they would differ
+(the `suite-platform` entry).
 `test/vendor/just-bash/network.test.ts` keeps the two deprecated
 connector-hook rejection checks outside the upstream tree.
 
 `vendor/just-bash-failures.txt` lists every expected failure by name,
-and the first error line of every test file that failed to load, since
-such a file runs none of its tests.
-The run fails when the set moves either way, a new failure or a listed
-one passing. The suite runs in one process that shares static state,
-such as `ReadWriteFs`'s mutation queue, so under load a host-disk test
-can fail for another file's leftovers: a new failure whose file passes
-when run alone is reported and let through, with what bun said before
-it, so its assertion stays in the log. A run that still differs
-is run again, three runs in all, since a loaded CI runner fails a
-host-disk test now and then even alone; a regression differs every
-time and fails the run. After a change that fixes one, or a sync, check each
+the first error line of every test file that failed to load, since
+such a file runs none of its tests, or `unhandled error` when bun
+printed none, and `(errors) N`, bun's count of them, since one message
+can stand for several files. The lines name no file of their own:
+`--parallel` prints them apart from it. A run also fails when bun's
+count differs from the errors in its log. It is recorded on Linux as a
+user other than root, and the same list holds on macOS. The run fails
+at once when the set moves either way, a new failure or a listed one
+passing, with no retry: it prints the diff and what bun said before
+each new failure. After a change that fixes one, or a sync, check each
 difference, then record it with `scripts/vendor-test.sh --update`, which
-runs the suite twice and keeps what failed both times.
+runs the suite twice and writes the list only when both runs agree
+(`make vendor-test ARGS="--parallel --update"` takes it too).
 
 ## Syncing a new upstream release
 
