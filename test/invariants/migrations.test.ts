@@ -2146,6 +2146,9 @@ describe("the schema", () => {
           (12, 'e3', 't', 'c2', 'release',
             'released after 1 hours without a report', '[]', null, null,
             'idle', 40),
+          (16, 'e7', 't', 'c2', 'release',
+            'released after 11 hours without a report', '[]', null, null,
+            'idle', 41),
           (5, 'e4', 't2', 'c3', 'progress', 'released v2 to staging', '[]',
             'u', 'desk', null, 50),
           (14, 'e5', 't', 'c4', 'release', 'released because access ended',
@@ -2192,6 +2195,7 @@ describe("the schema", () => {
       // write them; a member's or an agent's text stays as written
       const swept: Record<string, string> = {
         e3: "after 1 hour without a report",
+        e7: "after 11 hours without a report",
         e5: "access ended",
       };
       expect(entries).toEqual(
@@ -2214,7 +2218,13 @@ describe("the schema", () => {
       db.exec("delete from external_task_claims where id = 'c1'");
       expect(
         db.query("select id from external_task_entries order by rowid").all(),
-      ).toEqual([{ id: "e4" }, { id: "e3" }, { id: "e5" }, { id: "e6" }]);
+      ).toEqual([
+        { id: "e4" },
+        { id: "e3" },
+        { id: "e5" },
+        { id: "e6" },
+        { id: "e7" },
+      ]);
       db.exec("delete from external_tasks");
       expect(db.query("select id from external_task_claims").all()).toEqual([]);
       expect(db.query("select id from external_task_entries").all()).toEqual(

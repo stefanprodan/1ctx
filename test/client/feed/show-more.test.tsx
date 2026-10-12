@@ -18,14 +18,15 @@ describe("Show more", () => {
     expect(html).toBe("");
   });
 
-  test("is the list's last row while a page is left", () => {
+  test("ends the list in a small centred word while a page is left", () => {
     const html = render(
       <ShowMore
         more={{ next: true, loading: false, error: null }}
         onMore={() => {}}
       />,
     );
-    expect(html).toContain("rows-button");
+    expect(html).toContain("rows-more");
+    expect(html).not.toContain("rows-button");
     expect(html).toContain("Show more");
     expect(html).not.toContain("notice-failed");
   });

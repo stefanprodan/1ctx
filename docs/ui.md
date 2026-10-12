@@ -73,7 +73,9 @@ open row's body or a meta. The shared shapes are below.
 - **A folder tree is `RowsTree`,** over `treeOf()` in `lib/tree.ts`.
   An outcome log is `RowsLog` with its group, line and more parts.
 - **A paged list ends in `ShowMore`** from `feed/FeedCard.tsx` while
-  `next` is set. No infinite scroll.
+  `next` is set, drawn by `RowsMore`: a small centred word, never a
+  whole row. A list that only reveals more of what it holds uses
+  `RowsMore` too. No infinite scroll.
 - **A growing list has a search:** `ui/Search.tsx` as `RowsCard`'s
   `search`, over `useListSearch()` in `lib/search.ts`
   (`searchList()` outside a component).

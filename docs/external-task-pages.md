@@ -15,7 +15,8 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   (`data/external-tasks.ts`): blocked, claimed, open, latest move first,
   searched on the page with a count. The highest revision seen per task
   keeps an older list read from bringing a closed one back. Home's card
-  reads `?attention=1`, drawn as Not sent while a task is marked.
+  reads `?attention=1`, drawn as Not sent while a task is marked: five
+  rows, then Show more by twenty within the read, the count the total.
 - **Done and dropped page from the tab's load,** searched and filtered
   (All, Done, Dropped) by the server, with no count. A new search or
   filter reads the first page again; an older answer lands nowhere, and

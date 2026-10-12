@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Home's External tasks card: drawn only while a task is marked, a row
-// per task naming its project, who holds the claim and its last entry.
+// per task naming its project, who holds the claim and its last entry,
+// the first few with Show more for the rest.
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -53,5 +54,22 @@ describe("Home's External tasks card", () => {
     expect(html).toContain("Scope B");
     expect(html).toContain("blocked · claimed by stefan via laptop-claude");
     expect(html).toContain("Question: Which branch?");
+  });
+
+  test.serial("opens on the first rows and offers more", () => {
+    const rows = Array.from({ length: 7 }, (_, i) => ({
+      ...row,
+      id: `t${i}`,
+    }));
+    markedTasks.value = { tasks: rows, count: 100 };
+    const html = render(<MarkedTasks now={10} />);
+    expect(html.match(/href="\/external-tasks\/t\d"/g)).toHaveLength(5);
+    expect(html).toContain("Show more");
+    expect(html).toContain(">100<");
+  });
+
+  test.serial("offers no more when every row fits", () => {
+    markedTasks.value = { tasks: [row], count: 1 };
+    expect(render(<MarkedTasks now={10} />)).not.toContain("Show more");
   });
 });

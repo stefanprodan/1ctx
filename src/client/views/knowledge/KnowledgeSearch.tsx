@@ -12,10 +12,10 @@ import { loadMoreSearch, searchOf } from "../../data/knowledge-search.ts";
 import { ShowMore } from "../../feed/FeedCard.tsx";
 import { ago, plural } from "../../lib/format.ts";
 import {
-  RowsButton,
   RowsFailed,
   RowsGo,
   RowsMeta,
+  RowsMore,
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
@@ -89,13 +89,13 @@ export function SearchResults({
             </RowsGo>
           ))}
           {names.length < search.names.length && (
-            <RowsButton
+            <RowsMore
               onClick={() => {
                 allNames.value = true;
               }}
             >
               Show more
-            </RowsButton>
+            </RowsMore>
           )}
           {allNames.value && words.beyond !== null && (
             <RowsNote>{words.beyond}</RowsNote>
