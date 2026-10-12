@@ -4,7 +4,9 @@
 import { describe, expect, test } from "bun:test";
 import { parseSearch } from "../../../src/server/knowledge/parse.ts";
 import {
+  cursorOf,
   oneAtATime,
+  readCursor,
   type SearchSource,
   search,
 } from "../../../src/server/knowledge/search.ts";
@@ -14,27 +16,38 @@ import {
   SEARCH_NAMES,
   SEARCH_PAGE,
 } from "../../../src/shared/api/knowledge.ts";
+import type { KnowledgeFile } from "../../../src/shared/contracts/knowledge.ts";
 import {
   matchText as matchTerms,
   searchTerms,
 } from "../../../src/shared/search.ts";
 import { type Setup, setup } from "./helpers.ts";
 
-// the store's rows, counting the text bytes it loads
-function source(s: Setup) {
-  const loaded = { bytes: 0, files: [] as string[] };
-  const store = s.area.store;
-  const counted: SearchSource = {
-    files: (after) => store.after(s.projectId, after),
-    named: (after, terms) => store.named(s.projectId, after, terms),
-    text(fileId) {
-      const text = store.text(s.projectId, fileId);
-      loaded.bytes += Buffer.byteLength(text);
-      loaded.files.push(store.byId(s.projectId, fileId)!.name);
-      return text;
-    },
-  };
-  return Object.assign(counted, { loaded });
+// the store's rows as the area reads them
+const source = (s: Setup): SearchSource => ({
+  files: () => s.area.store.after(s.projectId, null),
+  text: (fileId) => s.area.store.text(s.projectId, fileId),
+});
+
+const names = (page: { files: { file: KnowledgeFile }[] }) =>
+  page.files.map((hit) => hit.file.name);
+
+// one text per name, the project made fresh
+function project(files: Record<string, string>): Setup {
+  const s = setup();
+  for (const [name, text] of Object.entries(files)) {
+    s.area.create(s.projectId, s.author, name, text);
+  }
+  return s;
+}
+
+function searched(files: Record<string, string>, q: string) {
+  const s = project(files);
+  try {
+    return s.area.search(s.projectId, "u", q, null);
+  } finally {
+    s.db.close();
+  }
 }
 
 const matchText = (text: string, q: string) => matchTerms(text, searchTerms(q));
@@ -96,7 +109,7 @@ describe("knowledge search", () => {
     expect(hit!.text).not.toMatch(/^[\udc00-\udfff]|[\ud800-\udbff]$/);
   });
 
-  test("pages the files whose text holds the query in name order", () => {
+  test("pages the files by rank, shorter first at equal counts", () => {
     const s = setup();
     try {
       for (let i = 1; i <= SEARCH_PAGE + 2; i++) {
@@ -105,7 +118,7 @@ describe("knowledge search", () => {
       }
       s.area.create(s.projectId, s.author, "other.md", "nothing here\n");
       const first = s.area.search(s.projectId, "u", "topic", null);
-      expect(first.files.map((hit) => hit.file.name)).toEqual(
+      expect(names(first)).toEqual(
         Array.from(
           { length: SEARCH_PAGE },
           (_, i) => `notes/n${String(i + 1).padStart(2, "0")}.md`,
@@ -116,12 +129,9 @@ describe("knowledge search", () => {
         lines: [{ line: 2, text: "some Topic 1" }],
       });
       expect(first.files[0]!.file).not.toHaveProperty("text");
-      expect(first.next).toBe(`notes/n${SEARCH_PAGE}.md`);
+      expect(readCursor(first.next!)?.name).toBe(`notes/n${SEARCH_PAGE}.md`);
       const second = s.area.search(s.projectId, "u", "topic", first.next);
-      expect(second.files.map((hit) => hit.file.name)).toEqual([
-        "notes/n11.md",
-        "notes/n12.md",
-      ]);
+      expect(names(second)).toEqual(["notes/n11.md", "notes/n12.md"]);
       expect(second.next).toBeNull();
       expect(second).toMatchObject({ names: [], namesTotal: 0 });
     } finally {
@@ -146,18 +156,17 @@ describe("knowledge search", () => {
     try {
       s.area.create(s.projectId, s.author, "plans/Topic.md", "no words\n");
       s.area.create(s.projectId, s.author, "topics/both.md", "a topic\n");
-      s.area.create(s.projectId, s.author, "zeta.md", "the TOPIC\n");
+      for (let i = 0; i < SEARCH_PAGE; i++) {
+        s.area.create(s.projectId, s.author, `z${i}.md`, "the TOPIC\n");
+      }
       const first = s.area.search(s.projectId, "u", "TOPIC", null);
       expect(first.names.map((file) => file.name)).toEqual(["plans/Topic.md"]);
       expect(first.namesTotal).toBe(1);
-      expect(first.files.map((hit) => hit.file.name)).toEqual([
-        "topics/both.md",
-        "zeta.md",
-      ]);
-      const later = s.area.search(s.projectId, "u", "topic", "topics/both.md");
+      expect(names(first)).toContain("topics/both.md");
+      const later = s.area.search(s.projectId, "u", "topic", first.next);
       expect(later.names).toEqual([]);
       expect(later.namesTotal).toBe(0);
-      expect(later.files.map((hit) => hit.file.name)).toEqual(["zeta.md"]);
+      expect(later.files).toHaveLength(1);
     } finally {
       s.db.close();
     }
@@ -208,7 +217,7 @@ describe("knowledge search", () => {
       s.area.create(s.projectId, s.author, "plan/external-tasks.md", "x\n");
       s.area.create(s.projectId, s.author, "plan/other.md", "x\n");
       const page = s.area.search(s.projectId, "u", "plan External tasks", null);
-      expect(page.files.map((hit) => hit.file.name)).toEqual(["a.md"]);
+      expect(names(page)).toEqual(["a.md"]);
       expect(page.files[0]!.count).toBe(2);
       expect(page.names.map((file) => file.name)).toEqual([
         "plan/external-tasks.md",
@@ -218,6 +227,26 @@ describe("knowledge search", () => {
       expect(() => s.area.search(s.projectId, "u", '""', null)).toThrow(
         new BadRequest("q must hold a word"),
       );
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test("a file gone mid-scan is neither a text nor a name row", () => {
+    const s = project({ "topic-a.md": "a topic\n", "topic-b.md": "none\n" });
+    try {
+      const gone = s.area.store.fileNamed(s.projectId, "topic-b.md")!.id;
+      const page = search(
+        {
+          files: source(s).files,
+          text: (fileId) =>
+            fileId === gone ? null : s.area.store.text(s.projectId, fileId),
+        },
+        "topic",
+        null,
+      );
+      expect(names(page)).toEqual(["topic-a.md"]);
+      expect(page).toMatchObject({ names: [], namesTotal: 0 });
     } finally {
       s.db.close();
     }
@@ -242,11 +271,20 @@ describe("knowledge search", () => {
     ).toBe(2);
   });
 
+  test("a cursor reads back to the same score and name", () => {
+    for (const score of [0, 1, 1 / 3, 2.5e-7, 1e21, 12.345678901234567]) {
+      expect(readCursor(cursorOf({ score, name: "docs/x.md" }))).toEqual({
+        score,
+        name: "docs/x.md",
+      });
+    }
+  });
+
   test("parses q and after", () => {
     expect(parseSearch(url("q=%20ab%20"))).toEqual({ q: "ab", after: null });
-    expect(parseSearch(url("q=abc&after=docs/x.md"))).toEqual({
+    expect(parseSearch(url("q=abc&after=1.5:docs/x.md"))).toEqual({
       q: "abc",
-      after: "docs/x.md",
+      after: "1.5:docs/x.md",
     });
   });
 
@@ -260,101 +298,193 @@ describe("knowledge search", () => {
     ["q=%22%22", "q must hold a word"],
     ["q=%22%20%22", "q must hold a word"],
     ["q=ab&after=x&after=y", "after must appear once"],
-    ["q=ab&after=../x", "after must be a file name"],
-    ["q=ab&after=", "after must be a file name"],
+    ["q=ab&after=docs/x.md", "after must be a search cursor"],
+    ["q=ab&after=1.5:../x", "after must be a search cursor"],
+    ["q=ab&after=-1:x.md", "after must be a search cursor"],
+    ["q=ab&after=NaN:x.md", "after must be a search cursor"],
+    ["q=ab&after=", "after must be a search cursor"],
     ["q=ab&page=2", "unknown parameter page"],
   ])("refuses %j", (query, words) => {
     expect(() => parseSearch(url(query))).toThrow(new BadRequest(words));
   });
-  test("a spent budget ends the page early with next set", () => {
-    const s = setup();
-    try {
-      for (const name of ["a.md", "b.md", "c.md", "d.md"]) {
-        s.area.create(s.projectId, s.author, name, "0123456789 hit\n");
-      }
-      const page = search(source(s), "hit", null, 30);
-      expect(page.files.map((hit) => hit.file.name)).toEqual(["a.md", "b.md"]);
-      expect(page.next).toBe("b.md");
-      const rest = search(source(s), "hit", page.next, 30);
-      expect(rest.files.map((hit) => hit.file.name)).toEqual(["c.md", "d.md"]);
-      expect(rest.next).toBeNull();
-      // one file a page at least, however small the budget
-      expect(search(source(s), "hit", null, 0).files).toHaveLength(1);
-    } finally {
-      s.db.close();
-    }
+});
+
+// a line of filler that holds no query word, to even out lengths
+const pad = (text: string, bytes: number) =>
+  `${text}\n${"x".repeat(Math.max(0, bytes - text.length - 2))}\n`;
+
+describe("knowledge search ranking", () => {
+  test("many credited hits rank above one", () => {
+    const page = searched(
+      {
+        "a.md": pad("deploy once", 200),
+        "b.md": pad("deploy, deploy again, deploy later", 200),
+        "c.md": pad("deploy and deploy", 200),
+      },
+      "deploy",
+    );
+    expect(names(page)).toEqual(["b.md", "c.md", "a.md"]);
   });
 
-  test("names past a spent budget are listed on the name alone", () => {
-    const s = setup();
-    try {
-      s.area.create(s.projectId, s.author, "a.md", "0123456789 hit\n");
-      s.area.create(s.projectId, s.author, "b.md", "0123456789 hit\n");
-      s.area.create(s.projectId, s.author, "hit-1.md", "none\n");
-      s.area.create(s.projectId, s.author, "hit-2.md", "a hit\n");
-      const page = search(source(s), "hit", null, 30);
-      expect(page.files.map((hit) => hit.file.name)).toEqual(["a.md", "b.md"]);
-      expect(page.next).toBe("b.md");
-      // unread, hit-2.md is named here and found in its text on a later page
-      expect(page.names.map((file) => file.name)).toEqual([
-        "hit-1.md",
-        "hit-2.md",
-      ]);
-      const judged = search(source(s), "hit", null, 1000);
-      expect(judged.names.map((file) => file.name)).toEqual(["hit-1.md"]);
-    } finally {
-      s.db.close();
-    }
-  });
-  test("never loads text past the budget, the page and the names together", () => {
-    const s = setup();
-    try {
-      // 15 bytes each
-      s.area.create(s.projectId, s.author, "a.md", "0123456789 hit\n");
-      s.area.create(s.projectId, s.author, "b.md", "0123456789 hit\n");
-      s.area.create(s.projectId, s.author, "c.md", "0123456789 hit\n");
-      s.area.create(s.projectId, s.author, "hit-1.md", "none, 15 bytes\n");
-      s.area.create(s.projectId, s.author, "hit-2.md", "none, 15 bytes\n");
-      for (const budget of [0, 14, 15, 29, 30, 44, 45, 60, 75]) {
-        const counted = source(s);
-        const page = search(counted, "hit", null, budget);
-        expect(counted.loaded.bytes).toBeLessThanOrEqual(Math.max(15, budget));
-        expect(page.namesTotal).toBe(2);
-      }
-      const counted = source(s);
-      const page = search(counted, "hit", null, 50);
-      expect(counted.loaded.files).toEqual(["a.md", "b.md", "c.md"]);
-      expect(page.next).toBe("c.md");
-      const names = source(s);
-      search(names, "hit", null, 45);
-      // the names pass starts where the page stopped and is held too
-      expect(names.loaded.files).toEqual(["a.md", "b.md", "c.md"]);
-      const all = source(s);
-      expect(search(all, "hit", null, 75).next).toBeNull();
-      expect(all.loaded.bytes).toBe(75);
-    } finally {
-      s.db.close();
-    }
+  test("a word nearly every file holds still ranks more uses higher", () => {
+    const files: Record<string, string> = {};
+    for (let i = 0; i < 12; i++) files[`f${i}.md`] = pad("the data", 100);
+    files["z.md"] = pad("data data data data", 100);
+    files["none.md"] = pad("nothing", 100);
+    expect(names(searched(files, "data"))[0]).toBe("z.md");
   });
 
-  test("the names pass reads only named files within what is left", () => {
-    const s = setup();
+  test("a name holding every term lifts a file by at most half", () => {
+    // equal lengths: one use scores 1, two 1.375, three 1.65 before IDF
+    const page = searched(
+      {
+        "deploy.md": pad("deploy", 100),
+        "b.md": pad("deploy deploy", 100),
+        "c.md": pad("deploy deploy deploy", 100),
+        "d.md": pad("none", 100),
+      },
+      "deploy",
+    );
+    expect(names(page)).toEqual(["c.md", "deploy.md", "b.md"]);
+  });
+
+  test("a name holding some terms lifts a file less", () => {
+    const page = searched(
+      {
+        "a.md": pad("deploy notes", 100),
+        "notes.md": pad("deploy notes", 100),
+        "deploy-notes.md": pad("deploy notes", 100),
+      },
+      "deploy notes",
+    );
+    expect(names(page)).toEqual(["deploy-notes.md", "notes.md", "a.md"]);
+  });
+
+  test("ties go in name order", () => {
+    const page = searched(
+      { "z.md": "a topic\n", "a.md": "a topic\n", "m.md": "a topic\n" },
+      "topic",
+    );
+    expect(names(page)).toEqual(["a.md", "m.md", "z.md"]);
+  });
+
+  test("the file about the words ranks above files that hold each once", () => {
+    // each word once, release and claim inside other words
+    const glancing: Record<string, string> = {};
+    for (const name of ["a-notes.md", "b-ideas.md", "c-review.md"]) {
+      glancing[name] = [
+        "# Notes",
+        "An idle thought about the pre-release build.",
+        "See claimUploads in the store.",
+        "x".repeat(2000),
+      ].join("\n");
+    }
+    const about = [
+      "# Idle release",
+      "Summary: who may claim a task, and when.",
+      ...Array.from(
+        { length: 6 },
+        (_, i) => `An idle claim ${i} sits until a release frees it.`,
+      ),
+      ...Array.from({ length: 14 }, (_, i) => `Each release ${i} is logged.`),
+      ...Array.from({ length: 55 }, (_, i) => `A claim ${i} names its owner.`),
+    ].join("\n");
+    const page = searched(
+      { ...glancing, "plans/tasks.md": about },
+      "idle release claim",
+    );
+    expect(names(page)[0]).toBe("plans/tasks.md");
+    // its best lines hold all three words, not the title and summary
+    expect(page.files[0]!.lines.map((line) => line.line)).toEqual([3, 4, 5]);
+  });
+});
+
+describe("knowledge search credit", () => {
+  test("inner matches list below every credited file", () => {
+    const page = searched(
+      {
+        "a.md": "the claimUploads port\n",
+        "b.md": "reclaim it\n",
+        "c.md": "two claims\n",
+        "d.md": "a claim\n",
+      },
+      "claim",
+    );
+    expect(names(page)).toEqual(["d.md", "c.md", "a.md", "b.md"]);
+  });
+
+  test("separators and plain endings credit a match", () => {
+    const page = searched(
+      {
+        "a.md": "the prerelease build\n",
+        "b.md": "the pre-release build\n",
+        "c.md": "see release-notes\n",
+        "d.md": "while releasing it, a release\n",
+        "e.md": "unrelease\n",
+      },
+      "release",
+    );
+    expect(names(page).slice(-2)).toEqual(["a.md", "e.md"]);
+    expect(names(page)[0]).toBe("d.md");
+  });
+
+  test("a Han term is credited inside Chinese text", () => {
+    const page = searched(
+      {
+        "a.md": "我们的搜索功能很好用，也很快\n",
+        "b.md": "我们的搜索功能很好用，搜索很快\n",
+      },
+      "搜索",
+    );
+    expect(names(page)).toEqual(["b.md", "a.md"]);
+  });
+});
+
+describe("knowledge search paging", () => {
+  test("every text match shows once across pages, names on the first", () => {
+    const files: Record<string, string> = {};
+    for (let i = 0; i < 3 * SEARCH_PAGE + 4; i++) {
+      // counts 1 to 5 repeat, so many files tie
+      const uses = (i % 5) + 1;
+      files[`f/${String(i).padStart(2, "0")}.md`] =
+        `${Array.from({ length: uses }, () => "topic").join(" ")}\n`;
+    }
+    for (let i = 0; i < 4; i++) files[`topic-${i}.md`] = "none\n";
+    files["other.md"] = "nothing\n";
+    const s = project(files);
     try {
-      for (let i = 0; i < SEARCH_PAGE + 1; i++) {
-        s.area.create(s.projectId, s.author, `a${i}.md`, "x hit\n");
+      const seen: string[] = [];
+      const pages = [];
+      let after: string | null = null;
+      for (let i = 0; i < 10; i++) {
+        const page = s.area.search(s.projectId, "u", "topic", after);
+        pages.push(page);
+        seen.push(...names(page));
+        after = page.next;
+        if (after === null) break;
       }
-      s.area.create(s.projectId, s.author, "b.md", "no match\n");
-      s.area.create(s.projectId, s.author, "hit-1.md", "none\n");
-      s.area.create(s.projectId, s.author, "hit-2.md", "hit\n");
-      const counted = source(s);
-      const page = search(counted, "hit", null, 11 * 6 + 5);
-      expect(page.files).toHaveLength(SEARCH_PAGE);
-      expect(counted.loaded.files.slice(SEARCH_PAGE + 1)).toEqual(["hit-1.md"]);
-      expect(counted.loaded.bytes).toBeLessThanOrEqual(11 * 6 + 5);
-      expect(page.names.map((file) => file.name)).toEqual([
-        "hit-1.md",
-        "hit-2.md",
+      expect(after).toBeNull();
+      expect(pages).toHaveLength(4);
+      expect(pages[0]!.names.map((file) => file.name)).toEqual([
+        "topic-0.md",
+        "topic-1.md",
+        "topic-2.md",
+        "topic-3.md",
       ]);
+      expect(pages.slice(1).every((page) => page.names.length === 0)).toBe(
+        true,
+      );
+      const matches = Object.keys(files).filter((name) =>
+        name.startsWith("f/"),
+      );
+      expect(new Set(seen).size).toBe(seen.length);
+      expect([...seen].sort()).toEqual(matches.sort());
+      // more uses first, then name order
+      const uses = (name: string) => files[name]!.split("topic").length - 1;
+      const expected = [...matches].sort(
+        (a, b) => uses(b) - uses(a) || (a < b ? -1 : 1),
+      );
+      expect(seen).toEqual(expected);
     } finally {
       s.db.close();
     }

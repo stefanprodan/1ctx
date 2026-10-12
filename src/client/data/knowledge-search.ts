@@ -191,7 +191,7 @@ async function ask(projectId: string, q: string, turn: number): Promise<void> {
   }
 }
 
-// Show more: the next page of files after the last held
+// Show more: the next page of files, after the cursor held
 export async function loadMoreSearch(projectId: string): Promise<void> {
   const held = searchOf(projectId);
   if (held.state !== "done" || held.next === null || held.more.loading) return;
