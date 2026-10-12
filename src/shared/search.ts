@@ -71,16 +71,6 @@ export function holdsAll(text: string, terms: readonly string[]): boolean {
   return held.size === terms.length;
 }
 
-// null when the text misses a term
-export function matchText(
-  text: string,
-  terms: readonly string[],
-): { count: number; lines: SearchLine[] } | null {
-  if (!holdsAll(text, terms)) return null;
-  const found = matchLines(text, terms);
-  return found.count === 0 ? null : found;
-}
-
 // the lines holding any term, counted, the first max kept
 export function matchLines(
   text: string,
@@ -190,4 +180,163 @@ export function cutSearchLine(
 
 function isLow(unit: number): boolean {
   return unit >= 0xdc00 && unit <= 0xdfff;
+}
+
+// Whether an occurrence counts toward a file's rank: a whole word, or
+// one carrying a plain English ending. Inner ones (claim in reclaim)
+// still match but score nothing.
+const ENDINGS = new Set(["s", "es", "d", "ed", "ing", "er", "ers"]);
+// scripts written without spaces between words
+const UNSPACED =
+  /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u;
+// a combining mark belongs to its letter, never separates
+const LETTER = /^[\p{L}\p{M}]$/u;
+const DIGIT = /^\p{N}$/u;
+const NONE = 0;
+const ALPHA = 1;
+const NUMERIC = 2;
+
+function kind(code: number): number {
+  if (code < 0) return NONE;
+  if (code < 0x80) {
+    if ((code >= 0x61 && code <= 0x7a) || (code >= 0x41 && code <= 0x5a)) {
+      return ALPHA;
+    }
+    return code >= 0x30 && code <= 0x39 ? NUMERIC : NONE;
+  }
+  const char = String.fromCodePoint(code);
+  return LETTER.test(char) ? ALPHA : DIGIT.test(char) ? NUMERIC : NONE;
+}
+
+// a switch between letter and digit parts words too (fts in fts5)
+const clear = (edge: number, neighbour: number): boolean =>
+  neighbour === NONE || neighbour !== edge;
+
+function codeBefore(text: string, at: number): number {
+  if (at <= 0) return -1;
+  const unit = text.charCodeAt(at - 1);
+  if (isLow(unit) && at >= 2) return text.codePointAt(at - 2)!;
+  return unit;
+}
+
+const codeAt = (text: string, at: number): number =>
+  at < text.length ? text.codePointAt(at)! : -1;
+
+// the run of one class glued at at, so letters stop at a digit, or
+// null past the longest ending
+function glued(text: string, at: number): string | null {
+  const run = kind(codeAt(text, at));
+  let end = at;
+  while (run !== NONE && kind(codeAt(text, end)) === run) {
+    end += codeAt(text, end) > 0xffff ? 2 : 1;
+    if (end - at > 3) return null;
+  }
+  return text.slice(at, end);
+}
+
+// the credited occurrences of a lowercased term in lowercased text
+export function creditedCount(lower: string, term: string): number {
+  if (term === "") return 0;
+  const step = (at: number) => at + term.length;
+  if (UNSPACED.test(term)) {
+    let count = 0;
+    for (
+      let at = lower.indexOf(term);
+      at >= 0;
+      at = lower.indexOf(term, step(at))
+    ) {
+      count++;
+    }
+    return count;
+  }
+  const first = kind(term.codePointAt(0)!);
+  const last = kind(codeBefore(term, term.length));
+  const startOk = (at: number) =>
+    first === NONE || clear(first, kind(codeBefore(lower, at)));
+  let count = 0;
+  for (
+    let at = lower.indexOf(term);
+    at >= 0;
+    at = lower.indexOf(term, step(at))
+  ) {
+    if (!startOk(at)) continue;
+    if (last === NONE || clear(last, kind(codeAt(lower, at + term.length)))) {
+      count++;
+      continue;
+    }
+    const rest = glued(lower, at + term.length);
+    if (rest !== null && ENDINGS.has(rest)) count++;
+  }
+  // release in releasing: the stem never holds the term, so no overlap.
+  // Short words would credit too much (the in thing, we in wing)
+  if (term.length >= 4 && term.endsWith("e")) {
+    const stem = `${term.slice(0, -1)}ing`;
+    for (
+      let at = lower.indexOf(stem);
+      at >= 0;
+      at = lower.indexOf(stem, at + stem.length)
+    ) {
+      const next = kind(codeAt(lower, at + stem.length));
+      if (startOk(at) && clear(ALPHA, next)) count++;
+    }
+  }
+  return count;
+}
+
+type Candidate = {
+  number: number;
+  line: string;
+  held: number;
+  credited: number;
+};
+
+// the lines holding any term, counted, and the max best kept in line
+// order: most distinct terms held, then most credited, then earliest
+export function bestLines(
+  text: string,
+  terms: readonly string[],
+  max = SEARCH_LINES,
+): { count: number; lines: SearchLine[] } {
+  let count = 0;
+  const kept: Candidate[] = [];
+  if (terms.length === 0) return { count, lines: [] };
+  const better = (a: Candidate, b: Candidate) =>
+    a.held - b.held || a.credited - b.credited || b.number - a.number;
+  let start = 0;
+  for (let number = 1; start <= text.length; number++) {
+    let end = text.indexOf("\n", start);
+    if (end < 0) end = text.length;
+    const line = text.slice(start, end);
+    start = end + 1;
+    const lower = line.toLowerCase();
+    let held = 0;
+    let credited = 0;
+    for (const term of terms) {
+      if (!lower.includes(term)) continue;
+      held++;
+      if (creditedCount(lower, term) > 0) credited++;
+    }
+    if (held === 0) continue;
+    count++;
+    const candidate = { number, line, held, credited };
+    if (kept.length < max) {
+      kept.push(candidate);
+      continue;
+    }
+    // the weakest kept gives way to a better line
+    let weakest = 0;
+    for (let i = 1; i < kept.length; i++) {
+      if (better(kept[i]!, kept[weakest]!) < 0) weakest = i;
+    }
+    if (max > 0 && better(candidate, kept[weakest]!) > 0) {
+      kept[weakest] = candidate;
+    }
+  }
+  kept.sort((a, b) => a.number - b.number);
+  const lines = kept.map(({ line, number }) => {
+    // a word folded in context (a final sigma) may not map back
+    const at = termRanges(line, terms)[0] ?? { from: 0, to: 0 };
+    return cutSearchLine(line, number, at);
+  });
+  return { count, lines };
 }

@@ -68,39 +68,23 @@ export class KnowledgeStore extends KnowledgeVersions {
       .map((raw) => ({ ...fileOf(raw), data: raw.data }));
   }
 
-  // the rows past after, in name order, without their text
-  after(projectId: string, after: string | null): Generator<KnowledgeFile> {
+  // every live file, in name order, without its text
+  files(projectId: string): Generator<KnowledgeFile> {
     return this.stream(
       `select ${FILE_COLUMNS} from knowledge_files
-       where project_id = ? and name > ? order by name`,
-      [projectId, after ?? ""],
+       where project_id = ? order by name`,
+      [projectId],
     );
   }
 
-  // names are ASCII, so SQLite's lower() folds them as JavaScript does;
-  // the name holds every term
-  named(
-    projectId: string,
-    after: string | null,
-    terms: readonly string[],
-  ): Generator<KnowledgeFile> {
-    const holds = terms.map(() => " and instr(lower(name), ?) > 0").join("");
-    return this.stream(
-      `select ${FILE_COLUMNS} from knowledge_files
-       where project_id = ? and name > ?${holds}
-       order by name`,
-      [projectId, after ?? "", ...terms],
-    );
-  }
-
-  // empty for a file gone
-  text(projectId: string, id: string): string {
+  // null for a file gone
+  text(projectId: string, id: string): string | null {
     return (
       this.db
         .query<{ text: string }, [string, string]>(
           "select text from knowledge_files where project_id = ? and id = ?",
         )
-        .get(projectId, id)?.text ?? ""
+        .get(projectId, id)?.text ?? null
     );
   }
 

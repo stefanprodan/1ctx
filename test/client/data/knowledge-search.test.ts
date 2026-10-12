@@ -91,7 +91,10 @@ describe("the search's shapes", () => {
   });
 
   test.serial("a later page adds its files once", () => {
-    const held = answered("dep", response({ files: [hit("a")], next: "a.md" }));
+    const held = answered(
+      "dep",
+      response({ files: [hit("a")], next: "1.5:a.md" }),
+    );
     const next = nextPage(held, response({ files: [hit("a"), hit("b")] }));
     expect(next.files.map((h) => h.file.id)).toEqual(["a", "b"]);
     expect(next.next).toBeNull();
@@ -133,7 +136,7 @@ describe("the search", () => {
     searchKnowledge("p1", "depl");
     expect(searchOf("p1").state).toBe("loading");
     expect(asked).toEqual([]);
-    reply = async () => response({ files: [hit("a")], next: "a.md" });
+    reply = async () => response({ files: [hit("a")], next: "1.5:a.md" });
     await pause();
     expect(asked).toEqual(["depl|null"]);
     expect(searchOf("p1").state).toBe("done");
@@ -173,13 +176,13 @@ describe("the search", () => {
     expect(searchOf("p1")).toBe(SEARCH_IDLE);
   });
 
-  test.serial("Show more asks after the last name held", async () => {
-    reply = async () => response({ files: [hit("a")], next: "a.md" });
+  test.serial("Show more passes the cursor back as given", async () => {
+    reply = async () => response({ files: [hit("a")], next: "1.5:a.md" });
     searchKnowledge("p1", "dep");
     await pause();
     reply = async () => response({ files: [hit("b")] });
     await loadMoreSearch("p1");
-    expect(asked).toEqual(["dep|null", "dep|a.md"]);
+    expect(asked).toEqual(["dep|null", "dep|1.5:a.md"]);
     expect(searchOf("p1").files.map((h) => h.file.id)).toEqual(["a", "b"]);
     expect(searchOf("p1").next).toBeNull();
   });
@@ -235,7 +238,7 @@ describe("the search", () => {
   test.serial(
     "a Show more waiting behind a request is dropped once overtaken",
     async () => {
-      reply = async () => response({ files: [hit("a")], next: "a.md" });
+      reply = async () => response({ files: [hit("a")], next: "1.5:a.md" });
       searchKnowledge("p1", "dep");
       await pause();
       // hold the flight with another project's search

@@ -858,6 +858,92 @@ describe("the composed inbound MCP endpoint", () => {
     }
   });
 
+  test("ranks knowledge search as the page does, pages by cursor and skip", async () => {
+    const chat = await chatApp();
+    try {
+      for (let i = 0; i < 12; i++) {
+        const uses = (i % 4) + 1;
+        await createFile(
+          chat,
+          chat.projectId,
+          `notes/n${String(i).padStart(2, "0")}.md`,
+          `${Array.from({ length: uses }, () => "rollout").join(" ")}\n`,
+        );
+      }
+      await createFile(chat, chat.projectId, "a.md", "the rollouts\n");
+      await createFile(chat, chat.projectId, "b.md", "prerollout\n");
+      await createFile(chat, chat.projectId, "rollout.md", "none\n");
+      const key = await createKey(chat.member, {
+        name: "ranked",
+        scope: "read",
+      });
+      const client = mcp(chat, key.token);
+      const pageNames = async (after: string | null) => {
+        const query = new URLSearchParams({ q: "rollout" });
+        if (after !== null) query.set("after", after);
+        const response = await chat.member.call(
+          "GET",
+          `/api/projects/${chat.projectId}/knowledge/search?${query}`,
+        );
+        return (await response.json()) as {
+          files: { file: { name: string } }[];
+          next: string | null;
+        };
+      };
+      const rows = (text: string) =>
+        text
+          .split("\n")
+          .filter((line) => line.startsWith('{"match"'))
+          .map(
+            (line) =>
+              JSON.parse(line) as { match: string; file: { name: string } },
+          );
+      const first = resultText(
+        await client.tool("knowledge", {
+          action: "search",
+          projectId: chat.projectId,
+          q: "rollout",
+        }),
+      );
+      const page = await pageNames(null);
+      expect(rows(first)[0]).toMatchObject({
+        match: "name",
+        file: { name: "rollout.md" },
+      });
+      expect(
+        rows(first)
+          .filter((row) => row.match === "text")
+          .map((row) => row.file.name),
+      ).toEqual(page.files.map((hit) => hit.file.name));
+      const after = JSON.parse(first.match(/after=("[^"]+")\.\n$/)![1]!);
+      expect(after).toBe(page.next);
+      const second = resultText(
+        await client.tool("knowledge", {
+          action: "search",
+          projectId: chat.projectId,
+          q: "rollout",
+          after,
+        }),
+      );
+      const later = await pageNames(page.next);
+      expect(rows(second).map((row) => row.file.name)).toEqual(
+        later.files.map((hit) => hit.file.name),
+      );
+      expect(rows(second).at(-1)!.file.name).toBe("b.md");
+      const skipped = resultText(
+        await client.tool("knowledge", {
+          action: "search",
+          projectId: chat.projectId,
+          q: "rollout",
+          skip: 2,
+        }),
+      );
+      expect(rows(skipped)).toEqual(rows(first).slice(2));
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("pages knowledge byte-exactly and protects continuations and replace", async () => {
     const chat = await chatApp();
     try {
