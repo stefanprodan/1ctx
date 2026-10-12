@@ -24,8 +24,8 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
   fixed window is held per key id, so every agent on one key shares it.
 - Knowledge and session search queue behind the server's other searches
   (`docs/search.md`), after page searches. A search the queue cannot take
-  within 5 s, or with 64 `/mcp` searches waiting, is the error result `search busy, retry
-  in 5 s`; `call()` awaits the tool inside its `try`, so the logged
+  within 5 s, or with 64 `/mcp` searches waiting, is the error result
+  `search busy, retry in 5 s`; `call()` awaits the tool inside its `try`, so the logged
   duration counts the wait. The request's abort signal reaches the queue
   through the auth info, and access is checked again after the scan.
 - The factory makes one server per request. It identifies itself as
