@@ -218,7 +218,10 @@ test("attention is capped with a visible count and seen clears its mark", async 
   expect((await attention()).tasks.map((row) => row.id)).toEqual(
     ids.slice(0, ATTENTION_ROWS),
   );
-  expect(await attention(f.outsider.client)).toEqual({ tasks: [], count: 0 });
+  expect(await attention(f.outsider.client)).toMatchObject({
+    tasks: [],
+    count: 0,
+  });
   const id = ids[0]!;
   const before = f.app.externalTasks.store.byId(id)!;
   expect((await f.show(id)).task.task).toEqual(before);
@@ -297,3 +300,45 @@ test.serial(
     expect(frames()).toHaveLength(1);
   },
 );
+
+test("Home lists marks only from the projects a user belongs to, an admin too", async () => {
+  await using f = await httpFixture();
+  const key = await f.key();
+  const id = (await f.create({ title: "Needs the team" })).task.task.id;
+  const claim = f.app.externalTasks.claim(key, id);
+  f.app.externalTasks.report(key, id, claim.claimId, "question", "Which?", []);
+  const attention = async (client: typeof f.admin) => {
+    const response = await client.call(
+      "GET",
+      "/api/external-tasks?attention=1",
+    );
+    expect(response.status).toBe(200);
+    return (await response.json()) as AttentionTasksResponse;
+  };
+  expect((await attention(f.member.client)).tasks.map((row) => row.id)).toEqual(
+    [id],
+  );
+  // the admin sees the team's tab, but its marks are the team's to clear
+  const outside = await attention(f.admin);
+  expect(outside).toMatchObject({ tasks: [], count: 0 });
+  // the client drops frames from projects the read did not cover
+  expect(outside.projectIds).not.toContain(f.projectId);
+  const me = (await (await f.admin.call("GET", "/api/me")).json()).user;
+  const personal = f.app.projects.personal(me.id)!.id;
+  expect(outside.projectIds).toContain(personal);
+  const tab = await f.admin.call("GET", f.base);
+  expect(tab.status).toBe(200);
+  expect((await tab.json()).tasks.map((row: { id: string }) => row.id)).toEqual(
+    [id],
+  );
+  // once a member, the admin's Home has the team's marks
+  const joined = await f.admin.call(
+    "POST",
+    `/api/projects/${f.projectId}/members`,
+    { body: { userId: me.id } },
+  );
+  expect(joined.status).toBeLessThan(300);
+  const inside = await attention(f.admin);
+  expect(inside.tasks.map((row) => row.id)).toEqual([id]);
+  expect(inside.projectIds).toContain(f.projectId);
+});

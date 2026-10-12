@@ -36,6 +36,9 @@ export type ClosedTasksResponse = {
 export type AttentionTasksResponse = {
   tasks: ExternalTaskRow[];
   count: number;
+  // the projects Home reads marks from, so a frame from another one,
+  // which an admin also receives, stays off the card
+  projectIds: string[];
 };
 
 // GET /api/external-tasks/:id?before=: the brief and a page of entries,

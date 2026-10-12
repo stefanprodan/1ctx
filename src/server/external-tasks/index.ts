@@ -27,6 +27,9 @@ export type ExternalTasksDeps = {
   // whether the principal may open the chat, as the chat's own route
   // decides
   chatOpens(principal: Principal, chatId: string): boolean;
+  // the projects Home lists marks from: those the principal reaches and
+  // belongs to or owns, so an admin is not handed every team's tasks
+  homeProjectIds(principal: Principal): string[];
 };
 
 export function externalTasksArea(deps: ExternalTasksDeps) {
@@ -87,7 +90,12 @@ export function externalTasksArea(deps: ExternalTasksDeps) {
       show,
       actions: tasks,
     }),
-    routes: routes({ db: deps.db, access: deps.access, tasks }),
+    routes: routes({
+      db: deps.db,
+      access: deps.access,
+      homeProjectIds: deps.homeProjectIds,
+      tasks,
+    }),
   };
 }
 

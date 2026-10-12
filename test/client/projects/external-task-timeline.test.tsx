@@ -216,6 +216,13 @@ describe("the timeline", () => {
       />,
     );
     expect(done).not.toContain("status-");
+    const moved = render(
+      <Timeline
+        page={page([...asked, entry("progress")], task({ state: "claimed" }))}
+        now={100}
+      />,
+    );
+    expect(moved).not.toContain("status-attention");
   });
 });
 
@@ -264,25 +271,30 @@ describe("the timeline's reading", () => {
     expect(lines.some((line) => line.waiting)).toBe(false);
   });
 
-  test("only the latest unanswered question of the holding claim waits", () => {
-    const lines = read([
+  test("only the question that blocks the task waits", () => {
+    const asked = [
       entry("claim"),
       entry("question", { text: "First?" }),
       entry("progress"),
       entry("question", { text: "Second?" }),
-      entry("progress"),
-    ]);
-    expect(lines.map((line) => line.waiting)).toEqual([
+    ];
+    const blocked = task({ state: "blocked" });
+    expect(read(asked, blocked).map((line) => line.waiting)).toEqual([
       false,
       false,
       false,
       true,
-      false,
     ]);
+    // the agent's own progress moves it on: nothing waits any more
+    expect(
+      read([...asked, entry("progress")], task({ state: "claimed" })).some(
+        (line) => line.waiting,
+      ),
+    ).toBe(false);
     expect(
       read(
         [entry("claim"), entry("question")],
-        task({ claim: claim("c2") }),
+        task({ state: "blocked", claim: claim("c2") }),
       ).some((line) => line.waiting),
     ).toBe(false);
   });

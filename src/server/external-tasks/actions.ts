@@ -103,11 +103,14 @@ export function writeEntry(
     kind === "question" ||
     kind === "result" ||
     (kind === "unclaim" && actor !== "member");
+  // only a question marks a blocked task, so the agent moving past it
+  // takes the mark away
+  const unblocked = kind === "progress" && task.state === "blocked";
   store.move(
     task.id,
     state,
     end === null ? (claim?.id ?? null) : null,
-    actor === "member" ? null : marked ? at : task.attentionAt,
+    actor === "member" || unblocked ? null : marked ? at : task.attentionAt,
     at,
   );
   const row = required(store, task.id);
@@ -305,7 +308,8 @@ export function taskActions(deps: ActionsDeps) {
           claimEnd: null,
           at: now,
         });
-        store.move(id, "claimed", claimId, task.attentionAt, now);
+        // only an unclaim can mark an open task, and work resuming ends it
+        store.move(id, "claimed", claimId, null, now);
         const result = { ...detail(id), claimId };
         return { result, events: [taskChanged(result.task.task)] };
       });

@@ -196,9 +196,12 @@ describe("the words", () => {
     expect(chatName("")).toBe("Untitled chat");
   });
 
-  test("a mark wins the icon's colour, a blocked task is always marked", () => {
+  test("a mark wins an unfinished icon's colour, a result keeps done's", () => {
     expect(taskIcon(row({ state: "claimed" })).status).toBe("running");
     expect(taskIcon(row({ state: "done", attentionAt: 5 })).status).toBe(
+      "done",
+    );
+    expect(taskIcon(row({ state: "open", attentionAt: 5 })).status).toBe(
       "attention",
     );
     expect(taskIcon(row({ state: "blocked" })).name).toBe("question");

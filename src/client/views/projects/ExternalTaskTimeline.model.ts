@@ -48,7 +48,8 @@ export type TimelineLine = {
   entry: ExternalTaskEntry;
   // an answer's question on one line, when it is among those read
   question: string | null;
-  // a question no answer followed, while its claim holds the task
+  // the question that blocks the task: once an answer or the agent's
+  // own progress moves it on, nothing waits
   waiting: boolean;
 };
 
@@ -58,7 +59,7 @@ const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 // its claim, and a claim or the end of one starts afresh
 export function timelineOf(
   entries: readonly ExternalTaskEntry[],
-  task: Pick<ExternalTaskRow, "claim">,
+  task: Pick<ExternalTaskRow, "claim" | "state">,
 ): TimelineLine[] {
   const lines = entries.map((entry) => ({
     entry,
@@ -80,6 +81,7 @@ export function timelineOf(
     }
   }
   if (
+    task.state === "blocked" &&
     asked !== null &&
     !answered &&
     task.claim !== null &&

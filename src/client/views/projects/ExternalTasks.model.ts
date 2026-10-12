@@ -99,7 +99,8 @@ export function fileLabel(file: Pick<ExternalTaskFile, "name" | "deleted">) {
   return file.name === null ? "a deleted file" : `deleted: ${file.name}`;
 }
 
-// the icon and its colour: a mark wins, then the state's own
+// the icon and its colour: a mark wins, then the state's own; a closed
+// task keeps its own, as its mark only lists a result to read
 export function taskIcon(row: Pick<ExternalTaskRow, "state" | "attentionAt">): {
   name: IconName;
   status: "running" | "done" | "attention" | "stopped" | null;
@@ -111,9 +112,9 @@ export function taskIcon(row: Pick<ExternalTaskRow, "state" | "attentionAt">): {
     case "claimed":
       return { name: "play", status: marked ?? "running" };
     case "done":
-      return { name: "check", status: marked ?? "done" };
+      return { name: "check", status: "done" };
     case "cancelled":
-      return { name: "cancelled", status: marked ?? "stopped" };
+      return { name: "cancelled", status: "stopped" };
     default:
       return { name: "task-open", status: marked };
   }

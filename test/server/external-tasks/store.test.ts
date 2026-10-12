@@ -104,7 +104,7 @@ describe("external task writes", () => {
   }
 
   test.serial(
-    "a claim writes its own entry in its transaction, outside the bound and the mark",
+    "a claim writes its own entry in its transaction, outside the bound, and ends the mark",
     () => {
       using f = fixture();
       const events: BusEvent[] = [];
@@ -141,7 +141,8 @@ describe("external task writes", () => {
         expect(held.task.task).toMatchObject({
           entries: marked.entries + 1,
           last: marked.last,
-          attentionAt: marked.attentionAt,
+          // the agent resumed, so the unclaim's mark is done
+          attentionAt: null,
           revision: marked.revision + 1,
         });
         expect(f.area.store.counted(task.id)).toBe(marked.entries - 1);
@@ -288,7 +289,9 @@ describe("external task writes", () => {
       "Found a way.",
       [],
     );
-    expect(continued.task.attentionAt).toBe(marked.task.task.attentionAt);
+    // moving past its own question takes the question's mark away
+    expect(continued.task.state).toBe("claimed");
+    expect(continued.task.attentionAt).toBeNull();
     const answered = f.area.answer(f.owner.id, task.id, {
       state: "claimed",
       text: "Agreed.",
@@ -423,4 +426,37 @@ describe("external task writes", () => {
       }
     },
   );
+});
+
+test("an agent moving past its question unmarks the task, a result keeps the mark", () => {
+  using f = fixture();
+  const moved = f.task("blocked");
+  f.advance(1000);
+  const finished = f.task("blocked");
+  expect(f.area.attention([f.projectId]).tasks.map((r) => r.id)).toEqual([
+    finished.id,
+    moved.id,
+  ]);
+  f.advance(1000);
+  const progress = f.area.report(
+    f.key,
+    moved.id,
+    moved.claimId!,
+    "progress",
+    "Found a way.",
+    [],
+  );
+  expect(progress.task).toMatchObject({ state: "claimed", attentionAt: null });
+  const result = f.area.report(
+    f.key,
+    finished.id,
+    finished.claimId!,
+    "result",
+    "Done without an answer.",
+    [],
+  );
+  expect(result.task).toMatchObject({ state: "done", attentionAt: f.now() });
+  expect(f.area.attention([f.projectId]).tasks.map((r) => r.id)).toEqual([
+    finished.id,
+  ]);
 });

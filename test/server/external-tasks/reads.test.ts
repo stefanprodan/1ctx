@@ -442,7 +442,8 @@ test("a new claim leaves the last entry the unclaim before it, on every read", (
   expect(held.task.task.last).toEqual(last);
   expect(f.area.store.byId(task.id)!.last).toEqual(last);
   expect(f.area.byProject(f.projectId).tasks[0]!.last).toEqual(last);
-  expect(f.area.attention([f.projectId]).tasks[0]!.last).toEqual(last);
+  // the claim ends the unclaim's mark, so Home no longer lists it
+  expect(f.area.attention([f.projectId]).tasks).toEqual([]);
   const listed = f.area.list({
     projectIds: [f.projectId],
     states: ["claimed"],

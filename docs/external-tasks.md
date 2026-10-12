@@ -21,10 +21,13 @@ agent reports use the area's task capability. The pages that show it
   project's closed index. Detail pages use `before`, an entry id scoped
   to that task.
 - The attention query requires `attention=1`, counts every marked task
-  in the caller's visible projects and returns at most `ATTENTION_ROWS`.
+  in the projects the caller belongs to or owns, an admin too, and
+  returns at most `ATTENTION_ROWS`.
   A read never clears a mark. Answer, unclaim, cancel and reopen clear it,
-  as does `seen` with the `attentionAt` the page read. A different or
-  already cleared mark answers 200 unchanged, without a frame.
+  as does `seen` with the `attentionAt` the page read, and an agent's
+  progress on a blocked task or its claim of an open one, since only the
+  question or the unclaim marked it. A different or already cleared
+  mark answers 200 unchanged, without a frame.
 - Create requires a title, text and file ids. A patch supplies changed
   fields and `editRevision`; reports do not invalidate a brief edit.
   Titles are stored trimmed.

@@ -35,6 +35,7 @@ export type AccessPort = {
 type RoutesDeps = {
   db: Db;
   access: AccessPort;
+  homeProjectIds(principal: Principal): string[];
   tasks: ReturnType<typeof taskActions> & {
     projectOf(id: string): string | null;
     show(
@@ -48,11 +49,16 @@ type RoutesDeps = {
       after: string | null,
       filter: ClosedFilter,
     ): ClosedTasksResponse;
-    attention(projectIds: string[]): AttentionTasksResponse;
+    attention(projectIds: string[]): Omit<AttentionTasksResponse, "projectIds">;
   };
 };
 
-export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
+export function routes({
+  db,
+  access,
+  homeProjectIds,
+  tasks,
+}: RoutesDeps): RouteDescriptor[] {
   const visible = (principal: Principal, id: string) => {
     const projectId = tasks.projectOf(id);
     if (projectId === null) throw new NotFound("no such external task");
@@ -92,9 +98,12 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(req, ctx) {
         parseTaskAttention(new URL(req.url));
-        return json(
-          tasks.attention(access.reachableProjectIds(ctx.principal!)),
-        );
+        const projectIds = homeProjectIds(ctx.principal!);
+        const body: AttentionTasksResponse = {
+          ...tasks.attention(projectIds),
+          projectIds,
+        };
+        return json(body);
       },
     },
     {
