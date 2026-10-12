@@ -31,7 +31,13 @@ import { useCut } from "../../lib/resize.ts";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsGo, RowsLine, RowsList, RowsTitle } from "../../ui/Rows.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import {
+  AsideHandle,
+  AsideLine,
+  AsideNames,
+  AsideSection,
+  Split,
+} from "../../ui/Split.tsx";
 import { fileHref } from "../knowledge/Knowledge.model.ts";
 import { TaskForm } from "./ExternalTaskForm.tsx";
 import { Answer, TaskMoves } from "./ExternalTaskMoves.tsx";
@@ -134,9 +140,7 @@ function Brief({
       <p class="external-tasks-brief-foot external-tasks-brief-narrow">
         <State task={task} />
         {deadline !== null && (
-          <span>
-            Unclaimed at {deadlineTime(deadline, now)} without a report
-          </span>
+          <span>Claim ends {deadlineTime(deadline, now)}</span>
         )}
         {task.scope !== null && <span>Scope: {task.scope}</span>}
       </p>
@@ -160,24 +164,18 @@ function Aside({
     <AsideSection label="Task">
       <AsideLine label="State">{task.state}</AsideLine>
       {task.claim !== null && (
-        <AsideLine label="Claimed by" cut>
-          @{task.claim.username} via {task.claim.keyName}
+        <AsideLine label="Claimed by">
+          <AsideHandle
+            name={task.claim.username}
+            href={userHref(task.claim.username)}
+          />{" "}
+          via <AsideNames names={[task.claim.keyName]} />
         </AsideLine>
       )}
       {deadline !== null && (
-        <div class="split-line">
-          <span>
-            Unclaimed at{" "}
-            <span class="split-strong">{deadlineTime(deadline, now)}</span>{" "}
-            without a report
-          </span>
-        </div>
+        <AsideLine label="Claim ends">{deadlineTime(deadline, now)}</AsideLine>
       )}
-      {task.scope !== null && (
-        <AsideLine label="Scope" cut>
-          {task.scope}
-        </AsideLine>
-      )}
+      {task.scope !== null && <AsideLine label="Scope">{task.scope}</AsideLine>}
       {task.createdBy !== null && (
         <AsideLine label="Created by" href={userHref(task.createdBy.username)}>
           @{task.createdBy.username}

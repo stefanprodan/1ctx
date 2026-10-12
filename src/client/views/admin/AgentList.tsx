@@ -39,7 +39,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideItem, AsideSection, Split } from "../../ui/Split.tsx";
 import { overviewTotals, SpendLines, UsageSection } from "./AdminAside.tsx";
 import { failing, failingLine, lastUse } from "./AgentPage.model.ts";
 import { NewAgent } from "./NewAgent.tsx";
@@ -231,9 +231,9 @@ function Aside({ using }: { using: { name: string; agents: number }[] }) {
           <p class="split-empty">None yet.</p>
         ) : (
           using.map((p) => (
-            <AsideLine key={p.name} label={p.name}>
+            <AsideItem key={p.name} name={p.name}>
               {p.agents}
-            </AsideLine>
+            </AsideItem>
           ))
         )}
       </AsideSection>

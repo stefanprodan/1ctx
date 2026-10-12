@@ -24,11 +24,19 @@
     min-width: 0;
   }
 
+  /* two columns: the section's longest label sets the first, so every
+     value starts at one line; every child spans both, and a pair lays
+     its label and value on them as a subgrid */
   .split-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
     padding: var(--space-3) 0 var(--space-4);
+  }
+  .split-section > :not(.split-pair),
+  .split-pair {
+    grid-column: 1 / -1;
   }
   .split-section:first-child {
     padding-top: 2px;
@@ -54,22 +62,31 @@
     color: var(--dim);
     font-size: var(--text-ui);
   }
+  .split-pair {
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: baseline;
+    padding: 2px 0;
+  }
+  .split-label {
+    white-space: nowrap;
+  }
   .split-strong {
+    min-width: 0;
     color: var(--fg);
     font-weight: 500;
+    overflow-wrap: break-word;
   }
-  .split-quiet {
-    color: var(--faint);
-    font-weight: 400;
-  }
-  .split-link {
-    color: var(--dim);
-  }
-  .split-link:hover {
-    color: var(--fg);
+  .split-word {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
   }
 
-  .split-stack {
+  .split-item-body {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -77,26 +94,53 @@
     gap: 2px;
     padding: 2px 0;
   }
-  .split-name {
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
+  .split-item-name {
     color: var(--fg);
   }
-  .split-name-link:hover {
-    color: var(--brand);
-  }
-  .split-faint {
-    display: block;
-    font-family: var(--mono);
-    font-size: var(--text-label);
+  .split-item-sub {
+    font-size: var(--text-small);
     color: var(--faint);
   }
-
-  .split-value {
-    font-family: var(--mono);
-    font-size: var(--text-mono);
+  .split-item-end {
+    flex-shrink: 0;
+    color: var(--fg);
     font-weight: 500;
+  }
+
+  .split-note {
+    margin: 0;
+    padding: 2px 0;
+    color: var(--dim);
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    overflow-wrap: break-word;
+  }
+  .split-note-faint {
+    color: var(--faint);
+  }
+  .split-note-error {
+    color: var(--failed);
+  }
+
+  .split-handle {
+    color: var(--fg);
+  }
+  .split-item-sub .split-handle {
+    color: var(--dim);
+  }
+  .split-quiet {
+    color: var(--faint);
+    font-weight: 400;
+  }
+  /* yellow only under the pointer or focus, after every rest colour */
+  .split-handle:hover,
+  .split-handle:focus-visible {
+    color: var(--brand);
+  }
+  .split-link {
+    color: var(--dim);
+  }
+  .split-link:hover {
     color: var(--fg);
   }
 

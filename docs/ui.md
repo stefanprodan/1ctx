@@ -82,8 +82,29 @@ open row's body or a meta. The shared shapes are below.
 - **A card head's filters are `RowsFilters`,** short words; under 720
   their icons are hidden, so a search beside them keeps room.
 - **A page with an aside is `ui/Split.tsx`.** Aside content is
-  `AsideSection`, `AsideLine` and `AsideRead`; `Page` alone has no
-  aside. The aside holds only real numbers, and is hidden under 1100.
+  `AsideSection`, `AsideRead` and three line shapes: `AsideLine` (a
+  label and its value), `AsideItem` (one thing in a list) and
+  `AsideNote` (a sentence). No view writes their classes by hand (the
+  structure test). `Page` alone has no aside. The aside holds only real
+  numbers, and is hidden under 1100. An aside never repeats its page:
+  what the head says (an agent's model) stays out of it, and a page's
+  line of what the aside holds (a user's local time, a task's state)
+  shows only under 1100. A note's web addresses link with `links`,
+  opening a new tab.
+- **A list in an aside is `AsideItem`:** the name in the aside's own
+  text, never mono whatever the rows use, linked when it has a page,
+  a count or word at the right, an optional faint line under it.
+- **A handle in an aside is quiet:** `AsideLine` with `href`, or
+  `AsideHandle` inside a value or a faint line, in the value's colour
+  and yellow only on hover or focus, never the rows' `RowsHandle`.
+- **An aside section is two columns.** Its labels never wrap and its
+  longest sets the first column, so every value starts at one line. A
+  value of words wraps in its column; `cut` is only for a one-token
+  value (an email, a zone), and `AsideLine` gives it its whole text as
+  the title. A list of names in a value is `AsideNames`.
+- **A tab row scrolls whenever it does not fit,** at any width, with a
+  fade at the hidden side, so it never runs under the aside. Under 720
+  it drops the counts.
 - **A user's settings page stacks `ui/Section.tsx`.** An object or
   admin settings page stacks `ui/Setting.tsx` cards in a
   `SettingStack`, each card saving apart through its own

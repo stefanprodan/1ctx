@@ -132,10 +132,12 @@ describe("Home", () => {
     expect(html).toContain('placeholder="Search sessions"');
     expect(html).toContain('aria-label="Loading sessions"');
     // the aside: the agents, and the week once it answers
+    // a plain name linked to its page, never mono, its model under it
     expect(html).toContain(
-      'class="split-name split-name-link" href="/agents/assistant">assistant<',
+      'class="split-item-name split-handle cut" href="/agents/assistant" title="assistant">assistant<',
     );
-    expect(html).toContain('class="split-faint cut">acme/small<');
+    expect(html).toContain('class="cut">acme/small<');
+    expect(html).not.toContain("split-name");
     expect(html).not.toContain("Manage");
     week.value = {
       since: 0,
@@ -146,10 +148,10 @@ describe("Home", () => {
       completionTokens: 12_400,
     };
     const again = render(<Home />);
-    expect(again).toContain('class="split-value">1.28K<');
-    expect(again).toContain('class="split-value">637<');
+    expect(again).toContain('Turns</span><span class="split-strong">1.28K<');
+    expect(again).toContain('Sessions</span><span class="split-strong">637<');
     // prompt and completion tokens as one number
-    expect(again).toContain('class="split-value">2.14M<');
+    expect(again).toContain('Tokens</span><span class="split-strong">2.14M<');
     // the recent weeks are the project page's, not Home's
     expect(again).not.toContain("activity-grid");
   });

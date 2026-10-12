@@ -25,7 +25,7 @@ import {
   hasLineBreak,
   MAX_TITLE,
 } from "../../../shared/words.ts";
-import { sinceText } from "../../feed/Row.model.ts";
+import { clock, longDate } from "../../lib/format.ts";
 import type { IconName } from "../../lib/icons.tsx";
 
 export const INTRO = "Work for an agent you run outside 1ctx.";
@@ -131,9 +131,12 @@ export function claimDeadline(
   return task.claim.activeAt + idleHours * 3_600_000;
 }
 
-// the deadline's time as an aside says it: the time today, else the day
-export const deadlineTime = (at: number, now: number): string =>
-  sinceText(at, now);
+// when the claim ends, as the aside says it: the time today, else the
+// date as Created reads, then the time
+export function deadlineTime(at: number, now: number): string {
+  const today = new Date(at).toDateString() === new Date(now).toDateString();
+  return today ? clock(at) : `${longDate(at)}, ${clock(at)}`;
+}
 
 // the chat a task was made in; an untitled one as Storage names it
 // a title the server cut at MAX_TITLE ends on a whole word, never half

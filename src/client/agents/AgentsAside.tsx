@@ -5,7 +5,7 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { AGENTS_HREF, agentHref } from "../lib/hrefs.ts";
 import { Fit } from "../ui/Fit.tsx";
-import { AsideSection } from "../ui/Split.tsx";
+import { AsideItem, AsideSection } from "../ui/Split.tsx";
 import { shortModel } from "./meta.ts";
 
 export function AgentsAside({
@@ -32,21 +32,23 @@ export function AgentsAside({
         <p class="split-empty">No agents yet.</p>
       ) : (
         agents.map((a) => (
-          <div key={a.id} class="split-line">
-            <span class="avatar avatar-22">
-              <AvatarIcon name={a.avatar} size={13} />
-            </span>
-            <span class="split-stack">
-              <a class="split-name split-name-link" href={agentHref(a.name)}>
-                {a.name}
-              </a>
+          <AsideItem
+            key={a.id}
+            name={a.name}
+            href={agentHref(a.name)}
+            lead={
+              <span class="avatar avatar-22">
+                <AvatarIcon name={a.avatar} size={13} />
+              </span>
+            }
+            sub={
               <Fit
-                class="split-faint cut"
+                class="cut"
                 long={a.model.id}
                 short={shortModel(a.model.id)}
               />
-            </span>
-          </div>
+            }
+          />
         ))
       )}
     </AsideSection>

@@ -42,6 +42,7 @@ import {
   chatName,
   claimDeadline,
   claimWords,
+  deadlineTime,
   draftOf,
   entryBy,
   fileLabel,
@@ -193,6 +194,16 @@ describe("the words", () => {
         ),
       ).toBeNull();
     }
+  });
+
+  test("a claim ends at a time today, else on a date as Created reads", () => {
+    const now = new Date(2026, 9, 12, 9, 0).getTime();
+    expect(deadlineTime(new Date(2026, 9, 12, 22, 1).getTime(), now)).toBe(
+      "22:01",
+    );
+    expect(deadlineTime(new Date(2026, 9, 13, 8, 0).getTime(), now)).toBe(
+      "13 October 2026, 08:00",
+    );
   });
 
   test("an untitled chat has a name", () => {

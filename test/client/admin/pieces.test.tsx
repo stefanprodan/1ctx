@@ -64,14 +64,18 @@ describe("the aside", () => {
         <SpendLines label="Answers" count={1200} tokens={5} cost={null} />,
       ),
     );
-    expect(html).toContain('Answers<span class="split-strong">1.2K</span>');
-    expect(html).toContain('Tokens<span class="split-strong">5</span>');
-    expect(html).toContain('Cost<span class="split-strong">not priced</span>');
+    expect(html).toContain(
+      'Answers</span><span class="split-strong">1.2K</span>',
+    );
+    expect(html).toContain('Tokens</span><span class="split-strong">5</span>');
+    expect(html).toContain(
+      'Cost</span><span class="split-strong">not priced</span>',
+    );
     expect(
       plain(
         render(<SpendLines label="Turns" count={1} tokens={1} cost={4.5} />),
       ),
-    ).toContain('Cost<span class="split-strong">$4.50</span>');
+    ).toContain('Cost</span><span class="split-strong">$4.50</span>');
   });
 
   test.serial("the overview's totals only for 30 days", () => {
@@ -93,13 +97,13 @@ describe("the aside", () => {
           reader={(file) =>
             file === "mcp-a"
               ? { label: "flux", href: "/admin/config/mcp/flux" }
-              : { label: "unused", quiet: true }
+              : { label: "unused" }
           }
         />,
       ),
     );
     expect(html).toBe(
-      '<section class="split-section"><div class="split-section-head"><span class="label">Key files</span></div><div class="split-line">mcp-a.key<a class="split-strong cut" href="/admin/config/mcp/flux">flux</a></div><div class="split-line">mcp-z.key<span class="split-strong cut split-quiet">unused</span></div></section>',
+      '<section class="split-section"><div class="split-section-head"><span class="label">Key files</span></div><div class="split-line split-item"><span class="split-item-body"><span class="split-item-name cut" title="mcp-a.key">mcp-a.key</span><span class="split-item-sub cut"><a class="split-handle" href="/admin/config/mcp/flux">flux</a></span></span></div><div class="split-line split-item"><span class="split-item-body"><span class="split-item-name cut" title="mcp-z.key">mcp-z.key</span><span class="split-item-sub cut">unused</span></span></div></section>',
     );
     expect(
       render(<KeyFilesSection files={[]} reader={() => ({ label: "" })} />),

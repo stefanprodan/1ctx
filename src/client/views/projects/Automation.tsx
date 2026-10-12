@@ -53,7 +53,13 @@ import { browserZone } from "../../lib/zone.ts";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsCard, RowsFilters, RowsNote } from "../../ui/Rows.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import {
+  AsideItem,
+  AsideLine,
+  AsideNote,
+  AsideSection,
+  Split,
+} from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { Note } from "../memory/Note.tsx";
 import { ATTENTION_LABELS } from "./Attention.model.ts";
@@ -128,29 +134,30 @@ function NextRuns({
   );
   const held = preview.value?.key === key ? preview.value : null;
   if (automation.agentRetired) {
-    return <div class="split-line">Paused</div>;
+    return <AsideNote>Paused</AsideNote>;
   }
   if (automation.suspendedAt !== null) {
-    return <div class="split-line">Suspended</div>;
+    return <AsideNote>Suspended</AsideNote>;
   }
   // a task that runs once has one fire, named with its year
   const next = nextRunsOf(automation, held?.fires ?? [], now);
   return (
     <>
-      {next.waiting !== null && <div class="split-line">{next.waiting}</div>}
+      {next.waiting !== null && <AsideNote>{next.waiting}</AsideNote>}
       {next.fires.map((fire) => (
-        <div key={fire} class="split-line automations-fire">
-          <span>
-            {fireLabel(fire, now, automation.tz, false, automation.once)}
-          </span>
-          <span class="automations-faint">{until(fire, now)}</span>
-        </div>
+        <AsideItem
+          key={fire}
+          name={fireLabel(fire, now, automation.tz, false, automation.once)}
+          quiet
+        >
+          {until(fire, now)}
+        </AsideItem>
       ))}
       {held?.problem && (
-        <div class="split-line error">{sentence(held.problem)}</div>
+        <AsideNote tone="error">{sentence(held.problem)}</AsideNote>
       )}
       {automation.tz !== browserZone() && (
-        <div class="split-line automations-faint">In {automation.tz}</div>
+        <AsideNote tone="faint">In {automation.tz}</AsideNote>
       )}
     </>
   );
@@ -222,15 +229,15 @@ export function Automation({ params }: { params: Params }) {
               </AsideSection>
               <AsideSection label="History">
                 {tally === null ? (
-                  <div class="split-line">Loading</div>
+                  <p class="split-empty">Loading</p>
                 ) : (
                   <>
-                    <div class="split-line">
+                    <AsideNote>
                       {total} {total === 1 ? "run" : "runs"} ·{" "}
                       {row.retentionDays}{" "}
                       {row.retentionDays === 1 ? "day" : "days"} retention
-                    </div>
-                    <div class="split-line">
+                    </AsideNote>
+                    <AsideNote>
                       {[
                         tally.running > 0 ? `${tally.running} running` : null,
                         `${tally.done} done`,
@@ -239,7 +246,7 @@ export function Automation({ params }: { params: Params }) {
                       ]
                         .filter((s) => s !== null)
                         .join(" · ")}
-                    </div>
+                    </AsideNote>
                   </>
                 )}
               </AsideSection>
@@ -252,9 +259,7 @@ export function Automation({ params }: { params: Params }) {
                 </AsideLine>
                 <AccessLines row={row} />
                 {row.rerunOnRestart && (
-                  <div class="split-line">
-                    Restarts a run the server stopped
-                  </div>
+                  <AsideNote>Restarts a run the server stopped</AsideNote>
                 )}
                 <AsideLine label="Owner" href={userHref(row.ownerName)}>
                   @{row.ownerName}

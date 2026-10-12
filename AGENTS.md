@@ -193,6 +193,8 @@ fixture under `test/fixtures/structure/`.
   inside its own selector, and never selects by element, attribute, id
   or `*` at any depth, inside `:is()`, `:has()`, `:where()` and `:not()`
   too.
+- Only `client/ui/Split.tsx` writes the aside's line classes
+  (`split-line`, `split-item`, `split-note` and their parts).
 - Colour, font family, font size, the `font` shorthand and radius come
   only from `tokens.css`: never a literal anywhere else, CSS or TSX, a
   `var()` fallback included (`LITERAL_EXEMPTIONS` lists the exceptions).

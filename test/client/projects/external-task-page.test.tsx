@@ -9,7 +9,6 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import type { TaskPage } from "../../../src/client/data/external-task.ts";
-import { sinceText } from "../../../src/client/feed/Row.model.ts";
 import { Icon } from "../../../src/client/lib/icons.tsx";
 import {
   TaskBody,
@@ -87,7 +86,7 @@ const draw = (p: TaskPage, edit = false) =>
 // the aside's State line
 const state = (html: string) =>
   html.match(
-    /<div class="split-line">State<span class="split-strong">.*?<\/div>/,
+    /<div class="split-line split-pair"><span class="split-label">State<\/span><span class="split-strong">.*?<\/div>/,
   )?.[0] ?? "";
 const brief = (html: string) =>
   html.match(
@@ -128,10 +127,10 @@ describe("the state", () => {
       />,
     );
     expect(state(html)).toBe(
-      '<div class="split-line">State<span class="split-strong">claimed</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">State</span><span class="split-strong">claimed</span></div>',
     );
     expect(aside(html)).toContain(
-      '<div class="split-line">Claimed by<span class="split-strong cut">@stefan via laptop</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">Claimed by</span><span class="split-strong"><a class="split-handle" href="/users/stefan">@stefan</a> via <span class="split-word" title="laptop">laptop</span></span></div>',
     );
     expect(narrow(html)).toContain(icon);
     expect(narrow(html)).toContain("<span>claimed by stefan via laptop</span>");
@@ -173,7 +172,7 @@ describe("the scope", () => {
     const html = draw(page(row({ scope: "part B" })));
     expect(state(html)).not.toContain("part B");
     expect(aside(html)).toContain(
-      '<div class="split-line">Scope<span class="split-strong cut">part B</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">Scope</span><span class="split-strong">part B</span></div>',
     );
     expect(narrow(html)).toContain("<span>Scope: part B</span>");
     const none = draw(page());
@@ -183,15 +182,15 @@ describe("the scope", () => {
 });
 
 describe("the idle deadline", () => {
-  const words = (at: number) =>
-    `Unclaimed at <span class="split-strong">${sinceText(at, NOW)}</span> without a report`;
+  // a line of its own, dated as Created is when it is not today
+  const words = (when: string) =>
+    `<span class="split-label">Claim ends</span><span class="split-strong">${when}</span>`;
 
   test("is the claim's last activity plus the limit, only while claimed", () => {
     const html = draw(page(row({ state: "claimed", claim })));
-    const at = claim.activeAt + 24 * HOUR;
-    expect(aside(html)).toContain(words(at));
+    expect(aside(html)).toContain(words("13 October 2026, 08:00"));
     expect(narrow(html)).toContain(
-      `<span>Unclaimed at ${sinceText(at, NOW)} without a report</span>`,
+      "<span>Claim ends 13 October 2026, 08:00</span>",
     );
     expect(html).not.toContain("Opens again");
     for (const task of [
@@ -200,14 +199,15 @@ describe("the idle deadline", () => {
       row({ state: "done" }),
     ]) {
       expect(draw(page(task))).not.toContain("Unclaimed at");
+      expect(draw(page(task))).not.toContain("Claim ends");
     }
   });
 
   test("moves on with a report", () => {
     const reported = { ...claim, activeAt: NOW };
     const html = draw(page(row({ state: "claimed", claim: reported })));
-    expect(aside(html)).toContain(words(NOW + 24 * HOUR));
-    expect(aside(html)).not.toContain(words(claim.activeAt + 24 * HOUR));
+    expect(aside(html)).toContain(words("13 October 2026, 09:00"));
+    expect(aside(html)).not.toContain(words("13 October 2026, 08:00"));
   });
 });
 

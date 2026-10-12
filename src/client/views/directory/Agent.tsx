@@ -7,12 +7,11 @@
 // card whose head is tabs at their own addresses: its instructions as
 // written with what the model can do at their foot, the built-in tools
 // a send offers it now, its skills and its MCP servers, each row a name,
-// one line under it and one fact at its end. The aside is the model's
-// facts and the agent's settings, with Manage for an admin.
+// one line under it and one fact at its end. The aside is the agent's
+// settings, with Manage for an admin: the head already says the model.
 
 import { useMemo } from "preact/hooks";
 import type { DirectoryAgentResponse } from "../../../shared/api/directory.ts";
-import { priceLine, shortModel, windowLine } from "../../agents/meta.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
 import {
@@ -33,7 +32,6 @@ import {
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
-import { Fit } from "../../ui/Fit.tsx";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import {
@@ -276,60 +274,27 @@ export function Agent({ params }: { params: Params }) {
       {shown && (
         <Split
           aside={
-            <>
-              <AsideSection label="Model">
-                <AsideLine label="Provider" cut>
-                  {shown.provider}
-                </AsideLine>
-                <div class="split-line">
-                  Model
-                  <Fit
-                    class="split-strong cut"
-                    long={shown.agent.model.id}
-                    short={shortModel(shown.agent.model.id)}
-                  />
-                </div>
-                {shown.agent.model.contextLength !== null && (
-                  <AsideLine label="Context">
-                    {windowLine(shown.agent.model.contextLength)}
-                  </AsideLine>
-                )}
-                {priceLine(
-                  shown.agent.model.promptPrice,
-                  shown.agent.model.completionPrice,
-                  shown.wire,
-                ) !== "" && (
-                  <AsideLine label="Price">
-                    {priceLine(
-                      shown.agent.model.promptPrice,
-                      shown.agent.model.completionPrice,
-                      shown.wire,
-                    )}
-                  </AsideLine>
-                )}
-              </AsideSection>
-              <AsideSection
-                label="Settings"
-                action={
-                  me.value?.role === "admin" ? (
-                    <a
-                      class="split-link"
-                      href={configAgentHref(shown.agent.name)}
-                    >
-                      Manage
-                    </a>
-                  ) : undefined
-                }
-              >
-                <AsideLine label="Thinking">
-                  {thinkingText(shown.agent)}
-                </AsideLine>
-                <AsideLine label="Effort">{effortText(shown.agent)}</AsideLine>
-                <AsideLine label="Created">
-                  {longDate(shown.agent.createdAt)}
-                </AsideLine>
-              </AsideSection>
-            </>
+            <AsideSection
+              label="Settings"
+              action={
+                me.value?.role === "admin" ? (
+                  <a
+                    class="split-link"
+                    href={configAgentHref(shown.agent.name)}
+                  >
+                    Manage
+                  </a>
+                ) : undefined
+              }
+            >
+              <AsideLine label="Thinking">
+                {thinkingText(shown.agent)}
+              </AsideLine>
+              <AsideLine label="Effort">{effortText(shown.agent)}</AsideLine>
+              <AsideLine label="Created">
+                {longDate(shown.agent.createdAt)}
+              </AsideLine>
+            </AsideSection>
           }
         >
           <div class="directory">
