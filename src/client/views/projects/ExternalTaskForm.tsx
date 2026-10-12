@@ -111,10 +111,7 @@ export function TaskForm({
   };
   return (
     <form class="external-tasks-form" ref={form} onSubmit={submit}>
-      <Section
-        title="Task"
-        text="One line, and its scope in the linked files if any"
-      >
+      <Section title="Task" text="The agent's goal">
         <div class="pair">
           <label class="field">
             <span class="label label-required">Title</span>
@@ -166,10 +163,7 @@ export function TaskForm({
           <FieldError save={save} field="text" />
         </label>
       </Section>
-      <Section
-        title="Files"
-        text={`Knowledge files the agent reads, at most ${MAX_TASK_FILES}`}
-      >
+      <Section title="Files" text="Knowledge files the agent reads">
         <div class="field">
           <RowsList>
             {d.fileIds.length === 0 && <RowsNote>No files linked.</RowsNote>}
