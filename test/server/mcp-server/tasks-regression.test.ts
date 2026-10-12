@@ -139,6 +139,7 @@ describe("the inbound MCP tasks regressions", () => {
       username: "foreign-agent",
       keyName: "satellite-key",
       startedAt: 250,
+      activeAt: 250,
     };
     const foreignRow = externalTaskRow({
       state: "claimed",

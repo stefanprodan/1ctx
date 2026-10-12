@@ -13,11 +13,12 @@ import type {
 import { lineFrom } from "../sessions/index.ts";
 
 // Match trim()'s whitespace so a bounded preview still reaches its first line.
-export const TASK_SELECT = `select t.id, t.project_id, t.title, t.part, t.state,
+// The last entry is a report or a move, never a claim.
+export const TASK_SELECT = `select t.id, t.project_id, t.title, t.scope, t.state,
     t.revision, t.edit_revision, t.claim_id, t.attention_at, t.created_by,
     t.created_at, t.moved_at, u.username as creator_name,
     c.user_id as claim_user, cu.username as claim_username, c.key_id,
-    c.key_name, c.started_at, e.kind as last_kind,
+    c.key_name, c.started_at, c.active_at, e.kind as last_kind,
     substr(ltrim(e.text, char(9, 10, 11, 12, 13, 32, 160, 5760,
       8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202,
       8232, 8233, 8239, 8287, 12288, 65279)), 1, 600) as last_text,
@@ -35,7 +36,7 @@ export const TASK_SELECT = `select t.id, t.project_id, t.title, t.part, t.state,
   left join users cu on cu.id = c.user_id
   left join external_task_entries e on e.rowid =
     (select rowid from external_task_entries where task_id = t.id
-      order by at desc, rowid desc limit 1)`;
+      and kind <> 'claim' order by at desc, rowid desc limit 1)`;
 
 export type TaskKey = { userId: string; keyId: string; keyName: string };
 export type TaskListRow = ExternalTaskRow & {
@@ -69,7 +70,7 @@ export type RawTask = {
   id: string;
   project_id: string;
   title: string;
-  part: string | null;
+  scope: string | null;
   state: ExternalTaskState;
   revision: number;
   edit_revision: number;
@@ -84,6 +85,7 @@ export type RawTask = {
   key_id: string;
   key_name: string;
   started_at: number;
+  active_at: number;
   last_kind: EntryKind | null;
   last_text: string;
   last_at: number;
@@ -108,7 +110,7 @@ export const taskRow = (raw: RawTask): ExternalTaskRow => ({
   id: raw.id,
   projectId: raw.project_id,
   title: raw.title,
-  part: raw.part,
+  scope: raw.scope,
   state: raw.state,
   revision: raw.revision,
   editRevision: raw.edit_revision,
@@ -122,6 +124,7 @@ export const taskRow = (raw: RawTask): ExternalTaskRow => ({
           keyId: raw.key_id,
           keyName: raw.key_name,
           startedAt: raw.started_at,
+          activeAt: raw.active_at,
         },
   last:
     raw.last_kind === null

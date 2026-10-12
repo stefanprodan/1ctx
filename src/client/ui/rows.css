@@ -186,6 +186,14 @@
     text-align: left;
     cursor: pointer;
   }
+  .rows-more {
+    display: flex;
+    justify-content: center;
+  }
+  /* the word is small, its padding keeps the tap target a row's height */
+  .rows-more .btn-text {
+    padding: var(--space-2) var(--space-3);
+  }
   .rows-button:disabled {
     background: transparent;
     color: var(--faint);

@@ -12,36 +12,36 @@ import {
 } from "../../../src/shared/contracts/external-task.ts";
 import { DAY, fixture, HOUR, refuses } from "./fixture.ts";
 
-test("idle release reads raised and lowered limits and releases exactly at the boundary", () => {
+test("idle unclaim reads raised and lowered limits and unclaims exactly at the boundary", () => {
   using f = fixture();
   const task = f.task("claimed");
   f.advance(25 * HOUR);
   f.limits.idle = 48;
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
   expect(f.area.show(task.id, null)!.idleHours).toBe(48);
   expect(f.area.claim(f.key, task.id).idleHours).toBe(48);
   f.limits.idle = 26;
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
   f.limits.idle = 25;
-  expect(f.area.releaseIdle(f.now())).toBe(1);
-  const released = f.area.show(task.id, null)!;
-  expect(released.task.task).toMatchObject({
+  expect(f.area.unclaimIdle(f.now())).toBe(1);
+  const unclaimed = f.area.show(task.id, null)!;
+  expect(unclaimed.task.task).toMatchObject({
     state: "open",
     claim: null,
     attentionAt: f.now(),
     revision: task.revision + 1,
     editRevision: 0,
   });
-  expect(released.entries[0]).toMatchObject({
-    kind: "release",
+  expect(unclaimed.entries[0]).toMatchObject({
+    kind: "unclaim",
     claimEnd: "idle",
     by: null,
     claimId: task.claimId,
     keyName: null,
-    text: "released after 25 hours without a report",
+    text: "after 25 hours without a report",
   });
   expect(f.area.store.claimById(task.claimId!)!.end_reason).toBe("idle");
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
   refuses(
     () => f.area.report(f.key, task.id, task.claimId!, "progress", "Late.", []),
     409,
@@ -49,7 +49,18 @@ test("idle release reads raised and lowered limits and releases exactly at the b
   );
   const held = f.area.claim(f.key, task.id);
   expect(held.claimId).not.toBe(task.claimId);
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
+});
+
+test("an idle unclaim after one hour says hour", () => {
+  using f = fixture();
+  const task = f.task("claimed");
+  f.limits.idle = 1;
+  f.advance(HOUR);
+  expect(f.area.unclaimIdle(f.now())).toBe(1);
+  expect(f.area.show(task.id, null)!.entries[0]!.text).toBe(
+    "after 1 hour without a report",
+  );
 });
 
 test("reports and answers restart idle time, blocked tasks never idle out", () => {
@@ -57,14 +68,14 @@ test("reports and answers restart idle time, blocked tasks never idle out", () =
   const blocked = f.task("blocked");
   f.advance(8 * DAY);
   f.limits.idle = 1;
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
   f.area.answer(f.member.id, blocked.id, {
     state: "blocked",
     text: "The first path.",
   });
   expect(f.area.store.claimById(blocked.claimId!)!.active_at).toBe(f.now());
   f.advance(HOUR - 1);
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
   f.area.report(
     f.key,
     blocked.id,
@@ -74,28 +85,28 @@ test("reports and answers restart idle time, blocked tasks never idle out", () =
     [],
   );
   f.advance(HOUR - 1);
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
   f.area.answer(f.member.id, blocked.id, {
     state: "claimed",
     text: "One more hint.",
   });
   f.advance(HOUR - 1);
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
   f.advance(1);
-  expect(f.area.releaseIdle(f.now())).toBe(1);
+  expect(f.area.unclaimIdle(f.now())).toBe(1);
 });
 
 test("a fresh reclaim ignores old entries", () => {
   using f = fixture();
   const task = f.task("claimed");
-  f.area.report(f.key, task.id, task.claimId!, "release", "Pause.", []);
+  f.area.report(f.key, task.id, task.claimId!, "unclaim", "Pause.", []);
   f.advance(30 * DAY);
   const held = f.area.claim(f.key, task.id);
   expect(f.area.store.claimById(held.claimId)!.active_at).toBe(f.now());
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
 });
 
-test("a report between the scan and release wins the transaction recheck", () => {
+test("a report between the scan and unclaim wins the transaction recheck", () => {
   using f = fixture();
   const task = f.task("claimed");
   f.advance(DAY);
@@ -112,11 +123,11 @@ test("a report between the scan and release wins the transaction recheck", () =>
     );
     return candidates;
   };
-  expect(f.area.releaseIdle(f.now())).toBe(0);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
   expect(f.area.store.byId(task.id)!.state).toBe("claimed");
   f.area.store.openClaims = scan;
   f.advance(DAY);
-  expect(f.area.releaseIdle(f.now())).toBe(1);
+  expect(f.area.unclaimIdle(f.now())).toBe(1);
   refuses(
     () =>
       f.area.report(f.key, task.id, task.claimId!, "result", "Too late.", []),
@@ -156,7 +167,7 @@ test.serial(
           attentionAt: f.now(),
         });
         expect(f.area.show(row.id, null)!.entries[0]).toMatchObject({
-          kind: "release",
+          kind: "unclaim",
           claimEnd: "access_gone",
           by: null,
           claimId: row.claimId,
@@ -190,7 +201,7 @@ for (const scope of ["keys", "user"] as const) {
       "Last question.",
       [],
     );
-    expect(f.area.store.byId(task.id)!.entries).toBe(CLOSING_ENTRIES);
+    expect(f.area.store.counted(task.id)).toBe(CLOSING_ENTRIES);
     refuses(
       () =>
         f.area.answer(f.owner.id, task.id, {
@@ -222,15 +233,16 @@ for (const scope of ["keys", "user"] as const) {
     expect(f.area.store.byId(task.id)).toMatchObject({
       state: "open",
       claim: null,
-      entries: CLOSING_ENTRIES + 1,
+      entries: CLOSING_ENTRIES + 2,
     });
+    expect(f.area.store.counted(task.id)).toBe(CLOSING_ENTRIES + 1);
     expect(f.area.store.claimById(held.claimId)!.end_reason).toBe(
       "access_gone",
     );
     refuses(() => f.area.claim(f.key, task.id), 409);
-    const dropped = f.area.drop(f.owner.id, task.id, { state: "open" });
-    expect(dropped.task.task.entries).toBe(CLOSING_ENTRIES + 2);
-    expect(dropped.task.task.entries).toBeLessThan(MAX_ENTRIES);
+    const cancelled = f.area.cancel(f.owner.id, task.id, { state: "open" });
+    expect(cancelled.task.task.entries).toBe(CLOSING_ENTRIES + 3);
+    expect(f.area.store.counted(task.id)).toBeLessThan(MAX_ENTRIES);
   });
 
   test.serial(
@@ -286,10 +298,10 @@ test("idle scanning excludes fresh and blocked claims before opening transaction
   expect(candidates.map((claim) => claim.id)).toEqual([idle.claimId!]);
   const transaction = spyOn(f.db, "transaction");
   try {
-    expect(f.area.releaseIdle(f.now())).toBe(1);
+    expect(f.area.unclaimIdle(f.now())).toBe(1);
     expect(transaction).toHaveBeenCalledTimes(1);
     transaction.mockClear();
-    expect(f.area.releaseIdle(f.now())).toBe(0);
+    expect(f.area.unclaimIdle(f.now())).toBe(0);
     expect(transaction).not.toHaveBeenCalled();
   } finally {
     transaction.mockRestore();
@@ -331,10 +343,10 @@ for (const kind of ["idle", "access_gone"] as const) {
     f.advance(DAY);
     expect(
       kind === "idle"
-        ? f.area.releaseIdle(f.now())
+        ? f.area.unclaimIdle(f.now())
         : f.area.endClaims([f.key.keyId]),
     ).toBe(1);
-    expect(f.area.store.byId(task.id)!.entries).toBe(241);
+    expect(f.area.store.counted(task.id)).toBe(241);
   });
 }
 
@@ -343,7 +355,7 @@ test.serial(
   () => {
     using f = fixture();
     const done = f.task("done");
-    const dropped = f.task("dropped");
+    const cancelled = f.task("cancelled");
     const reopened = f.task("done");
     const reclosed = f.task("done");
     f.area.reopen(f.owner.id, reopened.id, {
@@ -352,7 +364,7 @@ test.serial(
     });
     f.advance(20 * DAY);
     f.area.reopen(f.owner.id, reclosed.id, { state: "done", text: "Again." });
-    f.area.drop(f.owner.id, reclosed.id, { state: "open" });
+    f.area.cancel(f.owner.id, reclosed.id, { state: "open" });
     f.advance(10 * DAY);
     f.limits.days = 31;
     expect(f.area.deleteClosed(f.now())).toBe(0);
@@ -367,14 +379,14 @@ test.serial(
         events
           .map((e) => (e.type === "externalTask.deleted" ? e.data.taskId : ""))
           .sort(),
-      ).toEqual([done.id, dropped.id].sort());
-      for (const task of [done, dropped]) {
+      ).toEqual([done.id, cancelled.id].sort());
+      for (const task of [done, cancelled]) {
         expect(f.area.projectOf(task.id)).toBeNull();
         expect(f.area.store.claimsCount(task.id)).toBe(0);
         expect(f.area.store.entries(task.id, null).entries).toEqual([]);
       }
       expect(f.area.store.byId(reopened.id)!.state).toBe("open");
-      expect(f.area.store.byId(reclosed.id)!.state).toBe("dropped");
+      expect(f.area.store.byId(reclosed.id)!.state).toBe("cancelled");
       f.advance(20 * DAY);
       expect(f.area.deleteClosed(f.now())).toBe(1);
       expect(f.area.store.byId(reopened.id)!.state).toBe("open");
@@ -384,3 +396,28 @@ test.serial(
     }
   },
 );
+
+test("a claim's activeAt is its last report or answer, the idle sweep's basis", () => {
+  using f = fixture();
+  const task = f.task("claimed");
+  const activeAt = () => f.area.store.byId(task.id)!.claim!.activeAt;
+  expect(activeAt()).toBe(f.now());
+  f.advance(2 * HOUR);
+  f.area.report(f.key, task.id, task.claimId!, "progress", "Half.", []);
+  expect(activeAt()).toBe(f.now());
+  f.advance(3 * HOUR);
+  f.area.answer(f.owner.id, task.id, { state: "claimed", text: "Go on." });
+  const last = f.now();
+  expect(activeAt()).toBe(last);
+  expect(f.area.show(task.id, null)!.task.task.claim!.activeAt).toBe(last);
+  const deadline = last + f.limits.idle * HOUR;
+  f.at(deadline - 1);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
+  expect(f.area.store.byId(task.id)!.state).toBe("claimed");
+  f.at(deadline);
+  expect(f.area.unclaimIdle(f.now())).toBe(1);
+  expect(f.area.store.byId(task.id)!).toMatchObject({
+    state: "open",
+    claim: null,
+  });
+});

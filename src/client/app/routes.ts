@@ -40,7 +40,7 @@ import {
   loadUserPage,
 } from "../data/directory.ts";
 import { loadExternalTask } from "../data/external-task.ts";
-import { loadExternalTasks } from "../data/external-tasks.ts";
+import { loadClosedTasks, loadExternalTasks } from "../data/external-tasks.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadLink } from "../data/links.ts";
@@ -359,7 +359,9 @@ export const ROUTES: Route[] = [
     ),
     title: () => "External tasks",
     role: "authenticated",
-    load: framed,
+    load: async (params) => {
+      await Promise.all([...frame(params.id), loadClosedTasks(params.id)]);
+    },
   },
   {
     path: "/projects/:id/memory",

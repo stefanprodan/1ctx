@@ -91,6 +91,37 @@ test("agent pages seek each project's state indexes without scans or temp sorts"
   }
 });
 
+test("closed pages seek the project's closed index under a search and a state", () => {
+  using f = fixture();
+  f.task("done");
+  f.task("cancelled");
+  for (const filter of [
+    { q: "", state: null },
+    { q: "work", state: null },
+    { q: "", state: "done" },
+    { q: "work", state: "cancelled" },
+  ] as const) {
+    for (const after of [null, `${f.now()}.000000000000`]) {
+      const sqls = queries(f.db, () =>
+        f.area.closed(f.projectId, after, filter, 2),
+      );
+      const candidates = sqls.filter((sql) => !sql.includes("last_text"));
+      expect(candidates).toHaveLength(1);
+      const detail = plan(f.db, candidates[0]!);
+      expect(
+        detail.some((line) =>
+          line.startsWith(
+            "SEARCH t USING INDEX external_tasks_closed (project_id=?",
+          ),
+        ),
+      ).toBe(true);
+      expect(detail.some((line) => /SCAN \w+|TEMP B-TREE/.test(line))).toBe(
+        false,
+      );
+    }
+  }
+});
+
 test("held pages seek the key's open claims once and hydrate only the page", () => {
   using f = fixture();
   const held = f.task("claimed");

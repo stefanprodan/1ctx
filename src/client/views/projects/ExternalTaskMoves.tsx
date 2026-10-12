@@ -1,14 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A member's moves on an external task's page. Release, Drop and Reopen
-// open a box for the words the timeline keeps; the box names the state
-// and the claim the page showed when it opened, so a task moved since
-// is refused with the server's words rather than moved blind. Delete
-// asks in place. The answer box shows the open question while the task
-// is blocked, and stays while it holds a draft. A box whose move the
-// task no longer offers keeps its words and its refusal, and its button
-// is off.
+// A member's moves on an external task's page. Unclaim, Cancel task and
+// Reopen open a box for the words the timeline keeps; the box names the
+// state and the claim the page showed when it opened, so a task moved
+// since is refused with the server's words rather than moved blind.
+// Delete asks in place. The answer box shows the open question while
+// the task is blocked, and stays while it holds a draft. A box whose
+// move the task no longer offers keeps its words and its refusal, and
+// its button is off.
 
 import { useSignal } from "@preact/signals";
 import type { ExternalTaskRow } from "../../../shared/contracts/external-task.ts";
@@ -151,7 +151,7 @@ export function TaskMoves({
     opened.value = {
       move,
       state: task.state,
-      ...(move === "release" && task.claim !== null
+      ...(move === "unclaim" && task.claim !== null
         ? { claimId: task.claim.id }
         : {}),
     };
@@ -164,7 +164,7 @@ export function TaskMoves({
   };
   const notice = save.notice();
   const busy = save.busy || opened.value !== null;
-  const button = (move: Move, icon: "redo" | "close" | "play") => (
+  const button = (move: Move, icon: "redo" | "cancelled" | "play") => (
     <button
       key={move}
       type="button"
@@ -192,8 +192,8 @@ export function TaskMoves({
                 Edit
               </button>
             )}
-            {moves.release && button("release", "redo")}
-            {moves.drop && button("drop", "close")}
+            {moves.unclaim && button("unclaim", "redo")}
+            {moves.cancel && button("cancel", "cancelled")}
             {moves.reopen && button("reopen", "play")}
           </>
         )}

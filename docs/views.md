@@ -2,8 +2,9 @@
 
 Governs what pages draw: `src/client/views/`, `feed/`, `composer/`,
 `transcript/` and the `data/` entities behind them. The admin pages are
-in `docs/admin-pages.md`; the primitives, forms and the data layer's
-general rules are in `docs/ui.md`.
+in `docs/admin-pages.md`, the external task pages in
+`docs/external-task-pages.md`; the primitives, forms and the data
+layer's general rules are in `docs/ui.md`.
 
 ## The feed
 
@@ -323,19 +324,3 @@ Flagged.
   Decider while the list's `deciderOn` is false, with a hint saying
   why. A saved pick stays shown. The words on when are kept
   while the mode is off, so turning it on again brings them back.
-
-## External tasks
-
-- **The words are external task, brief, claim, report and answer,**
-  never ticket, issue, job or reply.
-- **The list loads whole, then frames keep it** by revision
-  (`data/external-tasks.ts`): blocked, claimed, open, latest move first.
-  The highest revision seen per task keeps an older list read from
-  bringing a closed one back. Done and dropped page on unfold. Home's
-  card reads `?attention=1`, drawn as Not sent while a task is marked.
-- **The task's page clears its mark with `seen`** once its read lands
-  marked. A frame adding an entry or editing the brief reads it again,
-  keeping older entries.
-- **A move names what the page showed:** a box keeps the state and the
-  claim from when it opened. An edit sends what changed and the edit
-  revision the form opened on.

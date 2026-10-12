@@ -52,7 +52,7 @@ test.serial(
   },
 );
 
-for (const kind of ["result", "release"] as const) {
+for (const kind of ["result", "unclaim"] as const) {
   test(`${kind} retry returns its original end even after another claim or brief edit`, () => {
     using f = fixture();
     const task = f.task("claimed");
@@ -118,7 +118,8 @@ test("a repeated progress after a member answer is a new entry", () => {
     [],
   );
   expect(repeated.entry.id).not.toBe(first.entry.id);
-  expect(repeated.task.entries).toBe(3);
+  // the claim, the first progress, the answer and the repeat
+  expect(repeated.task.entries).toBe(4);
   const links = f.port.report(
     f.key,
     task.id,
@@ -168,7 +169,7 @@ test("a question repeated after an answer blocks again instead of replaying the 
   expect(report.entry.id).not.toBe(first.id);
   expect(report.task).toMatchObject({
     state: "blocked",
-    entries: 3,
+    entries: 4,
     revision: answered.task.task.revision + 1,
     attentionAt: f.now(),
   });
@@ -176,7 +177,7 @@ test("a question repeated after an answer blocks again instead of replaying the 
   expect(f.area.store.claimById(task.claimId!)!.active_at).toBe(f.now());
 });
 
-for (const kind of ["progress", "result", "release"] as const) {
+for (const kind of ["progress", "result", "unclaim"] as const) {
   test(`${kind} refuses a claim from another task, including a retry`, () => {
     using f = fixture();
     const task = f.task("claimed");
@@ -194,28 +195,28 @@ for (const kind of ["progress", "result", "release"] as const) {
   });
 }
 
-test("a member's release of an unreported claim cannot be retried by the agent", () => {
+test("a member's unclaim of an unreported claim cannot be retried by the agent", () => {
   using f = fixture();
   const task = f.task("claimed");
-  f.area.release(f.owner.id, task.id, {
+  f.area.unclaim(f.owner.id, task.id, {
     state: "claimed",
     claimId: task.claimId!,
     text: "Stop.",
   });
   refuses(
-    () => f.port.report(f.key, task.id, task.claimId!, "release", "Stop.", []),
+    () => f.port.report(f.key, task.id, task.claimId!, "unclaim", "Stop.", []),
     409,
     STALE_TASK,
   );
 });
 
-test("a member or system release does not authorize an ended progress retry", () => {
+test("a member or system unclaim does not authorize an ended progress retry", () => {
   using f = fixture();
   for (const end of ["member", "access"] as const) {
     const task = f.task("claimed");
     f.port.report(f.key, task.id, task.claimId!, "progress", "Working.", []);
     if (end === "member")
-      f.area.release(f.owner.id, task.id, {
+      f.area.unclaim(f.owner.id, task.id, {
         state: "claimed",
         claimId: task.claimId!,
         text: "Take a break.",
@@ -240,7 +241,7 @@ test("a member or system release does not authorize an ended progress retry", ()
           f.key,
           task.id,
           task.claimId!,
-          "release",
+          "unclaim",
           "Take a break.",
           [],
         ),
@@ -272,6 +273,8 @@ test("a fresh area instance can retry a persisted result", () => {
     clock: f.now,
     externalTaskDays: () => f.limits.days,
     externalTaskIdleHours: () => f.limits.idle,
+    chatOpens: () => true,
+    homeProjectIds: () => [f.projectId],
     knowledge: { file: () => null, deletedName: () => null },
   });
   expect(

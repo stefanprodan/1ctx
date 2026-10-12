@@ -51,6 +51,8 @@ export function fixture() {
     },
     externalTaskIdleHours: () => limits.idle,
     externalTaskDays: () => limits.days,
+    chatOpens: () => true,
+    homeProjectIds: () => [projectId],
     knowledge: {
       file: (projectId, fileId) => files.get(`${projectId}/${fileId}`) ?? null,
       deletedName: (projectId, fileId) =>
@@ -74,12 +76,13 @@ export function fixture() {
       area.report(key, row.id, claimId!, "question", "Which path?", []);
     if (state === "done")
       area.report(key, row.id, claimId!, "result", "Finished.", []);
-    if (state === "dropped") area.drop(owner.id, row.id, { state: "open" });
+    if (state === "cancelled") area.cancel(owner.id, row.id, { state: "open" });
     return { ...area.store.byId(row.id)!, claimId };
   };
+  // fills to count entries of the 250 bound, which claims do not join
   const fillEntries = (id: string, count: number) =>
     transact(db, () => {
-      const have = area.store.byId(id)!.entries;
+      const have = area.store.counted(id);
       for (let i = have; i < count; i++) {
         area.store.append(id, {
           claimId: null,

@@ -21,6 +21,7 @@ import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
+import type { Principal } from "../lib/http.ts";
 import type { TaskKey } from "./rows.ts";
 import {
   type Actor,
@@ -72,16 +73,16 @@ export function writeEntry(
   const { actor, kind, text, links, userId, at } = input;
   const state = checkMove(task.state, kind, actor);
   checkEntry(kind, text, links);
-  checkRoom(task.entries, kind);
+  checkRoom(store.counted(task.id), kind);
   const end: ClaimEnd | null =
     kind === "result"
       ? "done"
-      : kind === "drop" && task.claim !== null
-        ? "dropped"
-        : kind === "release"
+      : kind === "cancel" && task.claim !== null
+        ? "cancelled"
+        : kind === "unclaim"
           ? actor === "idle" || actor === "access_gone"
             ? actor
-            : "released"
+            : "unclaimed"
           : null;
   const claim = task.claim;
   if (claim !== null) {
@@ -101,12 +102,15 @@ export function writeEntry(
   const marked =
     kind === "question" ||
     kind === "result" ||
-    (kind === "release" && actor !== "member");
+    (kind === "unclaim" && actor !== "member");
+  // only a question marks a blocked task, so the agent moving past it
+  // takes the mark away
+  const unblocked = kind === "progress" && task.state === "blocked";
   store.move(
     task.id,
     state,
     end === null ? (claim?.id ?? null) : null,
-    actor === "member" ? null : marked ? at : task.attentionAt,
+    actor === "member" || unblocked ? null : marked ? at : task.attentionAt,
     at,
   );
   const row = required(store, task.id);
@@ -119,13 +123,18 @@ type ActionsDeps = {
   clock: Clock;
   store: ExternalTaskStore;
   knowledge: KnowledgePort;
-  show(id: string, before: string | null): ExternalTaskResponse | null;
+  show(
+    id: string,
+    before: string | null,
+    viewer?: Principal | null,
+  ): ExternalTaskResponse | null;
 };
 
+// a route's moves answer the detail its viewer may read
 export function taskActions(deps: ActionsDeps) {
   const { db, store } = deps;
-  const detail = (id: string) => {
-    const found = deps.show(id, null);
+  const detail = (id: string, viewer: Principal | null = null) => {
+    const found = deps.show(id, null, viewer);
     if (found === null) throw new NotFound("no such external task");
     return found;
   };
@@ -139,15 +148,16 @@ export function taskActions(deps: ActionsDeps) {
   const member = (
     userId: string,
     id: string,
-    kind: "answer" | "release" | "drop" | "reopen",
+    kind: "answer" | "unclaim" | "cancel" | "reopen",
     body: ExternalTaskMoveRequest,
+    viewer: Principal | null,
   ) =>
     transact(db, () => {
       const task = required(store, id);
       if (task.state !== body.state) throw new Conflict(STALE_TASK);
-      // release names its claim; an answer or drop may, and is held to it
+      // unclaim names its claim; an answer or cancel may, and is held to it
       if (
-        (kind === "release" ||
+        (kind === "unclaim" ||
           (kind !== "reopen" && body.claimId !== undefined)) &&
         (task.claim === null || task.claim.id !== body.claimId)
       ) {
@@ -164,7 +174,10 @@ export function taskActions(deps: ActionsDeps) {
         links: [],
         at: deps.clock(),
       });
-      return { result: detail(id), events: [taskChanged(result.task)] };
+      return {
+        result: detail(id, viewer),
+        events: [taskChanged(result.task)],
+      };
     });
 
   return {
@@ -175,7 +188,7 @@ export function taskActions(deps: ActionsDeps) {
       chatId: string | null = null,
     ) {
       return transact(db, () => {
-        const brief = { ...body, part: body.part ?? null };
+        const brief = { ...body, scope: body.scope ?? null };
         checkBrief(brief);
         brief.title = brief.title.trim();
         files(projectId, brief.fileIds);
@@ -185,7 +198,11 @@ export function taskActions(deps: ActionsDeps) {
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
-    edit(id: string, body: PatchExternalTaskRequest) {
+    edit(
+      id: string,
+      body: PatchExternalTaskRequest,
+      viewer: Principal | null = null,
+    ) {
       return transact(db, () => {
         const task = required(store, id);
         if (task.editRevision !== body.editRevision)
@@ -195,38 +212,59 @@ export function taskActions(deps: ActionsDeps) {
         const old: Brief = {
           title: task.title,
           text: store.brief(id)!.text,
-          part: task.part,
+          scope: task.scope,
           fileIds: store.fileIds(id),
         };
         const brief: Brief = {
           title: body.title ?? old.title,
           text: body.text ?? old.text,
-          part: body.part === undefined ? old.part : body.part,
+          scope: body.scope === undefined ? old.scope : body.scope,
           fileIds: body.fileIds ?? old.fileIds,
         };
         checkBrief(brief);
         brief.title = brief.title.trim();
         files(task.projectId, brief.fileIds, old.fileIds);
         if (JSON.stringify(brief) === JSON.stringify(old))
-          return { result: detail(id) };
+          return { result: detail(id, viewer) };
         store.edit(id, brief, deps.clock());
-        const result = detail(id);
+        const result = detail(id, viewer);
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
-    answer: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "answer", body),
-    release: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "release", body),
-    drop: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "drop", body),
-    reopen: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "reopen", body),
-    seen(id: string, body: ExternalTaskSeenRequest) {
+    answer: (
+      userId: string,
+      id: string,
+      body: ExternalTaskMoveRequest,
+      viewer: Principal | null = null,
+    ) => member(userId, id, "answer", body, viewer),
+    unclaim: (
+      userId: string,
+      id: string,
+      body: ExternalTaskMoveRequest,
+      viewer: Principal | null = null,
+    ) => member(userId, id, "unclaim", body, viewer),
+    cancel: (
+      userId: string,
+      id: string,
+      body: ExternalTaskMoveRequest,
+      viewer: Principal | null = null,
+    ) => member(userId, id, "cancel", body, viewer),
+    reopen: (
+      userId: string,
+      id: string,
+      body: ExternalTaskMoveRequest,
+      viewer: Principal | null = null,
+    ) => member(userId, id, "reopen", body, viewer),
+    seen(
+      id: string,
+      body: ExternalTaskSeenRequest,
+      viewer: Principal | null = null,
+    ) {
       return transact(db, () => {
         required(store, id);
-        if (!store.seen(id, body.attentionAt)) return { result: detail(id) };
-        const result = detail(id);
+        if (!store.seen(id, body.attentionAt))
+          return { result: detail(id, viewer) };
+        const result = detail(id, viewer);
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
@@ -256,11 +294,22 @@ export function taskActions(deps: ActionsDeps) {
           throw new Conflict("this task is already claimed");
         }
         checkMove(task.state, "claim", "agent");
-        checkRoom(task.entries, "claim");
+        checkRoom(store.counted(id), "claim");
         checkClaims(store.claimsCount(id));
         const now = deps.clock();
         const claimId = store.startClaim(id, key, now);
-        store.move(id, "claimed", claimId, task.attentionAt, now);
+        store.append(id, {
+          claimId,
+          kind: "claim",
+          text: "",
+          links: [],
+          userId: key.userId,
+          keyName: key.keyName,
+          claimEnd: null,
+          at: now,
+        });
+        // only an unclaim can mark an open task, and work resuming ends it
+        store.move(id, "claimed", claimId, null, now);
         const result = { ...detail(id), claimId };
         return { result, events: [taskChanged(result.task.task)] };
       });
@@ -292,7 +341,7 @@ export function taskActions(deps: ActionsDeps) {
           JSON.stringify(last.links) === JSON.stringify(links);
         const endedByReport =
           (kind === "result" && claim.end_reason === "done") ||
-          (kind === "release" && claim.end_reason === "released");
+          (kind === "unclaim" && claim.end_reason === "unclaimed");
         if (
           (identical && claim.ended_at === null) ||
           (endedByReport && last?.kind === kind && last.keyName !== null)

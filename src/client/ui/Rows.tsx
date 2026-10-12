@@ -238,6 +238,23 @@ export function RowsButton({
   );
 }
 
+// the end of a list that holds more: a small centred word, not a row
+export function RowsMore({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: ComponentChildren;
+}) {
+  return (
+    <div class="rows-item rows-more">
+      <button type="button" class="btn-text" onClick={onClick}>
+        {children}
+      </button>
+    </div>
+  );
+}
+
 export function RowsList({ children }: { children: ComponentChildren }) {
   return <div class="rows-list">{children}</div>;
 }

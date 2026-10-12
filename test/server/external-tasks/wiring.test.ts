@@ -119,17 +119,17 @@ test("the hourly sweep reads live idle limits and spares blocked and recently ac
   );
   await f.limits({ externalTaskIdleHours: 24 });
   f.app.sweep();
-  const released = await f.show(idle!.task.task.id);
-  expect(released.task.task).toMatchObject({
+  const unclaimed = await f.show(idle!.task.task.id);
+  expect(unclaimed.task.task).toMatchObject({
     state: "open",
     claim: null,
     attentionAt: f.app.now.value,
   });
-  expect(released.entries[0]).toMatchObject({
-    kind: "release",
+  expect(unclaimed.entries[0]).toMatchObject({
+    kind: "unclaim",
     by: null,
     claimEnd: "idle",
-    text: "released after 24 hours without a report",
+    text: "after 24 hours without a report",
   });
   expect(f.app.externalTasks.store.claimById(idle!.claimId)?.end_reason).toBe(
     "idle",
@@ -194,7 +194,7 @@ test("the sweep ends expired and missing keys but keeps every key under a positi
       attentionAt: f.app.now.value,
     });
     expect(detail.entries[0]).toMatchObject({
-      kind: "release",
+      kind: "unclaim",
       by: null,
       claimEnd: "access_gone",
     });
@@ -225,15 +225,15 @@ test.serial(
     await using f = await httpFixture();
     const key = await f.key();
     const rows = [];
-    for (const title of ["done", "dropped", "reopened"]) {
+    for (const title of ["done", "cancelled", "reopened"]) {
       const id = (await f.create({ title })).task.task.id;
       const claim = f.app.externalTasks.claim(key, id);
-      if (title === "dropped") {
+      if (title === "cancelled") {
         expect(
           (
             await f.member.client.call(
               "POST",
-              `/api/external-tasks/${id}/drop`,
+              `/api/external-tasks/${id}/cancel`,
               { body: { state: "claimed" } },
             )
           ).status,
@@ -347,9 +347,13 @@ test("storage assigns every task table to external and cleans only closed task b
     .task.id;
   expect(
     (
-      await f.member.client.call("POST", `/api/external-tasks/${closed}/drop`, {
-        body: { state: "open", text: "No longer needed." },
-      })
+      await f.member.client.call(
+        "POST",
+        `/api/external-tasks/${closed}/cancel`,
+        {
+          body: { state: "open", text: "No longer needed." },
+        },
+      )
     ).status,
   ).toBe(200);
   await f.limits({ externalTaskDays: 90 });

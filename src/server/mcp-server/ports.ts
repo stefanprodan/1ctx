@@ -152,7 +152,7 @@ export type TasksPort = {
   // open to claimed; the same key holding it answers that claim again
   claim(key: TaskKey, taskId: string): TaskShow & { claimId: string };
   // the claim must belong to taskId; a live retry must repeat both the
-  // claim's and task's last entry. A result or release retry answers
+  // claim's and task's last entry. A result or unclaim retry answers
   // the original end even after later task entries
   report(
     key: TaskKey,

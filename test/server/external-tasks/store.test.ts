@@ -18,7 +18,7 @@ describe("external task writes", () => {
     progress: { claimed: "claimed", blocked: "claimed" },
     question: { claimed: "blocked" },
     result: { claimed: "done", blocked: "done" },
-    release: { claimed: "open", blocked: "open" },
+    unclaim: { claimed: "open", blocked: "open" },
   };
   for (const state of EXTERNAL_TASK_STATES) {
     for (const kind of AGENT_ENTRY_KINDS) {
@@ -62,12 +62,12 @@ describe("external task writes", () => {
   }
   const memberStates = {
     answer: { claimed: "claimed", blocked: "claimed" },
-    release: { claimed: "open", blocked: "open" },
-    drop: { open: "dropped", claimed: "dropped", blocked: "dropped" },
-    reopen: { done: "open", dropped: "open" },
+    unclaim: { claimed: "open", blocked: "open" },
+    cancel: { open: "cancelled", claimed: "cancelled", blocked: "cancelled" },
+    reopen: { done: "open", cancelled: "open" },
   };
   for (const state of EXTERNAL_TASK_STATES) {
-    for (const kind of ["answer", "release", "drop", "reopen"] as const) {
+    for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
       test(`member ${kind} while ${state}`, () => {
         using f = fixture();
         const task = f.task(state);
@@ -90,7 +90,7 @@ describe("external task writes", () => {
             by: { id: f.member.id, username: "member" },
             keyName: null,
             claimId:
-              kind === "release" || kind === "drop"
+              kind === "unclaim" || kind === "cancel"
                 ? (task.claim?.id ?? null)
                 : null,
           });
@@ -102,6 +102,65 @@ describe("external task writes", () => {
       });
     }
   }
+
+  test.serial(
+    "a claim writes its own entry in its transaction, outside the bound, and ends the mark",
+    () => {
+      using f = fixture();
+      const events: BusEvent[] = [];
+      const stop = subscribe((event) => {
+        if (event.type === "externalTask.changed") events.push(event);
+      }, silent);
+      try {
+        const task = f.task("claimed");
+        f.area.report(f.key, task.id, task.claimId!, "unclaim", "Later.", []);
+        const marked = f.area.store.byId(task.id)!;
+        expect(marked.attentionAt).not.toBeNull();
+        expect(() =>
+          transact(f.db, () => {
+            f.area.claim(f.key, task.id);
+            throw new Error("rollback");
+          }),
+        ).toThrow("rollback");
+        expect(f.area.store.byId(task.id)).toEqual(marked);
+        f.advance();
+        events.length = 0;
+        const held = f.area.claim(f.key, task.id);
+        const entry = held.entries[0]!;
+        expect(entry).toEqual({
+          id: entry.id,
+          kind: "claim",
+          text: "",
+          links: [],
+          by: { id: f.owner.id, username: "owner" },
+          keyName: "laptop",
+          claimId: held.claimId,
+          claimEnd: null,
+          at: f.now(),
+        });
+        expect(held.task.task).toMatchObject({
+          entries: marked.entries + 1,
+          last: marked.last,
+          // the agent resumed, so the unclaim's mark is done
+          attentionAt: null,
+          revision: marked.revision + 1,
+        });
+        expect(f.area.store.counted(task.id)).toBe(marked.entries - 1);
+        expect(events).toEqual([
+          {
+            type: "externalTask.changed",
+            data: { projectId: f.projectId, task: held.task.task },
+          },
+        ]);
+        // a retry answers the same claim and writes nothing
+        expect(f.area.claim(f.key, task.id).claimId).toBe(held.claimId);
+        expect(f.area.store.byId(task.id)!.entries).toBe(marked.entries + 1);
+        expect(f.area.store.lastEntry(held.claimId, true)!.id).toBe(entry.id);
+      } finally {
+        stop();
+      }
+    },
+  );
 
   test("claim contenders keep one holder and never name the other user", () => {
     using f = fixture();
@@ -129,10 +188,10 @@ describe("external task writes", () => {
     expect(f.area.store.byId(task.id)!.claim?.userId).toBe(f.owner.id);
   });
 
-  test("stale member states and release claim ids write nothing", () => {
+  test("stale member states and unclaim claim ids write nothing", () => {
     using f = fixture();
     const task = f.task("claimed");
-    for (const kind of ["answer", "release", "drop", "reopen"] as const) {
+    for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
       refuses(
         () =>
           f.area[kind](f.owner.id, task.id, {
@@ -144,7 +203,7 @@ describe("external task writes", () => {
         STALE_TASK,
       );
     }
-    f.area.release(f.member.id, task.id, {
+    f.area.unclaim(f.member.id, task.id, {
       state: "claimed",
       claimId: task.claimId!,
       text: "Start again.",
@@ -153,10 +212,10 @@ describe("external task writes", () => {
     const before = f.area.show(task.id, null);
     refuses(
       () =>
-        f.area.release(f.owner.id, task.id, {
+        f.area.unclaim(f.owner.id, task.id, {
           state: "claimed",
           claimId: task.claimId!,
-          text: "Late release.",
+          text: "Late unclaim.",
         }),
       409,
       STALE_TASK,
@@ -187,7 +246,7 @@ describe("external task writes", () => {
           editRevision: task.editRevision,
           text: "New brief.",
         });
-      if (state === "done" || state === "dropped") {
+      if (state === "done" || state === "cancelled") {
         refuses(run, 409, `this task is ${state}`);
         return;
       }
@@ -230,7 +289,9 @@ describe("external task writes", () => {
       "Found a way.",
       [],
     );
-    expect(continued.task.attentionAt).toBe(marked.task.task.attentionAt);
+    // moving past its own question takes the question's mark away
+    expect(continued.task.state).toBe("claimed");
+    expect(continued.task.attentionAt).toBeNull();
     const answered = f.area.answer(f.owner.id, task.id, {
       state: "claimed",
       text: "Agreed.",
@@ -288,7 +349,7 @@ describe("external task writes", () => {
     ).toBe("New title");
   });
 
-  for (const kind of ["answer", "release", "drop", "reopen"] as const) {
+  for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
     test(`member ${kind} clears attention`, () => {
       using f = fixture();
       const task = f.task(kind === "reopen" ? "done" : "blocked");
@@ -365,4 +426,37 @@ describe("external task writes", () => {
       }
     },
   );
+});
+
+test("an agent moving past its question unmarks the task, a result keeps the mark", () => {
+  using f = fixture();
+  const moved = f.task("blocked");
+  f.advance(1000);
+  const finished = f.task("blocked");
+  expect(f.area.attention([f.projectId]).tasks.map((r) => r.id)).toEqual([
+    finished.id,
+    moved.id,
+  ]);
+  f.advance(1000);
+  const progress = f.area.report(
+    f.key,
+    moved.id,
+    moved.claimId!,
+    "progress",
+    "Found a way.",
+    [],
+  );
+  expect(progress.task).toMatchObject({ state: "claimed", attentionAt: null });
+  const result = f.area.report(
+    f.key,
+    finished.id,
+    finished.claimId!,
+    "result",
+    "Done without an answer.",
+    [],
+  );
+  expect(result.task).toMatchObject({ state: "done", attentionAt: f.now() });
+  expect(f.area.attention([f.projectId]).tasks.map((r) => r.id)).toEqual([
+    finished.id,
+  ]);
 });

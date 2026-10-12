@@ -367,13 +367,13 @@ export const MAX_ATTENTION_REASON = 300;
 
 // an external task waits open for a claim, is claimed while an agent
 // outside 1ctx works it, blocked while its question waits on a member,
-// and closes done or dropped
+// and closes done or cancelled
 export const EXTERNAL_TASK_STATES = [
   "open",
   "claimed",
   "blocked",
   "done",
-  "dropped",
+  "cancelled",
 ] as const;
 export type ExternalTaskState = (typeof EXTERNAL_TASK_STATES)[number];
 export function isExternalTaskState(
@@ -386,27 +386,28 @@ export const AGENT_ENTRY_KINDS = [
   "progress",
   "question",
   "result",
-  "release",
+  "unclaim",
 ] as const;
 export type AgentEntryKind = (typeof AGENT_ENTRY_KINDS)[number];
 export function isAgentEntryKind(value: unknown): value is AgentEntryKind {
   return AGENT_ENTRY_KINDS.includes(value as AgentEntryKind);
 }
-// every entry on a task's timeline: the agent's, then a member's; a
-// release is also a member's and 1ctx's
+// every entry on a task's timeline: a claim (no report writes one), the
+// agent's, a member's; an unclaim is also a member's and 1ctx's
 export const ENTRY_KINDS = [
+  "claim",
   ...AGENT_ENTRY_KINDS,
   "answer",
-  "drop",
+  "cancel",
   "reopen",
 ] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
 // how a claim ended: access_gone when its key or its user's sight of
 // the project went, idle after externalTaskIdleHours with no entry
 export const CLAIM_ENDS = [
-  "released",
+  "unclaimed",
   "done",
-  "dropped",
+  "cancelled",
   "access_gone",
   "idle",
 ] as const;

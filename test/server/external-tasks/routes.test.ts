@@ -14,7 +14,7 @@ for (const who of ["member", "admin"] as const) {
     await using f = await httpFixture();
     const client = who === "admin" ? f.admin : f.member.client;
     const key = await f.key();
-    const made = await f.create({ part: "First" });
+    const made = await f.create({ scope: "First" });
     const id = made.task.task.id;
     const base = `/api/external-tasks/${id}`;
     expect(made).toMatchObject({
@@ -22,7 +22,7 @@ for (const who of ["member", "admin"] as const) {
         task: {
           projectId: f.projectId,
           title: "Check the work",
-          part: "First",
+          scope: "First",
           state: "open",
           revision: 0,
           editRevision: 0,
@@ -59,7 +59,7 @@ for (const who of ["member", "admin"] as const) {
         body: {
           editRevision: before.task.task.editRevision,
           text: `Brief while ${state}`,
-          part: null,
+          scope: null,
         },
       });
       expect(response.status).toBe(200);
@@ -94,6 +94,7 @@ for (const who of ["member", "admin"] as const) {
     expect((await late.json()).task.task.revision).toBe(
       answered.task.task.revision + 1,
     );
+    // the old name has no alias
     const released = await client.call("POST", `${base}/release`, {
       body: {
         state: "claimed",
@@ -101,13 +102,27 @@ for (const who of ["member", "admin"] as const) {
         text: "Try later.",
       },
     });
-    expect(released.status).toBe(200);
-    expect((await released.json()).task.task).toMatchObject({
+    expect(released.status).toBe(404);
+    const unclaimed = await client.call("POST", `${base}/unclaim`, {
+      body: {
+        state: "claimed",
+        claimId: answered.task.task.claim!.id,
+        text: "Try later.",
+      },
+    });
+    expect(unclaimed.status).toBe(200);
+    expect((await unclaimed.json()).task.task).toMatchObject({
       state: "open",
       claim: null,
     });
+    // the old name has no alias
     expect(
       (await client.call("POST", `${base}/drop`, { body: { state: "open" } }))
+        .status,
+    ).toBe(404);
+    expect(f.app.externalTasks.store.byId(id)!.state).toBe("open");
+    expect(
+      (await client.call("POST", `${base}/cancel`, { body: { state: "open" } }))
         .status,
     ).toBe(200);
     expect(
@@ -120,7 +135,7 @@ for (const who of ["member", "admin"] as const) {
     expect(
       (
         await client.call("POST", `${base}/reopen`, {
-          body: { state: "dropped", text: "Try again." },
+          body: { state: "cancelled", text: "Try again." },
         })
       ).status,
     ).toBe(200);
@@ -167,7 +182,7 @@ test("stale state, claim and edit revision are conflicts that change nothing", a
     key,
     first.task.task.id,
     first.claimId,
-    "release",
+    "unclaim",
     "Restart.",
     [],
   );
@@ -190,10 +205,10 @@ test("stale state, claim and edit revision are conflicts that change nothing", a
     ["POST", `${base}/answer`, { state: "claimed", text: "Stale" }],
     [
       "POST",
-      `${base}/release`,
+      `${base}/unclaim`,
       { state: "blocked", claimId: first.claimId, text: "Stale" },
     ],
-    ["POST", `${base}/drop`, { state: "open" }],
+    ["POST", `${base}/cancel`, { state: "open" }],
     ["POST", `${base}/reopen`, { state: "done", text: "Stale" }],
   ] as const;
   for (const [method, path, body] of requests) {
@@ -222,7 +237,7 @@ test("an unseen team or personal project and each of its task routes answer 404"
       ["GET", base],
       ["PATCH", base],
       ["DELETE", base],
-      ...["answer", "release", "drop", "reopen", "seen"].map((move) => [
+      ...["answer", "unclaim", "cancel", "reopen", "seen"].map((move) => [
         "POST",
         `${base}/${move}`,
       ]),

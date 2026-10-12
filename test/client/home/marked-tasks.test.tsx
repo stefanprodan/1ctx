@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Home's External tasks card: drawn only while a task is marked, a row
-// per task naming its project, who holds the claim and its last entry.
+// per task naming its project, who holds the claim and its last entry,
+// the first few with Show more for the rest.
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -14,7 +15,7 @@ const row: ExternalTaskRow = {
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  part: "Part B",
+  scope: "Scope B",
   state: "blocked",
   revision: 3,
   editRevision: 0,
@@ -25,6 +26,7 @@ const row: ExternalTaskRow = {
     keyId: "k1",
     keyName: "laptop-claude",
     startedAt: 1,
+    activeAt: 1,
   },
   last: { kind: "question", text: "Which branch?", at: 5 },
   entries: 2,
@@ -49,8 +51,25 @@ describe("Home's External tasks card", () => {
     const html = render(<MarkedTasks now={10} />);
     expect(html).toContain("External tasks");
     expect(html).toContain('href="/external-tasks/t1"');
-    expect(html).toContain("Part B");
+    expect(html).toContain("Scope B");
     expect(html).toContain("blocked · claimed by stefan via laptop-claude");
     expect(html).toContain("Question: Which branch?");
+  });
+
+  test.serial("opens on the first rows and offers more", () => {
+    const rows = Array.from({ length: 7 }, (_, i) => ({
+      ...row,
+      id: `t${i}`,
+    }));
+    markedTasks.value = { tasks: rows, count: 100 };
+    const html = render(<MarkedTasks now={10} />);
+    expect(html.match(/href="\/external-tasks\/t\d"/g)).toHaveLength(5);
+    expect(html).toContain("Show more");
+    expect(html).toContain(">100<");
+  });
+
+  test.serial("offers no more when every row fits", () => {
+    markedTasks.value = { tasks: [row], count: 1 };
+    expect(render(<MarkedTasks now={10} />)).not.toContain("Show more");
   });
 });

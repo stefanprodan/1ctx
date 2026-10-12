@@ -11,7 +11,7 @@ import {
 } from "../../../src/shared/contracts/external-task.ts";
 import { fixture, refuses } from "./fixture.ts";
 
-test("a claim taken at 239 can still end and close", () => {
+test("a claim taken at 239 can still end and close, its own entry outside the bound", () => {
   using f = fixture();
   const task = f.create();
   f.fillEntries(task.id, CLOSING_ENTRIES - 1);
@@ -24,7 +24,8 @@ test("a claim taken at 239 can still end and close", () => {
     "Need help.",
     [],
   );
-  expect(question.task.entries).toBe(240);
+  expect(question.task.entries).toBe(241);
+  expect(f.area.store.counted(task.id)).toBe(240);
   refuses(
     () =>
       f.area.report(
@@ -41,38 +42,38 @@ test("a claim taken at 239 can still end and close", () => {
     () => f.area.answer(f.owner.id, task.id, { state: "blocked", text: "Go." }),
     409,
   );
-  const released = f.area.release(f.owner.id, task.id, {
+  const unclaimed = f.area.unclaim(f.owner.id, task.id, {
     state: "blocked",
     claimId: held.claimId,
     text: "Enough.",
   });
-  expect(released.task.task.entries).toBe(241);
+  expect(unclaimed.task.task.entries).toBe(242);
   refuses(() => f.area.claim(f.key, task.id), 409, "make a new external task");
-  const dropped = f.area.drop(f.owner.id, task.id, { state: "open" });
-  expect(dropped.task.task.entries).toBe(242);
+  const cancelled = f.area.cancel(f.owner.id, task.id, { state: "open" });
+  expect(cancelled.task.task.entries).toBe(243);
   refuses(
     () =>
-      f.area.reopen(f.owner.id, task.id, { state: "dropped", text: "More." }),
+      f.area.reopen(f.owner.id, task.id, { state: "cancelled", text: "More." }),
     409,
     "make a new external task",
   );
 });
 
 for (const count of [239, 240, 249, 250]) {
-  for (const kind of ["result", "release", "drop"] as const) {
+  for (const kind of ["result", "unclaim", "cancel"] as const) {
     test(`${kind} at ${count} entries`, () => {
       using f = fixture();
       const task = f.task("blocked");
       f.fillEntries(task.id, count);
       const write = () =>
-        kind === "drop"
-          ? f.area.drop(f.owner.id, task.id, { state: "blocked" }).task.task
+        kind === "cancel"
+          ? f.area.cancel(f.owner.id, task.id, { state: "blocked" }).task.task
           : f.area.report(f.key, task.id, task.claimId!, kind, "End.", []).task;
       if (count === MAX_ENTRIES) {
         refuses(write, 409, "make a new external task");
-        expect(f.area.store.byId(task.id)!.entries).toBe(count);
+        expect(f.area.store.counted(task.id)).toBe(count);
         expect(f.area.store.claimById(task.claimId!)!.ended_at).toBeNull();
-      } else expect(write().entries).toBe(count + 1);
+      } else expect(write().entries).toBe(count + 2);
     });
   }
 }
@@ -101,14 +102,15 @@ test("the twentieth claim works and retries, the twenty-first is refused", () =>
       f.key,
       held.task.task.id,
       held.claimId,
-      "release",
+      "unclaim",
       "Another try.",
       [],
     );
   }
   refuses(() => f.area.claim(f.key, task.id), 409, "make a new external task");
   expect(f.area.store.claimsCount(task.id)).toBe(MAX_CLAIMS);
-  expect(f.area.store.byId(task.id)!.entries).toBe(MAX_CLAIMS);
+  expect(f.area.store.byId(task.id)!.entries).toBe(2 * MAX_CLAIMS);
+  expect(f.area.store.counted(task.id)).toBe(MAX_CLAIMS);
 });
 
 test("500 unfinished blocks create and reopen, not history or another project", () => {
@@ -134,12 +136,12 @@ test("500 unfinished blocks create and reopen, not history or another project", 
   expect(f.create("Elsewhere", f.otherProjectId).projectId).toBe(
     f.otherProjectId,
   );
-  f.area.drop(f.owner.id, blocked.id, { state: "blocked" });
+  f.area.cancel(f.owner.id, blocked.id, { state: "blocked" });
   expect(
     f.area.reopen(f.owner.id, closed.id, { state: "done", text: "Again." }).task
       .task.state,
   ).toBe("open");
-  f.area.drop(f.owner.id, closed.id, { state: "open" });
+  f.area.cancel(f.owner.id, closed.id, { state: "open" });
   expect(f.create().state).toBe("open");
   expect(f.area.byProject(f.projectId).closed).toBe(2);
 });
@@ -166,7 +168,7 @@ test("bounds also guard edits and member entries without partial writes", () => 
   );
   refuses(
     () =>
-      f.area.release(f.owner.id, task.id, {
+      f.area.unclaim(f.owner.id, task.id, {
         state: "claimed",
         claimId: task.claimId!,
         text: "",

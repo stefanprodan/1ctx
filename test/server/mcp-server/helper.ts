@@ -92,7 +92,7 @@ export const externalTaskRow = (
   id: "task00000001",
   projectId: project.id,
   title: "Review the proposal",
-  part: "MCP tool",
+  scope: "MCP tool",
   state: "open",
   revision: 1,
   editRevision: 1,
@@ -136,6 +136,7 @@ export const externalTaskDetail = (
   ],
   briefAt: 100,
   chatId: null,
+  chatTitle: null,
 });
 
 export const externalTaskShow = (

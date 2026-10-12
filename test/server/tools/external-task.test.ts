@@ -132,8 +132,8 @@ describe("the offer", () => {
         "create",
         "edit",
         "answer",
-        "release",
-        "drop",
+        "unclaim",
+        "cancel",
         "reopen",
       ]);
       const child = chat.app.runner.registry
@@ -169,7 +169,7 @@ describe("a chat's external tasks", () => {
           action: "create",
           title: "Port the parser",
           text: "Follow the plan.",
-          part: "B",
+          scope: "B",
           files: ["/knowledge/plans/port.md"],
         },
       ]);
@@ -177,7 +177,7 @@ describe("a chat's external tasks", () => {
       const [task] = chat.app.externalTasks.byProject(chat.projectId).tasks;
       expect(task).toMatchObject({
         state: "open",
-        part: "B",
+        scope: "B",
         createdBy: { id: chat.memberId },
       });
       expect(answers[0]).toContain(`(/external-tasks/${task!.id})`);
@@ -257,7 +257,8 @@ describe("a chat's external tasks", () => {
         { action: "answer", id: task.id, state: "claimed", text: "Left." },
       ]);
       expect(step.answers[0]).toContain("changed since you read it");
-      expect(entries()).toBe(1);
+      // the claim and the question
+      expect(entries()).toBe(2);
       step = await round(chat, step.next, [
         { action: "answer", id: task.id, state: "blocked", text: "Left." },
       ]);
@@ -265,12 +266,23 @@ describe("a chat's external tasks", () => {
       expect(tasks.store.byId(task.id)!.state).toBe("claimed");
 
       step = await round(chat, step.next, [
-        { action: "release", id: task.id, state: "claimed", claimId: "x" },
+        { action: "unclaim", id: task.id, state: "claimed", claimId: "x" },
       ]);
-      expect(step.answers[0]).toContain("release needs a text saying why");
+      expect(step.answers[0]).toContain("unclaim needs a text saying why");
       step = await round(chat, step.next, [
         {
           action: "release",
+          id: task.id,
+          state: "claimed",
+          claimId: first,
+          text: "Too slow.",
+        },
+      ]);
+      expect(step.answers[0]).toContain("action must be");
+      expect(tasks.store.byId(task.id)!.state).toBe("claimed");
+      step = await round(chat, step.next, [
+        {
+          action: "unclaim",
           id: task.id,
           state: "claimed",
           claimId: first,
@@ -282,14 +294,14 @@ describe("a chat's external tasks", () => {
       const held = entries();
       step = await round(chat, step.next, [
         {
-          action: "release",
+          action: "unclaim",
           id: task.id,
           state: "claimed",
           claimId: first,
           text: "Too slow.",
         },
-        { action: "drop", id: task.id, state: "open" },
-        { action: "reopen", id: task.id, state: "dropped", text: "Again." },
+        { action: "cancel", id: task.id, state: "open" },
+        { action: "reopen", id: task.id, state: "cancelled", text: "Again." },
       ]);
       for (const answer of step.answers) {
         expect(answer).toContain("changed since you read it");
@@ -303,13 +315,23 @@ describe("a chat's external tasks", () => {
       step = await round(chat, step.next, [
         { action: "drop", id: task.id, state: "claimed" },
       ]);
-      expect(step.answers[0]).toContain("now dropped");
+      expect(step.answers[0]).toContain("action must be");
+      expect(tasks.store.byId(task.id)!.state).toBe("claimed");
+      step = await round(chat, step.next, [
+        { action: "cancel", id: task.id, state: "claimed" },
+      ]);
+      expect(step.answers[0]).toContain("now cancelled");
+      step = await round(chat, step.next, [
+        { action: "reopen", id: task.id, state: "dropped", text: "Again." },
+      ]);
+      expect(step.answers[0]).toContain("state must be one of");
+      expect(tasks.store.byId(task.id)!.state).toBe("cancelled");
       step = await round(chat, step.next, [
         { action: "reopen", id: task.id, state: "done", text: "Again." },
       ]);
       expect(step.answers[0]).toContain("changed since you read it");
       step = await round(chat, step.next, [
-        { action: "reopen", id: task.id, state: "dropped", text: "Again." },
+        { action: "reopen", id: task.id, state: "cancelled", text: "Again." },
       ]);
       expect(step.answers[0]).toContain("now open");
       await finish(chat, step.next);

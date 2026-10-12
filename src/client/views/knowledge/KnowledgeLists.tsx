@@ -17,10 +17,10 @@ import { ago } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, type Save, useSave } from "../../lib/save.ts";
 import {
-  RowsButton,
   RowsEnd,
   RowsGo,
   RowsMeta,
+  RowsMore,
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
@@ -64,13 +64,13 @@ export function RecentList({
         </RowsGo>
       ))}
       {more && (
-        <RowsButton
+        <RowsMore
           onClick={() => {
             pages.value++;
           }}
         >
           Show more
-        </RowsButton>
+        </RowsMore>
       )}
     </>
   );

@@ -6,7 +6,9 @@
 // external task frames by the revision rule. Frames that land while a
 // read is out are applied over its answer. A project the user stops or
 // starts seeing, and rows cleared under the ones the read answered,
-// read them again, one flight folding a burst.
+// read them again, one flight folding a burst. An admin sees every team
+// project, so joining or leaving one sends no such frame: Home's next
+// load picks it up.
 
 import { effect, signal } from "@preact/signals";
 import type { AttentionTasksResponse } from "../../shared/api/external-tasks.ts";
@@ -30,6 +32,8 @@ let turn = 0;
 let during: Map<string, ExternalTaskRow> | null = null;
 // deleted tasks: a row read before its delete never joins again
 const gone = new Set<string>();
+// the projects the last read covered; a frame from any other is not Home's
+let home: Set<string> | null = null;
 // read is hoisted, so the flight exists before the user effect runs
 const flight = new Flight(read);
 
@@ -41,6 +45,7 @@ effect(() => {
   during = null;
   flight.stop();
   gone.clear();
+  home = null;
   markedTasks.value = null;
 });
 
@@ -76,6 +81,7 @@ async function read(): Promise<void> {
     if (owner !== forUser || mine !== turn) return;
     const seen = during;
     during = null;
+    home = new Set(body.projectIds);
     const answered: Marked = {
       tasks: body.tasks.filter((t) => !gone.has(t.id)),
       count: body.count,
@@ -83,6 +89,7 @@ async function read(): Promise<void> {
     let marked = answered;
     let ask = false;
     for (const row of seen.values()) {
+      if (!home.has(row.projectId)) continue;
       const done = step(marked, row);
       marked = done.next;
       ask ||= done.ask;
@@ -99,10 +106,13 @@ export const loadMarkedTasks = (): Promise<void> => flight.run(read);
 
 function take(row: ExternalTaskRow): void {
   if (gone.has(row.id)) return;
+  // a read out may cover a project the last one did not; its answer
+  // filters what it saw
   const was = during?.get(row.id);
   if (during !== null && (was === undefined || was.revision < row.revision)) {
     during.set(row.id, row);
   }
+  if (home !== null && !home.has(row.projectId)) return;
   const held = markedTasks.value;
   if (held === null) return;
   const { next, ask } = step(held, row);

@@ -474,6 +474,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     externalTaskIdleHours: () => limits.current().externalTaskIdleHours,
     externalTaskDays: () => limits.current().externalTaskDays,
+    chatOpens: (principal, id) =>
+      sessions.sessionProject(principal, id) !== null,
+    // a personal project holds its owner's membership too
+    homeProjectIds: (principal) => {
+      const member = new Set(projects.store.memberProjectIds(principal.userId));
+      return access
+        .reachableProjectIds(principal)
+        .filter((id) => member.has(id));
+    },
     knowledge: {
       file: (projectId, fileId) => knowledge.store.file(projectId, fileId),
       deletedName: (projectId, fileId) =>
@@ -848,7 +857,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
             externalTasks.store.openClaims().map((claim) => claim.key_id),
           ),
         );
-        const externalIdle = externalTasks.releaseIdle(now);
+        const externalIdle = externalTasks.unclaimIdle(now);
         const externalDeleted = externalTasks.deleteClosed(now);
         const removed =
           logins +

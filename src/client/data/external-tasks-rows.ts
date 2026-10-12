@@ -11,6 +11,7 @@ import type {
   ExternalTaskRow,
 } from "../../shared/contracts/external-task.ts";
 import type { ExternalTaskState } from "../../shared/words.ts";
+import { searched } from "../lib/search.ts";
 
 // the order a member acts in: what waits on them, what runs, what waits
 // for a claim
@@ -19,7 +20,7 @@ const RANK: Record<ExternalTaskState, number> = {
   claimed: 1,
   open: 2,
   done: 3,
-  dropped: 3,
+  cancelled: 3,
 };
 
 export const unfinished = (state: ExternalTaskState): boolean =>
@@ -58,8 +59,41 @@ function upsert(
 export const upsertTask = (list: ExternalTaskRow[], row: ExternalTaskRow) =>
   upsert(list, row, (t) => unfinished(t.state), taskOrder);
 
-export const upsertClosed = (list: ExternalTaskRow[], row: ExternalTaskRow) =>
-  upsert(list, row, (t) => !unfinished(t.state), closedOrder);
+// what the closed pages are read under: a search, trimmed when sent,
+// and done or cancelled, null for both
+export type ClosedFilter = {
+  q: string;
+  state: "done" | "cancelled" | null;
+};
+
+export const ALL_CLOSED: ClosedFilter = { q: "", state: null };
+
+export const sameClosed = (a: ClosedFilter, b: ClosedFilter) =>
+  a.q.trim() === b.q.trim() && a.state === b.state;
+
+const present = (fields: (string | null | undefined)[]): string[] =>
+  fields.filter((field): field is string => typeof field === "string");
+
+// what the page's search matches in a current task
+export const taskFields = (row: ExternalTaskRow): string[] =>
+  present([row.title, row.scope, row.createdBy?.username, row.claim?.username]);
+
+// a frame's closed row under the server's search: its fields, a closed
+// task holding no claim, by the server's ASCII-only case rule
+export const closedTakes =
+  (filter: ClosedFilter) =>
+  (row: ExternalTaskRow): boolean =>
+    !unfinished(row.state) &&
+    (filter.state === null || row.state === filter.state) &&
+    present([row.title, row.scope, row.createdBy?.username]).some((field) =>
+      searched(field, filter.q),
+    );
+
+export const closedUpsert =
+  (filter: ClosedFilter) => (list: ExternalTaskRow[], row: ExternalTaskRow) =>
+    upsert(list, row, closedTakes(filter), closedOrder);
+
+export const upsertClosed = closedUpsert(ALL_CLOSED);
 
 export const upsertMarked = (list: ExternalTaskRow[], row: ExternalTaskRow) =>
   upsert(list, row, (t) => t.attentionAt !== null, markOrder);
@@ -76,11 +110,11 @@ export function reconcile(
   );
 }
 
-// the closed pages, once unfolded
+// the closed pages read so far under the filter
 export type ClosedPages = { rows: ExternalTaskRow[]; next: string | null };
 
 // what a project's page holds: every unfinished task, the closed count,
-// and the closed pages read so far, null while folded
+// and the closed pages read so far, null while the first is out
 export type TaskLists = {
   tasks: ExternalTaskRow[];
   closed: number;
@@ -90,8 +124,13 @@ export type TaskLists = {
 // a frame's row into the lists. The unfinished list is whole, so a row
 // it lacks was closed or is new; a new one has no entry yet, and a
 // reopen writes one. A closed row is placed only above the paging
-// cursor, since one past it is read with its page.
-export function applyTask(lists: TaskLists, row: ExternalTaskRow): TaskLists {
+// cursor, since one past it is read with its page, and only when the
+// filter the pages were read under takes it.
+export function applyTask(
+  lists: TaskLists,
+  row: ExternalTaskRow,
+  filter: ClosedFilter = ALL_CLOSED,
+): TaskLists {
   const open = lists.tasks.find((t) => t.id === row.id);
   const shut = lists.pages?.rows.find((t) => t.id === row.id);
   const held = open ?? shut;
@@ -113,7 +152,7 @@ export function applyTask(lists: TaskLists, row: ExternalTaskRow): TaskLists {
       pages.next === null ||
       (last !== undefined && closedOrder(row, last) < 0);
     if (above || unfinished(row.state)) {
-      pages = { ...pages, rows: upsertClosed(pages.rows, row) };
+      pages = { ...pages, rows: closedUpsert(filter)(pages.rows, row) };
     }
   }
   return { tasks, closed, pages };

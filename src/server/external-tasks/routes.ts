@@ -12,6 +12,7 @@ import { jsonBody, parseNoQuery } from "../lib/body.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { taskActions } from "./actions.ts";
+import type { ClosedFilter } from "./lists.ts";
 import {
   MAX_MOVE_BODY,
   MAX_TASK_BODY,
@@ -34,16 +35,30 @@ export type AccessPort = {
 type RoutesDeps = {
   db: Db;
   access: AccessPort;
+  homeProjectIds(principal: Principal): string[];
   tasks: ReturnType<typeof taskActions> & {
     projectOf(id: string): string | null;
-    show(id: string, before: string | null): ExternalTaskResponse | null;
+    show(
+      id: string,
+      before: string | null,
+      viewer: Principal | null,
+    ): ExternalTaskResponse | null;
     byProject(projectId: string): ExternalTasksResponse;
-    closed(projectId: string, after: string | null): ClosedTasksResponse;
-    attention(projectIds: string[]): AttentionTasksResponse;
+    closed(
+      projectId: string,
+      after: string | null,
+      filter: ClosedFilter,
+    ): ClosedTasksResponse;
+    attention(projectIds: string[]): Omit<AttentionTasksResponse, "projectIds">;
   };
 };
 
-export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
+export function routes({
+  db,
+  access,
+  homeProjectIds,
+  tasks,
+}: RoutesDeps): RouteDescriptor[] {
   const visible = (principal: Principal, id: string) => {
     const projectId = tasks.projectOf(id);
     if (projectId === null) throw new NotFound("no such external task");
@@ -69,10 +84,10 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(req, ctx) {
         const project = access.project(ctx.principal!, ctx.params.id);
-        const { closed, after } = parseProjectTasks(new URL(req.url));
+        const { closed, after, filter } = parseProjectTasks(new URL(req.url));
         return json(
           closed
-            ? tasks.closed(project.id, after)
+            ? tasks.closed(project.id, after, filter)
             : tasks.byProject(project.id),
         );
       },
@@ -83,9 +98,12 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(req, ctx) {
         parseTaskAttention(new URL(req.url));
-        return json(
-          tasks.attention(access.reachableProjectIds(ctx.principal!)),
-        );
+        const projectIds = homeProjectIds(ctx.principal!);
+        const body: AttentionTasksResponse = {
+          ...tasks.attention(projectIds),
+          projectIds,
+        };
+        return json(body);
       },
     },
     {
@@ -94,7 +112,9 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(req, ctx) {
         const id = visible(ctx.principal!, ctx.params.id);
-        return json(tasks.show(id, parseTaskDetail(new URL(req.url)))!);
+        return json(
+          tasks.show(id, parseTaskDetail(new URL(req.url)), ctx.principal!)!,
+        );
       },
     },
     {
@@ -122,10 +142,12 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
         const id = visible(principal, ctx.params.id);
         parseNoQuery(new URL(req.url));
         const body = parsePatchTask(await jsonBody(req, MAX_TASK_BODY));
-        return json(write(principal, id, () => tasks.edit(id, body)));
+        return json(
+          write(principal, id, () => tasks.edit(id, body, principal)),
+        );
       },
     },
-    ...(["answer", "release", "drop", "reopen"] as const).map(
+    ...(["answer", "unclaim", "cancel", "reopen"] as const).map(
       (move): RouteDescriptor => ({
         method: "POST",
         path: `/api/external-tasks/:id/${move}`,
@@ -136,7 +158,9 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
           parseNoQuery(new URL(req.url));
           const body = parseMoveTask(await jsonBody(req, MAX_MOVE_BODY), move);
           return json(
-            write(principal, id, () => tasks[move](principal.userId, id, body)),
+            write(principal, id, () =>
+              tasks[move](principal.userId, id, body, principal),
+            ),
           );
         },
       }),
@@ -150,7 +174,9 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
         const id = visible(principal, ctx.params.id);
         parseNoQuery(new URL(req.url));
         const body = parseSeenTask(await jsonBody(req, 1024));
-        return json(write(principal, id, () => tasks.seen(id, body)));
+        return json(
+          write(principal, id, () => tasks.seen(id, body, principal)),
+        );
       },
     },
     {

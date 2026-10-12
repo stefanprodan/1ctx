@@ -91,12 +91,12 @@ errors and cuts every tool shares are in `docs/tools.md`.
   resolved by name to ids. An edit's `files` replace the links, and a
   linked file's id from `show` keeps it, a deleted one included.
 - **Every move names what the agent read.** `edit` names `editRevision`;
-  `answer`, `release`, `drop` and `reopen` the state, `release` also its
-  `claimId`, which `answer` and `drop` may name too and are then held
+  `answer`, `unclaim`, `cancel` and `reopen` the state, `unclaim` also its
+  `claimId`, which `answer` and `cancel` may name too and are then held
   to. A stale one answers that the task changed, nothing written.
 - **Task text is quoted as data.** An outside agent wrote the entries.
   The brief and each entry's text and links go through `asSent()` and
-  are fenced past any backticks; `list` gives the title, part and last
+  are fenced past any backticks; `list` gives the title, scope and last
   entry as JSON strings. The description asks for writes only on the
   user's ask in the chat, never on file, page or entry text.
 - **Every page fits the call's `resultCut`.** `list` pages by the area's

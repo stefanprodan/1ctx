@@ -34,9 +34,13 @@ test("closed pages sort latest first and continue without duplicating rows", asy
     } else {
       expect(
         (
-          await f.member.client.call("POST", `/api/external-tasks/${id}/drop`, {
-            body: { state: "open" },
-          })
+          await f.member.client.call(
+            "POST",
+            `/api/external-tasks/${id}/cancel`,
+            {
+              body: { state: "open" },
+            },
+          )
         ).status,
       ).toBe(200);
     }
@@ -63,12 +67,67 @@ test("closed pages sort latest first and continue without duplicating rows", asy
   });
 });
 
+test("closed pages search the title, the scope and the creator, and filter done or cancelled", async () => {
+  await using f = await httpFixture();
+  const key = await f.key();
+  const done = async (fields: object, client = f.creator.client) => {
+    const id = (await f.create(fields, client)).task.task.id;
+    const claim = f.app.externalTasks.claim(key, id);
+    f.app.externalTasks.report(key, id, claim.claimId, "result", "Done.", []);
+    f.app.now.value++;
+    return id;
+  };
+  const cancelled = async (fields: object, client = f.creator.client) => {
+    const id = (await f.create(fields, client)).task.task.id;
+    const response = await f.member.client.call(
+      "POST",
+      `/api/external-tasks/${id}/cancel`,
+      { body: { state: "open" } },
+    );
+    expect(response.status).toBe(200);
+    f.app.now.value++;
+    return id;
+  };
+  const percent = await done({ title: "Ship 100% of the API", scope: "api" });
+  const sweep = await cancelled({ title: "Sweep" }, f.member.client);
+  const under = await done(
+    { title: "Other", scope: "web_ui" },
+    f.member.client,
+  );
+  const plain = await cancelled({ title: "Webxui 100 points" });
+  await f.create({ title: "Still open API" });
+  const ids = async (query: string) => {
+    const response = await f.member.client.call(
+      "GET",
+      `${f.base}?closed=1${query}`,
+    );
+    expect(response.status).toBe(200);
+    const page: ClosedTasksResponse = await response.json();
+    return page.tasks.map((row) => row.id);
+  };
+  expect(await ids("")).toEqual([plain, under, sweep, percent]);
+  expect(await ids("&state=done")).toEqual([under, percent]);
+  expect(await ids("&state=cancelled")).toEqual([plain, sweep]);
+  expect(await ids("&q=api")).toEqual([percent]);
+  expect(await ids("&q=%20%20API%20")).toEqual([percent]);
+  expect(await ids("&q=member")).toEqual([under, sweep]);
+  expect(await ids("&q=member&state=cancelled")).toEqual([sweep]);
+  // the wildcards match as written
+  expect(await ids("&q=100%25")).toEqual([percent]);
+  expect(await ids("&q=b_u")).toEqual([under]);
+  expect(await ids("&q=nothing")).toEqual([]);
+  expect(await ids("&q=")).toEqual([plain, under, sweep, percent]);
+});
+
 test("detail entries continue by entry id through timestamp ties and new reports", async () => {
   await using f = await httpFixture();
   const id = (await f.create()).task.task.id;
   const key = await f.key();
   const claim = f.app.externalTasks.claim(key, id);
-  const ids: string[] = [];
+  // the claim's own entry is the oldest, paged like any other
+  const claimed = (await f.show(id)).entries;
+  expect(claimed.map((entry) => entry.kind)).toEqual(["claim"]);
+  const ids = [claimed[0]!.id];
   for (let i = 0; i < ENTRIES_PAGE + 3; i++) {
     ids.unshift(
       f.app.externalTasks.report(
@@ -159,7 +218,10 @@ test("attention is capped with a visible count and seen clears its mark", async 
   expect((await attention()).tasks.map((row) => row.id)).toEqual(
     ids.slice(0, ATTENTION_ROWS),
   );
-  expect(await attention(f.outsider.client)).toEqual({ tasks: [], count: 0 });
+  expect(await attention(f.outsider.client)).toMatchObject({
+    tasks: [],
+    count: 0,
+  });
   const id = ids[0]!;
   const before = f.app.externalTasks.store.byId(id)!;
   expect((await f.show(id)).task.task).toEqual(before);
@@ -238,3 +300,45 @@ test.serial(
     expect(frames()).toHaveLength(1);
   },
 );
+
+test("Home lists marks only from the projects a user belongs to, an admin too", async () => {
+  await using f = await httpFixture();
+  const key = await f.key();
+  const id = (await f.create({ title: "Needs the team" })).task.task.id;
+  const claim = f.app.externalTasks.claim(key, id);
+  f.app.externalTasks.report(key, id, claim.claimId, "question", "Which?", []);
+  const attention = async (client: typeof f.admin) => {
+    const response = await client.call(
+      "GET",
+      "/api/external-tasks?attention=1",
+    );
+    expect(response.status).toBe(200);
+    return (await response.json()) as AttentionTasksResponse;
+  };
+  expect((await attention(f.member.client)).tasks.map((row) => row.id)).toEqual(
+    [id],
+  );
+  // the admin sees the team's tab, but its marks are the team's to clear
+  const outside = await attention(f.admin);
+  expect(outside).toMatchObject({ tasks: [], count: 0 });
+  // the client drops frames from projects the read did not cover
+  expect(outside.projectIds).not.toContain(f.projectId);
+  const me = (await (await f.admin.call("GET", "/api/me")).json()).user;
+  const personal = f.app.projects.personal(me.id)!.id;
+  expect(outside.projectIds).toContain(personal);
+  const tab = await f.admin.call("GET", f.base);
+  expect(tab.status).toBe(200);
+  expect((await tab.json()).tasks.map((row: { id: string }) => row.id)).toEqual(
+    [id],
+  );
+  // once a member, the admin's Home has the team's marks
+  const joined = await f.admin.call(
+    "POST",
+    `/api/projects/${f.projectId}/members`,
+    { body: { userId: me.id } },
+  );
+  expect(joined.status).toBeLessThan(300);
+  const inside = await attention(f.admin);
+  expect(inside.tasks.map((row) => row.id)).toEqual([id]);
+  expect(inside.projectIds).toContain(f.projectId);
+});

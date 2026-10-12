@@ -26,7 +26,7 @@ test("unfinished tasks are grouped blocked, claimed, open and newest first", () 
   f.advance();
   const claimed = f.task("claimed");
   const done = f.task("done");
-  f.task("dropped");
+  f.task("cancelled");
   f.create("Hidden", f.otherProjectId);
   const result = f.area.byProject(f.projectId);
   expect(result.tasks.map((t) => t.id)).toEqual([
@@ -45,20 +45,20 @@ test("unfinished tasks are grouped blocked, claimed, open and newest first", () 
 
 test("closed cursor pages the close time and id, surviving a deleted cursor row", () => {
   using f = fixture();
-  const rows = [f.task("done"), f.task("dropped"), f.task("done")];
+  const rows = [f.task("done"), f.task("cancelled"), f.task("done")];
   f.advance();
-  rows.push(f.task("done"), f.task("dropped"));
+  rows.push(f.task("done"), f.task("cancelled"));
   const expected = rows
     .sort((a, b) => b.movedAt - a.movedAt || a.id.localeCompare(b.id))
     .map((r) => r.id);
-  const first = f.area.closed(f.projectId, null, 2);
+  const first = f.area.closed(f.projectId, null, undefined, 2);
   expect(first.tasks.map((r) => r.id)).toEqual(expected.slice(0, 2));
   expect(first.next).not.toBeNull();
   f.area.delete(first.tasks.at(-1)!.id);
   f.advance();
   f.task("done");
-  const second = f.area.closed(f.projectId, first.next, 2);
-  const last = f.area.closed(f.projectId, second.next, 2);
+  const second = f.area.closed(f.projectId, first.next, undefined, 2);
+  const last = f.area.closed(f.projectId, second.next, undefined, 2);
   expect([...second.tasks, ...last.tasks].map((r) => r.id)).toEqual(
     expected.slice(2),
   );
@@ -71,6 +71,52 @@ test("closed cursor pages the close time and id, surviving a deleted cursor row"
   ]) {
     refuses(() => f.area.closed(f.projectId, cursor), 400, "invalid cursor");
   }
+});
+
+test("a filtered closed page keeps its cursor through the rows it skips", () => {
+  using f = fixture();
+  const kept: { id: string; movedAt: number }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const row = f.task(i % 2 === 0 ? "done" : "cancelled");
+    if (i % 2 === 0) kept.push(row);
+    f.create(`Open ${i}`);
+    f.advance();
+  }
+  // three kept and one skipped close in the same millisecond, so the
+  // first page ends inside the tie and the id breaks it
+  const tie = f.now();
+  for (const state of ["done", "cancelled", "done", "done"] as const) {
+    const row = f.task(state);
+    expect(row.movedAt).toBe(tie);
+    if (state === "done") kept.push(row);
+  }
+  const order = kept
+    .sort((a, b) => b.movedAt - a.movedAt || a.id.localeCompare(b.id))
+    .map((row) => row.id);
+  const filter = { q: "WORK", state: "done" } as const;
+  const pages: string[][] = [];
+  const cursors: (string | null)[] = [];
+  let after: string | null = null;
+  do {
+    const page = f.area.closed(f.projectId, after, filter, 2);
+    pages.push(page.tasks.map((row) => row.id));
+    after = page.next;
+    cursors.push(after);
+  } while (after !== null);
+  expect(cursors[0]).toStartWith(`${tie}.`);
+  expect(pages).toEqual([
+    order.slice(0, 2),
+    order.slice(2, 4),
+    order.slice(4, 6),
+    order.slice(6),
+  ]);
+  expect(f.area.closed(f.projectId, null, { q: "nope", state: null })).toEqual({
+    tasks: [],
+    next: null,
+  });
+  expect(
+    f.area.closed(f.otherProjectId, null, { q: "work", state: null }).tasks,
+  ).toEqual([]);
 });
 
 test("agent lists filter projects and states, paging by moves without brief text", () => {
@@ -137,7 +183,7 @@ test("held lists mark only answers after this claim's last report, including tim
     text: "One more thing.",
   });
   expect(list()[0]!.answered).toBe(true);
-  f.area.release(f.member.id, task.id, {
+  f.area.unclaim(f.member.id, task.id, {
     state: "claimed",
     claimId: task.claimId!,
     text: "Reclaim.",
@@ -234,7 +280,11 @@ for (const kind of ["progress", "answer"] as const) {
 test("entry pages use time and rowid, so a new entry between pages skips none", () => {
   using f = fixture();
   const task = f.task("claimed");
-  const entries: ExternalTaskEntry[] = [];
+  // the claim's entry pages with the reports, in the same millisecond
+  const entries: ExternalTaskEntry[] = [
+    f.port.show(task.id, null)!.entries[0]!,
+  ];
+  expect(entries[0]!.kind).toBe("claim");
   for (let i = 0; i < ENTRIES_PAGE * 2 + 3; i++) {
     if (i % 25 === 0) f.advance();
     entries.push(
@@ -281,24 +331,24 @@ test("attention is bounded with a full count and ordered by mark across only the
     marked.push(f.task(i % 2 === 0 ? "done" : "blocked"));
   }
   const unmarked = f.task("claimed");
-  f.area.release(f.member.id, unmarked.id, {
+  f.area.unclaim(f.member.id, unmarked.id, {
     state: "claimed",
     claimId: unmarked.claimId!,
-    text: "Member release.",
+    text: "Member unclaim.",
   });
   expect(f.area.store.byId(unmarked.id)!.attentionAt).toBeNull();
   const other = f.create("Other", f.otherProjectId);
   const held = f.area.claim(f.key, other.id);
   f.advance();
-  const released = f.area.report(
+  const unclaimed = f.area.report(
     f.key,
     held.task.task.id,
     held.claimId,
-    "release",
+    "unclaim",
     "Needs a member.",
     [],
   );
-  expect(released.task.attentionAt).toBe(f.now());
+  expect(unclaimed.task.attentionAt).toBe(f.now());
   const result = f.area.attention([f.projectId]);
   expect(result.count).toBe(ATTENTION_ROWS + 3);
   expect(result.tasks.map((r) => r.id)).toEqual(
@@ -379,6 +429,29 @@ test("linked files read live names and revisions, then deleted names and a prune
       }),
     400,
   );
+});
+
+test("a new claim leaves the last entry the unclaim before it, on every read", () => {
+  using f = fixture();
+  const task = f.task("claimed");
+  f.area.report(f.key, task.id, task.claimId!, "unclaim", "Later.", []);
+  f.advance();
+  const held = f.area.claim(f.key, task.id);
+  expect(held.entries[0]!.kind).toBe("claim");
+  const last = { kind: "unclaim" as const, text: "Later.", at: f.now() - 1 };
+  expect(held.task.task.last).toEqual(last);
+  expect(f.area.store.byId(task.id)!.last).toEqual(last);
+  expect(f.area.byProject(f.projectId).tasks[0]!.last).toEqual(last);
+  // the claim ends the unclaim's mark, so Home no longer lists it
+  expect(f.area.attention([f.projectId]).tasks).toEqual([]);
+  const listed = f.area.list({
+    projectIds: [f.projectId],
+    states: ["claimed"],
+    held: null,
+    after: null,
+    limit: 10,
+  });
+  expect(listed.rows[0]!.last).toEqual(last);
 });
 
 test("last entry previews are one bounded line without a split surrogate", () => {

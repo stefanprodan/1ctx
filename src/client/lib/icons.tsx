@@ -116,6 +116,9 @@ const PATHS = {
   // one path splitting into two: a decision between its options
   decision: "M8 14V8M8 8 3.5 3.5M8 8l4.5-4.5M3.5 6.5v-3h3M9.5 3.5h3v3",
   clock: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8 4.5V8l2.5 1.5",
+  // a dashed ring: an external task waiting for an agent to claim it
+  "task-open":
+    "M7.06 2.07A6 6 0 0 1 8.94 2.07M11.53 3.15A6 6 0 0 1 12.85 4.47M13.93 7.06A6 6 0 0 1 13.93 8.94M12.85 11.53A6 6 0 0 1 11.53 12.85M8.94 13.93A6 6 0 0 1 7.06 13.93M4.47 12.85A6 6 0 0 1 3.15 11.53M2.07 8.94A6 6 0 0 1 2.07 7.06M3.15 4.47A6 6 0 0 1 4.47 3.15",
   // automation as a whole, whatever starts a run
   bolt: "M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z",
   play: "M5 3.5v9l7-4.5z",
@@ -158,6 +161,13 @@ const PATHS = {
   eye: "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   "eye-off":
     "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM2.5 2.5l11 11",
+  // a line rising: a report of progress on an external task
+  progress: "M2.5 11.5 6 8l2.5 2.5 5-5M10 5.5h3.5V9",
+  // bare, as a row already rings its icon
+  question:
+    "M5.25 5.75a2.75 2.75 0 1 1 4.1 2.4c-.8.45-1.35 1.1-1.35 2v.6M8 13h.01",
+  // the row's ring makes it the won't do sign
+  cancelled: "M12.5 3.5 3.5 12.5",
   // a bookmark: what the project's memory keeps
   memory: "M4.5 2.5h7v11L8 11l-3.5 2.5z",
   // the database file: the admin's Storage page

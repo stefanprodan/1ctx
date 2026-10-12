@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The brief of an external task, for a new one on its own page and for
-// an edit in place on the task's page: the title and its part, the
+// an edit in place on the task's page: the title and its scope, the
 // text, and the knowledge files the agent reads, picked from the
 // project's. An edit sends what changed and the edit revision the form
 // opened on; a brief changed since is refused with the server's words
@@ -12,7 +12,7 @@ import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import {
   type ExternalTaskDetail,
-  MAX_PART,
+  MAX_SCOPE,
   MAX_TASK_FILES,
 } from "../../../shared/contracts/external-task.ts";
 import { MAX_TITLE } from "../../../shared/words.ts";
@@ -111,7 +111,10 @@ export function TaskForm({
   };
   return (
     <form class="external-tasks-form" ref={form} onSubmit={submit}>
-      <Section title="Task" text="One line, and the plan part if any">
+      <Section
+        title="Task"
+        text="One line, and its scope in the linked files if any"
+      >
         <div class="pair">
           <label class="field">
             <span class="label label-required">Title</span>
@@ -130,19 +133,19 @@ export function TaskForm({
             <FieldError save={save} field="title" />
           </label>
           <label class="field">
-            <span class="label">Part</span>
+            <span class="label">Scope</span>
             <input
-              name="part"
-              aria-invalid={invalid("part") || undefined}
+              name="scope"
+              aria-invalid={invalid("scope") || undefined}
               autocomplete="off"
-              maxLength={MAX_PART}
+              maxLength={MAX_SCOPE}
               disabled={off}
-              value={d.part}
+              value={d.scope}
               onInput={(e) =>
-                set({ part: (e.currentTarget as HTMLInputElement).value })
+                set({ scope: (e.currentTarget as HTMLInputElement).value })
               }
             />
-            <FieldError save={save} field="part" />
+            <FieldError save={save} field="scope" />
           </label>
         </div>
       </Section>

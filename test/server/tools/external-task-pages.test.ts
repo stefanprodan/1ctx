@@ -96,20 +96,20 @@ describe("the arguments", () => {
     ).toThrow("action must be list, show");
     expect(() =>
       parseExternalTaskArgs(
-        { action: "release", id: "t", state: "claimed", text: "Why." },
+        { action: "unclaim", id: "t", state: "claimed", text: "Why." },
         true,
       ),
-    ).toThrow("release needs the claimId show gave");
+    ).toThrow("unclaim needs the claimId show gave");
     expect(() =>
       parseExternalTaskArgs({ action: "edit", id: "t", editRevision: 0 }, true),
-    ).toThrow("edit needs a title, text, part or files to change");
+    ).toThrow("edit needs a title, text, scope or files to change");
     expect(() =>
       parseExternalTaskArgs({ action: "list", states: ["closed"] }, true),
     ).toThrow("states must be a list of");
     expect(
-      parseExternalTaskArgs({ action: "drop", id: "t", state: "open" }, true),
+      parseExternalTaskArgs({ action: "cancel", id: "t", state: "open" }, true),
     ).toEqual({
-      action: "drop",
+      action: "cancel",
       id: "t",
       body: { state: "open", text: "" },
     });
@@ -250,18 +250,54 @@ describe("pages", () => {
 });
 
 describe("show and moves", () => {
+  test("a list keeps the last report after a claim, and a deleted user's key is named", async () => {
+    using f = fixture();
+    const held = f.task("claimed");
+    f.area.report(f.key, held.id, held.claimId!, "progress", "Halfway.", []);
+    f.area.report(f.key, held.id, held.claimId!, "unclaim", "Later.", []);
+    f.area.claim(f.key, held.id);
+    const list = await ok(f, { action: "list" });
+    expect(list).toContain('last unclaim 1970-01-02 00:00: "Later."');
+    expect(list).not.toContain("last claim");
+    f.db.exec("update external_task_entries set user_id = null");
+    const shown = await ok(f, { action: "show", id: held.id });
+    expect(shown).toMatch(
+      /^Entry \w+: claim by a deleted user via laptop at /m,
+    );
+    expect(shown).not.toContain("by 1ctx");
+  });
+
   test("a page ending on a cut entry points on only while older ones remain", async () => {
     using f = fixture();
     const held = f.task("claimed");
     const long = "word ".repeat(600).trim();
-    f.area.report(f.key, held.id, held.claimId!, "progress", long, []);
-    // the oldest of the two is the long one, cut on its own page
-    const last = await ok(
+    const longId = f.area.report(
+      f.key,
+      held.id,
+      held.claimId!,
+      "progress",
+      long,
+      [],
+    ).entry.id;
+    // the long one is cut on its own page, the claim's entry older still
+    const cut = await ok(
       f,
       { action: "show", id: held.id, before: "newest" },
       1200,
     );
-    expect(last).toContain("cut: characters 0 to");
+    expect(cut).toContain("cut: characters 0 to");
+    expect(cut).toContain(`before ${longId}.`);
+    const last = await ok(
+      f,
+      { action: "show", id: held.id, before: longId },
+      1200,
+    );
+    expect(last).toMatch(
+      new RegExp(
+        `^Entry \\w+: claim by @owner via laptop at .+, claim ${held.claimId}$`,
+        "m",
+      ),
+    );
     expect(last).not.toContain("More entries");
     // a different text, since a repeat of the last entry adds none
     f.area.report(f.key, held.id, held.claimId!, "progress", `${long}.`, []);
@@ -274,10 +310,10 @@ describe("show and moves", () => {
     expect(newer).toContain(`before ${shownId}.`);
   });
 
-  test("only a claimed task says when it is released", async () => {
+  test("only a claimed task says when it is unclaimed", async () => {
     using f = fixture();
-    const idle = "A claimed task is released after 24 hours without a report.";
-    for (const state of ["open", "blocked", "done", "dropped"] as const) {
+    const idle = "A claimed task is unclaimed after 24 hours without a report.";
+    for (const state of ["open", "blocked", "done", "cancelled"] as const) {
       const task = f.task(state);
       expect(await ok(f, { action: "show", id: task.id })).not.toContain(idle);
     }
@@ -285,7 +321,7 @@ describe("show and moves", () => {
     expect(await ok(f, { action: "show", id: claimed.id })).toContain(idle);
   });
 
-  test("answer and drop may name the claim they saw and are held to it", async () => {
+  test("answer and cancel may name the claim they saw and are held to it", async () => {
     using f = fixture();
     const blocked = f.task("blocked");
     const stale =
@@ -299,7 +335,7 @@ describe("show and moves", () => {
         claimId: "gone00000000",
         text: "A.",
       },
-      { action: "drop", state: "blocked", claimId: "gone00000000" },
+      { action: "cancel", state: "blocked", claimId: "gone00000000" },
     ]) {
       const result = await call(f, { ...args, id: blocked.id });
       expect(result.content).toBe(stale);
@@ -316,15 +352,15 @@ describe("show and moves", () => {
     ).toContain("now claimed");
     expect(
       await ok(f, {
-        action: "drop",
+        action: "cancel",
         id: blocked.id,
         state: "claimed",
         claimId: blocked.claimId,
       }),
-    ).toContain("now dropped");
+    ).toContain("now cancelled");
     const open = f.task("open");
     const named = await call(f, {
-      action: "drop",
+      action: "cancel",
       id: open.id,
       state: "open",
       claimId: blocked.claimId,
@@ -342,26 +378,26 @@ describe("show and moves", () => {
     ).toBe("Error: answer needs the text of the answer");
     expect(
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: " c1 " },
+        { action: "cancel", id: "t", state: "open", claimId: " c1 " },
         true,
       ),
     ).toEqual({
-      action: "drop",
+      action: "cancel",
       id: "t",
       body: { state: "open", text: "", claimId: "c1" },
     });
     expect(() =>
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: "" },
+        { action: "cancel", id: "t", state: "open", claimId: "" },
         true,
       ),
-    ).toThrow("drop needs the claimId show gave");
+    ).toThrow("cancel needs the claimId show gave");
     expect(
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: null },
+        { action: "cancel", id: "t", state: "open", claimId: null },
         true,
       ),
-    ).toEqual({ action: "drop", id: "t", body: { state: "open", text: "" } });
+    ).toEqual({ action: "cancel", id: "t", body: { state: "open", text: "" } });
     expect(
       parseExternalTaskArgs(
         {
@@ -381,7 +417,7 @@ describe("show and moves", () => {
     expect(() =>
       parseExternalTaskArgs(
         {
-          action: "release",
+          action: "unclaim",
           id: "t",
           state: "claimed",
           text: "R",
@@ -389,6 +425,6 @@ describe("show and moves", () => {
         },
         true,
       ),
-    ).toThrow("release needs the claimId show gave");
+    ).toThrow("unclaim needs the claimId show gave");
   });
 });

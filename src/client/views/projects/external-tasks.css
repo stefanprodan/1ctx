@@ -1,15 +1,9 @@
-/* The external task pages: the tab's note, the brief and its form,
-   the member's moves and their boxes, and the timeline's entries. */
+/* The external task pages: the brief and its form, the member's moves
+   and their boxes, and the timeline's entries. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .external-tasks-note {
-    margin: 0;
-    font-size: var(--text-small);
-    color: var(--faint);
-  }
-
   /* the brief */
   .external-tasks-brief {
     display: flex;
@@ -17,12 +11,17 @@
     gap: var(--space-3);
     padding: var(--space-4);
   }
-  .external-tasks-brief-line {
-    margin: 0;
-    font-size: var(--text-ui);
-    color: var(--dim);
+  /* the state's icon in its colour from base, beside its words */
+  .external-tasks-state {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
   }
-  /* the idle release and the chat it was made in, phone width too */
+  .external-tasks-state-icon {
+    flex-shrink: 0;
+  }
+  /* the chat it was made in, and on a phone the aside's state, deadline
+     and scope */
   .external-tasks-brief-foot {
     display: flex;
     flex-wrap: wrap;
@@ -30,6 +29,27 @@
     margin: 0;
     font-size: var(--text-small);
     color: var(--faint);
+  }
+  /* a long chat name is cut */
+  .external-tasks-chat {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* the aside hides under 1100 */
+  .external-tasks-brief-narrow {
+    display: none;
+  }
+  @media (max-width: 1099px) {
+    .external-tasks-brief-narrow {
+      display: flex;
+    }
+  }
+  /* what an edit hides keeps the page's gap while shown */
+  .external-tasks-rest {
+    display: contents;
   }
   /* the padding sits on the box, so the cut falls on a line's edge */
   .external-tasks-brief-text {
@@ -102,17 +122,43 @@
   }
   .external-tasks-entry-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-2);
     margin: 0;
     min-width: 0;
     font-size: var(--text-small);
     color: var(--dim);
   }
-  /* a question or a result wears its state's colour */
+  /* neutral but for a question still waiting, which wears attention */
   .external-tasks-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     flex-shrink: 0;
     font-weight: 500;
+  }
+  .external-tasks-kind-icon {
+    flex-shrink: 0;
+  }
+  .external-tasks-by-link {
+    text-decoration: none;
+  }
+  .external-tasks-by-link:hover {
+    text-decoration: underline;
+  }
+  .external-tasks-by-faint {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  /* the question an answer follows, one line */
+  .external-tasks-entry-pair {
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .external-tasks-entry-pair-icon {
+    margin-right: var(--space-1);
+    vertical-align: -2px;
   }
   .external-tasks-when {
     flex-shrink: 0;

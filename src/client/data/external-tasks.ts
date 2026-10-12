@@ -1,12 +1,14 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// External tasks: one project's unfinished list, loaded whole, with its
-// closed pages read on unfold. A task's page and the writes are
-// data/external-task.ts, Home's marked tasks data/marked-tasks.ts. The
-// socket's frames keep the lists current by the revision rule; a frame
-// the client cannot place asks for one trailing read. An answer is kept
-// only for the user and the turn it was asked for.
+// External tasks: one project's unfinished list, loaded whole, and its
+// closed pages under a search and a state, read by the server a page at
+// a time; a changed filter starts again from the first. A task's page
+// and the writes are data/external-task.ts, Home's marked tasks
+// data/marked-tasks.ts. The socket's frames keep the lists current by
+// the revision rule; a frame the client cannot place asks for one
+// trailing read. An answer is kept only for the user and the turn it
+// was asked for.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -18,10 +20,13 @@ import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import {
+  ALL_CLOSED,
   applyTask,
+  type ClosedFilter,
   type ClosedPages,
   dropTask,
   reconcile,
+  sameClosed,
   type TaskLists,
   unfinished,
   upsertClosed,
@@ -34,15 +39,17 @@ import { onSocketEvent } from "./socket.ts";
 // the project's unfinished tasks, null while not loaded
 export const externalTasks = signal<ExternalTaskRow[] | null>(null);
 export const externalTasksError = signal<Failure | null>(null);
-// how many are done or dropped
+// how many are done or cancelled, so the card shows only while some are
 export const closedCount = signal(0);
-// the closed pages read so far, null while folded
+// what the closed pages are read under
+export const closedFilter = signal<ClosedFilter>(ALL_CLOSED);
+// the closed pages read so far, null while the first is out
 export const closedPages = signal<ClosedPages | null>(null);
 export const closedMore = signal<{ loading: boolean; error: Failure | null }>({
   loading: false,
   error: null,
 });
-// the hours a claim goes without a report before it is released
+// the hours a claim goes without a report before it is unclaimed
 export const idleHours = signal<number | null>(null);
 
 let owner: string | null = null;
@@ -84,6 +91,7 @@ effect(() => {
   externalTasks.value = null;
   externalTasksError.value = null;
   closedCount.value = 0;
+  closedFilter.value = ALL_CLOSED;
   closedPages.value = null;
   closedMore.value = idle;
   idleHours.value = null;
@@ -135,6 +143,7 @@ export async function loadExternalTasks(projectId: string): Promise<void> {
     externalTasks.value = held?.tasks ?? null;
     closedCount.value = held?.closed ?? 0;
     idleHours.value = held?.idle ?? null;
+    closedFilter.value = ALL_CLOSED;
     closedPages.value = null;
     closedMore.value = idle;
     closedTurn++;
@@ -176,7 +185,20 @@ export async function loadExternalTasks(projectId: string): Promise<void> {
   }
 }
 
-// the closed tasks unfolded: the first page, then each after the cursor
+export function closedAddress(
+  projectId: string,
+  filter: ClosedFilter,
+  after: string | null,
+): string {
+  const query = new URLSearchParams({ closed: "1" });
+  if (filter.q.trim() !== "") query.set("q", filter.q.trim());
+  if (filter.state !== null) query.set("state", filter.state);
+  if (after !== null) query.set("after", after);
+  return `${listPath(projectId)}?${query}`;
+}
+
+// the closed tasks under the filter: the first page, then each after
+// the cursor
 async function readClosed(more: boolean): Promise<void> {
   const projectId = projectFor;
   if (projectId === null) return;
@@ -185,12 +207,11 @@ async function readClosed(more: boolean): Promise<void> {
   const forUser = owner;
   const turn = ++closedTurn;
   const closed = closes;
+  const filter = closedFilter.value;
   closedMore.value = { loading: true, error: null };
-  const query = new URLSearchParams({ closed: "1" });
-  if (more && held?.next) query.set("after", held.next);
   try {
     const body = await api<ClosedTasksResponse>(
-      `${listPath(projectId)}?${query}`,
+      closedAddress(projectId, filter, more ? (held?.next ?? null) : null),
     );
     if (owner !== forUser || closedTurn !== turn) return;
     // a task reopened since it was asked is the unfinished list's
@@ -198,7 +219,8 @@ async function readClosed(more: boolean): Promise<void> {
       (t) => !gone.has(t.id) && latestOf(t.id) <= t.revision,
     );
     const now = closedPages.value;
-    // a frame that landed while the page was out keeps its word
+    // a frame that landed while the page was out keeps its word; the
+    // server's rows are the filter's, whatever the page would match
     const base = more
       ? rows.reduce(upsertClosed, now?.rows ?? [])
       : rows.reduce(
@@ -220,16 +242,23 @@ async function reloadClosed(): Promise<void> {
   if (closedPages.value !== null) await readClosed(false);
 }
 
-export const loadClosedTasks = (): Promise<void> =>
-  closedFlight.run(() => readClosed(false));
+// the first closed page of the project the list was loaded for
+export function loadClosedTasks(projectId: string): Promise<void> {
+  if (projectFor !== projectId) return Promise.resolve();
+  return closedFlight.run(() => readClosed(false));
+}
 export const loadMoreClosed = (): Promise<void> => readClosed(true);
 
-// folded again: the pages go, read afresh on the next unfold
-export function foldClosed(): void {
-  closedTurn++;
-  closedFlight.stop();
+// a new search or state: the pages read under the old one go, and an
+// answer still out for it lands nowhere. The box's text is kept as
+// typed, trailing space and all
+export function filterClosed(filter: ClosedFilter): Promise<void> {
+  const was = closedFilter.value;
+  closedFilter.value = filter;
+  if (sameClosed(filter, was)) return Promise.resolve();
   closedPages.value = null;
   closedMore.value = idle;
+  return closedFlight.run(() => readClosed(false));
 }
 
 // a row from a frame or an answer into the lists; while none is held
@@ -244,7 +273,7 @@ export function takeTask(row: ExternalTaskRow): void {
     listMoves++;
     return;
   }
-  const next = applyTask(lists, row);
+  const next = applyTask(lists, row, closedFilter.value);
   if (next === lists) return;
   if (next.closed !== lists.closed) listMoves++;
   setLists(next);

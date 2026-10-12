@@ -6,11 +6,10 @@
 [![license](https://img.shields.io/github/license/stefanprodan/1ctx)](LICENSE)
 [![SLSA 2](https://slsa.dev/images/gh-badge-level2.svg)](https://github.com/stefanprodan/1ctx/attestations)
 
-A self-hosted AI factory with continuous context.
-
 1ctx brings people and AI agents together in shared projects. Give each
-agent a model, instructions and tools. Work with them in team chats, or
-schedule tasks for them to carry out autonomously.
+agent a model, instructions and tools. Work with them in team chats,
+schedule tasks for them to carry out autonomously, or hand work to the
+coding agents you already run, such as Claude Code, Codex or OpenCode.
 
 Context stays with the project. Working memory keeps compact project
 notes in context across chats and scheduled tasks. The shared knowledge
@@ -31,6 +30,12 @@ data kept on your server.
 - **Scheduled tasks.** Run an agent on a cron schedule in your time zone,
   or start a task by hand. Set deadlines and let agents flag results that
   need your attention.
+- **Delegate to your coding agents.** Hand an external task to an agent
+  you run outside 1ctx. It connects over MCP with a personal access
+  key, claims the task, reads the linked knowledge, asks when it is
+  stuck and reports back on the task's timeline. The same endpoint lets
+  it search the project's knowledge and chats and update the knowledge
+  base.
 - **Conversations that continue.** Long chats are summarized with recent
   turns kept in context. Fork a chat or bring another agent into a turn
   with `@name`.

@@ -52,7 +52,9 @@ function claimText(claim: ExternalTaskClaim, time: Time): string {
 export function listLine(row: ExternalTaskRow, time: Time): string {
   const parts = [
     `${titleOf(row)} id ${row.id}`,
-    ...(row.part === null ? [] : [`part ${JSON.stringify(asSent(row.part))}`]),
+    ...(row.scope === null
+      ? []
+      : [`scope ${JSON.stringify(asSent(row.scope))}`]),
     row.state,
     row.claim === null ? "not claimed" : `claim ${claimText(row.claim, time)}`,
     ...(row.attentionAt === null ? [] : ["needs a member"]),
@@ -143,7 +145,7 @@ function headText(
   const files = detail.files.map(fileLine);
   return [
     `External task ${titleOf(row)}, id ${row.id}, ${row.state}`,
-    `Part: ${row.part === null ? "none" : JSON.stringify(asSent(row.part))}`,
+    `Scope: ${row.scope === null ? "none" : JSON.stringify(asSent(row.scope))}`,
     made(detail, chatId, time),
     `Brief edited ${time(detail.briefAt)}, edit revision ${row.editRevision}`,
     `Claim: ${row.claim === null ? "none" : claimText(row.claim, time)}`,
@@ -151,7 +153,7 @@ function headText(
     `Entries: ${row.entries}`,
     ...(row.state === "claimed"
       ? [
-          `A claimed task is released after ${plural(shown.idleHours, "hour")} without a report.`,
+          `A claimed task is unclaimed after ${plural(shown.idleHours, "hour")} without a report.`,
         ]
       : []),
     files.length === 0
@@ -161,12 +163,12 @@ function headText(
 }
 
 function entryHead(entry: ExternalTaskEntry, time: Time): string {
+  // a key outlives its deleted user
+  const who = entry.by === null ? null : `@${entry.by.username}`;
   const by =
-    entry.by === null
-      ? "1ctx"
-      : entry.keyName === null
-        ? `@${entry.by.username}`
-        : `@${entry.by.username} via ${entry.keyName}`;
+    entry.keyName === null
+      ? (who ?? "1ctx")
+      : `${who ?? "a deleted user"} via ${entry.keyName}`;
   const claim =
     entry.claimId === null
       ? ""
@@ -314,8 +316,8 @@ export function readOnText(input: {
 
 const VERBS = {
   answer: "Answered",
-  release: "Released",
-  drop: "Dropped",
+  unclaim: "Unclaimed",
+  cancel: "Cancelled",
   reopen: "Reopened",
 } as const;
 

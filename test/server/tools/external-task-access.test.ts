@@ -100,13 +100,13 @@ describe("external task tool access", () => {
       { action: "edit", id: other.id, editRevision: 0, files: [] },
       { action: "answer", id: other.id, state: "blocked", text: "x" },
       {
-        action: "release",
+        action: "unclaim",
         id: other.id,
         state: "blocked",
         claimId: claim,
         text: "x",
       },
-      { action: "drop", id: other.id, state: "blocked" },
+      { action: "cancel", id: other.id, state: "blocked" },
       { action: "reopen", id: other.id, state: "blocked", text: "x" },
     ];
     for (const args of calls) {

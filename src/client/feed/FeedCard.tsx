@@ -12,10 +12,10 @@ import type { FeedRow } from "../../shared/api/sessions.ts";
 import type { Failure } from "../lib/format.ts";
 import type { IconName } from "../lib/icons.tsx";
 import {
-  RowsButton,
   RowsCard,
   RowsFailed,
   RowsFilters,
+  RowsMore,
   RowsNote,
 } from "../ui/Rows.tsx";
 import { Search } from "../ui/Search.tsx";
@@ -129,7 +129,7 @@ export function ShowMore({
   if (more.loading) return <Ghosts count={3} />;
   return (
     <>
-      <RowsButton onClick={onMore}>Show more</RowsButton>
+      <RowsMore onClick={onMore}>Show more</RowsMore>
       {more.error !== null && <RowsFailed failure={more.error} />}
     </>
   );
