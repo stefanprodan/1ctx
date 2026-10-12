@@ -56,7 +56,14 @@ test("the manifest's icons are served beside the page", async () => {
       "text/markdown; charset=utf-8",
     );
     expect(await skill.text()).toStartWith("---\nname: external-tasks\n");
-    for (const path of ["/mcp/", "/mcp/other", "/.well-known/skills/other"]) {
+    for (const path of [
+      "/mcp/",
+      "/mcp/other",
+      "/.well-known/skills/other",
+      "/.well-known/oauth-protected-resource",
+      "/.well-known/oauth-protected-resource/mcp",
+      "/.well-known/oauth-authorization-server",
+    ]) {
       const response = await fetch(`${origin}${path}`);
       expect(response.status).toBe(404);
       expect(response.headers.get("content-type")).toStartWith(

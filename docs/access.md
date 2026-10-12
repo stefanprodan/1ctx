@@ -25,10 +25,12 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   `Retry-After` header in whole seconds.
 - **The access matrix is checked against the composed route list,**
   health and ready included.
-- **Only `/api/*`, `/mcp`, `/mcp/*` and `/.well-known/skills/*` go through
+- **Only `/api/*`, `/mcp`, `/mcp/*` and `/.well-known/*` go through
   the router.** `/mcp` is the access-key endpoint in `docs/mcp-server.md`;
-  its subpaths reach the router and do not match a route. The skills path
-  serves the `public` external tasks skill and nothing else. The page, its bundle and
+  its subpaths reach the router and do not match a route. Under
+  `/.well-known/` only the skills path matches, serving the `public`
+  external tasks skill; any other path, the OAuth metadata an MCP client
+  probes for included, is a JSON 404, never the page. The page, its bundle and
   the files `serve()` takes by a fixed path (the manifest's icons) are
   public static files outside it, with no row in the matrix.
 
