@@ -11,7 +11,10 @@ import { render } from "preact-render-to-string";
 import type { TaskPage } from "../../../src/client/data/external-task.ts";
 import { sinceText } from "../../../src/client/feed/Row.model.ts";
 import { Icon } from "../../../src/client/lib/icons.tsx";
-import { TaskBody } from "../../../src/client/views/projects/ExternalTask.tsx";
+import {
+  TaskBody,
+  TaskNotice,
+} from "../../../src/client/views/projects/ExternalTask.tsx";
 import type {
   ExternalTaskClaim,
   ExternalTaskDetail,
@@ -81,8 +84,15 @@ const draw = (p: TaskPage, edit = false) =>
     />,
   );
 
+// the aside's State line
 const state = (html: string) =>
-  html.match(/<p class="external-tasks-brief-state">.*?<\/p>/)?.[0] ?? "";
+  html.match(
+    /<div class="split-line">State<span class="split-strong">.*?<\/div>/,
+  )?.[0] ?? "";
+const brief = (html: string) =>
+  html.match(
+    /<section class="card external-tasks-brief">.*?<\/section>/,
+  )?.[0] ?? "";
 const aside = (html: string) =>
   html.slice(html.indexOf('<div class="split-aside">'));
 const narrow = (html: string) =>
@@ -90,52 +100,76 @@ const narrow = (html: string) =>
     /<p class="external-tasks-brief-foot external-tasks-brief-narrow">.*?<\/p>/,
   )?.[0] ?? "";
 
-describe("the state line", () => {
-  test("draws the state's icon in its colour before the words", () => {
-    const claimed = state(draw(page(row({ state: "claimed", claim }))));
-    expect(claimed).toContain(
+describe("the notice", () => {
+  test("an open task asks for an agent to claim it and links Connect agents", () => {
+    const html = render(<TaskNotice state="open" />);
+    expect(html).toContain("Ask your agent to claim this task.");
+    expect(html).toContain('<a class="btn btn-small" href="/connect">');
+    for (const state of ["claimed", "blocked", "done", "cancelled"] as const) {
+      expect(TaskNotice({ state })).toBeUndefined();
+    }
+    // the page draws it above the brief, and an edit hides it
+    const open = draw(page());
+    expect(open.indexOf("Ask your agent")).toBeLessThan(
+      open.indexOf("external-tasks-brief"),
+    );
+    expect(draw(page(), true)).not.toContain("Ask your agent");
+  });
+});
+
+describe("the state", () => {
+  test("leads the aside and the phone line with its icon, never the brief", () => {
+    const html = draw(page(row({ state: "claimed", claim })));
+    const icon = render(
+      <Icon
+        name="play"
+        size={14}
+        class="external-tasks-state-icon status-running"
+      />,
+    );
+    expect(state(html)).toBe(
+      '<div class="split-line">State<span class="split-strong">claimed</span></div>',
+    );
+    expect(aside(html)).toContain(
+      '<div class="split-line">Claimed by<span class="split-strong cut">@stefan via laptop</span></div>',
+    );
+    expect(narrow(html)).toContain(icon);
+    expect(narrow(html)).toContain("<span>claimed by stefan via laptop</span>");
+    expect(brief(html).replace(narrow(html), "")).not.toContain("claimed by");
+    const open = draw(page());
+    expect(state(open)).toContain(">open</span>");
+    expect(narrow(open)).toContain(
       render(
-        <Icon
-          name="play"
-          size={15}
-          class="external-tasks-brief-icon status-running"
-        />,
+        <Icon name="task-open" size={14} class="external-tasks-state-icon" />,
       ),
     );
-    expect(claimed).toContain("<span>claimed by stefan via laptop</span>");
-    const open = state(draw(page()));
-    expect(open).toContain(
-      render(
-        <Icon name="task-open" size={15} class="external-tasks-brief-icon" />,
-      ),
-    );
-    expect(open).toContain("<span>open</span>");
   });
 });
 
 describe("the chat it was made in", () => {
-  test("names and links the chat only when the reader may open it", () => {
+  test("links only the chat's name, when the reader may open it", () => {
     const named = draw(
       page(row(), { chatId: "s1", chatTitle: "Plan the sweep" }),
     );
     expect(named).toContain(
-      '<a class="external-tasks-chat" href="/chat/s1"><span>Made in</span><span class="cut">Plan the sweep</span>',
+      '<span class="external-tasks-chat"><span>Made in</span><a class="cut" href="/chat/s1">Plan the sweep</a></span>',
     );
-    expect(named).toContain(
-      render(<Icon name="open" size={12} class="external-tasks-chat-icon" />),
+    // Made in ends the brief panel, after the text
+    expect(named.indexOf("Made in")).toBeGreaterThan(
+      named.indexOf("external-tasks-brief-text"),
     );
     const hidden = draw(page(row(), { chatId: "s1", chatTitle: null }));
     expect(hidden).toContain("<span>Made in a chat</span>");
     expect(hidden).not.toContain("/chat/s1");
     expect(draw(page())).not.toContain("Made in");
     expect(draw(page(row(), { chatId: "s1", chatTitle: "" }))).toContain(
-      '<span class="cut">Untitled chat</span>',
+      '<a class="cut" href="/chat/s1">Untitled chat</a>',
     );
   });
 });
 
 describe("the scope", () => {
-  test("sits in the aside and the phone line, never the state line", () => {
+  test("sits in the aside and the phone line, after the state", () => {
     const html = draw(page(row({ scope: "part B" })));
     expect(state(html)).not.toContain("part B");
     expect(aside(html)).toContain(
@@ -144,7 +178,7 @@ describe("the scope", () => {
     expect(narrow(html)).toContain("<span>Scope: part B</span>");
     const none = draw(page());
     expect(aside(none)).not.toContain("Scope");
-    expect(narrow(none)).toBe("");
+    expect(narrow(none)).not.toContain("Scope");
   });
 });
 
@@ -185,7 +219,8 @@ describe("an edit", () => {
     expect(shown).toContain("external-tasks-brief");
     const editing = draw(page(blocked), true);
     expect(editing).toContain('<div class="external-tasks-rest" hidden>');
-    expect(editing).not.toContain("external-tasks-brief-state");
+    expect(editing).not.toContain('external-tasks-brief"');
+    expect(shown).not.toContain("page-notice");
     expect(editing).toContain('class="external-tasks-form"');
     // the hidden rest still holds the moves, the answer box and the
     // timeline, so a draft answer survives the edit
@@ -208,16 +243,16 @@ describe("a cancel", () => {
       `${render(<Icon name="cancelled" size={12} />)}Cancel task</button>`,
     );
     const cancelled = draw(page(row({ state: "cancelled" })));
-    expect(state(cancelled)).toContain(
+    expect(narrow(cancelled)).toContain(
       render(
         <Icon
           name="cancelled"
-          size={15}
-          class="external-tasks-brief-icon status-stopped"
+          size={14}
+          class="external-tasks-state-icon status-stopped"
         />,
       ),
     );
-    expect(state(cancelled)).toContain("<span>cancelled</span>");
+    expect(state(cancelled)).toContain(">cancelled</span>");
     expect(cancelled).not.toContain("Cancel task");
     expect(cancelled).toContain("Reopen</button>");
   });

@@ -66,6 +66,7 @@ import {
   MAX_TASK_FILES,
 } from "../../../src/shared/contracts/external-task.ts";
 import type { SocketEvent } from "../../../src/shared/socket.ts";
+import { MAX_TITLE } from "../../../src/shared/words.ts";
 
 const claim = {
   id: "c1",
@@ -76,6 +77,9 @@ const claim = {
   startedAt: 2_000,
   activeAt: 2_000,
 };
+
+// the projects Home's reads cover
+const HOME = ["p1", "p9"];
 
 const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
@@ -194,6 +198,19 @@ describe("the words", () => {
   test("an untitled chat has a name", () => {
     expect(chatName("Plan the sweep")).toBe("Plan the sweep");
     expect(chatName("")).toBe("Untitled chat");
+    // a title the server cut mid word drops the half word
+    const line = "Create a task with the external task tool. ".repeat(3);
+    const cut = `${line.slice(0, MAX_TITLE - 1)}…`;
+    expect(cut.length).toBe(MAX_TITLE);
+    expect(chatName(cut)).toBe(`${cut.slice(0, cut.lastIndexOf(" "))}…`);
+    const unbroken = `${"x".repeat(MAX_TITLE - 1)}…`;
+    expect(chatName(unbroken)).toBe(unbroken);
+    // a cut that ended on a space was trimmed to MAX_TITLE - 1: whole
+    const whole = `${"word ".repeat(15)}abc…`;
+    expect(whole.length).toBe(MAX_TITLE - 1);
+    expect(chatName(whole)).toBe(whole);
+    // a short title ending in … was written so
+    expect(chatName("What if we…")).toBe("What if we…");
   });
 
   test("a mark wins an unfinished icon's colour, a result keeps done's", () => {
@@ -447,11 +464,20 @@ describe("the entity", () => {
 
   test.serial("Home's marked rows follow the frames", async () => {
     answer = () =>
-      Response.json({ tasks: [row({ id: "a", attentionAt: 10 })], count: 1 });
+      Response.json({
+        tasks: [row({ id: "a", attentionAt: 10 })],
+        count: 1,
+        projectIds: HOME,
+      });
     await loadMarkedTasks();
     expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["a"]);
     onMarkedSocket(
       frame(row({ id: "b", projectId: "p9", attentionAt: 20, revision: 2 })),
+    );
+    expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["b", "a"]);
+    // a project the read did not cover, an admin's other team, stays off
+    onMarkedSocket(
+      frame(row({ id: "c", projectId: "p8", attentionAt: 30, revision: 2 })),
     );
     expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["b", "a"]);
     onMarkedSocket(frame(row({ id: "a", revision: 2 })));
@@ -719,6 +745,7 @@ describe("the entity", () => {
         Response.json({
           tasks: [row({ id: "a", attentionAt: 10, revision: 1 })],
           count: 1,
+          projectIds: HOME,
         });
       hold = true;
       const load = loadMarkedTasks();
@@ -731,11 +758,41 @@ describe("the entity", () => {
     },
   );
 
+  test.serial(
+    "Home keeps a frame from a project the read out is adding",
+    async () => {
+      answer = () => Response.json({ tasks: [], count: 0, projectIds: ["p1"] });
+      await loadMarkedTasks();
+      answer = () =>
+        Response.json({ tasks: [], count: 0, projectIds: ["p1", "p7"] });
+      hold = true;
+      const load = loadMarkedTasks();
+      send(frame(row({ id: "n", projectId: "p7", attentionAt: 20 })));
+      await unclaim();
+      await load;
+      expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["n"]);
+    },
+  );
+
+  test.serial(
+    "Home's first read drops what it saw from projects it does not cover",
+    async () => {
+      answer = () => Response.json({ tasks: [], count: 0, projectIds: ["p1"] });
+      hold = true;
+      const load = loadMarkedTasks();
+      send(frame(row({ id: "x", projectId: "p8", attentionAt: 20 })));
+      await unclaim();
+      await load;
+      expect(markedTasks.value?.tasks).toEqual([]);
+    },
+  );
+
   test.serial("Home reads again once cleared rows thin the card", async () => {
     answer = () =>
       Response.json({
         tasks: [row({ id: "a", attentionAt: 10 })],
         count: 60,
+        projectIds: HOME,
       });
     await loadMarkedTasks();
     send(frame(row({ id: "a", attentionAt: null, revision: 2 })));
@@ -869,7 +926,8 @@ describe("the entity", () => {
       const fifty = Array.from({ length: 50 }, (_, i) =>
         row({ id: `a${i}`, attentionAt: 100 - i }),
       );
-      answer = () => Response.json({ tasks: fifty, count: 60 });
+      answer = () =>
+        Response.json({ tasks: fifty, count: 60, projectIds: HOME });
       hold = true;
       const load = loadMarkedTasks();
       send(frame(row({ id: "b", attentionAt: 500, revision: 2 })));
@@ -886,7 +944,8 @@ describe("the entity", () => {
       const fifty = Array.from({ length: 50 }, (_, i) =>
         row({ id: `a${i}`, attentionAt: 100 - i }),
       );
-      answer = () => Response.json({ tasks: fifty, count: 60 });
+      answer = () =>
+        Response.json({ tasks: fifty, count: 60, projectIds: HOME });
       await loadMarkedTasks();
       send({ type: "externalTaskDeleted", projectId: "p1", taskId: "zz" });
       await settle();

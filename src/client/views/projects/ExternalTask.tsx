@@ -12,7 +12,10 @@
 // Frames keep it current, and a mark is cleared once it is read.
 
 import { useSignal } from "@preact/signals";
-import type { ExternalTaskDetail } from "../../../shared/contracts/external-task.ts";
+import type {
+  ExternalTaskDetail,
+  ExternalTaskRow,
+} from "../../../shared/contracts/external-task.ts";
 import type { Params } from "../../app/params.ts";
 import {
   type TaskPage,
@@ -39,7 +42,9 @@ import {
   fileLabel,
   stateLine,
   taskIcon,
+  UNCLAIMED,
 } from "./ExternalTasks.model.ts";
+import { ConnectNotice } from "./ExternalTasks.tsx";
 import { Timeline } from "./ExternalTaskTimeline.tsx";
 import "./external-tasks.css";
 
@@ -52,13 +57,29 @@ function MadeIn({ detail }: { detail: ExternalTaskDetail }) {
       {detail.chatTitle === null ? (
         <span>Made in a chat</span>
       ) : (
-        <a class="external-tasks-chat" href={chatHref(detail.chatId)}>
+        <span class="external-tasks-chat">
           <span>Made in</span>
-          <span class="cut">{chatName(detail.chatTitle)}</span>
-          <Icon name="open" size={12} class="external-tasks-chat-icon" />
-        </a>
+          <a class="cut" href={chatHref(detail.chatId)}>
+            {chatName(detail.chatTitle)}
+          </a>
+        </span>
       )}
     </p>
+  );
+}
+
+// the state's icon in its colour, then its words, for the phone line
+function State({ task }: { task: ExternalTaskDetail["task"] }) {
+  const icon = taskIcon(task);
+  return (
+    <span class="external-tasks-state">
+      <Icon
+        name={icon.name}
+        size={14}
+        class={`external-tasks-state-icon${icon.status === null ? "" : ` status-${icon.status}`}`}
+      />
+      <span>{stateLine(task)}</span>
+    </span>
   );
 }
 
@@ -73,19 +94,9 @@ function Brief({
 }) {
   const task = detail.task;
   const { el, open, long } = useCut<HTMLParagraphElement>([detail.text]);
-  const icon = taskIcon(task);
   const deadline = claimDeadline(task, idle);
   return (
     <section class="card external-tasks-brief">
-      <p class="external-tasks-brief-state">
-        <Icon
-          name={icon.name}
-          size={15}
-          class={`external-tasks-brief-icon${icon.status === null ? "" : ` status-${icon.status}`}`}
-        />
-        <span>{stateLine(task)}</span>
-      </p>
-      <MadeIn detail={detail} />
       <div class="external-tasks-brief-text">
         <Fold
           cut={long.value && !open.value}
@@ -120,16 +131,16 @@ function Brief({
           )}
         </RowsList>
       )}
-      {(task.scope !== null || deadline !== null) && (
-        <p class="external-tasks-brief-foot external-tasks-brief-narrow">
-          {task.scope !== null && <span>Scope: {task.scope}</span>}
-          {deadline !== null && (
-            <span>
-              Unclaimed at {deadlineTime(deadline, now)} without a report
-            </span>
-          )}
-        </p>
-      )}
+      <p class="external-tasks-brief-foot external-tasks-brief-narrow">
+        <State task={task} />
+        {deadline !== null && (
+          <span>
+            Unclaimed at {deadlineTime(deadline, now)} without a report
+          </span>
+        )}
+        {task.scope !== null && <span>Scope: {task.scope}</span>}
+      </p>
+      <MadeIn detail={detail} />
     </section>
   );
 }
@@ -147,6 +158,21 @@ function Aside({
   const deadline = claimDeadline(task, idle);
   return (
     <AsideSection label="Task">
+      <AsideLine label="State">{task.state}</AsideLine>
+      {task.claim !== null && (
+        <AsideLine label="Claimed by" cut>
+          @{task.claim.username} via {task.claim.keyName}
+        </AsideLine>
+      )}
+      {deadline !== null && (
+        <div class="split-line">
+          <span>
+            Unclaimed at{" "}
+            <span class="split-strong">{deadlineTime(deadline, now)}</span>{" "}
+            without a report
+          </span>
+        </div>
+      )}
       {task.scope !== null && (
         <AsideLine label="Scope" cut>
           {task.scope}
@@ -161,17 +187,13 @@ function Aside({
       {detail.briefAt > task.createdAt && (
         <AsideLine label="Brief edited">{ago(detail.briefAt, now)}</AsideLine>
       )}
-      {deadline !== null && (
-        <div class="split-line">
-          <span>
-            Unclaimed at{" "}
-            <span class="split-strong">{deadlineTime(deadline, now)}</span>{" "}
-            without a report
-          </span>
-        </div>
-      )}
     </AsideSection>
   );
+}
+
+// an open task waits for an agent, so the page says where to connect one
+export function TaskNotice({ state }: Pick<ExternalTaskRow, "state">) {
+  return state === "open" ? <ConnectNotice words={UNCLAIMED} /> : undefined;
 }
 
 // the page under its title: the brief or its form, then the rest, which
@@ -194,6 +216,7 @@ export function TaskBody({
     <Split
       aside={<Aside detail={page.detail} idle={page.idleHours} now={now} />}
     >
+      {!edit && TaskNotice(task)}
       {edit ? (
         <TaskForm
           key={task.id}

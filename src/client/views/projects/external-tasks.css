@@ -11,22 +11,17 @@
     gap: var(--space-3);
     padding: var(--space-4);
   }
-  /* the state as a row's title reads, its icon in the state's colour
-     from base */
-  .external-tasks-brief-state {
-    display: flex;
+  /* the state's icon in its colour from base, beside its words */
+  .external-tasks-state {
+    display: inline-flex;
     align-items: center;
-    gap: var(--space-2);
-    margin: 0;
-    font-size: var(--text-ui);
-    font-weight: 500;
-    color: var(--fg);
+    gap: var(--space-1);
   }
-  .external-tasks-brief-icon {
+  .external-tasks-state-icon {
     flex-shrink: 0;
   }
-  /* the chat it was made in, and on a phone the aside's scope and
-     deadline */
+  /* the chat it was made in, and on a phone the aside's state, deadline
+     and scope */
   .external-tasks-brief-foot {
     display: flex;
     flex-wrap: wrap;
@@ -35,16 +30,13 @@
     font-size: var(--text-small);
     color: var(--faint);
   }
-  /* a long title is cut, the icon stays */
+  /* a long chat name is cut */
   .external-tasks-chat {
     display: inline-flex;
     align-items: center;
     gap: var(--space-1);
     min-width: 0;
     max-width: 100%;
-  }
-  .external-tasks-chat-icon {
-    flex-shrink: 0;
   }
   /* the aside hides under 1100 */
   .external-tasks-brief-narrow {

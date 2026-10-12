@@ -29,6 +29,7 @@ import { sinceText } from "../../feed/Row.model.ts";
 import type { IconName } from "../../lib/icons.tsx";
 
 export const INTRO = "Work for an agent you run outside 1ctx.";
+export const UNCLAIMED = "Ask your agent to claim this task.";
 
 export const claimWords = (claim: ExternalTaskClaim): string =>
   `claimed by ${claim.username} via ${claim.keyName}`;
@@ -135,8 +136,18 @@ export const deadlineTime = (at: number, now: number): string =>
   sinceText(at, now);
 
 // the chat a task was made in; an untitled one as Storage names it
-export const chatName = (title: string): string =>
-  title.trim() === "" ? "Untitled chat" : title;
+// a title the server cut at MAX_TITLE ends on a whole word, never half
+// of one; a shorter one ending in … was written so and stays
+export function chatName(title: string): string {
+  const text = title.trim();
+  if (text === "") return "Untitled chat";
+  // only a cut at the full MAX_TITLE can end mid word; a shorter one
+  // trimmed a space or a split pair, a whole word either way
+  if (!text.endsWith("…") || text.length < MAX_TITLE) return text;
+  const kept = text.slice(0, -1);
+  const space = kept.search(/\s\S*$/);
+  return space <= 0 ? text : `${kept.slice(0, space).trimEnd()}…`;
+}
 
 // what the page offers in a state: the brief is edited and the task
 // cancelled until it closes, a claimed task unclaimed while held, an answer

@@ -25,6 +25,7 @@ import {
 } from "../../data/external-tasks-rows.ts";
 import { ShowMore } from "../../feed/FeedCard.tsx";
 import { newExternalTaskHref } from "../../lib/hrefs.ts";
+import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
 import { useListSearch } from "../../lib/search.ts";
 import { PageNotice } from "../../ui/Page.tsx";
@@ -114,9 +115,14 @@ export function FinishedTasks({ now }: { now: number }) {
 
 // shown whatever the tasks and the user's keys
 export function TasksIntro() {
+  return <ConnectNotice words={INTRO} />;
+}
+
+export function ConnectNotice({ words }: { words: string }) {
   return (
-    <PageNotice words={INTRO}>
+    <PageNotice words={words}>
       <a class="btn btn-small" href={CONNECT_HREF}>
+        <Icon name="plug" size={12} />
         Connect agents
       </a>
     </PageNotice>
