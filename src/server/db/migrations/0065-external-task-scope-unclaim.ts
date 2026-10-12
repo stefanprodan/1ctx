@@ -74,8 +74,12 @@ export const m0065: Migration = {
       select rowid, id, task_id, claim_id,
         case kind when 'release' then 'unclaim' else kind end,
         case when key_name is null and claim_end in ('idle', 'access_gone')
-            and text like 'released %'
-          then 'unclaimed' || substr(text, 9) else text end,
+          then case
+            when text = 'released because access ended' then 'access ended'
+            when text like 'released after %'
+              then replace(substr(text, 10), 'after 1 hours ', 'after 1 hour ')
+            else text end
+          else text end,
         links, user_id, key_name,
         case claim_end when 'released' then 'unclaimed' else claim_end end, at
       from external_task_entries;

@@ -94,7 +94,7 @@ async function atomicEnding(
       });
       expect(current.entries[0]).toMatchObject({
         kind: "unclaim",
-        text: "unclaimed because access ended",
+        text: "access ended",
         claimId: held.claimId,
         claimEnd: "access_gone",
         by: null,

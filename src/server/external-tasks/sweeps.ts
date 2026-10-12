@@ -9,6 +9,9 @@ import type { OpenClaim } from "./rows.ts";
 import { closed } from "./rules.ts";
 import type { ExternalTaskStore } from "./store.ts";
 
+const hoursText = (hours: number) =>
+  hours === 1 ? "1 hour" : `${hours} hours`;
+
 type SweepDeps = {
   db: Db;
   store: ExternalTaskStore;
@@ -30,7 +33,7 @@ export function taskSweeps(deps: SweepDeps) {
         actor: "access_gone",
         kind: "unclaim",
         userId: null,
-        text: "unclaimed because access ended",
+        text: "access ended",
         links: [],
         at: now,
       });
@@ -73,7 +76,7 @@ export function taskSweeps(deps: SweepDeps) {
             actor: "idle",
             kind: "unclaim",
             userId: null,
-            text: `unclaimed after ${hours} hours without a report`,
+            text: `after ${hoursText(hours)} without a report`,
             links: [],
             at: now,
           });

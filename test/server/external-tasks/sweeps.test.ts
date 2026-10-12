@@ -38,7 +38,7 @@ test("idle unclaim reads raised and lowered limits and unclaims exactly at the b
     by: null,
     claimId: task.claimId,
     keyName: null,
-    text: "unclaimed after 25 hours without a report",
+    text: "after 25 hours without a report",
   });
   expect(f.area.store.claimById(task.claimId!)!.end_reason).toBe("idle");
   expect(f.area.unclaimIdle(f.now())).toBe(0);
@@ -50,6 +50,17 @@ test("idle unclaim reads raised and lowered limits and unclaims exactly at the b
   const held = f.area.claim(f.key, task.id);
   expect(held.claimId).not.toBe(task.claimId);
   expect(f.area.unclaimIdle(f.now())).toBe(0);
+});
+
+test("an idle unclaim after one hour says hour", () => {
+  using f = fixture();
+  const task = f.task("claimed");
+  f.limits.idle = 1;
+  f.advance(HOUR);
+  expect(f.area.unclaimIdle(f.now())).toBe(1);
+  expect(f.area.show(task.id, null)!.entries[0]!.text).toBe(
+    "after 1 hour without a report",
+  );
 });
 
 test("reports and answers restart idle time, blocked tasks never idle out", () => {

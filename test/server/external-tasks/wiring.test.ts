@@ -129,7 +129,7 @@ test("the hourly sweep reads live idle limits and spares blocked and recently ac
     kind: "unclaim",
     by: null,
     claimEnd: "idle",
-    text: "unclaimed after 24 hours without a report",
+    text: "after 24 hours without a report",
   });
   expect(f.app.externalTasks.store.claimById(idle!.claimId)?.end_reason).toBe(
     "idle",
