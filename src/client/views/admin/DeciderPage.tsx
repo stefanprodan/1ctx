@@ -36,7 +36,7 @@ import {
   SettingForm,
   SettingStack,
 } from "../../ui/Setting.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideItem, AsideSection, Split } from "../../ui/Split.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import { DeciderModelFields } from "./DeciderModelFields.tsx";
 import { DeciderDrafts } from "./DeciderPage.state.ts";
@@ -331,11 +331,11 @@ function Aside({ decider }: { decider: DeciderSummary }) {
           <p class="split-empty">No decision.</p>
         ) : (
           asks.map((x) => (
-            <div key={x.id} class="split-line">
-              <a class="split-link" href={configDecisionHref(x.id)}>
-                {DECISION_WORDS[x.id].title}
-              </a>
-            </div>
+            <AsideItem
+              key={x.id}
+              name={DECISION_WORDS[x.id].title}
+              href={configDecisionHref(x.id)}
+            />
           ))
         )}
       </AsideSection>

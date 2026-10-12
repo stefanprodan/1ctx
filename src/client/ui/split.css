@@ -85,18 +85,8 @@
     white-space: nowrap;
     vertical-align: bottom;
   }
-  .split-quiet {
-    color: var(--faint);
-    font-weight: 400;
-  }
-  .split-link {
-    color: var(--dim);
-  }
-  .split-link:hover {
-    color: var(--fg);
-  }
 
-  .split-stack {
+  .split-item-body {
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -104,26 +94,53 @@
     gap: 2px;
     padding: 2px 0;
   }
-  .split-name {
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: var(--text-mono);
+  .split-item-name {
     color: var(--fg);
   }
-  .split-name-link:hover {
-    color: var(--brand);
-  }
-  .split-faint {
-    display: block;
-    font-family: var(--mono);
-    font-size: var(--text-label);
+  .split-item-sub {
+    font-size: var(--text-small);
     color: var(--faint);
   }
-
-  .split-value {
-    font-family: var(--mono);
-    font-size: var(--text-mono);
+  .split-item-end {
+    flex-shrink: 0;
+    color: var(--fg);
     font-weight: 500;
+  }
+
+  .split-note {
+    margin: 0;
+    padding: 2px 0;
+    color: var(--dim);
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    overflow-wrap: break-word;
+  }
+  .split-note-faint {
+    color: var(--faint);
+  }
+  .split-note-error {
+    color: var(--failed);
+  }
+
+  .split-handle {
+    color: var(--fg);
+  }
+  .split-item-sub .split-handle {
+    color: var(--dim);
+  }
+  .split-quiet {
+    color: var(--faint);
+    font-weight: 400;
+  }
+  /* yellow only under the pointer or focus, after every rest colour */
+  .split-handle:hover,
+  .split-handle:focus-visible {
+    color: var(--brand);
+  }
+  .split-link {
+    color: var(--dim);
+  }
+  .split-link:hover {
     color: var(--fg);
   }
 

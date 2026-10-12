@@ -97,13 +97,13 @@ describe("the aside", () => {
           reader={(file) =>
             file === "mcp-a"
               ? { label: "flux", href: "/admin/config/mcp/flux" }
-              : { label: "unused", quiet: true }
+              : { label: "unused" }
           }
         />,
       ),
     );
     expect(html).toBe(
-      '<section class="split-section"><div class="split-section-head"><span class="label">Key files</span></div><div class="split-line split-pair"><span class="split-label">mcp-a.key</span><a class="split-strong cut" href="/admin/config/mcp/flux" title="flux">flux</a></div><div class="split-line split-pair"><span class="split-label">mcp-z.key</span><span class="split-strong cut split-quiet" title="unused">unused</span></div></section>',
+      '<section class="split-section"><div class="split-section-head"><span class="label">Key files</span></div><div class="split-line split-item"><span class="split-item-body"><span class="split-item-name cut" title="mcp-a.key">mcp-a.key</span><span class="split-item-sub cut"><a class="split-handle" href="/admin/config/mcp/flux">flux</a></span></span></div><div class="split-line split-item"><span class="split-item-body"><span class="split-item-name cut" title="mcp-z.key">mcp-z.key</span><span class="split-item-sub cut">unused</span></span></div></section>',
     );
     expect(
       render(<KeyFilesSection files={[]} reader={() => ({ label: "" })} />),

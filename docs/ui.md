@@ -82,8 +82,17 @@ open row's body or a meta. The shared shapes are below.
 - **A card head's filters are `RowsFilters`,** short words; under 720
   their icons are hidden, so a search beside them keeps room.
 - **A page with an aside is `ui/Split.tsx`.** Aside content is
-  `AsideSection`, `AsideLine` and `AsideRead`; `Page` alone has no
-  aside. The aside holds only real numbers, and is hidden under 1100.
+  `AsideSection`, `AsideRead` and three line shapes: `AsideLine` (a
+  label and its value), `AsideItem` (one thing in a list) and
+  `AsideNote` (a sentence). No view writes their classes by hand (the
+  structure test). `Page` alone has no aside. The aside holds only real
+  numbers, and is hidden under 1100.
+- **A list in an aside is `AsideItem`:** the name in the aside's own
+  text, never mono whatever the rows use, linked when it has a page,
+  a count or word at the right, an optional faint line under it.
+- **A handle in an aside is quiet:** `AsideLine` with `href`, or
+  `AsideHandle` inside a value or a faint line, in the value's colour
+  and yellow only on hover or focus, never the rows' `RowsHandle`.
 - **An aside section is two columns.** Its labels never wrap and its
   longest sets the first column, so every value starts at one line. A
   value of words wraps in its column; `cut` is only for a one-token

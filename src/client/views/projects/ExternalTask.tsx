@@ -31,7 +31,14 @@ import { useCut } from "../../lib/resize.ts";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsGo, RowsLine, RowsList, RowsTitle } from "../../ui/Rows.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import {
+  AsideHandle,
+  AsideLine,
+  AsideNames,
+  AsideNote,
+  AsideSection,
+  Split,
+} from "../../ui/Split.tsx";
 import { fileHref } from "../knowledge/Knowledge.model.ts";
 import { TaskForm } from "./ExternalTaskForm.tsx";
 import { Answer, TaskMoves } from "./ExternalTaskMoves.tsx";
@@ -160,18 +167,18 @@ function Aside({
     <AsideSection label="Task">
       <AsideLine label="State">{task.state}</AsideLine>
       {task.claim !== null && (
-        <AsideLine label="Claimed by" cut>
-          @{task.claim.username} via {task.claim.keyName}
+        <AsideLine label="Claimed by">
+          <AsideHandle
+            name={task.claim.username}
+            href={userHref(task.claim.username)}
+          />{" "}
+          via <AsideNames names={[task.claim.keyName]} />
         </AsideLine>
       )}
       {deadline !== null && (
-        <div class="split-line">
-          <span>
-            Unclaimed at{" "}
-            <span class="split-strong">{deadlineTime(deadline, now)}</span>{" "}
-            without a report
-          </span>
-        </div>
+        <AsideNote>
+          Unclaimed at {deadlineTime(deadline, now)} without a report
+        </AsideNote>
       )}
       {task.scope !== null && <AsideLine label="Scope">{task.scope}</AsideLine>}
       {task.createdBy !== null && (

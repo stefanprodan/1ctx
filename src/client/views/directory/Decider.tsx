@@ -102,14 +102,13 @@ export function Decider({ params }: { params: Params }) {
                 <AsideLine label="Provider" cut>
                   {shown.provider}
                 </AsideLine>
-                <div class="split-line">
-                  Model
+                <AsideLine label="Model" cut>
                   <Fit
-                    class="split-strong cut"
+                    class="cut"
                     long={shown.decider.model}
                     short={shortModel(shown.decider.model)}
                   />
-                </div>
+                </AsideLine>
                 {shown.decider.contextLength !== null && (
                   <AsideLine label="Context">
                     {windowLine(shown.decider.contextLength)}

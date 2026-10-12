@@ -17,6 +17,9 @@ reporting.
   `views/admin/AdminAside.tsx`. An aside over the Monitor's numbers
   reads `overviewTotals()`, which answers only for 30d, so the
   Monitor's range never reaches a list.
+- **Key files are items, file first** (`KeyFilesSection`): the file is
+  the name, what reads it the faint line under it, linked to its page,
+  or "unused". A name never sits in a label's place.
 - **A page whose object can be renamed or deleted uses
   `useShownRow()`.** It holds the last row by id until the address
   follows, so the page never flashes "No ... by that name." The body is

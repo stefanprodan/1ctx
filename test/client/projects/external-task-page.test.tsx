@@ -131,7 +131,7 @@ describe("the state", () => {
       '<div class="split-line split-pair"><span class="split-label">State</span><span class="split-strong">claimed</span></div>',
     );
     expect(aside(html)).toContain(
-      '<div class="split-line split-pair"><span class="split-label">Claimed by</span><span class="split-strong cut" title="@stefan via laptop">@stefan via laptop</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">Claimed by</span><span class="split-strong"><a class="split-handle" href="/users/stefan">@stefan</a> via <span class="split-word" title="laptop">laptop</span></span></div>',
     );
     expect(narrow(html)).toContain(icon);
     expect(narrow(html)).toContain("<span>claimed by stefan via laptop</span>");
@@ -184,7 +184,7 @@ describe("the scope", () => {
 
 describe("the idle deadline", () => {
   const words = (at: number) =>
-    `Unclaimed at <span class="split-strong">${sinceText(at, NOW)}</span> without a report`;
+    `<p class="split-note">Unclaimed at ${sinceText(at, NOW)} without a report</p>`;
 
   test("is the claim's last activity plus the limit, only while claimed", () => {
     const html = draw(page(row({ state: "claimed", claim })));

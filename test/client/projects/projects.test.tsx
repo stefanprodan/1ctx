@@ -601,14 +601,12 @@ describe("the pages", () => {
     };
     projectAgents.value = [];
     const html = render(<Project params={{ id: "p1" }} />);
-    expect(html).toContain(
-      '<div class="split-line">Your personal project</div>',
-    );
+    expect(html).toContain('<p class="split-note">Your personal project</p>');
     // the aside's second section is the project's activity, not its agents
     expect(html).not.toContain("No agents yet.");
     expect(html).toContain(">Activity<");
     expect(html).not.toContain("Members");
-    expect(html).not.toContain('<div class="split-line">Chats');
+    expect(html).not.toContain('<span class="split-label">Chats');
     expect(html).toContain(
       'class="seg-option seg-on" aria-pressed="true">All<',
     );
@@ -634,7 +632,7 @@ describe("the pages", () => {
       members: [casey],
     };
     let html = render(<Project params={{ id: "p1" }} />);
-    expect(html).toContain('<div class="split-line">Incidents and pages</div>');
+    expect(html).toContain('<p class="split-note">Incidents and pages</p>');
     // the members are the tab's; the aside shows the activity
     expect(html).not.toContain("1 user</a>");
     expect(html).toContain(">Activity<");

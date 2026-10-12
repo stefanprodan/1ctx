@@ -46,7 +46,7 @@ import { NumberBox } from "../../ui/NumberBox.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { Seg } from "../../ui/Seg.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
 import { AccessSection } from "./AccessSection.tsx";
 import { AttentionSection } from "./AttentionSection.tsx";
 import { ownerNote, staleFailure, staleWords } from "./AutomationEdit.model.ts";
@@ -410,9 +410,7 @@ const RUN_FACTS = [
 const aside = (
   <AsideSection label="How it works">
     {RUN_FACTS.map((fact) => (
-      <p key={fact} class="automations-aside-text">
-        {fact}
-      </p>
+      <AsideNote key={fact}>{fact}</AsideNote>
     ))}
   </AsideSection>
 );

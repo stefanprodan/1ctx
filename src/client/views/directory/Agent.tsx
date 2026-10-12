@@ -281,14 +281,13 @@ export function Agent({ params }: { params: Params }) {
                 <AsideLine label="Provider" cut>
                   {shown.provider}
                 </AsideLine>
-                <div class="split-line">
-                  Model
+                <AsideLine label="Model" cut>
                   <Fit
-                    class="split-strong cut"
+                    class="cut"
                     long={shown.agent.model.id}
                     short={shortModel(shown.agent.model.id)}
                   />
-                </div>
+                </AsideLine>
                 {shown.agent.model.contextLength !== null && (
                   <AsideLine label="Context">
                     {windowLine(shown.agent.model.contextLength)}

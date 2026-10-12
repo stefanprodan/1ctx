@@ -162,11 +162,6 @@
   .automations-bar-failed {
     background: var(--failed);
   }
-  .automations-fire {
-    justify-content: space-between;
-    font-family: var(--mono);
-    font-size: var(--text-small);
-  }
 
   /* the editor */
   .automations-editor {
@@ -191,13 +186,6 @@
     font-size: var(--text-ui);
     color: var(--dim);
   }
-  .automations-aside-text {
-    margin: 0;
-    color: var(--dim);
-    font-size: var(--text-ui);
-    line-height: 1.5;
-  }
-
   .automations-task {
     display: flex;
     flex-direction: column;

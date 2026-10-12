@@ -393,7 +393,7 @@ describe("a card of the page", () => {
     // a repository reads a key without a credential: it is used
     expect(reader("http-repo")).toEqual({ label: "platform/widgets" });
     expect(reader("http-repos")).toEqual({ label: "2 repositories" });
-    expect(reader("http-none")).toEqual({ label: "unused", quiet: true });
+    expect(reader("http-none")).toEqual({ label: "unused" });
   });
 });
 

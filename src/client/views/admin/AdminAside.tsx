@@ -6,7 +6,12 @@ import type { OverviewTotals } from "../../../shared/api/admin.ts";
 import { overview, overviewError } from "../../data/overview.ts";
 import { count, money } from "../../lib/format.ts";
 import { USAGE_HREF } from "../../lib/hrefs.ts";
-import { AsideLine, AsideRead, AsideSection } from "../../ui/Split.tsx";
+import {
+  AsideItem,
+  AsideLine,
+  AsideRead,
+  AsideSection,
+} from "../../ui/Split.tsx";
 
 export function UsageSection<T>({
   value,
@@ -68,7 +73,7 @@ export function KeyFilesSection({
   files: readonly string[];
   // what reads the file: a label ("unused", a name, "2 credentials"),
   // and its page when one reads it
-  reader: (file: string) => { label: string; href?: string; quiet?: boolean };
+  reader: (file: string) => { label: string; href?: string };
 }) {
   const sorted = [...files].sort((a, b) => a.localeCompare(b));
   return (
@@ -79,15 +84,12 @@ export function KeyFilesSection({
         sorted.map((file) => {
           const read = reader(file);
           return (
-            <AsideLine
+            <AsideItem
               key={file}
-              label={`${file}.key`}
-              cut
-              href={read.href}
-              quiet={read.quiet}
-            >
-              {read.label}
-            </AsideLine>
+              name={`${file}.key`}
+              sub={read.label}
+              subHref={read.href}
+            />
           );
         })
       )}
@@ -108,9 +110,9 @@ export function TopSection({
   return (
     <AsideSection label={label}>
       {rows.slice(0, TOP).map((row) => (
-        <AsideLine key={row.name} label={row.name} cut href={row.href}>
+        <AsideItem key={row.name} name={row.name} href={row.href}>
           {count(row.value)}
-        </AsideLine>
+        </AsideItem>
       ))}
     </AsideSection>
   );
