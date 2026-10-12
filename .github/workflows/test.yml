@@ -15,47 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-test-build:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Read Bun version
-        id: bun
-        run: |
-          version=$(scripts/bun-version.sh)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: ${{ steps.bun.outputs.version }}
-      - name: Verify architecture
-        run: test "$(uname -m)" = arm64
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-      - name: Lint and type-check
-        run: make lint
-      - name: Check if working tree is dirty
-        run: |
-          if [[ $(git diff --stat) != '' ]]; then
-            git --no-pager diff
-            echo 'run make lint and commit changes'
-            exit 1
-          fi
-      - name: Test
-        run: make test
-      - name: Test vendored just-bash
-        run: make vendor-test
-      - name: Build
-        run: make build
-      - name: Smoke test binary
-        run: |
-          expected="v$(bun -e 'console.log(require("./package.json").version)')"
-          test "$(./bin/1ctx --version)" = "$expected"
-          ./bin/1ctx --help >/dev/null
-          make smoke
-
-  linux-test-build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -73,6 +33,15 @@ jobs:
         run: test "$(uname -m)" = x86_64
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
+      - name: Lint and type-check
+        run: make lint
+      - name: Check if working tree is dirty
+        run: |
+          if [[ $(git diff --stat) != '' ]]; then
+            git --no-pager diff
+            echo 'run make lint and commit changes'
+            exit 1
+          fi
       - name: Test
         run: make test ARGS=--parallel
       - name: Build
@@ -83,34 +52,82 @@ jobs:
           test "$(./bin/1ctx --version)" = "$expected"
           ./bin/1ctx --help >/dev/null
           make smoke
-      - name: Smoke test image
-        run: |
-          expected="v$(bun -e 'console.log(require("./package.json").version)')"
-          make image-smoke VERSION="$expected"
-      - name: Check Docker Compose files
-        env:
-          ONECTX_VERSION: dev
-        run: |
-          docker compose -f deploy/docker/compose.yaml config --quiet
-          docker compose -f deploy/docker/compose.yaml \
-            -f deploy/docker/compose.dev.yaml config --quiet
       # flux-schema renders charts with Helm 4
       - name: Setup Helm
         uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: v4.3.0
-      - name: Lint Helm chart
-        run: helm lint --strict deploy/charts/onectx
       - name: Setup Flux CLI
         uses: fluxcd/flux2/action@b9c17924adb533d3617ec7de97a7b0f4acc07b39 # v2.9.6
         with:
           version: 2.9.6
           plugins: |
             schema@0.15.0
-      - name: Validate Kubernetes manifests
-        uses: fluxcd/flux-schema/actions/validate@fac00ee3cb2fb0bd904c77e9e7727e98ba8a3c05 # v0.15.0
+      - parallel:
+          - name: Smoke test image
+            run: |
+              expected="v$(bun -e 'console.log(require("./package.json").version)')"
+              make image-smoke VERSION="$expected"
+          - name: Check Docker Compose files
+            env:
+              ONECTX_VERSION: dev
+            run: |
+              docker compose -f deploy/docker/compose.yaml config --quiet
+              docker compose -f deploy/docker/compose.yaml \
+                -f deploy/docker/compose.dev.yaml config --quiet
+          - name: Lint Helm chart
+            run: helm lint --strict deploy/charts/onectx
+          - name: Validate Kubernetes manifests
+            uses: fluxcd/flux-schema/actions/validate@fac00ee3cb2fb0bd904c77e9e7727e98ba8a3c05 # v0.15.0
+            with:
+              path: deploy
+              exclude: |
+                deploy/docker
+              helm-charts: "true"
+
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Read Bun version
+        id: bun
+        run: |
+          version=$(scripts/bun-version.sh)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          path: deploy
-          exclude: |
-            deploy/docker
-          helm-charts: "true"
+          bun-version: ${{ steps.bun.outputs.version }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Test vendored just-bash
+        run: make vendor-test ARGS=--parallel
+
+  macos-smoke:
+    if: github.event_name == 'push'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Read Bun version
+        id: bun
+        run: |
+          version=$(scripts/bun-version.sh)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: ${{ steps.bun.outputs.version }}
+      - name: Verify architecture
+        run: test "$(uname -m)" = arm64
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Build
+        run: make build
+      - name: Smoke test binary
+        run: |
+          expected="v$(bun -e 'console.log(require("./package.json").version)')"
+          test "$(./bin/1ctx --version)" = "$expected"
+          ./bin/1ctx --help >/dev/null
+          make smoke

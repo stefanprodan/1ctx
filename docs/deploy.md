@@ -144,14 +144,20 @@ deletes the cluster with every release in it.
 - **The Dockerfile's `oven/bun:<version>@sha256:<digest>` line is the
   one Bun version.** `scripts/bun-version.sh` hands it to `setup-bun`
   in every workflow, and Dependabot's `docker` ecosystem bumps it.
-- **CI (`test.yml`) has a macOS and a Linux job.** Only the macOS job
-  runs `make lint` and `make vendor-test`. Only the Linux job runs the
-  test files in parallel and `make image-smoke` for amd64. Nothing in CI
-  runs the arm64 image; it is smoke-tested by hand on an arm64 machine.
-- **The Linux job checks `deploy/`.** It runs `docker compose config` on
-  both Compose files, `helm lint --strict` on the chart, and `flux-schema`
-  on the chart's default render and `deploy/flux/`, CEL rules included.
-  Helm is set up at 4, which `flux-schema` needs.
+- **CI (`test.yml`) has three jobs.** `test` and `vendor` run on Linux
+  for every pull request and push to `main`, side by side. `test` runs
+  `make lint` and fails on a tree it changed, the test files in
+  parallel, the build and the binary's smoke test. `vendor` runs
+  `make vendor-test ARGS=--parallel`. `macos-smoke` builds and
+  smoke-tests the arm64 binary on macOS, on a push to `main` only, with
+  no test suite.
+- **`test` ends with its checks as parallel steps.** After Helm and the
+  Flux CLI are set up, one `parallel:` group runs `make image-smoke`
+  for amd64, `docker compose config` on both Compose files,
+  `helm lint --strict` on the chart and `flux-schema` on the chart's
+  default render and `deploy/flux/`, CEL rules included. Helm is set up
+  at 4, which `flux-schema` needs. Nothing in CI runs the arm64 image;
+  it is smoke-tested by hand on an arm64 machine.
 - **`e2e.yml` runs the load harness by hand** (`workflow_dispatch`) on a
   Linux runner: `cluster`, the default, builds the image into a fresh
   `1ctx-test` cluster and runs one step (inputs `mult`, `minutes`,
@@ -163,8 +169,8 @@ deletes the cluster with every release in it.
   `make models` and opens or updates one signed PR on `models-refresh`,
   labelled `chore`. A PR made with `github.token` starts no workflow,
   so the job dispatches `test.yml` (which takes `workflow_dispatch` for
-  this) on the branch, and that run reports the required
-  `lint-test-build`. Never auto-merged.
+  this) on the branch, and that run reports the required `test` and
+  `vendor`. Never auto-merged.
 - **A `v*` tag releases (`release.yml`) only a commit on `main`.**
   CI has already linted and tested it, so the release does not. The
   tag must be `vMAJOR.MINOR.PATCH[-PRERELEASE]`; a `-` makes a
