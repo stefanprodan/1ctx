@@ -19,12 +19,13 @@ export const MCP_MESSAGES_PER_MINUTE = 120;
 const messages = (body: unknown): number =>
   Array.isArray(body) ? Math.max(1, body.length) : 1;
 
-function authInfo(principal: KeyPrincipal): AuthInfo {
+// the request's signal ends a search its client left
+function authInfo(principal: KeyPrincipal, signal: AbortSignal): AuthInfo {
   return {
     token: principal.via.id,
     clientId: principal.userId,
     scopes: [principal.via.scope],
-    extra: { principal },
+    extra: { principal, signal },
   };
 }
 
@@ -54,7 +55,7 @@ export function routes(
         if (!admitted) throw new TooManyRequests();
         return handler().fetch(req, {
           parsedBody: body,
-          authInfo: authInfo(principal),
+          authInfo: authInfo(principal, req.signal),
         });
       },
     },

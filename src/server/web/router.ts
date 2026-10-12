@@ -5,7 +5,7 @@
 // a browser sends Origin on the handshake.
 
 import { isIP } from "node:net";
-import { BadRequest, HttpError } from "../lib/errors.ts";
+import { BadRequest, HttpError, TooManyRequests } from "../lib/errors.ts";
 import {
   json,
   type Method,
@@ -163,7 +163,11 @@ async function dispatch(
     });
   } catch (err) {
     if (err instanceof HttpError) {
-      return json({ error: err.message }, err.status);
+      const res = json({ error: err.message }, err.status);
+      if (err instanceof TooManyRequests && err.retryAfter !== null) {
+        res.headers.set("retry-after", String(err.retryAfter));
+      }
+      return res;
     }
     throw err;
   }

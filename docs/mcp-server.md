@@ -21,7 +21,13 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
   unless it emits a related message first.
 - A key may send 120 JSON-RPC messages a minute. An exhausted key is refused
   before its body is read. Every member of an admitted batch counts. The
-  fixed window is held per key id.
+  fixed window is held per key id, so every agent on one key shares it.
+- Knowledge and session search queue behind the server's other searches
+  (`docs/search.md`), after page searches. A search the queue cannot take
+  within 5 s, or with 64 `/mcp` searches waiting, is the error result
+  `search busy, retry in 5 s`; `call()` awaits the tool inside its `try`, so the logged
+  duration counts the wait. The request's abort signal reaches the queue
+  through the auth info, and access is checked again after the scan.
 - The factory makes one server per request. It identifies itself as
   `1ctx` at the build version, registers tools only, and advertises
   `tools.listChanged: false`. It advertises no resources, prompts,
@@ -163,8 +169,8 @@ underlying rows by `after` and oversized formatted knowledge-search rows by
 `skip`; they explicitly say when nothing matched. A search, version list or
 project list page ends with the exact next call or an end line, as a read
 does; a knowledge or session list page ends with its `List read at` line.
-With `fileId`, knowledge search checks only that reachable file under the same
-per-user one-at-a-time guard as project search. Each answer gives the file
+With `fileId`, knowledge search checks only that reachable file and is never
+queued. Each answer gives the file
 metadata once, then only line and sanitized text per hit. It stops scanning
 when the page is full and returns `skip` for the next hit. Search hit lines use
 the shared 160-character cutter.

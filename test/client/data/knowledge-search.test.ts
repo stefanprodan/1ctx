@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The knowledge search: asked after a pause in typing, one request out
-// at a time, an answer to a query no longer wanted dropped, and Show
-// more paging the files.
+// The knowledge search: asked after a pause in typing, a request no
+// longer wanted aborted and its answer dropped, and Show more paging the
+// files.
 
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import {
@@ -103,6 +103,7 @@ describe("the search's shapes", () => {
 
 const realFetch = globalThis.fetch;
 let asked: string[];
+let aborted: string[];
 let reply: (url: URL) => Promise<KnowledgeSearchResponse>;
 // The pause runs on fake time; one real turn of the event loop then
 // lets the request it starts settle.
@@ -116,11 +117,22 @@ beforeEach(() => {
   me.value = null;
   me.value = reader;
   asked = [];
+  aborted = [];
   reply = async () => response();
-  globalThis.fetch = (async (input: string) => {
+  globalThis.fetch = ((input: string, init?: RequestInit) => {
     const url = new URL(input, "http://x");
-    asked.push(`${url.searchParams.get("q")}|${url.searchParams.get("after")}`);
-    return new Response(JSON.stringify(await reply(url)));
+    const call = `${url.searchParams.get("q")}|${url.searchParams.get("after")}`;
+    asked.push(call);
+    return new Promise<Response>((resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => {
+        aborted.push(call);
+        reject(new DOMException("The operation was aborted.", "AbortError"));
+      });
+      reply(url).then(
+        (answer) => resolve(new Response(JSON.stringify(answer))),
+        reject,
+      );
+    });
   }) as typeof fetch;
 });
 
@@ -144,7 +156,7 @@ describe("the search", () => {
   });
 
   test.serial(
-    "a query typed while one is out waits, and the old answer goes",
+    "a new query aborts the request out, and the abort is no failure",
     async () => {
       let give: (r: KnowledgeSearchResponse) => void = () => {};
       reply = () =>
@@ -154,19 +166,31 @@ describe("the search", () => {
       searchKnowledge("p1", "old");
       await pause();
       expect(asked).toEqual(["old|null"]);
-      searchKnowledge("p1", "new");
-      await pause();
-      // the server scans one search at a time: nothing more went out
-      expect(asked).toEqual(["old|null"]);
       const first = give;
+      searchKnowledge("p1", "new");
+      expect(aborted).toEqual(["old|null"]);
       reply = async () => response({ files: [hit("n")] });
+      await pause();
+      // the new query went out at once, never behind the old scan
+      expect(asked).toEqual(["old|null", "new|null"]);
+      expect(searchOf("p1").state).toBe("done");
       first(response({ files: [hit("o")] }));
       await pause();
-      expect(asked).toEqual(["old|null", "new|null"]);
       expect(searchOf("p1").q).toBe("new");
+      expect(searchOf("p1").failure).toBeNull();
       expect(searchOf("p1").files.map((h) => h.file.id)).toEqual(["n"]);
     },
   );
+
+  test.serial("a clear aborts the request out", async () => {
+    reply = () => new Promise(() => {});
+    searchKnowledge("p1", "old");
+    await pause();
+    clearSearch("p1");
+    await pause();
+    expect(aborted).toEqual(["old|null"]);
+    expect(searchOf("p1")).toBe(SEARCH_IDLE);
+  });
 
   test.serial("a short query clears the search", async () => {
     searchKnowledge("p1", "dep");
@@ -225,7 +249,8 @@ describe("the search", () => {
       reply = async () => response({ files: [hit("n")] });
       searchKnowledge("p1", "new");
       await pause();
-      // the new user's search went out while the old one was still out
+      // the old user's search was aborted, the new one went out
+      expect(aborted).toEqual(["old|null"]);
       expect(asked).toEqual(["old|null", "new|null"]);
       expect(searchOf("p1").files.map((h) => h.file.id)).toEqual(["n"]);
       first(response({ files: [hit("o")] }));
@@ -236,12 +261,11 @@ describe("the search", () => {
   );
 
   test.serial(
-    "a Show more waiting behind a request is dropped once overtaken",
+    "a new query aborts a Show more out, and another project's stays",
     async () => {
       reply = async () => response({ files: [hit("a")], next: "1.5:a.md" });
       searchKnowledge("p1", "dep");
       await pause();
-      // hold the flight with another project's search
       let give: (r: KnowledgeSearchResponse) => void = () => {};
       reply = () =>
         new Promise((resolve) => {
@@ -249,14 +273,24 @@ describe("the search", () => {
         });
       searchKnowledge("p2", "other");
       await pause();
+      const other = give;
       const more = loadMoreSearch("p1");
       searchKnowledge("p1", "depl");
-      reply = async () => response({ files: [hit("z")] });
-      give(response());
       await more;
+      reply = async () => response({ files: [hit("z")] });
       await pause();
-      expect(asked).toEqual(["dep|null", "other|null", "depl|null"]);
+      expect(aborted).toEqual(["dep|1.5:a.md"]);
+      expect(asked).toEqual([
+        "dep|null",
+        "other|null",
+        "dep|1.5:a.md",
+        "depl|null",
+      ]);
       expect(searchOf("p1").files.map((h) => h.file.id)).toEqual(["z"]);
+      expect(searchOf("p1").more.failure).toBeNull();
+      other(response({ files: [hit("o")] }));
+      await pause();
+      expect(searchOf("p2").files.map((h) => h.file.id)).toEqual(["o"]);
     },
   );
 });

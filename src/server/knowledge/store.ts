@@ -68,35 +68,29 @@ export class KnowledgeStore extends KnowledgeVersions {
       .map((raw) => ({ ...fileOf(raw), data: raw.data }));
   }
 
-  // every live file, in name order, without its text
-  files(projectId: string): Generator<KnowledgeFile> {
-    return this.stream(
-      `select ${FILE_COLUMNS} from knowledge_files
-       where project_id = ? order by name`,
-      [projectId],
-    );
+  // every live file's id, in name order: a search's snapshot
+  fileIds(projectId: string): string[] {
+    return this.db
+      .query<{ id: string }, [string]>(
+        "select id from knowledge_files where project_id = ? order by name",
+      )
+      .all(projectId)
+      .map((row) => row.id);
   }
 
-  // null for a file gone
-  text(projectId: string, id: string): string | null {
-    return (
-      this.db
-        .query<{ text: string }, [string, string]>(
-          "select text from knowledge_files where project_id = ? and id = ?",
-        )
-        .get(projectId, id)?.text ?? null
-    );
-  }
-
-  // its own statement, finalized at the end, since a cached one left
-  // mid-step by a caller that stops early refuses its next use
-  private *stream(sql: string, params: string[]): Generator<KnowledgeFile> {
-    const statement = this.db.prepare<FileRaw, string[]>(sql);
-    try {
-      for (const raw of statement.iterate(...params)) yield fileOf(raw);
-    } finally {
-      statement.finalize();
-    }
+  // a file's metadata and text from one read, so both are one
+  // revision's; null for a file gone
+  withText(
+    projectId: string,
+    id: string,
+  ): { file: KnowledgeFile; text: string } | null {
+    const raw = this.db
+      .query<FileRaw & { text: string }, [string, string]>(
+        `select ${FILE_COLUMNS}, text from knowledge_files
+         where project_id = ? and id = ?`,
+      )
+      .get(projectId, id);
+    return raw === null ? null : { file: fileOf(raw), text: raw.text };
   }
 
   file(projectId: string, id: string): KnowledgeFile | null {

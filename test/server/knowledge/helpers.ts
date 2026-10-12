@@ -5,6 +5,7 @@ import { AgentStore } from "../../../src/server/agents/index.ts";
 import { knowledgeArea } from "../../../src/server/knowledge/index.ts";
 import { NotFound } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
+import { searchQueue } from "../../../src/server/lib/search-queue.ts";
 import {
   DEFAULT_LIMITS,
   type KnowledgeCaps,
@@ -126,6 +127,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
         return project;
       },
     },
+    searches: searchQueue(),
   });
   return {
     db,

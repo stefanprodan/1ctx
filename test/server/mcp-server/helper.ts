@@ -210,7 +210,6 @@ type State = {
   fileName: string;
   revision: number;
   sessionTitle: string;
-  guardedSearches: number;
   reachable: string[];
   listed: KnowledgeFileView[];
   deleted: KnowledgeListResponse["deleted"];
@@ -247,7 +246,6 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
     fileName: "notes/readme.md",
     revision: 7,
     sessionTitle: session.title,
-    guardedSearches: 0,
     reachable: [project.id],
     listed: [file("hello")],
     deleted: [],
@@ -294,7 +292,7 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
         return { ...session, title: state.sessionTitle };
       },
       exportRows: () => state.rows,
-      search: (projectId, q, after) => {
+      search: async (projectId, q, after) => {
         state.sessionCalls.push({ action: "search", projectId, q, after });
         return state.sessionSearch;
       },
@@ -341,10 +339,6 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
       },
     },
     knowledge: {
-      oneAtATime: (_userId, scan) => {
-        state.guardedSearches++;
-        return scan();
-      },
       list: () => ({
         files: state.listed,
         deleted: state.deleted,
@@ -385,7 +379,7 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
           code: null,
         };
       },
-      search: () => state.search,
+      search: async () => state.search,
       create: (_projectId, author, name) => {
         state.writes.push({ action: "create", author });
         return { ...file(), name, revision: 1 };

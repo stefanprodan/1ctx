@@ -17,6 +17,7 @@ import type { Db } from "../db/index.ts";
 import type { KnowledgeEdit } from "../knowledge/index.ts";
 import type { Principal, Via } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
+import type { SearchAsk } from "../lib/search-queue.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type {
   ExportRow,
@@ -36,7 +37,6 @@ export type AccessPort = {
 };
 
 export type KnowledgePort = {
-  oneAtATime<T>(userId: string, scan: () => T): T;
   list(projectId: string): KnowledgeListResponse;
   projectOf(kind: "file" | "version", id: string): string | null;
   rawFile(
@@ -90,12 +90,13 @@ export type KnowledgePort = {
     fileId: string,
     revision?: number,
   ): { id: string; name: string; revision: number };
+  // queued behind the server's other searches
   search(
     projectId: string,
-    userId: string,
     q: string,
     after: string | null,
-  ): KnowledgeSearchResponse;
+    ask: SearchAsk,
+  ): Promise<KnowledgeSearchResponse>;
 };
 
 export type ProjectsPort = { byId(id: string): ProjectRow | null };
@@ -103,8 +104,14 @@ export type ProjectsPort = { byId(id: string): ProjectRow | null };
 export type SessionsPort = {
   byId(id: string): SessionRow | null;
   exportRows(sessionId: string): ExportRow[];
-  // access is the caller's: the project is checked before either
-  search(projectId: string, q: string, after: string | null): SessionSearchPage;
+  // access is the caller's: the project is checked before either, and
+  // again after a search, which is queued behind the server's others
+  search(
+    projectId: string,
+    q: string,
+    after: string | null,
+    ask: SearchAsk,
+  ): Promise<SessionSearchPage>;
   list(
     projectId: string,
     since: number | null,

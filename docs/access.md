@@ -21,6 +21,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   throws a 400 on anything unexpected. A body is read through
   `readBody()` or `readBytes()` with the route's own cap, never
   `req.json()`. The listener's ceiling is `MAX_REQUEST_BYTES` (32 MiB).
+- **A `TooManyRequests` with a `retryAfter`** answers its 429 with a
+  `Retry-After` header in whole seconds.
 - **The access matrix is checked against the composed route list,**
   health and ready included.
 - **Only `/api/*`, `/mcp`, `/mcp/*` and `/.well-known/skills/*` go through

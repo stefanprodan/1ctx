@@ -15,6 +15,7 @@ import {
 } from "../../shared/search.ts";
 import type { Db } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { noStep, type SearchStep } from "../lib/search-queue.ts";
 import { parseRunsCursor, type RunsCursor } from "./cursor.ts";
 import { SHOWN } from "./export.ts";
 import { FEED_LIMIT } from "./rows.ts";
@@ -63,20 +64,21 @@ export type SessionListPage = {
   next: string | null;
 };
 
+type RawPlace = { id: string; last_activity_at: number };
+
 type RawFound = {
-  id: string;
   title: string;
   origin: "chat" | "automation";
   parent_session_id: string | null;
-  last_activity_at: number;
   bytes: number;
 };
 
-type RawListed = Omit<RawFound, "bytes"> & {
-  archived_at: number | null;
-  agent: string;
-  owner: string;
-};
+type RawListed = Omit<RawFound, "bytes"> &
+  RawPlace & {
+    archived_at: number | null;
+    agent: string;
+    owner: string;
+  };
 
 const cursorOf = (row: { last_activity_at: number; id: string }) =>
   `${row.last_activity_at}.${row.id}`;
@@ -98,29 +100,45 @@ function past(after: RunsCursor | null): {
   };
 }
 
+// the words and the cursor checked, before a search takes its turn
+export function sessionQuery(
+  q: string,
+  after: string | null,
+): { terms: string[]; after: RunsCursor | null } {
+  const terms = searchTerms(q);
+  if (terms.length === 0) throw new BadRequest("q must hold a word");
+  return { terms, after: after === null ? null : parseRunsCursor(after) };
+}
+
 // The cursor is a place in activity order, so a session active again
 // between two pages moves above it: shown already, it is not shown
-// again; not reached yet, this search misses it.
-export function searchSessions(
+// again; not reached yet, this search misses it. Only the order is
+// read up front; each session's size and messages are read at its turn,
+// so a session the page never reaches is never summed.
+export async function searchSessions(
   db: Db,
   projectId: string,
   q: string,
   after: string | null,
   budget = SESSION_SCAN_BYTES,
-): SessionSearchPage {
-  const terms = searchTerms(q);
-  if (terms.length === 0) throw new BadRequest("q must hold a word");
-  const from = past(after === null ? null : parseRunsCursor(after));
-  // its own statement, finalized at the end, since one left mid-step by
-  // the early stop refuses its next use
-  const sessions = db.prepare<RawFound, (string | number)[]>(
-    `select id, title, origin, parent_session_id, last_activity_at,
+  step: SearchStep = noStep,
+): Promise<SessionSearchPage> {
+  const query = sessionQuery(q, after);
+  const terms = query.terms;
+  const from = past(query.after);
+  const order = db
+    .query<RawPlace, (string | number)[]>(
+      `select id, last_activity_at from sessions indexed by sessions_activity
+       where project_id = ? ${from.sql}
+       order by last_activity_at desc, id`,
+    )
+    .all(projectId, ...from.args);
+  const found = db.query<RawFound, [string]>(
+    `select title, origin, parent_session_id,
        (select coalesce(sum(octet_length(messages.content)), 0)
         from messages join sends on sends.id = messages.send_id
         where messages.session_id = sessions.id and ${SHOWN}) as bytes
-     from sessions indexed by sessions_activity
-     where project_id = ? ${from.sql}
-     order by last_activity_at desc, id`,
+     from sessions where id = ?`,
   );
   const texts = db.query<{ id: string; content: string }, [string]>(
     `select messages.id, messages.content
@@ -129,34 +147,35 @@ export function searchSessions(
   );
   const hits: SessionSearchHit[] = [];
   let read = 0;
-  let last: RawFound | null = null;
+  let last: RawPlace | null = null;
   let next: string | null = null;
-  try {
-    for (const raw of sessions.iterate(projectId, ...from.args)) {
-      if (last !== null && read + raw.bytes > budget) {
-        next = cursorOf(last);
-        break;
-      }
-      read += raw.bytes;
-      last = raw;
-      const hit = matchSession(texts.all(raw.id), terms);
-      if (hit === null) continue;
-      if (hits.length === SEARCH_PAGE) {
-        const end = hits[SEARCH_PAGE - 1]!;
-        next = `${end.lastActivityAt}.${end.id}`;
-        break;
-      }
-      hits.push({
-        id: raw.id,
-        title: raw.title,
-        kind: kindOf(raw.origin),
-        parentSessionId: raw.parent_session_id,
-        lastActivityAt: raw.last_activity_at,
-        ...hit,
-      });
+  for (const place of order) {
+    await step();
+    // its size, the budget and its messages in one stretch, so a write
+    // between steps cannot split them
+    const raw = found.get(place.id);
+    if (raw === null) continue;
+    if (last !== null && read + raw.bytes > budget) {
+      next = cursorOf(last);
+      break;
     }
-  } finally {
-    sessions.finalize();
+    read += raw.bytes;
+    last = place;
+    const hit = matchSession(texts.all(place.id), terms);
+    if (hit === null) continue;
+    if (hits.length === SEARCH_PAGE) {
+      const end = hits[SEARCH_PAGE - 1]!;
+      next = `${end.lastActivityAt}.${end.id}`;
+      break;
+    }
+    hits.push({
+      id: place.id,
+      title: raw.title,
+      kind: kindOf(raw.origin),
+      parentSessionId: raw.parent_session_id,
+      lastActivityAt: place.last_activity_at,
+      ...hit,
+    });
   }
   return { hits, next };
 }
