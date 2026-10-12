@@ -197,12 +197,15 @@ describe("command admission", () => {
     async () => {
       const s = setup();
       const release = await acquireSession(s.session.id, freshSignal());
+      const realNow = Date.now;
       const pending = run(s, "while :; do sleep 0.05; done", {
         ...callCaps,
         callTimeoutMs: 2000,
       });
       try {
-        await Bun.sleep(1200);
+        // the wait is read from this thread's clock, moved past a second
+        // rather than slept through
+        Date.now = () => realNow() + 1200;
         release();
         const result = await pending;
         expect(result.ended).toEqual({ phase: "run", cause: "deadline" });
@@ -211,6 +214,7 @@ describe("command admission", () => {
         );
         expect(result.content).toEndWith("exit 124");
       } finally {
+        Date.now = realNow;
         release();
         await pending;
         s.db.close();

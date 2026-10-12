@@ -212,6 +212,12 @@ export async function savedCwd(
   return (await directory(fs, path)) ? path : home(docs);
 }
 
+// a command that ended at or past its deadline was cut, whatever exit the
+// interpreter gave, so it is the deadline's 124 and saves nothing
+export function exitAt(exitCode: number, endedAt: number, endsAt: number) {
+  return endedAt >= endsAt ? 124 : exitCode;
+}
+
 export function executionLimits(
   job: Job,
   fs: InMemoryFs,

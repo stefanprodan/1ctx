@@ -235,6 +235,23 @@ a lazy file, held the command past the grace, so the execution scope
 was poisoned and the whole script ended, `bash: execution aborted`,
 exit 124. Upstream's #506 and #397 do not cover it.
 
+### deadline-abort: a command cut by its deadline ends the script
+Files: `src/interpreter/helpers/loop.ts`,
+  `src/interpreter/control-flow.ts`, `src/interpreter/subshell-group.ts`,
+  `src/interpreter/interpreter.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/deadline-abort.test.ts`
+
+Now: a command stopped by its execution deadline or an abort ends the
+script with 124 wherever it ran: a loop, if, case, subshell, group or
+function body, or a `[[ ]]` test passes its error up as a limit's,
+with the output before it.
+
+Before: those bodies caught it as any other error, so the command
+failed with `execution aborted`, exit 1, and the script went on. Only
+the script's next time check made it 124, and in the same millisecond
+that check passed, so a cut command's writes were kept.
+
 ### globstar: a trailing ** lists everything below, as bash
 Files: `src/shell/glob.ts`
 Upstream: not reported

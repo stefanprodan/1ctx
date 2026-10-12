@@ -18,6 +18,7 @@ import {
   BreakError,
   ContinueError,
   ErrexitError,
+  ExecutionAbortedError,
   ExecutionLimitError,
   ExitError,
   isScopeExitError,
@@ -129,7 +130,11 @@ async function executeSubshellBody(
     }
   } catch (error) {
     // ExecutionLimitError must always propagate - these are safety limits
-    if (error instanceof ExecutionLimitError) {
+    if (
+      error instanceof ExecutionLimitError ||
+      // (1ctx deadline-abort) a cut command ends the script, as a limit does
+      error instanceof ExecutionAbortedError
+    ) {
       output.prependTo(error);
       throw error;
     }
@@ -293,7 +298,11 @@ async function executeGroupBody(
     // Restore groupStdin before handling error
     restoreGroupStdin();
     // ExecutionLimitError must always propagate - these are safety limits
-    if (error instanceof ExecutionLimitError) {
+    if (
+      error instanceof ExecutionLimitError ||
+      // (1ctx deadline-abort) a cut command ends the script, as a limit does
+      error instanceof ExecutionAbortedError
+    ) {
       output.prependTo(error);
       throw error;
     }
