@@ -85,8 +85,9 @@ src/client/   the Preact app from client/index.html: app/ (routes,
 test/         invariants/ (cross-cutting suites), server/, client/,
               shared/, vendor/just-bash/, structure.ts (the layout
               rules), helpers/, fixtures/.
-scripts/      preview, staging, smoke, image, release and vendor-test
-              scripts; brand.py; record/, the fixture recorders, run by
+scripts/      preview, staging, smoke, image, release, vendor-test and
+              cloud-setup (a Claude Code cloud environment) scripts;
+              brand.py; record/, the fixture recorders, run by
               hand; load/, the load harness (docs/load-testing.md).
 skills/       installable agent skills, added by URL, never seeded;
               the binary embeds and serves external-tasks/.
