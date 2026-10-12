@@ -4,14 +4,16 @@
 // One search scan at a time, server-wide, on the server's one thread.
 // A scan yields to the event loop about every SEARCH_SLICE_MS through
 // its step, so socket streams and timers run while it reads. Page
-// searches go before /mcp ones, each in arrival order. A waiter leaves
-// at its deadline or its abort, taking its job out of the queue; a
-// running scan whose caller left stops at its next step.
+// searches go before /mcp ones, each in arrival order, and each lane
+// holds at most SEARCH_WAITERS. A waiter leaves at its deadline or its
+// abort, taking its job out of the queue; a running scan whose caller
+// left stops at its next step.
 
 import { HttpError, TooManyRequests } from "./errors.ts";
 
 // under Bun's 10 s idleTimeout, so a waiter is answered, never dropped
 export const SEARCH_WAIT_MS = 5000;
+// per lane, so a full /mcp lane never refuses a page search
 export const SEARCH_WAITERS = 64;
 export const SEARCH_SLICE_MS = 8;
 export const SEARCH_RETRY_S = 5;
@@ -26,8 +28,8 @@ export type SearchStep = () => Promise<void>;
 
 export type SearchQueue = {
   run<T>(ask: SearchAsk, scan: (step: SearchStep) => Promise<T>): Promise<T>;
-  // how many wait now
-  waiting(): number;
+  // how many wait now, in one lane or in both
+  waiting(from?: SearchFrom): number;
 };
 
 export type SearchQueueOptions = {
@@ -65,14 +67,19 @@ export function searchQueue(
   const now = options.now ?? (() => performance.now());
   const queues: Record<SearchFrom, (() => void)[]> = { page: [], mcp: [] };
   let busy = false;
-  const waiting = () => queues.page.length + queues.mcp.length;
+  // the slice is the queue's, not a job's: a backlog of short scans
+  // handed on one after another still yields once it is spent
+  let mark = now();
+  const waiting = (from?: SearchFrom) =>
+    from === undefined
+      ? queues.page.length + queues.mcp.length
+      : queues[from].length;
 
   async function start<T>(
     ask: SearchAsk,
     scan: (step: SearchStep) => Promise<T>,
   ): Promise<T> {
     busy = true;
-    let mark = now();
     const step: SearchStep = async () => {
       if (now() - mark >= sliceMs) {
         await turn();
@@ -93,9 +100,13 @@ export function searchQueue(
     waiting,
     run(ask, scan) {
       if (ask.signal?.aborted) return Promise.reject(new SearchCancelled());
-      if (!busy) return start(ask, scan);
-      if (waiting() >= waiters) return Promise.reject(new SearchBusy());
+      if (!busy) {
+        // an idle queue owes nothing to the event loop yet
+        mark = now();
+        return start(ask, scan);
+      }
       const queue = queues[ask.from];
+      if (queue.length >= waiters) return Promise.reject(new SearchBusy());
       return new Promise((resolve, reject) => {
         const settle = () => {
           clearTimeout(deadline);

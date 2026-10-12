@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The search queue: one scan at a time, page searches first, a waiter
-// that leaves takes its job out, a bound and a deadline that answer
-// busy, and a scan that yields and stops once its caller left.
+// that leaves takes its job out, a bound per lane and a deadline that
+// answer busy, and scans that yield, alone or in a backlog, and stop
+// once their caller left.
 
 import { describe, expect, test } from "bun:test";
 import { HttpError } from "../../../src/server/lib/errors.ts";
@@ -95,22 +96,43 @@ describe("the search queue", () => {
     expect(most).toBe(1);
   });
 
-  test("past the bound a search is refused at once with when to retry", async () => {
+  test("past a lane's bound a search is refused at once with when to retry", async () => {
     const queue = searchQueue({ waiters: 2 });
     const first = held();
     const holding = queue.run({ from: "mcp" }, () => first.gate);
+    const order: string[] = [];
+    const job = (name: string) => async () => {
+      order.push(name);
+      return name;
+    };
     const waiting = [
-      queue.run({ from: "mcp" }, async () => 1),
-      queue.run({ from: "page" }, async () => 2),
+      queue.run({ from: "mcp" }, job("mcp-1")),
+      queue.run({ from: "mcp" }, job("mcp-2")),
     ];
-    const refused = await failure(queue.run({ from: "page" }, async () => 3));
+    const refused = await failure(queue.run({ from: "mcp" }, job("mcp-3")));
     expect(refused).toBeInstanceOf(SearchBusy);
     expect(refused.status).toBe(429);
     expect(refused.message).toBe(`search busy, retry in ${SEARCH_RETRY_S} s`);
     expect((refused as SearchBusy).retryAfter).toBe(SEARCH_RETRY_S);
+    // the /mcp lane is full; the page lane still takes a search, first
+    const page = [
+      queue.run({ from: "page" }, job("page-1")),
+      queue.run({ from: "page" }, job("page-2")),
+    ];
+    expect(
+      await failure(queue.run({ from: "page" }, job("page-3"))),
+    ).toBeInstanceOf(SearchBusy);
+    expect(queue.waiting("mcp")).toBe(2);
+    expect(queue.waiting("page")).toBe(2);
     first.release();
     await holding;
-    expect(await Promise.all(waiting)).toEqual([1, 2]);
+    expect(await Promise.all([...waiting, ...page])).toEqual([
+      "mcp-1",
+      "mcp-2",
+      "page-1",
+      "page-2",
+    ]);
+    expect(order).toEqual(["page-1", "page-2", "mcp-1", "mcp-2"]);
   });
 
   test("a waiter past its deadline leaves busy, its job never run", async () => {
@@ -199,6 +221,33 @@ describe("the search queue", () => {
     expect(firedAt).toBeGreaterThan(0);
     expect(firedAt).toBeLessThan(12);
   });
+
+  // serial: a neighbour's sleeping wait would stretch this one's turns
+  test.serial(
+    "a backlog of short scans yields between them once a slice is spent",
+    async () => {
+      const queue = searchQueue();
+      let firedAt = -1;
+      let done = 0;
+      setTimeout(() => {
+        firedAt = done;
+      }, 0);
+      // each scan is shorter than a slice: 5 ms of a sleeping wait
+      const scans = Array.from({ length: 20 }, () =>
+        queue.run({ from: "mcp" }, async (step) => {
+          await step();
+          Bun.sleepSync(5);
+          done++;
+        }),
+      );
+      await Promise.all(scans);
+      expect(done).toBe(20);
+      // the slice is the queue's: the timer fires within two slices, where
+      // a fresh slice per scan would hold it past all twenty
+      expect(firedAt).toBeGreaterThan(0);
+      expect(firedAt).toBeLessThanOrEqual(4);
+    },
+  );
 
   test("an aborted caller is refused before it waits or runs", async () => {
     const queue = searchQueue();

@@ -41,13 +41,16 @@ project's session search and list (`sessions/search.ts`).
 - **One scan at a time, server-wide** (`lib/search-queue.ts`, made once
   in `compose.ts` and shared by knowledge and session search). The
   server has one thread, which also carries every chat's stream, so a
-  scan yields to the event loop about every 8 ms through its step.
-  Page searches go before `/mcp` ones, each in arrival order.
+  scan yields to the event loop about every 8 ms through its step. The
+  slice is the queue's, not a scan's, so a backlog of short scans
+  handed on one after another still yields. Page searches go before
+  `/mcp` ones, each in arrival order.
   Knowledge search with `fileId` is one file and never queues.
 - **A waiter waits at most 5 s,** under Bun's 10 s idle timeout, so it
-  gets an answer rather than a dropped connection, and at most 64
-  wait. Past either it is `SearchBusy`: a 429 with `Retry-After` on the
-  page, an error result saying when to retry over `/mcp`.
+  gets an answer rather than a dropped connection, and at most 64 wait
+  in each lane, so a full `/mcp` lane never refuses a page search. Past
+  either it is `SearchBusy`: a 429 with `Retry-After` on the page, an
+  error result saying when to retry over `/mcp`.
 - **A caller that leaves stops its search.** The request's abort
   signal takes a waiting job out of the queue and stops a running scan
   at its next step. The page aborts a superseded query's request.

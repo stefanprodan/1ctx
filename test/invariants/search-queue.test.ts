@@ -85,24 +85,18 @@ async function createFile(
 }
 
 describe("the composed search queue", () => {
-  test("a full queue answers the page 429 with Retry-After and /mcp an error result", async () => {
+  test("a full lane answers the page 429 with Retry-After and /mcp an error result", async () => {
     const chat = await chatApp();
     try {
       await createFile(chat, chat.projectId, "a.md", "a topic\n");
       const key = await createKey(chat.member, { name: "busy", scope: "read" });
       const held = hold(chat);
-      const waiting = Array.from({ length: SEARCH_WAITERS }, () =>
-        chat.app.searches.run({ from: "mcp" }, async () => {}),
-      );
-      expect(chat.app.searches.waiting()).toBe(SEARCH_WAITERS);
-
-      const page = await chat.member.call(
-        "GET",
-        searchPath(chat.projectId, "topic"),
-      );
-      expect(page.status).toBe(429);
-      expect(page.headers.get("retry-after")).toBe(String(SEARCH_RETRY_S));
-      expect(await page.json()).toEqual({ error: BUSY });
+      const fill = (from: "page" | "mcp") =>
+        Array.from({ length: SEARCH_WAITERS }, () =>
+          chat.app.searches.run({ from }, async () => {}),
+        );
+      const mcpLane = fill("mcp");
+      expect(chat.app.searches.waiting("mcp")).toBe(SEARCH_WAITERS);
 
       const files = await tool(chat, key.token, "knowledge", {
         action: "search",
@@ -119,13 +113,53 @@ describe("the composed search queue", () => {
       expect(sessions.isError).toBe(true);
       expect(text(sessions)).toBe(BUSY);
 
+      const pageLane = fill("page");
+      const page = await chat.member.call(
+        "GET",
+        searchPath(chat.projectId, "topic"),
+      );
+      expect(page.status).toBe(429);
+      expect(page.headers.get("retry-after")).toBe(String(SEARCH_RETRY_S));
+      expect(await page.json()).toEqual({ error: BUSY });
+
       await held.release();
-      await Promise.all(waiting);
+      await Promise.all([...mcpLane, ...pageLane]);
       const later = await chat.member.call(
         "GET",
         searchPath(chat.projectId, "topic"),
       );
       expect(later.status).toBe(200);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a page search is taken and runs first while the /mcp lane is full", async () => {
+    const chat = await chatApp();
+    try {
+      await createFile(chat, chat.projectId, "a.md", "a topic\n");
+      const held = hold(chat);
+      // each /mcp job notes whether the page search still waits
+      const pageWaiting: number[] = [];
+      const mcpLane = Array.from({ length: SEARCH_WAITERS }, () =>
+        chat.app.searches.run({ from: "mcp" }, async () => {
+          pageWaiting.push(chat.app.searches.waiting("page"));
+        }),
+      );
+      const page = chat.member.call("GET", searchPath(chat.projectId, "topic"));
+      for (let i = 0; i < 200 && chat.app.searches.waiting("page") < 1; i++) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      expect(chat.app.searches.waiting("page")).toBe(1);
+      await held.release();
+      const answer = await page;
+      await Promise.all(mcpLane);
+      expect(answer.status).toBe(200);
+      expect(
+        ((await answer.json()) as { files: { file: { name: string } }[] })
+          .files[0]!.file.name,
+      ).toBe("a.md");
+      expect(pageWaiting).toEqual(Array(SEARCH_WAITERS).fill(0));
     } finally {
       await chat.app.shutdown();
     }
