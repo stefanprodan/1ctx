@@ -98,6 +98,8 @@ describe("Profile", () => {
     expect(html).toContain("Europe/Bucharest");
     expect(html).toContain('autocomplete="new-password"');
     expect(html).toContain("Change password");
+    // access keys live on Connect agents
+    expect(html).not.toContain("Access keys");
     // email from agents only once email is set up
     expect(html).not.toContain("Email from agents");
     profileEmailOn.value = true;

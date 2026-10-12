@@ -199,6 +199,17 @@ export function Rail({
               <Icon name="user" size={14} />
               <span>Profile</span>
             </a>
+            <a
+              class="menu-item"
+              href="/connect"
+              onClick={() => {
+                open.value = false;
+                follow?.();
+              }}
+            >
+              <Icon name="plug" size={14} />
+              <span>Connect agents</span>
+            </a>
             <button
               type="button"
               role="switch"

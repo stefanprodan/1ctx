@@ -83,6 +83,16 @@ export function serve(options: ServeOptions) {
             options.trustProxy,
           ),
         ),
+      // the skills an outside agent fetches, by the path it is told
+      "/.well-known/skills/*": (req, server) =>
+        options.handle(
+          req,
+          clientAddress(
+            req,
+            server.requestIP(req)?.address ?? null,
+            options.trustProxy,
+          ),
+        ),
       "/api/*": (req, server) =>
         options.handle(
           req,

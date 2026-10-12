@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An access key's row with Revoke, which asks first: the profile's list
+// An access key's row with Revoke, which asks first: Connect agents' list
 // and an admin's user page draw it. It lives apart from both views so
 // neither pulls in the other's stylesheet; it draws only Rows and Foot
 // primitives, so it has none of its own.

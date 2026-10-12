@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Access keys: the signed-in user's own, listed and made on the profile,
+// Access keys: the signed-in user's own, listed and made on Connect agents,
 // and a user's as an admin sees them on the user's page. A create's
 // token is handed to the caller and never kept here, so it goes with the
 // view that shows it.

@@ -9,6 +9,11 @@
 import { firstSentence, MAX_CATALOG_LINE } from "./text.ts";
 import type { SkillSource } from "./words.ts";
 
+// where the instance serves the external tasks skill, and where Connect
+// agents tells an agent to fetch it from
+export const EXTERNAL_TASKS_SKILL_PATH =
+  "/.well-known/skills/external-tasks/SKILL.md";
+
 // the form a URL takes, decided on the URL alone; null when it is not
 // an http(s) URL or carries credentials
 export type SourceForm =

@@ -902,16 +902,22 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Profile",
     role: "authenticated",
-    // the projects name a key's picks; the server refuses both until
-    // the password changes, which loads the page again
-    load: async () => {
-      await Promise.all(
-        me.value?.mustChangePassword
-          ? [loadProfile()]
-          : [loadProfile(), loadAccessKeys(), loadProjects()],
-      );
-    },
+    load: loadProfile,
   },
+  // the projects name a key's picks
+  ...tabRoutes(
+    "/connect",
+    [
+      ["", () => "Connect agents"],
+      ["/codex", () => "Connect agents"],
+      ["/opencode", () => "Connect agents"],
+    ],
+    lazy(() => import("../views/connect/Connect.tsx").then((m) => m.Connect)),
+    "authenticated",
+    async () => {
+      await Promise.all([loadAccessKeys(), loadProjects()]);
+    },
+  ),
 ];
 
 export type Match = { route: Route; params: Params };

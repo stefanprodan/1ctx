@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The access keys section's rules: the new key's draft and its checks,
-// and the two setup snippets shown once with the key. A key's row is
-// views/keys/, shared with the admin's user page.
+// and the variable shown once with the key. A key's row is views/keys/,
+// shared with the admin's user page.
 
 import type { CreateAccessKeyRequest } from "../../../shared/api/profile.ts";
 import type {
@@ -13,7 +13,7 @@ import type {
 } from "../../../shared/contracts/access-key.ts";
 import { plural } from "../../lib/format.ts";
 import { at, type Problem } from "../../lib/save.ts";
-import { fullNameProblem } from "./Profile.model.ts";
+import { fullNameProblem } from "../profile/Profile.model.ts";
 
 export type KeyReach = "all" | "picked";
 
@@ -26,10 +26,11 @@ export type KeyDraft = {
   days: AccessKeyDays;
 };
 
-// the narrowest key, and the shortest life
+// read and write, since working an external task writes; the shortest
+// life
 export const NEW_KEY: KeyDraft = {
   name: "",
-  scope: "read",
+  scope: "write",
   reach: "all",
   projectIds: [],
   days: 30,
@@ -53,18 +54,13 @@ export const DAYS_OPTIONS: { value: AccessKeyDays; label: string }[] = [
 
 export const scopeHint = (scope: AccessKeyScope): string =>
   scope === "read"
-    ? "Lists projects and reads their knowledge, chats, runs and external tasks."
-    : "Also writes knowledge files and claims and reports on external tasks.";
+    ? "Reads knowledge, chats and tasks."
+    : "Reads, edits knowledge, works tasks.";
 
 export const reachHint = (reach: KeyReach): string =>
-  reach === "all"
-    ? "Every project you see, now and later."
-    : "Only these, while you still see them.";
+  reach === "all" ? "All you see, now and later." : "Only these.";
 
-export const SECTION_TEXT =
-  "Let your own agents, such as Claude Code or Codex, reach your projects over MCP.";
 export const OFF_TEXT = "Access keys are off. An admin can turn them on.";
-export const MUST_CHANGE_TEXT = "Change your password first.";
 export const SHOWN_ONCE = "Copy the key now. It is not shown again.";
 
 export const capLine = (limit: number): string =>
@@ -108,20 +104,8 @@ export function keyFieldOf(message: string): string | undefined {
   return undefined;
 }
 
-export const mcpUrl = (origin: string): string => `${origin}/mcp`;
+// every setup reads the key from this variable, so none holds the key
+export const KEY_ENV = "ONECTX_ACCESS_KEY";
 
-export const claudeLine = (origin: string, token: string): string =>
-  `claude mcp add --transport http 1ctx "${mcpUrl(origin)}" --header "Authorization: Bearer ${token}"`;
-
-export const CODEX_ENV = "ONECTX_ACCESS_KEY";
-
-// the skill an agent installs to work external tasks
-export const SKILL_URL =
-  "https://github.com/stefanprodan/1ctx/tree/main/skills/external-tasks";
-
-export const codexBlock = (origin: string): string =>
-  [
-    "[mcp_servers.1ctx]",
-    `url = "${mcpUrl(origin)}"`,
-    `bearer_token_env_var = "${CODEX_ENV}"`,
-  ].join("\n");
+export const exportLine = (token: string): string =>
+  `export ${KEY_ENV}="${token}"`;

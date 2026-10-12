@@ -18,6 +18,7 @@ import {
 } from "../../../src/client/app/routes.ts";
 import { ZONES } from "../../../src/client/app/zones.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { loadProfile } from "../../../src/client/data/profile.ts";
 import { session } from "../../../src/client/data/sessions.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 
@@ -131,6 +132,12 @@ describe("the route table's shape", () => {
     expect(match("/admin/config/web")?.route.view).toBe(
       match("/admin/config/web/credentials")?.route.view,
     );
+    // a key shown once on Connect agents outlives a switch of agent
+    const connect = match("/connect")?.route.view;
+    expect(match("/connect/codex")?.route.view).toBe(connect);
+    expect(match("/connect/opencode")?.route.view).toBe(connect);
+    // the keys and their projects load on Connect agents, not the profile
+    expect(match("/profile")?.route.load).toBe(loadProfile);
   });
 
   test("a malformed segment matches nothing", () => {

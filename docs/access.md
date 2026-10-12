@@ -23,9 +23,10 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   `req.json()`. The listener's ceiling is `MAX_REQUEST_BYTES` (32 MiB).
 - **The access matrix is checked against the composed route list,**
   health and ready included.
-- **Only `/api/*`, `/mcp` and `/mcp/*` go through the router.** `/mcp` is the
-  access-key endpoint in `docs/mcp-server.md`; its subpaths reach the router
-  and do not match a route. The page, its bundle and
+- **Only `/api/*`, `/mcp`, `/mcp/*` and `/.well-known/skills/*` go through
+  the router.** `/mcp` is the access-key endpoint in `docs/mcp-server.md`;
+  its subpaths reach the router and do not match a route. The skills path
+  serves the `public` external tasks skill and nothing else. The page, its bundle and
   the files `serve()` takes by a fixed path (the manifest's icons) are
   public static files outside it, with no row in the matrix.
 

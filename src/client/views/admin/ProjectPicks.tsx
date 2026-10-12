@@ -42,18 +42,22 @@ export function AddProject({
   value,
   disabled,
   empty = "Every team project is added",
+  align,
   onChange,
 }: {
   teams: { id: string; name: string }[];
   value: string[];
   disabled: boolean;
   empty?: string;
+  // the side the list opens to, under an Add that is not at the right
+  align?: "left" | "right";
   onChange: (projectIds: string[]) => void;
 }) {
   return (
     <Finder
       label="Projects"
       add="Add project"
+      align={align}
       disabled={disabled}
       options={teams
         .filter((p) => !value.includes(p.id))

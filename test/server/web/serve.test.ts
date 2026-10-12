@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The listener serves the manifest's icons at the fixed paths the
-// manifest names, with no login, and every other path the page.
+// manifest names, with no login, the router's paths through the router,
+// and every other path the page.
 
 import { expect, test } from "bun:test";
 import { join } from "node:path";
@@ -46,7 +47,16 @@ test("the manifest's icons are served beside the page", async () => {
     const other = await fetch(`${origin}/icon-1024.png`);
     expect(other.headers.get("content-type")).toStartWith("text/html");
     await other.text();
-    for (const path of ["/mcp/", "/mcp/other"]) {
+    // the router answers the skill, not the page
+    const skill = await fetch(
+      `${origin}/.well-known/skills/external-tasks/SKILL.md`,
+    );
+    expect(skill.status).toBe(200);
+    expect(skill.headers.get("content-type")).toBe(
+      "text/markdown; charset=utf-8",
+    );
+    expect(await skill.text()).toStartWith("---\nname: external-tasks\n");
+    for (const path of ["/mcp/", "/mcp/other", "/.well-known/skills/other"]) {
       const response = await fetch(`${origin}${path}`);
       expect(response.status).toBe(404);
       expect(response.headers.get("content-type")).toStartWith(

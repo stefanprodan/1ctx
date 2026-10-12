@@ -88,7 +88,8 @@ test/         invariants/ (cross-cutting suites), server/, client/,
 scripts/      preview, staging, smoke, image, release and vendor-test
               scripts; brand.py; record/, the fixture recorders, run by
               hand; load/, the load harness (docs/load-testing.md).
-skills/       installable agent skills, added by URL, never seeded.
+skills/       installable agent skills, added by URL, never seeded;
+              the binary embeds and serves external-tasks/.
 site/         1ctx.dev and the brand files, its own project.
               site/README.md is the brand book.
 vendor/       just-bash/ (a git subtree, outside Biome and the structure

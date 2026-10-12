@@ -8,6 +8,8 @@ COPY patches patches
 RUN bun install --frozen-lockfile --ignore-scripts
 COPY tsconfig.json ./
 COPY vendor vendor
+# the binary embeds and serves this skill
+COPY skills/external-tasks skills/external-tasks
 COPY src src
 ARG TARGETARCH
 ARG VERSION
