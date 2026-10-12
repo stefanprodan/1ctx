@@ -5,7 +5,8 @@
 # Any difference fails the run, a new failure or a listed one passing.
 # Every file runs in a fresh global, so no file sees another's leftovers;
 # further arguments go to bun test, such as --parallel in CI. `--update`
-# runs the suite twice and rewrites the list when both runs agree.
+# runs the suite twice and rewrites the list when both runs agree; it
+# may sit anywhere among the arguments.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -15,10 +16,14 @@ LOG=$(mktemp "${TMPDIR:-/tmp}/vendor-test.XXXXXX")
 trap 'rm -f "$LOG" "$LOG.now" "$LOG.first"' EXIT
 
 update=false
-if [[ ${1:-} == --update ]]; then
-  update=true
-  shift
-fi
+args=()
+for arg in "$@"; do
+  if [[ $arg == --update ]]; then
+    update=true
+  else
+    args+=("$arg")
+  fi
+done
 
 cd "$DIR"
 
@@ -34,25 +39,38 @@ run() {
     exit 1
   fi
 
+  # bun counts each unhandled error, and each one is listed below; a count
+  # that differs means the log changed shape and the list would miss some
+  errors=$(sed -nE 's/^ *([0-9]+) errors?$/\1/p' "$LOG" | tail -1)
+  blocks=$(grep -c '^# Unhandled error' "$LOG" || true)
+  if [[ ${errors:-0} -ne $blocks ]]; then
+    echo "vendor-test: bun counted ${errors:-0} errors, the log shows $blocks" >&2
+    exit 1
+  fi
+
   # A file that fails to load runs none of its tests, so its error is
   # listed too: the file and the first error line of each, with the
-  # checkout's path taken out.
+  # checkout's path taken out, or "unhandled error" when no line names one.
   {
-    awk '/^src\/.*\.test\.ts:$/ { file = $0; want = 0; seen = 0; next }
-         /^# Unhandled error/ { want = 1; next }
-         want && /^-+$/ && seen { want = 0; seen = 0; next }
-         want && /^-+$/ { seen = 1; next }
-         want && /^([A-Z][A-Za-z]*)?[Ee]rror: / { print file " " $0; want = 0; seen = 0 }' "$LOG" |
+    awk 'function close_block() {
+           if (want) print file " unhandled error"
+           want = 0; dashes = 0
+         }
+         /^src\/.*\.test\.ts:$/ { close_block(); file = $0; next }
+         /^# Unhandled error/ { close_block(); want = 1; next }
+         want && /^-+$/ { if (++dashes == 2) close_block(); next }
+         want && /^([A-Z][A-Za-z]*)?[Ee]rror: / { print file " " $0; want = 0; dashes = 0 }
+         END { close_block() }' "$LOG" |
       sed "s|$DIR/||g" || true
     grep '^(fail)' "$LOG" | sed -E 's/ \[[0-9.]+m?s\]$//' || true
   } | LC_ALL=C sort -u >"$LOG.now"
 }
 
-run "$@"
+run ${args[@]+"${args[@]}"}
 if $update; then
   # only a set seen twice is recorded, so a flake shows up here first
   cp "$LOG.now" "$LOG.first"
-  run "$@"
+  run ${args[@]+"${args[@]}"}
   if ! diff -u "$LOG.first" "$LOG.now"; then
     echo "vendor-test: two runs failed differently, nothing written" >&2
     exit 1
@@ -63,9 +81,14 @@ if $update; then
 fi
 
 if ! diff -u "$LIST" "$LOG.now"; then
-  # what bun said before each new failure, since the list keeps only names
+  # what bun said about each new failure, since the list keeps only names:
+  # the lines before a failed test, the lines after a load error's file
   LC_ALL=C comm -13 "$LIST" "$LOG.now" | while IFS= read -r line; do
-    grep -aF -B 30 -- "$line" "$LOG" | grep -av '^(pass)' | tail -30 || true
+    if [[ $line == "(fail) "* ]]; then
+      grep -aF -B 30 -- "$line" "$LOG" | grep -av '^(pass)' | tail -30 || true
+    else
+      grep -axF -A 30 -- "${line%%: *}:" "$LOG" | grep -av '^(pass)' | head -30 || true
+    fi
   done
   echo "vendor-test: failures differ from vendor/just-bash-failures.txt" >&2
   exit 1

@@ -168,14 +168,17 @@ and the platform's `realpath`, are skipped where they would differ
 connector-hook rejection checks outside the upstream tree.
 
 `vendor/just-bash-failures.txt` lists every expected failure by name,
-and every test file that failed to load with its first error line,
-since such a file runs none of its tests. It is recorded on Linux as a
+and every test file that failed to load with its first error line, or
+`unhandled error` when bun printed none, since such a file runs none of
+its tests; a run also fails when bun's count of errors differs from the
+errors in its log. It is recorded on Linux as a
 user other than root, and the same list holds on macOS. The run fails
 at once when the set moves either way, a new failure or a listed one
 passing, with no retry: it prints the diff and what bun said before
 each new failure. After a change that fixes one, or a sync, check each
 difference, then record it with `scripts/vendor-test.sh --update`, which
-runs the suite twice and writes the list only when both runs agree.
+runs the suite twice and writes the list only when both runs agree
+(`make vendor-test ARGS="--parallel --update"` takes it too).
 
 ## Syncing a new upstream release
 
