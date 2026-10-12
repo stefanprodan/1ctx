@@ -202,52 +202,49 @@ describe("the search queue", () => {
     expect(await queue.run({ from: "mcp" }, async () => "next")).toBe("next");
   });
 
-  test("a timer set before a long scan fires during it", async () => {
-    const queue = searchQueue();
-    let firedAt = -1;
+  test("work queued before a long scan runs at its first yield", async () => {
+    let clock = 0;
+    const queue = searchQueue({ sliceMs: 8, now: () => clock });
+    let ranAfter = -1;
     let units = 0;
-    setTimeout(() => {
-      firedAt = units;
-    }, 0);
+    // a yield is a setImmediate turn, so this runs at the first one
+    setImmediate(() => {
+      ranAfter = units;
+    });
     await queue.run({ from: "page" }, async (step) => {
       for (let n = 0; n < 12; n++) {
         await step();
-        // a slow unit of work: 2 ms of a sleeping wait
-        Bun.sleepSync(2);
         units++;
+        clock += 3;
       }
     });
     expect(units).toBe(12);
-    expect(firedAt).toBeGreaterThan(0);
-    expect(firedAt).toBeLessThan(12);
+    // the clock reaches the slice after three units
+    expect(ranAfter).toBe(3);
   });
 
-  // serial: a neighbour's sleeping wait would stretch this one's turns
-  test.serial(
-    "a backlog of short scans yields between them once a slice is spent",
-    async () => {
-      const queue = searchQueue();
-      let firedAt = -1;
-      let done = 0;
-      setTimeout(() => {
-        firedAt = done;
-      }, 0);
-      // each scan is shorter than a slice: 5 ms of a sleeping wait
-      const scans = Array.from({ length: 20 }, () =>
-        queue.run({ from: "mcp" }, async (step) => {
-          await step();
-          Bun.sleepSync(5);
-          done++;
-        }),
-      );
-      await Promise.all(scans);
-      expect(done).toBe(20);
-      // the slice is the queue's: the timer fires within two slices, where
-      // a fresh slice per scan would hold it past all twenty
-      expect(firedAt).toBeGreaterThan(0);
-      expect(firedAt).toBeLessThanOrEqual(4);
-    },
-  );
+  test("a backlog of short scans yields once the queue's slice is spent", async () => {
+    let clock = 0;
+    const queue = searchQueue({ sliceMs: 8, now: () => clock });
+    let ranAfter = -1;
+    let done = 0;
+    setImmediate(() => {
+      ranAfter = done;
+    });
+    // each scan is shorter than a slice
+    const scans = Array.from({ length: 20 }, () =>
+      queue.run({ from: "mcp" }, async (step) => {
+        await step();
+        clock += 5;
+        done++;
+      }),
+    );
+    await Promise.all(scans);
+    expect(done).toBe(20);
+    // the slice is the queue's, spent on the third scan's step; a fresh
+    // slice per scan would never yield before all twenty
+    expect(ranAfter).toBe(2);
+  });
 
   test("an aborted caller is refused before it waits or runs", async () => {
     const queue = searchQueue();
