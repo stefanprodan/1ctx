@@ -208,8 +208,6 @@ function kind(code: number): number {
   return LETTER.test(char) ? ALPHA : DIGIT.test(char) ? NUMERIC : NONE;
 }
 
-const isWord = (code: number): boolean => kind(code) !== NONE;
-
 // a switch between letter and digit parts words too (fts in fts5)
 const clear = (edge: number, neighbour: number): boolean =>
   neighbour === NONE || neighbour !== edge;
@@ -224,10 +222,12 @@ function codeBefore(text: string, at: number): number {
 const codeAt = (text: string, at: number): number =>
   at < text.length ? text.codePointAt(at)! : -1;
 
-// the letters and digits glued at at, or null past the longest ending
+// the run of one class glued at at, so letters stop at a digit, or
+// null past the longest ending
 function glued(text: string, at: number): string | null {
+  const run = kind(codeAt(text, at));
   let end = at;
-  while (isWord(codeAt(text, end))) {
+  while (run !== NONE && kind(codeAt(text, end)) === run) {
     end += codeAt(text, end) > 0xffff ? 2 : 1;
     if (end - at > 3) return null;
   }
@@ -276,7 +276,8 @@ export function creditedCount(lower: string, term: string): number {
       at >= 0;
       at = lower.indexOf(stem, at + stem.length)
     ) {
-      if (startOk(at) && !isWord(codeAt(lower, at + stem.length))) count++;
+      const next = kind(codeAt(lower, at + stem.length));
+      if (startOk(at) && clear(ALPHA, next)) count++;
     }
   }
   return count;

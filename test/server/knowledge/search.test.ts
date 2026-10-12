@@ -288,6 +288,29 @@ describe("knowledge search", () => {
     }
   });
 
+  test("a page row that no longer holds every word is left out", () => {
+    const s = project({ "a.md": "a topic\n", "b.md": "a topic\n" });
+    try {
+      const changed = s.area.store.fileNamed(s.projectId, "b.md")!.id;
+      let reads = 0;
+      const page = search(
+        {
+          files: source(s).files,
+          text: (fileId) =>
+            fileId === changed && reads++ > 0
+              ? "no word here\n"
+              : s.area.store.text(s.projectId, fileId),
+        },
+        "topic",
+        null,
+      );
+      expect(names(page)).toEqual(["a.md"]);
+      expect(page.next).toBeNull();
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("runs one scan per user at a time", () => {
     const running = new Set<string>();
     const inner = () =>
