@@ -1,11 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A project's External tasks tab: what the tasks are, then one card of
-// the unfinished tasks in the order a member acts (blocked, claimed,
-// open), searched on the page, and one of the done and dropped ones,
-// searched and filtered by the server a page at a time. New external
-// task leads to its page.
+// A project's External tasks tab: a notice of what the tasks are, with
+// a link to Connect agents, then one card of the unfinished tasks in
+// the order a member acts (blocked, claimed, open), searched on the
+// page, and one of the done and dropped ones, searched and filtered by
+// the server a page at a time. New external task leads to its page.
 
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
@@ -27,6 +27,7 @@ import { ShowMore } from "../../feed/FeedCard.tsx";
 import { newExternalTaskHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { useListSearch } from "../../lib/search.ts";
+import { PageNotice } from "../../ui/Page.tsx";
 import {
   RowsAdd,
   RowsCard,
@@ -35,6 +36,7 @@ import {
   RowsNote,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
+import { CONNECT_HREF } from "../connect/Setup.model.ts";
 import { TaskRow } from "./ExternalTaskRow.tsx";
 import { INTRO } from "./ExternalTasks.model.ts";
 import { Frame } from "./Frame.tsx";
@@ -110,6 +112,17 @@ export function FinishedTasks({ now }: { now: number }) {
   );
 }
 
+// shown whatever the tasks and the user's keys
+export function TasksIntro() {
+  return (
+    <PageNotice words={INTRO}>
+      <a class="btn btn-small" href={CONNECT_HREF}>
+        Connect agents
+      </a>
+    </PageNotice>
+  );
+}
+
 export function CurrentTasks({
   projectId,
   now,
@@ -154,7 +167,7 @@ export function ExternalTasks({ params }: { params: Params }) {
     <Frame id={id} tab="external-tasks">
       {(project) => (
         <>
-          <p class="external-tasks-note">{INTRO}</p>
+          <TasksIntro />
           <CurrentTasks projectId={project.id} now={now} />
           <FinishedTasks now={now} />
         </>

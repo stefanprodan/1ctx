@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The External tasks tab's two cards: the current tasks searched on the
-// page with a count, and the done and dropped ones searched and
-// filtered by the server, with no count, hidden while there are none.
+// The External tasks tab: the notice linking Connect agents, the current
+// tasks searched on the page with a count, and the done and dropped
+// ones searched and filtered by the server, with no count, hidden while
+// there are none.
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -17,6 +18,7 @@ import { ALL_CLOSED } from "../../../src/client/data/external-tasks-rows.ts";
 import {
   CurrentTasks,
   FinishedTasks,
+  TasksIntro,
 } from "../../../src/client/views/projects/ExternalTasks.tsx";
 import type { ExternalTaskRow } from "../../../src/shared/contracts/external-task.ts";
 
@@ -43,6 +45,17 @@ afterEach(() => {
   closedCount.value = 0;
   closedFilter.value = ALL_CLOSED;
   closedPages.value = null;
+});
+
+describe("the notice", () => {
+  test("says what the tasks are and links Connect agents in place", () => {
+    const html = render(<TasksIntro />);
+    expect(html).toContain('class="page-notice"');
+    expect(html).toContain("Work for an agent you run outside 1ctx.");
+    expect(html).toContain('<a class="btn btn-small" href="/connect">');
+    expect(html).toContain(">Connect agents</a>");
+    expect(html).not.toContain("target=");
+  });
 });
 
 describe("the current tasks", () => {

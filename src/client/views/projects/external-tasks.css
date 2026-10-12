@@ -1,15 +1,9 @@
-/* The external task pages: the tab's note, the brief and its form,
-   the member's moves and their boxes, and the timeline's entries. */
+/* The external task pages: the brief and its form, the member's moves
+   and their boxes, and the timeline's entries. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  .external-tasks-note {
-    margin: 0;
-    font-size: var(--text-small);
-    color: var(--faint);
-  }
-
   /* the brief */
   .external-tasks-brief {
     display: flex;

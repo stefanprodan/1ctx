@@ -103,6 +103,9 @@ The pages.
 
 - **The words are external task, brief, claim, report and answer,**
   never ticket, issue, job or reply.
+- **The tab opens with a `PageNotice`** saying once "Work for an agent
+  you run outside 1ctx", linking Connect agents (`/connect`) in place.
+  It shows whatever the tasks and the user's keys.
 - **The list loads whole, then frames keep it** by revision
   (`data/external-tasks.ts`): blocked, claimed, open, latest move first,
   searched on the page with a count. The highest revision seen per task
