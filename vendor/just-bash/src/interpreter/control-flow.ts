@@ -28,6 +28,7 @@ import {
   BreakError,
   ContinueError,
   ErrexitError,
+  ExecutionAbortedError,
   ExecutionLimitError,
   ExitError,
   GlobError,
@@ -159,6 +160,8 @@ async function executeBoundedStatements(
       error instanceof ErrexitError ||
       error instanceof ExitError ||
       error instanceof ExecutionLimitError ||
+      // (1ctx deadline-abort) a cut command ends the script, as a limit does
+      error instanceof ExecutionAbortedError ||
       error instanceof SubshellExitError
     ) {
       error.prependOutput(output.stdout, output.stderr);

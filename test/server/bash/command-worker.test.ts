@@ -10,6 +10,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Job } from "../../../src/server/bash/protocol.ts";
 import { heldSessions } from "../../../src/server/bash/queue.ts";
+import { exitAt } from "../../../src/server/bash/tree.ts";
 import {
   type CommandHooks,
   commandWorkers,
@@ -338,6 +339,26 @@ describe("the command worker", () => {
       answer: { exitCode: 124, changes: null },
     });
     expect(settled.ok && settled.answer.stderr).toContain("exceeded");
+  });
+
+  test("a command that ends past its deadline is the deadline and saves nothing", async () => {
+    const workers = commandWorkers(COMMAND_WORKER, silent);
+    const settled = await workers.run(
+      job("echo x > /knowledge/late", { endsAt: Date.now() - 1000 }),
+      hooks,
+      stops(AbortSignal.timeout(60_000)),
+    );
+    expect(settled).toMatchObject({
+      ok: true,
+      answer: { exitCode: 124, changes: null },
+    });
+  });
+
+  test("the clock decides a cut command's exit, whatever the interpreter gave", () => {
+    expect(exitAt(1, 1000, 1000)).toBe(124);
+    expect(exitAt(0, 1001, 1000)).toBe(124);
+    expect(exitAt(1, 999, 1000)).toBe(1);
+    expect(exitAt(126, 999, 1000)).toBe(126);
   });
 
   test("the call timeout is the interpreter's deadline, before the backstop", async () => {

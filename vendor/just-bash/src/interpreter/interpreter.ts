@@ -1234,6 +1234,8 @@ export class Interpreter {
           }
           return bodyResult;
         } catch (error) {
+          // (1ctx deadline-abort) a cut command ends the script
+          if (error instanceof ExecutionAbortedError) throw error;
           const exitCode = error instanceof ArithmeticError ? 1 : 2;
           return failure(
             `bash: conditional expression: ${(error as Error).message}\n`,
