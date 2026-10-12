@@ -4,7 +4,7 @@
 // A project's External tasks tab: a notice of what the tasks are, with
 // a link to Connect agents, then one card of the unfinished tasks in
 // the order a member acts (blocked, claimed, open), searched on the
-// page, and one of the done and dropped ones, searched and filtered by
+// page, and one of the done and cancelled ones, searched and filtered by
 // the server a page at a time. New external task leads to its page.
 
 import type { Params } from "../../app/params.ts";
@@ -45,7 +45,7 @@ import "./external-tasks.css";
 const STATES: { value: ClosedFilter["state"]; label: string }[] = [
   { value: null, label: "All" },
   { value: "done", label: "Done" },
-  { value: "dropped", label: "Dropped" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 export function FinishedTasks({ now }: { now: number }) {
@@ -62,7 +62,7 @@ export function FinishedTasks({ now }: { now: number }) {
   }
   return (
     <RowsCard
-      label="Done and dropped"
+      label="Done and cancelled"
       search={
         <Search
           value={filter.q}

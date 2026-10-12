@@ -240,8 +240,8 @@ for (const scope of ["keys", "user"] as const) {
       "access_gone",
     );
     refuses(() => f.area.claim(f.key, task.id), 409);
-    const dropped = f.area.drop(f.owner.id, task.id, { state: "open" });
-    expect(dropped.task.task.entries).toBe(CLOSING_ENTRIES + 3);
+    const cancelled = f.area.cancel(f.owner.id, task.id, { state: "open" });
+    expect(cancelled.task.task.entries).toBe(CLOSING_ENTRIES + 3);
     expect(f.area.store.counted(task.id)).toBeLessThan(MAX_ENTRIES);
   });
 
@@ -355,7 +355,7 @@ test.serial(
   () => {
     using f = fixture();
     const done = f.task("done");
-    const dropped = f.task("dropped");
+    const cancelled = f.task("cancelled");
     const reopened = f.task("done");
     const reclosed = f.task("done");
     f.area.reopen(f.owner.id, reopened.id, {
@@ -364,7 +364,7 @@ test.serial(
     });
     f.advance(20 * DAY);
     f.area.reopen(f.owner.id, reclosed.id, { state: "done", text: "Again." });
-    f.area.drop(f.owner.id, reclosed.id, { state: "open" });
+    f.area.cancel(f.owner.id, reclosed.id, { state: "open" });
     f.advance(10 * DAY);
     f.limits.days = 31;
     expect(f.area.deleteClosed(f.now())).toBe(0);
@@ -379,14 +379,14 @@ test.serial(
         events
           .map((e) => (e.type === "externalTask.deleted" ? e.data.taskId : ""))
           .sort(),
-      ).toEqual([done.id, dropped.id].sort());
-      for (const task of [done, dropped]) {
+      ).toEqual([done.id, cancelled.id].sort());
+      for (const task of [done, cancelled]) {
         expect(f.area.projectOf(task.id)).toBeNull();
         expect(f.area.store.claimsCount(task.id)).toBe(0);
         expect(f.area.store.entries(task.id, null).entries).toEqual([]);
       }
       expect(f.area.store.byId(reopened.id)!.state).toBe("open");
-      expect(f.area.store.byId(reclosed.id)!.state).toBe("dropped");
+      expect(f.area.store.byId(reclosed.id)!.state).toBe("cancelled");
       f.advance(20 * DAY);
       expect(f.area.deleteClosed(f.now())).toBe(1);
       expect(f.area.store.byId(reopened.id)!.state).toBe("open");

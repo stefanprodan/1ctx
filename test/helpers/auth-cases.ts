@@ -59,7 +59,7 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "POST",
-    path: "/api/external-tasks/:id/drop",
+    path: "/api/external-tasks/:id/cancel",
     body: { state: "open" },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },

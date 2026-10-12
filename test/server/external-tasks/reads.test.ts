@@ -26,7 +26,7 @@ test("unfinished tasks are grouped blocked, claimed, open and newest first", () 
   f.advance();
   const claimed = f.task("claimed");
   const done = f.task("done");
-  f.task("dropped");
+  f.task("cancelled");
   f.create("Hidden", f.otherProjectId);
   const result = f.area.byProject(f.projectId);
   expect(result.tasks.map((t) => t.id)).toEqual([
@@ -45,9 +45,9 @@ test("unfinished tasks are grouped blocked, claimed, open and newest first", () 
 
 test("closed cursor pages the close time and id, surviving a deleted cursor row", () => {
   using f = fixture();
-  const rows = [f.task("done"), f.task("dropped"), f.task("done")];
+  const rows = [f.task("done"), f.task("cancelled"), f.task("done")];
   f.advance();
-  rows.push(f.task("done"), f.task("dropped"));
+  rows.push(f.task("done"), f.task("cancelled"));
   const expected = rows
     .sort((a, b) => b.movedAt - a.movedAt || a.id.localeCompare(b.id))
     .map((r) => r.id);
@@ -77,7 +77,7 @@ test("a filtered closed page keeps its cursor through the rows it skips", () => 
   using f = fixture();
   const kept: { id: string; movedAt: number }[] = [];
   for (let i = 0; i < 7; i++) {
-    const row = f.task(i % 2 === 0 ? "done" : "dropped");
+    const row = f.task(i % 2 === 0 ? "done" : "cancelled");
     if (i % 2 === 0) kept.push(row);
     f.create(`Open ${i}`);
     f.advance();
@@ -85,7 +85,7 @@ test("a filtered closed page keeps its cursor through the rows it skips", () => 
   // three kept and one skipped close in the same millisecond, so the
   // first page ends inside the tie and the id breaks it
   const tie = f.now();
-  for (const state of ["done", "dropped", "done", "done"] as const) {
+  for (const state of ["done", "cancelled", "done", "done"] as const) {
     const row = f.task(state);
     expect(row.movedAt).toBe(tie);
     if (state === "done") kept.push(row);

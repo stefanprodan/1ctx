@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The External tasks tab: the notice linking Connect agents, the current
-// tasks searched on the page with a count, and the done and dropped
+// tasks searched on the page with a count, and the done and cancelled
 // ones searched and filtered by the server, with no count, hidden while
 // there are none.
 
@@ -75,13 +75,13 @@ describe("the current tasks", () => {
   });
 });
 
-describe("the done and dropped tasks", () => {
+describe("the done and cancelled tasks", () => {
   test.serial("hidden while the project has none and nothing is set", () => {
     closedPages.value = { rows: [], next: null };
     expect(render(<FinishedTasks now={2_000} />)).toBe("");
   });
 
-  test.serial("a search and All, Done, Dropped, with no count", () => {
+  test.serial("a search and All, Done, Cancelled, with no count", () => {
     closedCount.value = 1;
     closedPages.value = {
       rows: [row({ id: "d1", state: "done" })],
@@ -90,7 +90,7 @@ describe("the done and dropped tasks", () => {
     const html = render(<FinishedTasks now={2_000} />);
     expect(html).toContain('placeholder="Search finished tasks"');
     expect(html).not.toContain("rows-count");
-    for (const label of ["All", "Done", "Dropped"]) {
+    for (const label of ["All", "Done", "Cancelled"]) {
       expect(html).toContain(`>${label}</button>`);
     }
     expect(html).toContain('aria-pressed="true">All<');
@@ -99,10 +99,10 @@ describe("the done and dropped tasks", () => {
   });
 
   test.serial("a filter with no match says so", () => {
-    closedFilter.value = { q: "", state: "dropped" };
+    closedFilter.value = { q: "", state: "cancelled" };
     closedPages.value = { rows: [], next: null };
     const html = render(<FinishedTasks now={2_000} />);
     expect(html).toContain("No external task matches.");
-    expect(html).toContain('aria-pressed="true">Dropped<');
+    expect(html).toContain('aria-pressed="true">Cancelled<');
   });
 });

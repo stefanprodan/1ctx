@@ -63,11 +63,11 @@ describe("external task writes", () => {
   const memberStates = {
     answer: { claimed: "claimed", blocked: "claimed" },
     unclaim: { claimed: "open", blocked: "open" },
-    drop: { open: "dropped", claimed: "dropped", blocked: "dropped" },
-    reopen: { done: "open", dropped: "open" },
+    cancel: { open: "cancelled", claimed: "cancelled", blocked: "cancelled" },
+    reopen: { done: "open", cancelled: "open" },
   };
   for (const state of EXTERNAL_TASK_STATES) {
-    for (const kind of ["answer", "unclaim", "drop", "reopen"] as const) {
+    for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
       test(`member ${kind} while ${state}`, () => {
         using f = fixture();
         const task = f.task(state);
@@ -90,7 +90,7 @@ describe("external task writes", () => {
             by: { id: f.member.id, username: "member" },
             keyName: null,
             claimId:
-              kind === "unclaim" || kind === "drop"
+              kind === "unclaim" || kind === "cancel"
                 ? (task.claim?.id ?? null)
                 : null,
           });
@@ -190,7 +190,7 @@ describe("external task writes", () => {
   test("stale member states and unclaim claim ids write nothing", () => {
     using f = fixture();
     const task = f.task("claimed");
-    for (const kind of ["answer", "unclaim", "drop", "reopen"] as const) {
+    for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
       refuses(
         () =>
           f.area[kind](f.owner.id, task.id, {
@@ -245,7 +245,7 @@ describe("external task writes", () => {
           editRevision: task.editRevision,
           text: "New brief.",
         });
-      if (state === "done" || state === "dropped") {
+      if (state === "done" || state === "cancelled") {
         refuses(run, 409, `this task is ${state}`);
         return;
       }
@@ -346,7 +346,7 @@ describe("external task writes", () => {
     ).toBe("New title");
   });
 
-  for (const kind of ["answer", "unclaim", "drop", "reopen"] as const) {
+  for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
     test(`member ${kind} clears attention`, () => {
       using f = fixture();
       const task = f.task(kind === "reopen" ? "done" : "blocked");

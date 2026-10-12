@@ -106,7 +106,7 @@ describe("the timeline", () => {
       entry("answer"),
       entry("result", { claimEnd: "done" }),
       entry("reopen"),
-      entry("drop"),
+      entry("cancel"),
       entry("unclaim", { by: null, claimEnd: "idle", claimId: "c1" }),
     ];
     expect(written.map((e) => e.kind).toSorted()).toEqual(

@@ -91,8 +91,8 @@ errors and cuts every tool shares are in `docs/tools.md`.
   resolved by name to ids. An edit's `files` replace the links, and a
   linked file's id from `show` keeps it, a deleted one included.
 - **Every move names what the agent read.** `edit` names `editRevision`;
-  `answer`, `unclaim`, `drop` and `reopen` the state, `unclaim` also its
-  `claimId`, which `answer` and `drop` may name too and are then held
+  `answer`, `unclaim`, `cancel` and `reopen` the state, `unclaim` also its
+  `claimId`, which `answer` and `cancel` may name too and are then held
   to. A stale one answers that the task changed, nothing written.
 - **Task text is quoted as data.** An outside agent wrote the entries.
   The brief and each entry's text and links go through `asSent()` and

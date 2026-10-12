@@ -6,8 +6,9 @@ tab, the task's page and its timeline, and Home's card
 `data/external-task*.ts`, `data/marked-tasks.ts`). The server's rules
 are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
 
-- **The words are external task, brief, scope, claim, unclaim, report
-  and answer,** never ticket, issue, job or reply.
+- **The words are external task, brief, scope, claim, unclaim, cancel,
+  report and answer,** never ticket, issue, job, reply or drop. The
+  move's button says Cancel task, since a bare Cancel reads as a form's.
 - **The tab opens with a `PageNotice`** saying once "Work for an agent
   you run outside 1ctx", linking Connect agents (`/connect`) in place.
   It shows whatever the tasks and the user's keys.
@@ -17,13 +18,14 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   keeps an older list read from bringing a closed one back. Home's card
   reads `?attention=1`, drawn as Not sent while a task is marked: five
   rows, then Show more by twenty within the read, the count the total.
-- **Done and dropped page from the tab's load,** searched and filtered
-  (All, Done, Dropped) by the server, with no count. A new search or
+- **Done and cancelled page from the tab's load,** searched and filtered
+  (All, Done, Cancelled) by the server, with no count. A new search or
   filter reads the first page again; an older answer lands nowhere, and
   a frame joins the pages only when the filter takes it. The card shows
   while the project has a finished task or a filter is set.
-- **A state's icon comes from `taskIcon()`.** An open task is
-  `task-open`, never the clock, which means a schedule.
+- **A state's icon comes from `taskIcon()`.** Open is `task-open`,
+  blocked `question`, cancelled `cancelled`; the clock, `alert` and `close`
+  keep their own meanings.
 - **The brief opens with the state** in a row title's words and
   weight, the state's icon in its colour before it, never dimmed.
   "Made in" names and links the chat only when the detail carries its
@@ -43,7 +45,7 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   revision the form opened on.
 - **The timeline is neutral but for a waiting question.** Each entry
   has its kind's icon (`ENTRY_ICONS`), a state's icon only where the
-  entry is that move (claim, result, drop). Only a question no answer
+  entry is that move (claim, question, result, cancel). Only a question no answer
   followed, while its claim holds the task, wears attention; nothing is
   green. The author is a handle, a key a tag after it, 1ctx faint. An
   answer names the latest question of its claim on one line

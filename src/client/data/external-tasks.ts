@@ -39,7 +39,7 @@ import { onSocketEvent } from "./socket.ts";
 // the project's unfinished tasks, null while not loaded
 export const externalTasks = signal<ExternalTaskRow[] | null>(null);
 export const externalTasksError = signal<Failure | null>(null);
-// how many are done or dropped, so the card shows only while some are
+// how many are done or cancelled, so the card shows only while some are
 export const closedCount = signal(0);
 // what the closed pages are read under
 export const closedFilter = signal<ClosedFilter>(ALL_CLOSED);

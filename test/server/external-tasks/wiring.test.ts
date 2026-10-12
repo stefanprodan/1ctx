@@ -225,15 +225,15 @@ test.serial(
     await using f = await httpFixture();
     const key = await f.key();
     const rows = [];
-    for (const title of ["done", "dropped", "reopened"]) {
+    for (const title of ["done", "cancelled", "reopened"]) {
       const id = (await f.create({ title })).task.task.id;
       const claim = f.app.externalTasks.claim(key, id);
-      if (title === "dropped") {
+      if (title === "cancelled") {
         expect(
           (
             await f.member.client.call(
               "POST",
-              `/api/external-tasks/${id}/drop`,
+              `/api/external-tasks/${id}/cancel`,
               { body: { state: "claimed" } },
             )
           ).status,
@@ -347,9 +347,13 @@ test("storage assigns every task table to external and cleans only closed task b
     .task.id;
   expect(
     (
-      await f.member.client.call("POST", `/api/external-tasks/${closed}/drop`, {
-        body: { state: "open", text: "No longer needed." },
-      })
+      await f.member.client.call(
+        "POST",
+        `/api/external-tasks/${closed}/cancel`,
+        {
+          body: { state: "open", text: "No longer needed." },
+        },
+      )
     ).status,
   ).toBe(200);
   await f.limits({ externalTaskDays: 90 });

@@ -85,7 +85,7 @@ describe("the storage scan", () => {
     const { externalTasks: tasks, db } = chat.app;
     const key = { userId: chat.memberId, keyId: "key", keyName: "terminal" };
     let closed = 0;
-    for (const state of ["open", "claimed", "blocked", "done", "dropped"]) {
+    for (const state of ["open", "claimed", "blocked", "done", "cancelled"]) {
       const made = tasks.create(chat.memberId, chat.projectId, {
         title: state,
         text: "Brief \u00e9",
@@ -107,9 +107,9 @@ describe("the storage scan", () => {
         "Report \u00e9",
         ["https://example.test/result"],
       );
-      if (state === "dropped")
-        tasks.drop(chat.memberId, id, { state: "claimed" });
-      if (state !== "done" && state !== "dropped") continue;
+      if (state === "cancelled")
+        tasks.cancel(chat.memberId, id, { state: "claimed" });
+      if (state !== "done" && state !== "cancelled") continue;
       const detail = tasks.show(id, null)!;
       closed += Buffer.byteLength(
         state +

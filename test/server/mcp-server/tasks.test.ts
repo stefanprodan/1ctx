@@ -78,6 +78,16 @@ describe("the inbound MCP tasks tool", () => {
         },
       },
     ]);
+    // the old name has no alias
+    const refused = await toolCall(send, "tasks", {
+      action: "list",
+      states: ["done", "dropped"],
+    });
+    expect(refused.result.isError).toBe(true);
+    expect(soleText(refused)).toContain(
+      "states must have 1 to 5 of open, claimed, blocked, done, cancelled",
+    );
+    expect(state.taskCalls).toHaveLength(1);
     await area.close();
   });
 
@@ -457,6 +467,8 @@ describe("the inbound MCP tasks tool", () => {
     for (const [change, message] of [
       [{ kind: "answer" }, "kind must be one of"],
       [{ kind: "release" }, "kind must be one of"],
+      [{ kind: "drop" }, "kind must be one of"],
+      [{ kind: "cancel" }, "kind must be one of"],
       [{ text: "   " }, "text must not be blank"],
       [{ text: "x".repeat(MAX_ENTRY_BYTES + 1) }, "text must be at most"],
       [

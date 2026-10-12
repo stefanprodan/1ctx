@@ -98,7 +98,7 @@ export function parseMoveTask(
     throw new BadRequest("invalid task state");
   }
   const entry =
-    move === "drop" && !Object.hasOwn(parsed, "text")
+    move === "cancel" && !Object.hasOwn(parsed, "text")
       ? ""
       : text(parsed.text, "text");
   checkEntry(move, entry, []);
@@ -109,7 +109,7 @@ export function parseMoveTask(
 }
 
 // ?closed=1&q=&state=&after=: the closed pages, narrowed by a search
-// and done or dropped
+// and done or cancelled
 export function parseProjectTasks(url: URL): {
   closed: boolean;
   after: string | null;
@@ -135,8 +135,8 @@ export function parseProjectTasks(url: URL): {
   if (after !== null) parseCursor(after);
   if (q !== null && q.length > MAX_SEARCH)
     throw new BadRequest("q is too long");
-  if (state !== null && state !== "done" && state !== "dropped") {
-    throw new BadRequest("state must be done or dropped");
+  if (state !== null && state !== "done" && state !== "cancelled") {
+    throw new BadRequest("state must be done or cancelled");
   }
   return {
     closed: closed !== null,

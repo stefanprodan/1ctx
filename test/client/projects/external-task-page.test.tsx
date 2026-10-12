@@ -3,7 +3,8 @@
 //
 // An external task's page: the state with its icon, the chat it was made
 // in by name only when the reader may open it, the scope in the aside and
-// on a phone, the claim's idle deadline, and an edit hiding the rest.
+// on a phone, the claim's idle deadline, an edit hiding the rest, and
+// a cancel.
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -197,5 +198,27 @@ describe("an edit", () => {
     // moves stay off: no Edit while the form is open
     expect(rest).not.toContain(">Edit</button>");
     expect(shown).toContain("Edit</button>");
+  });
+});
+
+describe("a cancel", () => {
+  test("is Cancel task on a live task, and a cancelled one says so and reopens", () => {
+    const open = draw(page());
+    expect(open).toContain(
+      `${render(<Icon name="cancelled" size={12} />)}Cancel task</button>`,
+    );
+    const cancelled = draw(page(row({ state: "cancelled" })));
+    expect(state(cancelled)).toContain(
+      render(
+        <Icon
+          name="cancelled"
+          size={15}
+          class="external-tasks-brief-icon status-stopped"
+        />,
+      ),
+    );
+    expect(state(cancelled)).toContain("<span>cancelled</span>");
+    expect(cancelled).not.toContain("Cancel task");
+    expect(cancelled).toContain("Reopen</button>");
   });
 });

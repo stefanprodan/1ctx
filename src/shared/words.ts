@@ -367,13 +367,13 @@ export const MAX_ATTENTION_REASON = 300;
 
 // an external task waits open for a claim, is claimed while an agent
 // outside 1ctx works it, blocked while its question waits on a member,
-// and closes done or dropped
+// and closes done or cancelled
 export const EXTERNAL_TASK_STATES = [
   "open",
   "claimed",
   "blocked",
   "done",
-  "dropped",
+  "cancelled",
 ] as const;
 export type ExternalTaskState = (typeof EXTERNAL_TASK_STATES)[number];
 export function isExternalTaskState(
@@ -398,7 +398,7 @@ export const ENTRY_KINDS = [
   "claim",
   ...AGENT_ENTRY_KINDS,
   "answer",
-  "drop",
+  "cancel",
   "reopen",
 ] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
@@ -407,7 +407,7 @@ export type EntryKind = (typeof ENTRY_KINDS)[number];
 export const CLAIM_ENDS = [
   "unclaimed",
   "done",
-  "dropped",
+  "cancelled",
   "access_gone",
   "idle",
 ] as const;

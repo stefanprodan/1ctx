@@ -115,7 +115,7 @@ describe("a frame on a project's lists", () => {
 
   test("a closed task lands on the pages read, latest close first", () => {
     const pages = {
-      rows: [taskRow({ id: "z", state: "dropped", movedAt: 500 })],
+      rows: [taskRow({ id: "z", state: "cancelled", movedAt: 500 })],
       next: null,
     };
     const next = applyTask(
@@ -127,7 +127,7 @@ describe("a frame on a project's lists", () => {
 
   test("a closed task past the paging cursor waits for its page", () => {
     const pages = {
-      rows: [taskRow({ id: "z", state: "dropped", movedAt: 500 })],
+      rows: [taskRow({ id: "z", state: "cancelled", movedAt: 500 })],
       next: "cursor",
     };
     const next = applyTask(
@@ -216,7 +216,7 @@ describe("the closed pages", () => {
   test("latest close first, an older revision keeps the held row", () => {
     const list = [
       taskRow({ id: "a", state: "done", movedAt: 1 }),
-      taskRow({ id: "b", state: "dropped", movedAt: 3, revision: 4 }),
+      taskRow({ id: "b", state: "cancelled", movedAt: 3, revision: 4 }),
     ].reduce(upsertClosed, [] as ExternalTaskRow[]);
     expect(ids(list)).toEqual(["b", "a"]);
     expect(upsertClosed(list, taskRow({ id: "b", revision: 3 }))).toBe(list);
@@ -245,17 +245,17 @@ describe("the closed pages", () => {
 
   test("a filter takes only its state and its search", () => {
     const done = taskRow({ state: "done", scope: "API" });
-    const dropped = taskRow({ state: "dropped" });
+    const cancelled = taskRow({ state: "cancelled" });
     expect(closedTakes({ q: "", state: null })(done)).toBe(true);
     expect(closedTakes({ q: "", state: null })(taskRow())).toBe(false);
-    expect(closedTakes({ q: "", state: "done" })(dropped)).toBe(false);
+    expect(closedTakes({ q: "", state: "done" })(cancelled)).toBe(false);
     expect(closedTakes({ q: " api ", state: "done" })(done)).toBe(true);
-    expect(closedTakes({ q: "CASEY", state: null })(dropped)).toBe(true);
-    expect(closedTakes({ q: "robin", state: null })(dropped)).toBe(false);
+    expect(closedTakes({ q: "CASEY", state: null })(cancelled)).toBe(true);
+    expect(closedTakes({ q: "robin", state: null })(cancelled)).toBe(false);
   });
 
   test("a frame's closed row matches as the server's LIKE does", () => {
-    const row = taskRow({ state: "dropped", title: "Überprüfung der Logs" });
+    const row = taskRow({ state: "cancelled", title: "Überprüfung der Logs" });
     const takes = (q: string) => closedTakes({ q, state: null })(row);
     // ASCII letters fold, every other letter is as written
     expect(takes("LOGS")).toBe(true);
@@ -291,13 +291,13 @@ describe("the closed pages", () => {
     };
     const held: TaskLists = { tasks: [], closed: 1, pages };
     const filter = { q: "", state: "done" } as const;
-    const dropped = applyTask(
+    const cancelled = applyTask(
       held,
-      taskRow({ id: "y", state: "dropped", revision: 2, movedAt: 900 }),
+      taskRow({ id: "y", state: "cancelled", revision: 2, movedAt: 900 }),
       filter,
     );
-    expect(ids(dropped.pages?.rows ?? [])).toEqual(["z"]);
-    expect(dropped.closed).toBe(1);
+    expect(ids(cancelled.pages?.rows ?? [])).toEqual(["z"]);
+    expect(cancelled.closed).toBe(1);
     const done = applyTask(
       held,
       taskRow({ id: "y", state: "done", revision: 2, movedAt: 900 }),

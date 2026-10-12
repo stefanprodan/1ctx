@@ -13,12 +13,12 @@ import { type ListInput, type RawTask, TASK_SELECT, taskRow } from "./rows.ts";
 import { ATTENTION_ROWS, CLOSED_PAGE, closed, parseCursor } from "./rules.ts";
 
 export const UNFINISHED = "t.state in ('open', 'claimed', 'blocked')";
-export const CLOSED = "t.state in ('done', 'dropped')";
+export const CLOSED = "t.state in ('done', 'cancelled')";
 
 // a search and a state narrowing the closed pages; an empty q is none
 export type ClosedFilter = {
   q: string;
-  state: Extract<ExternalTaskState, "done" | "dropped"> | null;
+  state: Extract<ExternalTaskState, "done" | "cancelled"> | null;
 };
 
 const ALL_CLOSED: ClosedFilter = { q: "", state: null };

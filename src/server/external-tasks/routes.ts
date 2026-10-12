@@ -138,7 +138,7 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
         );
       },
     },
-    ...(["answer", "unclaim", "drop", "reopen"] as const).map(
+    ...(["answer", "unclaim", "cancel", "reopen"] as const).map(
       (move): RouteDescriptor => ({
         method: "POST",
         path: `/api/external-tasks/:id/${move}`,

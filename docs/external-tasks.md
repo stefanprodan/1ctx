@@ -15,20 +15,20 @@ agent reports use the area's task capability. The pages that show it
 - The project list returns unfinished rows, a closed count and the
   current idle limit. `closed=1` selects closed pages with an `after`
   cursor, narrowed by `q` (at most `MAX_SEARCH`, trimmed) and `state`
-  (`done` or `dropped`); each needs `closed=1`. `q` is the session
+  (`done` or `cancelled`); each needs `closed=1`. `q` is the session
   list's LIKE (`lib/like.ts`) over the title, the scope and the
   creator's username; a closed task holds no claim. The page walks the
   project's closed index. Detail pages use `before`, an entry id scoped
   to that task.
 - The attention query requires `attention=1`, counts every marked task
   in the caller's visible projects and returns at most `ATTENTION_ROWS`.
-  A read never clears a mark. Answer, unclaim, drop and reopen clear it,
+  A read never clears a mark. Answer, unclaim, cancel and reopen clear it,
   as does `seen` with the `attentionAt` the page read. A different or
   already cleared mark answers 200 unchanged, without a frame.
 - Create requires a title, text and file ids. A patch supplies changed
   fields and `editRevision`; reports do not invalidate a brief edit.
   Titles are stored trimmed.
-  Answer, unclaim, drop and reopen name the state the caller saw;
+  Answer, unclaim, cancel and reopen name the state the caller saw;
   unclaim also names its claim. Stale values answer 409 without a write.
 - Request parsers reject unknown fields and query parameters. Body
   caps allow JSON escaping of the bounded text. New file links must
@@ -53,8 +53,8 @@ agent reports use the area's task capability. The pages that show it
   tail count every entry but claims (`counted()`), which `MAX_CLAIMS`
   bounds, so a task holds at most 270 entries. `entries` counts all.
 - Every agent entry and every entry ending a claim carries its claim
-  id, including member unclaims and drops, and idle or access unclaims.
-  Answers, reopens and drops of open tasks have none. The entry stores
+  id, including member unclaims and cancels, and idle or access unclaims.
+  Answers, reopens and cancels of open tasks have none. The entry stores
   a key name only for claims and agent reports, never member or system
   entries.
 - `movedAt` is creation or the last state change, not the last report
@@ -75,7 +75,7 @@ agent reports use the area's task capability. The pages that show it
 - Create stores the chat id; nothing deletes the task with the chat.
   `task()` reads the row, the brief and the link ids without entries;
   `entry()` reads one entry by id, scoped to its task.
-- An answer or drop may name the claim it saw, and is then refused as
+- An answer or cancel may name the claim it saw, and is then refused as
   stale when that is not the current claim.
 
 ## Delivery and maintenance

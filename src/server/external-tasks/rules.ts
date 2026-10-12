@@ -60,8 +60,8 @@ const TRANSITIONS: Record<
   member: {
     answer: { blocked: "claimed", claimed: "claimed" },
     unclaim: { claimed: "open", blocked: "open" },
-    drop: { open: "dropped", claimed: "dropped", blocked: "dropped" },
-    reopen: { done: "open", dropped: "open" },
+    cancel: { open: "cancelled", claimed: "cancelled", blocked: "cancelled" },
+    reopen: { done: "open", cancelled: "open" },
   },
   idle: { unclaim: { claimed: "open" } },
   access_gone: { unclaim: { claimed: "open", blocked: "open" } },
@@ -76,7 +76,7 @@ export function transition(
 }
 
 export const closed = (state: ExternalTaskState) =>
-  state === "done" || state === "dropped";
+  state === "done" || state === "cancelled";
 
 export function checkMove(
   state: ExternalTaskState,
@@ -94,7 +94,7 @@ export function checkRoom(entries: number, move: Move): void {
     (entries >= CLOSING_ENTRIES &&
       move !== "result" &&
       move !== "unclaim" &&
-      move !== "drop")
+      move !== "cancel")
   ) {
     throw new Conflict("make a new external task");
   }
@@ -139,7 +139,7 @@ export function checkEntry(
   text: string,
   links: string[],
 ): void {
-  if (kind !== "drop" && text.trim() === "") {
+  if (kind !== "cancel" && text.trim() === "") {
     throw new BadRequest("entry text is required");
   }
   if (Buffer.byteLength(text) > MAX_ENTRY_BYTES) {

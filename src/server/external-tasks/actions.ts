@@ -77,8 +77,8 @@ export function writeEntry(
   const end: ClaimEnd | null =
     kind === "result"
       ? "done"
-      : kind === "drop" && task.claim !== null
-        ? "dropped"
+      : kind === "cancel" && task.claim !== null
+        ? "cancelled"
         : kind === "unclaim"
           ? actor === "idle" || actor === "access_gone"
             ? actor
@@ -145,14 +145,14 @@ export function taskActions(deps: ActionsDeps) {
   const member = (
     userId: string,
     id: string,
-    kind: "answer" | "unclaim" | "drop" | "reopen",
+    kind: "answer" | "unclaim" | "cancel" | "reopen",
     body: ExternalTaskMoveRequest,
     viewer: Principal | null,
   ) =>
     transact(db, () => {
       const task = required(store, id);
       if (task.state !== body.state) throw new Conflict(STALE_TASK);
-      // unclaim names its claim; an answer or drop may, and is held to it
+      // unclaim names its claim; an answer or cancel may, and is held to it
       if (
         (kind === "unclaim" ||
           (kind !== "reopen" && body.claimId !== undefined)) &&
@@ -240,12 +240,12 @@ export function taskActions(deps: ActionsDeps) {
       body: ExternalTaskMoveRequest,
       viewer: Principal | null = null,
     ) => member(userId, id, "unclaim", body, viewer),
-    drop: (
+    cancel: (
       userId: string,
       id: string,
       body: ExternalTaskMoveRequest,
       viewer: Principal | null = null,
-    ) => member(userId, id, "drop", body, viewer),
+    ) => member(userId, id, "cancel", body, viewer),
     reopen: (
       userId: string,
       id: string,

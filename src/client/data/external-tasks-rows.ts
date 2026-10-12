@@ -20,7 +20,7 @@ const RANK: Record<ExternalTaskState, number> = {
   claimed: 1,
   open: 2,
   done: 3,
-  dropped: 3,
+  cancelled: 3,
 };
 
 export const unfinished = (state: ExternalTaskState): boolean =>
@@ -60,10 +60,10 @@ export const upsertTask = (list: ExternalTaskRow[], row: ExternalTaskRow) =>
   upsert(list, row, (t) => unfinished(t.state), taskOrder);
 
 // what the closed pages are read under: a search, trimmed when sent,
-// and done or dropped, null for both
+// and done or cancelled, null for both
 export type ClosedFilter = {
   q: string;
-  state: "done" | "dropped" | null;
+  state: "done" | "cancelled" | null;
 };
 
 export const ALL_CLOSED: ClosedFilter = { q: "", state: null };

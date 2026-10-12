@@ -46,7 +46,7 @@ export function stateLine(
   return row.state;
 }
 
-// a row's line: the icon and the section say open, done and dropped
+// a row's line: the icon and the section say open, done and cancelled
 export const rowLine = (row: Pick<ExternalTaskRow, "state" | "claim">) =>
   row.state === "claimed" || row.state === "blocked" ? stateLine(row) : "";
 
@@ -57,7 +57,7 @@ export const ENTRY_WORDS: Record<EntryKind, string> = {
   result: "Result",
   unclaim: "Unclaimed",
   answer: "Answer",
-  drop: "Dropped",
+  cancel: "Cancelled",
   reopen: "Reopened",
 };
 
@@ -107,13 +107,13 @@ export function taskIcon(row: Pick<ExternalTaskRow, "state" | "attentionAt">): {
   const marked = row.attentionAt !== null ? "attention" : null;
   switch (row.state) {
     case "blocked":
-      return { name: "alert", status: "attention" };
+      return { name: "question", status: "attention" };
     case "claimed":
       return { name: "play", status: marked ?? "running" };
     case "done":
       return { name: "check", status: marked ?? "done" };
-    case "dropped":
-      return { name: "close", status: marked ?? "stopped" };
+    case "cancelled":
+      return { name: "cancelled", status: marked ?? "stopped" };
     default:
       return { name: "task-open", status: marked };
   }
@@ -138,7 +138,7 @@ export const chatName = (title: string): string =>
   title.trim() === "" ? "Untitled chat" : title;
 
 // what the page offers in a state: the brief is edited and the task
-// dropped until it closes, a claimed task unclaimed while held, an answer
+// cancelled until it closes, a claimed task unclaimed while held, an answer
 // given while blocked, a closed task reopened; delete always
 export function movesOf(state: ExternalTaskState) {
   const open = state === "open" || state === "claimed" || state === "blocked";
@@ -146,14 +146,14 @@ export function movesOf(state: ExternalTaskState) {
     edit: open,
     answer: state === "blocked",
     unclaim: state === "claimed" || state === "blocked",
-    drop: open,
+    cancel: open,
     reopen: !open,
   };
 }
 
-export type Move = "unclaim" | "drop" | "reopen";
+export type Move = "unclaim" | "cancel" | "reopen";
 
-// each move's button and its box; drop alone takes no reason
+// each move's button and its box; cancel alone takes no reason
 export const MOVE_WORDS: Record<
   Move,
   { label: string; going: string; required: boolean }
@@ -163,9 +163,9 @@ export const MOVE_WORDS: Record<
     going: "Unclaiming",
     required: true,
   },
-  drop: {
-    label: "Drop",
-    going: "Dropping",
+  cancel: {
+    label: "Cancel task",
+    going: "Cancelling",
     required: false,
   },
   reopen: {

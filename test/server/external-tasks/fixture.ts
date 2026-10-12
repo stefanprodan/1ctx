@@ -75,7 +75,7 @@ export function fixture() {
       area.report(key, row.id, claimId!, "question", "Which path?", []);
     if (state === "done")
       area.report(key, row.id, claimId!, "result", "Finished.", []);
-    if (state === "dropped") area.drop(owner.id, row.id, { state: "open" });
+    if (state === "cancelled") area.cancel(owner.id, row.id, { state: "open" });
     return { ...area.store.byId(row.id)!, claimId };
   };
   // fills to count entries of the 250 bound, which claims do not join

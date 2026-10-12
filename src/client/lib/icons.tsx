@@ -163,9 +163,11 @@ const PATHS = {
     "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM2.5 2.5l11 11",
   // a line rising: a report of progress on an external task
   progress: "M2.5 11.5 6 8l2.5 2.5 5-5M10 5.5h3.5V9",
-  // a question mark in a circle: an agent's question on an external task
+  // bare, as a row already rings its icon
   question:
-    "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM6.25 6.25a1.75 1.75 0 1 1 2.6 1.53c-.5.28-.85.72-.85 1.27v.45M8 11h.01",
+    "M5.25 5.75a2.75 2.75 0 1 1 4.1 2.4c-.8.45-1.35 1.1-1.35 2v.6M8 13h.01",
+  // the row's ring makes it the won't do sign
+  cancelled: "M12.5 3.5 3.5 12.5",
   // a bookmark: what the project's memory keeps
   memory: "M4.5 2.5h7v11L8 11l-3.5 2.5z",
   // the database file: the admin's Storage page

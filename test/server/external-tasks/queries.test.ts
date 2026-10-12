@@ -94,12 +94,12 @@ test("agent pages seek each project's state indexes without scans or temp sorts"
 test("closed pages seek the project's closed index under a search and a state", () => {
   using f = fixture();
   f.task("done");
-  f.task("dropped");
+  f.task("cancelled");
   for (const filter of [
     { q: "", state: null },
     { q: "work", state: null },
     { q: "", state: "done" },
-    { q: "work", state: "dropped" },
+    { q: "work", state: "cancelled" },
   ] as const) {
     for (const after of [null, `${f.now()}.000000000000`]) {
       const sqls = queries(f.db, () =>

@@ -12,8 +12,9 @@ import type { ClaimEnd, EntryKind } from "../../../shared/words.ts";
 import type { IconName } from "../../lib/icons.tsx";
 import { ENTRY_WORDS } from "./ExternalTasks.model.ts";
 
-// a state's icon only where the entry is that move: a claim, a result
-// and a drop; no colour, since green and the rest mean a task's state
+// a state's icon only where the entry is that move: a claim, a question,
+// a result and a cancel; no colour, since green and the rest mean a
+// task's state
 export const ENTRY_ICONS: Record<EntryKind, IconName> = {
   claim: "play",
   progress: "progress",
@@ -21,7 +22,7 @@ export const ENTRY_ICONS: Record<EntryKind, IconName> = {
   result: "check",
   unclaim: "sign-out",
   answer: "chat",
-  drop: "close",
+  cancel: "cancelled",
   reopen: "redo",
 };
 

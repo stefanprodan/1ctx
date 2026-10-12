@@ -106,7 +106,7 @@ test("moves validate their state, text and unclaim claim before changing the tas
   const id = (await f.create()).task.task.id;
   const claim = f.app.externalTasks.claim(await f.key(), id);
   const base = `/api/external-tasks/${id}`;
-  for (const move of ["answer", "unclaim", "drop", "reopen"] as const) {
+  for (const move of ["answer", "unclaim", "cancel", "reopen"] as const) {
     const valid = {
       state: "claimed",
       text: "A note.",
@@ -137,7 +137,7 @@ test("moves validate their state, text and unclaim claim before changing the tas
         })
       ).status,
     ).toBe(400);
-    if (move !== "drop") {
+    if (move !== "cancel") {
       for (const text of [undefined, "", " \n\t "]) {
         expect(
           (
@@ -191,7 +191,7 @@ test("queries reject unknown, repeated and malformed parameters", async () => {
     [f.base, `?closed=1&q=${"a".repeat(MAX_SEARCH + 1)}`],
     [f.base, "?closed=1&state=open"],
     [f.base, "?closed=1&state="],
-    [f.base, "?closed=1&state=done&state=dropped"],
+    [f.base, "?closed=1&state=done&state=cancelled"],
     [f.base, "?extra=1"],
     [detail, "?before="],
     [detail, "?before=bad"],

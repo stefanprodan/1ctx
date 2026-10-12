@@ -42,11 +42,11 @@ const allowed = new Map<string, ExternalTaskState>([
   ["member/claimed/answer", "claimed"],
   ["member/claimed/unclaim", "open"],
   ["member/blocked/unclaim", "open"],
-  ["member/open/drop", "dropped"],
-  ["member/claimed/drop", "dropped"],
-  ["member/blocked/drop", "dropped"],
+  ["member/open/cancel", "cancelled"],
+  ["member/claimed/cancel", "cancelled"],
+  ["member/blocked/cancel", "cancelled"],
   ["member/done/reopen", "open"],
-  ["member/dropped/reopen", "open"],
+  ["member/cancelled/reopen", "open"],
   ["idle/claimed/unclaim", "open"],
   ["access_gone/claimed/unclaim", "open"],
   ["access_gone/blocked/unclaim", "open"],
@@ -119,13 +119,13 @@ describe("external task validation", () => {
       ["x", ["not a url"]],
     ] satisfies [string, string[]][])
       refuses(() => checkEntry("progress", text, links), 400);
-    expect(() => checkEntry("drop", "", [])).not.toThrow();
+    expect(() => checkEntry("cancel", "", [])).not.toThrow();
   });
 
   test("only closing entries fit the reserved tail, and none passes the hard cap", () => {
     for (const kind of ["claim", ...ENTRY_KINDS] satisfies Move[]) {
       expect(() => checkRoom(CLOSING_ENTRIES - 1, kind)).not.toThrow();
-      if (["result", "unclaim", "drop"].includes(kind)) {
+      if (["result", "unclaim", "cancel"].includes(kind)) {
         expect(() => checkRoom(CLOSING_ENTRIES, kind)).not.toThrow();
         expect(() => checkRoom(MAX_ENTRIES - 1, kind)).not.toThrow();
       } else refuses(() => checkRoom(CLOSING_ENTRIES, kind), 409);

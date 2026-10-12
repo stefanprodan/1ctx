@@ -107,9 +107,9 @@ describe("the arguments", () => {
       parseExternalTaskArgs({ action: "list", states: ["closed"] }, true),
     ).toThrow("states must be a list of");
     expect(
-      parseExternalTaskArgs({ action: "drop", id: "t", state: "open" }, true),
+      parseExternalTaskArgs({ action: "cancel", id: "t", state: "open" }, true),
     ).toEqual({
-      action: "drop",
+      action: "cancel",
       id: "t",
       body: { state: "open", text: "" },
     });
@@ -313,7 +313,7 @@ describe("show and moves", () => {
   test("only a claimed task says when it is unclaimed", async () => {
     using f = fixture();
     const idle = "A claimed task is unclaimed after 24 hours without a report.";
-    for (const state of ["open", "blocked", "done", "dropped"] as const) {
+    for (const state of ["open", "blocked", "done", "cancelled"] as const) {
       const task = f.task(state);
       expect(await ok(f, { action: "show", id: task.id })).not.toContain(idle);
     }
@@ -321,7 +321,7 @@ describe("show and moves", () => {
     expect(await ok(f, { action: "show", id: claimed.id })).toContain(idle);
   });
 
-  test("answer and drop may name the claim they saw and are held to it", async () => {
+  test("answer and cancel may name the claim they saw and are held to it", async () => {
     using f = fixture();
     const blocked = f.task("blocked");
     const stale =
@@ -335,7 +335,7 @@ describe("show and moves", () => {
         claimId: "gone00000000",
         text: "A.",
       },
-      { action: "drop", state: "blocked", claimId: "gone00000000" },
+      { action: "cancel", state: "blocked", claimId: "gone00000000" },
     ]) {
       const result = await call(f, { ...args, id: blocked.id });
       expect(result.content).toBe(stale);
@@ -352,15 +352,15 @@ describe("show and moves", () => {
     ).toContain("now claimed");
     expect(
       await ok(f, {
-        action: "drop",
+        action: "cancel",
         id: blocked.id,
         state: "claimed",
         claimId: blocked.claimId,
       }),
-    ).toContain("now dropped");
+    ).toContain("now cancelled");
     const open = f.task("open");
     const named = await call(f, {
-      action: "drop",
+      action: "cancel",
       id: open.id,
       state: "open",
       claimId: blocked.claimId,
@@ -378,26 +378,26 @@ describe("show and moves", () => {
     ).toBe("Error: answer needs the text of the answer");
     expect(
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: " c1 " },
+        { action: "cancel", id: "t", state: "open", claimId: " c1 " },
         true,
       ),
     ).toEqual({
-      action: "drop",
+      action: "cancel",
       id: "t",
       body: { state: "open", text: "", claimId: "c1" },
     });
     expect(() =>
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: "" },
+        { action: "cancel", id: "t", state: "open", claimId: "" },
         true,
       ),
-    ).toThrow("drop needs the claimId show gave");
+    ).toThrow("cancel needs the claimId show gave");
     expect(
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: null },
+        { action: "cancel", id: "t", state: "open", claimId: null },
         true,
       ),
-    ).toEqual({ action: "drop", id: "t", body: { state: "open", text: "" } });
+    ).toEqual({ action: "cancel", id: "t", body: { state: "open", text: "" } });
     expect(
       parseExternalTaskArgs(
         {

@@ -34,9 +34,13 @@ test("closed pages sort latest first and continue without duplicating rows", asy
     } else {
       expect(
         (
-          await f.member.client.call("POST", `/api/external-tasks/${id}/drop`, {
-            body: { state: "open" },
-          })
+          await f.member.client.call(
+            "POST",
+            `/api/external-tasks/${id}/cancel`,
+            {
+              body: { state: "open" },
+            },
+          )
         ).status,
       ).toBe(200);
     }
@@ -63,7 +67,7 @@ test("closed pages sort latest first and continue without duplicating rows", asy
   });
 });
 
-test("closed pages search the title, the scope and the creator, and filter done or dropped", async () => {
+test("closed pages search the title, the scope and the creator, and filter done or cancelled", async () => {
   await using f = await httpFixture();
   const key = await f.key();
   const done = async (fields: object, client = f.creator.client) => {
@@ -73,11 +77,11 @@ test("closed pages search the title, the scope and the creator, and filter done 
     f.app.now.value++;
     return id;
   };
-  const dropped = async (fields: object, client = f.creator.client) => {
+  const cancelled = async (fields: object, client = f.creator.client) => {
     const id = (await f.create(fields, client)).task.task.id;
     const response = await f.member.client.call(
       "POST",
-      `/api/external-tasks/${id}/drop`,
+      `/api/external-tasks/${id}/cancel`,
       { body: { state: "open" } },
     );
     expect(response.status).toBe(200);
@@ -85,12 +89,12 @@ test("closed pages search the title, the scope and the creator, and filter done 
     return id;
   };
   const percent = await done({ title: "Ship 100% of the API", scope: "api" });
-  const sweep = await dropped({ title: "Sweep" }, f.member.client);
+  const sweep = await cancelled({ title: "Sweep" }, f.member.client);
   const under = await done(
     { title: "Other", scope: "web_ui" },
     f.member.client,
   );
-  const plain = await dropped({ title: "Webxui 100 points" });
+  const plain = await cancelled({ title: "Webxui 100 points" });
   await f.create({ title: "Still open API" });
   const ids = async (query: string) => {
     const response = await f.member.client.call(
@@ -103,11 +107,11 @@ test("closed pages search the title, the scope and the creator, and filter done 
   };
   expect(await ids("")).toEqual([plain, under, sweep, percent]);
   expect(await ids("&state=done")).toEqual([under, percent]);
-  expect(await ids("&state=dropped")).toEqual([plain, sweep]);
+  expect(await ids("&state=cancelled")).toEqual([plain, sweep]);
   expect(await ids("&q=api")).toEqual([percent]);
   expect(await ids("&q=%20%20API%20")).toEqual([percent]);
   expect(await ids("&q=member")).toEqual([under, sweep]);
-  expect(await ids("&q=member&state=dropped")).toEqual([sweep]);
+  expect(await ids("&q=member&state=cancelled")).toEqual([sweep]);
   // the wildcards match as written
   expect(await ids("&q=100%25")).toEqual([percent]);
   expect(await ids("&q=b_u")).toEqual([under]);

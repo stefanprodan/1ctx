@@ -71,6 +71,7 @@ import { m0062 } from "./0062-external-tasks.ts";
 import { m0063 } from "./0063-external-task-tool.ts";
 import { m0064 } from "./0064-external-task-claim-entries.ts";
 import { m0065 } from "./0065-external-task-scope-unclaim.ts";
+import { m0066 } from "./0066-external-task-cancelled.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -138,4 +139,5 @@ export const MIGRATIONS: Migration[] = [
   m0063,
   m0064,
   m0065,
+  m0066,
 ];

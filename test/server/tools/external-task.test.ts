@@ -133,7 +133,7 @@ describe("the offer", () => {
         "edit",
         "answer",
         "unclaim",
-        "drop",
+        "cancel",
         "reopen",
       ]);
       const child = chat.app.runner.registry
@@ -300,8 +300,8 @@ describe("a chat's external tasks", () => {
           claimId: first,
           text: "Too slow.",
         },
-        { action: "drop", id: task.id, state: "open" },
-        { action: "reopen", id: task.id, state: "dropped", text: "Again." },
+        { action: "cancel", id: task.id, state: "open" },
+        { action: "reopen", id: task.id, state: "cancelled", text: "Again." },
       ]);
       for (const answer of step.answers) {
         expect(answer).toContain("changed since you read it");
@@ -315,13 +315,23 @@ describe("a chat's external tasks", () => {
       step = await round(chat, step.next, [
         { action: "drop", id: task.id, state: "claimed" },
       ]);
-      expect(step.answers[0]).toContain("now dropped");
+      expect(step.answers[0]).toContain("action must be");
+      expect(tasks.store.byId(task.id)!.state).toBe("claimed");
+      step = await round(chat, step.next, [
+        { action: "cancel", id: task.id, state: "claimed" },
+      ]);
+      expect(step.answers[0]).toContain("now cancelled");
+      step = await round(chat, step.next, [
+        { action: "reopen", id: task.id, state: "dropped", text: "Again." },
+      ]);
+      expect(step.answers[0]).toContain("state must be one of");
+      expect(tasks.store.byId(task.id)!.state).toBe("cancelled");
       step = await round(chat, step.next, [
         { action: "reopen", id: task.id, state: "done", text: "Again." },
       ]);
       expect(step.answers[0]).toContain("changed since you read it");
       step = await round(chat, step.next, [
-        { action: "reopen", id: task.id, state: "dropped", text: "Again." },
+        { action: "reopen", id: task.id, state: "cancelled", text: "Again." },
       ]);
       expect(step.answers[0]).toContain("now open");
       await finish(chat, step.next);

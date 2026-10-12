@@ -317,7 +317,7 @@ export function readOnText(input: {
 const VERBS = {
   answer: "Answered",
   unclaim: "Unclaimed",
-  drop: "Dropped",
+  cancel: "Cancelled",
   reopen: "Reopened",
 } as const;
 

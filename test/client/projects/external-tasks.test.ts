@@ -126,7 +126,7 @@ describe("the words", () => {
     expect(rowLine(row({ state: "claimed", claim }))).toBe(
       "claimed by stefan via laptop-claude",
     );
-    for (const state of ["open", "done", "dropped"] as const) {
+    for (const state of ["open", "done", "cancelled"] as const) {
       expect(rowLine(row({ state }))).toBe("");
     }
   });
@@ -151,8 +151,8 @@ describe("the words", () => {
         row({ last: { kind: "question", text: "Which\nbranch?", at: 1 } }),
       ),
     ).toBe("Question: Which branch?");
-    expect(lastLine(row({ last: { kind: "drop", text: "", at: 1 } }))).toBe(
-      "Dropped",
+    expect(lastLine(row({ last: { kind: "cancel", text: "", at: 1 } }))).toBe(
+      "Cancelled",
     );
   });
 
@@ -181,7 +181,7 @@ describe("the words", () => {
     expect(
       claimDeadline({ ...claimed, claim: { ...claim, activeAt: 9_000 } }, 24),
     ).toBe(9_000 + 24 * hour);
-    for (const state of ["open", "blocked", "done", "dropped"] as const) {
+    for (const state of ["open", "blocked", "done", "cancelled"] as const) {
       expect(
         claimDeadline(
           row({ state, claim: state === "blocked" ? claim : null }),
@@ -201,7 +201,8 @@ describe("the words", () => {
     expect(taskIcon(row({ state: "done", attentionAt: 5 })).status).toBe(
       "attention",
     );
-    expect(taskIcon(row({ state: "blocked" })).name).toBe("alert");
+    expect(taskIcon(row({ state: "blocked" })).name).toBe("question");
+    expect(taskIcon(row({ state: "cancelled" })).name).toBe("cancelled");
   });
 
   test("an open task waits for a claim, never a clock", () => {
@@ -219,14 +220,14 @@ describe("the moves", () => {
       edit: true,
       answer: false,
       unclaim: false,
-      drop: true,
+      cancel: true,
       reopen: false,
     });
     expect(movesOf("blocked")).toEqual({
       edit: true,
       answer: true,
       unclaim: true,
-      drop: true,
+      cancel: true,
       reopen: false,
     });
     expect(movesOf("claimed").unclaim).toBe(true);
@@ -234,10 +235,10 @@ describe("the moves", () => {
       edit: false,
       answer: false,
       unclaim: false,
-      drop: false,
+      cancel: false,
       reopen: true,
     });
-    expect(movesOf("dropped").reopen).toBe(true);
+    expect(movesOf("cancelled").reopen).toBe(true);
   });
 });
 
@@ -435,7 +436,7 @@ describe("the entity", () => {
       return realAnswer(init?.method ?? "GET", url);
     }) as unknown as typeof fetch;
     const load = loadExternalTasks("p1");
-    send(frame(row({ id: "a", revision: 2, state: "dropped", entries: 1 })));
+    send(frame(row({ id: "a", revision: 2, state: "cancelled", entries: 1 })));
     unclaim();
     await load;
     expect(externalTasks.value).toEqual([]);
@@ -676,7 +677,7 @@ describe("the entity", () => {
               tasks: [
                 row({
                   id: url.includes("q=old") ? "old" : "new",
-                  state: "dropped",
+                  state: "cancelled",
                 }),
               ],
               next: null,
@@ -700,7 +701,9 @@ describe("the entity", () => {
       expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["new"]);
       // a frame the filter does not take stays off the pages
       send(
-        frame(row({ id: "x", title: "other", state: "dropped", revision: 2 })),
+        frame(
+          row({ id: "x", title: "other", state: "cancelled", revision: 2 }),
+        ),
       );
       expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["new"]);
     },
@@ -902,9 +905,9 @@ describe("the entity", () => {
       expect(taskPage.value?.id).toBe("t1");
       // and their own move lands on the page
       answer = () =>
-        Response.json(pageAnswer(row({ revision: 2, state: "dropped" })));
-      await moveExternalTask("t1", "drop", { state: "open" });
-      expect(taskPage.value?.detail.task.state).toBe("dropped");
+        Response.json(pageAnswer(row({ revision: 2, state: "cancelled" })));
+      await moveExternalTask("t1", "cancel", { state: "open" });
+      expect(taskPage.value?.detail.task.state).toBe("cancelled");
     },
   );
 });

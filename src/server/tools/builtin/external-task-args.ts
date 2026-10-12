@@ -17,7 +17,7 @@ import {
 import { ToolError } from "../../lib/errors.ts";
 import { UNFINISHED } from "./external-task-text.ts";
 
-export type Move = "answer" | "unclaim" | "drop" | "reopen";
+export type Move = "answer" | "unclaim" | "cancel" | "reopen";
 
 export const READ_ACTIONS = {
   list: ["action", "states", "after"],
@@ -28,7 +28,7 @@ const WRITE_ACTIONS = {
   edit: ["action", "id", "editRevision", "title", "text", "scope", "files"],
   answer: ["action", "id", "state", "claimId", "text"],
   unclaim: ["action", "id", "state", "claimId", "text"],
-  drop: ["action", "id", "state", "claimId", "text"],
+  cancel: ["action", "id", "state", "claimId", "text"],
   reopen: ["action", "id", "state", "text"],
 } as const;
 export const ACTIONS = { ...READ_ACTIONS, ...WRITE_ACTIONS };
@@ -182,7 +182,7 @@ export function parseExternalTaskArgs(
   }
   const state = stateOf(args.state);
   const said = args.text === undefined ? undefined : text(args.text, "text");
-  if (said === undefined && action !== "drop") {
+  if (said === undefined && action !== "cancel") {
     throw new Error(
       action === "answer"
         ? "answer needs the text of the answer"
@@ -190,7 +190,7 @@ export function parseExternalTaskArgs(
     );
   }
   const body: ExternalTaskMoveRequest = { state, text: said ?? "" };
-  // optional on answer and drop, where a claim may be live; null there
+  // optional on answer and cancel, where a claim may be live; null there
   // means none, since show prints "Claim: none" and a model echoes it
   if (
     action === "unclaim" ||

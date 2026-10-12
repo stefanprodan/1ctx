@@ -94,7 +94,7 @@ export type ExternalTaskDetail = {
 export const MEMBER_MOVES = [
   "answer",
   "unclaim",
-  "drop",
+  "cancel",
   "reopen",
   "seen",
 ] as const;

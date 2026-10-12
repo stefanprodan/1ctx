@@ -76,19 +76,19 @@ test("a task's chat title reaches only a reader who may open the chat", async ()
     expect((await read(chat.member, hidden)).chatTitle).toBe("Private notes");
 
     // a move answers the detail its reader may see
-    const dropped = await other.call(
+    const cancelled = await other.call(
       "POST",
-      `/api/external-tasks/${hidden}/drop`,
+      `/api/external-tasks/${hidden}/cancel`,
       { body: { state: "open" } },
     );
-    expect(dropped.status).toBe(200);
-    const answer = await dropped.text();
+    expect(cancelled.status).toBe(200);
+    const answer = await cancelled.text();
     expect(answer).not.toContain("Private notes");
     expect(JSON.parse(answer).task.chatTitle).toBeNull();
     const reopened = await chat.member.call(
       "POST",
       `/api/external-tasks/${hidden}/reopen`,
-      { body: { state: "dropped", text: "Again." } },
+      { body: { state: "cancelled", text: "Again." } },
     );
     expect(reopened.status).toBe(200);
     expect((await reopened.json()).task.chatTitle).toBe("Private notes");

@@ -115,8 +115,14 @@ for (const who of ["member", "admin"] as const) {
       state: "open",
       claim: null,
     });
+    // the old name has no alias
     expect(
       (await client.call("POST", `${base}/drop`, { body: { state: "open" } }))
+        .status,
+    ).toBe(404);
+    expect(f.app.externalTasks.store.byId(id)!.state).toBe("open");
+    expect(
+      (await client.call("POST", `${base}/cancel`, { body: { state: "open" } }))
         .status,
     ).toBe(200);
     expect(
@@ -129,7 +135,7 @@ for (const who of ["member", "admin"] as const) {
     expect(
       (
         await client.call("POST", `${base}/reopen`, {
-          body: { state: "dropped", text: "Try again." },
+          body: { state: "cancelled", text: "Try again." },
         })
       ).status,
     ).toBe(200);
@@ -202,7 +208,7 @@ test("stale state, claim and edit revision are conflicts that change nothing", a
       `${base}/unclaim`,
       { state: "blocked", claimId: first.claimId, text: "Stale" },
     ],
-    ["POST", `${base}/drop`, { state: "open" }],
+    ["POST", `${base}/cancel`, { state: "open" }],
     ["POST", `${base}/reopen`, { state: "done", text: "Stale" }],
   ] as const;
   for (const [method, path, body] of requests) {
@@ -231,7 +237,7 @@ test("an unseen team or personal project and each of its task routes answer 404"
       ["GET", base],
       ["PATCH", base],
       ["DELETE", base],
-      ...["answer", "unclaim", "drop", "reopen", "seen"].map((move) => [
+      ...["answer", "unclaim", "cancel", "reopen", "seen"].map((move) => [
         "POST",
         `${base}/${move}`,
       ]),
