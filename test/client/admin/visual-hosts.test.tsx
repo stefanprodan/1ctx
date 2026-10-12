@@ -24,7 +24,11 @@ import {
   type WebToolSummary,
 } from "../../../src/shared/contracts/tool.ts";
 import { parseVisualHosts } from "../../../src/shared/visual.ts";
-import { automationTool, emailUser } from "../../helpers/client-fixtures.ts";
+import {
+  automationTool,
+  emailUser,
+  externalTaskTool,
+} from "../../helpers/client-fixtures.ts";
 
 const visual: WebToolSummary = {
   name: "visualize",
@@ -43,6 +47,7 @@ const response = (hosts: string[]): ToolsResponse => ({
   visualize: { ...visual, hosts },
   emailUser: emailUser(),
   automation: automationTool(),
+  externalTask: externalTaskTool(),
   search: {
     provider: null,
     keys: { exa: false, firecrawl: false, tavily: false },

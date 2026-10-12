@@ -10,8 +10,14 @@ import type {
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 
-// a row per web tool, the web's own, email_user's and automation's
-type RowName = WebTool | "web" | typeof EMAIL_TOOL | typeof AUTOMATION_TOOL;
+// a row per web tool, the web's own, email_user's, automation's and
+// external_task's
+type RowName = WebTool | "web" | SwitchedRow;
+type SwitchedRow =
+  | WebTool
+  | typeof EMAIL_TOOL
+  | typeof AUTOMATION_TOOL
+  | "external_task";
 
 export type ToolRow = {
   name: RowName;
@@ -77,11 +83,7 @@ export class ToolStore {
       .run(mode, JSON.stringify(domains), now);
   }
 
-  setEnabled(
-    name: WebTool | typeof EMAIL_TOOL | typeof AUTOMATION_TOOL,
-    enabled: boolean,
-    now: number,
-  ): void {
+  setEnabled(name: SwitchedRow, enabled: boolean, now: number): void {
     this.db
       .query("update tools set enabled = ?, updated_at = ? where name = ?")
       .run(enabled ? 1 : 0, now, name);

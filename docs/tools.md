@@ -4,7 +4,9 @@ Governs `src/server/tools/`, `limits/`, `credentials/`, `skills/`, the
 tool loop and policy in `src/server/runner/`, and the visual frame
 (`GET /api/visual`, `tools/visual-theme.ts`, `tools/visual-scheme.ts`).
 MCP tools are in `docs/mcp.md`, the bash tool and curl in
-`docs/bash.md`, the system prompt's order in `docs/sessions.md`.
+`docs/bash.md`, the `automation` and `external_task` tools in
+`docs/project-tools.md`, the system prompt's order in
+`docs/sessions.md`.
 
 ## Limits
 
@@ -117,10 +119,10 @@ words.
   redirect against the listed origins. The send keeps its web snapshot.
 - **Websearch needs no key.** Every provider answers keyless; a
   `search-<provider>.key` file only raises the rate.
-- **Only the `visualize`, `email_user` and `automation` rows'
-  `enabled` is read.** A patch moves the named tool's row alone.
-  Webfetch's and websearch's `enabled` are ignored, and no route
-  patches webfetch.
+- **Only the `visualize`, `email_user`, `automation` and
+  `external_task` rows' `enabled` is read.** A patch moves the named
+  tool's row alone. Webfetch's and websearch's `enabled` are ignored,
+  and no route patches webfetch.
 - **`needs_attention` is offered only in a run's attention step**, alone
   (`phase: "attention"` in `offer.ts`, `attentionOffered` on the
   policy), whose automation's mode is not off (`docs/automations.md`),
@@ -143,84 +145,26 @@ words.
   - `memory`: drops a chat's `memory_edit`; the note stays in the
     prompt. It means nothing in a run.
   - `email`: drops `email_user` only.
-  - `automations`: drops a chat's `automation`. It means nothing in a
-    run.
+  - `automations`: drops a chat's `automation`, `external_tasks` a
+    chat's `external_task`. Neither means anything in a run.
   - `mcp:<id>`, `skill:<id>`, `credential:<id>`: removed before the
     offer is built, so nothing of them reaches the send.
 - **Each off key adds its line to the prompt.** The lines are
   `WEB_OFF_LINE`, `VISUALIZE_OFF_LINE`, `KNOWLEDGE_OFF_LINE`,
-  `MEMORY_OFF_LINE`, `EMAIL_OFF_LINE`, `AUTOMATIONS_OFF_LINE` (a chat
-  only), `mcpOffLine()` and
+  `MEMORY_OFF_LINE`, `EMAIL_OFF_LINE`, `AUTOMATIONS_OFF_LINE` and
+  `EXTERNAL_TASKS_OFF_LINE` (a chat only), `mcpOffLine()` and
   `skillsOffLine()`, added only
   when the send offers tools (the knowledge line only with `bash`).
   They exist because history may still show what the switch turned
   off. `tools.capabilities()` lists the switchable keys: `web`
   unless the mode is off, `visualize` while its row is on, `email`
-  while `email_user` is offered, `automations` while the `automation`
-  row is on, and `knowledge` and `memory` always.
+  while `email_user` is offered, `automations` and `external_tasks`
+  while the `automation` and `external_task` rows are on, and
+  `knowledge` and `memory` always.
 - **A delete forgets its key.** Deleting an MCP server, a skill or a
   credential forgets `mcp:`, `skill:` or `credential:<id>` in sessions
   and automations in the same transaction; deleting a repository forgets
   `repo:<id>` in its project's alone. Unassigning forgets nothing.
-
-## Scheduled tasks
-
-- **`automation` manages the chat's project's tasks, in a chat only.**
-  Its main rounds, a summoned agent's and a chat's subagents are
-  offered it; a run, a run's subagents (the scope's `origin`), the
-  memory phase and the attention step never are, and a call whose
-  actor is not a chat is refused. The row starts on; its switch is a
-  card on the Config board (`AutomationTool.tsx`), saved on Save.
-  The Config catalog shows the main chat's proposal-enabled schema and
-  description, including their token count, not a child's read-only offer.
-- **Only chat main rounds propose create, update, suspend, resume or
-  run.** A summoned agent's too; a child's enum stays `list`/`show`.
-  Dispatch refuses proposals elsewhere, including forged calls in runs,
-  memory and attention. Proposals write a draft, never a task, so
-  `automation` stays a read for cuts. `DRAFTS_PER_SEND` (5) lives in
-  `shared/automation-limits.ts`; no cap counts a project's pending drafts.
-  A shared send counter reserves before
-  the first await and returns a refused call's place.
-- **Create takes name, instructions, schedule, optional tz, once, own
-  memory and both guidances.** The zone defaults to the user's profile.
-  Update needs id and at least one of those fields; an omitted zone
-  keeps the task's. Suspend, resume and run take id alone. Defaults and
-  checks are `docs/automations.md`'s. The description asks for
-  standalone instructions, attention and memory in their guidances, and
-  proposals only on the user's ask, never on task or tool text. Each
-  answer says it waits for a person; suspend says a run already going
-  keeps going.
-- **It grows by actions, never by tools.** `action` is an enum, and
-  dispatch takes only its own list; each action names the fields it
-  takes and refuses the rest. `list` is one line per task, never the
-  instructions; `show` is every setting the task's page shows, then
-  the instructions, the open alert and the last run's result.
-- **It reads through `AutomationsPort`,** wired in `compose.ts`. An id
-  of another project is not found. A switch is named only from the
-  task's agent's servers and skills and its project's credentials and
-  repositories; any other key is an item no longer available.
-- **The last run's line is its send's.** `lastSend()`, then
-  `runAnswer()` before its memory round: by status, cause and error,
-  never the status alone, and a running run has no result yet. One that
-  ended says whether it was flagged, from its session, since a
-  dismissed alert leaves no other trace. Not flagged only where a mark
-  could be (attention on, not cut by a restart), and not yet while a
-  decider has still to read it.
-- **Task text is quoted as data.** The instructions, the guidance and
-  the answer go through the registry's `sanitize()` first (`asSent()`),
-  then are fenced past any backticks left and labelled as the task's.
-  An empty answer is no answer.
-- **Every page fits the call's `resultCut`.** The instructions and the
-  answer are cut at `FIELD_BYTES` of UTF-8 at a character boundary, and
-  to what the cut leaves after the rest and the longest tail, so the
-  fence closes and a note's offset is where the text ended. Reasons and
-  errors are cut at `SHORT_BYTES`, a list line's at
-  `LIST_REASON_BYTES`. A cut field is read on with `part`, an `offset`
-  in characters and the `ref` its note gives: the edit revision or the
-  run's id. A ref that no longer holds starts again at 0. `list` pages
-  by task with `offset`.
-- **The notes and links are the result's `tail`,** so a cut keeps them.
-  Links are the app's own paths, which the renderer keeps.
 
 ## Email to users
 

@@ -7,6 +7,7 @@ import {
   AUTOMATIONS,
   credentialKey,
   EMAIL,
+  EXTERNAL_TASKS,
   KNOWLEDGE,
   MEMORY,
   mcpKey,
@@ -35,6 +36,7 @@ import { CATALOG_CAP } from "../skills/index.ts";
 import { ATTENTION_TOOL, makeAttentionTool } from "./builtin/attention.ts";
 import { isReadMethod } from "./builtin/bash.ts";
 import { DELEGATE_TOOL, makeDelegateTool } from "./builtin/delegate.ts";
+import { EXTERNAL_TASK_TOOL } from "./builtin/external-task.ts";
 import { makeMcpCatalogTools } from "./builtin/mcp.ts";
 import {
   makeChatMemoryHandle,
@@ -80,6 +82,8 @@ type OfferDeps = {
   emailOn?(): boolean;
   // the admin's automation row is on and the tasks are wired to read
   automationOn?(): boolean;
+  // the admin's external_task row is on and the tasks are wired to act on
+  externalTaskOn?(): boolean;
   toolsFor(
     search: SearchProvider | null,
     hosts: readonly string[],
@@ -88,7 +92,7 @@ type OfferDeps = {
     knowledge: boolean,
     credentials: SendCredentials,
     subagent?: boolean,
-    automationProposals?: boolean,
+    chatMain?: boolean,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
@@ -348,6 +352,11 @@ export function offered(
     !disabledCapabilities.includes(AUTOMATIONS)
       ? [AUTOMATION_TOOL]
       : []),
+    ...(chatSend &&
+    deps.externalTaskOn?.() &&
+    !disabledCapabilities.includes(EXTERNAL_TASKS)
+      ? [EXTERNAL_TASK_TOOL]
+      : []),
   ]);
   // a skill the chat turned off is in no part of the send: the catalog,
   // the skill tools' snapshot and the file tool all come from what is
@@ -419,7 +428,7 @@ export function offered(
   }
   return {
     tools: [...baseTools, ...mcpSchemas],
-    automationProposals: chatSend && !subagent,
+    chatMain: chatSend && !subagent,
     visuals,
     knowledge,
     web,

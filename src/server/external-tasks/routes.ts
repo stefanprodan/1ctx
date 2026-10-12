@@ -27,6 +27,8 @@ import {
 export type AccessPort = {
   project(principal: Principal, id: string): { id: string };
   reachableProjectIds(principal: Principal): string[];
+  // a chat's user, by id: null when disabled or gone
+  visibleProjectIds(userId: string): string[] | null;
 };
 
 type RoutesDeps = {

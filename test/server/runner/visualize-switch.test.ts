@@ -92,6 +92,7 @@ describe("the chat's visualize switch", () => {
         "web",
         "visualize",
         "automations",
+        "external_tasks",
         "knowledge",
         "memory",
       ]);
@@ -106,6 +107,7 @@ describe("the chat's visualize switch", () => {
       expect((await after.json()).capabilities).toEqual([
         "web",
         "automations",
+        "external_tasks",
         "knowledge",
         "memory",
       ]);

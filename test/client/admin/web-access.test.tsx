@@ -39,6 +39,7 @@ import {
   admin,
   automationTool,
   emailUser,
+  externalTaskTool,
 } from "../../helpers/client-fixtures.ts";
 
 const tool = (
@@ -78,6 +79,7 @@ const response = (
   },
   emailUser: emailUser(),
   automation: automationTool(),
+  externalTask: externalTaskTool(),
 });
 
 const limit = (changes: Partial<LimitRow>): LimitRow => ({

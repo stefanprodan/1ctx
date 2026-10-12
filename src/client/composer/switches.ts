@@ -12,6 +12,7 @@ import {
   AUTOMATIONS,
   CREDENTIAL,
   EMAIL,
+  EXTERNAL_TASKS,
   KNOWLEDGE,
   MCP,
   MEMORY,
@@ -33,6 +34,7 @@ import {
 import {
   agentMoved,
   emailItem,
+  externalTasksItem,
   reposItem,
   serversItem,
   skillsItem,
@@ -91,6 +93,7 @@ export function useSwitches({
     memory: item(MEMORY),
     email: emailItem(input(EMAIL)),
     tasks: tasksItem(input(AUTOMATIONS)),
+    externalTasks: externalTasksItem(input(EXTERNAL_TASKS)),
     servers: serversItem({
       tools: readable,
       servers: (agent === null ? undefined : servers.value[agent]) ?? [],

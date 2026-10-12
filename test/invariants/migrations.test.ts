@@ -74,6 +74,7 @@ const EXPECTED_IDS = [
   "0060-knowledge-keys",
   "0061-session-activity",
   "0062-external-tasks",
+  "0063-external-task-tool",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -969,6 +970,7 @@ describe("the schema", () => {
       // off until an admin turns it on
       { name: "email_user", enabled: 0, provider: null, updated_at: 0 },
       { name: "automation", enabled: 1, provider: null, updated_at: 0 },
+      { name: "external_task", enabled: 1, provider: null, updated_at: 0 },
     ]);
     expect(db.query("select count(*) as n from limits").get()).toEqual({
       n: 0,
@@ -1784,7 +1786,7 @@ describe("the schema", () => {
       expect(
         db
           .query(
-            "select * from tools where name not in ('email_user', 'automation') order by rowid",
+            "select * from tools where name not in ('email_user', 'automation', 'external_task') order by rowid",
           )
           .all(),
       ).toEqual(tools);
@@ -1922,7 +1924,7 @@ describe("the schema", () => {
       expect(
         db
           .query(
-            "select * from tools where name != 'automation' order by rowid",
+            "select * from tools where name not in ('automation', 'external_task') order by rowid",
           )
           .all(),
       ).toEqual(tools);
@@ -1933,6 +1935,42 @@ describe("the schema", () => {
           )
           .get(),
       ).toEqual({ name: "automation", enabled: 1, updated_at: 0 });
+      expect(() =>
+        db.exec(
+          "insert into tools (name, enabled, updated_at) values ('other', 1, 0)",
+        ),
+      ).toThrow(/CHECK/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0063 adds the external task row on and keeps every tool row", () => {
+    const db = seed(MIGRATIONS.slice(0, 62));
+    try {
+      db.exec(`
+        update tools set enabled = 0, hosts = '["https://cdn.test"]',
+          updated_at = 5 where name = 'visualize';
+        update tools set enabled = 0, updated_at = 6 where name = 'automation';
+        update tools set mode = 'listed', hosts = '["a.test"]', updated_at = 7
+          where name = 'web';
+      `);
+      const tools = db.query("select rowid, * from tools order by rowid").all();
+      expect(migrate(db)).toEqual(expectedFrom("0063-external-task-tool"));
+      expect(
+        db
+          .query(
+            "select rowid, * from tools where name != 'external_task' order by rowid",
+          )
+          .all(),
+      ).toEqual(tools);
+      expect(
+        db
+          .query(
+            "select name, enabled, updated_at from tools where name = 'external_task'",
+          )
+          .get(),
+      ).toEqual({ name: "external_task", enabled: 1, updated_at: 0 });
       expect(() =>
         db.exec(
           "insert into tools (name, enabled, updated_at) values ('other', 1, 0)",
@@ -3174,6 +3212,7 @@ test("a test's memory database is a fresh migrate", () => {
       "web",
       "email_user",
       "automation",
+      "external_task",
     ]);
     expect(state(first)).toEqual(state(fresh));
     first.exec("create table scratch (a int)");

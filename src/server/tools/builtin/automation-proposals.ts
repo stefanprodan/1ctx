@@ -3,7 +3,11 @@
 
 import { AUTOMATION_DEFAULTS } from "../../../shared/automation-defaults.ts";
 import { DRAFTS_PER_SEND } from "../../../shared/automation-limits.ts";
-import { AUTOMATIONS, MEMORY } from "../../../shared/capabilities.ts";
+import {
+  AUTOMATIONS,
+  EXTERNAL_TASKS,
+  MEMORY,
+} from "../../../shared/capabilities.ts";
 import {
   type AutomationProposal,
   PROPOSAL_FIELDS,
@@ -41,6 +45,13 @@ export type ProposalsPort = {
   }): string | Promise<string>;
 };
 
+// a chat's alone: a task's runs are never offered what they switch
+const CHAT_KEYS: ReadonlySet<string> = new Set([
+  AUTOMATIONS,
+  EXTERNAL_TASKS,
+  MEMORY,
+]);
+
 // Shared by every round and parallel call, without keeping ended sends alive.
 const counts = new WeakMap<ToolBudget, number>();
 
@@ -67,7 +78,7 @@ export async function propose(
             ...call.fields,
             agentId: actor.agentId,
             disabledCapabilities: ctx.disabledCapabilities.filter(
-              (key) => key !== AUTOMATIONS && key !== MEMORY,
+              (key) => !CHAT_KEYS.has(key),
             ),
           }
         : call.fields;

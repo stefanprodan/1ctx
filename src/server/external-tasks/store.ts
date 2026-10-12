@@ -264,10 +264,13 @@ export class ExternalTaskStore {
     };
   }
 
-  entry(id: string): ExternalTaskEntry {
-    return entryRow(
-      this.db.query<RawEntry, [string]>(`${ENTRY} where e.id = ?`).get(id)!,
-    );
+  entry(taskId: string, id: string): ExternalTaskEntry | null {
+    const raw = this.db
+      .query<RawEntry, [string, string]>(
+        `${ENTRY} where e.id = ? and e.task_id = ?`,
+      )
+      .get(id, taskId);
+    return raw === null ? null : entryRow(raw);
   }
 
   lastEntry(claimId: string, taskLast: boolean): ExternalTaskEntry | null {

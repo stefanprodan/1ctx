@@ -69,7 +69,8 @@ type PatchedTool =
   | "websearch"
   | "visualize"
   | "email_user"
-  | "automation";
+  | "automation"
+  | "external_task";
 
 export async function patchTool(
   name: PatchedTool,

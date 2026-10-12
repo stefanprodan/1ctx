@@ -101,6 +101,7 @@ describe("tools administration", () => {
       "automation",
       "builtin",
       "emailUser",
+      "externalTask",
       "search",
       "visualize",
     ]);

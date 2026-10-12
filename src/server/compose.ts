@@ -512,6 +512,12 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     // a closure: the runner is built after the tools
     delegate: (input, call, ctx) => runner.delegate(input, call, ctx),
+    externalTasks: {
+      ...externalTasks.chat,
+      fileId: (projectId, name) =>
+        knowledge.store.fileNamed(projectId, name)?.id ?? null,
+      userZone: (id) => users.byId(id)!.tz,
+    },
     // closures: automations are built after the tools
     automations: {
       byProject: (projectId) => automations.store.byProject(projectId),

@@ -9,6 +9,7 @@ import {
 } from "../../shared/words.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { DELEGATE_TOOL } from "./builtin/delegate.ts";
+import { EXTERNAL_TASK_TOOL } from "./builtin/external-task.ts";
 import { mcpCallName } from "./builtin/mcp.ts";
 import type { Offered } from "./types.ts";
 
@@ -17,6 +18,7 @@ const LOGGED_TOOLS: ReadonlySet<string> = new Set([
   ...WEB_TOOLS,
   EMAIL_TOOL,
   AUTOMATION_TOOL,
+  EXTERNAL_TASK_TOOL,
   DELEGATE_TOOL,
 ]);
 

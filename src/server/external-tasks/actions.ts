@@ -111,7 +111,7 @@ export function writeEntry(
   );
   const row = required(store, task.id);
   if (actor === "agent") store.remember(claim!.id, row);
-  return { entry: store.entry(id), task: row };
+  return { entry: store.entry(task.id, id)!, task: row };
 }
 
 type ActionsDeps = {
@@ -145,8 +145,10 @@ export function taskActions(deps: ActionsDeps) {
     transact(db, () => {
       const task = required(store, id);
       if (task.state !== body.state) throw new Conflict(STALE_TASK);
+      // release names its claim; an answer or drop may, and is held to it
       if (
-        kind === "release" &&
+        (kind === "release" ||
+          (kind !== "reopen" && body.claimId !== undefined)) &&
         (task.claim === null || task.claim.id !== body.claimId)
       ) {
         throw new Conflict(STALE_TASK);

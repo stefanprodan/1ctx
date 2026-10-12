@@ -28,6 +28,7 @@ import {
   admin,
   automationTool,
   emailUser,
+  externalTaskTool,
 } from "../../helpers/client-fixtures.ts";
 
 const visual: WebToolSummary = {
@@ -47,6 +48,7 @@ const response = (changes: Partial<WebToolSummary> = {}): ToolsResponse => ({
   visualize: { ...visual, ...changes },
   emailUser: emailUser(),
   automation: automationTool(),
+  externalTask: externalTaskTool(),
   search: {
     provider: null,
     keys: { exa: false, firecrawl: false, tavily: false },

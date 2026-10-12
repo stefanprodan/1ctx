@@ -77,7 +77,8 @@ an event whose outcome is `run`, `skipped` or `deferred`
   follows the deadline limit, keeps 30 days, uses own memory with
   `OWN_MEMORY_GUIDANCE`, attention by the agent with no guidance, no
   rerun on restart and `once` off. A proposal takes the send's disabled
-  set without `automations` and `memory`; an update keeps the task's set.
+  set without `automations`, `external_tasks` and `memory`; an update
+  keeps the task's set.
 - **A proposal never stores a guidance nothing reads.** `memoryGuidance`
   without own memory, on the create or the task after the update, is
   refused; a create with `ownMemory` false stores none. As on the page,

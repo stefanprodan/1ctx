@@ -380,6 +380,7 @@ test("project agents expose the same switchable map to members and admins", asyn
       "web",
       "visualize",
       "automations",
+      "external_tasks",
       "knowledge",
       "memory",
     ]);

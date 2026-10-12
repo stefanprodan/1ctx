@@ -6,6 +6,7 @@ import { render } from "preact-render-to-string";
 import {
   agentMoved,
   emailItem,
+  externalTasksItem,
   onWords,
   panelessOf,
   reposItem,
@@ -19,6 +20,7 @@ import { AddPane } from "../../../src/client/composer/AddPane.tsx";
 import {
   AUTOMATIONS,
   EMAIL,
+  EXTERNAL_TASKS,
   KNOWLEDGE,
   MEMORY,
   VISUALIZE,
@@ -187,6 +189,28 @@ describe("the Scheduled tasks item", () => {
     expect(
       tasksItem({ tools: false, switchable: [AUTOMATIONS], off: false }),
     ).toEqual({ live: false, on: false, reason: "Agent cannot use tools" });
+  });
+});
+
+describe("the External tasks item", () => {
+  test("is on unless the chat turned it off, locked while the admin's row is off", () => {
+    expect(
+      externalTasksItem({
+        tools: true,
+        switchable: [EXTERNAL_TASKS],
+        off: false,
+      }),
+    ).toEqual({ live: true, on: true, reason: null });
+    expect(
+      externalTasksItem({
+        tools: true,
+        switchable: [EXTERNAL_TASKS],
+        off: true,
+      }),
+    ).toEqual({ live: true, on: false, reason: null });
+    expect(
+      externalTasksItem({ tools: true, switchable: [AUTOMATIONS], off: false }),
+    ).toEqual({ live: false, on: false, reason: "Turned off by an admin" });
   });
 });
 

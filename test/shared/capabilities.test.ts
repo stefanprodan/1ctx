@@ -8,6 +8,7 @@ import {
   credentialKey,
   credentialOf,
   EMAIL,
+  EXTERNAL_TASKS,
   isCapabilityKey,
   KNOWLEDGE,
   MAX_CAPABILITY_KEY,
@@ -40,6 +41,12 @@ describe("capability keys", () => {
     expect(AUTOMATIONS).toBe("automations");
     expect(isCapabilityKey(AUTOMATIONS)).toBe(true);
     expect(isCapabilityKey("automations:x")).toBe(false);
+  });
+
+  test("the external_task tool is a kind alone, a chat's", () => {
+    expect(EXTERNAL_TASKS).toBe("external_tasks");
+    expect(isCapabilityKey(EXTERNAL_TASKS)).toBe(true);
+    expect(isCapabilityKey("external_tasks:x")).toBe(false);
   });
 
   test("the visualize tool is a kind alone, like web access", () => {

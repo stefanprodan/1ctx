@@ -10,6 +10,7 @@ import type {
 import {
   AUTOMATIONS,
   EMAIL,
+  EXTERNAL_TASKS,
   KNOWLEDGE,
   MEMORY,
   skillKey,
@@ -49,6 +50,11 @@ import {
 } from "./builtin/delegate.ts";
 import { makeEmailTool } from "./builtin/email.ts";
 import {
+  EXTERNAL_TASK_TOOL,
+  type ExternalTasksPort,
+  makeExternalTaskTool,
+} from "./builtin/external-task.ts";
+import {
   asMcpCall,
   checkMcpArguments,
   makeMcpCatalogTools,
@@ -72,7 +78,7 @@ import {
   type SendCredentials,
   type SkillsPort,
 } from "./offer.ts";
-import type { ToolName } from "./parse.ts";
+import { switchOf, type ToolName } from "./parse.ts";
 import { failedCall, Registry } from "./registry.ts";
 import { toolsResponse } from "./response.ts";
 import { routes } from "./routes.ts";
@@ -150,6 +156,8 @@ export type ToolsDeps = {
   delegate?: DelegatePort;
   // what the automation tool reads; without it the tool is never offered
   automations?: AutomationsPort;
+  // the external_task tool's port; without it the tool is never offered
+  externalTasks?: ExternalTasksPort;
 };
 
 export type Tools = {
@@ -186,17 +194,6 @@ const ATTENTION_ONLY = `only ${ATTENTION_TOOL} is offered in this step.`;
 // an MCP call's own timer runs this far past the registry's, so two
 // timers never race and the timeout words are the registry's
 const MCP_BACKSTOP_MS = 1000;
-
-// the row each switch moves: a tool's own, named, so no switch moves
-// another's
-function switchOf(name: ToolName): SwitchedTool {
-  if (name === "web" || name === "websearch") {
-    throw new BadRequest(`${name} has no switch`);
-  }
-  return name;
-}
-
-type SwitchedTool = Exclude<ToolName, "web" | "websearch">;
 
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
@@ -235,6 +232,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   // the admin's row, with the tasks wired to read
   const automationOn = () =>
     automations !== null && store.row(AUTOMATION_TOOL).enabled;
+  const externalTaskOn = () =>
+    deps.externalTasks !== undefined && store.row(EXTERNAL_TASK_TOOL).enabled;
 
   const toolsFor = (
     search: SearchProvider | null,
@@ -244,7 +243,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     knowledge: boolean,
     credentials: SendCredentials,
     subagent = false,
-    automationProposals = false,
+    chatMain = false,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
@@ -259,7 +258,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         ]),
     makeVisualizeTool(hosts),
     makeEmailTool(emailPort),
-    makeAutomationTool(automations, automationProposals),
+    makeAutomationTool(automations, chatMain),
+    makeExternalTaskTool(deps.externalTasks ?? null, chatMain),
     makeBashTool({
       bash: deps.bash,
       web,
@@ -350,6 +350,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       ...(store.row("visualize").enabled ? [VISUALIZE] : []),
       ...(emailOn() ? [EMAIL] : []),
       ...(automationOn() ? [AUTOMATIONS] : []),
+      ...(externalTaskOn() ? [EXTERNAL_TASKS] : []),
       // no admin row governs these
       KNOWLEDGE,
       MEMORY,
@@ -379,6 +380,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           credentials: deps.credentials,
           emailOn,
           automationOn,
+          externalTaskOn,
           toolsFor,
           log: deps.log,
         },
@@ -445,7 +447,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
             off: offered.credentialsOff,
           },
           offered.subagent,
-          offered.automationProposals === true,
+          offered.chatMain === true,
         )
           .filter((tool) => allowed.has(tool.name))
           .map((tool) =>

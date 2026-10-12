@@ -8,6 +8,8 @@ import {
   AUTOMATIONS_OFF_LINE,
   EMAIL,
   EMAIL_OFF_LINE,
+  EXTERNAL_TASKS,
+  EXTERNAL_TASKS_OFF_LINE,
   KNOWLEDGE,
   KNOWLEDGE_OFF_LINE,
   MEMORY,
@@ -196,6 +198,13 @@ export function systemPrompt(
     policy.automation === null
   ) {
     parts.push(AUTOMATIONS_OFF_LINE);
+  }
+  if (
+    policy.disabledCapabilities.includes(EXTERNAL_TASKS) &&
+    policy.offered.tools.length > 0 &&
+    policy.automation === null
+  ) {
+    parts.push(EXTERNAL_TASKS_OFF_LINE);
   }
   if (policy.mcpOff.length > 0) parts.push(mcpOffLine(policy.mcpOff));
   if (policy.skillsOff.length > 0) {

@@ -109,7 +109,8 @@ is its root.
 - **Its offer is `childOffered()`** (`tools/offer.ts`), taken with the
   parent's as `policy.childOffered`: the main offer less `delegate`,
   `memory_edit`, `email_user`, `visualize`, `needs_attention`,
-  `automation` when the parent is a run (the scope's `origin`), its MCP
+  `automation` and `external_task` when the parent is a run (the
+  scope's `origin`), the write actions of both otherwise, its MCP
   links read alone so `offeredServers()` drops the write side, a bash
   that says nothing of `open`, and each credential signing `GET` and
   `HEAD` alone (`readOnly`), refused as `writes` when it had neither.

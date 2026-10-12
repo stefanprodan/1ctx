@@ -266,6 +266,7 @@ test("a fresh area instance can retry a persisted result", () => {
     access: {
       project: (_principal, id) => ({ id }),
       reachableProjectIds: () => [f.projectId],
+      visibleProjectIds: () => [f.projectId],
     },
     db: f.db,
     clock: f.now,
