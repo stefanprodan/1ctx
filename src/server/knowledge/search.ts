@@ -59,8 +59,8 @@ export function readCursor(value: string): SearchCursor | null {
   return Number.isFinite(score) ? { score, name } : null;
 }
 
-type Found = { file: KnowledgeFile; text: string; counts: number[] };
-type Ranked = { file: KnowledgeFile; text: string; score: number };
+type Found = { file: KnowledgeFile; counts: number[] };
+type Ranked = { file: KnowledgeFile; score: number };
 
 // Every file is read on every page: the IDF needs the whole project, and
 // the project's cap bounds the scan. A write between two pages changes
@@ -92,7 +92,7 @@ export function search(
       if (count > 0) df[i]!++;
     });
     if (terms.every((term) => lower.includes(term)) && holdsAll(text, terms)) {
-      found.push({ file, text, counts });
+      found.push({ file, counts });
     } else if (cursor === null && holdsAll(file.name, terms)) {
       namesTotal++;
       if (names.length < SEARCH_NAMES) names.push(file);
@@ -100,7 +100,7 @@ export function search(
   }
   const avg = Math.max(1, bytes / Math.max(1, scanned));
   const idf = df.map((n) => Math.log(1 + (scanned - n + 0.5) / (n + 0.5)));
-  const ranked: Ranked[] = found.map(({ file, text, counts }) => {
+  const ranked: Ranked[] = found.map(({ file, counts }) => {
     const norm = K1 * (1 - B + (B * file.bytes) / avg);
     let score = 0;
     counts.forEach((tf, i) => {
@@ -110,7 +110,7 @@ export function search(
     const named = terms.filter((term) => name.includes(term)).length;
     if (named === terms.length) score *= NAME_ALL;
     else if (named > 0) score *= NAME_SOME;
-    return { file, text, score };
+    return { file, score };
   });
   ranked.sort(
     (a, b) =>
@@ -132,10 +132,14 @@ export function search(
     last !== undefined && start + SEARCH_PAGE < ranked.length
       ? cursorOf({ score: last.score, name: last.file.name })
       : null;
-  const files: KnowledgeSearchHit[] = page.map(({ file, text }) => ({
-    file,
-    ...bestLines(text, terms),
-  }));
+  // texts are read again for the page alone, so a scan holds one at a
+  // time; a row gone or changed since is left out, the cursor unmoved
+  const files: KnowledgeSearchHit[] = [];
+  for (const { file } of page) {
+    const text = source.text(file.id);
+    if (text === null || !holdsAll(text, terms)) continue;
+    files.push({ file, ...bestLines(text, terms) });
+  }
   return { names, namesTotal, files, next };
 }
 

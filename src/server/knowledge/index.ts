@@ -302,7 +302,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       guardedSearch(userId, () =>
         search(
           {
-            files: () => store.after(projectId, null),
+            files: () => store.files(projectId),
             text: (fileId) => store.text(projectId, fileId),
           },
           q,

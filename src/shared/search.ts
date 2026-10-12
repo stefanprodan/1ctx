@@ -71,16 +71,6 @@ export function holdsAll(text: string, terms: readonly string[]): boolean {
   return held.size === terms.length;
 }
 
-// null when the text misses a term
-export function matchText(
-  text: string,
-  terms: readonly string[],
-): { count: number; lines: SearchLine[] } | null {
-  if (!holdsAll(text, terms)) return null;
-  const found = matchLines(text, terms);
-  return found.count === 0 ? null : found;
-}
-
 // the lines holding any term, counted, the first max kept
 export function matchLines(
   text: string,
@@ -199,7 +189,8 @@ const ENDINGS = new Set(["s", "es", "d", "ed", "ing", "er", "ers"]);
 // scripts written without spaces between words
 const UNSPACED =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u;
-const WORD_CHAR = /^[\p{L}\p{N}]$/u;
+// a combining mark belongs to its letter, never separates
+const WORD_CHAR = /^[\p{L}\p{M}\p{N}]$/u;
 
 function isWord(code: number): boolean {
   if (code < 0) return false;
@@ -265,8 +256,9 @@ export function creditedCount(lower: string, term: string): number {
     const rest = glued(lower, at + term.length);
     if (rest === "" || (rest !== null && ENDINGS.has(rest))) count++;
   }
-  // release in releasing: the stem never holds the term, so no overlap
-  if (term.length > 1 && term.endsWith("e")) {
+  // release in releasing: the stem never holds the term, so no overlap.
+  // Short words would credit too much (the in thing, we in wing)
+  if (term.length >= 4 && term.endsWith("e")) {
     const stem = `${term.slice(0, -1)}ing`;
     for (
       let at = lower.indexOf(stem);

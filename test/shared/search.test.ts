@@ -7,7 +7,6 @@ import {
   creditedCount,
   holdsAll,
   matchLines,
-  matchText,
   searchTerms,
   termRanges,
 } from "../../src/shared/search.ts";
@@ -34,7 +33,11 @@ describe("searchTerms", () => {
   });
 });
 
-describe("matchText", () => {
+// a text's hit as knowledge search builds it, null when it misses a word
+const matchText = (text: string, terms: readonly string[]) =>
+  holdsAll(text, terms) ? bestLines(text, terms) : null;
+
+describe("a text's hit", () => {
   test("words on different lines of one text match", () => {
     const text = "the plan\nsome notes\nexternal tasks here\nend";
     expect(matchText(text, searchTerms("plan external tasks"))).toEqual({
@@ -122,6 +125,12 @@ describe("creditedCount", () => {
     ["releasings", "release", 0],
     ["released, releases", "release", 2],
     ["writing it", "write", 1],
+    ["releasing", "release", 1],
+    ["a thing", "the", 0],
+    ["a wing", "we", 0],
+    ["a ring", "re", 0],
+    ["e\u0301tude", "tude", 0],
+    ["e\u0301tude", "e\u0301tude", 1],
     ["docs/full-text-search.md", "search", 1],
     ["search.ts", ".ts", 1],
     ["search.tsx", ".ts", 0],

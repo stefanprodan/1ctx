@@ -68,12 +68,12 @@ export class KnowledgeStore extends KnowledgeVersions {
       .map((raw) => ({ ...fileOf(raw), data: raw.data }));
   }
 
-  // the rows past after, in name order, without their text
-  after(projectId: string, after: string | null): Generator<KnowledgeFile> {
+  // every live file, in name order, without its text
+  files(projectId: string): Generator<KnowledgeFile> {
     return this.stream(
       `select ${FILE_COLUMNS} from knowledge_files
-       where project_id = ? and name > ? order by name`,
-      [projectId, after ?? ""],
+       where project_id = ? order by name`,
+      [projectId],
     );
   }
 

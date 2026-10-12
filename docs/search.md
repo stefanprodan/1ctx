@@ -21,14 +21,15 @@ project's session search and list (`sessions/search.ts`).
   file's length its bytes. The score sums the terms, times 1.5 when the
   name holds every term and 1.2 when it holds some; ties go in name
   order. Matching stays the filter, so ranking never drops a file.
-- **A match is credited** (`creditedCount()`) when no letter or digit
-  touches it, or the letters glued after it are exactly `s`, `es`, `d`,
-  `ed`, `ing`, `er` or `ers`; a term ending in `e` also counts its stem
-  followed by exactly `ing` (`releasing`). An edge is tested only where
-  the term's own edge is a letter or digit, and a phrase only on its
-  outer edges. A term in Han, Hiragana, Katakana, Hangul or Thai is
-  credited everywhere. Any other match scores 0, so a file holding only
-  inner matches (`claim` in `reclaim`) lists below every credited one.
+- **A match is credited** (`creditedCount()`) when no letter, digit or
+  combining mark touches it, or the letters glued after it are exactly
+  `s`, `es`, `d`, `ed`, `ing`, `er` or `ers`; a term of four or more
+  characters ending in `e` also counts its stem followed by exactly
+  `ing` (`releasing`). An edge is tested only where the term's own edge
+  is a letter or digit, and a phrase only on its outer edges. A term in
+  Han, Hiragana, Katakana, Hangul or Thai is credited everywhere. Any
+  other match scores 0, so a file holding only inner matches (`claim` in
+  `reclaim`) lists below every credited one.
 - **A hit shows its best lines** (`bestLines()`): the most distinct
   terms held, then the most credited, then the earliest, in line order;
   `count` stays every line holding a term. A search with `fileId` keeps

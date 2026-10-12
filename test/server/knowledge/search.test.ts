@@ -18,14 +18,15 @@ import {
 } from "../../../src/shared/api/knowledge.ts";
 import type { KnowledgeFile } from "../../../src/shared/contracts/knowledge.ts";
 import {
-  matchText as matchTerms,
+  bestLines,
+  holdsAll,
   searchTerms,
 } from "../../../src/shared/search.ts";
 import { type Setup, setup } from "./helpers.ts";
 
 // the store's rows as the area reads them
 const source = (s: Setup): SearchSource => ({
-  files: () => s.area.store.after(s.projectId, null),
+  files: () => s.area.store.files(s.projectId),
   text: (fileId) => s.area.store.text(s.projectId, fileId),
 });
 
@@ -50,20 +51,24 @@ function searched(files: Record<string, string>, q: string) {
   }
 }
 
-const matchText = (text: string, q: string) => matchTerms(text, searchTerms(q));
+// a text's hit as the search builds it, null when it misses a word
+function matchText(text: string, q: string) {
+  const terms = searchTerms(q);
+  return holdsAll(text, terms) ? bestLines(text, terms) : null;
+}
 
 const url = (query: string) =>
   new URL(`http://x/api/projects/p/knowledge/search?${query}`);
 
 describe("knowledge search", () => {
-  test("counts matching lines in any case and keeps the first three", () => {
+  test("counts matching lines in any case and keeps three, credited first", () => {
     const text = "Alpha\nbeta\nALPHA two\ngamma\nalphabet\nlast alpha";
     expect(matchText(text, "alpha")).toEqual({
       count: 4,
       lines: [
         { line: 1, text: "Alpha", cutStart: false, cutEnd: false },
         { line: 3, text: "ALPHA two", cutStart: false, cutEnd: false },
-        { line: 5, text: "alphabet", cutStart: false, cutEnd: false },
+        { line: 6, text: "last alpha", cutStart: false, cutEnd: false },
       ],
     });
     expect(matchText(text, "delta")).toBeNull();
@@ -252,6 +257,37 @@ describe("knowledge search", () => {
     }
   });
 
+  test("a page row gone after the scan is left out, the cursor kept", () => {
+    const files: Record<string, string> = {};
+    for (let i = 0; i < SEARCH_PAGE + 2; i++) {
+      files[`f${String(i).padStart(2, "0")}.md`] = "a topic\n";
+    }
+    const s = project(files);
+    try {
+      const gone = s.area.store.fileNamed(s.projectId, "f03.md")!.id;
+      let reads = 0;
+      const page = search(
+        {
+          files: source(s).files,
+          // the scan reads it once; the page's second read finds it gone
+          text: (fileId) =>
+            fileId === gone && reads++ > 0
+              ? null
+              : s.area.store.text(s.projectId, fileId),
+        },
+        "topic",
+        null,
+      );
+      expect(names(page)).toHaveLength(SEARCH_PAGE - 1);
+      expect(names(page)).not.toContain("f03.md");
+      expect(readCursor(page.next!)?.name).toBe("f09.md");
+      const rest = s.area.search(s.projectId, "u", "topic", page.next);
+      expect(names(rest)).toEqual(["f10.md", "f11.md"]);
+    } finally {
+      s.db.close();
+    }
+  });
+
   test("runs one scan per user at a time", () => {
     const running = new Set<string>();
     const inner = () =>
@@ -335,7 +371,7 @@ describe("knowledge search ranking", () => {
   });
 
   test("a name holding every term lifts a file by at most half", () => {
-    // equal lengths: one use scores 1, two 1.375, three 1.65 before IDF
+    // equal lengths: one use scores 1, two 1.375, three 1.57 before IDF
     const page = searched(
       {
         "deploy.md": pad("deploy", 100),
