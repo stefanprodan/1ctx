@@ -190,19 +190,29 @@ const ENDINGS = new Set(["s", "es", "d", "ed", "ing", "er", "ers"]);
 const UNSPACED =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/u;
 // a combining mark belongs to its letter, never separates
-const WORD_CHAR = /^[\p{L}\p{M}\p{N}]$/u;
+const LETTER = /^[\p{L}\p{M}]$/u;
+const DIGIT = /^\p{N}$/u;
+const NONE = 0;
+const ALPHA = 1;
+const NUMERIC = 2;
 
-function isWord(code: number): boolean {
-  if (code < 0) return false;
+function kind(code: number): number {
+  if (code < 0) return NONE;
   if (code < 0x80) {
-    return (
-      (code >= 0x61 && code <= 0x7a) ||
-      (code >= 0x30 && code <= 0x39) ||
-      (code >= 0x41 && code <= 0x5a)
-    );
+    if ((code >= 0x61 && code <= 0x7a) || (code >= 0x41 && code <= 0x5a)) {
+      return ALPHA;
+    }
+    return code >= 0x30 && code <= 0x39 ? NUMERIC : NONE;
   }
-  return WORD_CHAR.test(String.fromCodePoint(code));
+  const char = String.fromCodePoint(code);
+  return LETTER.test(char) ? ALPHA : DIGIT.test(char) ? NUMERIC : NONE;
 }
+
+const isWord = (code: number): boolean => kind(code) !== NONE;
+
+// a switch between letter and digit parts words too (fts in fts5)
+const clear = (edge: number, neighbour: number): boolean =>
+  neighbour === NONE || neighbour !== edge;
 
 function codeBefore(text: string, at: number): number {
   if (at <= 0) return -1;
@@ -239,9 +249,10 @@ export function creditedCount(lower: string, term: string): number {
     }
     return count;
   }
-  const checkStart = isWord(term.codePointAt(0)!);
-  const checkEnd = isWord(codeBefore(term, term.length));
-  const startOk = (at: number) => !checkStart || !isWord(codeBefore(lower, at));
+  const first = kind(term.codePointAt(0)!);
+  const last = kind(codeBefore(term, term.length));
+  const startOk = (at: number) =>
+    first === NONE || clear(first, kind(codeBefore(lower, at)));
   let count = 0;
   for (
     let at = lower.indexOf(term);
@@ -249,12 +260,12 @@ export function creditedCount(lower: string, term: string): number {
     at = lower.indexOf(term, step(at))
   ) {
     if (!startOk(at)) continue;
-    if (!checkEnd) {
+    if (last === NONE || clear(last, kind(codeAt(lower, at + term.length)))) {
       count++;
       continue;
     }
     const rest = glued(lower, at + term.length);
-    if (rest === "" || (rest !== null && ENDINGS.has(rest))) count++;
+    if (rest !== null && ENDINGS.has(rest)) count++;
   }
   // release in releasing: the stem never holds the term, so no overlap.
   // Short words would credit too much (the in thing, we in wing)
