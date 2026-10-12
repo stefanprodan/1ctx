@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The knowledge search, per project. The box calls searchKnowledge() on
-// every key; the ask goes after a pause in typing, and one request is
-// out at a time, since the server scans one search per user: a query
-// typed meanwhile waits for it and takes its place, and an answer to a
-// query no longer wanted is dropped.
+// every key; the ask goes after a pause in typing. A new query, a clear
+// or a user change aborts the request out, so the server drops its scan
+// and the new one is not stuck behind it; an answer to a query no longer
+// wanted is dropped.
 
 import { effect, signal } from "@preact/signals";
 import {
@@ -108,8 +108,24 @@ let owner: string | null = null;
 // the latest word per project: a key, a clear and a user change bump it
 const turns = new Map<string, number>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
-// the one request out, which every other waits for
-let flight: Promise<unknown> = Promise.resolve();
+// the request out per project, aborted once its answer is unwanted
+const flights = new Map<string, AbortController>();
+
+function land(projectId: string): void {
+  flights.get(projectId)?.abort();
+  flights.delete(projectId);
+}
+
+function settled(projectId: string, signal: AbortSignal): void {
+  if (flights.get(projectId)?.signal === signal) flights.delete(projectId);
+}
+
+function fly(projectId: string): AbortSignal {
+  land(projectId);
+  const flight = new AbortController();
+  flights.set(projectId, flight);
+  return flight.signal;
+}
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -118,8 +134,7 @@ effect(() => {
   for (const timer of timers.values()) clearTimeout(timer);
   timers.clear();
   turns.clear();
-  // the new user's first search never waits on the old user's
-  flight = Promise.resolve();
+  for (const projectId of [...flights.keys()]) land(projectId);
   searches.value = new Map();
 });
 
@@ -131,17 +146,11 @@ function put(projectId: string, value: KnowledgeSearch): void {
 }
 
 const bump = (projectId: string): number => {
+  land(projectId);
   const turn = (turns.get(projectId) ?? 0) + 1;
   turns.set(projectId, turn);
   return turn;
 };
-
-// one request after the one out, whatever became of it
-function queued<T>(ask: () => Promise<T> | T): Promise<T> {
-  const run = flight.then(ask, ask);
-  flight = run.catch(() => {});
-  return run;
-}
 
 const searchPath = (projectId: string, q: string, after: string | null) => {
   const query = new URLSearchParams({ q });
@@ -172,22 +181,27 @@ export function searchKnowledge(projectId: string, text: string): void {
 async function ask(projectId: string, q: string, turn: number): Promise<void> {
   const forUser = owner;
   const wanted = () => owner === forUser && turns.get(projectId) === turn;
+  if (!wanted()) return;
+  const signal = fly(projectId);
   try {
-    const answer = await queued(() =>
-      // a query overtaken while it waited is never sent
-      wanted()
-        ? api<KnowledgeSearchResponse>(searchPath(projectId, q, null))
-        : null,
+    const answer = await api<KnowledgeSearchResponse>(
+      searchPath(projectId, q, null),
+      "GET",
+      undefined,
+      signal,
     );
-    if (answer !== null && wanted()) put(projectId, answered(q, answer));
+    if (wanted()) put(projectId, answered(q, answer));
   } catch (err) {
-    if (wanted()) {
+    // an abort is a query overtaken, never a failure
+    if (!signal.aborted && wanted()) {
       put(projectId, {
         ...searchOf(projectId),
         state: "failed",
         failure: failure(err),
       });
     }
+  } finally {
+    settled(projectId, signal);
   }
 }
 
@@ -200,23 +214,24 @@ export async function loadMoreSearch(projectId: string): Promise<void> {
   const wanted = () => owner === forUser && turns.get(projectId) === turn;
   const after = held.next;
   put(projectId, { ...held, more: { loading: true, failure: null } });
+  const signal = fly(projectId);
   try {
-    const answer = await queued(() =>
-      // a page asked for a query overtaken while it waited is never sent
-      wanted()
-        ? api<KnowledgeSearchResponse>(searchPath(projectId, held.q, after))
-        : null,
+    const answer = await api<KnowledgeSearchResponse>(
+      searchPath(projectId, held.q, after),
+      "GET",
+      undefined,
+      signal,
     );
-    if (answer !== null && wanted()) {
-      put(projectId, nextPage(searchOf(projectId), answer));
-    }
+    if (wanted()) put(projectId, nextPage(searchOf(projectId), answer));
   } catch (err) {
-    if (wanted()) {
+    if (!signal.aborted && wanted()) {
       put(projectId, {
         ...searchOf(projectId),
         more: { loading: false, failure: failure(err) },
       });
     }
+  } finally {
+    settled(projectId, signal);
   }
 }
 
