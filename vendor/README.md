@@ -134,7 +134,7 @@ suite under `bun test`, which accepts vitest's imports, with
 `src/vitest-setup.ts` preloaded. Every file runs in a fresh global
 (`--isolate`), so static state such as `ReadWriteFs`'s mutation queue
 or a module mock never crosses files. Locally the files run one by one;
-CI's `vendor` job passes `ARGS=--parallel`, a process per worker. Some
+CI's `vendor-test` job passes `ARGS=--parallel`, a process per worker. Some
 tests fail upstream under Bun as well:
 
 - the `bundle` tests: they need the built `dist/`;
@@ -168,10 +168,12 @@ and the platform's `realpath`, are skipped where they would differ
 connector-hook rejection checks outside the upstream tree.
 
 `vendor/just-bash-failures.txt` lists every expected failure by name,
-and every test file that failed to load with its first error line, or
-`unhandled error` when bun printed none, since such a file runs none of
-its tests; a run also fails when bun's count of errors differs from the
-errors in its log. It is recorded on Linux as a
+the first error line of every test file that failed to load, since
+such a file runs none of its tests, or `unhandled error` when bun
+printed none, and `(errors) N`, bun's count of them, since one message
+can stand for several files. The lines name no file of their own:
+`--parallel` prints them apart from it. A run also fails when bun's
+count differs from the errors in its log. It is recorded on Linux as a
 user other than root, and the same list holds on macOS. The run fails
 at once when the set moves either way, a new failure or a listed one
 passing, with no retry: it prints the diff and what bun said before

@@ -49,17 +49,19 @@ run() {
   fi
 
   # A file that fails to load runs none of its tests, so its error is
-  # listed too: the file and the first error line of each, with the
-  # checkout's path taken out, or "unhandled error" when no line names one.
+  # listed too: the first error line of each, with the checkout's path
+  # taken out, or "unhandled error" when there is none. Under --parallel
+  # bun prints these apart from their file, so no file is named; the
+  # count line keeps a repeated message strict.
   {
+    echo "(errors) ${errors:-0}"
     awk 'function close_block() {
-           if (want) print file " unhandled error"
+           if (want) print "unhandled error"
            want = 0; dashes = 0
          }
-         /^src\/.*\.test\.ts:$/ { close_block(); file = $0; next }
          /^# Unhandled error/ { close_block(); want = 1; next }
          want && /^-+$/ { if (++dashes == 2) close_block(); next }
-         want && /^([A-Z][A-Za-z]*)?[Ee]rror: / { print file " " $0; want = 0; dashes = 0 }
+         want && /^([A-Z][A-Za-z]*)?[Ee]rror: / { print; want = 0; dashes = 0 }
          END { close_block() }' "$LOG" |
       sed "s|$DIR/||g" || true
     grep '^(fail)' "$LOG" | sed -E 's/ \[[0-9.]+m?s\]$//' || true
@@ -81,14 +83,19 @@ if $update; then
 fi
 
 if ! diff -u "$LIST" "$LOG.now"; then
-  # what bun said about each new failure, since the list keeps only names:
-  # the lines before a failed test, the lines after a load error's file
+  # what bun said before each new failure or load error, best effort,
+  # since the list keeps only names and first lines
   LC_ALL=C comm -13 "$LIST" "$LOG.now" | while IFS= read -r line; do
-    if [[ $line == "(fail) "* ]]; then
-      grep -aF -B 30 -- "$line" "$LOG" | grep -av '^(pass)' | tail -30 || true
-    else
-      grep -axF -A 30 -- "${line%%: *}:" "$LOG" | grep -av '^(pass)' | head -30 || true
-    fi
+    case $line in
+    "(errors) "*) ;;
+    "unhandled error")
+      grep -a -A 20 '^# Unhandled error' "$LOG" | head -60 || true
+      ;;
+    *)
+      sed "s|$DIR/||g" "$LOG" | grep -aF -B 30 -- "$line" |
+        grep -av '^(pass)' | tail -30 || true
+      ;;
+    esac
   done
   echo "vendor-test: failures differ from vendor/just-bash-failures.txt" >&2
   exit 1

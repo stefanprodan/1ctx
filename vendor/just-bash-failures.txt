@@ -1,3 +1,4 @@
+(errors) 15
 (fail) (unnamed)
 (fail) AGENTS.npm.md Bash examples > should execute bash examples without errors
 (fail) AGENTS.npm.md Bash examples > should have bash code blocks
@@ -187,18 +188,16 @@
 (fail) yq format strings > edge cases > @csv on non-array returns null
 (fail) yq format strings > edge cases > @csv with null values
 (fail) yq format strings > edge cases > @sh on non-string returns null
-src/security/attacks/defense-in-depth-independence.test.ts: TypeError: describe.runIf is not a function. (In 'describe.runIf(typeof nodeModule.registerHooks === "function")', 'describe.runIf' is undefined)
-src/security/attacks/query-engine-defense-violation-probes.test.ts: TypeError: describe.runIf is not a function. (In 'describe.runIf(typeof nodeModule.registerHooks === "function")', 'describe.runIf' is undefined)
-src/security/defense-in-depth-exploit-regression.test.ts: TypeError: describe.runIf is not a function. (In 'describe.runIf(typeof nodeModule.registerHooks === "function")', 'describe.runIf' is undefined)
-src/security/defense-in-depth-lifecycle.test.ts: error: Cannot find package 'tsx' from 'src/security/defense-in-depth-lifecycle.test.ts'
-src/security/defense-in-depth-trusted-settlement.test.ts: error: Cannot find package 'tsx' from 'src/security/defense-in-depth-trusted-settlement.test.ts'
-src/security/defense-runtime-capability.test.ts: error: Cannot find package 'tsx' from 'src/security/defense-runtime-capability.test.ts'
-src/security/fuzzing/__tests__/fuzz-coverage.test.ts: error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
-src/security/fuzzing/__tests__/fuzz-dos.test.ts: error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
-src/security/fuzzing/__tests__/fuzz-malformed.test.ts: error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-malformed.test.ts'
-src/security/fuzzing/__tests__/fuzz-sandbox.test.ts: error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-sandbox.test.ts'
-src/security/fuzzing/generators/grammar-generator.test.ts: error: Cannot find package 'fast-check' from 'src/security/fuzzing/generators/grammar-generator.test.ts'
-src/security/module-accessor-descriptors.test.ts: error: Cannot find package 'tsx' from 'src/security/module-accessor-descriptors.test.ts'
-src/security/module-accessor-redefinition.test.ts: error: Cannot find package 'tsx' from 'src/security/module-accessor-redefinition.test.ts'
-src/security/symbol-locking.test.ts: TypeError: it.runIf is not a function. (In 'it.runIf(typeof nodeModule.registerHooks === "function")', 'it.runIf' is undefined)
-src/worker-lifecycle.browser-build.test.ts: error: Cannot find package 'esbuild' from 'src/worker-lifecycle.browser-build.test.ts'
+TypeError: describe.runIf is not a function. (In 'describe.runIf(typeof nodeModule.registerHooks === "function")', 'describe.runIf' is undefined)
+TypeError: it.runIf is not a function. (In 'it.runIf(typeof nodeModule.registerHooks === "function")', 'it.runIf' is undefined)
+error: Cannot find package 'esbuild' from 'src/worker-lifecycle.browser-build.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-malformed.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-sandbox.test.ts'
+error: Cannot find package 'fast-check' from 'src/security/fuzzing/generators/grammar-generator.test.ts'
+error: Cannot find package 'tsx' from 'src/security/defense-in-depth-lifecycle.test.ts'
+error: Cannot find package 'tsx' from 'src/security/defense-in-depth-trusted-settlement.test.ts'
+error: Cannot find package 'tsx' from 'src/security/defense-runtime-capability.test.ts'
+error: Cannot find package 'tsx' from 'src/security/module-accessor-descriptors.test.ts'
+error: Cannot find package 'tsx' from 'src/security/module-accessor-redefinition.test.ts'

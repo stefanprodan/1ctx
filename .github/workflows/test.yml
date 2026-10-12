@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  build-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -86,7 +86,7 @@ jobs:
                 deploy/docker
               helm-charts: "true"
 
-  vendor:
+  vendor-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
