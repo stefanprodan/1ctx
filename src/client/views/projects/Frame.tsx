@@ -81,7 +81,7 @@ export function Frame({
             shown !== null && (
               <>
                 <AsideSection label="About">
-                  {about !== null && <AsideNote>{about}</AsideNote>}
+                  {about !== null && <AsideNote links>{about}</AsideNote>}
                   {knowledge.files > 0 && (
                     <AsideLine label="Knowledge">
                       {knowledgeWords(knowledge)}

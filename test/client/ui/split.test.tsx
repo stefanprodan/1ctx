@@ -9,6 +9,7 @@ import {
   AsideLine,
   AsideNames,
   AsideNote,
+  textLinks,
 } from "../../../src/client/ui/Split.tsx";
 
 const plain = (html: string) => html.replaceAll("<!-- -->", "");
@@ -50,6 +51,17 @@ describe("AsideLine", () => {
         </AsideLine>,
       ),
     ).toContain('<span class="split-strong cut" title="http-x.key">');
+  });
+
+  test("a cut value with a child that draws nothing still gets the title", () => {
+    const html = render(
+      <AsideLine label="Key file" cut>
+        {false}
+        mcp-github.key
+        {null}
+      </AsideLine>,
+    );
+    expect(html).toContain('title="mcp-github.key"');
   });
 
   test("a value that wraps has no title", () => {
@@ -122,6 +134,64 @@ describe("AsideNote", () => {
     );
     expect(render(<AsideNote tone="error">No fire</AsideNote>)).toBe(
       '<p class="split-note split-note-error">No fire</p>',
+    );
+  });
+});
+
+describe("an about line's links", () => {
+  test("splits out each web address, its closing mark left as text", () => {
+    expect(
+      textLinks("Runbooks at https://wiki.test/sre. And http://a.test/x"),
+    ).toEqual([
+      { text: "Runbooks at " },
+      { text: "https://wiki.test/sre", href: "https://wiki.test/sre" },
+      { text: ". And " },
+      { text: "http://a.test/x", href: "http://a.test/x" },
+    ]);
+    expect(textLinks("(see https://a.test/b)")).toEqual([
+      { text: "(see " },
+      { text: "https://a.test/b", href: "https://a.test/b" },
+      { text: ")" },
+    ]);
+  });
+
+  test("strips a run of unmatched closing marks after an address", () => {
+    expect(textLinks("(see (https://a.test/x_(y))).")).toEqual([
+      { text: "(see (" },
+      { text: "https://a.test/x_(y)", href: "https://a.test/x_(y)" },
+      { text: "))." },
+    ]);
+  });
+
+  test("keeps an address's own parentheses and never links mid word", () => {
+    expect(textLinks("See https://w.test/wiki/Foo_(bar).")).toEqual([
+      { text: "See " },
+      {
+        text: "https://w.test/wiki/Foo_(bar)",
+        href: "https://w.test/wiki/Foo_(bar)",
+      },
+      { text: "." },
+    ]);
+    expect(textLinks("foohttps://a.test x")).toEqual([
+      { text: "foohttps://a.test x" },
+    ]);
+  });
+
+  test("links nothing else: a text without a web address stays whole", () => {
+    expect(textLinks("Incidents and pages")).toEqual([
+      { text: "Incidents and pages" },
+    ]);
+    expect(textLinks("ftp://a.test or javascript:alert(1)")).toEqual([
+      { text: "ftp://a.test or javascript:alert(1)" },
+    ]);
+    expect(textLinks("")).toEqual([]);
+  });
+
+  test("a note with links opens them in a new tab, quiet", () => {
+    expect(
+      plain(render(<AsideNote links>Docs at https://a.test/d</AsideNote>)),
+    ).toBe(
+      '<p class="split-note">Docs at <a class="split-handle" href="https://a.test/d" target="_blank" rel="noopener">https://a.test/d</a></p>',
     );
   });
 });

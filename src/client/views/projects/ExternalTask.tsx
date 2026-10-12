@@ -35,7 +35,6 @@ import {
   AsideHandle,
   AsideLine,
   AsideNames,
-  AsideNote,
   AsideSection,
   Split,
 } from "../../ui/Split.tsx";
@@ -141,9 +140,7 @@ function Brief({
       <p class="external-tasks-brief-foot external-tasks-brief-narrow">
         <State task={task} />
         {deadline !== null && (
-          <span>
-            Unclaimed at {deadlineTime(deadline, now)} without a report
-          </span>
+          <span>Claim ends {deadlineTime(deadline, now)}</span>
         )}
         {task.scope !== null && <span>Scope: {task.scope}</span>}
       </p>
@@ -176,9 +173,7 @@ function Aside({
         </AsideLine>
       )}
       {deadline !== null && (
-        <AsideNote>
-          Unclaimed at {deadlineTime(deadline, now)} without a report
-        </AsideNote>
+        <AsideLine label="Claim ends">{deadlineTime(deadline, now)}</AsideLine>
       )}
       {task.scope !== null && <AsideLine label="Scope">{task.scope}</AsideLine>}
       {task.createdBy !== null && (

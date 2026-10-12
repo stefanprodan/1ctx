@@ -34,12 +34,14 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   the detail carries its title, otherwise "Made in a chat", unlinked. A
   title cut short ends on a whole word (`chatName()`). The timeline
   tells the story, the aside the state.
-- **The aside's Task section opens with the state** in words, then
-  Claimed by (`@user via key`) while held, then, while claimed, when the
-  idle sweep unclaims it: the claim's `activeAt` plus the idle hours, at
-  a time today, else the day too (`sinceText()`). Scope follows. Under
-  1100, where the aside hides, the whole state line with its icon, the
-  deadline and the scope sit in a small line under the brief's files.
+- **The aside's Task section opens with the state** as a word, no
+  icon, then Claimed by while held: the user's handle linked to their
+  page, then "via" and the key's name. While claimed, Claim ends says
+  when the idle sweep unclaims it: the claim's `activeAt` plus the idle
+  hours, at a time today, else on the date as Created reads, then the
+  time (`deadlineTime()`). Scope follows and wraps. Under 1100, where
+  the aside hides, the whole state line with its icon, Claim ends and
+  the scope sit in a small line under the brief's files.
 - **An edit shows only the form and the aside.** The moves, the answer
   box and the timeline stay mounted under `hidden`, so a draft answer
   survives and no move runs under the open form.

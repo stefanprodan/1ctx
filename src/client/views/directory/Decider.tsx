@@ -7,11 +7,10 @@
 // decisions it answers now, each drawn as the admin's Decisions list
 // draws it, from the words in code: its options and an admin's text
 // stay on the admin pages, and the row is no link, since a member
-// cannot open them. The aside is the model's facts and when the
-// decider was added, with Manage for an admin.
+// cannot open them. The aside is when the decider was added, with
+// Manage for an admin: the head already says the model.
 
 import { useMemo } from "preact/hooks";
-import { shortModel, windowLine } from "../../agents/meta.ts";
 import type { Params } from "../../app/params.ts";
 import {
   deciderDays,
@@ -27,7 +26,6 @@ import {
   DIRECTORY_HREF,
 } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
-import { Fit } from "../../ui/Fit.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -39,7 +37,6 @@ import {
 } from "../../ui/Rows.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
-import { inputPriceLine } from "../admin/Deciders.model.ts";
 import { DECISION_WORDS } from "../admin/Decisions.model.ts";
 import { ANSWER_WORDS, activityModel } from "../projects/Activity.model.ts";
 import { Activity, ActivityGhost } from "../projects/Activity.tsx";
@@ -97,47 +94,23 @@ export function Decider({ params }: { params: Params }) {
       {shown && (
         <Split
           aside={
-            <>
-              <AsideSection label="Model">
-                <AsideLine label="Provider" cut>
-                  {shown.provider}
-                </AsideLine>
-                <AsideLine label="Model" cut>
-                  <Fit
-                    class="cut"
-                    long={shown.decider.model}
-                    short={shortModel(shown.decider.model)}
-                  />
-                </AsideLine>
-                {shown.decider.contextLength !== null && (
-                  <AsideLine label="Context">
-                    {windowLine(shown.decider.contextLength)}
-                  </AsideLine>
-                )}
-                {shown.decider.promptPrice !== null && (
-                  <AsideLine label="Price">
-                    {inputPriceLine(shown.decider.promptPrice)}
-                  </AsideLine>
-                )}
-              </AsideSection>
-              <AsideSection
-                label="Decider"
-                action={
-                  me.value?.role === "admin" ? (
-                    <a
-                      class="split-link"
-                      href={configDeciderHref(shown.decider.name)}
-                    >
-                      Manage
-                    </a>
-                  ) : undefined
-                }
-              >
-                <AsideLine label="Added">
-                  {longDate(shown.decider.createdAt)}
-                </AsideLine>
-              </AsideSection>
-            </>
+            <AsideSection
+              label="Decider"
+              action={
+                me.value?.role === "admin" ? (
+                  <a
+                    class="split-link"
+                    href={configDeciderHref(shown.decider.name)}
+                  >
+                    Manage
+                  </a>
+                ) : undefined
+              }
+            >
+              <AsideLine label="Added">
+                {longDate(shown.decider.createdAt)}
+              </AsideLine>
+            </AsideSection>
           }
         >
           <div class="directory">

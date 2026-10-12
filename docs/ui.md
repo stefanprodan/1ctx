@@ -86,7 +86,11 @@ open row's body or a meta. The shared shapes are below.
   label and its value), `AsideItem` (one thing in a list) and
   `AsideNote` (a sentence). No view writes their classes by hand (the
   structure test). `Page` alone has no aside. The aside holds only real
-  numbers, and is hidden under 1100.
+  numbers, and is hidden under 1100. An aside never repeats its page:
+  what the head says (an agent's model) stays out of it, and a page's
+  line of what the aside holds (a user's local time, a task's state)
+  shows only under 1100. A note's web addresses link with `links`,
+  opening a new tab.
 - **A list in an aside is `AsideItem`:** the name in the aside's own
   text, never mono whatever the rows use, linked when it has a page,
   a count or word at the right, an optional faint line under it.

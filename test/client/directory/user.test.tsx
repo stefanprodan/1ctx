@@ -187,16 +187,27 @@ describe("the user page's activity", () => {
 });
 
 describe("the user page's About", () => {
-  test.serial("ends on the time where the user is", () => {
+  test.serial("holds only the text, the time being the aside's", () => {
     userPage.value = {
       ...bogdan,
       user: { ...bogdan.user, tz: "Europe/Bucharest", about: "Head of SRE." },
     };
     const html = render(<User params={{ username: "bogdan" }} />);
     expect(html).toContain(">Head of SRE.<");
+    expect(html).not.toContain("directory-foot");
     expect(html).toMatch(
-      /class="directory-foot">.*Local time<\/span>\d\d:\d\d · GMT\+[23]</,
+      /<span class="split-label">Local time<\/span><span class="split-strong">\d\d:\d\d · GMT\+[23]</,
     );
+  });
+
+  test.serial("says when nothing is written", () => {
+    userPage.value = {
+      ...bogdan,
+      user: { ...bogdan.user, tz: "Nowhere/Land" },
+    };
+    const html = render(<User params={{ username: "bogdan" }} />);
+    expect(html).toContain("Nothing written yet.");
+    expect(html).not.toContain("directory-foot");
   });
 
   test.serial("drops the time for a zone the browser does not know", () => {
@@ -205,8 +216,9 @@ describe("the user page's About", () => {
       user: { ...bogdan.user, tz: "Nowhere/Land" },
     };
     const html = render(<User params={{ username: "bogdan" }} />);
-    expect(html).toContain("Nothing written yet.");
-    expect(html).not.toContain("directory-foot");
+    expect(html).not.toContain(">Local time<");
+    expect(html).not.toContain(" in Nowhere/Land");
+    expect(html).toContain(">Nowhere/Land<");
   });
 });
 

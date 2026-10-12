@@ -44,6 +44,8 @@ function textOf(children: ComponentChildren): string | undefined {
   if (typeof children === "string" || typeof children === "number") {
     return String(children);
   }
+  // what a `cond && x` child leaves when it draws nothing
+  if (children == null || typeof children === "boolean") return "";
   if (isValidElement(children)) {
     return textOf(
       (children.props as { children?: ComponentChildren }).children,
@@ -72,7 +74,7 @@ export function AsideLine({
   children: ComponentChildren;
 }) {
   const strong = `split-strong${cut ? " cut" : ""}${quiet ? " split-quiet" : ""}${href === undefined ? "" : " split-handle"}`;
-  const title = cut ? textOf(children) : undefined;
+  const title = (cut && textOf(children)) || undefined;
   return (
     <div class="split-line split-pair">
       <span class="split-label">{label}</span>
@@ -169,17 +171,73 @@ export function AsideItem({
   );
 }
 
-// a sentence in a section rather than a label and its value
+// an address's end without a sentence's closing marks; a closing
+// parenthesis stays when the address opened one, as a wiki's do
+function addressEnd(url: string): string {
+  let open = 0;
+  let close = 0;
+  for (const c of url) {
+    if (c === "(") open++;
+    else if (c === ")") close++;
+  }
+  let end = url.length;
+  for (;;) {
+    const c = url[end - 1];
+    if (c !== undefined && ".,;:!?'\"]".includes(c)) end--;
+    else if (c === ")" && close > open) {
+      end--;
+      close--;
+    } else return url.slice(0, end);
+  }
+}
+
+// a text's runs, each web address its own with its href; an address
+// starts a word, so text glued before it never links
+export function textLinks(text: string): { text: string; href?: string }[] {
+  const out: { text: string; href?: string }[] = [];
+  let at = 0;
+  for (const m of text.matchAll(/(?<![\w/])https?:\/\/[^\s<>"]+/g)) {
+    const url = addressEnd(m[0]);
+    if (!/^https?:\/\/./.test(url)) continue;
+    const start = m.index ?? 0;
+    if (start > at) out.push({ text: text.slice(at, start) });
+    out.push({ text: url, href: url });
+    at = start + url.length;
+  }
+  if (at < text.length) out.push({ text: text.slice(at) });
+  return out;
+}
+
+// a sentence in a section rather than a label and its value; with
+// links, its web addresses open in a new tab as a message's do
 export function AsideNote({
   tone,
+  links,
   children,
 }: {
   tone?: "faint" | "error";
+  links?: boolean;
   children: ComponentChildren;
 }) {
   return (
     <p class={`split-note${tone === undefined ? "" : ` split-note-${tone}`}`}>
-      {children}
+      {links && typeof children === "string"
+        ? textLinks(children).map((part, i) =>
+            part.href === undefined ? (
+              part.text
+            ) : (
+              <a
+                key={i}
+                class="split-handle"
+                href={part.href}
+                target="_blank"
+                rel="noopener"
+              >
+                {part.text}
+              </a>
+            ),
+          )
+        : children}
     </p>
   );
 }

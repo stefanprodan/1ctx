@@ -9,7 +9,6 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import type { TaskPage } from "../../../src/client/data/external-task.ts";
-import { sinceText } from "../../../src/client/feed/Row.model.ts";
 import { Icon } from "../../../src/client/lib/icons.tsx";
 import {
   TaskBody,
@@ -183,15 +182,15 @@ describe("the scope", () => {
 });
 
 describe("the idle deadline", () => {
-  const words = (at: number) =>
-    `<p class="split-note">Unclaimed at ${sinceText(at, NOW)} without a report</p>`;
+  // a line of its own, dated as Created is when it is not today
+  const words = (when: string) =>
+    `<span class="split-label">Claim ends</span><span class="split-strong">${when}</span>`;
 
   test("is the claim's last activity plus the limit, only while claimed", () => {
     const html = draw(page(row({ state: "claimed", claim })));
-    const at = claim.activeAt + 24 * HOUR;
-    expect(aside(html)).toContain(words(at));
+    expect(aside(html)).toContain(words("13 October 2026, 08:00"));
     expect(narrow(html)).toContain(
-      `<span>Unclaimed at ${sinceText(at, NOW)} without a report</span>`,
+      "<span>Claim ends 13 October 2026, 08:00</span>",
     );
     expect(html).not.toContain("Opens again");
     for (const task of [
@@ -200,14 +199,15 @@ describe("the idle deadline", () => {
       row({ state: "done" }),
     ]) {
       expect(draw(page(task))).not.toContain("Unclaimed at");
+      expect(draw(page(task))).not.toContain("Claim ends");
     }
   });
 
   test("moves on with a report", () => {
     const reported = { ...claim, activeAt: NOW };
     const html = draw(page(row({ state: "claimed", claim: reported })));
-    expect(aside(html)).toContain(words(NOW + 24 * HOUR));
-    expect(aside(html)).not.toContain(words(claim.activeAt + 24 * HOUR));
+    expect(aside(html)).toContain(words("13 October 2026, 09:00"));
+    expect(aside(html)).not.toContain(words("13 October 2026, 08:00"));
   });
 });
 
