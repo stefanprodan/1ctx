@@ -848,7 +848,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
             externalTasks.store.openClaims().map((claim) => claim.key_id),
           ),
         );
-        const externalIdle = externalTasks.releaseIdle(now);
+        const externalIdle = externalTasks.unclaimIdle(now);
         const externalDeleted = externalTasks.deleteClosed(now);
         const removed =
           logins +

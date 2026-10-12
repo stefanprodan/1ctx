@@ -219,7 +219,7 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     text: "Days a done or dropped external task is kept.",
   },
   externalTaskIdleHours: {
-    label: "Release idle claims",
+    label: "Unclaim idle tasks",
     text: "Hours without a report before a claimed task opens again.",
   },
 };

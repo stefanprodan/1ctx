@@ -76,7 +76,7 @@ const present = (fields: (string | null | undefined)[]): string[] =>
 
 // what the page's search matches in a current task
 export const taskFields = (row: ExternalTaskRow): string[] =>
-  present([row.title, row.part, row.createdBy?.username, row.claim?.username]);
+  present([row.title, row.scope, row.createdBy?.username, row.claim?.username]);
 
 // a frame's closed row under the server's search: its fields, a closed
 // task holding no claim, by the server's ASCII-only case rule
@@ -85,7 +85,7 @@ export const closedTakes =
   (row: ExternalTaskRow): boolean =>
     !unfinished(row.state) &&
     (filter.state === null || row.state === filter.state) &&
-    present([row.title, row.part, row.createdBy?.username]).some((field) =>
+    present([row.title, row.scope, row.createdBy?.username]).some((field) =>
       searched(field, filter.q),
     );
 

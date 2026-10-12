@@ -16,7 +16,7 @@
     font-size: var(--text-ui);
     color: var(--dim);
   }
-  /* the idle release and the chat it was made in, phone width too */
+  /* the idle unclaim and the chat it was made in, phone width too */
   .external-tasks-brief-foot {
     display: flex;
     flex-wrap: wrap;

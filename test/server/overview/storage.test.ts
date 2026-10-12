@@ -89,7 +89,7 @@ describe("the storage scan", () => {
       const made = tasks.create(chat.memberId, chat.projectId, {
         title: state,
         text: "Brief \u00e9",
-        part: "Part",
+        scope: "Part",
         fileIds: [],
       });
       const id = made.task.task.id;

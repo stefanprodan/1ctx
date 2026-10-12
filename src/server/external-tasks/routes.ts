@@ -130,7 +130,7 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
         return json(write(principal, id, () => tasks.edit(id, body)));
       },
     },
-    ...(["answer", "release", "drop", "reopen"] as const).map(
+    ...(["answer", "unclaim", "drop", "reopen"] as const).map(
       (move): RouteDescriptor => ({
         method: "POST",
         path: `/api/external-tasks/:id/${move}`,

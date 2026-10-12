@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An external task's page: the brief (its part and state, the text cut
+// An external task's page: the brief (its scope and state, the text cut
 // to a few lines, the linked files, a deleted one marked), edited in
 // place while the task is unfinished; the member's moves; the answer
 // box while blocked; then the timeline. The aside has who made it and
@@ -40,9 +40,9 @@ function Brief({ detail, idle }: { detail: ExternalTaskDetail; idle: number }) {
   return (
     <section class="card external-tasks-brief">
       <p class="external-tasks-brief-line">
-        {task.part !== null && (
+        {task.scope !== null && (
           <>
-            <RowsTag>{task.part}</RowsTag>{" "}
+            <RowsTag>{task.scope}</RowsTag>{" "}
           </>
         )}
         {stateLine(task)}

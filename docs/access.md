@@ -84,7 +84,7 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   rows count, expired ones included. Lowering it deletes nothing; raising
   it from 0 lets retained unexpired keys work again.
 - **The task sweep shares the endpoint's key availability rule.**
-  Gone or expired keys and every key at cap 0 release their claims.
+  Gone or expired keys and every key at cap 0 unclaim their tasks.
   A positive cap leaves every retained unexpired key available.
   This read deletes no key.
 - **A missing, malformed, unknown or expired bearer is a plain 401,**
@@ -225,8 +225,8 @@ from `emailOn` in `GET /api/me`.
   lets a member write a team project's. A key file's name (`keyName`)
   is in an admin's answer only.
 - **Removing a member drops their waiting messages in the same
-  transaction.** If they lose visibility, it also releases their task
-  claims there. An admin made a member releases claims only in team
+  transaction.** If they lose visibility, it also unclaims their tasks
+  there. An admin made a member unclaims tasks only in team
   projects they have not joined; both use a closure port.
 - **Anyone who may open a chat may archive it.** Rename and delete are
   in `docs/sessions.md`.

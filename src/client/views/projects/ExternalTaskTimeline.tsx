@@ -22,14 +22,10 @@ import {
   RowsNote,
   RowsTag,
 } from "../../ui/Rows.tsx";
-import {
-  ENTRY_WORDS,
-  entryBy,
-  GONE_USER,
-  webLink,
-} from "./ExternalTasks.model.ts";
+import { entryBy, GONE_USER, webLink } from "./ExternalTasks.model.ts";
 import {
   ENTRY_ICONS,
+  entryWords,
   type TimelineLine,
   timelineOf,
 } from "./ExternalTaskTimeline.model.ts";
@@ -74,7 +70,7 @@ function Entry({ line, now }: { line: TimelineLine; now: number }) {
               size={14}
               class="external-tasks-kind-icon"
             />
-            {ENTRY_WORDS[entry.kind]}
+            {entryWords(entry)}
           </span>
           <By entry={entry} />
           <span class="external-tasks-when">{ago(entry.at, now)}</span>

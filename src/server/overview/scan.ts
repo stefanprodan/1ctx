@@ -370,7 +370,7 @@ function externalTasks(db: Db): ScanResult["externalTasks"] {
     closed: total(
       db,
       `select sum(octet_length(t.title) + octet_length(t.text)
-        + coalesce(octet_length(t.part), 0)
+        + coalesce(octet_length(t.scope), 0)
         + coalesce((select sum(octet_length(text) + octet_length(links))
             from external_task_entries where task_id = t.id), 0)
         + coalesce((select sum(octet_length(last_task))

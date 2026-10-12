@@ -18,7 +18,7 @@ describe("external task writes", () => {
     progress: { claimed: "claimed", blocked: "claimed" },
     question: { claimed: "blocked" },
     result: { claimed: "done", blocked: "done" },
-    release: { claimed: "open", blocked: "open" },
+    unclaim: { claimed: "open", blocked: "open" },
   };
   for (const state of EXTERNAL_TASK_STATES) {
     for (const kind of AGENT_ENTRY_KINDS) {
@@ -62,12 +62,12 @@ describe("external task writes", () => {
   }
   const memberStates = {
     answer: { claimed: "claimed", blocked: "claimed" },
-    release: { claimed: "open", blocked: "open" },
+    unclaim: { claimed: "open", blocked: "open" },
     drop: { open: "dropped", claimed: "dropped", blocked: "dropped" },
     reopen: { done: "open", dropped: "open" },
   };
   for (const state of EXTERNAL_TASK_STATES) {
-    for (const kind of ["answer", "release", "drop", "reopen"] as const) {
+    for (const kind of ["answer", "unclaim", "drop", "reopen"] as const) {
       test(`member ${kind} while ${state}`, () => {
         using f = fixture();
         const task = f.task(state);
@@ -90,7 +90,7 @@ describe("external task writes", () => {
             by: { id: f.member.id, username: "member" },
             keyName: null,
             claimId:
-              kind === "release" || kind === "drop"
+              kind === "unclaim" || kind === "drop"
                 ? (task.claim?.id ?? null)
                 : null,
           });
@@ -113,7 +113,7 @@ describe("external task writes", () => {
       }, silent);
       try {
         const task = f.task("claimed");
-        f.area.report(f.key, task.id, task.claimId!, "release", "Later.", []);
+        f.area.report(f.key, task.id, task.claimId!, "unclaim", "Later.", []);
         const marked = f.area.store.byId(task.id)!;
         expect(marked.attentionAt).not.toBeNull();
         expect(() =>
@@ -187,10 +187,10 @@ describe("external task writes", () => {
     expect(f.area.store.byId(task.id)!.claim?.userId).toBe(f.owner.id);
   });
 
-  test("stale member states and release claim ids write nothing", () => {
+  test("stale member states and unclaim claim ids write nothing", () => {
     using f = fixture();
     const task = f.task("claimed");
-    for (const kind of ["answer", "release", "drop", "reopen"] as const) {
+    for (const kind of ["answer", "unclaim", "drop", "reopen"] as const) {
       refuses(
         () =>
           f.area[kind](f.owner.id, task.id, {
@@ -202,7 +202,7 @@ describe("external task writes", () => {
         STALE_TASK,
       );
     }
-    f.area.release(f.member.id, task.id, {
+    f.area.unclaim(f.member.id, task.id, {
       state: "claimed",
       claimId: task.claimId!,
       text: "Start again.",
@@ -211,10 +211,10 @@ describe("external task writes", () => {
     const before = f.area.show(task.id, null);
     refuses(
       () =>
-        f.area.release(f.owner.id, task.id, {
+        f.area.unclaim(f.owner.id, task.id, {
           state: "claimed",
           claimId: task.claimId!,
-          text: "Late release.",
+          text: "Late unclaim.",
         }),
       409,
       STALE_TASK,
@@ -346,7 +346,7 @@ describe("external task writes", () => {
     ).toBe("New title");
   });
 
-  for (const kind of ["answer", "release", "drop", "reopen"] as const) {
+  for (const kind of ["answer", "unclaim", "drop", "reopen"] as const) {
     test(`member ${kind} clears attention`, () => {
       using f = fixture();
       const task = f.task(kind === "reopen" ? "done" : "blocked");

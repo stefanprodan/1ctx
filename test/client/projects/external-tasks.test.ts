@@ -79,7 +79,7 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  part: null,
+  scope: null,
   state: "open",
   revision: 1,
   editRevision: 0,
@@ -196,22 +196,22 @@ describe("the moves", () => {
     expect(movesOf("open")).toEqual({
       edit: true,
       answer: false,
-      release: false,
+      unclaim: false,
       drop: true,
       reopen: false,
     });
     expect(movesOf("blocked")).toEqual({
       edit: true,
       answer: true,
-      release: true,
+      unclaim: true,
       drop: true,
       reopen: false,
     });
-    expect(movesOf("claimed").release).toBe(true);
+    expect(movesOf("claimed").unclaim).toBe(true);
     expect(movesOf("done")).toEqual({
       edit: false,
       answer: false,
-      release: false,
+      unclaim: false,
       drop: false,
       reopen: true,
     });
@@ -220,7 +220,7 @@ describe("the moves", () => {
 });
 
 describe("the brief's form", () => {
-  const draft = { title: "Sweep", part: "", text: "Do it", fileIds: [] };
+  const draft = { title: "Sweep", scope: "", text: "Do it", fileIds: [] };
 
   test("a title is required and one line, the brief is required", () => {
     expect(requestOf({ ...draft, title: " " })).toEqual({
@@ -244,9 +244,9 @@ describe("the brief's form", () => {
     ).toMatchObject({ field: "files" });
   });
 
-  test("an empty part is sent as none", () => {
-    expect(requestOf({ ...draft, title: " Sweep ", part: " " })).toEqual({
-      body: { title: "Sweep", text: "Do it", part: null, fileIds: [] },
+  test("an empty scope is sent as none", () => {
+    expect(requestOf({ ...draft, title: " Sweep ", scope: " " })).toEqual({
+      body: { title: "Sweep", text: "Do it", scope: null, fileIds: [] },
     });
   });
 
@@ -279,11 +279,11 @@ const realFetch = globalThis.fetch;
 let calls: { call: string; body: unknown }[] = [];
 let answer: (method: string, url: string) => Response;
 let user = 0;
-// while set, every call waits for release()
+// while set, every call waits for unclaim()
 let hold = false;
 let gates: (() => void)[] = [];
 
-const release = async () => {
+const unclaim = async () => {
   hold = false;
   for (const open of gates.splice(0)) open();
   await settle();
@@ -403,18 +403,18 @@ describe("the entity", () => {
   test.serial("a list read before a close never brings it back", async () => {
     answer = () => Response.json(listAnswer([row({ id: "a", revision: 1 })]));
     await loadExternalTasks("p1");
-    let release: () => void = () => {};
+    let unclaim: () => void = () => {};
     answer = () => Response.json(listAnswer([row({ id: "a", revision: 1 })]));
     const realAnswer = answer;
     globalThis.fetch = (async (url: string, init?: RequestInit) => {
       await new Promise<void>((resolve) => {
-        release = resolve;
+        unclaim = resolve;
       });
       return realAnswer(init?.method ?? "GET", url);
     }) as unknown as typeof fetch;
     const load = loadExternalTasks("p1");
     send(frame(row({ id: "a", revision: 2, state: "dropped", entries: 1 })));
-    release();
+    unclaim();
     await load;
     expect(externalTasks.value).toEqual([]);
   });
@@ -474,18 +474,18 @@ describe("the entity", () => {
     },
   );
 
-  test.serial("a release names the state and the claim shown", async () => {
+  test.serial("an unclaim names the state and the claim shown", async () => {
     const held = row({ state: "claimed", claim, revision: 4 });
     answer = () =>
       Response.json(pageAnswer({ ...held, state: "open", claim: null }));
-    await moveExternalTask("t1", "release", {
+    await moveExternalTask("t1", "unclaim", {
       state: "claimed",
       claimId: "c1",
       text: "wrong plan",
     });
     expect(calls).toEqual([
       {
-        call: "POST /api/external-tasks/t1/release",
+        call: "POST /api/external-tasks/t1/unclaim",
         body: { state: "claimed", claimId: "c1", text: "wrong plan" },
       },
     ]);
@@ -548,7 +548,7 @@ describe("the entity", () => {
     hold = true;
     const load = loadExternalTask("t1");
     send(frame(row({ revision: 5, state: "claimed", claim })));
-    await release();
+    await unclaim();
     await load;
     await settle();
     expect(gets("/api/external-tasks/t1")).toBe(2);
@@ -563,7 +563,7 @@ describe("the entity", () => {
       send(frame(row({ id: "a", revision: 2, state: "claimed", claim })));
       send(frame(row({ id: "b", revision: 1 })));
       expect(gets("/api/projects/p1/external-tasks")).toBe(1);
-      await release();
+      await unclaim();
       await load;
       // the answer may predate the frames: one trailing read settles it
       expect(gets("/api/projects/p1/external-tasks")).toBe(2);
@@ -578,7 +578,7 @@ describe("the entity", () => {
     const load = loadExternalTasks("p1");
     send(frame(row({ id: "a", revision: 2, state: "done", entries: 1 })));
     expect(closedCount.value).toBe(3);
-    await release();
+    await unclaim();
     await load;
     expect(gets("/api/projects/p1/external-tasks")).toBe(3);
   });
@@ -594,7 +594,7 @@ describe("the entity", () => {
       hold = true;
       const load = loadClosedTasks("p1");
       send(frame(row({ id: "a", revision: 2, state: "done", entries: 1 })));
-      await release();
+      await unclaim();
       await load;
       // the flight's pause, then the page again
       await new Promise((resolve) => setTimeout(resolve, 350));
@@ -696,7 +696,7 @@ describe("the entity", () => {
       const load = loadMarkedTasks();
       send(frame(row({ id: "b", attentionAt: 20, revision: 2 })));
       send(frame(row({ id: "a", attentionAt: null, revision: 2 })));
-      await release();
+      await unclaim();
       await load;
       expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["b"]);
       expect(markedTasks.value?.count).toBe(1);
@@ -763,7 +763,7 @@ describe("the entity", () => {
           }),
         ),
       );
-      await release();
+      await unclaim();
       expect(taskPage.value?.entries.map((e) => e.id)).toEqual(["q1"]);
       expect(taskPage.value?.detail.task.revision).toBe(3);
     },
@@ -822,7 +822,7 @@ describe("the entity", () => {
       hold = true;
       const load = loadExternalTask("t1");
       send({ type: "revoked", projectId: "p1" });
-      await release();
+      await unclaim();
       await load;
       expect(taskPage.value).toBeNull();
       expect(taskError.value).toBe("You no longer see this project.");
@@ -830,7 +830,7 @@ describe("the entity", () => {
       hold = true;
       const again = loadExternalTask("t2");
       expect(taskPage.value).toBeNull();
-      await release();
+      await unclaim();
       await again;
     },
   );
@@ -845,7 +845,7 @@ describe("the entity", () => {
       hold = true;
       const load = loadMarkedTasks();
       send(frame(row({ id: "b", attentionAt: 500, revision: 2 })));
-      await release();
+      await unclaim();
       await load;
       await new Promise((resolve) => setTimeout(resolve, 350));
       expect(gets("/api/external-tasks?attention=1")).toBe(2);

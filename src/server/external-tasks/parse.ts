@@ -24,7 +24,7 @@ import {
 // JSON can escape each byte of text as six characters.
 export const MAX_TASK_BODY = 6 * MAX_BRIEF_BYTES + 4096;
 export const MAX_MOVE_BODY = 6 * MAX_ENTRY_BYTES + 1024;
-const BRIEF_KEYS = ["title", "text", "part", "fileIds"];
+const BRIEF_KEYS = ["title", "text", "scope", "fileIds"];
 const ENTRY_ID = new RegExp(`^${ID_SHAPE}$`);
 
 function text(value: unknown, name: string): string {
@@ -36,8 +36,8 @@ function briefValues(body: Record<string, unknown>) {
   const out: Partial<CreateExternalTaskRequest> = {};
   if (Object.hasOwn(body, "title")) out.title = text(body.title, "title");
   if (Object.hasOwn(body, "text")) out.text = text(body.text, "text");
-  if (Object.hasOwn(body, "part")) {
-    out.part = body.part === null ? null : text(body.part, "part");
+  if (Object.hasOwn(body, "scope")) {
+    out.scope = body.scope === null ? null : text(body.scope, "scope");
   }
   if (Object.hasOwn(body, "fileIds")) {
     if (!Array.isArray(body.fileIds)) {
@@ -48,7 +48,7 @@ function briefValues(body: Record<string, unknown>) {
   checkBrief({
     title: out.title ?? "Task",
     text: out.text ?? "",
-    part: out.part ?? null,
+    scope: out.scope ?? null,
     fileIds: out.fileIds ?? [],
   });
   return out;
@@ -65,7 +65,7 @@ export function parseCreateTask(body: unknown): CreateExternalTaskRequest {
   return {
     title: values.title!,
     text: values.text!,
-    part: values.part ?? null,
+    scope: values.scope ?? null,
     fileIds: values.fileIds!,
   };
 }
@@ -92,7 +92,7 @@ export function parseMoveTask(
 ): ExternalTaskMoveRequest {
   const parsed = fields(
     body,
-    move === "release" ? ["state", "text", "claimId"] : ["state", "text"],
+    move === "unclaim" ? ["state", "text", "claimId"] : ["state", "text"],
   );
   if (!isExternalTaskState(parsed.state)) {
     throw new BadRequest("invalid task state");
@@ -102,7 +102,7 @@ export function parseMoveTask(
       ? ""
       : text(parsed.text, "text");
   checkEntry(move, entry, []);
-  if (move !== "release") return { state: parsed.state, text: entry };
+  if (move !== "unclaim") return { state: parsed.state, text: entry };
   const claimId = text(parsed.claimId, "claimId");
   if (claimId === "") throw new BadRequest("claimId must not be empty");
   return { state: parsed.state, text: entry, claimId };

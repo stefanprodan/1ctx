@@ -25,12 +25,12 @@ export function taskSweeps(deps: SweepDeps) {
     for (const claim of claims) {
       const task = store.byId(claim.task_id);
       if (task === null || task.claim?.id !== claim.id) continue;
-      // A live claim has at most 240 counted entries; release fits the 250 cap.
+      // A live claim has at most 240 counted entries; unclaim fits the 250 cap.
       const result = writeEntry(store, task, {
         actor: "access_gone",
-        kind: "release",
+        kind: "unclaim",
         userId: null,
-        text: "released because access ended",
+        text: "unclaimed because access ended",
         links: [],
         at: now,
       });
@@ -47,7 +47,7 @@ export function taskSweeps(deps: SweepDeps) {
         ? []
         : end(store.claimsForUser(userId, projectIds));
     },
-    releaseIdle(now: number): number {
+    unclaimIdle(now: number): number {
       const hours = deps.externalTaskIdleHours();
       const cutoff = now - hours * 3_600_000;
       let count = 0;
@@ -71,9 +71,9 @@ export function taskSweeps(deps: SweepDeps) {
           }
           const result = writeEntry(store, task, {
             actor: "idle",
-            kind: "release",
+            kind: "unclaim",
             userId: null,
-            text: `released after ${hours} hours without a report`,
+            text: `unclaimed after ${hours} hours without a report`,
             links: [],
             at: now,
           });

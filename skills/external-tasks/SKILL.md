@@ -1,15 +1,15 @@
 ---
 name: external-tasks
-description: Work an external task from a 1ctx project through its MCP tasks and knowledge tools, to list, claim, report progress, ask or pick up an answer, finish or release. Load when asked to pick up, claim, continue or report on a 1ctx task, or at the start of a scheduled run that works 1ctx tasks.
+description: Work an external task from a 1ctx project through its MCP tasks and knowledge tools, to list, claim, report progress, ask or pick up an answer, finish or unclaim. Load when asked to pick up, claim, continue or report on a 1ctx task, or at the start of a scheduled run that works 1ctx tasks.
 license: Apache-2.0
 compatibility: Requires the 1ctx MCP server with its tasks and knowledge tools.
 ---
 
 A 1ctx project hands work to you as external tasks. Each has a brief (a
-title, a text, an optional part such as "part B") and linked knowledge
-files, often a plan. You claim a task, do the work where you run, and
-report back so the project sees it. This is how we work one. Change it
-to suit your team.
+title, a text, an optional scope such as "part B" or "the server side")
+and linked knowledge files, often a plan. You claim a task, do the work
+where you run, and report back so the project sees it. This is how we
+work one. Change it to suit your team.
 
 ## Pick and claim
 
@@ -29,7 +29,7 @@ to suit your team.
    `tasks show` says when.
 
 The claim answer says after how many hours without a report the task
-is released. Report at least that often, or it opens again.
+is unclaimed. Report at least that often, or it opens again.
 
 ## Report
 
@@ -42,7 +42,7 @@ Report with `tasks report`, naming the task id, the claim id and a kind.
 - `question`: only when no user is there to answer (see below).
 - `result`: the work is done. Name the files you wrote in the text.
   Links take only web addresses, such as the PR.
-- `release`: you will not finish it. Say why, so the next agent can
+- `unclaim`: you will not finish it. Say why, so the next agent can
   pick it up from your reports instead of starting over.
 
 Write files back with `knowledge edit`, naming the revision you read.
@@ -56,7 +56,7 @@ task stays claimed while you talk, and your next progress keeps it so.
 
 Run unattended, on a schedule, post a `question` rather than a guess:
 the plan contradicts the code, or a merge waits for your user's word.
-The task is blocked and is never released while it waits. Then end the
+The task is blocked and is never unclaimed while it waits. Then end the
 run: nothing wakes you when a member answers.
 
 ## Unattended runs
@@ -71,7 +71,7 @@ key still holds:
   `tasks claim` with its task id to get the claim id back and read the
   answer, then go on.
 - Still claimed: work you left unfinished. Continue from its last
-  report, or release it with a reason.
+  report, or unclaim it with a reason.
 - Blocked and not answered: it waits for a member. Leave it, unless
   you find your own way past your question: then a progress report
   unblocks it.
@@ -79,11 +79,11 @@ key still holds:
 A run that must end before the work is done leaves a progress report
 saying where it stopped, so the next run continues there. Schedule runs
 at least as often as the idle hours the claim states, or a claim is
-released between runs.
+unclaimed between runs.
 
-## Picking up a released task
+## Picking up an unclaimed task
 
-A task released by another agent, or by you in an earlier run, keeps
+A task unclaimed by another agent, or by you in an earlier run, keeps
 its reports. The claim answer lists them: continue from the last one.
 Never redo work a report says is done.
 

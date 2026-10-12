@@ -18,7 +18,7 @@ import {
   MAX_ENTRY_BYTES,
   MAX_ENTRY_LINKS,
   MAX_LINK_BYTES,
-  MAX_PART,
+  MAX_SCOPE,
   MAX_TASK_FILES,
 } from "../../../src/shared/contracts/external-task.ts";
 import {
@@ -36,20 +36,20 @@ const allowed = new Map<string, ExternalTaskState>([
   ["agent/claimed/question", "blocked"],
   ["agent/claimed/result", "done"],
   ["agent/blocked/result", "done"],
-  ["agent/claimed/release", "open"],
-  ["agent/blocked/release", "open"],
+  ["agent/claimed/unclaim", "open"],
+  ["agent/blocked/unclaim", "open"],
   ["member/blocked/answer", "claimed"],
   ["member/claimed/answer", "claimed"],
-  ["member/claimed/release", "open"],
-  ["member/blocked/release", "open"],
+  ["member/claimed/unclaim", "open"],
+  ["member/blocked/unclaim", "open"],
   ["member/open/drop", "dropped"],
   ["member/claimed/drop", "dropped"],
   ["member/blocked/drop", "dropped"],
   ["member/done/reopen", "open"],
   ["member/dropped/reopen", "open"],
-  ["idle/claimed/release", "open"],
-  ["access_gone/claimed/release", "open"],
-  ["access_gone/blocked/release", "open"],
+  ["idle/claimed/unclaim", "open"],
+  ["access_gone/claimed/unclaim", "open"],
+  ["access_gone/blocked/unclaim", "open"],
 ]);
 
 describe("external task transitions", () => {
@@ -69,12 +69,12 @@ describe("external task transitions", () => {
 });
 
 describe("external task validation", () => {
-  const brief: Brief = { title: "Work", text: "", part: null, fileIds: [] };
+  const brief: Brief = { title: "Work", text: "", scope: null, fileIds: [] };
   test("brief fields accept their exact bounds, counting bytes for text", () => {
     expect(() =>
       checkBrief({
         title: "\u{1f600}".repeat(MAX_TITLE),
-        part: "p".repeat(MAX_PART),
+        scope: "p".repeat(MAX_SCOPE),
         text: "\u00e9".repeat(MAX_BRIEF_BYTES / 2),
         fileIds: Array.from({ length: MAX_TASK_FILES }, (_, i) => `f${i}`),
       }),
@@ -86,7 +86,7 @@ describe("external task validation", () => {
       { title: "a\rb" },
       { title: "a\u2028b" },
       { title: "a".repeat(MAX_TITLE + 1) },
-      { part: "p".repeat(MAX_PART + 1) },
+      { scope: "p".repeat(MAX_SCOPE + 1) },
       { text: `${"\u00e9".repeat(MAX_BRIEF_BYTES / 2)}a` },
       {
         fileIds: Array.from({ length: MAX_TASK_FILES + 1 }, (_, i) => `f${i}`),
@@ -125,7 +125,7 @@ describe("external task validation", () => {
   test("only closing entries fit the reserved tail, and none passes the hard cap", () => {
     for (const kind of ["claim", ...ENTRY_KINDS] satisfies Move[]) {
       expect(() => checkRoom(CLOSING_ENTRIES - 1, kind)).not.toThrow();
-      if (["result", "release", "drop"].includes(kind)) {
+      if (["result", "unclaim", "drop"].includes(kind)) {
         expect(() => checkRoom(CLOSING_ENTRIES, kind)).not.toThrow();
         expect(() => checkRoom(MAX_ENTRIES - 1, kind)).not.toThrow();
       } else refuses(() => checkRoom(CLOSING_ENTRIES, kind), 409);

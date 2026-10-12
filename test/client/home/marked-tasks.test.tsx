@@ -14,7 +14,7 @@ const row: ExternalTaskRow = {
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  part: "Part B",
+  scope: "Scope B",
   state: "blocked",
   revision: 3,
   editRevision: 0,
@@ -49,7 +49,7 @@ describe("Home's External tasks card", () => {
     const html = render(<MarkedTasks now={10} />);
     expect(html).toContain("External tasks");
     expect(html).toContain('href="/external-tasks/t1"');
-    expect(html).toContain("Part B");
+    expect(html).toContain("Scope B");
     expect(html).toContain("blocked · claimed by stefan via laptop-claude");
     expect(html).toContain("Question: Which branch?");
   });

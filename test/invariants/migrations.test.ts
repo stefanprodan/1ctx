@@ -76,6 +76,7 @@ const EXPECTED_IDS = [
   "0062-external-tasks",
   "0063-external-task-tool",
   "0064-external-task-claim-entries",
+  "0065-external-task-scope-unclaim",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2026,9 +2027,9 @@ describe("the schema", () => {
       expect(() =>
         db.exec("update external_task_entries set kind = 'claim'"),
       ).toThrow(/CHECK/);
-      expect(migrate(db)).toEqual(
-        expectedFrom("0064-external-task-claim-entries"),
-      );
+      expect(migrate(db, MIGRATIONS.slice(0, 64))).toEqual([
+        "0064-external-task-claim-entries",
+      ]);
       const after = entries();
       expect(after.filter((row) => row.kind !== "claim")).toEqual(before);
       const claim = (
@@ -2081,6 +2082,123 @@ describe("the schema", () => {
           .get()!.n,
       ).toBe(2);
       db.exec("delete from external_tasks");
+      expect(db.query("select id from external_task_entries").all()).toEqual(
+        [],
+      );
+      expect(migrate(db, MIGRATIONS.slice(0, 64))).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0065 renames part to scope and release to unclaim, keeping every row, rowid and index", () => {
+    const db = seed(MIGRATIONS.slice(0, 64));
+    const tables = [
+      "external_tasks",
+      "external_task_claims",
+      "external_task_entries",
+    ];
+    const rows = (table: string) =>
+      db
+        .query<Record<string, unknown>, []>(
+          `select rowid, * from ${table} order by rowid`,
+        )
+        .all();
+    const indexes = () =>
+      db
+        .query<{ name: string; sql: string }, []>(
+          `select name, sql from sqlite_schema where type = 'index'
+            and tbl_name in (${tables.map((t) => `'${t}'`).join(", ")})
+            and sql is not null order by name`,
+        )
+        .all()
+        .map((row) => ({ ...row, sql: row.sql.replace(/\s+/g, " ") }));
+    try {
+      const retry = {
+        id: "t",
+        part: "part B",
+        state: "open",
+        last: { kind: "release", text: "Stop", at: 20 },
+      };
+      // rowids out of insert order, since a tie on time sorts by rowid
+      db.exec(`
+        insert into external_tasks (id, project_id, title, text, part, state,
+            claim_id, created_at, brief_at, moved_at)
+          values ('t', 'p', 'Task', 'Brief', 'part B', 'open', null, 0, 0, 0),
+          ('t2', 'p', 'Other', 'Brief', null, 'open', null, 0, 0, 0);
+        insert into external_task_claims (rowid, id, task_id, user_id, key_id,
+            key_name, started_at, after_entry_id, active_at, ended_at,
+            end_reason, last_task)
+          values (4, 'c1', 't', 'u', 'k1', 'laptop', 10, null, 15, 20,
+            'released', '${JSON.stringify(retry)}'),
+          (2, 'c2', 't', 'u', 'k1', 'laptop', 30, 'e2', 30, 40, 'idle', null),
+          (7, 'c3', 't2', 'u', 'k2', 'desk', 50, null, 50, null, null, null);
+        insert into external_task_entries (rowid, id, task_id, claim_id,
+            kind, text, links, user_id, key_name, claim_end, at)
+          values (9, 'e1', 't', 'c1', 'claim', '', '[]', 'u', 'laptop', null,
+            10),
+          (3, 'e2', 't', 'c1', 'release', 'Stop', '[]', 'u', 'laptop',
+            'released', 20),
+          (12, 'e3', 't', 'c2', 'release', 'idle', '[]', null, null, 'idle',
+            40),
+          (5, 'e4', 't2', 'c3', 'progress', 'Go', '[]', 'u', 'desk', null,
+            50);
+        update external_tasks set state = 'claimed', claim_id = 'c3'
+          where id = 't2';
+      `);
+      const before = tables.map(rows);
+      const existing = indexes();
+      expect(migrate(db)).toEqual(
+        expectedFrom("0065-external-task-scope-unclaim"),
+      );
+      const [tasks, claims, entries] = tables.map(rows);
+      expect(tasks).toEqual(
+        before[0]!.map(({ part, ...row }) => ({ ...row, scope: part })),
+      );
+      expect(claims!.map(({ last_task: _, ...row }) => row)).toEqual(
+        before[1]!.map(({ last_task: _, ...row }) => ({
+          ...row,
+          end_reason:
+            row.end_reason === "released" ? "unclaimed" : row.end_reason,
+        })),
+      );
+      expect(claims!.map((row) => row.rowid)).toEqual([2, 4, 7]);
+      expect(
+        claims!.map((row) =>
+          row.last_task === null ? null : JSON.parse(row.last_task as string),
+        ),
+      ).toEqual([
+        null,
+        {
+          id: "t",
+          scope: "part B",
+          state: "open",
+          last: { kind: "unclaim", text: "Stop", at: 20 },
+        },
+        null,
+      ]);
+      expect(entries).toEqual(
+        before[2]!.map((row) => ({
+          ...row,
+          kind: row.kind === "release" ? "unclaim" : row.kind,
+          claim_end: row.claim_end === "released" ? "unclaimed" : row.claim_end,
+        })),
+      );
+      expect(indexes()).toEqual(existing);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      for (const sql of [
+        "update external_task_entries set kind = 'release' where id = 'e2'",
+        "update external_task_entries set claim_end = 'released' where id = 'e2'",
+        "update external_task_claims set end_reason = 'released' where id = 'c1'",
+      ]) {
+        expect(() => db.exec(sql)).toThrow(/CHECK/);
+      }
+      db.exec("delete from external_task_claims where id = 'c1'");
+      expect(
+        db.query("select id from external_task_entries order by rowid").all(),
+      ).toEqual([{ id: "e4" }, { id: "e3" }]);
+      db.exec("delete from external_tasks");
+      expect(db.query("select id from external_task_claims").all()).toEqual([]);
       expect(db.query("select id from external_task_entries").all()).toEqual(
         [],
       );

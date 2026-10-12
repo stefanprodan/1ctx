@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Request and response bodies of the external task routes. Anyone who
-// sees the project creates, edits, answers, releases, drops, reopens
+// sees the project creates, edits, answers, unclaims, drops, reopens
 // and deletes; an agent claims and reports only over /mcp.
 
 import type {
@@ -22,7 +22,7 @@ export type ExternalTasksResponse = {
 };
 
 // GET /api/projects/:id/external-tasks?closed=1&q=&state=&after=: done
-// and dropped, or the one state named, holding q in the title, the part
+// and dropped, or the one state named, holding q in the title, the scope
 // or the creator's name, latest close first; next is the cursor of the
 // page after under the same q and state
 export type ClosedTasksResponse = {
@@ -52,7 +52,7 @@ export type ExternalTaskResponse = {
 export type CreateExternalTaskRequest = {
   title: string;
   text: string;
-  part?: string | null;
+  scope?: string | null;
   // knowledge files of the project, in order
   fileIds: string[];
 };
@@ -63,9 +63,9 @@ export type PatchExternalTaskRequest = Partial<CreateExternalTaskRequest> & {
   editRevision: number;
 };
 
-// POST /api/external-tasks/:id/answer|release|drop|reopen: the state
-// the page shows, a 409 once the task moved on; release also names the
-// claim the page shows. Text is required for answer, release and
+// POST /api/external-tasks/:id/answer|unclaim|drop|reopen: the state
+// the page shows, a 409 once the task moved on; unclaim also names the
+// claim the page shows. Text is required for answer, unclaim and
 // reopen, optional for drop.
 // DELETE /api/external-tasks/:id answers 204
 export type ExternalTaskMoveRequest = {

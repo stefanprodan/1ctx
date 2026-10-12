@@ -17,17 +17,17 @@ import {
 import { ToolError } from "../../lib/errors.ts";
 import { UNFINISHED } from "./external-task-text.ts";
 
-export type Move = "answer" | "release" | "drop" | "reopen";
+export type Move = "answer" | "unclaim" | "drop" | "reopen";
 
 export const READ_ACTIONS = {
   list: ["action", "states", "after"],
   show: ["action", "id", "before", "entry", "offset", "ref"],
 } as const;
 const WRITE_ACTIONS = {
-  create: ["action", "title", "text", "part", "files"],
-  edit: ["action", "id", "editRevision", "title", "text", "part", "files"],
+  create: ["action", "title", "text", "scope", "files"],
+  edit: ["action", "id", "editRevision", "title", "text", "scope", "files"],
   answer: ["action", "id", "state", "claimId", "text"],
-  release: ["action", "id", "state", "claimId", "text"],
+  unclaim: ["action", "id", "state", "claimId", "text"],
   drop: ["action", "id", "state", "claimId", "text"],
   reopen: ["action", "id", "state", "text"],
 } as const;
@@ -81,9 +81,9 @@ function brief(args: Record<string, unknown>) {
   const out: Partial<CreateExternalTaskRequest> = {};
   if (args.title !== undefined) out.title = text(args.title, "title");
   if (args.text !== undefined) out.text = text(args.text, "text");
-  if (args.part !== undefined) {
-    const part = args.part === null ? "" : text(args.part, "part").trim();
-    out.part = part === "" ? null : part;
+  if (args.scope !== undefined) {
+    const scope = args.scope === null ? "" : text(args.scope, "scope").trim();
+    out.scope = scope === "" ? null : scope;
   }
   let files: string[] | null = null;
   if (args.files !== undefined) {
@@ -140,7 +140,7 @@ export function parseExternalTaskArgs(
       body: {
         title: out.title,
         text: out.text,
-        part: out.part ?? null,
+        scope: out.scope ?? null,
         fileIds: [],
       },
       files: files ?? [],
@@ -176,7 +176,7 @@ export function parseExternalTaskArgs(
     const editRevision = whole(args.editRevision, "editRevision");
     const { out, files } = brief(args);
     if (Object.keys(out).length === 0 && files === null) {
-      throw new Error("edit needs a title, text, part or files to change");
+      throw new Error("edit needs a title, text, scope or files to change");
     }
     return { action, id, body: { ...out, editRevision }, files };
   }
@@ -193,7 +193,7 @@ export function parseExternalTaskArgs(
   // optional on answer and drop, where a claim may be live; null there
   // means none, since show prints "Claim: none" and a model echoes it
   if (
-    action === "release" ||
+    action === "unclaim" ||
     (args.claimId !== undefined && args.claimId !== null)
   ) {
     if (typeof args.claimId !== "string" || args.claimId.trim() === "") {

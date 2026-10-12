@@ -6,8 +6,8 @@ tab, the task's page and its timeline, and Home's card
 `data/external-task*.ts`, `data/marked-tasks.ts`). The server's rules
 are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
 
-- **The words are external task, brief, claim, report and answer,**
-  never ticket, issue, job or reply.
+- **The words are external task, brief, scope, claim, unclaim, report
+  and answer,** never ticket, issue, job or reply.
 - **The tab opens with a `PageNotice`** saying once "Work for an agent
   you run outside 1ctx", linking Connect agents (`/connect`) in place.
   It shows whatever the tasks and the user's keys.

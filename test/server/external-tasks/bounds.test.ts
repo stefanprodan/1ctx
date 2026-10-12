@@ -42,12 +42,12 @@ test("a claim taken at 239 can still end and close, its own entry outside the bo
     () => f.area.answer(f.owner.id, task.id, { state: "blocked", text: "Go." }),
     409,
   );
-  const released = f.area.release(f.owner.id, task.id, {
+  const unclaimed = f.area.unclaim(f.owner.id, task.id, {
     state: "blocked",
     claimId: held.claimId,
     text: "Enough.",
   });
-  expect(released.task.task.entries).toBe(242);
+  expect(unclaimed.task.task.entries).toBe(242);
   refuses(() => f.area.claim(f.key, task.id), 409, "make a new external task");
   const dropped = f.area.drop(f.owner.id, task.id, { state: "open" });
   expect(dropped.task.task.entries).toBe(243);
@@ -60,7 +60,7 @@ test("a claim taken at 239 can still end and close, its own entry outside the bo
 });
 
 for (const count of [239, 240, 249, 250]) {
-  for (const kind of ["result", "release", "drop"] as const) {
+  for (const kind of ["result", "unclaim", "drop"] as const) {
     test(`${kind} at ${count} entries`, () => {
       using f = fixture();
       const task = f.task("blocked");
@@ -102,7 +102,7 @@ test("the twentieth claim works and retries, the twenty-first is refused", () =>
       f.key,
       held.task.task.id,
       held.claimId,
-      "release",
+      "unclaim",
       "Another try.",
       [],
     );
@@ -168,7 +168,7 @@ test("bounds also guard edits and member entries without partial writes", () => 
   );
   refuses(
     () =>
-      f.area.release(f.owner.id, task.id, {
+      f.area.unclaim(f.owner.id, task.id, {
         state: "claimed",
         claimId: task.claimId!,
         text: "",

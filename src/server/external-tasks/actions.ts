@@ -78,10 +78,10 @@ export function writeEntry(
       ? "done"
       : kind === "drop" && task.claim !== null
         ? "dropped"
-        : kind === "release"
+        : kind === "unclaim"
           ? actor === "idle" || actor === "access_gone"
             ? actor
-            : "released"
+            : "unclaimed"
           : null;
   const claim = task.claim;
   if (claim !== null) {
@@ -101,7 +101,7 @@ export function writeEntry(
   const marked =
     kind === "question" ||
     kind === "result" ||
-    (kind === "release" && actor !== "member");
+    (kind === "unclaim" && actor !== "member");
   store.move(
     task.id,
     state,
@@ -139,15 +139,15 @@ export function taskActions(deps: ActionsDeps) {
   const member = (
     userId: string,
     id: string,
-    kind: "answer" | "release" | "drop" | "reopen",
+    kind: "answer" | "unclaim" | "drop" | "reopen",
     body: ExternalTaskMoveRequest,
   ) =>
     transact(db, () => {
       const task = required(store, id);
       if (task.state !== body.state) throw new Conflict(STALE_TASK);
-      // release names its claim; an answer or drop may, and is held to it
+      // unclaim names its claim; an answer or drop may, and is held to it
       if (
-        (kind === "release" ||
+        (kind === "unclaim" ||
           (kind !== "reopen" && body.claimId !== undefined)) &&
         (task.claim === null || task.claim.id !== body.claimId)
       ) {
@@ -175,7 +175,7 @@ export function taskActions(deps: ActionsDeps) {
       chatId: string | null = null,
     ) {
       return transact(db, () => {
-        const brief = { ...body, part: body.part ?? null };
+        const brief = { ...body, scope: body.scope ?? null };
         checkBrief(brief);
         brief.title = brief.title.trim();
         files(projectId, brief.fileIds);
@@ -195,13 +195,13 @@ export function taskActions(deps: ActionsDeps) {
         const old: Brief = {
           title: task.title,
           text: store.brief(id)!.text,
-          part: task.part,
+          scope: task.scope,
           fileIds: store.fileIds(id),
         };
         const brief: Brief = {
           title: body.title ?? old.title,
           text: body.text ?? old.text,
-          part: body.part === undefined ? old.part : body.part,
+          scope: body.scope === undefined ? old.scope : body.scope,
           fileIds: body.fileIds ?? old.fileIds,
         };
         checkBrief(brief);
@@ -216,8 +216,8 @@ export function taskActions(deps: ActionsDeps) {
     },
     answer: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
       member(userId, id, "answer", body),
-    release: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "release", body),
+    unclaim: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
+      member(userId, id, "unclaim", body),
     drop: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
       member(userId, id, "drop", body),
     reopen: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
@@ -302,7 +302,7 @@ export function taskActions(deps: ActionsDeps) {
           JSON.stringify(last.links) === JSON.stringify(links);
         const endedByReport =
           (kind === "result" && claim.end_reason === "done") ||
-          (kind === "release" && claim.end_reason === "released");
+          (kind === "unclaim" && claim.end_reason === "unclaimed");
         if (
           (identical && claim.ended_at === null) ||
           (endedByReport && last?.kind === kind && last.keyName !== null)

@@ -96,13 +96,13 @@ describe("the arguments", () => {
     ).toThrow("action must be list, show");
     expect(() =>
       parseExternalTaskArgs(
-        { action: "release", id: "t", state: "claimed", text: "Why." },
+        { action: "unclaim", id: "t", state: "claimed", text: "Why." },
         true,
       ),
-    ).toThrow("release needs the claimId show gave");
+    ).toThrow("unclaim needs the claimId show gave");
     expect(() =>
       parseExternalTaskArgs({ action: "edit", id: "t", editRevision: 0 }, true),
-    ).toThrow("edit needs a title, text, part or files to change");
+    ).toThrow("edit needs a title, text, scope or files to change");
     expect(() =>
       parseExternalTaskArgs({ action: "list", states: ["closed"] }, true),
     ).toThrow("states must be a list of");
@@ -254,10 +254,10 @@ describe("show and moves", () => {
     using f = fixture();
     const held = f.task("claimed");
     f.area.report(f.key, held.id, held.claimId!, "progress", "Halfway.", []);
-    f.area.report(f.key, held.id, held.claimId!, "release", "Later.", []);
+    f.area.report(f.key, held.id, held.claimId!, "unclaim", "Later.", []);
     f.area.claim(f.key, held.id);
     const list = await ok(f, { action: "list" });
-    expect(list).toContain('last release 1970-01-02 00:00: "Later."');
+    expect(list).toContain('last unclaim 1970-01-02 00:00: "Later."');
     expect(list).not.toContain("last claim");
     f.db.exec("update external_task_entries set user_id = null");
     const shown = await ok(f, { action: "show", id: held.id });
@@ -310,9 +310,9 @@ describe("show and moves", () => {
     expect(newer).toContain(`before ${shownId}.`);
   });
 
-  test("only a claimed task says when it is released", async () => {
+  test("only a claimed task says when it is unclaimed", async () => {
     using f = fixture();
-    const idle = "A claimed task is released after 24 hours without a report.";
+    const idle = "A claimed task is unclaimed after 24 hours without a report.";
     for (const state of ["open", "blocked", "done", "dropped"] as const) {
       const task = f.task(state);
       expect(await ok(f, { action: "show", id: task.id })).not.toContain(idle);
@@ -417,7 +417,7 @@ describe("show and moves", () => {
     expect(() =>
       parseExternalTaskArgs(
         {
-          action: "release",
+          action: "unclaim",
           id: "t",
           state: "claimed",
           text: "R",
@@ -425,6 +425,6 @@ describe("show and moves", () => {
         },
         true,
       ),
-    ).toThrow("release needs the claimId show gave");
+    ).toThrow("unclaim needs the claimId show gave");
   });
 });

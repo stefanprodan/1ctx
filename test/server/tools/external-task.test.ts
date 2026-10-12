@@ -132,7 +132,7 @@ describe("the offer", () => {
         "create",
         "edit",
         "answer",
-        "release",
+        "unclaim",
         "drop",
         "reopen",
       ]);
@@ -169,7 +169,7 @@ describe("a chat's external tasks", () => {
           action: "create",
           title: "Port the parser",
           text: "Follow the plan.",
-          part: "B",
+          scope: "B",
           files: ["/knowledge/plans/port.md"],
         },
       ]);
@@ -177,7 +177,7 @@ describe("a chat's external tasks", () => {
       const [task] = chat.app.externalTasks.byProject(chat.projectId).tasks;
       expect(task).toMatchObject({
         state: "open",
-        part: "B",
+        scope: "B",
         createdBy: { id: chat.memberId },
       });
       expect(answers[0]).toContain(`(/external-tasks/${task!.id})`);
@@ -266,12 +266,23 @@ describe("a chat's external tasks", () => {
       expect(tasks.store.byId(task.id)!.state).toBe("claimed");
 
       step = await round(chat, step.next, [
-        { action: "release", id: task.id, state: "claimed", claimId: "x" },
+        { action: "unclaim", id: task.id, state: "claimed", claimId: "x" },
       ]);
-      expect(step.answers[0]).toContain("release needs a text saying why");
+      expect(step.answers[0]).toContain("unclaim needs a text saying why");
       step = await round(chat, step.next, [
         {
           action: "release",
+          id: task.id,
+          state: "claimed",
+          claimId: first,
+          text: "Too slow.",
+        },
+      ]);
+      expect(step.answers[0]).toContain("action must be");
+      expect(tasks.store.byId(task.id)!.state).toBe("claimed");
+      step = await round(chat, step.next, [
+        {
+          action: "unclaim",
           id: task.id,
           state: "claimed",
           claimId: first,
@@ -283,7 +294,7 @@ describe("a chat's external tasks", () => {
       const held = entries();
       step = await round(chat, step.next, [
         {
-          action: "release",
+          action: "unclaim",
           id: task.id,
           state: "claimed",
           claimId: first,

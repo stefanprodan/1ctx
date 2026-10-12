@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An external task as a row leading to its page: its state's icon, the
-// title and its part, who holds the claim, the latest entry cut to a
+// title and its scope, who holds the claim, the latest entry cut to a
 // line, and when it last moved. Home's section names its project too.
 
 import type { ExternalTaskRow } from "../../../shared/contracts/external-task.ts";
@@ -46,10 +46,10 @@ export function TaskRow({
         name={
           <>
             <span class="cut">{row.title}</span>
-            {row.part !== null && (
+            {row.scope !== null && (
               <>
                 {" "}
-                <RowsTag>{row.part}</RowsTag>
+                <RowsTag>{row.scope}</RowsTag>
               </>
             )}
           </>

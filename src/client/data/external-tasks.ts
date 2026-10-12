@@ -49,7 +49,7 @@ export const closedMore = signal<{ loading: boolean; error: Failure | null }>({
   loading: false,
   error: null,
 });
-// the hours a claim goes without a report before it is released
+// the hours a claim goes without a report before it is unclaimed
 export const idleHours = signal<number | null>(null);
 
 let owner: string | null = null;

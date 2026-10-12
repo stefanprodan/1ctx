@@ -32,7 +32,7 @@ export type ExternalTaskRow = {
   id: string;
   projectId: string;
   title: string;
-  part: string | null;
+  scope: string | null;
   state: ExternalTaskState;
   revision: number;
   editRevision: number;
@@ -81,14 +81,14 @@ export type ExternalTaskDetail = {
   files: ExternalTaskFile[];
   // when the brief was last edited, the create at first
   briefAt: number;
-  // the chat that made it (Part C), null otherwise or once deleted
+  // the chat that made it, null otherwise or once deleted
   chatId: string | null;
 };
 
 // the moves a member makes on the page; `seen` clears the mark
 export const MEMBER_MOVES = [
   "answer",
-  "release",
+  "unclaim",
   "drop",
   "reopen",
   "seen",
@@ -99,7 +99,7 @@ export type { AgentEntryKind };
 
 // bounds (decision 27): the brief and an entry fit show's 32 KiB page
 export const MAX_TASK_FILES = 10;
-export const MAX_PART = 80;
+export const MAX_SCOPE = 80;
 export const MAX_BRIEF_BYTES = 16 * 1024;
 export const MAX_ENTRY_BYTES = 16 * 1024;
 export const MAX_ENTRY_LINKS = 5;

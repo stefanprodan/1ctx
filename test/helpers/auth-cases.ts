@@ -53,7 +53,7 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "POST",
-    path: "/api/external-tasks/:id/release",
+    path: "/api/external-tasks/:id/unclaim",
     body: { state: "claimed", claimId: "none", text: "Try later." },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },

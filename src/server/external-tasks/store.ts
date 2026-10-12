@@ -144,7 +144,7 @@ export class ExternalTaskStore extends ExternalTaskEntries {
     this.db
       .query(
         `insert into external_tasks
-        (id, project_id, title, text, part, created_by, chat_id, created_at, brief_at, moved_at)
+        (id, project_id, title, text, scope, created_by, chat_id, created_at, brief_at, moved_at)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
@@ -152,7 +152,7 @@ export class ExternalTaskStore extends ExternalTaskEntries {
         projectId,
         brief.title,
         brief.text,
-        brief.part,
+        brief.scope,
         userId,
         chatId,
         now,
@@ -176,10 +176,10 @@ export class ExternalTaskStore extends ExternalTaskEntries {
   edit(id: string, brief: Brief, now: number): void {
     this.db
       .query(
-        `update external_tasks set title = ?, text = ?, part = ?, brief_at = ?,
+        `update external_tasks set title = ?, text = ?, scope = ?, brief_at = ?,
         revision = revision + 1, edit_revision = edit_revision + 1 where id = ?`,
       )
-      .run(brief.title, brief.text, brief.part, now, id);
+      .run(brief.title, brief.text, brief.scope, now, id);
     this.setFiles(id, brief.fileIds);
   }
 

@@ -386,14 +386,14 @@ export const AGENT_ENTRY_KINDS = [
   "progress",
   "question",
   "result",
-  "release",
+  "unclaim",
 ] as const;
 export type AgentEntryKind = (typeof AGENT_ENTRY_KINDS)[number];
 export function isAgentEntryKind(value: unknown): value is AgentEntryKind {
   return AGENT_ENTRY_KINDS.includes(value as AgentEntryKind);
 }
 // every entry on a task's timeline: a claim (no report writes one), the
-// agent's, a member's; a release is also a member's and 1ctx's
+// agent's, a member's; an unclaim is also a member's and 1ctx's
 export const ENTRY_KINDS = [
   "claim",
   ...AGENT_ENTRY_KINDS,
@@ -405,7 +405,7 @@ export type EntryKind = (typeof ENTRY_KINDS)[number];
 // how a claim ended: access_gone when its key or its user's sight of
 // the project went, idle after externalTaskIdleHours with no entry
 export const CLAIM_ENDS = [
-  "released",
+  "unclaimed",
   "done",
   "dropped",
   "access_gone",

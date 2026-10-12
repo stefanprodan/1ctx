@@ -30,7 +30,7 @@ const taskRow = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  part: null,
+  scope: null,
   state: "open",
   revision: 1,
   editRevision: 0,
@@ -222,7 +222,7 @@ describe("the closed pages", () => {
     expect(upsertClosed(list, taskRow({ id: "b", revision: 3 }))).toBe(list);
   });
 
-  test("a search reads the title, the part and both users' names", () => {
+  test("a search reads the title, the scope and both users' names", () => {
     const claim = {
       id: "c1",
       userId: "u2",
@@ -231,7 +231,7 @@ describe("the closed pages", () => {
       keyName: "laptop",
       startedAt: 1,
     };
-    expect(taskFields(taskRow({ part: "api", claim }))).toEqual([
+    expect(taskFields(taskRow({ scope: "api", claim }))).toEqual([
       "Wire the sweep",
       "api",
       "casey",
@@ -243,7 +243,7 @@ describe("the closed pages", () => {
   });
 
   test("a filter takes only its state and its search", () => {
-    const done = taskRow({ state: "done", part: "API" });
+    const done = taskRow({ state: "done", scope: "API" });
     const dropped = taskRow({ state: "dropped" });
     expect(closedTakes({ q: "", state: null })(done)).toBe(true);
     expect(closedTakes({ q: "", state: null })(taskRow())).toBe(false);

@@ -16,7 +16,7 @@ import {
   type ExternalTaskFile,
   type ExternalTaskRow,
   MAX_BRIEF_BYTES,
-  MAX_PART,
+  MAX_SCOPE,
   MAX_TASK_FILES,
 } from "../../../shared/contracts/external-task.ts";
 import {
@@ -54,7 +54,7 @@ export const ENTRY_WORDS: Record<EntryKind, string> = {
   progress: "Progress",
   question: "Question",
   result: "Result",
-  release: "Released",
+  unclaim: "Unclaimed",
   answer: "Answer",
   drop: "Dropped",
   reopen: "Reopened",
@@ -125,29 +125,29 @@ export const idleWords = (hours: number): string =>
   `Opens again after ${hoursOf(hours)} without a report`;
 
 // what the page offers in a state: the brief is edited and the task
-// dropped until it closes, a claim released while held, an answer
+// dropped until it closes, a claimed task unclaimed while held, an answer
 // given while blocked, a closed task reopened; delete always
 export function movesOf(state: ExternalTaskState) {
   const open = state === "open" || state === "claimed" || state === "blocked";
   return {
     edit: open,
     answer: state === "blocked",
-    release: state === "claimed" || state === "blocked",
+    unclaim: state === "claimed" || state === "blocked",
     drop: open,
     reopen: !open,
   };
 }
 
-export type Move = "release" | "drop" | "reopen";
+export type Move = "unclaim" | "drop" | "reopen";
 
 // each move's button and its box; drop alone takes no reason
 export const MOVE_WORDS: Record<
   Move,
   { label: string; going: string; required: boolean }
 > = {
-  release: {
-    label: "Release",
-    going: "Releasing",
+  unclaim: {
+    label: "Unclaim",
+    going: "Unclaiming",
     required: true,
   },
   drop: {
@@ -165,16 +165,16 @@ export const MOVE_WORDS: Record<
 // the brief's form
 export type Draft = {
   title: string;
-  part: string;
+  scope: string;
   text: string;
   fileIds: string[];
 };
 
 export function draftOf(detail: ExternalTaskDetail | null): Draft {
-  if (detail === null) return { title: "", part: "", text: "", fileIds: [] };
+  if (detail === null) return { title: "", scope: "", text: "", fileIds: [] };
   return {
     title: detail.task.title,
-    part: detail.task.part ?? "",
+    scope: detail.task.scope ?? "",
     text: detail.text,
     fileIds: detail.files.map((f) => f.fileId),
   };
@@ -201,11 +201,11 @@ export function requestOf(
       field: "title",
     };
   }
-  const part = draft.part.trim();
-  if (part.length > MAX_PART || hasLineBreak(part)) {
+  const scope = draft.scope.trim();
+  if (scope.length > MAX_SCOPE || hasLineBreak(scope)) {
     return {
-      problem: `a part is one line of at most ${MAX_PART} characters`,
-      field: "part",
+      problem: `a scope is one line of at most ${MAX_SCOPE} characters`,
+      field: "scope",
     };
   }
   if (draft.text.trim() === "") {
@@ -224,7 +224,7 @@ export function requestOf(
     body: {
       title,
       text: draft.text,
-      part: part === "" ? null : part,
+      scope: scope === "" ? null : scope,
       fileIds: draft.fileIds,
     },
   };
@@ -241,7 +241,7 @@ export function patchOf(
   return {
     editRevision,
     ...(body.title === was.title ? {} : { title: body.title }),
-    ...((body.part ?? "") === was.part ? {} : { part: body.part ?? null }),
+    ...((body.scope ?? "") === was.scope ? {} : { scope: body.scope ?? null }),
     ...(body.text === was.text ? {} : { text: body.text }),
     ...(sameOrder(body.fileIds, was.fileIds) ? {} : { fileIds: body.fileIds }),
   };
@@ -251,7 +251,7 @@ export function dirtyOf(draft: Draft, detail: ExternalTaskDetail | null) {
   const was = draftOf(detail);
   return (
     draft.title !== was.title ||
-    draft.part !== was.part ||
+    draft.scope !== was.scope ||
     draft.text !== was.text ||
     !sameOrder(draft.fileIds, was.fileIds)
   );
@@ -261,7 +261,7 @@ export function dirtyOf(draft: Draft, detail: ExternalTaskDetail | null) {
 export function taskFieldOf(message: string): string | undefined {
   const word = message.trim().toLowerCase();
   if (word.startsWith("a title") || word.startsWith("title")) return "title";
-  if (word.startsWith("a part") || word.startsWith("part")) return "part";
+  if (word.startsWith("a scope") || word.startsWith("scope")) return "scope";
   if (word.startsWith("the brief") || word.startsWith("text")) return "text";
   if (word.includes("file")) return "files";
   return undefined;

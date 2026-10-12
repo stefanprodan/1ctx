@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A member's moves on an external task's page. Release, Drop and Reopen
+// A member's moves on an external task's page. Unclaim, Drop and Reopen
 // open a box for the words the timeline keeps; the box names the state
 // and the claim the page showed when it opened, so a task moved since
 // is refused with the server's words rather than moved blind. Delete
@@ -151,7 +151,7 @@ export function TaskMoves({
     opened.value = {
       move,
       state: task.state,
-      ...(move === "release" && task.claim !== null
+      ...(move === "unclaim" && task.claim !== null
         ? { claimId: task.claim.id }
         : {}),
     };
@@ -192,7 +192,7 @@ export function TaskMoves({
                 Edit
               </button>
             )}
-            {moves.release && button("release", "redo")}
+            {moves.unclaim && button("unclaim", "redo")}
             {moves.drop && button("drop", "close")}
             {moves.reopen && button("reopen", "play")}
           </>

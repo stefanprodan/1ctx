@@ -26,7 +26,7 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  part: null,
+  scope: null,
   state: "open",
   revision: 1,
   editRevision: 0,

@@ -183,7 +183,7 @@ test("held lists mark only answers after this claim's last report, including tim
     text: "One more thing.",
   });
   expect(list()[0]!.answered).toBe(true);
-  f.area.release(f.member.id, task.id, {
+  f.area.unclaim(f.member.id, task.id, {
     state: "claimed",
     claimId: task.claimId!,
     text: "Reclaim.",
@@ -331,24 +331,24 @@ test("attention is bounded with a full count and ordered by mark across only the
     marked.push(f.task(i % 2 === 0 ? "done" : "blocked"));
   }
   const unmarked = f.task("claimed");
-  f.area.release(f.member.id, unmarked.id, {
+  f.area.unclaim(f.member.id, unmarked.id, {
     state: "claimed",
     claimId: unmarked.claimId!,
-    text: "Member release.",
+    text: "Member unclaim.",
   });
   expect(f.area.store.byId(unmarked.id)!.attentionAt).toBeNull();
   const other = f.create("Other", f.otherProjectId);
   const held = f.area.claim(f.key, other.id);
   f.advance();
-  const released = f.area.report(
+  const unclaimed = f.area.report(
     f.key,
     held.task.task.id,
     held.claimId,
-    "release",
+    "unclaim",
     "Needs a member.",
     [],
   );
-  expect(released.task.attentionAt).toBe(f.now());
+  expect(unclaimed.task.attentionAt).toBe(f.now());
   const result = f.area.attention([f.projectId]);
   expect(result.count).toBe(ATTENTION_ROWS + 3);
   expect(result.tasks.map((r) => r.id)).toEqual(
@@ -431,14 +431,14 @@ test("linked files read live names and revisions, then deleted names and a prune
   );
 });
 
-test("a new claim leaves the last entry the release before it, on every read", () => {
+test("a new claim leaves the last entry the unclaim before it, on every read", () => {
   using f = fixture();
   const task = f.task("claimed");
-  f.area.report(f.key, task.id, task.claimId!, "release", "Later.", []);
+  f.area.report(f.key, task.id, task.claimId!, "unclaim", "Later.", []);
   f.advance();
   const held = f.area.claim(f.key, task.id);
   expect(held.entries[0]!.kind).toBe("claim");
-  const last = { kind: "release" as const, text: "Later.", at: f.now() - 1 };
+  const last = { kind: "unclaim" as const, text: "Later.", at: f.now() - 1 };
   expect(held.task.task.last).toEqual(last);
   expect(f.area.store.byId(task.id)!.last).toEqual(last);
   expect(f.area.byProject(f.projectId).tasks[0]!.last).toEqual(last);

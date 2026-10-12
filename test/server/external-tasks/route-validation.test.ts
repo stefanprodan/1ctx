@@ -9,7 +9,7 @@ import {
 import {
   MAX_BRIEF_BYTES,
   MAX_ENTRY_BYTES,
-  MAX_PART,
+  MAX_SCOPE,
   MAX_TASK_FILES,
 } from "../../../src/server/external-tasks/rules.ts";
 import { MAX_SEARCH, MAX_TITLE } from "../../../src/shared/words.ts";
@@ -36,8 +36,8 @@ test("create and edit reject unknown fields, wrong types, oversized values and f
     { title: "x".repeat(MAX_TITLE + 1) },
     { text: 1 },
     { text: "x".repeat(MAX_BRIEF_BYTES + 1) },
-    { part: false },
-    { part: "x".repeat(MAX_PART + 1) },
+    { scope: false },
+    { scope: "x".repeat(MAX_SCOPE + 1) },
     { fileIds: null },
     { fileIds: [1] },
     { fileIds: [""] },
@@ -101,16 +101,16 @@ test("create and edit reject unknown fields, wrong types, oversized values and f
   expect(detail.task.task.title).toBe("Check the work");
 });
 
-test("moves validate their state, text and release claim before changing the task", async () => {
+test("moves validate their state, text and unclaim claim before changing the task", async () => {
   await using f = await httpFixture();
   const id = (await f.create()).task.task.id;
   const claim = f.app.externalTasks.claim(await f.key(), id);
   const base = `/api/external-tasks/${id}`;
-  for (const move of ["answer", "release", "drop", "reopen"] as const) {
+  for (const move of ["answer", "unclaim", "drop", "reopen"] as const) {
     const valid = {
       state: "claimed",
       text: "A note.",
-      ...(move === "release" ? { claimId: claim.claimId } : {}),
+      ...(move === "unclaim" ? { claimId: claim.claimId } : {}),
     };
     for (const extra of [
       { state: "unknown" },
@@ -148,7 +148,7 @@ test("moves validate their state, text and release claim before changing the tas
         ).toBe(400);
       }
     }
-    if (move !== "release") {
+    if (move !== "unclaim") {
       expect(
         (
           await f.member.client.call("POST", `${base}/${move}`, {
@@ -161,8 +161,8 @@ test("moves validate their state, text and release claim before changing the tas
   for (const claimId of [undefined, null, "", 1]) {
     expect(
       (
-        await f.member.client.call("POST", `${base}/release`, {
-          body: { state: "claimed", text: "Release.", claimId },
+        await f.member.client.call("POST", `${base}/unclaim`, {
+          body: { state: "claimed", text: "Unclaim.", claimId },
         })
       ).status,
     ).toBe(400);
@@ -251,7 +251,7 @@ test("body caps reject declared and streamed excess while exact byte bounds acce
   await using f = await httpFixture();
   const made = await f.create({
     title: "x".repeat(MAX_TITLE),
-    part: "x".repeat(MAX_PART),
+    scope: "x".repeat(MAX_SCOPE),
     text: "\u0001".repeat(MAX_BRIEF_BYTES),
   });
   expect(made.task.text).toHaveLength(MAX_BRIEF_BYTES);

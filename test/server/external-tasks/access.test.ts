@@ -93,8 +93,8 @@ async function atomicEnding(
         entries: before[i]!.task.task.entries + 1,
       });
       expect(current.entries[0]).toMatchObject({
-        kind: "release",
-        text: "released because access ended",
+        kind: "unclaim",
+        text: "unclaimed because access ended",
         claimId: held.claimId,
         claimEnd: "access_gone",
         by: null,

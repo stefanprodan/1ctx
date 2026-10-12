@@ -9,7 +9,7 @@ import {
   MAX_ENTRY_BYTES,
   MAX_ENTRY_LINKS,
   MAX_LINK_BYTES,
-  MAX_PART,
+  MAX_SCOPE,
   MAX_TASK_FILES,
   MAX_UNFINISHED,
 } from "../../shared/contracts/external-task.ts";
@@ -32,7 +32,7 @@ export {
   MAX_ENTRY_BYTES,
   MAX_ENTRY_LINKS,
   MAX_LINK_BYTES,
-  MAX_PART,
+  MAX_SCOPE,
   MAX_TASK_FILES,
   MAX_UNFINISHED,
 } from "../../shared/contracts/external-task.ts";
@@ -42,7 +42,7 @@ export type Move = EntryKind;
 export type Brief = {
   title: string;
   text: string;
-  part: string | null;
+  scope: string | null;
   fileIds: string[];
 };
 
@@ -55,16 +55,16 @@ const TRANSITIONS: Record<
     progress: { claimed: "claimed", blocked: "claimed" },
     question: { claimed: "blocked" },
     result: { claimed: "done", blocked: "done" },
-    release: { claimed: "open", blocked: "open" },
+    unclaim: { claimed: "open", blocked: "open" },
   },
   member: {
     answer: { blocked: "claimed", claimed: "claimed" },
-    release: { claimed: "open", blocked: "open" },
+    unclaim: { claimed: "open", blocked: "open" },
     drop: { open: "dropped", claimed: "dropped", blocked: "dropped" },
     reopen: { done: "open", dropped: "open" },
   },
-  idle: { release: { claimed: "open" } },
-  access_gone: { release: { claimed: "open", blocked: "open" } },
+  idle: { unclaim: { claimed: "open" } },
+  access_gone: { unclaim: { claimed: "open", blocked: "open" } },
 };
 
 export function transition(
@@ -93,7 +93,7 @@ export function checkRoom(entries: number, move: Move): void {
     entries >= MAX_ENTRIES ||
     (entries >= CLOSING_ENTRIES &&
       move !== "result" &&
-      move !== "release" &&
+      move !== "unclaim" &&
       move !== "drop")
   ) {
     throw new Conflict("make a new external task");
@@ -119,8 +119,8 @@ export function checkBrief(brief: Brief): void {
       `title must be one line of 1 to ${MAX_TITLE} characters`,
     );
   }
-  if (brief.part !== null && [...brief.part].length > MAX_PART) {
-    throw new BadRequest(`part must be at most ${MAX_PART} characters`);
+  if (brief.scope !== null && [...brief.scope].length > MAX_SCOPE) {
+    throw new BadRequest(`scope must be at most ${MAX_SCOPE} characters`);
   }
   if (Buffer.byteLength(brief.text) > MAX_BRIEF_BYTES) {
     throw new BadRequest(`brief must be at most ${MAX_BRIEF_BYTES} bytes`);

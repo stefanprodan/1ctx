@@ -22,7 +22,7 @@ import type { ExternalTaskStore } from "./store.ts";
 // the chat's user and project
 type ChatActor = { userId: string; projectId: string };
 
-type ChatMove = "answer" | "release" | "drop" | "reopen";
+type ChatMove = "answer" | "unclaim" | "drop" | "reopen";
 
 type ChatDeps = {
   db: Db;

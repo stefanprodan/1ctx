@@ -259,7 +259,7 @@ export async function editExternalTask(
   return body;
 }
 
-// a member's move names the state the page shows, and a release the
+// a member's move names the state the page shows, and an unclaim the
 // claim it shows
 export async function moveExternalTask(
   id: string,

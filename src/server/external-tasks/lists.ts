@@ -24,7 +24,7 @@ export type ClosedFilter = {
 const ALL_CLOSED: ClosedFilter = { q: "", state: null };
 
 // A closed task holds no claim, so of the page's fields only the title,
-// the part and the creator's name are left to match.
+// the scope and the creator's name are left to match.
 function closedWhere(projectId: string, filter: ClosedFilter) {
   let where = `t.project_id = ? and ${CLOSED}`;
   const args: string[] = [projectId];
@@ -33,7 +33,7 @@ function closedWhere(projectId: string, filter: ClosedFilter) {
     args.push(filter.state);
   }
   if (filter.q !== "") {
-    where += ` and (t.title ${LIKE} or t.part ${LIKE}
+    where += ` and (t.title ${LIKE} or t.scope ${LIKE}
       or exists (select 1 from users u where u.id = t.created_by
         and u.username ${LIKE}))`;
     const pattern = containing(filter.q);

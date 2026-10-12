@@ -50,7 +50,7 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
   revisions and newest entries. A write key also gets `claim` and `report`;
   report takes the task and claim ids, an agent entry kind, text and optional
   HTTP(S) links. Claim and show say after how many idle hours a silent claim is
-  released. In a live session the agent asks its user directly; only an
+  unclaimed. In a live session the agent asks its user directly; only an
   unattended agent reports a question, ends its run and checks next run.
 
 The schemas are JSON Schema adapted by `fromJsonSchema()` with a
@@ -82,7 +82,7 @@ access port, to the task store. Show, claim and report resolve the task's
 project before reading or writing it; hidden and missing tasks both answer
 `not found`. Claim and report call `checkKey()` in the transaction and carry
 the key's user, id and copied name. Report kinds are `progress`, `question`,
-`result` and `release`; text is at most 16 KiB and it accepts at most five
+`result` and `unclaim`; text is at most 16 KiB and it accepts at most five
 HTTP(S) links of at most 2 KiB each. A claim's own entry, kind `claim`,
 shows in `show` like any other and no report writes one.
 `skills/external-tasks/` teaches an outside agent this loop. The binary

@@ -8,8 +8,9 @@ import type {
   ExternalTaskEntry,
   ExternalTaskRow,
 } from "../../../shared/contracts/external-task.ts";
-import type { EntryKind } from "../../../shared/words.ts";
+import type { ClaimEnd, EntryKind } from "../../../shared/words.ts";
 import type { IconName } from "../../lib/icons.tsx";
+import { ENTRY_WORDS } from "./ExternalTasks.model.ts";
 
 // a state's icon only where the entry is that move: a claim, a result
 // and a drop; no colour, since green and the rest mean a task's state
@@ -18,11 +19,29 @@ export const ENTRY_ICONS: Record<EntryKind, IconName> = {
   progress: "progress",
   question: "question",
   result: "check",
-  release: "sign-out",
+  unclaim: "sign-out",
   answer: "chat",
   drop: "close",
   reopen: "redo",
 };
+
+// 1ctx's unclaim names why after a comma; a member's or agent's says it
+// in its text
+const SWEEP_REASONS: Partial<Record<ClaimEnd, string>> = {
+  idle: "idle",
+  access_gone: "access gone",
+};
+
+export function entryWords(
+  entry: Pick<ExternalTaskEntry, "kind" | "claimEnd">,
+): string {
+  const reason =
+    entry.kind === "unclaim" && entry.claimEnd !== null
+      ? SWEEP_REASONS[entry.claimEnd]
+      : undefined;
+  const word = ENTRY_WORDS[entry.kind];
+  return reason === undefined ? word : `${word}, ${reason}`;
+}
 
 export type TimelineLine = {
   entry: ExternalTaskEntry;

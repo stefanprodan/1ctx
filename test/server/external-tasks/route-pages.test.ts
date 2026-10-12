@@ -63,7 +63,7 @@ test("closed pages sort latest first and continue without duplicating rows", asy
   });
 });
 
-test("closed pages search the title, the part and the creator, and filter done or dropped", async () => {
+test("closed pages search the title, the scope and the creator, and filter done or dropped", async () => {
   await using f = await httpFixture();
   const key = await f.key();
   const done = async (fields: object, client = f.creator.client) => {
@@ -84,9 +84,12 @@ test("closed pages search the title, the part and the creator, and filter done o
     f.app.now.value++;
     return id;
   };
-  const percent = await done({ title: "Ship 100% of the API", part: "api" });
+  const percent = await done({ title: "Ship 100% of the API", scope: "api" });
   const sweep = await dropped({ title: "Sweep" }, f.member.client);
-  const under = await done({ title: "Other", part: "web_ui" }, f.member.client);
+  const under = await done(
+    { title: "Other", scope: "web_ui" },
+    f.member.client,
+  );
   const plain = await dropped({ title: "Webxui 100 points" });
   await f.create({ title: "Still open API" });
   const ids = async (query: string) => {

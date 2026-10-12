@@ -14,7 +14,7 @@ import { lineFrom } from "../sessions/index.ts";
 
 // Match trim()'s whitespace so a bounded preview still reaches its first line.
 // The last entry is a report or a move, never a claim.
-export const TASK_SELECT = `select t.id, t.project_id, t.title, t.part, t.state,
+export const TASK_SELECT = `select t.id, t.project_id, t.title, t.scope, t.state,
     t.revision, t.edit_revision, t.claim_id, t.attention_at, t.created_by,
     t.created_at, t.moved_at, u.username as creator_name,
     c.user_id as claim_user, cu.username as claim_username, c.key_id,
@@ -70,7 +70,7 @@ export type RawTask = {
   id: string;
   project_id: string;
   title: string;
-  part: string | null;
+  scope: string | null;
   state: ExternalTaskState;
   revision: number;
   edit_revision: number;
@@ -109,7 +109,7 @@ export const taskRow = (raw: RawTask): ExternalTaskRow => ({
   id: raw.id,
   projectId: raw.project_id,
   title: raw.title,
-  part: raw.part,
+  scope: raw.scope,
   state: raw.state,
   revision: raw.revision,
   editRevision: raw.edit_revision,

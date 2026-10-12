@@ -12,6 +12,7 @@ import { Icon } from "../../../src/client/lib/icons.tsx";
 import { ENTRY_WORDS } from "../../../src/client/views/projects/ExternalTasks.model.ts";
 import {
   ENTRY_ICONS,
+  entryWords,
   timelineOf,
 } from "../../../src/client/views/projects/ExternalTaskTimeline.model.ts";
 import { Timeline } from "../../../src/client/views/projects/ExternalTaskTimeline.tsx";
@@ -58,7 +59,7 @@ const task = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  part: null,
+  scope: null,
   state: "claimed",
   revision: 1,
   editRevision: 0,
@@ -104,7 +105,7 @@ describe("the timeline", () => {
       entry("result", { claimEnd: "done" }),
       entry("reopen"),
       entry("drop"),
-      entry("release", { by: null, claimEnd: "idle", claimId: "c1" }),
+      entry("unclaim", { by: null, claimEnd: "idle", claimId: "c1" }),
     ];
     expect(written.map((e) => e.kind).toSorted()).toEqual(
       [...ENTRY_KINDS].toSorted(),
@@ -124,9 +125,32 @@ describe("the timeline", () => {
         />,
       );
       expect(html).toContain(icon);
-      expect(html).toContain(`${ENTRY_WORDS[e.kind]}</span>`);
+      expect(html).toContain(`${entryWords(e)}</span>`);
     });
     expect(ENTRY_WORDS.claim).toBe("Claimed");
+  });
+
+  test("names a sweep's unclaim by its reason after a comma", () => {
+    const [access, idle, member] = rows(
+      render(
+        <Timeline
+          page={page([
+            entry("unclaim", { claimEnd: "unclaimed", claimId: "c1" }),
+            entry("unclaim", { by: null, claimEnd: "idle", claimId: "c2" }),
+            entry("unclaim", {
+              by: null,
+              keyName: null,
+              claimEnd: "access_gone",
+              claimId: "c3",
+            }),
+          ])}
+          now={100}
+        />,
+      ),
+    );
+    expect(access).toContain("Unclaimed, access gone</span>");
+    expect(idle).toContain("Unclaimed, idle</span>");
+    expect(member).toContain("Unclaimed</span>");
   });
 
   test("tells an agent, a member, a deleted user's key and 1ctx apart", () => {
@@ -134,7 +158,7 @@ describe("the timeline", () => {
       render(
         <Timeline
           page={page([
-            entry("release", { by: null, claimEnd: "idle" }),
+            entry("unclaim", { by: null, claimEnd: "idle" }),
             entry("answer"),
             entry("claim"),
             entry("claim", { by: null }),
@@ -222,7 +246,7 @@ describe("the timeline's reading", () => {
       [
         entry("claim"),
         entry("question", { text: "Stuck?" }),
-        entry("release", { claimEnd: "released" }),
+        entry("unclaim", { claimEnd: "unclaimed" }),
         entry("claim", { claimId: "c2" }),
         entry("answer"),
       ],
