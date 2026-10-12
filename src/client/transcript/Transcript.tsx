@@ -102,7 +102,9 @@ export function Transcript({
 
   const toEnd = () => {
     const scroller = box.current;
-    if (!scroller) return;
+    // an observer can fire after the rows leave and before the cleanup,
+    // and the scroller is the next page's
+    if (!scroller || !rows.current?.isConnected) return;
     scroller.scrollTop = scroller.scrollHeight;
     last.current = boxOf(scroller);
   };
