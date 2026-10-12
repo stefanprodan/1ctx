@@ -22,10 +22,14 @@ import {
 } from "../../../src/client/data/external-task.ts";
 import {
   closedCount,
+  closedFilter,
+  closedPages,
   externalTaskCount,
   externalTasks,
+  filterClosed,
   loadClosedTasks,
   loadExternalTasks,
+  loadMoreClosed,
   onExternalTasksSocket,
 } from "../../../src/client/data/external-tasks.ts";
 import {
@@ -173,6 +177,14 @@ describe("the words", () => {
       "attention",
     );
     expect(taskIcon(row({ state: "blocked" })).name).toBe("alert");
+  });
+
+  test("an open task waits for a claim, never a clock", () => {
+    expect(taskIcon(row())).toEqual({ name: "task-open", status: null });
+    expect(taskIcon(row({ attentionAt: 5 }))).toEqual({
+      name: "task-open",
+      status: "attention",
+    });
   });
 });
 
@@ -577,13 +589,95 @@ describe("the entity", () => {
           : Response.json(listAnswer([row({ id: "a" })]));
       await loadExternalTasks("p1");
       hold = true;
-      const load = loadClosedTasks();
+      const load = loadClosedTasks("p1");
       send(frame(row({ id: "a", revision: 2, state: "done", entries: 1 })));
       await release();
       await load;
       // the flight's pause, then the page again
       await new Promise((resolve) => setTimeout(resolve, 350));
       expect(gets("/api/projects/p1/external-tasks?closed=1")).toBe(2);
+    },
+  );
+
+  test.serial(
+    "a closed search and state go to the server, a later page keeps them",
+    async () => {
+      answer = (_method, url) =>
+        url.includes("closed=1")
+          ? Response.json({
+              tasks: [
+                row({
+                  id: url.includes("after=") ? "d2" : "d1",
+                  state: "done",
+                }),
+              ],
+              next: url.includes("after=") ? null : "5.abcdefghijkl",
+            })
+          : Response.json(listAnswer([]));
+      await loadExternalTasks("p1");
+      await loadClosedTasks("p1");
+      expect(gets("/api/projects/p1/external-tasks?closed=1")).toBe(1);
+      await filterClosed({ q: " sweep ", state: "done" });
+      expect(
+        gets("/api/projects/p1/external-tasks?closed=1&q=sweep&state=done"),
+      ).toBe(1);
+      // the box's text stays as typed; the same words read nothing
+      await filterClosed({ q: "sweep", state: "done" });
+      expect(closedFilter.value.q).toBe("sweep");
+      expect(
+        gets("/api/projects/p1/external-tasks?closed=1&q=sweep&state=done"),
+      ).toBe(1);
+      await loadMoreClosed();
+      expect(
+        gets(
+          "/api/projects/p1/external-tasks?closed=1&q=sweep&state=done&after=5.abcdefghijkl",
+        ),
+      ).toBe(1);
+      expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["d1", "d2"]);
+      expect(closedPages.value?.next).toBeNull();
+      // another project starts from every finished task
+      await loadExternalTasks("p2");
+      expect(closedFilter.value).toEqual({ q: "", state: null });
+    },
+  );
+
+  test.serial(
+    "an answer to an older search never lands over a newer one",
+    async () => {
+      const waiting: (() => void)[] = [];
+      answer = (_method, url) =>
+        url.includes("closed=1")
+          ? Response.json({
+              tasks: [
+                row({
+                  id: url.includes("q=old") ? "old" : "new",
+                  state: "dropped",
+                }),
+              ],
+              next: null,
+            })
+          : Response.json(listAnswer([]));
+      await loadExternalTasks("p1");
+      const realAnswer = answer;
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        // the older search answers last
+        if (url.includes("q=old")) {
+          await new Promise<void>((open) => waiting.push(open));
+        }
+        return realAnswer(init?.method ?? "GET", url);
+      }) as unknown as typeof fetch;
+      const older = filterClosed({ q: "old", state: null });
+      expect(closedPages.value).toBeNull();
+      await filterClosed({ q: "new", state: null });
+      expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["new"]);
+      for (const open of waiting) open();
+      await older;
+      expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["new"]);
+      // a frame the filter does not take stays off the pages
+      send(
+        frame(row({ id: "x", title: "other", state: "dropped", revision: 2 })),
+      );
+      expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["new"]);
     },
   );
 

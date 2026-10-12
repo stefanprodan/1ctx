@@ -63,6 +63,55 @@ test("closed pages sort latest first and continue without duplicating rows", asy
   });
 });
 
+test("closed pages search the title, the part and the creator, and filter done or dropped", async () => {
+  await using f = await httpFixture();
+  const key = await f.key();
+  const done = async (fields: object, client = f.creator.client) => {
+    const id = (await f.create(fields, client)).task.task.id;
+    const claim = f.app.externalTasks.claim(key, id);
+    f.app.externalTasks.report(key, id, claim.claimId, "result", "Done.", []);
+    f.app.now.value++;
+    return id;
+  };
+  const dropped = async (fields: object, client = f.creator.client) => {
+    const id = (await f.create(fields, client)).task.task.id;
+    const response = await f.member.client.call(
+      "POST",
+      `/api/external-tasks/${id}/drop`,
+      { body: { state: "open" } },
+    );
+    expect(response.status).toBe(200);
+    f.app.now.value++;
+    return id;
+  };
+  const percent = await done({ title: "Ship 100% of the API", part: "api" });
+  const sweep = await dropped({ title: "Sweep" }, f.member.client);
+  const under = await done({ title: "Other", part: "web_ui" }, f.member.client);
+  const plain = await dropped({ title: "Webxui 100 points" });
+  await f.create({ title: "Still open API" });
+  const ids = async (query: string) => {
+    const response = await f.member.client.call(
+      "GET",
+      `${f.base}?closed=1${query}`,
+    );
+    expect(response.status).toBe(200);
+    const page: ClosedTasksResponse = await response.json();
+    return page.tasks.map((row) => row.id);
+  };
+  expect(await ids("")).toEqual([plain, under, sweep, percent]);
+  expect(await ids("&state=done")).toEqual([under, percent]);
+  expect(await ids("&state=dropped")).toEqual([plain, sweep]);
+  expect(await ids("&q=api")).toEqual([percent]);
+  expect(await ids("&q=%20%20API%20")).toEqual([percent]);
+  expect(await ids("&q=member")).toEqual([under, sweep]);
+  expect(await ids("&q=member&state=dropped")).toEqual([sweep]);
+  // the wildcards match as written
+  expect(await ids("&q=100%25")).toEqual([percent]);
+  expect(await ids("&q=b_u")).toEqual([under]);
+  expect(await ids("&q=nothing")).toEqual([]);
+  expect(await ids("&q=")).toEqual([plain, under, sweep, percent]);
+});
+
 test("detail entries continue by entry id through timestamp ties and new reports", async () => {
   await using f = await httpFixture();
   const id = (await f.create()).task.task.id;

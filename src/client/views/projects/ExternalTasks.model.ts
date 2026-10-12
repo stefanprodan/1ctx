@@ -111,7 +111,7 @@ export function taskIcon(row: Pick<ExternalTaskRow, "state" | "attentionAt">): {
     case "dropped":
       return { name: "close", status: marked ?? "stopped" };
     default:
-      return { name: "clock", status: marked };
+      return { name: "task-open", status: marked };
   }
 }
 

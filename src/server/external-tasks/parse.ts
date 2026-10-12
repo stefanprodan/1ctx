@@ -8,10 +8,11 @@ import type {
   PatchExternalTaskRequest,
 } from "../../shared/api/external-tasks.ts";
 import type { MemberMove } from "../../shared/contracts/external-task.ts";
-import { isExternalTaskState } from "../../shared/words.ts";
+import { isExternalTaskState, MAX_SEARCH } from "../../shared/words.ts";
 import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { ID_SHAPE } from "../lib/ids.ts";
+import type { ClosedFilter } from "./lists.ts";
 import {
   checkBrief,
   checkEntry,
@@ -107,18 +108,41 @@ export function parseMoveTask(
   return { state: parsed.state, text: entry, claimId };
 }
 
-export function parseProjectTasks(url: URL) {
-  const get = queryParams(url, ["closed", "after"]);
+// ?closed=1&q=&state=&after=: the closed pages, narrowed by a search
+// and done or dropped
+export function parseProjectTasks(url: URL): {
+  closed: boolean;
+  after: string | null;
+  filter: ClosedFilter;
+} {
+  const get = queryParams(url, ["closed", "after", "q", "state"]);
   const closed = get("closed");
   const after = get("after");
+  const q = get("q");
+  const state = get("state");
   if (closed !== null && closed !== "1") {
     throw new BadRequest("closed must be 1");
   }
-  if (after !== null) {
-    if (closed === null) throw new BadRequest("after requires closed");
-    parseCursor(after);
+  for (const [name, value] of [
+    ["after", after],
+    ["q", q],
+    ["state", state],
+  ] as const) {
+    if (value !== null && closed === null) {
+      throw new BadRequest(`${name} requires closed`);
+    }
   }
-  return { closed: closed !== null, after };
+  if (after !== null) parseCursor(after);
+  if (q !== null && q.length > MAX_SEARCH)
+    throw new BadRequest("q is too long");
+  if (state !== null && state !== "done" && state !== "dropped") {
+    throw new BadRequest("state must be done or dropped");
+  }
+  return {
+    closed: closed !== null,
+    after,
+    filter: { q: (q ?? "").trim(), state },
+  };
 }
 
 export function parseTaskDetail(url: URL): string | null {

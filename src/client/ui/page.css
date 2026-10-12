@@ -201,7 +201,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2) var(--space-3);
-    margin-top: var(--space-2);
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -215,8 +214,10 @@
     color: var(--fg);
   }
   /* the head's lead is the shell button's room on its first row; the
-     notice below it starts at the gutter */
+     notice below it starts at the gutter. In a page's body the column's
+     gap spaces it */
   .page-head-notice .page-notice {
+    margin-top: var(--space-2);
     margin-left: calc(-1 * var(--page-lead, 0px));
     flex-basis: calc(100% + var(--page-lead, 0px));
   }

@@ -12,6 +12,7 @@ import { jsonBody, parseNoQuery } from "../lib/body.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { taskActions } from "./actions.ts";
+import type { ClosedFilter } from "./lists.ts";
 import {
   MAX_MOVE_BODY,
   MAX_TASK_BODY,
@@ -38,7 +39,11 @@ type RoutesDeps = {
     projectOf(id: string): string | null;
     show(id: string, before: string | null): ExternalTaskResponse | null;
     byProject(projectId: string): ExternalTasksResponse;
-    closed(projectId: string, after: string | null): ClosedTasksResponse;
+    closed(
+      projectId: string,
+      after: string | null,
+      filter: ClosedFilter,
+    ): ClosedTasksResponse;
     attention(projectIds: string[]): AttentionTasksResponse;
   };
 };
@@ -69,10 +74,10 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(req, ctx) {
         const project = access.project(ctx.principal!, ctx.params.id);
-        const { closed, after } = parseProjectTasks(new URL(req.url));
+        const { closed, after, filter } = parseProjectTasks(new URL(req.url));
         return json(
           closed
-            ? tasks.closed(project.id, after)
+            ? tasks.closed(project.id, after, filter)
             : tasks.byProject(project.id),
         );
       },

@@ -144,7 +144,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
 | `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention mark (agent, runner, decider backup) |
-| `docs/external-tasks.md` | `external-tasks/`: member routes, task delivery and maintenance |
+| `docs/external-tasks.md` | `external-tasks/`: member routes, task delivery and maintenance, the pages |
 | `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user` |
 | `docs/project-tools.md` | the `automation` and `external_task` tools |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |

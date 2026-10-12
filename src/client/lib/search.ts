@@ -9,6 +9,13 @@ export function matches(query: string, fields: readonly string[]): boolean {
   return fields.some((field) => field.toLowerCase().includes(needle));
 }
 
+// the server's search: the query trimmed, then a text holding it, ASCII
+// letters in any case and every other character as it is, as SQLite's
+// LIKE folds with % and _ escaped
+const ascii = (text: string) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
+export const searched = (text: string, q: string) =>
+  ascii(text).includes(ascii(q.trim()));
+
 // the entity keeps its own order; a page shows it by name
 export const byName = <T extends { name: string }>(rows: readonly T[]): T[] =>
   rows.slice().sort((a, b) => a.name.localeCompare(b.name));

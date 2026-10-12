@@ -21,8 +21,10 @@ export type ExternalTasksResponse = {
   idleHours: number;
 };
 
-// GET /api/projects/:id/external-tasks?closed=1&after=: done and
-// dropped, latest close first; next is the cursor of the page after
+// GET /api/projects/:id/external-tasks?closed=1&q=&state=&after=: done
+// and dropped, or the one state named, holding q in the title, the part
+// or the creator's name, latest close first; next is the cursor of the
+// page after under the same q and state
 export type ClosedTasksResponse = {
   tasks: ExternalTaskRow[];
   next: string | null;

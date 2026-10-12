@@ -3,6 +3,7 @@
 
 import type { SessionsResponse } from "../../shared/api/sessions.ts";
 import type { Db } from "../db/index.ts";
+import { containing, LIKE } from "../lib/like.ts";
 import { ROOT } from "./children.ts";
 import {
   type FeedCursor,
@@ -26,13 +27,9 @@ type Part = { sql: string; args: (string | number)[] };
 
 const ORDER = "order by status = 'running' desc, last_activity_at desc, id";
 
-const searchArgs = (q: string): [string, string] => [
-  q,
-  `%${q.replace(/[%_\\]/g, "\\$&")}%`,
-];
+const searchArgs = (q: string): [string, string] => [q, containing(q)];
 
-const titleLike = (column: string) =>
-  `(? = '' or ${column} like ? escape '\\')`;
+const titleLike = (column: string) => `(? = '' or ${column} ${LIKE})`;
 
 function arm(
   projects: string,

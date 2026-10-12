@@ -3,57 +3,94 @@
 //
 // A project's External tasks tab: what the tasks are, then one card of
 // the unfinished tasks in the order a member acts (blocked, claimed,
-// open), and the done and dropped ones folded at the foot, read a page
-// at a time once unfolded. New external task leads to its page.
+// open), searched on the page, and one of the done and dropped ones,
+// searched and filtered by the server a page at a time. New external
+// task leads to its page.
 
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
 import {
   closedCount,
+  closedFilter,
   closedMore,
   closedPages,
   externalTasks,
   externalTasksError,
-  foldClosed,
-  loadClosedTasks,
+  filterClosed,
   loadMoreClosed,
 } from "../../data/external-tasks.ts";
+import {
+  type ClosedFilter,
+  taskFields,
+} from "../../data/external-tasks-rows.ts";
 import { ShowMore } from "../../feed/FeedCard.tsx";
 import { newExternalTaskHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
+import { useListSearch } from "../../lib/search.ts";
 import {
-  RowsAction,
   RowsAdd,
   RowsCard,
   RowsFailed,
+  RowsFilters,
   RowsNote,
 } from "../../ui/Rows.tsx";
+import { Search } from "../../ui/Search.tsx";
 import { TaskRow } from "./ExternalTaskRow.tsx";
 import { INTRO } from "./ExternalTasks.model.ts";
 import { Frame } from "./Frame.tsx";
 import "./external-tasks.css";
 
-function Closed({ now }: { now: number }) {
+const STATES: { value: ClosedFilter["state"]; label: string }[] = [
+  { value: null, label: "All" },
+  { value: "done", label: "Done" },
+  { value: "dropped", label: "Dropped" },
+];
+
+export function FinishedTasks({ now }: { now: number }) {
   const pages = closedPages.value;
   const more = closedMore.value;
-  const count = closedCount.value;
-  if (count === 0 && (pages === null || pages.rows.length === 0)) return null;
+  const filter = closedFilter.value;
+  const filtered = filter.q.trim() !== "" || filter.state !== null;
+  if (
+    !filtered &&
+    closedCount.value === 0 &&
+    (pages === null || pages.rows.length === 0)
+  ) {
+    return null;
+  }
   return (
     <RowsCard
       label="Done and dropped"
-      count={String(count)}
+      search={
+        <Search
+          value={filter.q}
+          onChange={(q) => void filterClosed({ ...closedFilter.value, q })}
+          placeholder="Search finished tasks"
+        />
+      }
       action={
-        <RowsAction
-          label={pages === null ? "Show" : "Hide"}
-          disabled={pages === null && more.loading}
-          onClick={() =>
-            pages === null ? void loadClosedTasks() : foldClosed()
-          }
+        <RowsFilters
+          label="Show"
+          filters={STATES.map((choice) => ({
+            label: choice.label,
+            on: filter.state === choice.value,
+            onPick: () =>
+              void filterClosed({
+                ...closedFilter.value,
+                state: choice.value,
+              }),
+          }))}
         />
       }
     >
       {pages === null ? (
-        more.error !== null && <RowsFailed failure={more.error} />
+        more.error !== null ? (
+          <RowsFailed failure={more.error} />
+        ) : (
+          <RowsNote>Loading</RowsNote>
+        )
+      ) : pages.rows.length === 0 ? (
+        <RowsNote>No external task matches.</RowsNote>
       ) : (
         <>
           {pages.rows.map((row) => (
@@ -73,36 +110,53 @@ function Closed({ now }: { now: number }) {
   );
 }
 
-export function ExternalTasks({ params }: { params: Params }) {
-  const id = params.id ?? "";
+export function CurrentTasks({
+  projectId,
+  now,
+}: {
+  projectId: string;
+  now: number;
+}) {
   const list = externalTasks.value;
   const error = externalTasksError.value;
+  const { q, shown, count } = useListSearch(list ?? [], taskFields);
+  return (
+    <RowsCard
+      label="External tasks"
+      search={<Search query={q} placeholder="Search current tasks" />}
+      count={count}
+      action={
+        <RowsAdd
+          label="New external task"
+          onClick={() => navigate(newExternalTaskHref(projectId))}
+        />
+      }
+    >
+      {error !== null ? (
+        <RowsFailed failure={error} />
+      ) : list === null ? (
+        <RowsNote>Loading</RowsNote>
+      ) : list.length === 0 ? (
+        <RowsNote>No external tasks yet.</RowsNote>
+      ) : shown.length === 0 ? (
+        <RowsNote>No external task matches.</RowsNote>
+      ) : (
+        shown.map((row) => <TaskRow key={row.id} row={row} now={now} />)
+      )}
+    </RowsCard>
+  );
+}
+
+export function ExternalTasks({ params }: { params: Params }) {
+  const id = params.id ?? "";
   const now = useNow(60_000);
   return (
     <Frame id={id} tab="external-tasks">
-      {(shown) => (
+      {(project) => (
         <>
           <p class="external-tasks-note">{INTRO}</p>
-          <RowsCard
-            label="External tasks"
-            action={
-              <RowsAdd
-                label="New external task"
-                onClick={() => navigate(newExternalTaskHref(shown.id))}
-              />
-            }
-          >
-            {error !== null ? (
-              <RowsFailed failure={error} />
-            ) : list === null ? (
-              <RowsNote>Loading</RowsNote>
-            ) : list.length === 0 ? (
-              <RowsNote>No external tasks yet.</RowsNote>
-            ) : (
-              list.map((row) => <TaskRow key={row.id} row={row} now={now} />)
-            )}
-          </RowsCard>
-          <Closed now={now} />
+          <CurrentTasks projectId={project.id} now={now} />
+          <FinishedTasks now={now} />
         </>
       )}
     </Frame>

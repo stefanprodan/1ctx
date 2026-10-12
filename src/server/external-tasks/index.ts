@@ -6,6 +6,7 @@ import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { type KnowledgePort, taskActions } from "./actions.ts";
 import { chatTasks } from "./chat.ts";
+import type { ClosedFilter } from "./lists.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import type { ListInput } from "./rows.ts";
 import { ExternalTaskStore } from "./store.ts";
@@ -57,8 +58,12 @@ export function externalTasksArea(deps: ExternalTasksDeps) {
       ...store.byProject(projectId),
       idleHours: deps.externalTaskIdleHours(),
     }),
-    closed: (projectId: string, after: string | null, limit?: number) =>
-      store.closed(projectId, after, limit),
+    closed: (
+      projectId: string,
+      after: string | null,
+      filter?: ClosedFilter,
+      limit?: number,
+    ) => store.closed(projectId, after, limit, filter),
     attention: (projectIds: string[]) => store.attention(projectIds),
     ...taskActions({ ...deps, store, show }),
     ...taskSweeps({ ...deps, store }),

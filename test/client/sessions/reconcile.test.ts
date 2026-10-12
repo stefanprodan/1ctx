@@ -8,8 +8,8 @@ import {
   reconcile as reconciled,
   replay,
   type Shown,
-  searched,
 } from "../../../src/client/data/sessions-rows.ts";
+import { searched } from "../../../src/client/lib/search.ts";
 import type { EnvelopeRow, FeedRow } from "../../../src/shared/api/sessions.ts";
 import type {
   SendSummary,

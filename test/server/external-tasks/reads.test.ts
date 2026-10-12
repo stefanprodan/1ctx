@@ -51,14 +51,14 @@ test("closed cursor pages the close time and id, surviving a deleted cursor row"
   const expected = rows
     .sort((a, b) => b.movedAt - a.movedAt || a.id.localeCompare(b.id))
     .map((r) => r.id);
-  const first = f.area.closed(f.projectId, null, 2);
+  const first = f.area.closed(f.projectId, null, undefined, 2);
   expect(first.tasks.map((r) => r.id)).toEqual(expected.slice(0, 2));
   expect(first.next).not.toBeNull();
   f.area.delete(first.tasks.at(-1)!.id);
   f.advance();
   f.task("done");
-  const second = f.area.closed(f.projectId, first.next, 2);
-  const last = f.area.closed(f.projectId, second.next, 2);
+  const second = f.area.closed(f.projectId, first.next, undefined, 2);
+  const last = f.area.closed(f.projectId, second.next, undefined, 2);
   expect([...second.tasks, ...last.tasks].map((r) => r.id)).toEqual(
     expected.slice(2),
   );
@@ -71,6 +71,52 @@ test("closed cursor pages the close time and id, surviving a deleted cursor row"
   ]) {
     refuses(() => f.area.closed(f.projectId, cursor), 400, "invalid cursor");
   }
+});
+
+test("a filtered closed page keeps its cursor through the rows it skips", () => {
+  using f = fixture();
+  const kept: { id: string; movedAt: number }[] = [];
+  for (let i = 0; i < 7; i++) {
+    const row = f.task(i % 2 === 0 ? "done" : "dropped");
+    if (i % 2 === 0) kept.push(row);
+    f.create(`Open ${i}`);
+    f.advance();
+  }
+  // three kept and one skipped close in the same millisecond, so the
+  // first page ends inside the tie and the id breaks it
+  const tie = f.now();
+  for (const state of ["done", "dropped", "done", "done"] as const) {
+    const row = f.task(state);
+    expect(row.movedAt).toBe(tie);
+    if (state === "done") kept.push(row);
+  }
+  const order = kept
+    .sort((a, b) => b.movedAt - a.movedAt || a.id.localeCompare(b.id))
+    .map((row) => row.id);
+  const filter = { q: "WORK", state: "done" } as const;
+  const pages: string[][] = [];
+  const cursors: (string | null)[] = [];
+  let after: string | null = null;
+  do {
+    const page = f.area.closed(f.projectId, after, filter, 2);
+    pages.push(page.tasks.map((row) => row.id));
+    after = page.next;
+    cursors.push(after);
+  } while (after !== null);
+  expect(cursors[0]).toStartWith(`${tie}.`);
+  expect(pages).toEqual([
+    order.slice(0, 2),
+    order.slice(2, 4),
+    order.slice(4, 6),
+    order.slice(6),
+  ]);
+  expect(f.area.closed(f.projectId, null, { q: "nope", state: null })).toEqual({
+    tasks: [],
+    next: null,
+  });
+  expect(
+    f.area.closed(f.otherProjectId, null, { q: "work", state: null }).tasks,
+  ).toEqual([]);
 });
 
 test("agent lists filter projects and states, paging by moves without brief text", () => {

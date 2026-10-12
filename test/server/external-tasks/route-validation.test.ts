@@ -12,7 +12,7 @@ import {
   MAX_PART,
   MAX_TASK_FILES,
 } from "../../../src/server/external-tasks/rules.ts";
-import { MAX_TITLE } from "../../../src/shared/words.ts";
+import { MAX_SEARCH, MAX_TITLE } from "../../../src/shared/words.ts";
 import { httpFixture } from "./http-fixture.ts";
 
 test("create and edit reject unknown fields, wrong types, oversized values and foreign files", async () => {
@@ -183,6 +183,13 @@ test("queries reject unknown, repeated and malformed parameters", async () => {
     [f.base, "?after=1.abcdefghijkl"],
     [f.base, "?closed=1&after=bad"],
     [f.base, "?closed=1&after="],
+    [f.base, "?q=api"],
+    [f.base, "?state=done"],
+    [f.base, "?closed=1&q=a&q=b"],
+    [f.base, `?closed=1&q=${"a".repeat(MAX_SEARCH + 1)}`],
+    [f.base, "?closed=1&state=open"],
+    [f.base, "?closed=1&state="],
+    [f.base, "?closed=1&state=done&state=dropped"],
     [f.base, "?extra=1"],
     [detail, "?before="],
     [detail, "?before=bad"],
