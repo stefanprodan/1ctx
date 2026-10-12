@@ -212,9 +212,9 @@ describe("the Visuals page", () => {
         })) as unknown as typeof fetch;
       await loadVisualsUsage();
       const html = render(<Visuals />);
-      expect(html).toMatch(/Drawn<span class="split-strong">12</);
-      expect(html).toMatch(/Failed<span class="split-strong">1</);
-      expect(html).toMatch(/Files opened<span class="split-strong">3</);
+      expect(html).toMatch(/Drawn<\/span><span class="split-strong">12</);
+      expect(html).toMatch(/Failed<\/span><span class="split-strong">1</);
+      expect(html).toMatch(/Files opened<\/span><span class="split-strong">3</);
       expect(html).toContain('href="/admin/monitor/usage"');
       globalThis.fetch = (async () =>
         Response.json(

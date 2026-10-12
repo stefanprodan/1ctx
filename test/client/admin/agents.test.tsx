@@ -1002,9 +1002,9 @@ describe("the page", () => {
     keys.value = ["provider-spare", "provider-router"];
     const html = render(<Providers />);
     expect(html).toMatch(
-      /provider-router\.key<a\b[^>]*href="\/admin\/config\/providers\/router"[^>]*>router</,
+      /provider-router\.key<\/span><a\b[^>]*href="\/admin\/config\/providers\/router"[^>]*>router</,
     );
-    expect(html).toMatch(/provider-spare\.key<span\b[^>]*>unused</);
+    expect(html).toMatch(/provider-spare\.key<\/span><span\b[^>]*>unused</);
     // by name, whatever order the server answered
     expect(html.indexOf("provider-router.key")).toBeLessThan(
       html.indexOf("provider-spare.key"),

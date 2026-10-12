@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ComponentChildren } from "preact";
+import { type ComponentChildren, Fragment, isValidElement } from "preact";
 import "./split.css";
 
 export function Split({
@@ -39,6 +39,24 @@ export function AsideSection({
   );
 }
 
+// the words of a value, for the title of one cut short
+function textOf(children: ComponentChildren): string | undefined {
+  if (typeof children === "string" || typeof children === "number") {
+    return String(children);
+  }
+  if (isValidElement(children)) {
+    return textOf(
+      (children.props as { children?: ComponentChildren }).children,
+    );
+  }
+  if (!Array.isArray(children)) return undefined;
+  const parts = children.map(textOf);
+  return parts.every((p) => p !== undefined) ? parts.join("") : undefined;
+}
+
+// A label and its value, the section's labels in one column and its
+// values aligned in the next. A value of words wraps in its column; a
+// one-token value is cut and keeps its whole text as the title.
 export function AsideLine({
   label,
   cut,
@@ -53,18 +71,34 @@ export function AsideLine({
   children: ComponentChildren;
 }) {
   const strong = `split-strong${cut ? " cut" : ""}${quiet ? " split-quiet" : ""}`;
+  const title = cut ? textOf(children) : undefined;
   return (
-    <div class="split-line">
-      {label}
+    <div class="split-line split-pair">
+      <span class="split-label">{label}</span>
       {href === undefined ? (
-        <span class={strong}>{children}</span>
+        <span class={strong} title={title}>
+          {children}
+        </span>
       ) : (
-        <a class={strong} href={href}>
+        <a class={strong} href={href} title={title}>
           {children}
         </a>
       )}
     </div>
   );
+}
+
+// names in a value, comma separated, each kept whole on its line and
+// cut with its title only when longer than the column
+export function AsideNames({ names }: { names: readonly string[] }) {
+  return names.map((name, i) => (
+    <Fragment key={name}>
+      {i > 0 && ", "}
+      <span class="split-word" title={name}>
+        {name}
+      </span>
+    </Fragment>
+  ));
 }
 
 // undefined while the read runs, null when it failed

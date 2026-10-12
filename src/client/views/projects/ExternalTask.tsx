@@ -173,11 +173,7 @@ function Aside({
           </span>
         </div>
       )}
-      {task.scope !== null && (
-        <AsideLine label="Scope" cut>
-          {task.scope}
-        </AsideLine>
-      )}
+      {task.scope !== null && <AsideLine label="Scope">{task.scope}</AsideLine>}
       {task.createdBy !== null && (
         <AsideLine label="Created by" href={userHref(task.createdBy.username)}>
           @{task.createdBy.username}

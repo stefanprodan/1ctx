@@ -84,6 +84,14 @@ open row's body or a meta. The shared shapes are below.
 - **A page with an aside is `ui/Split.tsx`.** Aside content is
   `AsideSection`, `AsideLine` and `AsideRead`; `Page` alone has no
   aside. The aside holds only real numbers, and is hidden under 1100.
+- **An aside section is two columns.** Its labels never wrap and its
+  longest sets the first column, so every value starts at one line. A
+  value of words wraps in its column; `cut` is only for a one-token
+  value (an email, a zone), and `AsideLine` gives it its whole text as
+  the title. A list of names in a value is `AsideNames`.
+- **A tab row scrolls whenever it does not fit,** at any width, with a
+  fade at the hidden side, so it never runs under the aside. Under 720
+  it drops the counts.
 - **A user's settings page stacks `ui/Section.tsx`.** An object or
   admin settings page stacks `ui/Setting.tsx` cards in a
   `SettingStack`, each card saving apart through its own

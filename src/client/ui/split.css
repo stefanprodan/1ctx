@@ -24,11 +24,19 @@
     min-width: 0;
   }
 
+  /* two columns: the section's longest label sets the first, so every
+     value starts at one line; every child spans both, and a pair lays
+     its label and value on them as a subgrid */
   .split-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: var(--space-2);
     padding: var(--space-3) 0 var(--space-4);
+  }
+  .split-section > :not(.split-pair),
+  .split-pair {
+    grid-column: 1 / -1;
   }
   .split-section:first-child {
     padding-top: 2px;
@@ -54,9 +62,28 @@
     color: var(--dim);
     font-size: var(--text-ui);
   }
+  .split-pair {
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: baseline;
+    padding: 2px 0;
+  }
+  .split-label {
+    white-space: nowrap;
+  }
   .split-strong {
+    min-width: 0;
     color: var(--fg);
     font-weight: 500;
+    overflow-wrap: break-word;
+  }
+  .split-word {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
   }
   .split-quiet {
     color: var(--faint);

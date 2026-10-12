@@ -87,7 +87,7 @@ const draw = (p: TaskPage, edit = false) =>
 // the aside's State line
 const state = (html: string) =>
   html.match(
-    /<div class="split-line">State<span class="split-strong">.*?<\/div>/,
+    /<div class="split-line split-pair"><span class="split-label">State<\/span><span class="split-strong">.*?<\/div>/,
   )?.[0] ?? "";
 const brief = (html: string) =>
   html.match(
@@ -128,10 +128,10 @@ describe("the state", () => {
       />,
     );
     expect(state(html)).toBe(
-      '<div class="split-line">State<span class="split-strong">claimed</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">State</span><span class="split-strong">claimed</span></div>',
     );
     expect(aside(html)).toContain(
-      '<div class="split-line">Claimed by<span class="split-strong cut">@stefan via laptop</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">Claimed by</span><span class="split-strong cut" title="@stefan via laptop">@stefan via laptop</span></div>',
     );
     expect(narrow(html)).toContain(icon);
     expect(narrow(html)).toContain("<span>claimed by stefan via laptop</span>");
@@ -173,7 +173,7 @@ describe("the scope", () => {
     const html = draw(page(row({ scope: "part B" })));
     expect(state(html)).not.toContain("part B");
     expect(aside(html)).toContain(
-      '<div class="split-line">Scope<span class="split-strong cut">part B</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">Scope</span><span class="split-strong">part B</span></div>',
     );
     expect(narrow(html)).toContain("<span>Scope: part B</span>");
     const none = draw(page());

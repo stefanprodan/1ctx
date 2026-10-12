@@ -527,7 +527,9 @@ describe("the pages", () => {
     expect(html).toContain('href="/admin/config/web/credentials"');
     expect(html).toContain("page-pill");
     // the aside
-    expect(html).toMatch(/Key file<span class="split-strong cut">/);
+    expect(html).toMatch(
+      /Key file<\/span><span class="split-strong cut" title="/,
+    );
     expect(html).toContain("1 project");
   });
 
