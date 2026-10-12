@@ -184,11 +184,12 @@ open row's body or a meta. The shared shapes are below.
 - **A link to another origin opens a new tab,** which an installed app
   hands to Safari. The markdown renderer gives every `http(s):` and
   `mailto:` link `target="_blank" rel="noopener"`, and keeps no other
-  relative link but `/automations/<id>`, `/automations/<id>/memory`
-  and `/run/<id>` (`APP_HREF` in `render/markdown.ts`), without a
-  target, so the router takes them in place; in an installed app
-  (`display-mode: standalone`) the router's `inApp()` still opens a
-  page of the app in place, so it never leaves the app.
+  relative link but `/automations/<id>`, `/automations/<id>/memory`,
+  `/run/<id>`, `/chat/<id>` and `/external-tasks/<id>` (`APP_HREF` in
+  `render/markdown.ts`), without a target, so the router takes them in
+  place; in an installed app (`display-mode: standalone`) the router's
+  `inApp()` still opens a page of the app in place, so it never leaves
+  the app.
 - **The address picks what the rail shows.** Under an admin address it
   shows the admin panel's zones (Monitor, Access, Config) from
   `app/zones.ts`; an admin page lives under its zone's address and

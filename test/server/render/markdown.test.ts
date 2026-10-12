@@ -38,12 +38,14 @@ describe("renderMarkdown", () => {
     );
   });
 
-  test("keeps the app's task, memory and run links, opened in place", () => {
+  test("keeps the app's own page links, opened in place", () => {
     const id = "abc123def456";
     for (const path of [
       `/automations/${id}`,
       `/automations/${id}/memory`,
       `/run/${id}`,
+      `/chat/${id}`,
+      `/external-tasks/${id}`,
     ]) {
       expect(renderMarkdown(`[task](${path})`)).toBe(
         `<p class="md-p"><a class="md-link" href="${path}">task</a></p>`,
@@ -62,6 +64,8 @@ describe("renderMarkdown", () => {
       `/automations/abc%2F${id}`,
       `/automations/${id}/edit`,
       `/run/${id}/x`,
+      `/external-tasks/${id}/edit`,
+      `/chat/${id}/x`,
       `/run/${id}?x=1`,
       `/run/${id}#top`,
       "/run/ABC123DEF456",
