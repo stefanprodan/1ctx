@@ -25,6 +25,7 @@ import {
   hasLineBreak,
   MAX_TITLE,
 } from "../../../shared/words.ts";
+import { sinceText } from "../../feed/Row.model.ts";
 import type { IconName } from "../../lib/icons.tsx";
 
 export const INTRO = "Work for an agent you run outside 1ctx.";
@@ -118,11 +119,23 @@ export function taskIcon(row: Pick<ExternalTaskRow, "state" | "attentionAt">): {
   }
 }
 
-const hoursOf = (hours: number) => `${hours} ${hours === 1 ? "hour" : "hours"}`;
+// when the idle sweep unclaims this claim, from its last report on the
+// sweep's own basis; a blocked task waits for a member and never idles
+export function claimDeadline(
+  task: Pick<ExternalTaskRow, "state" | "claim">,
+  idleHours: number,
+): number | null {
+  if (task.state !== "claimed" || task.claim === null) return null;
+  return task.claim.activeAt + idleHours * 3_600_000;
+}
 
-// under a claim on the task's page
-export const idleWords = (hours: number): string =>
-  `Opens again after ${hoursOf(hours)} without a report`;
+// the deadline's time as an aside says it: the time today, else the day
+export const deadlineTime = (at: number, now: number): string =>
+  sinceText(at, now);
+
+// the chat a task was made in; an untitled one as Storage names it
+export const chatName = (title: string): string =>
+  title.trim() === "" ? "Untitled chat" : title;
 
 // what the page offers in a state: the brief is edited and the task
 // dropped until it closes, a claimed task unclaimed while held, an answer

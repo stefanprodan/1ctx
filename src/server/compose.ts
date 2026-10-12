@@ -474,6 +474,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     externalTaskIdleHours: () => limits.current().externalTaskIdleHours,
     externalTaskDays: () => limits.current().externalTaskDays,
+    chatOpens: (principal, id) =>
+      sessions.sessionProject(principal, id) !== null,
     knowledge: {
       file: (projectId, fileId) => knowledge.store.file(projectId, fileId),
       deletedName: (projectId, fileId) =>

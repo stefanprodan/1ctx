@@ -18,7 +18,7 @@ export const TASK_SELECT = `select t.id, t.project_id, t.title, t.scope, t.state
     t.revision, t.edit_revision, t.claim_id, t.attention_at, t.created_by,
     t.created_at, t.moved_at, u.username as creator_name,
     c.user_id as claim_user, cu.username as claim_username, c.key_id,
-    c.key_name, c.started_at, e.kind as last_kind,
+    c.key_name, c.started_at, c.active_at, e.kind as last_kind,
     substr(ltrim(e.text, char(9, 10, 11, 12, 13, 32, 160, 5760,
       8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202,
       8232, 8233, 8239, 8287, 12288, 65279)), 1, 600) as last_text,
@@ -85,6 +85,7 @@ export type RawTask = {
   key_id: string;
   key_name: string;
   started_at: number;
+  active_at: number;
   last_kind: EntryKind | null;
   last_text: string;
   last_at: number;
@@ -123,6 +124,7 @@ export const taskRow = (raw: RawTask): ExternalTaskRow => ({
           keyId: raw.key_id,
           keyName: raw.key_name,
           startedAt: raw.started_at,
+          activeAt: raw.active_at,
         },
   last:
     raw.last_kind === null

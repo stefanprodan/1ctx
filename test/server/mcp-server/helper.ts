@@ -136,6 +136,7 @@ export const externalTaskDetail = (
   ],
   briefAt: 100,
   chatId: null,
+  chatTitle: null,
 });
 
 export const externalTaskShow = (

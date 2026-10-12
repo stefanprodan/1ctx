@@ -4,6 +4,7 @@
 import type { ExternalTaskResponse } from "../../shared/api/external-tasks.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
+import type { Principal } from "../lib/http.ts";
 import { type KnowledgePort, taskActions } from "./actions.ts";
 import { chatTasks } from "./chat.ts";
 import type { ClosedFilter } from "./lists.ts";
@@ -23,17 +24,26 @@ export type ExternalTasksDeps = {
   externalTaskDays(): number;
   knowledge: KnowledgePort;
   access: AccessPort;
+  // whether the principal may open the chat, as the chat's own route
+  // decides
+  chatOpens(principal: Principal, chatId: string): boolean;
 };
 
 export function externalTasksArea(deps: ExternalTasksDeps) {
   const store = new ExternalTaskStore(deps.db);
+  // the chat's title only for a viewer who may open the chat
   const show = (
     id: string,
     before: string | null,
+    viewer: Principal | null = null,
   ): ExternalTaskResponse | null => {
     const task = store.byId(id);
     if (task === null) return null;
-    const brief = store.brief(id)!;
+    const { chatTitle, ...brief } = store.brief(id)!;
+    const opens =
+      viewer !== null &&
+      brief.chatId !== null &&
+      deps.chatOpens(viewer, brief.chatId);
     const files = store.fileIds(id).map((fileId) => {
       const live = deps.knowledge.file(task.projectId, fileId);
       return {
@@ -44,7 +54,7 @@ export function externalTasksArea(deps: ExternalTasksDeps) {
       };
     });
     return {
-      task: { task, files, ...brief },
+      task: { task, files, ...brief, chatTitle: opens ? chatTitle : null },
       ...store.entries(id, before),
       idleHours: deps.externalTaskIdleHours(),
     };

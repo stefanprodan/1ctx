@@ -25,6 +25,7 @@ const row: ExternalTaskRow = {
     keyId: "k1",
     keyName: "laptop-claude",
     startedAt: 1,
+    activeAt: 1,
   },
   last: { kind: "question", text: "Which branch?", at: 5 },
   entries: 2,

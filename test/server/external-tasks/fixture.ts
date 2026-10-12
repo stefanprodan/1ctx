@@ -51,6 +51,7 @@ export function fixture() {
     },
     externalTaskIdleHours: () => limits.idle,
     externalTaskDays: () => limits.days,
+    chatOpens: () => true,
     knowledge: {
       file: (projectId, fileId) => files.get(`${projectId}/${fileId}`) ?? null,
       deletedName: (projectId, fileId) =>

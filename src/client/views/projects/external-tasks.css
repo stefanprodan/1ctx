@@ -11,12 +11,22 @@
     gap: var(--space-3);
     padding: var(--space-4);
   }
-  .external-tasks-brief-line {
+  /* the state as a row's title reads, its icon in the state's colour
+     from base */
+  .external-tasks-brief-state {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     margin: 0;
     font-size: var(--text-ui);
-    color: var(--dim);
+    font-weight: 500;
+    color: var(--fg);
   }
-  /* the idle unclaim and the chat it was made in, phone width too */
+  .external-tasks-brief-icon {
+    flex-shrink: 0;
+  }
+  /* the chat it was made in, and on a phone the aside's scope and
+     deadline */
   .external-tasks-brief-foot {
     display: flex;
     flex-wrap: wrap;
@@ -24,6 +34,30 @@
     margin: 0;
     font-size: var(--text-small);
     color: var(--faint);
+  }
+  /* a long title is cut, the icon stays */
+  .external-tasks-chat {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    max-width: 100%;
+  }
+  .external-tasks-chat-icon {
+    flex-shrink: 0;
+  }
+  /* the aside hides under 1100 */
+  .external-tasks-brief-narrow {
+    display: none;
+  }
+  @media (max-width: 1099px) {
+    .external-tasks-brief-narrow {
+      display: flex;
+    }
+  }
+  /* what an edit hides keeps the page's gap while shown */
+  .external-tasks-rest {
+    display: contents;
   }
   /* the padding sits on the box, so the cut falls on a line's edge */
   .external-tasks-brief-text {

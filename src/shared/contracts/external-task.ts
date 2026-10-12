@@ -25,6 +25,9 @@ export type ExternalTaskClaim = {
   // the key's name, kept once the key is deleted
   keyName: string;
   startedAt: number;
+  // the claim or its last report or answer; the idle sweep unclaims a
+  // claimed task externalTaskIdleHours after it
+  activeAt: number;
 };
 
 // a row of the project's list, Home's section and a frame
@@ -83,6 +86,8 @@ export type ExternalTaskDetail = {
   briefAt: number;
   // the chat that made it, null otherwise or once deleted
   chatId: string | null;
+  // its title, only when the reader may open that chat
+  chatTitle: string | null;
 };
 
 // the moves a member makes on the page; `seen` clears the mark

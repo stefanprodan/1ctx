@@ -39,11 +39,12 @@ import {
 } from "../../../src/client/data/marked-tasks.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
+  chatName,
+  claimDeadline,
   claimWords,
   draftOf,
   entryBy,
   fileLabel,
-  idleWords,
   lastLine,
   movesOf,
   patchOf,
@@ -73,6 +74,7 @@ const claim = {
   keyId: "k1",
   keyName: "laptop-claude",
   startedAt: 2_000,
+  activeAt: 2_000,
 };
 
 const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
@@ -101,6 +103,7 @@ const detail = (
   files: [{ fileId: "f1", name: "plan.md", revision: 3, deleted: false }],
   briefAt: 1_000,
   chatId: null,
+  chatTitle: null,
   ...changes,
 });
 
@@ -169,9 +172,28 @@ describe("the words", () => {
     expect(webLink("not a url")).toBe(false);
   });
 
-  test("the idle limit is said in hours", () => {
-    expect(idleWords(1)).toBe("Opens again after 1 hour without a report");
-    expect(idleWords(24)).toBe("Opens again after 24 hours without a report");
+  test("a claim's deadline is its last activity plus the idle limit, only while claimed", () => {
+    const hour = 3_600_000;
+    const claimed = row({ state: "claimed", claim });
+    expect(claimDeadline(claimed, 24)).toBe(2_000 + 24 * hour);
+    expect(claimDeadline(claimed, 1)).toBe(2_000 + hour);
+    // a report moves it on
+    expect(
+      claimDeadline({ ...claimed, claim: { ...claim, activeAt: 9_000 } }, 24),
+    ).toBe(9_000 + 24 * hour);
+    for (const state of ["open", "blocked", "done", "dropped"] as const) {
+      expect(
+        claimDeadline(
+          row({ state, claim: state === "blocked" ? claim : null }),
+          24,
+        ),
+      ).toBeNull();
+    }
+  });
+
+  test("an untitled chat has a name", () => {
+    expect(chatName("Plan the sweep")).toBe("Plan the sweep");
+    expect(chatName("")).toBe("Untitled chat");
   });
 
   test("a mark wins the icon's colour, a blocked task is always marked", () => {

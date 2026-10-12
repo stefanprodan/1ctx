@@ -273,6 +273,7 @@ test("a fresh area instance can retry a persisted result", () => {
     clock: f.now,
     externalTaskDays: () => f.limits.days,
     externalTaskIdleHours: () => f.limits.idle,
+    chatOpens: () => true,
     knowledge: { file: () => null, deletedName: () => null },
   });
   expect(

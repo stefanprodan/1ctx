@@ -23,6 +23,17 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   while the project has a finished task or a filter is set.
 - **A state's icon comes from `taskIcon()`.** An open task is
   `task-open`, never the clock, which means a schedule.
+- **The brief opens with the state** in a row title's words and
+  weight, the state's icon in its colour before it, never dimmed.
+  "Made in" names and links the chat only when the detail carries its
+  title; otherwise it says "Made in a chat", unlinked.
+- **The aside holds the scope** and, while claimed, when the idle sweep
+  unclaims it: the claim's `activeAt` plus the idle hours, at a time
+  today, else the day too (`sinceText()`). Under 1100, where the aside
+  hides, both sit in a small line under the brief's files.
+- **An edit shows only the form and the aside.** The moves, the answer
+  box and the timeline stay mounted under `hidden`, so a draft answer
+  survives and no move runs under the open form.
 - **The task's page clears its mark with `seen`** once its read lands
   marked. A frame adding an entry or editing the brief reads it again,
   keeping older entries.

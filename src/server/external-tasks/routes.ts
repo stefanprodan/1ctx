@@ -37,7 +37,11 @@ type RoutesDeps = {
   access: AccessPort;
   tasks: ReturnType<typeof taskActions> & {
     projectOf(id: string): string | null;
-    show(id: string, before: string | null): ExternalTaskResponse | null;
+    show(
+      id: string,
+      before: string | null,
+      viewer: Principal | null,
+    ): ExternalTaskResponse | null;
     byProject(projectId: string): ExternalTasksResponse;
     closed(
       projectId: string,
@@ -99,7 +103,9 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(req, ctx) {
         const id = visible(ctx.principal!, ctx.params.id);
-        return json(tasks.show(id, parseTaskDetail(new URL(req.url)))!);
+        return json(
+          tasks.show(id, parseTaskDetail(new URL(req.url)), ctx.principal!)!,
+        );
       },
     },
     {
@@ -127,7 +133,9 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
         const id = visible(principal, ctx.params.id);
         parseNoQuery(new URL(req.url));
         const body = parsePatchTask(await jsonBody(req, MAX_TASK_BODY));
-        return json(write(principal, id, () => tasks.edit(id, body)));
+        return json(
+          write(principal, id, () => tasks.edit(id, body, principal)),
+        );
       },
     },
     ...(["answer", "unclaim", "drop", "reopen"] as const).map(
@@ -141,7 +149,9 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
           parseNoQuery(new URL(req.url));
           const body = parseMoveTask(await jsonBody(req, MAX_MOVE_BODY), move);
           return json(
-            write(principal, id, () => tasks[move](principal.userId, id, body)),
+            write(principal, id, () =>
+              tasks[move](principal.userId, id, body, principal),
+            ),
           );
         },
       }),
@@ -155,7 +165,9 @@ export function routes({ db, access, tasks }: RoutesDeps): RouteDescriptor[] {
         const id = visible(principal, ctx.params.id);
         parseNoQuery(new URL(req.url));
         const body = parseSeenTask(await jsonBody(req, 1024));
-        return json(write(principal, id, () => tasks.seen(id, body)));
+        return json(
+          write(principal, id, () => tasks.seen(id, body, principal)),
+        );
       },
     },
     {

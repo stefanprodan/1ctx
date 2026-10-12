@@ -139,6 +139,7 @@ describe("the inbound MCP tasks tool", () => {
       username: "casey",
       keyName: "laptop",
       startedAt: 300,
+      activeAt: 300,
     };
     const row = externalTaskRow({ state: "claimed", claim, entries: 1 });
     state.taskShow = {

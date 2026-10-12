@@ -34,6 +34,7 @@ export class ExternalTaskStore extends ExternalTaskEntries {
     );
   }
 
+  // the chat's title is for a reader who may open it: show() decides
   brief(id: string) {
     const raw = this.db
       .query<
@@ -41,12 +42,13 @@ export class ExternalTaskStore extends ExternalTaskEntries {
           text: string;
           brief_at: number;
           chat_id: string | null;
+          chat_title: string | null;
         },
         [string]
       >(
-        `select text, brief_at,
-        case when exists (select 1 from sessions where id = t.chat_id)
-          then chat_id end as chat_id from external_tasks t where id = ?`,
+        `select t.text, t.brief_at, s.id as chat_id, s.title as chat_title
+        from external_tasks t left join sessions s on s.id = t.chat_id
+        where t.id = ?`,
       )
       .get(id);
     return raw === null
@@ -55,6 +57,7 @@ export class ExternalTaskStore extends ExternalTaskEntries {
           text: raw.text,
           briefAt: raw.brief_at,
           chatId: raw.chat_id,
+          chatTitle: raw.chat_title,
         };
   }
 

@@ -230,6 +230,7 @@ describe("the closed pages", () => {
       keyId: "k1",
       keyName: "laptop",
       startedAt: 1,
+      activeAt: 1,
     };
     expect(taskFields(taskRow({ scope: "api", claim }))).toEqual([
       "Wire the sweep",
@@ -270,6 +271,7 @@ describe("the closed pages", () => {
       keyId: "k1",
       keyName: "laptop",
       startedAt: 1,
+      activeAt: 1,
     };
     expect(closedTakes({ q: "robin", state: null })({ ...row, claim })).toBe(
       false,

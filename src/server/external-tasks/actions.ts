@@ -21,6 +21,7 @@ import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
+import type { Principal } from "../lib/http.ts";
 import type { TaskKey } from "./rows.ts";
 import {
   type Actor,
@@ -119,13 +120,18 @@ type ActionsDeps = {
   clock: Clock;
   store: ExternalTaskStore;
   knowledge: KnowledgePort;
-  show(id: string, before: string | null): ExternalTaskResponse | null;
+  show(
+    id: string,
+    before: string | null,
+    viewer?: Principal | null,
+  ): ExternalTaskResponse | null;
 };
 
+// a route's moves answer the detail its viewer may read
 export function taskActions(deps: ActionsDeps) {
   const { db, store } = deps;
-  const detail = (id: string) => {
-    const found = deps.show(id, null);
+  const detail = (id: string, viewer: Principal | null = null) => {
+    const found = deps.show(id, null, viewer);
     if (found === null) throw new NotFound("no such external task");
     return found;
   };
@@ -141,6 +147,7 @@ export function taskActions(deps: ActionsDeps) {
     id: string,
     kind: "answer" | "unclaim" | "drop" | "reopen",
     body: ExternalTaskMoveRequest,
+    viewer: Principal | null,
   ) =>
     transact(db, () => {
       const task = required(store, id);
@@ -164,7 +171,10 @@ export function taskActions(deps: ActionsDeps) {
         links: [],
         at: deps.clock(),
       });
-      return { result: detail(id), events: [taskChanged(result.task)] };
+      return {
+        result: detail(id, viewer),
+        events: [taskChanged(result.task)],
+      };
     });
 
   return {
@@ -185,7 +195,11 @@ export function taskActions(deps: ActionsDeps) {
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
-    edit(id: string, body: PatchExternalTaskRequest) {
+    edit(
+      id: string,
+      body: PatchExternalTaskRequest,
+      viewer: Principal | null = null,
+    ) {
       return transact(db, () => {
         const task = required(store, id);
         if (task.editRevision !== body.editRevision)
@@ -208,25 +222,46 @@ export function taskActions(deps: ActionsDeps) {
         brief.title = brief.title.trim();
         files(task.projectId, brief.fileIds, old.fileIds);
         if (JSON.stringify(brief) === JSON.stringify(old))
-          return { result: detail(id) };
+          return { result: detail(id, viewer) };
         store.edit(id, brief, deps.clock());
-        const result = detail(id);
+        const result = detail(id, viewer);
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
-    answer: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "answer", body),
-    unclaim: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "unclaim", body),
-    drop: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "drop", body),
-    reopen: (userId: string, id: string, body: ExternalTaskMoveRequest) =>
-      member(userId, id, "reopen", body),
-    seen(id: string, body: ExternalTaskSeenRequest) {
+    answer: (
+      userId: string,
+      id: string,
+      body: ExternalTaskMoveRequest,
+      viewer: Principal | null = null,
+    ) => member(userId, id, "answer", body, viewer),
+    unclaim: (
+      userId: string,
+      id: string,
+      body: ExternalTaskMoveRequest,
+      viewer: Principal | null = null,
+    ) => member(userId, id, "unclaim", body, viewer),
+    drop: (
+      userId: string,
+      id: string,
+      body: ExternalTaskMoveRequest,
+      viewer: Principal | null = null,
+    ) => member(userId, id, "drop", body, viewer),
+    reopen: (
+      userId: string,
+      id: string,
+      body: ExternalTaskMoveRequest,
+      viewer: Principal | null = null,
+    ) => member(userId, id, "reopen", body, viewer),
+    seen(
+      id: string,
+      body: ExternalTaskSeenRequest,
+      viewer: Principal | null = null,
+    ) {
       return transact(db, () => {
         required(store, id);
-        if (!store.seen(id, body.attentionAt)) return { result: detail(id) };
-        const result = detail(id);
+        if (!store.seen(id, body.attentionAt))
+          return { result: detail(id, viewer) };
+        const result = detail(id, viewer);
         return { result, events: [taskChanged(result.task.task)] };
       });
     },

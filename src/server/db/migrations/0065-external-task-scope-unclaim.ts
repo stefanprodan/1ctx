@@ -6,9 +6,10 @@ import type { Migration } from "../migration.ts";
 // A task's part is its scope, and a release is an unclaim. The column is
 // renamed in place. The claims and the entries list the old words in
 // their checks, so both are rebuilt with every row and rowid kept (a tie
-// on time sorts entries by rowid), the stored words rewritten, and a
-// claim's saved retry row given the new field and kind. Tasks and
-// entries reference claims, so external_tasks is checked with them.
+// on time sorts entries by rowid), the stored words rewritten, a sweep's
+// own entry text with them, and a claim's saved retry row given the new
+// field and kind. Tasks and entries reference claims, so external_tasks
+// is checked with them.
 export const m0065: Migration = {
   id: "0065-external-task-scope-unclaim",
   rebuild: true,
@@ -72,7 +73,10 @@ export const m0065: Migration = {
          claim_end, at)
       select rowid, id, task_id, claim_id,
         case kind when 'release' then 'unclaim' else kind end,
-        text, links, user_id, key_name,
+        case when key_name is null and claim_end in ('idle', 'access_gone')
+            and text like 'released %'
+          then 'unclaimed' || substr(text, 9) else text end,
+        links, user_id, key_name,
         case claim_end when 'released' then 'unclaimed' else claim_end end, at
       from external_task_entries;
       drop table external_task_entries;

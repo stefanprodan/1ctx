@@ -2118,7 +2118,7 @@ describe("the schema", () => {
         id: "t",
         part: "part B",
         state: "open",
-        last: { kind: "release", text: "Stop", at: 20 },
+        last: { kind: "release", text: "released it, too slow", at: 20 },
       };
       // rowids out of insert order, since a tie on time sorts by rowid
       db.exec(`
@@ -2132,17 +2132,26 @@ describe("the schema", () => {
           values (4, 'c1', 't', 'u', 'k1', 'laptop', 10, null, 15, 20,
             'released', '${JSON.stringify(retry)}'),
           (2, 'c2', 't', 'u', 'k1', 'laptop', 30, 'e2', 30, 40, 'idle', null),
-          (7, 'c3', 't2', 'u', 'k2', 'desk', 50, null, 50, null, null, null);
+          (7, 'c3', 't2', 'u', 'k2', 'desk', 50, null, 50, null, null, null),
+          (8, 'c4', 't', 'u', 'k3', 'cli', 60, null, 60, 70, 'access_gone',
+            null),
+          (9, 'c5', 't', 'u', 'k3', 'cli', 80, null, 80, 90, 'released',
+            null);
         insert into external_task_entries (rowid, id, task_id, claim_id,
             kind, text, links, user_id, key_name, claim_end, at)
           values (9, 'e1', 't', 'c1', 'claim', '', '[]', 'u', 'laptop', null,
             10),
-          (3, 'e2', 't', 'c1', 'release', 'Stop', '[]', 'u', 'laptop',
-            'released', 20),
-          (12, 'e3', 't', 'c2', 'release', 'idle', '[]', null, null, 'idle',
-            40),
-          (5, 'e4', 't2', 'c3', 'progress', 'Go', '[]', 'u', 'desk', null,
-            50);
+          (3, 'e2', 't', 'c1', 'release', 'released it, too slow', '[]',
+            'u', 'laptop', 'released', 20),
+          (12, 'e3', 't', 'c2', 'release',
+            'released after 24 hours without a report', '[]', null, null,
+            'idle', 40),
+          (5, 'e4', 't2', 'c3', 'progress', 'released v2 to staging', '[]',
+            'u', 'desk', null, 50),
+          (14, 'e5', 't', 'c4', 'release', 'released because access ended',
+            '[]', null, null, 'access_gone', 70),
+          (15, 'e6', 't', 'c5', 'release', 'released the lock first', '[]',
+            'u', null, 'released', 90);
         update external_tasks set state = 'claimed', claim_id = 'c3'
           where id = 't2';
       `);
@@ -2162,7 +2171,7 @@ describe("the schema", () => {
             row.end_reason === "released" ? "unclaimed" : row.end_reason,
         })),
       );
-      expect(claims!.map((row) => row.rowid)).toEqual([2, 4, 7]);
+      expect(claims!.map((row) => row.rowid)).toEqual([2, 4, 7, 8, 9]);
       expect(
         claims!.map((row) =>
           row.last_task === null ? null : JSON.parse(row.last_task as string),
@@ -2173,14 +2182,23 @@ describe("the schema", () => {
           id: "t",
           scope: "part B",
           state: "open",
-          last: { kind: "unclaim", text: "Stop", at: 20 },
+          last: { kind: "unclaim", text: "released it, too slow", at: 20 },
         },
         null,
+        null,
+        null,
       ]);
+      // only 1ctx's own sweep words follow the rename, as the sweeps now
+      // write them; a member's or an agent's text stays as written
+      const swept: Record<string, string> = {
+        e3: "unclaimed after 24 hours without a report",
+        e5: "unclaimed because access ended",
+      };
       expect(entries).toEqual(
         before[2]!.map((row) => ({
           ...row,
           kind: row.kind === "release" ? "unclaim" : row.kind,
+          text: swept[row.id as string] ?? row.text,
           claim_end: row.claim_end === "released" ? "unclaimed" : row.claim_end,
         })),
       );
@@ -2196,7 +2214,7 @@ describe("the schema", () => {
       db.exec("delete from external_task_claims where id = 'c1'");
       expect(
         db.query("select id from external_task_entries order by rowid").all(),
-      ).toEqual([{ id: "e4" }, { id: "e3" }]);
+      ).toEqual([{ id: "e4" }, { id: "e3" }, { id: "e5" }, { id: "e6" }]);
       db.exec("delete from external_tasks");
       expect(db.query("select id from external_task_claims").all()).toEqual([]);
       expect(db.query("select id from external_task_entries").all()).toEqual(

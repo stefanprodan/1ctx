@@ -385,3 +385,28 @@ test.serial(
     }
   },
 );
+
+test("a claim's activeAt is its last report or answer, the idle sweep's basis", () => {
+  using f = fixture();
+  const task = f.task("claimed");
+  const activeAt = () => f.area.store.byId(task.id)!.claim!.activeAt;
+  expect(activeAt()).toBe(f.now());
+  f.advance(2 * HOUR);
+  f.area.report(f.key, task.id, task.claimId!, "progress", "Half.", []);
+  expect(activeAt()).toBe(f.now());
+  f.advance(3 * HOUR);
+  f.area.answer(f.owner.id, task.id, { state: "claimed", text: "Go on." });
+  const last = f.now();
+  expect(activeAt()).toBe(last);
+  expect(f.area.show(task.id, null)!.task.task.claim!.activeAt).toBe(last);
+  const deadline = last + f.limits.idle * HOUR;
+  f.at(deadline - 1);
+  expect(f.area.unclaimIdle(f.now())).toBe(0);
+  expect(f.area.store.byId(task.id)!.state).toBe("claimed");
+  f.at(deadline);
+  expect(f.area.unclaimIdle(f.now())).toBe(1);
+  expect(f.area.store.byId(task.id)!).toMatchObject({
+    state: "open",
+    claim: null,
+  });
+});

@@ -31,6 +31,7 @@ const claim = (id: string): ExternalTaskClaim => ({
   keyId: "k1",
   keyName: "laptop-claude",
   startedAt: 1,
+  activeAt: 1,
 });
 
 let at = 0;
@@ -84,6 +85,7 @@ const page = (
     files: [],
     briefAt: 0,
     chatId: null,
+    chatTitle: null,
   },
   entries: written.toReversed(),
   next: null,

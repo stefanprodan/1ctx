@@ -35,6 +35,9 @@ agent reports use the area's task capability. The pages that show it
   name live knowledge files in the same project. A retained deleted
   link reads its name from deletion history, or null after pruning.
 - Create answers 201; edits, moves and seen answer the detail shape.
+  The detail's `chatTitle`, read with the brief, is set only when the
+  caller may open the chat by the chat route's own check (the
+  `chatOpens` port); an agent's or a chat tool's read has none.
   Delete answers 204 and removes all of the task's dependent rows.
 
 ## Claims and ordering
@@ -93,8 +96,9 @@ agent reports use the area's task capability. The pages that show it
   attention mark. Frames publish only after the outer commit.
 - Idle unclaim reads `externalTaskIdleHours` on each pass. Only claimed
   tasks expire this way; blocked tasks wait for a member. Reports and
-  answers refresh activity. Closed deletion reads `externalTaskDays`
-  and the latest close time; reopened tasks stay.
+  answers refresh activity, which a row's claim carries as `activeAt`.
+  Closed deletion reads `externalTaskDays` and the latest close time;
+  reopened tasks stay.
   Idle candidates are filtered by activity in SQL and rechecked in
   their write transaction; access endings select the supplied key ids.
 - Sweep logs contain counts only: unavailable-key unclaims, idle
