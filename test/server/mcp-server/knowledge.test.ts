@@ -613,7 +613,6 @@ describe("the inbound MCP knowledge tool", () => {
       skip = Number(next[1]);
     }
     expect(found).toEqual(Array.from({ length: 400 }, (_, index) => index + 1));
-    expect(state.guardedSearches).toBeGreaterThan(1);
 
     const missing = await toolCall(send, "knowledge", {
       action: "search",
@@ -647,7 +646,6 @@ describe("the inbound MCP knowledge tool", () => {
     expect(Buffer.byteLength(result)).toBeLessThanOrEqual(32 * 1024);
     expect(result).toContain('fileId="file00000001", skip=');
     expect(elapsed).toBeLessThan(250);
-    expect(state.guardedSearches).toBe(1);
     await area.close();
   });
 

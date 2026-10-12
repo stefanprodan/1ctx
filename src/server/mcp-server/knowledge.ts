@@ -229,11 +229,12 @@ function projectOf(
   }
 }
 
-export function knowledgeTool(
+export async function knowledgeTool(
   deps: McpServerDeps,
   principal: KeyPrincipal,
   input: KnowledgeInput,
-): McpResult {
+  signal?: AbortSignal,
+): Promise<McpResult> {
   const project = projectOf(deps, principal, input);
   if (input.action === "list") {
     const all = deps.knowledge.list(project.id).files;
@@ -274,23 +275,24 @@ export function knowledgeTool(
     );
   }
   if (input.action === "search") {
+    // one file is grep on it: never queued
     if (input.fileId !== null) {
       const fileId = input.fileId;
-      return deps.knowledge.oneAtATime(principal.userId, () => {
-        const listed = deps.knowledge
-          .list(project.id)
-          .files.find((file) => file.id === fileId);
-        const file = deps.knowledge.rawFile(project.id, fileId);
-        if (listed === undefined || file === null) throw new NotFound();
-        return fileSearch(listed, file.text, project.id, input.q, input.skip);
-      });
+      const listed = deps.knowledge
+        .list(project.id)
+        .files.find((file) => file.id === fileId);
+      const file = deps.knowledge.rawFile(project.id, fileId);
+      if (listed === undefined || file === null) throw new NotFound();
+      return fileSearch(listed, file.text, project.id, input.q, input.skip);
     }
-    const found = deps.knowledge.search(
+    const found = await deps.knowledge.search(
       project.id,
-      principal.userId,
       input.q,
       input.after,
+      { from: "mcp", signal },
     );
+    // the key may have lost the project while the search waited
+    deps.access.project(principal, project.id);
     const lines = [
       ...found.names.map((file) =>
         jsonLine({ match: "name", file: metadata(file) }),

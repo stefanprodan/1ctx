@@ -17,7 +17,8 @@ import {
   searchTerms,
 } from "../../shared/search.ts";
 import { isKnowledgeName } from "../../shared/words.ts";
-import { BadRequest, TooManyRequests } from "../lib/errors.ts";
+import { BadRequest } from "../lib/errors.ts";
+import { noStep, type SearchStep } from "../lib/search-queue.ts";
 
 // BM25 with Lucene's IDF
 const K1 = 1.2;
@@ -26,10 +27,10 @@ const NAME_ALL = 1.5;
 const NAME_SOME = 1.2;
 
 export type SearchSource = {
-  // every live file, in name order
-  files(): Iterable<KnowledgeFile>;
-  // null for a file gone since its row was read
-  text(fileId: string): string | null;
+  // every live file's id, in name order, taken at the start
+  ids(): string[];
+  // the file's metadata and text from one read, null for a file gone
+  row(fileId: string): { file: KnowledgeFile; text: string } | null;
 };
 
 // the query's words, refused when it holds none
@@ -59,31 +60,42 @@ export function readCursor(value: string): SearchCursor | null {
   return Number.isFinite(score) ? { score, name } : null;
 }
 
+export type SearchQuery = { terms: string[]; cursor: SearchCursor | null };
+
+// the query and cursor checked, before a search takes its turn
+export function prepareSearch(q: string, after: string | null): SearchQuery {
+  const terms = queryTerms(q);
+  const cursor = after === null ? null : readCursor(after);
+  if (after !== null && cursor === null) {
+    throw new BadRequest("after must be a search cursor");
+  }
+  return { terms, cursor };
+}
+
 type Found = { file: KnowledgeFile; counts: number[] };
 type Ranked = { file: KnowledgeFile; score: number };
 
 // Every file is read on every page: the IDF needs the whole project, and
 // the project's cap bounds the scan. A write between two pages changes
 // the scores, so a row may then repeat or be skipped.
-export function search(
+export async function search(
   source: SearchSource,
-  q: string,
-  after: string | null,
-): KnowledgeSearchResponse {
-  const terms = queryTerms(q);
-  const cursor = after === null ? null : readCursor(after);
-  if (after !== null && cursor === null) {
-    throw new BadRequest("after must be a search cursor");
-  }
+  query: SearchQuery,
+  step: SearchStep = noStep,
+): Promise<KnowledgeSearchResponse> {
+  const { terms, cursor } = query;
   const found: Found[] = [];
   const names: KnowledgeFile[] = [];
   let namesTotal = 0;
   const df = terms.map(() => 0);
   let scanned = 0;
   let bytes = 0;
-  for (const file of source.files()) {
-    const text = source.text(file.id);
-    if (text === null) continue;
+  for (const id of source.ids()) {
+    await step();
+    // a file gone since the snapshot is neither row
+    const row = source.row(id);
+    if (row === null) continue;
+    const { file, text } = row;
     scanned++;
     bytes += file.bytes;
     const lower = text.toLowerCase();
@@ -132,30 +144,14 @@ export function search(
     last !== undefined && start + SEARCH_PAGE < ranked.length
       ? cursorOf({ score: last.score, name: last.file.name })
       : null;
-  // texts are read again for the page alone, so a scan holds one at a
-  // time; a row gone or changed since is left out, the cursor unmoved
+  // rows are read again for the page alone, so a scan holds one text at
+  // a time; a row gone or changed since is left out, the cursor unmoved
   const files: KnowledgeSearchHit[] = [];
   for (const { file } of page) {
-    const text = source.text(file.id);
-    if (text === null || !holdsAll(text, terms)) continue;
-    files.push({ file, ...bestLines(text, terms) });
+    await step();
+    const row = source.row(file.id);
+    if (row === null || !holdsAll(row.text, terms)) continue;
+    files.push({ file: row.file, ...bestLines(row.text, terms) });
   }
   return { names, namesTotal, files, next };
-}
-
-// one scan per user at a time, should the scan ever yield
-export function oneAtATime<T>(
-  running: Set<string>,
-  userId: string,
-  scan: () => T,
-): T {
-  if (running.has(userId)) {
-    throw new TooManyRequests("a search is already running");
-  }
-  running.add(userId);
-  try {
-    return scan();
-  } finally {
-    running.delete(userId);
-  }
 }

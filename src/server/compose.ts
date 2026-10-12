@@ -41,6 +41,7 @@ import type { Clock } from "./lib/clock.ts";
 import { userAgent, withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import { errorFields, type LogFactory, scrubErrors } from "./lib/log.ts";
+import { type SearchQueue, searchQueue } from "./lib/search-queue.ts";
 import { limitsArea } from "./limits/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
 import { mcpServerArea } from "./mcp-server/index.ts";
@@ -140,6 +141,8 @@ export type App = {
   deciders: Deciders;
   memory: MemoryStore;
   knowledge: KnowledgeArea;
+  // the one search queue, which a test may hold
+  searches: SearchQueue;
   repos: Repos;
   // the cache directory as startup found it
   repoCache: { dir: string; trees: number; bytes: number } | null;
@@ -410,7 +413,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     sessions: { sessionInfo: (sessionId) => sessions.sessionInfo(sessionId) },
   });
-  const knowledge = knowledgeArea({ db, clock, limits, access });
+  // one scan at a time across knowledge and session search
+  const searches = searchQueue();
+  const knowledge = knowledgeArea({ db, clock, limits, access, searches });
   repos = reposArea({
     db,
     clock,
@@ -455,6 +460,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     limits,
     uploads: knowledge,
+    searches,
     scratch: bash.scratch,
     wakeQueue: () => runner.queue.wake(),
     pruned: (run) => automations.runDeleted(run),
@@ -726,7 +732,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: {
       byId: (id) => sessions.store.byId(id),
       exportRows: (id) => sessions.store.exportRows(id),
-      search: (projectId, q, after) => sessions.search(projectId, q, after),
+      search: (projectId, q, after, ask) =>
+        sessions.search(projectId, q, after, ask),
       list: (projectId, since, after) => sessions.list(projectId, since, after),
     },
     tasks: externalTasks,
@@ -817,6 +824,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     deciders,
     memory: memory.store,
     knowledge,
+    searches,
     repos,
     repoCache,
     bash,
