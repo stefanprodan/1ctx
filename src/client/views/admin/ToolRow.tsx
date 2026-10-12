@@ -5,6 +5,7 @@ import type {
   AutomationToolSummary,
   BuiltinToolSummary,
   EmailToolSummary,
+  ExternalTaskToolSummary,
   WebToolSummary,
 } from "../../../shared/contracts/tool.ts";
 import { firstSentence, tokensText } from "../../lib/format.ts";
@@ -23,7 +24,8 @@ export function ToolRow({
     | BuiltinToolSummary
     | WebToolSummary
     | EmailToolSummary
-    | AutomationToolSummary;
+    | AutomationToolSummary
+    | ExternalTaskToolSummary;
   open: boolean;
   onToggle: () => void;
   // the Config board's list: Off while no turn is offered it

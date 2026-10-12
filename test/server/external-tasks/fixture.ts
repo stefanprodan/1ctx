@@ -47,6 +47,7 @@ export function fixture() {
     access: {
       project: (_principal, id) => ({ id }),
       reachableProjectIds: () => [projectId],
+      visibleProjectIds: () => [projectId],
     },
     externalTaskIdleHours: () => limits.idle,
     externalTaskDays: () => limits.days,

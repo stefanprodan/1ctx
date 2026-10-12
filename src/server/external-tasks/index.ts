@@ -5,6 +5,7 @@ import type { ExternalTaskResponse } from "../../shared/api/external-tasks.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { type KnowledgePort, taskActions } from "./actions.ts";
+import { chatTasks } from "./chat.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import type { ListInput } from "./rows.ts";
 import { ExternalTaskStore } from "./store.ts";
@@ -64,6 +65,13 @@ export function externalTasksArea(deps: ExternalTasksDeps) {
   };
   return {
     ...tasks,
+    chat: chatTasks({
+      db: deps.db,
+      store,
+      visibleProjectIds: (userId) => deps.access.visibleProjectIds(userId),
+      show,
+      actions: tasks,
+    }),
     routes: routes({ db: deps.db, access: deps.access, tasks }),
   };
 }

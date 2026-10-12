@@ -213,6 +213,13 @@ export function instanceLines(
   ];
 }
 
+// the external task card's line, by its switch
+export function externalTaskLine(on: boolean): string {
+  return on
+    ? "A chat's agent may make its project's external tasks and act on them as the chat's user. Each chat can turn it off."
+    : "No agent makes or changes external tasks.";
+}
+
 // the automation card's line, by its switch
 export function automationLine(on: boolean): string {
   return on

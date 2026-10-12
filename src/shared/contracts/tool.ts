@@ -119,6 +119,13 @@ export type AutomationToolSummary = ToolSchema & {
   updatedAt: number;
 };
 
+// external_task, on until an admin turns it off; only a chat is offered it
+export type ExternalTaskToolSummary = ToolSchema & {
+  name: "external_task";
+  enabled: boolean;
+  updatedAt: number;
+};
+
 // the search provider an admin chose, null when never chosen, and
 // whether each provider's key file is there; the value never rides
 export type SearchState = {

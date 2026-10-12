@@ -9,6 +9,7 @@ import type {
   AutomationToolSummary,
   BuiltinToolSummary,
   EmailToolSummary,
+  ExternalTaskToolSummary,
   SearchState,
   WebToolSummary,
 } from "../contracts/tool.ts";
@@ -25,12 +26,13 @@ export type ToolsResponse = {
   visualize: WebToolSummary;
   emailUser: EmailToolSummary;
   automation: AutomationToolSummary;
+  externalTask: ExternalTaskToolSummary;
 };
 
 // PATCH /api/tools/:name. `web` takes the mode and the domains, and
 // `listed` needs at least one host, given or stored. `websearch` takes
 // the provider, null for None. `visualize` takes its switch and hosts,
-// `email_user` and `automation` their switches.
+// `email_user`, `automation` and `external_task` their switches.
 // Any other name, any other field and an empty body are a 400.
 export type PatchToolRequest = {
   mode?: WebAccessMode;

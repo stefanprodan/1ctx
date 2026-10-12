@@ -18,6 +18,7 @@ export const TOOL_NAMES = [
   "visualize",
   EMAIL_TOOL,
   AUTOMATION_TOOL,
+  "external_task",
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 export const isToolName = (value: unknown): value is ToolName =>
@@ -30,7 +31,19 @@ export const TOOL_FIELDS: Record<ToolName, readonly string[]> = {
   visualize: ["enabled", "hosts"],
   [EMAIL_TOOL]: ["enabled"],
   [AUTOMATION_TOOL]: ["enabled"],
+  external_task: ["enabled"],
 };
+
+export type SwitchedTool = Exclude<ToolName, "web" | "websearch">;
+
+// the row each switch moves: a tool's own, named, so no switch moves
+// another's
+export function switchOf(name: ToolName): SwitchedTool {
+  if (name === "web" || name === "websearch") {
+    throw new BadRequest(`${name} has no switch`);
+  }
+  return name;
+}
 
 export function parseToolName(value: unknown): ToolName {
   if (!isToolName(value)) throw new BadRequest("no such tool");

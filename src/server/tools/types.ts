@@ -154,7 +154,8 @@ export type OfferedCredential = Pick<
 };
 
 export type Offered = {
-  automationProposals?: boolean;
+  // a chat's main rounds: automation proposes, external_task writes
+  chatMain?: boolean;
   tools: ChatTool[];
   visuals: boolean;
   // false while the send has the project docs off

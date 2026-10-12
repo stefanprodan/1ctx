@@ -49,6 +49,7 @@ import {
   admin as adminFixture,
   automationTool,
   emailUser,
+  externalTaskTool,
 } from "../../helpers/client-fixtures.ts";
 
 const admin = adminFixture({ fullName: "Admin" });
@@ -473,6 +474,7 @@ describe("the pages", () => {
       },
       emailUser: emailUser(),
       automation: automationTool(),
+      externalTask: externalTaskTool(),
     };
     const html = render(<CredentialList />);
     expect(html).toContain(

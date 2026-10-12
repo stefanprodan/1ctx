@@ -28,11 +28,11 @@ function unescapeHtml(value: string): string {
 }
 
 const SAFE_HREF = /^(https?:|mailto:)/i;
-// the app's own pages an agent links to: a task, its memory and a run,
-// with nothing after the id. A fixed list, since the route table is the
-// client's; any other relative path stays text
+// the app's own pages an agent links to: a task, its memory, a run, a
+// chat and an external task, with nothing after the id. A fixed list, since the
+// route table is the client's; any other relative path stays text
 const APP_HREF = new RegExp(
-  `^/(?:automations/${ID_SHAPE}(?:/memory)?|run/${ID_SHAPE})$`,
+  `^/(?:automations/${ID_SHAPE}(?:/memory)?|(?:run|chat|external-tasks)/${ID_SHAPE})$`,
 );
 // the same strokes as the client's copy and check icons; the button
 // carries both and the client shows the check for a moment after a copy

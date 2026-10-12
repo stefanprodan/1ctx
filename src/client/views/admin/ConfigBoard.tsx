@@ -16,11 +16,13 @@ import { Page } from "../../ui/Page.tsx";
 import { RowsCard } from "../../ui/Rows.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
-import { AutomationTool } from "./AutomationTool.tsx";
+import { ChatToolCard } from "./ChatToolCard.tsx";
 import {
+  automationLine,
   builtinsOf,
   CONFIG_TABS,
   configTab,
+  externalTaskLine,
   instanceLines,
   LIMITS_CARDS,
   type LimitsGroup,
@@ -82,7 +84,16 @@ export function ConfigBoard() {
             <div
               class={`config-board-cards${tab === "overview" ? "" : " config-board-away"}`}
             >
-              <AutomationTool tool={state.automation} />
+              <ChatToolCard
+                tool={state.automation}
+                title="Agents manage scheduled tasks"
+                line={automationLine}
+              />
+              <ChatToolCard
+                tool={state.externalTask}
+                title="Agents manage external tasks"
+                line={externalTaskLine}
+              />
             </div>
           </div>
         </Split>

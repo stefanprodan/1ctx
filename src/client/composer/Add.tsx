@@ -3,8 +3,9 @@
 //
 // The plus at the start of the composer's row and its menu, placed as
 // the agent list is. Add files opens the file picker. Web access,
-// Visuals, Knowledge, Memory and Email are switches, drawn as the rail's
-// theme switch is, and flipping one leaves the menu open. MCP servers,
+// Visuals, Knowledge, Memory, Email, Scheduled tasks and External tasks
+// are switches, drawn as the rail's theme switch is, and flipping one
+// leaves the menu open. MCP servers,
 // Skills and Repositories each swap the menu's rows for a switch per
 // server, skill or repository, and so does Web access when the project
 // has credentials, and Escape or the pane's first row swaps them back.
@@ -17,6 +18,7 @@ import { useEffect, useRef } from "preact/hooks";
 import {
   AUTOMATIONS,
   EMAIL,
+  EXTERNAL_TASKS,
   KNOWLEDGE,
   MEMORY,
   VISUALIZE,
@@ -127,6 +129,7 @@ export function Add({
   memory,
   email,
   tasks,
+  externalTasks,
   servers,
   skills,
   repos,
@@ -146,6 +149,9 @@ export function Add({
   // the automation tool, which reads the project's scheduled tasks and
   // proposes changes to them
   tasks: WebItem;
+  // the external_task tool, which makes and follows the project's
+  // external tasks
+  externalTasks: WebItem;
   // null when the picked agent has no MCP server
   servers: PaneItem | null;
   // null when the picked agent has no skill
@@ -292,6 +298,12 @@ export function Add({
             icon="clock"
             item={tasks}
             onFlip={() => onFlip(AUTOMATIONS)}
+          />
+          <SwitchItem
+            name="External tasks"
+            icon="open"
+            item={externalTasks}
+            onFlip={() => onFlip(EXTERNAL_TASKS)}
           />
           {(["servers", "skills", "repos"] as const).map((name) => {
             const item = items[name];

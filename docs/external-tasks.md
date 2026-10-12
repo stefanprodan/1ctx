@@ -49,6 +49,19 @@ agent reports use the area's task capability.
   omit the brief and bound the last entry preview after trimming leading
   whitespace in SQL. Attention reads use the visible-project mark index.
 
+## Chats
+
+- `chat.ts` serves the `external_task` tool (`docs/project-tools.md`).
+  Every call takes the chat's user and project. A read checks the user
+  still sees the project and the task is in it; a write checks both
+  inside its transaction, then calls the same action a route does.
+  Visibility comes from the access port's `visibleProjectIds(userId)`.
+- Create stores the chat id; nothing deletes the task with the chat.
+  `task()` reads the row, the brief and the link ids without entries;
+  `entry()` reads one entry by id, scoped to its task.
+- An answer or drop may name the claim it saw, and is then refused as
+  stale when that is not the current claim.
+
 ## Delivery and maintenance
 
 - Committed changes carry a task row and its revision through the bus.

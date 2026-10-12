@@ -8,6 +8,7 @@ import {
   AUTOMATIONS,
   credentialOf,
   EMAIL,
+  EXTERNAL_TASKS,
   KNOWLEDGE,
   MEMORY,
   repoOf,
@@ -36,7 +37,11 @@ const KIND_WORDS: Record<string, string> = {
 };
 
 // a chat's alone: they mean nothing for a run, so show names neither
-const CHAT_ONLY: ReadonlySet<string> = new Set([MEMORY, AUTOMATIONS]);
+const CHAT_ONLY: ReadonlySet<string> = new Set([
+  MEMORY,
+  AUTOMATIONS,
+  EXTERNAL_TASKS,
+]);
 
 // the names of what a task's runs go without, read only from what its
 // agent and project hold, as the page names them; with the web off a

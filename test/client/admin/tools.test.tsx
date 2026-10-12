@@ -26,6 +26,7 @@ import {
   builtinsOf,
   CONFIG_TABS,
   configTab,
+  externalTaskLine,
   instanceLines,
   LIMITS_CARDS,
   offered,
@@ -79,6 +80,7 @@ import {
   admin as adminFixture,
   automationTool,
   emailUser,
+  externalTaskTool,
 } from "../../helpers/client-fixtures.ts";
 
 const admin = adminFixture();
@@ -230,6 +232,7 @@ const body = (visualize = fetchTool, web = access): ToolsResponse => ({
   visualize,
   emailUser: emailUser(),
   automation: automationTool(),
+  externalTask: externalTaskTool(),
 });
 const search: SearchState = {
   provider: "exa",
@@ -691,6 +694,7 @@ describe("the Config board", () => {
       ...state,
       emailUser: emailUser(over),
       automation: automationTool(),
+      externalTask: externalTaskTool(),
     });
     const on = email({ enabled: true, emailOn: true });
     expect(offered(on.emailUser, on)).toBe(true);
@@ -797,8 +801,9 @@ describe("the Config board", () => {
     );
     // visualize is switched off: Off in place of its tokens
     expect(html).toContain("rows-item rows-item-off");
-    // the automation tool's card is the one switch, its Save in a form
-    expect(html.match(/role="switch"/g)).toHaveLength(1);
+    // the automation and external_task cards are the switches, each
+    // with its Save in a form
+    expect(html.match(/role="switch"/g)).toHaveLength(2);
     const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
     const card = forms.find((form) =>
       form.includes("Agents manage scheduled tasks"),
@@ -830,6 +835,7 @@ describe("the Config board", () => {
     tools.value = {
       ...tools.value,
       automation: automationTool({ enabled: false }),
+      externalTask: externalTaskTool(),
     };
     limits.value = rows;
     path.value = "/admin/config";
@@ -842,6 +848,34 @@ describe("the Config board", () => {
     path.value = "/";
   });
 
+  test.serial("the external task card switches its own row", () => {
+    tools.value = {
+      ...body(),
+      externalTask: externalTaskTool({ enabled: false }),
+    };
+    limits.value = rows;
+    path.value = "/admin/config";
+    const html = render(<ConfigBoard />);
+    const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
+    const card = forms.find((form) =>
+      form.includes("Agents manage external tasks"),
+    )!;
+    expect(card).toContain('aria-checked="false"');
+    expect(card).toContain(externalTaskLine(false));
+    expect(card).toContain('<span class="cut">external_task</span>');
+    const automation = forms.find((form) =>
+      form.includes("Agents manage scheduled tasks"),
+    )!;
+    expect(automation).toContain('aria-checked="true"');
+    expect(externalTaskLine(true)).toBe(
+      "A chat's agent may make its project's external tasks and act on them as the chat's user. Each chat can turn it off.",
+    );
+    expect(externalTaskLine(false)).toBe(
+      "No agent makes or changes external tasks.",
+    );
+    path.value = "/";
+  });
+
   test.serial("Limits and Storage draw their cards", () => {
     tools.value = body();
     limits.value = rows;
@@ -850,8 +884,8 @@ describe("the Config board", () => {
     expect(html).toContain(">Turns<");
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
-    // the automation card stays mounted, hidden, so its draft is kept
-    expect(html.match(/<form/g)).toHaveLength(10);
+    // the tool cards stay mounted, hidden, so their drafts are kept
+    expect(html.match(/<form/g)).toHaveLength(11);
     expect(html).toMatch(
       /config-board-cards config-board-away"><form[\s\S]*?Agents manage scheduled tasks/,
     );

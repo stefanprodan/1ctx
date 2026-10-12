@@ -229,6 +229,7 @@ test("tools routes expose access, None and the independent visual settings", asy
       "automation",
       "builtin",
       "emailUser",
+      "externalTask",
       "search",
       "visualize",
     ]);

@@ -7,6 +7,7 @@ import type { ProviderSummary } from "../../src/shared/contracts/provider.ts";
 import type {
   AutomationToolSummary,
   EmailToolSummary,
+  ExternalTaskToolSummary,
 } from "../../src/shared/contracts/tool.ts";
 import type { Me } from "../../src/shared/contracts/user.ts";
 
@@ -69,6 +70,21 @@ export const emailUser = (
   tokens: 150,
   enabled: false,
   emailOn: false,
+  updatedAt: 0,
+  ...over,
+});
+
+// external_task as GET /api/tools answers it: on
+export const externalTaskTool = (
+  over: Partial<ExternalTaskToolSummary> = {},
+): ExternalTaskToolSummary => ({
+  name: "external_task",
+  description:
+    "Hand work in this project to an agent the user runs outside 1ctx, and follow it.",
+  parameters: {},
+  parametersHtml: "",
+  tokens: 600,
+  enabled: true,
   updatedAt: 0,
   ...over,
 });

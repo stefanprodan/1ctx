@@ -8,7 +8,7 @@
 // colon. Web access is a kind alone, and so are the visualize tool, the
 // project docs under /knowledge, saving to the project's memory,
 // which only a chat is offered, the email_user tool, and the
-// automation tool, which only a chat is offered too. An
+// automation and external_task tools, which only a chat is offered too. An
 // MCP server is `mcp:<server id>`: the id, since the name is not what an
 // agent's links hold. A skill is `skill:<skill id>`, by the same rule. An
 // HTTP credential is `credential:<credential id>`, a repository
@@ -20,6 +20,7 @@ export const KNOWLEDGE = "knowledge";
 export const MEMORY = "memory";
 export const EMAIL = "email";
 export const AUTOMATIONS = "automations";
+export const EXTERNAL_TASKS = "external_tasks";
 export const MCP = "mcp";
 export const SKILL = "skill";
 export const CREDENTIAL = "credential";
@@ -68,6 +69,7 @@ export function isCapabilityKey(value: unknown): value is string {
       value === MEMORY ||
       value === EMAIL ||
       value === AUTOMATIONS ||
+      value === EXTERNAL_TASKS ||
       serverOf(value) !== null ||
       skillOf(value) !== null ||
       credentialOf(value) !== null ||
@@ -182,6 +184,11 @@ export const EMAIL_OFF_LINE =
 // task read before the flip is in the history
 export const AUTOMATIONS_OFF_LINE =
   "The user turned scheduled tasks off for this chat. Do not call automation. Say so if a task is asked about.";
+
+// the line after it while a chat has the external_task tool off: a
+// task made or read before the flip is in the history
+export const EXTERNAL_TASKS_OFF_LINE =
+  "The user turned external tasks off for this chat. Do not call external_task. Say so if an external task is asked about.";
 
 // the line after it while a chat has servers off that its agent would
 // otherwise be offered: names sorted, so it is constant between flips

@@ -11,6 +11,10 @@ import { AUTOMATION_TOOL, EMAIL_TOOL } from "../../shared/words.ts";
 import { wireTokens } from "../providers/index.ts";
 import { makeAutomationTool } from "./builtin/automation.ts";
 import { makeEmailTool } from "./builtin/email.ts";
+import {
+  EXTERNAL_TASK_TOOL,
+  makeExternalTaskTool,
+} from "./builtin/external-task.ts";
 import { makeVisualizeTool } from "./builtin/visualize.ts";
 import { builtinCatalog, fillYear, parametersHtml } from "./catalog.ts";
 import type { ToolStore } from "./store.ts";
@@ -31,6 +35,9 @@ export function toolsResponse(input: {
   const emailTool = makeEmailTool(null);
   const automationRow = store.row(AUTOMATION_TOOL);
   const automationTool = makeAutomationTool(null, true);
+  const externalRow = store.row(EXTERNAL_TASK_TOOL);
+  // the chat's main rounds: every action
+  const externalTool = makeExternalTaskTool(null, true);
   return {
     builtin: builtinCatalog(now, render),
     access: input.access,
@@ -62,6 +69,15 @@ export function toolsResponse(input: {
       tokens: wireTokens([automationTool]),
       enabled: automationRow.enabled,
       updatedAt: automationRow.updatedAt,
+    },
+    externalTask: {
+      name: EXTERNAL_TASK_TOOL,
+      description: externalTool.description,
+      parameters: externalTool.parameters,
+      parametersHtml: parametersHtml(externalTool, render),
+      tokens: wireTokens([externalTool]),
+      enabled: externalRow.enabled,
+      updatedAt: externalRow.updatedAt,
     },
     search: {
       provider: store.row("websearch").provider,
