@@ -1,0 +1,56 @@
+/* Connect agents: a line on what it is for, then the access keys card
+   and the setup card with a tab per agent. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .connect {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+  .connect-lead {
+    margin: 0;
+    color: var(--dim);
+  }
+  .connect-key-shown,
+  .connect-setup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .connect-key-picks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .connect-key-add {
+    display: flex;
+  }
+  .connect-key-once {
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+  .connect-key-done {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  /* the copy button sits in the box's corner, the text clear of it */
+  .connect-snippet {
+    position: relative;
+  }
+  /* code keeps its lines; a narrow box scrolls rather than wraps */
+  .connect-snippet-text {
+    padding-right: 40px;
+    overflow-x: auto;
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+  .connect-snippet-copy {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+  }
+}

@@ -231,15 +231,16 @@ Flagged.
 
 ## Access keys
 
-- **A key's token lives in the view alone.** `createAccessKey()` hands
-  the answer to the caller and `data/access-keys.ts` keeps only the
-  key, so the shown-once box goes on Done or on leaving the profile.
-- **At a cap of 0 the profile's section says keys are off** and offers
-  no form; kept keys still list with Revoke. Until the password changes
-  the route loads neither keys nor projects.
+- **Keys live on Connect agents (`views/connect/`),** one view for its
+  agent tabs and `?new` (a `NewCard` page).
+- **A key's token lives in that view alone;** `data/access-keys.ts`
+  keeps only the key. The shown-once box goes on Done or on leaving.
+- **No setup line carries a token.** Each reads `ONECTX_ACCESS_KEY`.
+- **At a cap of 0 the keys card says keys are off** with no New; kept
+  keys list with Revoke, and Setup shows only while one is kept.
 - **An admin's user page lists a user's keys from `userKeys`,** read
   again after a revoke (whatever its answer), a reset and a disable,
-  which delete them. No admin page makes a key. A profile revoke that
+  which delete them. No admin page makes a key. A Connect agents revoke that
   answers 404 drops the row.
 - **A key's row is `views/keys/`,** shared by both pages, so neither
   view imports the other.

@@ -1,11 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The profile's Access keys section: the draft's checks, the server's
-// refusals at their fields, the row's words, the key shown once with
-// its setup lines, and the entity behind the list.
+// The Access keys card on Connect agents: the draft's checks, the
+// server's refusals at their fields, the row's words, the key shown
+// once with its export line, and the entity behind the list.
 
 import { beforeEach, describe, expect, test } from "bun:test";
+import { signal } from "@preact/signals";
 import { render } from "preact-render-to-string";
 import {
   accessKeys,
@@ -19,6 +20,21 @@ import { ApiError } from "../../../src/client/data/api.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
 import { Save } from "../../../src/client/lib/save.ts";
+import {
+  capLine,
+  createBody,
+  exportLine,
+  keyFieldOf,
+  keyProblem,
+  NEW_KEY,
+  OFF_TEXT,
+} from "../../../src/client/views/connect/AccessKeys.model.ts";
+import {
+  AccessKeys,
+  KeyFields,
+  NewKeyForm,
+  ShownKey,
+} from "../../../src/client/views/connect/AccessKeys.tsx";
 import { KeyRow } from "../../../src/client/views/keys/KeyRow.tsx";
 import {
   expiryWords,
@@ -26,43 +42,17 @@ import {
   reachWords,
   usedWords,
 } from "../../../src/client/views/keys/Keys.model.ts";
-import {
-  capLine,
-  claudeLine,
-  codexBlock,
-  createBody,
-  keyFieldOf,
-  keyProblem,
-  NEW_KEY,
-  OFF_TEXT,
-} from "../../../src/client/views/profile/AccessKeys.model.ts";
-import {
-  AccessKeys,
-  KeyFields,
-  KeyForm,
-  ShownKey,
-} from "../../../src/client/views/profile/AccessKeys.tsx";
+import type { CreateAccessKeyResponse } from "../../../src/shared/api/profile.ts";
 import type { AccessKey } from "../../../src/shared/contracts/access-key.ts";
-import type { Profile } from "../../../src/shared/contracts/user.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
 
 const DAY = 86_400_000;
 const NOW = Date.now();
 
-const casey: Profile = {
-  id: "u1",
-  username: "casey",
-  fullName: "Casey Doe",
-  email: "casey@example.com",
-  tz: "UTC",
-  disabled: false,
-  mustChangePassword: false,
-  emailPlaceholder: false,
-  emailFromAgents: false,
-  about: "",
-  role: "member",
-  createdAt: 0,
-};
+// nothing shown once, as the page starts
+const card = () => (
+  <AccessKeys shown={signal<CreateAccessKeyResponse | null>(null)} />
+);
 
 const key = (over: Partial<AccessKey> = {}): AccessKey => ({
   id: "k1",
@@ -118,9 +108,10 @@ describe("the new key's checks", () => {
   });
 
   test("the body trims the name and sends null for every project", () => {
+    // read and write first, since working a task writes
     expect(createBody({ ...NEW_KEY, name: " laptop " })).toEqual({
       name: "laptop",
-      scope: "read",
+      scope: "write",
       projectIds: null,
       days: 30,
     });
@@ -186,37 +177,23 @@ describe("a key's words", () => {
     expect(capLine(1)).toStartWith("At most 1 access key, ");
   });
 
-  test("the setup lines carry the page's origin and the key", () => {
-    const origin = "https://1ctx.example.test";
-    expect(claudeLine(origin, "1ctx_abc")).toBe(
-      'claude mcp add --transport http 1ctx "https://1ctx.example.test/mcp" --header "Authorization: Bearer 1ctx_abc"',
-    );
-    // quoted, so a shell never globs an IPv6 origin's brackets
-    expect(claudeLine("http://[::1]:1236", "t")).toContain(
-      ' 1ctx "http://[::1]:1236/mcp" ',
-    );
-    expect(codexBlock(origin)).toBe(
-      [
-        "[mcp_servers.1ctx]",
-        'url = "https://1ctx.example.test/mcp"',
-        'bearer_token_env_var = "ONECTX_ACCESS_KEY"',
-      ].join("\n"),
-    );
+  test("the export line quotes the key into the shared variable", () => {
+    expect(exportLine("1ctx_abc")).toBe('export ONECTX_ACCESS_KEY="1ctx_abc"');
   });
 });
 
-describe("the section", () => {
+describe("the card", () => {
   test.serial("at a cap of 0 it says keys are off and offers no form", () => {
     accessKeys.value = [];
     accessKeysLimit.value = 0;
-    const html = render(<AccessKeys user={casey} />);
+    const html = render(card());
     expect(html).toContain(">Access keys<");
     expect(html).toContain(OFF_TEXT);
     expect(html).not.toContain("New access key");
     expect(html).not.toContain("No access keys yet.");
     // a key kept from before can still be revoked
     accessKeys.value = [key()];
-    const kept = render(<AccessKeys user={casey} />);
+    const kept = render(card());
     expect(kept).toContain("laptop-claude");
     expect(kept).toContain(">Revoke<");
     expect(kept).not.toContain("New access key");
@@ -235,7 +212,7 @@ describe("the section", () => {
       }),
     ];
     accessKeysLimit.value = 5;
-    const html = render(<AccessKeys user={casey} />);
+    const html = render(card());
     expect(html).toContain("New access key");
     expect(html).toContain(">laptop-claude<");
     expect(html).toContain("Read and write · Every project");
@@ -254,78 +231,68 @@ describe("the section", () => {
   test.serial("at the cap it says why there is no New", () => {
     accessKeys.value = [key()];
     accessKeysLimit.value = 1;
-    const html = render(<AccessKeys user={casey} />);
+    const html = render(card());
     expect(html).not.toContain("New access key");
     expect(html).toContain(capLine(1));
   });
 
-  test.serial("no keys yet, and a password to change first", () => {
+  test.serial("no keys yet", () => {
     accessKeys.value = [];
     accessKeysLimit.value = 5;
-    expect(render(<AccessKeys user={casey} />)).toContain(
-      "No access keys yet.",
-    );
-    accessKeys.value = null;
-    const locked = render(
-      <AccessKeys user={{ ...casey, mustChangePassword: true }} />,
-    );
-    expect(locked).toContain("Change your password first.");
-    expect(locked).not.toContain("New access key");
+    expect(render(card())).toContain("No access keys yet.");
   });
 
   test.serial("a failed load says so", () => {
     accessKeys.value = null;
     accessKeysError.value = { words: "down", status: 503 };
     try {
-      expect(render(<AccessKeys user={casey} />)).toContain("Down.");
+      expect(render(card())).toContain("Down.");
     } finally {
       accessKeysError.value = null;
     }
   });
 
-  test("the key is shown once with both setup lines and copy buttons", () => {
-    const html = render(
-      <ShownKey
-        token="1ctx_secret"
-        origin="https://1ctx.example.test"
-        onDone={() => {}}
-      />,
-    );
+  test("the key is shown once with its export line and copy buttons", () => {
+    const html = render(<ShownKey token="1ctx_secret" onDone={() => {}} />);
     expect(html).toContain("Copy the key now. It is not shown again.");
     expect(html).toContain(">1ctx_secret<");
-    expect(html).toContain(
-      "claude mcp add --transport http 1ctx &quot;https://1ctx.example.test/mcp&quot; --header &quot;Authorization: Bearer 1ctx_secret&quot;",
-    );
-    expect(html).toContain("[mcp_servers.1ctx]");
-    expect(html).toContain("url = &quot;https://1ctx.example.test/mcp&quot;");
-    expect(html).toContain(
-      "bearer_token_env_var = &quot;ONECTX_ACCESS_KEY&quot;",
-    );
-    expect(html).toContain("Set ONECTX_ACCESS_KEY to the key.");
+    expect(html).toContain("export ONECTX_ACCESS_KEY=&quot;1ctx_secret&quot;");
+    expect(html).toContain("In your shell profile.");
     expect(html).toContain('aria-label="Copy Key"');
-    expect(html).toContain('aria-label="Copy Claude Code"');
-    expect(html).toContain('aria-label="Copy Codex"');
+    expect(html).toContain('aria-label="Copy Environment"');
+    // the agents' setup is the page's, never the box's
+    expect(html).not.toContain("claude mcp add");
     expect(html).toContain(">Done<");
+  });
+
+  test.serial("a key made on the new page is shown on the card", () => {
+    accessKeys.value = [key()];
+    accessKeysLimit.value = 5;
+    const shown = signal<CreateAccessKeyResponse | null>({
+      key: key(),
+      token: "1ctx_made",
+    });
+    const html = render(<AccessKeys shown={shown} />);
+    expect(html).toContain(">1ctx_made<");
+    // one key at a time: New waits for Done
+    expect(html).toMatch(
+      /<button[^>]*rows-add" disabled>(?:(?!<\/button>).)*New access key/s,
+    );
   });
 });
 
 describe("the form and the row", () => {
-  test.serial("the open form asks every field, the shortest key first", () => {
+  test.serial("the new page asks every field, the shortest life first", () => {
     const html = render(
-      <KeyForm
-        keys={[]}
-        username="casey"
-        onClose={() => {}}
-        onMade={() => {}}
-      />,
+      <NewKeyForm keys={[]} username="casey" onMade={() => {}} />,
     );
     expect(html).toContain('name="name"');
-    expect(html).toContain("History names its writes @casey via this name.");
-    expect(html).toMatch(/aria-pressed="true"[^>]*>Read</);
+    expect(html).toContain("Edits show as @casey via this name.");
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Read and write</);
     expect(html).toMatch(/aria-pressed="true"[^>]*>Every project</);
     expect(html).toMatch(/aria-pressed="true"[^>]*>30 days</);
     expect(html).toContain("Create access key");
-    expect(html).toContain(">Cancel<");
+    expect(html).toMatch(/href="\/connect"[^>]*>Cancel</);
   });
 
   test.serial(
@@ -357,17 +324,15 @@ describe("the form and the row", () => {
       expect(named).toContain(
         'class="field-error" role="alert">Access key name is taken.<',
       );
-      expect(named).not.toContain("History names its writes");
+      expect(named).not.toContain("Edits show as");
       const lost = refused("no such project");
       await lost.run(null);
       const picked = fields(lost);
       expect(picked).toContain(
         'class="field-error" role="alert">No such project.<',
       );
-      expect(picked).not.toContain("Only these, while you still see them.");
-      expect(picked).toContain(
-        "History names its writes @casey via this name.",
-      );
+      expect(picked).not.toContain("Only these.");
+      expect(picked).toContain("Edits show as @casey via laptop.");
     },
   );
 

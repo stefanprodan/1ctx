@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The words of an access key's row, the same on the profile and on an
+// The words of an access key's row, the same on Connect agents and on an
 // admin's user page.
 
 import type {

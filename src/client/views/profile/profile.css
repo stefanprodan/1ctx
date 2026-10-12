@@ -29,45 +29,4 @@
     flex-direction: column;
     gap: var(--space-4);
   }
-
-  /* Access keys: New access key over the list, as Repositories */
-  .profile-keys-head {
-    display: flex;
-    justify-content: flex-end;
-  }
-  .profile-key-form,
-  .profile-key-shown {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-4);
-  }
-  .profile-key-picks {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  .profile-key-add {
-    display: flex;
-  }
-  .profile-key-once {
-    margin: 0;
-    font-size: var(--text-ui);
-    color: var(--fg);
-  }
-  /* the copy button sits in the box's corner, the text clear of it */
-  .profile-key-snippet {
-    position: relative;
-  }
-  .profile-key-text {
-    padding-right: 40px;
-  }
-  .profile-key-copy {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-  }
-  .profile-key-done {
-    display: flex;
-    justify-content: flex-end;
-  }
 }

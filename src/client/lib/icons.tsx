@@ -133,6 +133,8 @@ const PATHS = {
   // an HTTP credential: a key bash's curl signs with
   email: "M2 3.5h12v9H2zM2 4l6 5 6-5",
   key: "M5.5 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7.6 8.4 13.5 2.5M11.5 4.5l1.75 1.75M9.75 6.25l1.25 1.25",
+  // Connect agents in the user menu: a plug
+  plug: "M8 14.5v-3M6 5.5v-4M10 5.5v-4M4 5.5h8v3a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z",
   clip: "m14.29 7.37-6.13 6.13a4 4 0 0 1-5.66-5.66l5.71-5.71A2.67 2.67 0 1 1 12 5.89l-5.73 5.71a1.33 1.33 0 0 1-1.89-1.89l5.66-5.65",
   file: "M4 1.5h5l3 3V14a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 14zM9 1.5v3h3",
   // the page with lines of text: prose, Markdown
