@@ -190,7 +190,7 @@ for (const scope of ["keys", "user"] as const) {
       "Last question.",
       [],
     );
-    expect(f.area.store.byId(task.id)!.entries).toBe(CLOSING_ENTRIES);
+    expect(f.area.store.counted(task.id)).toBe(CLOSING_ENTRIES);
     refuses(
       () =>
         f.area.answer(f.owner.id, task.id, {
@@ -222,15 +222,16 @@ for (const scope of ["keys", "user"] as const) {
     expect(f.area.store.byId(task.id)).toMatchObject({
       state: "open",
       claim: null,
-      entries: CLOSING_ENTRIES + 1,
+      entries: CLOSING_ENTRIES + 2,
     });
+    expect(f.area.store.counted(task.id)).toBe(CLOSING_ENTRIES + 1);
     expect(f.area.store.claimById(held.claimId)!.end_reason).toBe(
       "access_gone",
     );
     refuses(() => f.area.claim(f.key, task.id), 409);
     const dropped = f.area.drop(f.owner.id, task.id, { state: "open" });
-    expect(dropped.task.task.entries).toBe(CLOSING_ENTRIES + 2);
-    expect(dropped.task.task.entries).toBeLessThan(MAX_ENTRIES);
+    expect(dropped.task.task.entries).toBe(CLOSING_ENTRIES + 3);
+    expect(f.area.store.counted(task.id)).toBeLessThan(MAX_ENTRIES);
   });
 
   test.serial(
@@ -334,7 +335,7 @@ for (const kind of ["idle", "access_gone"] as const) {
         ? f.area.releaseIdle(f.now())
         : f.area.endClaims([f.key.keyId]),
     ).toBe(1);
-    expect(f.area.store.byId(task.id)!.entries).toBe(241);
+    expect(f.area.store.counted(task.id)).toBe(241);
   });
 }
 

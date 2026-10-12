@@ -11,7 +11,7 @@ import {
 } from "../../../src/shared/contracts/external-task.ts";
 import { fixture, refuses } from "./fixture.ts";
 
-test("a claim taken at 239 can still end and close", () => {
+test("a claim taken at 239 can still end and close, its own entry outside the bound", () => {
   using f = fixture();
   const task = f.create();
   f.fillEntries(task.id, CLOSING_ENTRIES - 1);
@@ -24,7 +24,8 @@ test("a claim taken at 239 can still end and close", () => {
     "Need help.",
     [],
   );
-  expect(question.task.entries).toBe(240);
+  expect(question.task.entries).toBe(241);
+  expect(f.area.store.counted(task.id)).toBe(240);
   refuses(
     () =>
       f.area.report(
@@ -46,10 +47,10 @@ test("a claim taken at 239 can still end and close", () => {
     claimId: held.claimId,
     text: "Enough.",
   });
-  expect(released.task.task.entries).toBe(241);
+  expect(released.task.task.entries).toBe(242);
   refuses(() => f.area.claim(f.key, task.id), 409, "make a new external task");
   const dropped = f.area.drop(f.owner.id, task.id, { state: "open" });
-  expect(dropped.task.task.entries).toBe(242);
+  expect(dropped.task.task.entries).toBe(243);
   refuses(
     () =>
       f.area.reopen(f.owner.id, task.id, { state: "dropped", text: "More." }),
@@ -70,9 +71,9 @@ for (const count of [239, 240, 249, 250]) {
           : f.area.report(f.key, task.id, task.claimId!, kind, "End.", []).task;
       if (count === MAX_ENTRIES) {
         refuses(write, 409, "make a new external task");
-        expect(f.area.store.byId(task.id)!.entries).toBe(count);
+        expect(f.area.store.counted(task.id)).toBe(count);
         expect(f.area.store.claimById(task.claimId!)!.ended_at).toBeNull();
-      } else expect(write().entries).toBe(count + 1);
+      } else expect(write().entries).toBe(count + 2);
     });
   }
 }
@@ -108,7 +109,8 @@ test("the twentieth claim works and retries, the twenty-first is refused", () =>
   }
   refuses(() => f.area.claim(f.key, task.id), 409, "make a new external task");
   expect(f.area.store.claimsCount(task.id)).toBe(MAX_CLAIMS);
-  expect(f.area.store.byId(task.id)!.entries).toBe(MAX_CLAIMS);
+  expect(f.area.store.byId(task.id)!.entries).toBe(2 * MAX_CLAIMS);
+  expect(f.area.store.counted(task.id)).toBe(MAX_CLAIMS);
 });
 
 test("500 unfinished blocks create and reopen, not history or another project", () => {

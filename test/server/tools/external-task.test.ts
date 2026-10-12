@@ -257,7 +257,8 @@ describe("a chat's external tasks", () => {
         { action: "answer", id: task.id, state: "claimed", text: "Left." },
       ]);
       expect(step.answers[0]).toContain("changed since you read it");
-      expect(entries()).toBe(1);
+      // the claim and the question
+      expect(entries()).toBe(2);
       step = await round(chat, step.next, [
         { action: "answer", id: task.id, state: "blocked", text: "Left." },
       ]);

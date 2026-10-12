@@ -69,6 +69,7 @@ import { m0060 } from "./0060-knowledge-keys.ts";
 import { m0061 } from "./0061-session-activity.ts";
 import { m0062 } from "./0062-external-tasks.ts";
 import { m0063 } from "./0063-external-task-tool.ts";
+import { m0064 } from "./0064-external-task-claim-entries.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -134,4 +135,5 @@ export const MIGRATIONS: Migration[] = [
   m0061,
   m0062,
   m0063,
+  m0064,
 ];

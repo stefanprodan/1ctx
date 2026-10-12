@@ -103,6 +103,64 @@ describe("external task writes", () => {
     }
   }
 
+  test.serial(
+    "a claim writes its own entry in its transaction, outside the bound and the mark",
+    () => {
+      using f = fixture();
+      const events: BusEvent[] = [];
+      const stop = subscribe((event) => {
+        if (event.type === "externalTask.changed") events.push(event);
+      }, silent);
+      try {
+        const task = f.task("claimed");
+        f.area.report(f.key, task.id, task.claimId!, "release", "Later.", []);
+        const marked = f.area.store.byId(task.id)!;
+        expect(marked.attentionAt).not.toBeNull();
+        expect(() =>
+          transact(f.db, () => {
+            f.area.claim(f.key, task.id);
+            throw new Error("rollback");
+          }),
+        ).toThrow("rollback");
+        expect(f.area.store.byId(task.id)).toEqual(marked);
+        f.advance();
+        events.length = 0;
+        const held = f.area.claim(f.key, task.id);
+        const entry = held.entries[0]!;
+        expect(entry).toEqual({
+          id: entry.id,
+          kind: "claim",
+          text: "",
+          links: [],
+          by: { id: f.owner.id, username: "owner" },
+          keyName: "laptop",
+          claimId: held.claimId,
+          claimEnd: null,
+          at: f.now(),
+        });
+        expect(held.task.task).toMatchObject({
+          entries: marked.entries + 1,
+          last: marked.last,
+          attentionAt: marked.attentionAt,
+          revision: marked.revision + 1,
+        });
+        expect(f.area.store.counted(task.id)).toBe(marked.entries - 1);
+        expect(events).toEqual([
+          {
+            type: "externalTask.changed",
+            data: { projectId: f.projectId, task: held.task.task },
+          },
+        ]);
+        // a retry answers the same claim and writes nothing
+        expect(f.area.claim(f.key, task.id).claimId).toBe(held.claimId);
+        expect(f.area.store.byId(task.id)!.entries).toBe(marked.entries + 1);
+        expect(f.area.store.lastEntry(held.claimId, true)!.id).toBe(entry.id);
+      } finally {
+        stop();
+      }
+    },
+  );
+
   test("claim contenders keep one holder and never name the other user", () => {
     using f = fixture();
     const task = f.create();

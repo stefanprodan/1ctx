@@ -161,12 +161,12 @@ function headText(
 }
 
 function entryHead(entry: ExternalTaskEntry, time: Time): string {
+  // a key outlives its deleted user
+  const who = entry.by === null ? null : `@${entry.by.username}`;
   const by =
-    entry.by === null
-      ? "1ctx"
-      : entry.keyName === null
-        ? `@${entry.by.username}`
-        : `@${entry.by.username} via ${entry.keyName}`;
+    entry.keyName === null
+      ? (who ?? "1ctx")
+      : `${who ?? "a deleted user"} via ${entry.keyName}`;
   const claim =
     entry.claimId === null
       ? ""

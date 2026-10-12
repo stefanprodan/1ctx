@@ -1,9 +1,9 @@
 # Admin pages
 
 Governs what the admin pages draw: `src/client/views/admin/` and the
-`data/` entities behind them. The other pages are in `docs/views.md`;
-the primitives, forms and the data layer's general rules are in
-`docs/ui.md`.
+`data/` entities behind them. The other pages are in `docs/views.md`
+and `docs/external-task-pages.md`; the primitives, forms and the data
+layer's general rules are in `docs/ui.md`.
 
 Every admin page is a list, an object page or a New page. Copy the
 nearest sibling of the same shape and compare the two before

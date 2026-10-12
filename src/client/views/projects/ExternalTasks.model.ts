@@ -50,6 +50,7 @@ export const rowLine = (row: Pick<ExternalTaskRow, "state" | "claim">) =>
   row.state === "claimed" || row.state === "blocked" ? stateLine(row) : "";
 
 export const ENTRY_WORDS: Record<EntryKind, string> = {
+  claim: "Claimed",
   progress: "Progress",
   question: "Question",
   result: "Result",
@@ -59,14 +60,16 @@ export const ENTRY_WORDS: Record<EntryKind, string> = {
   reopen: "Reopened",
 };
 
-// who wrote an entry: an agent through a key, a member, or 1ctx itself
+export const GONE_USER = "a deleted user";
+
+// who wrote an entry: an agent through a key, a member, or 1ctx itself;
+// a key outlives its deleted user
 export function entryBy(
   entry: Pick<ExternalTaskEntry, "by" | "keyName">,
 ): string {
-  if (entry.by === null) return "1ctx";
-  return entry.keyName === null
-    ? `@${entry.by.username}`
-    : `@${entry.by.username} via ${entry.keyName}`;
+  const who = entry.by === null ? null : `@${entry.by.username}`;
+  if (entry.keyName !== null) return `${who ?? GONE_USER} via ${entry.keyName}`;
+  return who ?? "1ctx";
 }
 
 // the row's second line: the latest entry, cut by the server; none

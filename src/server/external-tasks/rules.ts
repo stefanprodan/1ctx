@@ -38,7 +38,7 @@ export {
 } from "../../shared/contracts/external-task.ts";
 
 export type Actor = "agent" | "member" | "idle" | "access_gone";
-export type Move = EntryKind | "claim";
+export type Move = EntryKind;
 export type Brief = {
   title: string;
   text: string;

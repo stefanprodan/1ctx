@@ -72,7 +72,7 @@ export function writeEntry(
   const { actor, kind, text, links, userId, at } = input;
   const state = checkMove(task.state, kind, actor);
   checkEntry(kind, text, links);
-  checkRoom(task.entries, kind);
+  checkRoom(store.counted(task.id), kind);
   const end: ClaimEnd | null =
     kind === "result"
       ? "done"
@@ -256,10 +256,20 @@ export function taskActions(deps: ActionsDeps) {
           throw new Conflict("this task is already claimed");
         }
         checkMove(task.state, "claim", "agent");
-        checkRoom(task.entries, "claim");
+        checkRoom(store.counted(id), "claim");
         checkClaims(store.claimsCount(id));
         const now = deps.clock();
         const claimId = store.startClaim(id, key, now);
+        store.append(id, {
+          claimId,
+          kind: "claim",
+          text: "",
+          links: [],
+          userId: key.userId,
+          keyName: key.keyName,
+          claimEnd: null,
+          at: now,
+        });
         store.move(id, "claimed", claimId, task.attentionAt, now);
         const result = { ...detail(id), claimId };
         return { result, events: [taskChanged(result.task.task)] };

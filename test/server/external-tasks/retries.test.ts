@@ -118,7 +118,8 @@ test("a repeated progress after a member answer is a new entry", () => {
     [],
   );
   expect(repeated.entry.id).not.toBe(first.entry.id);
-  expect(repeated.task.entries).toBe(3);
+  // the claim, the first progress, the answer and the repeat
+  expect(repeated.task.entries).toBe(4);
   const links = f.port.report(
     f.key,
     task.id,
@@ -168,7 +169,7 @@ test("a question repeated after an answer blocks again instead of replaying the 
   expect(report.entry.id).not.toBe(first.id);
   expect(report.task).toMatchObject({
     state: "blocked",
-    entries: 3,
+    entries: 4,
     revision: answered.task.task.revision + 1,
     attentionAt: f.now(),
   });

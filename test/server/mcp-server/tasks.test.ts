@@ -130,6 +130,43 @@ describe("the inbound MCP tasks tool", () => {
     await area.close();
   });
 
+  test("shows a claim entry by its kind, and no report writes one", async () => {
+    const { area, send, state } = fixture("write");
+    const claim = {
+      id: "claim0000001",
+      keyId: "key000000001",
+      userId: "user00000001",
+      username: "casey",
+      keyName: "laptop",
+      startedAt: 300,
+    };
+    const row = externalTaskRow({ state: "claimed", claim, entries: 1 });
+    state.taskShow = {
+      ...externalTaskShow(row),
+      task: externalTaskDetail(row),
+      entries: [externalTaskEntry({ kind: "claim", text: "" })],
+    };
+    const text = soleText(
+      await toolCall(send, "tasks", { action: "show", taskId: row.id }),
+    );
+    const entryLine = text
+      .split("\n")
+      .find((line) => line.startsWith("Entry: "))!;
+    expect(JSON.parse(entryLine.slice("Entry: ".length))).toEqual({
+      id: "entry0000001",
+      kind: "claim",
+      by: "you",
+      keyName: "laptop",
+      claimId: "claim0000001",
+      claimEnd: null,
+      at: new Date(300).toISOString(),
+    });
+    const refused = await toolCall(send, "tasks", { ...report, kind: "claim" });
+    expect(refused.result.isError).toBe(true);
+    expect(soleText(refused)).toContain("kind must be one of");
+    await area.close();
+  });
+
   test("claims and reports through a transactionally rechecked write key", async () => {
     const { area, send, state } = fixture("write");
     state.taskShow = { ...externalTaskShow(), idleHours: 12 };

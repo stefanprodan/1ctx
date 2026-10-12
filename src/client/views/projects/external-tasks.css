@@ -96,17 +96,43 @@
   }
   .external-tasks-entry-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--space-2);
     margin: 0;
     min-width: 0;
     font-size: var(--text-small);
     color: var(--dim);
   }
-  /* a question or a result wears its state's colour */
+  /* neutral but for a question still waiting, which wears attention */
   .external-tasks-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     flex-shrink: 0;
     font-weight: 500;
+  }
+  .external-tasks-kind-icon {
+    flex-shrink: 0;
+  }
+  .external-tasks-by-link {
+    text-decoration: none;
+  }
+  .external-tasks-by-link:hover {
+    text-decoration: underline;
+  }
+  .external-tasks-by-faint {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  /* the question an answer follows, one line */
+  .external-tasks-entry-pair {
+    margin: 0;
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .external-tasks-entry-pair-icon {
+    margin-right: var(--space-1);
+    vertical-align: -2px;
   }
   .external-tasks-when {
     flex-shrink: 0;

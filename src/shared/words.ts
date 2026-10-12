@@ -392,9 +392,10 @@ export type AgentEntryKind = (typeof AGENT_ENTRY_KINDS)[number];
 export function isAgentEntryKind(value: unknown): value is AgentEntryKind {
   return AGENT_ENTRY_KINDS.includes(value as AgentEntryKind);
 }
-// every entry on a task's timeline: the agent's, then a member's; a
-// release is also a member's and 1ctx's
+// every entry on a task's timeline: a claim (no report writes one), the
+// agent's, a member's; a release is also a member's and 1ctx's
 export const ENTRY_KINDS = [
+  "claim",
   ...AGENT_ENTRY_KINDS,
   "answer",
   "drop",

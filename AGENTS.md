@@ -134,6 +134,7 @@ change it in the same commit as the code that changes a rule.
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
 | `docs/views.md` | what a page draws: `views/`, the composer, the session list (feed) |
+| `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
@@ -144,7 +145,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
 | `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention mark (agent, runner, decider backup) |
-| `docs/external-tasks.md` | `external-tasks/`: member routes, task delivery and maintenance, the pages |
+| `docs/external-tasks.md` | `external-tasks/`: member routes, task delivery and maintenance |
 | `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user` |
 | `docs/project-tools.md` | the `automation` and `external_task` tools |
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |

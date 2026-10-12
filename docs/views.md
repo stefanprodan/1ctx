@@ -2,8 +2,9 @@
 
 Governs what pages draw: `src/client/views/`, `feed/`, `composer/`,
 `transcript/` and the `data/` entities behind them. The admin pages are
-in `docs/admin-pages.md`; the primitives, forms and the data layer's
-general rules are in `docs/ui.md`.
+in `docs/admin-pages.md`, the external task pages in
+`docs/external-task-pages.md`; the primitives, forms and the data
+layer's general rules are in `docs/ui.md`.
 
 ## The feed
 
@@ -323,8 +324,3 @@ Flagged.
   Decider while the list's `deciderOn` is false, with a hint saying
   why. A saved pick stays shown. The words on when are kept
   while the mode is off, so turning it on again brings them back.
-
-## External tasks
-
-- **The External tasks tab, Home's card and the task's page** follow
-  `docs/external-tasks.md` § The pages.

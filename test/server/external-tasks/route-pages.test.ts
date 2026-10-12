@@ -117,7 +117,10 @@ test("detail entries continue by entry id through timestamp ties and new reports
   const id = (await f.create()).task.task.id;
   const key = await f.key();
   const claim = f.app.externalTasks.claim(key, id);
-  const ids: string[] = [];
+  // the claim's own entry is the oldest, paged like any other
+  const claimed = (await f.show(id)).entries;
+  expect(claimed.map((entry) => entry.kind)).toEqual(["claim"]);
+  const ids = [claimed[0]!.id];
   for (let i = 0; i < ENTRIES_PAGE + 3; i++) {
     ids.unshift(
       f.app.externalTasks.report(

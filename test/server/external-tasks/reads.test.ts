@@ -280,7 +280,11 @@ for (const kind of ["progress", "answer"] as const) {
 test("entry pages use time and rowid, so a new entry between pages skips none", () => {
   using f = fixture();
   const task = f.task("claimed");
-  const entries: ExternalTaskEntry[] = [];
+  // the claim's entry pages with the reports, in the same millisecond
+  const entries: ExternalTaskEntry[] = [
+    f.port.show(task.id, null)!.entries[0]!,
+  ];
+  expect(entries[0]!.kind).toBe("claim");
   for (let i = 0; i < ENTRIES_PAGE * 2 + 3; i++) {
     if (i % 25 === 0) f.advance();
     entries.push(
@@ -425,6 +429,28 @@ test("linked files read live names and revisions, then deleted names and a prune
       }),
     400,
   );
+});
+
+test("a new claim leaves the last entry the release before it, on every read", () => {
+  using f = fixture();
+  const task = f.task("claimed");
+  f.area.report(f.key, task.id, task.claimId!, "release", "Later.", []);
+  f.advance();
+  const held = f.area.claim(f.key, task.id);
+  expect(held.entries[0]!.kind).toBe("claim");
+  const last = { kind: "release" as const, text: "Later.", at: f.now() - 1 };
+  expect(held.task.task.last).toEqual(last);
+  expect(f.area.store.byId(task.id)!.last).toEqual(last);
+  expect(f.area.byProject(f.projectId).tasks[0]!.last).toEqual(last);
+  expect(f.area.attention([f.projectId]).tasks[0]!.last).toEqual(last);
+  const listed = f.area.list({
+    projectIds: [f.projectId],
+    states: ["claimed"],
+    held: null,
+    after: null,
+    limit: 10,
+  });
+  expect(listed.rows[0]!.last).toEqual(last);
 });
 
 test("last entry previews are one bounded line without a split surrogate", () => {

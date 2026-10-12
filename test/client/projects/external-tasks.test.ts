@@ -131,6 +131,9 @@ describe("the words", () => {
   test("an entry names who wrote it", () => {
     const by = { id: "u1", username: "stefan" };
     expect(entryBy({ by: null, keyName: null })).toBe("1ctx");
+    expect(entryBy({ by: null, keyName: "laptop-claude" })).toBe(
+      "a deleted user via laptop-claude",
+    );
     expect(entryBy({ by, keyName: null })).toBe("@stefan");
     expect(entryBy({ by, keyName: "laptop-claude" })).toBe(
       "@stefan via laptop-claude",

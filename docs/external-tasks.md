@@ -3,8 +3,8 @@
 Governs `src/server/external-tasks/`: project work assigned to agents
 outside the server. Member operations use the HTTP routes; claims and
 agent reports use the area's task capability. The pages that show it
-(`views/projects/ExternalTask*`, `data/external-tasks*.ts`) are under
-The pages.
+(`views/projects/ExternalTask*`, `data/external-tasks*.ts`) follow
+`docs/external-task-pages.md`.
 
 ## Member routes
 
@@ -44,10 +44,16 @@ The pages.
   and links of both the claim's and task's last entry; an intervening
   member answer makes the next report new. An agent's terminal result
   or release retry returns its original end, even after later entries.
+- A claim writes a `claim` entry in its own transaction: the key's
+  user and name, its claim id, no text. No report writes one, it marks
+  nothing, a retried claim adds none, and a row's `last` skips it. The 250 bound and the 240
+  tail count every entry but claims (`counted()`), which `MAX_CLAIMS`
+  bounds, so a task holds at most 270 entries. `entries` counts all.
 - Every agent entry and every entry ending a claim carries its claim
   id, including member releases and drops, and idle or access releases.
   Answers, reopens and drops of open tasks have none. The entry stores
-  a key name only for agent reports, never member or system entries.
+  a key name only for claims and agent reports, never member or system
+  entries.
 - `movedAt` is creation or the last state change, not the last report
   or answer. Every change still advances `revision`. Agent lists merge
   indexed project/state id pages by move time and id, then hydrate only
@@ -98,29 +104,3 @@ The pages.
   entries and saved claim responses appear under `externalTasks` in
   cleaned retention, using the current day limit; unfinished bytes
   remain in kept storage.
-
-## The pages
-
-- **The words are external task, brief, claim, report and answer,**
-  never ticket, issue, job or reply.
-- **The tab opens with a `PageNotice`** saying once "Work for an agent
-  you run outside 1ctx", linking Connect agents (`/connect`) in place.
-  It shows whatever the tasks and the user's keys.
-- **The list loads whole, then frames keep it** by revision
-  (`data/external-tasks.ts`): blocked, claimed, open, latest move first,
-  searched on the page with a count. The highest revision seen per task
-  keeps an older list read from bringing a closed one back. Home's card
-  reads `?attention=1`, drawn as Not sent while a task is marked.
-- **Done and dropped page from the tab's load,** searched and filtered
-  (All, Done, Dropped) by the server, with no count. A new search or
-  filter reads the first page again; an older answer lands nowhere, and
-  a frame joins the pages only when the filter takes it. The card shows
-  while the project has a finished task or a filter is set.
-- **A state's icon comes from `taskIcon()`.** An open task is
-  `task-open`, never the clock, which means a schedule.
-- **The task's page clears its mark with `seen`** once its read lands
-  marked. A frame adding an entry or editing the brief reads it again,
-  keeping older entries.
-- **A move names what the page showed:** a box keeps the state and the
-  claim from when it opened. An edit sends what changed and the edit
-  revision the form opened on.

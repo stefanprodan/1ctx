@@ -13,6 +13,7 @@ import type {
 import { lineFrom } from "../sessions/index.ts";
 
 // Match trim()'s whitespace so a bounded preview still reaches its first line.
+// The last entry is a report or a move, never a claim.
 export const TASK_SELECT = `select t.id, t.project_id, t.title, t.part, t.state,
     t.revision, t.edit_revision, t.claim_id, t.attention_at, t.created_by,
     t.created_at, t.moved_at, u.username as creator_name,
@@ -35,7 +36,7 @@ export const TASK_SELECT = `select t.id, t.project_id, t.title, t.part, t.state,
   left join users cu on cu.id = c.user_id
   left join external_task_entries e on e.rowid =
     (select rowid from external_task_entries where task_id = t.id
-      order by at desc, rowid desc limit 1)`;
+      and kind <> 'claim' order by at desc, rowid desc limit 1)`;
 
 export type TaskKey = { userId: string; keyId: string; keyName: string };
 export type TaskListRow = ExternalTaskRow & {

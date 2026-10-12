@@ -25,7 +25,7 @@ export function taskSweeps(deps: SweepDeps) {
     for (const claim of claims) {
       const task = store.byId(claim.task_id);
       if (task === null || task.claim?.id !== claim.id) continue;
-      // A live claim has at most 240 entries; release fits the 250-entry cap.
+      // A live claim has at most 240 counted entries; release fits the 250 cap.
       const result = writeEntry(store, task, {
         actor: "access_gone",
         kind: "release",

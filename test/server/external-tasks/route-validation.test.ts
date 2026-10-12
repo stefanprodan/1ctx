@@ -170,7 +170,9 @@ test("moves validate their state, text and release claim before changing the tas
   expect(
     (await f.member.client.call("POST", `${base}/seen`, { body: {} })).status,
   ).toBe(400);
-  expect((await f.show(id)).entries).toEqual([]);
+  expect((await f.show(id)).entries.map((entry) => entry.kind)).toEqual([
+    "claim",
+  ]);
 });
 
 test("queries reject unknown, repeated and malformed parameters", async () => {

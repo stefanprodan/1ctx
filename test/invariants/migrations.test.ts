@@ -75,6 +75,7 @@ const EXPECTED_IDS = [
   "0061-session-activity",
   "0062-external-tasks",
   "0063-external-task-tool",
+  "0064-external-task-claim-entries",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -1976,6 +1977,114 @@ describe("the schema", () => {
           "insert into tools (name, enabled, updated_at) values ('other', 1, 0)",
         ),
       ).toThrow(/CHECK/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0064 gives every claim its entry after the one it followed and keeps every entry", () => {
+    const db = seed(MIGRATIONS.slice(0, 63));
+    const entries = () =>
+      db
+        .query<Record<string, unknown>, []>(
+          `select id, task_id, claim_id, kind, text, links, user_id, key_name,
+            claim_end, at from external_task_entries order by at, rowid`,
+        )
+        .all();
+    const indexes = () =>
+      db
+        .query<{ name: string; sql: string | null }, []>(
+          `select name, sql from sqlite_schema where type = 'index'
+            and tbl_name = 'external_task_entries' order by name`,
+        )
+        .all();
+    try {
+      // c1 started with no entry before it, c2 after e2 in the same
+      // millisecond as e3, by a user since gone
+      db.exec(`
+        insert into external_tasks (id, project_id, title, text, state,
+            claim_id, created_at, brief_at, moved_at)
+          values ('t', 'p', 'Task', 'Brief', 'open', null, 0, 0, 0);
+        insert into external_task_claims (id, task_id, user_id, key_id,
+            key_name, started_at, after_entry_id, active_at, ended_at,
+            end_reason)
+          values ('c1', 't', 'u', 'k1', 'laptop', 10, null, 10, 20,
+            'released'),
+          ('c2', 't', 'gone', 'k2', 'desk', 30, 'e2', 30, null, null);
+        insert into external_task_entries (rowid, id, task_id, claim_id,
+            kind, text, links, user_id, key_name, claim_end, at)
+          values (5, 'e1', 't', 'c1', 'progress', 'Step', '[]', 'u',
+            'laptop', null, 15),
+          (9, 'e2', 't', 'c1', 'release', 'Later', '[]', 'u', 'laptop',
+            'released', 20),
+          (12, 'e3', 't', 'c2', 'progress', 'Again', '["https://x.test"]',
+            null, 'desk', null, 30);
+        update external_tasks set state = 'claimed', claim_id = 'c2';
+      `);
+      const before = entries();
+      const existing = indexes();
+      expect(() =>
+        db.exec("update external_task_entries set kind = 'claim'"),
+      ).toThrow(/CHECK/);
+      expect(migrate(db)).toEqual(
+        expectedFrom("0064-external-task-claim-entries"),
+      );
+      const after = entries();
+      expect(after.filter((row) => row.kind !== "claim")).toEqual(before);
+      const claim = (
+        id: string,
+        user: string | null,
+        key: string,
+        at: number,
+      ) => ({
+        task_id: "t",
+        claim_id: id,
+        kind: "claim",
+        text: "",
+        links: "[]",
+        user_id: user,
+        key_name: key,
+        claim_end: null,
+        at,
+      });
+      expect(after.map(({ id: _, ...row }) => row)).toEqual([
+        claim("c1", "u", "laptop", 10),
+        ...before.slice(0, 2).map(({ id: _, ...row }) => row),
+        claim("c2", null, "desk", 30),
+        ...before.slice(2).map(({ id: _, ...row }) => row),
+      ]);
+      expect(
+        after
+          .filter((row) => row.kind === "claim")
+          .every((row) => /^[0-9a-z]{12}$/.test(row.id as string)),
+      ).toBe(true);
+      // the rowids follow that order, so a tie on time keeps it
+      expect(
+        db
+          .query<{ rowid: number }, []>(
+            "select rowid from external_task_entries order by at, rowid",
+          )
+          .all()
+          .map((row) => row.rowid),
+      ).toEqual([1, 2, 3, 4, 5]);
+      expect(indexes()).toEqual(existing);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      expect(() =>
+        db.exec("update external_task_entries set kind = 'other'"),
+      ).toThrow(/CHECK/);
+      db.exec("delete from external_task_claims where id = 'c1'");
+      expect(
+        db
+          .query<{ n: number }, []>(
+            "select count(*) as n from external_task_entries",
+          )
+          .get()!.n,
+      ).toBe(2);
+      db.exec("delete from external_tasks");
+      expect(db.query("select id from external_task_entries").all()).toEqual(
+        [],
+      );
+      expect(migrate(db)).toEqual([]);
     } finally {
       db.close();
     }

@@ -77,9 +77,10 @@ export function fixture() {
     if (state === "dropped") area.drop(owner.id, row.id, { state: "open" });
     return { ...area.store.byId(row.id)!, claimId };
   };
+  // fills to count entries of the 250 bound, which claims do not join
   const fillEntries = (id: string, count: number) =>
     transact(db, () => {
-      const have = area.store.byId(id)!.entries;
+      const have = area.store.counted(id);
       for (let i = have; i < count; i++) {
         area.store.append(id, {
           claimId: null,

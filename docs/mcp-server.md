@@ -83,7 +83,8 @@ project before reading or writing it; hidden and missing tasks both answer
 `not found`. Claim and report call `checkKey()` in the transaction and carry
 the key's user, id and copied name. Report kinds are `progress`, `question`,
 `result` and `release`; text is at most 16 KiB and it accepts at most five
-HTTP(S) links of at most 2 KiB each.
+HTTP(S) links of at most 2 KiB each. A claim's own entry, kind `claim`,
+shows in `show` like any other and no report writes one.
 `skills/external-tasks/` teaches an outside agent this loop. The binary
 embeds that file and serves it at
 `/.well-known/skills/external-tasks/SKILL.md`, and Connect agents gives the
