@@ -24,8 +24,8 @@ dev: ## Run with hot reload of the page and restart on server changes (make dev 
 test: ## Run tests
 	@bun run test $(ARGS)
 
-vendor-test: ## Run just-bash's own suite on vendor/just-bash against its expected failures
-	@bun run vendor-test
+vendor-test: ## Run just-bash's own suite on vendor/just-bash against its expected failures (ARGS=--parallel in CI)
+	@bun run vendor-test $(ARGS)
 
 lint: ## Format and lint with Biome, then type-check with bun check
 	@bun run lint
