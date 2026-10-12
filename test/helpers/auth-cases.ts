@@ -106,6 +106,11 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 401, admin: 401 },
   },
   {
+    method: "GET",
+    path: "/.well-known/skills/external-tasks/SKILL.md",
+    expect: { anonymous: 200, member: 200, admin: 200 },
+  },
+  {
     method: "POST",
     path: "/api/projects/:id/uploads",
     expect: { anonymous: 401, member: 404, admin: 404 },

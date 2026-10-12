@@ -60,6 +60,13 @@ export const WORKER_EXEMPTIONS: Record<string, string> = {
     "loads usage/index.ts for decisionSlots, a query and not a pure rule, and opens its own database; it runs on the overview's timer, not per command",
 };
 
+// imports allowed outside the root, as "importer -> target" relative to
+// it, with the reason
+export const ESCAPE_EXEMPTIONS: Record<string, string> = {
+  "server/mcp-server/routes.ts -> ../skills/external-tasks/SKILL.md":
+    "the binary serves the repo's own skill, so the two never differ",
+};
+
 // production files allowed past MAX_LINES, with the reason
 export const LINE_EXEMPTIONS: Record<string, string> = {
   "server/compose.ts":
@@ -101,7 +108,7 @@ export const FORBIDDEN_HOSTS = [
 const SERVER_ROOT_FILES = new Set(["main.ts", "compose.ts"]);
 
 // the extensions an import may name; a bare specifier is refused
-const IMPORT_EXTENSIONS = /\.(?:ts|tsx|css|html|json|svg|woff2|png)$/;
+const IMPORT_EXTENSIONS = /\.(?:ts|tsx|css|html|json|svg|woff2|png|md)$/;
 
 // the two stylesheets with global reach, and where they live
 const TOKENS = join("client", "style", "tokens.css");
@@ -306,11 +313,13 @@ export function check(root: string): Violation[] {
       const target = relative(root, resolved);
       if (extname(target) === ".json") continue;
       if (target.startsWith("..")) {
-        out.push({
-          file: rel,
-          rule: "escape",
-          detail: `imports ${s} outside the root`,
-        });
+        if (!(`${rel} -> ${target}` in ESCAPE_EXEMPTIONS)) {
+          out.push({
+            file: rel,
+            rule: "escape",
+            detail: `imports ${s} outside the root`,
+          });
+        }
         continue;
       }
       const ext = extname(target);

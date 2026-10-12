@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { AuthInfo, McpHttpHandler } from "@modelcontextprotocol/server";
+import skill from "../../../skills/external-tasks/SKILL.md" with {
+  type: "text",
+};
+import { EXTERNAL_TASKS_SKILL_PATH } from "../../shared/skills.ts";
 import { RateLimit } from "../access/index.ts";
 import { MAX_KNOWLEDGE_BODY } from "../knowledge/index.ts";
 import { jsonBody } from "../lib/body.ts";
@@ -65,6 +69,17 @@ export function routes(
       path: "/mcp",
       policy: "key",
       handle: methodNotAllowed,
+    },
+    // public: curl carries no cookie, and the text is the repo's own
+    {
+      method: "GET",
+      // served from the build it runs, so it names only the tools this has
+      path: EXTERNAL_TASKS_SKILL_PATH,
+      policy: "public",
+      handle: () =>
+        new Response(skill, {
+          headers: { "content-type": "text/markdown; charset=utf-8" },
+        }),
     },
   ];
 }
