@@ -3,8 +3,8 @@
 //
 // A run's own mark: attention is never offered in the main rounds,
 // only alone in the attention step after a finished run, whose verdict
-// is written with the run's end, a true one alone marking; the runner marks a failure, a deadline and
-// a spent budget with no model. The step has two rounds at most, refuses
+// is written with the run's end, a true one alone marking; the runner
+// marks a failure, a deadline and a spent budget with no model. The step has two rounds at most, refuses
 // any other tool, and its failure, its window or a Stop marks nothing and
 // never fails the run. An automation whose mode is off has no step.
 
@@ -119,7 +119,7 @@ describe("the main rounds", () => {
       const own = await agentMode(chat, { ownMemory: true });
       const run = await startRun(chat, own.id);
       expect(names(run.main)).not.toContain("attention");
-      expect(JSON.stringify(run.main.body.messages)).not.toContain("attention");
+      expect(JSON.stringify(run.main.body.tools)).not.toContain('"attention"');
       const step = await answerRun(chat, run.main, "All good.");
       expect(names(step)).toEqual(["attention"]);
       const phase = await waitScript(chat.scripted, 4);
@@ -648,7 +648,10 @@ describe("the attention step", () => {
       );
       const phase = await waitScript(chat.scripted, 3);
       expect(messages(phase)[0]?.content).toBe(memorySystem("daily-run"));
-      expect(JSON.stringify(phase.body.messages)).not.toContain("attention");
+      // the step's call, its verdict and its reason, are not in the record
+      const record = JSON.stringify(phase.body.messages);
+      expect(record).not.toContain("needed");
+      expect(record).not.toContain("flux-system is not ready");
       phase.reply("Nothing to keep.");
       expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
       expect(markOf(chat, run.sessionId)).toEqual(

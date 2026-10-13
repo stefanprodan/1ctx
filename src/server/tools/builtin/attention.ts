@@ -72,6 +72,15 @@ export function checkReason(value: unknown): string {
   return reason;
 }
 
+// no reason at all, as against one that breaks the rules
+function absent(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "string" && value.trim() === "")
+  );
+}
+
 export function makeAttentionTool(handle: AttentionHandle): Tool {
   return {
     name: ATTENTION_TOOL,
@@ -89,7 +98,7 @@ export function makeAttentionTool(handle: AttentionHandle): Tool {
     // reason, never stored or shown
     async run(args) {
       if (typeof args.needed !== "boolean") throw new Error(NEEDED_REFUSED);
-      if (args.needed && args.reason === undefined) throw new Error(MISSING);
+      if (args.needed && absent(args.reason)) throw new Error(MISSING);
       const reason = args.needed ? checkReason(args.reason) : null;
       handle.reason = reason;
       handle.answered = true;

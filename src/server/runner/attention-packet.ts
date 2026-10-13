@@ -39,7 +39,7 @@ export type AttentionPacket = {
 };
 
 export function attentionSystem(automation: string): string {
-  return `You review a finished run of the ${automation} automation. Its run is over. You do not do its task or write an answer. You read the record of the run and call attention with your verdict, and nothing else.`;
+  return `You review a finished run of the ${automation} automation. Its run is over. You do not do its task or write an answer. You read the record of the run and call attention with needed true when a user should look at it, or needed false when not, and nothing else.`;
 }
 
 export function attentionAsk(guidance: string): string {

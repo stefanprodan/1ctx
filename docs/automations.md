@@ -222,7 +222,7 @@ optional words on when, `attention_guidance` (`MAX_ATTENTION_GUIDANCE`).
   model wrote the call out as text. Only a `needed: true` call marks;
   `needed: false` answers no, and text is never read for either.
   At most `ATTENTION_ROUNDS` (2): a valid verdict ends the step, while
-  text or a round whose calls all failed is asked again once
+  text or a round with no valid verdict is asked again once
   (`asksAgain()`, the text with `ATTENTION_AGAIN` as a request-local
   message). Two rounds with no valid verdict mark nothing.
 - **The step is part of the run.** Its rows are work from

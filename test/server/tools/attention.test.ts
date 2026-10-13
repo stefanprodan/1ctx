@@ -134,9 +134,11 @@ describe("the tool", () => {
         tool.run({ needed, reason: "flux is behind" }, ctx),
       ).rejects.toThrow("needed must be true or false.");
     }
-    await expect(tool.run({ needed: true }, ctx)).rejects.toThrow(
-      "needed true takes a one-line reason.",
-    );
+    for (const reason of [undefined, null, "", "  \t "]) {
+      await expect(tool.run({ needed: true, reason }, ctx)).rejects.toThrow(
+        "needed true takes a one-line reason.",
+      );
+    }
     await expect(
       tool.run({ needed: true, reason: "a\nb" }, ctx),
     ).rejects.toThrow("reason must be one line.");
@@ -148,7 +150,7 @@ describe("the tool", () => {
     expect(handle.answered).toBeFalse();
     await tool.run({ needed: true, reason: "kept" }, ctx);
     await expect(tool.run({ needed: true, reason: "" }, ctx)).rejects.toThrow(
-      "reason must be one line.",
+      "needed true takes a one-line reason.",
     );
     expect(handle).toEqual({ guidance: "", reason: "kept", answered: true });
   });

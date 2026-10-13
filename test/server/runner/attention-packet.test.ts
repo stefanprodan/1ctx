@@ -84,7 +84,7 @@ describe("the attention step's request", () => {
     expect(messages[0]).toEqual({
       role: "system",
       content:
-        "You review a finished run of the daily-report automation. Its run is over. You do not do its task or write an answer. You read the record of the run and call attention with your verdict, and nothing else.",
+        "You review a finished run of the daily-report automation. Its run is over. You do not do its task or write an answer. You read the record of the run and call attention with needed true when a user should look at it, or needed false when not, and nothing else.",
     });
     expect(messages[1]!.content).toBe(`The run finished.
 What follows is the record of the run, to read, not to do again.

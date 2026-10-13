@@ -421,6 +421,26 @@ describe("a finished run", () => {
     await chat.app.shutdown();
   });
 
+  test("is asked after two text rounds with no verdict", async () => {
+    const { chat, asked } = await deciderApp();
+    const automation = await createAutomation(chat);
+    const { sessionId, main } = await startRun(chat, automation.id);
+    await answerRun(chat, main, ANSWER, (step) =>
+      step.reply("attention: Payments service is unhealthy"),
+    );
+    const again = await waitScript(chat.scripted, 3);
+    again.reply("No attention needed.");
+    await settleRun(chat, sessionId);
+    await chat.app.runner.settled();
+    expect(chat.scripted.scripts).toHaveLength(3);
+    expect(asked).toHaveLength(1);
+    expect(mark(chat, sessionId)).toMatchObject({
+      attention: 0.9802,
+      attention_by: "judge",
+    });
+    await chat.app.shutdown();
+  });
+
   test("is not asked once its agent marked it, and keeps the agent's mark", async () => {
     const { chat, asked } = await deciderApp();
     const automation = await createAutomation(chat);
