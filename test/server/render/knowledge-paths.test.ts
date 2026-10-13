@@ -30,12 +30,18 @@ describe("knowledge paths", () => {
     ],
     ["# /knowledge/x.md", `<h1 class="md-h1">${a("x.md")}</h1>`],
     ["[the plan](/knowledge/plans/x.md)", p(a("plans/x.md", "the plan"))],
+    ["see (/knowledge/a.md).", p(`see (${a("a.md")}).`)],
+    ["(/knowledge/a.md)", p(`(${a("a.md")})`)],
+    ["a *(/knowledge/a.md)*", p(`a <em class="md-em">(${a("a.md")})</em>`)],
+    ["- /knowledge/a.md", `<li class="md-li">${a("a.md")}</li>`],
+    ["> /knowledge/a.md", `<blockquote class="md-quote">${p(a("a.md"))}`],
+    ["| /knowledge/a.md |\n|:-|", `style="text-align:left">${a("a.md")}</th>`],
     [
       "[`code`](/knowledge/x.md)",
       p(a("x.md", '<code class="md-code">code</code>')),
     ],
   ])("links %j", (md, html) => {
-    expect(renderMarkdown(md, { project: P })).toBe(html);
+    expect(renderMarkdown(md, { project: P })).toContain(html);
   });
 
   test.each([
@@ -65,6 +71,25 @@ describe("knowledge paths", () => {
     ["/knowledge/../x", p("/knowledge/../x")],
     ["/knowledge/a/./x", p("/knowledge/a/./x")],
     ["/knowledge/a%2Fb", p("/knowledge/a%2Fb")],
+    ["http://h.com/_a_/knowledge/x.md", "</em>/knowledge/x.md</p>"],
+    ["*foo*/knowledge/x.md", "</em>/knowledge/x.md</p>"],
+    ["`code`/knowledge/x.md", "</code>/knowledge/x.md</p>"],
+    ["[l](https://x)/knowledge/a.md", "</a>/knowledge/a.md</p>"],
+    ["https://h.com/x(/knowledge/y.md)", p("https://h.com/x(/knowledge/y.md)")],
+    ["x (a(/knowledge/y.md)", p("x (a(/knowledge/y.md)")],
+    [
+      `/knowledge/${".".repeat(100_000)}x`,
+      p(`/knowledge/${".".repeat(100_000)}x`),
+    ],
+    [
+      `/knowledge/${"a".repeat(100_000)}.md`,
+      p(`/knowledge/${"a".repeat(100_000)}.md`),
+    ],
+    [
+      `/knowledge/${"a/".repeat(50_000)}x`,
+      p(`/knowledge/${"a/".repeat(50_000)}x`),
+    ],
+    [`${"(".repeat(50_000)}/knowledge/x.md`, "(/knowledge/x.md</p>"],
     ["/knowledge/café.md", p("/knowledge/café.md")],
     ["[x](/knowledge/a%2Fb)", p("x")],
     ["[x](/knowledge/../y)", p("x")],
@@ -107,6 +132,25 @@ describe("knowledge paths", () => {
     const md =
       "a_b *c* `d` [e](/f) ![g](h) | t |\n|---|\n| /knowledge/x.md |\n\n```\nz\n```";
     expect(renderMarkdown(md, { project: P })).not.toMatch(/<\/?kp>/);
+  });
+
+  test("an explicit link keeps its title", () => {
+    expect(
+      renderMarkdown('[l](/knowledge/a.md "the plan")', { project: P }),
+    ).toBe(
+      p(
+        `<a class="md-link md-path" href="/projects/${P}/knowledge/path?name=a.md" title="the plan">l</a>`,
+      ),
+    );
+  });
+
+  test("text naming no path renders as without a project", () => {
+    const md =
+      "# Plan\n\nSee *a* and `b`, [c](https://example.test) and /tmp/x.\n\n| t |\n|-|\n| u |\n\n```ts\nconst x = 1;\n```";
+    expect(renderMarkdown(md, { project: P })).toBe(renderMarkdown(md));
+    expect(renderMarkdown(md, { project: P, autolinks: true })).toBe(
+      renderMarkdown(md, { autolinks: true }),
+    );
   });
 
   test("the project is encoded into the link", () => {
