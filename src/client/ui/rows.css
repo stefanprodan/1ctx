@@ -52,24 +52,7 @@
     font-variant-numeric: tabular-nums;
     color: var(--faint);
   }
-  .rows-head-slot {
-    display: flex;
-    flex: 1 1 auto;
-    min-width: 0;
-  }
   @media (max-width: 719px) {
-    .rows-head-wrap {
-      flex-wrap: wrap;
-      row-gap: 0;
-      padding-bottom: var(--space-2);
-    }
-    .rows-head-wrap .rows-head-slot {
-      flex-basis: 100%;
-    }
-    .rows-head-wrap .rows-count {
-      margin-left: 15px;
-      margin-right: auto;
-    }
     .rows-head-below {
       flex-wrap: wrap;
       row-gap: 0;
@@ -92,18 +75,34 @@
     flex-shrink: 0;
     margin-left: auto;
   }
-  /* the search beside them takes what a phone's head has left; the
-     words carry the filters there */
+  /* the phone's dropdown of the same filters */
+  .rows-filters-pick {
+    display: none;
+    flex-shrink: 0;
+    width: 104px;
+    margin-left: auto;
+  }
+  /* the hidden dropdown sits between the count and the segments */
+  .rows-count + .rows-filters-pick,
+  .rows-count + .rows-filters-pick + .rows-filters,
+  .rows-hint ~ .rows-filters-pick {
+    margin-left: 0;
+  }
   @media (max-width: 719px) {
-    .rows-filters .seg-option {
-      padding: 0 6px;
+    .rows-filters {
+      display: none;
     }
-    .rows-filter-icon {
+    .rows-filters-pick {
+      display: block;
+    }
+    /* a head's add button keeps its plus, and its name for readers */
+    .rows-head .rows-add-words {
       display: none;
     }
   }
   .rows-count + .rows-add,
-  .rows-count + .rows-filters {
+  .rows-count + .rows-filters,
+  .rows-filters ~ .rows-add {
     margin-left: 0;
   }
   .rows-hint ~ .rows-add,
@@ -161,6 +160,10 @@
   .rows-line-static {
     padding-left: calc(var(--space-4) + 14px + var(--space-3));
     color: var(--dim);
+  }
+  /* as tall as its lines, still a touch target */
+  .rows-line.rows-go-compact {
+    min-height: 44px;
   }
 
   .rows-toggle.rows-line:hover,

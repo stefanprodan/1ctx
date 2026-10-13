@@ -109,7 +109,6 @@ function Deciders() {
           <Rows>
             <RowsCard
               label="Deciders"
-              wrap
               search={<Search query={q} placeholder="Search deciders" />}
               count={count}
             >

@@ -276,7 +276,7 @@ describe("the card", () => {
     expect(html).toContain(">1ctx_made<");
     // one key at a time: New waits for Done
     expect(html).toMatch(
-      /<button[^>]*rows-add" disabled>(?:(?!<\/button>).)*New access key/s,
+      /<button[^>]*rows-add"[^>]* disabled>(?:(?!<\/button>).)*New access key/s,
     );
   });
 });

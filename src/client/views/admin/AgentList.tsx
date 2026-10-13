@@ -96,7 +96,6 @@ function List() {
         <Rows>
           <RowsCard
             label="Agents"
-            wrap
             search={<Search query={q} placeholder="Search agents" />}
             count={countOf(shown.length, all.length)}
             action={

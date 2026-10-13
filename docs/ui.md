@@ -80,8 +80,12 @@ open row's body or a meta. The shared shapes are below.
 - **A growing list has a search:** `ui/Search.tsx` as `RowsCard`'s
   `search`, over `useListSearch()` in `lib/search.ts`
   (`searchList()` outside a component).
-- **A card head's filters are `RowsFilters`,** short words; under 720
-  their icons are hidden, so a search beside them keeps room.
+- **A card head is one line on a phone.** Its filters are
+  `RowsFilters`, short words, and a small `Seg` in a head takes `head`;
+  under 720 either is a compact outlined dropdown of the same choices
+  (`Select`'s `quiet`). A head's `RowsAdd` shows only its plus there,
+  keeping its name for readers. The search takes what is left and its
+  icon keeps its size; no head wraps.
 - **A page with an aside is `ui/Split.tsx`.** Aside content is
   `AsideSection`, `AsideRead` and three line shapes: `AsideLine` (a
   label and its value), `AsideItem` (one thing in a list) and
