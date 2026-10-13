@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
+  RowsAdd,
   RowsBad,
   RowsButton,
   RowsCard,
@@ -27,6 +28,7 @@ import {
   RowsTag,
   RowsTitle,
 } from "../../../src/client/ui/Rows.tsx";
+import { Seg } from "../../../src/client/ui/Seg.tsx";
 
 const noop = () => {};
 
@@ -231,5 +233,59 @@ describe("the system's other parts", () => {
       />,
     );
     expect(buttons).toContain('aria-pressed="false">Chats</button>');
+  });
+
+  test("a phone's head keeps one line: filters as a dropdown, add as its plus", () => {
+    const filters = render(
+      <RowsFilters
+        label="Show"
+        filters={[
+          { label: "Open", on: false, onPick: noop },
+          { label: "Done", on: true, onPick: noop },
+        ]}
+      />,
+    );
+    // the dropdown of the same choices sits before the segments, which
+    // the sheet hides under 720 while it shows the dropdown
+    expect(filters.startsWith('<span class="rows-filters-pick">')).toBe(true);
+    expect(filters.indexOf("rows-filters-pick")).toBeLessThan(
+      filters.indexOf('class="seg seg-small rows-filters"'),
+    );
+    expect(filters).toContain('class="select-trigger select-trigger-quiet"');
+    expect(filters).toContain('aria-label="Show"');
+    expect(filters).toMatch(/select-trigger-quiet"[^>]*>.*Done/);
+    const add = render(<RowsAdd label="New task" onClick={noop} />);
+    expect(add).toContain('aria-label="New task"');
+    expect(add).toContain('<span class="rows-add-words">New task</span>');
+  });
+
+  test("with no filter on, the dropdown names the set, so any pick counts", () => {
+    const html = render(
+      <RowsFilters
+        label="Lists"
+        filters={[
+          { label: "Files", on: false, onPick: noop },
+          { label: "Deleted", on: false, onPick: noop },
+        ]}
+      />,
+    );
+    expect(html).toContain('<span class="select-label cut">Lists</span>');
+    expect(html).not.toContain('<span class="select-label cut">Files</span>');
+  });
+
+  test("a small switch in a head becomes the dropdown, elsewhere it stays", () => {
+    const options = [
+      { value: "a", label: "Current" },
+      { value: "b", label: "Changes" },
+    ] as const;
+    const inHead = render(
+      <Seg label="Show" small head options={options} value="a" onPick={noop} />,
+    );
+    expect(inHead).toContain('class="rows-filters-pick"');
+    expect(inHead).toContain('class="seg seg-small rows-filters"');
+    const inRow = render(
+      <Seg label="Access" small options={options} value="a" onPick={noop} />,
+    );
+    expect(inRow).not.toContain("rows-filters");
   });
 });

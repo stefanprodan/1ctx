@@ -46,4 +46,10 @@
   .agent-list-pick[aria-expanded="true"] .agent-list-pick-chevron {
     transform: rotate(180deg);
   }
+  /* a phone's head holds the pick, not its name */
+  @media (max-width: 719px) {
+    .agent-list-pick-key {
+      display: none;
+    }
+  }
 }

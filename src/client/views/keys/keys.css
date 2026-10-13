@@ -1,0 +1,36 @@
+/* An access key's row: the key, the name at the feed's size in mono,
+   its scope as a quiet tag, and an expiry close at hand. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .keys-icon {
+    flex-shrink: 0;
+    color: var(--dim);
+  }
+  .keys-name {
+    font-family: var(--mono);
+    font-size: var(--text-input);
+  }
+  /* as a task's label: a thin outline, no fill */
+  .keys-tag {
+    border-color: var(--line-strong);
+    border-radius: var(--radius-card);
+    color: var(--dim);
+  }
+  .keys-line {
+    display: flex;
+    min-width: 0;
+  }
+  .keys-rest {
+    flex-shrink: 0;
+    white-space: pre;
+  }
+  /* the ask's buttons and More sit in the row's end as its own */
+  .keys-acts {
+    display: contents;
+  }
+  .keys-soon {
+    color: var(--attention);
+  }
+}

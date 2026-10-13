@@ -5,8 +5,10 @@
 // page at a time; and every write on a task. A write keeps the server's
 // row in the lists (data/external-tasks.ts) and on the page. A frame
 // that adds an entry or edits the brief reads the page again, as does
-// an answer older than a frame seen while it was out. A mark is cleared
-// once the page is read, never by the read itself.
+// an answer older than a frame seen while it was out, and a label of its
+// project renamed or deleted. A linked file's write or delete patches
+// its row in place and reads the page; a file written while a read was
+// out reads it once more, since the write moves no task revision.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -17,9 +19,10 @@ import type {
 } from "../../shared/api/external-tasks.ts";
 import type {
   ExternalTaskDetail,
-  ExternalTaskEntry,
+  ExternalTaskPageEntry,
   MemberMove,
 } from "../../shared/contracts/external-task.ts";
+import type { KnowledgeFile } from "../../shared/contracts/knowledge.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
@@ -36,7 +39,7 @@ import { onSocketEvent } from "./socket.ts";
 export type TaskPage = {
   id: string;
   detail: ExternalTaskDetail;
-  entries: ExternalTaskEntry[];
+  entries: ExternalTaskPageEntry[];
   next: string | null;
   idleHours: number;
   more: { loading: boolean; error: Failure | null };
@@ -60,6 +63,20 @@ let moreTurn = 0;
 // clears it, since a grant made while the socket was down sends no frame
 let revokes = 0;
 const revokedAt = new Map<string, number>();
+// label renames and deletes by project, numbered, so a read that learns
+// its project only from the answer asks again for one that came while
+// it was out
+let relabels = 0;
+const relabeledAt = new Map<string, number>();
+const relabeledSince = (projectId: string, since: number) =>
+  (relabeledAt.get(projectId) ?? 0) > since;
+// knowledge frames by project, numbered, so a read out while one landed
+// asks again: its answer may hold the file as it was before
+let filings = 0;
+const filedAt = new Map<string, number>();
+// what a read started on: the revokes and the file writes seen
+type Started = { revokes: number; filings: number };
+const startOf = (): Started => ({ revokes, filings });
 const idle = { loading: false, error: null };
 // the read is hoisted, so the flight exists before the user effect runs
 const pageFlight = new Flight(refreshPage);
@@ -90,15 +107,15 @@ const taskPath = (id: string) =>
 // page in flight.
 // whether an answer to a read started at that turn still holds: a
 // revoke after its start drops it, and an answer after one clears it
-function holds(projectId: string, started: number): boolean {
+function holds(projectId: string, started: Started): boolean {
   const at = revokedAt.get(projectId);
   if (at === undefined) return true;
-  if (at > started) return false;
+  if (at > started.revokes) return false;
   revokedAt.delete(projectId);
   return true;
 }
 
-function takePage(body: ExternalTaskResponse, started: number): void {
+function takePage(body: ExternalTaskResponse, started: Started): void {
   const row = body.task.task;
   if (!holds(row.projectId, started)) return;
   const held = taskPage.value?.id === row.id ? taskPage.value : null;
@@ -123,7 +140,12 @@ function takePage(body: ExternalTaskResponse, started: number): void {
   };
   taskPage.value = next;
   pages.set(row.id, next);
-  if (latestOf(row.id) > row.revision) pageFlight.ask();
+  if (
+    latestOf(row.id) > row.revision ||
+    (filedAt.get(row.projectId) ?? 0) > started.filings
+  ) {
+    pageFlight.ask();
+  }
 }
 
 // the page's task read again; frames in a burst share one read
@@ -132,7 +154,7 @@ async function refreshPage(): Promise<void> {
   if (id === undefined) return;
   const forUser = owner;
   const turn = pageTurn;
-  const started = revokes;
+  const started = startOf();
   try {
     const body = await api<ExternalTaskResponse>(taskPath(id));
     if (owner === forUser && pageTurn === turn && taskPage.value?.id === id) {
@@ -148,7 +170,8 @@ async function refreshPage(): Promise<void> {
 export async function loadExternalTask(id: string): Promise<void> {
   const forUser = owner;
   const turn = ++pageTurn;
-  const started = revokes;
+  const started = startOf();
+  const labeled = relabels;
   pageFlight.stop();
   taskError.value = null;
   if (taskPage.value?.id !== id) taskPage.value = pages.get(id) ?? null;
@@ -177,8 +200,7 @@ export async function loadExternalTask(id: string): Promise<void> {
   takePage(body, started);
   takeTask(body.task.task);
   const projectId = body.task.task.projectId;
-  const mark = body.task.task.attentionAt;
-  if (mark !== null) void markSeen(id, mark).catch(() => {});
+  if (relabeledSince(projectId, labeled)) pageFlight.ask();
   await Promise.all([loadProject(projectId), loadKnowledge(projectId)]);
 }
 
@@ -224,7 +246,7 @@ export async function loadMoreEntries(): Promise<void> {
 function takeAnswer(
   body: ExternalTaskResponse,
   forUser: string | null,
-  started: number,
+  started: Started,
 ): void {
   if (owner !== forUser) return;
   if (!holds(body.task.task.projectId, started)) return;
@@ -237,7 +259,7 @@ export async function createExternalTask(
   request: CreateExternalTaskRequest,
 ): Promise<ExternalTaskResponse> {
   const forUser = owner;
-  const started = revokes;
+  const started = startOf();
   const body = await api<ExternalTaskResponse>(
     listPath(projectId),
     "POST",
@@ -253,7 +275,7 @@ export async function editExternalTask(
   request: PatchExternalTaskRequest,
 ): Promise<ExternalTaskResponse> {
   const forUser = owner;
-  const started = revokes;
+  const started = startOf();
   const body = await api<ExternalTaskResponse>(taskPath(id), "PATCH", request);
   takeAnswer(body, forUser, started);
   return body;
@@ -263,11 +285,11 @@ export async function editExternalTask(
 // claim it shows
 export async function moveExternalTask(
   id: string,
-  move: Exclude<MemberMove, "seen">,
+  move: MemberMove,
   request: ExternalTaskMoveRequest,
 ): Promise<ExternalTaskResponse> {
   const forUser = owner;
-  const started = revokes;
+  const started = startOf();
   const body = await api<ExternalTaskResponse>(
     `${taskPath(id)}/${move}`,
     "POST",
@@ -275,20 +297,6 @@ export async function moveExternalTask(
   );
   takeAnswer(body, forUser, started);
   return body;
-}
-
-// the mark the page read: one set since is left for the next look
-export async function markSeen(id: string, attentionAt: number): Promise<void> {
-  const forUser = owner;
-  const started = revokes;
-  const body = await api<Partial<ExternalTaskResponse>>(
-    `${taskPath(id)}/seen`,
-    "POST",
-    { attentionAt },
-  );
-  if (body.task !== undefined) {
-    takeAnswer(body as ExternalTaskResponse, forUser, started);
-  }
 }
 
 export async function deleteExternalTask(id: string): Promise<void> {
@@ -305,6 +313,33 @@ function closePage(words: string): void {
   pageFlight.stop();
   taskPage.value = null;
   taskError.value = words;
+}
+
+// a linked file as a knowledge frame leaves it, by the revision rule; a
+// page that does not link it, or holds it newer, is returned as it is
+export function withFileFrame(
+  page: TaskPage,
+  file: KnowledgeFile,
+  deleted: boolean,
+): TaskPage {
+  if (page.detail.task.projectId !== file.projectId) return page;
+  let moved = false;
+  const files = page.detail.files.map((held) => {
+    if (held.fileId !== file.id || held.deleted) return held;
+    if (!deleted && held.revision !== null && held.revision >= file.revision) {
+      return held;
+    }
+    moved = true;
+    return deleted
+      ? { ...held, name: file.name, revision: null, changedAt: null, deleted }
+      : {
+          ...held,
+          name: file.name,
+          revision: file.revision,
+          changedAt: file.updatedAt,
+        };
+  });
+  return moved ? { ...page, detail: { ...page.detail, files } } : page;
 }
 
 // registered after the lists' handler, which it imports, so a frame's
@@ -344,6 +379,24 @@ export function onExternalTaskSocket(ev: SocketEvent): void {
       break;
     case "granted":
       revokedAt.delete(ev.projectId);
+      break;
+    // a file written, renamed or deleted moves no task revision: a
+    // linked one is patched at once and read, and a read out asks again
+    case "knowledge":
+      filedAt.set(ev.projectId, ++filings);
+      pages.update((held) => withFileFrame(held, ev.file, ev.deleted));
+      if (page !== null) {
+        const next = withFileFrame(page, ev.file, ev.deleted);
+        if (next !== page) taskPage.value = next;
+        if (page.detail.files.some((f) => f.fileId === ev.file.id)) {
+          pageFlight.ask();
+        }
+      }
+      break;
+    // a label renamed or deleted moves no revision: the page reads it
+    case "projectLabels":
+      relabeledAt.set(ev.projectId, ++relabels);
+      if (page?.detail.task.projectId === ev.projectId) pageFlight.ask();
       break;
     default:
       break;

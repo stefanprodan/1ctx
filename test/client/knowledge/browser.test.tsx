@@ -213,7 +213,7 @@ describe("the Deleted list", () => {
   test("a refused Restore is said at its row's end, nowhere else", () => {
     const held = bin(false, "f9");
     held.save.status.value = {
-      error: "a file named old/notes.md exists",
+      error: "a file with this name exists",
       action: "restore",
     };
     const html = render(
@@ -225,7 +225,7 @@ describe("the Deleted list", () => {
         bin={held}
       />,
     );
-    const said = "Could not restore. A file named old/notes.md exists.";
+    const said = "Could not restore. A file with this name exists.";
     expect(html.split(said).length - 1).toBe(1);
     expect(html.indexOf(said)).toBeLessThan(html.indexOf("other.md"));
     expect(html).toContain("rows-end-error");

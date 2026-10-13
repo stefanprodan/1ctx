@@ -25,7 +25,7 @@ import {
   atCap,
   CAP_LINE,
   createBody,
-  DELETE_ASK,
+  deleteAsk,
   draftOf,
   footOf,
   LABELS_TEXT,
@@ -178,7 +178,9 @@ function LabelForm({
         save={save}
         asking={asking}
         busy={save.busy}
-        words={DELETE_ASK}
+        words={deleteAsk(
+          project.labels.find((label) => label.id === row.id)?.tasks ?? 0,
+        )}
         wordsClass="labels-ask"
         onDelete={() => {
           void save.act("delete", async () => {

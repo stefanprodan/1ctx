@@ -21,6 +21,12 @@ export function externalTaskFrame(
         ...event.data,
       }));
       return true;
+    case "project.labels":
+      toProject(event.data.projectId, () => ({
+        type: "projectLabels",
+        ...event.data,
+      }));
+      return true;
     default:
       return false;
   }

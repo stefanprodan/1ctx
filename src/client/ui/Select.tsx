@@ -27,6 +27,7 @@ export function Select({
   name,
   invalid,
   placeholder = "Pick one",
+  quiet,
 }: {
   label: string;
   value: string;
@@ -39,6 +40,8 @@ export function Select({
   name?: string;
   invalid?: boolean;
   placeholder?: string;
+  // a card head's filter, outlined as the segments are
+  quiet?: boolean;
 }) {
   const open = useSignal(false);
   const query = useSignal("");
@@ -120,7 +123,9 @@ export function Select({
         ref={trigger}
         type="button"
         name={name}
-        class={`select-trigger${invalid ? " select-trigger-invalid" : ""}`}
+        class={`select-trigger${invalid ? " select-trigger-invalid" : ""}${
+          quiet ? " select-trigger-quiet" : ""
+        }`}
         aria-label={label}
         aria-invalid={invalid || undefined}
         aria-haspopup="listbox"

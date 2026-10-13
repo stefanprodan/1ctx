@@ -11,7 +11,12 @@ the external task pages in `docs/external-task-pages.md`.
   view reads signals. A route names its `load` in `app/routes.ts`,
   and `app/loading.ts` starts it when the path, the query or the
   signed-in user changes, before the view renders. A public route's
-  loads for anyone, once per address. `reload()` runs it again.
+  loads for anyone, once per address. `reload()` runs it again. A route
+  whose filter or search needs less than its whole load names a
+  `loadQuery`, run in its place when only the query moved on the same
+  path; arriving, a new user and `reload()` run `load`. The feed's
+  search and pick on Home and a project's Feed tab read only the
+  session list, since nothing else on those pages reads the query.
 - **Every route is one `lazy()` entry in `app/routes.ts`.** The rail
   is computed from that table.
 - **Only the latest answer lands.** A later load or a write
@@ -63,7 +68,8 @@ open row's body or a meta. The shared shapes are below.
   The head, end and controls (`RowsTitle`, `RowsMeta`, `RowsEnd`,
   `RowsSwitch`, `RowsCheck`, `RowsRadio`, `RowsRemove`, `RowsNote`,
   `RowsFailed`, ...) are exported from `Rows.tsx`. The session list's
-  row (`feed/Row.tsx`) is the one row outside Rows.
+  row (`feed/Row.tsx`) is the one row outside Rows. A `RowsCard` whose
+  rows open a More menu takes `menus`, or its edge clips the menu.
 - **A row's meta wraps under its title on a phone,** unless `RowsGo`
   has `side`: then it stays beside the title, as the feed's time does,
   and the arrow shows only from 720 wide.
@@ -80,8 +86,13 @@ open row's body or a meta. The shared shapes are below.
 - **A growing list has a search:** `ui/Search.tsx` as `RowsCard`'s
   `search`, over `useListSearch()` in `lib/search.ts`
   (`searchList()` outside a component).
-- **A card head's filters are `RowsFilters`,** short words; under 720
-  their icons are hidden, so a search beside them keeps room.
+- **A card head is one line on a phone.** Its filters are
+  `RowsFilters`, short words, and a small `Seg` in a head takes `head`;
+  under 720 either is a compact outlined dropdown of the same choices
+  (`Select`'s `quiet`), naming the set while no filter is on, so any
+  pick is a change. A head's `RowsAdd` shows only its plus there,
+  keeping its name for readers. The search takes what is left and its
+  icon keeps its size; no head wraps.
 - **A page with an aside is `ui/Split.tsx`.** Aside content is
   `AsideSection`, `AsideRead` and three line shapes: `AsideLine` (a
   label and its value), `AsideItem` (one thing in a list) and
@@ -275,6 +286,11 @@ One helper per job, never a copy in a view.
   constant or builder there, never a literal in a view.
 - **A name is a link to its page** wherever it is drawn, except inside
   a row that is itself a link.
+- **A one-line summary of Markdown is `plainLine()`** in
+  `lib/plain.ts`: the first line with words as a reader sees it, link
+  words, code without backticks, no emphasis, heading, quote or list
+  marks. A line left empty (a bare `#`, an image with no alt, a code
+  fence) gives way to the next.
 - **Other single homes:** a menu is `useMenu()` in `lib/menu.ts`; the
   browser's zone `browserZone()` in `lib/zone.ts`; picked ids
   `sameIds()` and `toggledId()` in `lib/ids.ts`; a skipped pick's

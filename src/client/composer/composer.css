@@ -463,9 +463,12 @@
     .composer-chip-model {
       max-width: 120px;
     }
-    /* a finger's size */
+    /* a finger's size, the chips too, so the row is one height */
     .composer-add {
       width: 32px;
+      height: 32px;
+    }
+    .composer-row .composer-chip {
       height: 32px;
     }
     .composer-files-head {

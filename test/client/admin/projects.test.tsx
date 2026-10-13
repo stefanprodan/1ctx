@@ -82,7 +82,7 @@ const detail: ProjectDetail = {
   ...team,
   description: "",
   members: [casey],
-  labels: [{ id: "l1", name: "build", description: "New work" }],
+  labels: [{ id: "l1", name: "build", description: "New work", tasks: 0 }],
   chats: 3,
   knowledge: { files: 0, tokens: 0 },
   latestFiles: [],

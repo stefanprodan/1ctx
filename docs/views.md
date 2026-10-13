@@ -209,7 +209,9 @@ Flagged.
   form, with no buttons on the row, and every row waits while a form
   is open.
 - **The last label has no Delete,** and Add label goes at the cap; the
-  server refuses both anyway.
+  server refuses both anyway. The delete ask says how many external
+  tasks carry the label, closed ones too (`deleteAsk()` over the
+  detail's `tasks`).
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted in its provider's wire shape; the client never
   counts tokens.
@@ -244,18 +246,17 @@ Flagged.
 ## Access keys
 
 - **Keys live on Connect agents (`views/connect/`),** one view for its
-  agent tabs and `?new` (a `NewCard` page).
+  agent tabs and `?new` (a `NewCard` page, its name shaped as an
+  agent's).
 - **A key's token lives in that view alone;** `data/access-keys.ts`
   keeps only the key. The shown-once box goes on Done or on leaving.
 - **No setup line carries a token.** Each reads `ONECTX_ACCESS_KEY`.
 - **At a cap of 0 the keys card says keys are off** with no New; kept
   keys list with Revoke, and Setup shows only while one is kept.
-- **An admin's user page lists a user's keys from `userKeys`,** read
-  again after a revoke (whatever its answer), a reset and a disable,
-  which delete them. No admin page makes a key. A Connect agents revoke that
-  answers 404 drops the row.
-- **A key's row is `views/keys/`,** shared by both pages, so neither
-  view imports the other.
+- **A Connect agents revoke that answers 404 drops the row.**
+- **A key's row is `views/keys/`,** shared with the admin's user page,
+  so neither view imports the other: the feed's two lines, with Revoke
+  in its More menu.
 
 ## Knowledge
 

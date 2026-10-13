@@ -30,12 +30,6 @@ import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm, SettingStack } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { KeyRow } from "../keys/KeyRow.tsx";
-import {
-  expired,
-  expiryWords,
-  scopeWords,
-  usedWords,
-} from "../keys/Keys.model.ts";
 import { fullNameProblem } from "../profile/Profile.model.ts";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import { teamsOf } from "./Credentials.model.ts";
@@ -323,8 +317,8 @@ function KeysCard({ user }: { user: AdminUser }) {
           <KeyRow
             key={key.id}
             row={key}
-            sub={`${scopeWords(key.scope)} · ${usedWords(key, now)}`}
-            lines={[{ text: expiryWords(key, now), bad: expired(key, now) }]}
+            projects={projects.value ?? []}
+            now={now}
             onRevoke={() => revokeUserKey(user.id, key.id)}
           />
         ))

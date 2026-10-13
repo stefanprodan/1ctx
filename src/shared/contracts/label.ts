@@ -19,6 +19,10 @@ export type ProjectLabel = {
   description: string;
 };
 
+// a label on the project's detail: how many external tasks carry it,
+// closed ones too, so a delete can say what it takes the label off
+export type ProjectLabelUse = ProjectLabel & { tasks: number };
+
 // a label as a create names it, before it has an id
 export type LabelInput = { name: string; description?: string };
 

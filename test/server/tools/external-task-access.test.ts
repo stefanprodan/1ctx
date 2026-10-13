@@ -83,8 +83,8 @@ describe("external task tool access", () => {
     const port = portOf(f, visible);
     const other = f.area.create(f.member.id, f.otherProjectId, {
       title: "Hidden",
-      text: "secret brief",
-      fileIds: [],
+      labels: ["build"],
+      fileIds: ["brief"],
     }).task.task;
     const key = { userId: f.member.id, keyId: "k2", keyName: "x" };
     const claim = f.area.claim(key, other.id).claimId;
@@ -94,20 +94,19 @@ describe("external task tool access", () => {
     const calls: Record<string, unknown>[] = [
       { action: "show", id: other.id },
       { action: "show", id: other.id, before: entryId },
-      { action: "show", id: other.id, offset: 0, ref: 0 },
       { action: "show", id: other.id, entry: entryId, offset: 0 },
       { action: "edit", id: other.id, editRevision: 0, title: "Mine" },
       { action: "edit", id: other.id, editRevision: 0, files: [] },
-      { action: "answer", id: other.id, state: "blocked", text: "x" },
+      { action: "answer", id: other.id, state: "awaiting_input", text: "x" },
       {
         action: "unclaim",
         id: other.id,
-        state: "blocked",
+        state: "awaiting_input",
         claimId: claim,
         text: "x",
       },
-      { action: "cancel", id: other.id, state: "blocked" },
-      { action: "reopen", id: other.id, state: "blocked", text: "x" },
+      { action: "cancel", id: other.id, state: "awaiting_input" },
+      { action: "reopen", id: other.id, state: "awaiting_input", text: "x" },
     ];
     for (const args of calls) {
       const result = await call(f, port, args);
@@ -153,14 +152,26 @@ describe("external task tool access", () => {
     using f = fixture();
     const visible = { ids: [f.projectId] as string[] | null };
     const port = portOf(f, visible);
-    const task = f.task("blocked");
+    const task = f.task("awaiting_input");
     visible.ids = [];
     const before = JSON.stringify(f.area.store.byId(task.id));
     for (const args of [
       { action: "list" },
       { action: "show", id: task.id },
-      { action: "create", title: "T", text: "B" },
-      { action: "answer", id: task.id, state: "blocked", text: "x" },
+      {
+        action: "create",
+        title: "T",
+        labels: ["build"],
+        files: ["/knowledge/brief.md"],
+      },
+      // a missing path answers as an existing one: the names stay hidden
+      {
+        action: "create",
+        title: "T",
+        labels: ["build"],
+        files: ["/knowledge/nope.md"],
+      },
+      { action: "answer", id: task.id, state: "awaiting_input", text: "x" },
     ]) {
       const result = await call(f, port, args);
       expect(result.content).toBe(
@@ -198,11 +209,10 @@ describe("external task tool paging", () => {
       using f = fixture();
       const visible = { ids: [f.projectId] as string[] | null };
       const port = portOf(f, visible);
-      const brief = "B".repeat(16 * 1024 - 10);
       const task = f.area.create(f.owner.id, f.projectId, {
         title: "T ```` [x](y)",
-        text: brief,
-        fileIds: [],
+        labels: ["build"],
+        fileIds: ["brief"],
       }).task.task;
       const sizes = [5, 16000, 300, 1, 9000, 200, 16384, 40, 3000, 800];
       transact(f.db, () => {
@@ -258,15 +268,6 @@ describe("external task tool paging", () => {
       let args: Record<string, unknown> = { action: "show", id: task.id };
       for (;;) {
         const shown = await page(args);
-        if (args.before === undefined) {
-          const rest = await readOn(
-            shown,
-            "Its brief",
-            { action: "show", id: task.id, ref: 0 },
-            /Brief cut: .* offset (\d+), ref 0\./,
-          );
-          expect(quotedText(shown, "Its brief")! + rest).toBe(brief);
-        }
         for (const m of shown.matchAll(/^Entry (\w+): answer/gm)) {
           const id = m[1]!;
           seen.push(id);

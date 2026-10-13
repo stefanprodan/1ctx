@@ -111,6 +111,10 @@ const FOLDER_WORDS: Record<KnowledgePathReason, string> = {
 
 export const FOLDER_ONCE = "folder must be given at most once";
 
+// a create or rename onto a live name; the path is the field's own, so
+// the words never repeat it
+export const FILE_EXISTS = "a file with this name exists";
+
 // a refusal the Folder field owns, told apart by its exact words, since
 // a file named folder has refusals that start the same way
 export function isFolderRefusal(words: string): boolean {

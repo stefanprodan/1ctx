@@ -8,7 +8,10 @@ import {
   type McpHttpHandler,
   McpServer,
 } from "@modelcontextprotocol/server";
-import { MAX_ENTRY_LINKS } from "../../shared/contracts/external-task.ts";
+import {
+  MAX_ENTRY_LINKS,
+  MAX_TASK_LABELS,
+} from "../../shared/contracts/external-task.ts";
 import { AGENT_ENTRY_KINDS, EXTERNAL_TASK_STATES } from "../../shared/words.ts";
 import { MAX_EDITS } from "../knowledge/index.ts";
 import { HttpError } from "../lib/errors.ts";
@@ -75,6 +78,12 @@ const taskProperties = {
       enum: [...EXTERNAL_TASK_STATES],
     },
   },
+  labels: {
+    type: ["array", "null"],
+    minItems: 1,
+    maxItems: MAX_TASK_LABELS,
+    items: { type: "string" },
+  },
   held: { type: "boolean" },
   after: { type: ["string", "null"] },
   taskId: { type: "string" },
@@ -112,7 +121,7 @@ const schema = (
 export const READ_ACTIONS = ["list", "search", "read", "versions", "version"];
 export const WRITE_ACTIONS = ["create", "edit", "replace", "rename", "delete"];
 export const TASK_READ_ACTIONS = ["list", "show"];
-export const TASK_WRITE_ACTIONS = ["claim", "report"];
+export const TASK_WRITE_ACTIONS = ["claim", "unclaim", "report"];
 
 // a read key's text never names a write action
 const READ_DESCRIPTION =
@@ -120,11 +129,14 @@ const READ_DESCRIPTION =
 
 const WRITE_DESCRIPTION = `${READ_DESCRIPTION} create: a new file from projectId, name and text. edit: up to ${MAX_EDITS} old/new pairs, each old matching exactly once; the way to change a file. replace: the whole new text, only for a file that fits one read. rename, delete. A change names the revision read and is refused if the file changed since.`;
 
-const TASK_READ_DESCRIPTION =
-  "Work handed to you from a 1ctx project: list and show. list: open work by default; states filters it. show: the current brief, linked knowledge files and newest entries by taskId. projectId is optional with taskId and must match when given. Read linked files with knowledge read at the revision shown. A result that does not fit ends with the exact next call.";
+// what list and show share, read key and write key alike
+const TASK_LIST = `states filters it by ${EXTERNAL_TASK_STATES.join(", ")}; labels keeps tasks carrying any of 1 to ${MAX_TASK_LABELS} label names, the ones your user gave. A list with projectId names that project's labels.`;
+const TASK_SHOW =
+  "show: the title, labels, linked knowledge files and newest entries by taskId. projectId is optional with taskId and must match when given. The brief is in the linked files: read each with knowledge read by its fileId.";
 
-const TASK_WRITE_DESCRIPTION =
-  "Work handed to you from a 1ctx project: list, claim, report back. list: open work by default; states filters it, held=true finds this key's claims and marks an answer after your last report. show: the current brief, linked knowledge files and newest entries by taskId. projectId is optional with taskId and must match when given. Read linked files with knowledge read at the revision shown. claim: take open work and receive a claimId. report: add progress, question, result or unclaim with that claimId and taskId. Report progress at real milestones, result with useful links, or unclaim with a reason. If a user is present, ask them directly. Report a question only when no user is there to answer, then end the run and look for the answer next run. A blocked claim may continue with progress or result if you solve it. A result that does not fit ends with the exact next call.";
+const TASK_READ_DESCRIPTION = `Work handed to you from a 1ctx project: list and show. list: todo work by default; ${TASK_LIST} ${TASK_SHOW} A result that does not fit ends with the exact next call.`;
+
+const TASK_WRITE_DESCRIPTION = `Work handed to you from a 1ctx project: list, claim, report back. list: todo work by default; ${TASK_LIST} held=true finds this key's claims, ignoring labels, and marks an answer after your last report. ${TASK_SHOW} claim: take todo work and receive a claimId. report: add progress, question or result with that claimId and taskId. unclaim: give the task back with that claimId and a text saying why. Report progress at real milestones and result with useful links. If a user is present, ask them directly. Report a question only when no user is there to answer, then end the run and look for the answer next run. A task awaiting input may continue with progress or result if you solve it. A result that does not fit ends with the exact next call.`;
 
 function signalOf(authInfo: unknown): AbortSignal | undefined {
   const signal = (authInfo as { extra?: { signal?: unknown } })?.extra?.signal;
@@ -291,6 +303,7 @@ function server(
           : {
               projectId: taskProperties.projectId,
               states: taskProperties.states,
+              labels: taskProperties.labels,
               after: taskProperties.after,
               taskId: taskProperties.taskId,
               before: taskProperties.before,

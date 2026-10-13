@@ -10,6 +10,7 @@ import { EXTERNAL_TASKS_OFF_LINE } from "../../../src/shared/capabilities.ts";
 import { type ChatApp, chatApp, type Script } from "../../helpers/chat.ts";
 import { allowSubagents, system, toolNames } from "../../helpers/subagents.ts";
 import { settle } from "../../helpers/tool-loop.ts";
+import { briefFile } from "../external-tasks/http-fixture.ts";
 
 async function app(): Promise<ChatApp> {
   const chat = await chatApp();
@@ -47,6 +48,7 @@ const switchable = async (chat: ChatApp) =>
 
 // a create the model sends whether or not it was offered the tool
 async function forged(chat: ChatApp, script: Script): Promise<string> {
+  briefFile(chat.app, chat.projectId, chat.memberId);
   const pending = chat.scripted.next();
   script.toolRound([
     {
@@ -55,7 +57,8 @@ async function forged(chat: ChatApp, script: Script): Promise<string> {
       arguments: JSON.stringify({
         action: "create",
         title: "Port the parser",
-        text: "Follow the plan.",
+        labels: ["build"],
+        files: ["/knowledge/brief.md"],
       }),
     },
   ]);

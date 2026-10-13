@@ -8,6 +8,7 @@ import type {
   KnowledgeCounts,
   KnowledgeFile,
 } from "../../shared/contracts/knowledge.ts";
+import { FILE_EXISTS } from "../../shared/knowledge.ts";
 import {
   MAX_UPLOADS_PER_MESSAGE,
   type MessageUpload,
@@ -248,7 +249,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     create(projectId, author, name, text) {
       return write(projectId, (caps) => {
         if (store.byName(projectId, name) !== null) {
-          throw new Conflict(`a file named ${name} exists`);
+          throw new Conflict(FILE_EXISTS);
         }
         checkNames([...store.list(projectId).map((file) => file.name), name]);
         const bytes = Buffer.byteLength(text);
@@ -279,7 +280,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
           throw new BadRequest(`the file is named ${name} already`);
         }
         if (store.byName(projectId, name) !== null) {
-          throw new Conflict(`a file named ${name} exists`);
+          throw new Conflict(FILE_EXISTS);
         }
         // the size is unchanged, so only the tree's shape is checked
         checkNames([

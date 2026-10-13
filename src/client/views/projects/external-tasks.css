@@ -1,126 +1,130 @@
-/* The external task pages: the brief and its form, the member's moves
-   and their boxes, and the timeline's entries. */
+/* The external task pages: the tab's groups and rows, the task's page
+   (its head, result, files and activity), the member's moves and their
+   boxes, and the brief's form. */
 
 @layer tokens, base, owners;
 
 @layer owners {
-  /* the brief */
-  .external-tasks-brief {
+  /* a group's head inside the list: its state and count, quiet */
+  .external-tasks-group {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    padding: var(--space-4);
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4) var(--space-1);
+    border-top: 1px solid var(--line);
   }
-  /* the state's icon in its colour from base, beside its words */
-  .external-tasks-state {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
+  .external-tasks-group-first {
+    border-top: 0;
   }
-  .external-tasks-state-icon {
-    flex-shrink: 0;
-  }
-  /* the chat it was made in, and on a phone the aside's state, deadline
-     and scope */
-  .external-tasks-brief-foot {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-3);
-    margin: 0;
-    font-size: var(--text-small);
+  .external-tasks-group-count {
+    font-size: var(--text-label);
     color: var(--faint);
   }
-  /* a long chat name is cut */
-  .external-tasks-chat {
+  /* the state's ring: quiet, except where a member is waited on */
+  .external-tasks-ring {
+    flex-shrink: 0;
+    color: var(--dim);
+  }
+  .external-tasks-ring.status-attention {
+    color: var(--attention);
+  }
+  /* a label: small mono words in a thin outline, no fill */
+  .external-tasks-tag {
+    border-color: var(--line-strong);
+    border-radius: var(--radius-card);
+    color: var(--dim);
+  }
+  /* the title at the feed's size, then its labels */
+  .external-tasks-row-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    min-width: 0;
+    font-size: var(--text-input);
+  }
+  /* on a phone a row is the feed's two lines, and the labels wait for
+     the task's page */
+  @media (max-width: 719px) {
+    .external-tasks-row-name {
+      flex-wrap: nowrap;
+    }
+    .external-tasks-row-name .external-tasks-tag {
+      display: none;
+    }
+  }
+
+  /* the task's page: the title as its heading, then where it stands */
+  .external-tasks-head {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .external-tasks-title {
+    margin: 0;
+    font-size: var(--text-body);
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+  .external-tasks-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--dim);
+  }
+  .external-tasks-status-state {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-1);
-    min-width: 0;
-    max-width: 100%;
+    gap: var(--space-2);
+    color: var(--fg);
+    font-weight: 500;
   }
-  /* the aside hides under 1100 */
-  .external-tasks-brief-narrow {
+  .external-tasks-status-jump {
+    color: var(--attention);
+  }
+  .external-tasks-status-faint {
+    color: var(--faint);
+  }
+  .external-tasks-head-labels,
+  .external-tasks-aside-labels {
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin: 0;
+  }
+  .external-tasks-aside-labels {
+    display: inline-flex;
+  }
+  /* the aside hides under 1100, so its labels sit under the title */
+  .external-tasks-narrow {
     display: none;
   }
   @media (max-width: 1099px) {
-    .external-tasks-brief-narrow {
+    .external-tasks-narrow {
       display: flex;
     }
+  }
+  .external-tasks-head-moves {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
   /* what an edit hides keeps the page's gap while shown */
   .external-tasks-rest {
     display: contents;
   }
-  /* the padding sits on the box, so the cut falls on a line's edge */
-  .external-tasks-brief-text {
-    padding: var(--space-3);
-    border-radius: var(--radius);
-    background: var(--inset);
-  }
-  .external-tasks-brief-body {
-    --clamp: 8;
-    margin: 0;
-    font-size: var(--text-input);
-    line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
 
-  /* the form */
-  .external-tasks-form {
+  /* a done task's result */
+  .external-tasks-result {
     display: flex;
     flex-direction: column;
-  }
-  .external-tasks-pick {
-    display: flex;
-    margin-top: var(--space-2);
-  }
-  .external-tasks-foot {
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--line);
-  }
-
-  /* the moves */
-  .external-tasks-actions,
-  .external-tasks-actions-end {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
     gap: var(--space-2);
-  }
-  .external-tasks-actions-end {
-    margin-left: auto;
-  }
-  .external-tasks-box {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
     padding: var(--space-4);
   }
-  /* the open question over the answer box */
-  .external-tasks-question {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-  }
-  .external-tasks-question-text {
-    --clamp: 6;
-    margin: 0;
-    font-size: var(--text-ui);
-    line-height: 1.5;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  /* an entry of the timeline */
-  .external-tasks-entry {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-    flex: 1 1 0;
-  }
-  .external-tasks-entry-head {
+  .external-tasks-result-head {
     display: flex;
     align-items: center;
     gap: var(--space-2);
@@ -129,26 +133,264 @@
     font-size: var(--text-small);
     color: var(--dim);
   }
-  /* neutral but for a question still waiting, which wears attention */
-  .external-tasks-kind {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
+  .external-tasks-result-kind {
     flex-shrink: 0;
     font-weight: 500;
+    color: var(--fg);
   }
-  .external-tasks-kind-icon {
+  /* rendered words at the list's size */
+  .external-tasks-md {
+    --text-body: var(--text-input);
+    min-width: 0;
+  }
+  /* an entry's or a result's headings at its words' size, under the
+     task's title; a file read keeps the document's */
+  .external-tasks-entry {
+    --text-title: var(--text-input);
+  }
+
+  /* a linked file opens in place; the pencil leads to its page. The
+     row is Knowledge's file row: 34 px, the name in mono */
+  .external-tasks-file {
+    display: flex;
+    flex-direction: column;
+  }
+  .external-tasks-file-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-right: var(--space-3);
+  }
+  .external-tasks-file-row:hover {
+    background: var(--hover);
+  }
+  .external-tasks-file-row-off:hover {
+    background: transparent;
+  }
+  .external-tasks-file-go {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: 34px;
+    padding: 0 var(--space-4);
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--fg);
+    text-align: left;
+    cursor: pointer;
+  }
+  /* after file-go, which sets the colour it overrides */
+  .external-tasks-file-gone {
+    color: var(--faint);
+    cursor: default;
+  }
+  .external-tasks-file-icon {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .external-tasks-file-name {
+    min-width: 0;
+    font-family: var(--mono);
+    font-size: var(--text-mono);
+  }
+  .external-tasks-file-word {
     flex-shrink: 0;
   }
-  .external-tasks-by-link {
-    text-decoration: none;
+  /* when it last changed, as Knowledge's rows say it; a phone leaves
+     it out */
+  .external-tasks-file-when {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: var(--space-3);
+    font-size: var(--text-small);
+    color: var(--faint);
+    white-space: nowrap;
   }
-  .external-tasks-by-link:hover {
+  @media (max-width: 719px) {
+    .external-tasks-file-when {
+      display: none;
+    }
+  }
+  .external-tasks-file-body {
+    padding: var(--space-2) var(--space-4) var(--space-4);
+    border-top: 1px solid var(--line);
+  }
+  .external-tasks-file-note {
+    margin: 0;
+    font-size: var(--text-ui);
+    color: var(--faint);
+  }
+  .external-tasks-file-text {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* the activity: oldest first, a line per entry */
+  .external-tasks-activity {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .external-tasks-activity-label {
+    margin: 0;
+  }
+  .external-tasks-stream {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .external-tasks-earlier {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  /* an entry as one line: icon, verb, who, its words, when */
+  .external-tasks-line {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 36px;
+    padding: 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    font: inherit;
+    font-size: var(--text-ui);
+    color: var(--dim);
+    text-align: left;
+  }
+  /* the jump's target clears the sticky page head */
+  .external-tasks-jump {
+    scroll-margin-top: calc(2 * var(--space-6));
+  }
+  .external-tasks-line-go {
+    position: relative;
+    cursor: pointer;
+  }
+  .external-tasks-line-go:hover {
+    background: var(--hover);
+  }
+  .external-tasks-line-go:has(.external-tasks-line-toggle:focus-visible) {
+    outline: 1px solid var(--brand);
+    outline-offset: -1px;
+  }
+  /* the verb opens the words; its cover makes the whole line the
+     target, below the links in it */
+  .external-tasks-line-toggle {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .external-tasks-line-toggle:focus-visible {
+    outline: none;
+  }
+  .external-tasks-line-toggle::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+  }
+  .external-tasks-line-icon {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .external-tasks-line-icon.status-attention {
+    color: var(--attention);
+  }
+  .external-tasks-line-verb {
+    flex-shrink: 0;
+    font-weight: 500;
+    color: var(--fg);
+  }
+  /* who gives way, the key first, so the time keeps its place */
+  .external-tasks-line-who {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    overflow: hidden;
+  }
+  .external-tasks-line-via {
+    flex-shrink: 0;
+  }
+  /* a name keeps its place up to a cap; the key gives way first */
+  .external-tasks-line-user {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    max-width: 14ch;
+    color: var(--fg);
+  }
+  /* a link in the text's colour shows itself under the pointer */
+  .external-tasks-line-user:hover,
+  .external-tasks-line-user:focus-visible,
+  .external-tasks-line-chat:hover,
+  .external-tasks-line-chat:focus-visible {
+    color: var(--fg);
     text-decoration: underline;
+  }
+  /* above the line's cover, so a cut key's title shows */
+  .external-tasks-key {
+    position: relative;
+    z-index: 1;
+    flex: 0 4 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .external-tasks-by-faint {
     flex-shrink: 0;
     color: var(--faint);
+  }
+  /* the chat it was made in gives way before the time */
+  .external-tasks-line-place {
+    display: inline-flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .external-tasks-line-chat {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    color: var(--fg);
+  }
+  .external-tasks-line-via {
+    color: var(--faint);
+  }
+  .external-tasks-line-text {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .external-tasks-when {
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--faint);
+  }
+  .external-tasks-line-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2) var(--space-4) 30px;
+  }
+  @media (max-width: 719px) {
+    .external-tasks-line-body {
+      padding-left: var(--space-2);
+    }
   }
   /* the question an answer follows, one line */
   .external-tasks-entry-pair {
@@ -160,19 +402,6 @@
     margin-right: var(--space-1);
     vertical-align: -2px;
   }
-  .external-tasks-when {
-    flex-shrink: 0;
-    margin-left: auto;
-    color: var(--faint);
-  }
-  .external-tasks-entry-text {
-    --clamp: 6;
-    margin: 0;
-    font-size: var(--text-ui);
-    line-height: 1.5;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
   .external-tasks-link,
   .external-tasks-link-text {
     display: block;
@@ -180,5 +409,61 @@
   }
   .external-tasks-link {
     color: var(--brand);
+  }
+  /* the answer box at the foot of the waiting question */
+  .external-tasks-answer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--line);
+  }
+
+  /* the moves' boxes, at the top of the body */
+  .external-tasks-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+  .external-tasks-ask {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: var(--text-ui);
+  }
+  .external-tasks-actions-end {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: auto;
+  }
+
+  /* the form */
+  .external-tasks-form {
+    display: flex;
+    flex-direction: column;
+  }
+  .external-tasks-pick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  /* a new file, made inside the Files section */
+  .external-tasks-new-file {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+    margin: var(--space-3) 0 0;
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .external-tasks-foot {
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--line);
   }
 }

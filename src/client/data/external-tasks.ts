@@ -4,11 +4,11 @@
 // External tasks: one project's unfinished list, loaded whole, and its
 // closed pages under a search and a state, read by the server a page at
 // a time; a changed filter starts again from the first. A task's page
-// and the writes are data/external-task.ts, Home's marked tasks
-// data/marked-tasks.ts. The socket's frames keep the lists current by
-// the revision rule; a frame the client cannot place asks for one
-// trailing read. An answer is kept only for the user and the turn it
-// was asked for.
+// and the writes are data/external-task.ts, Home's waiting tasks
+// data/waiting-tasks.ts. The socket's frames keep the lists current by
+// the revision rule; a frame the client cannot place, or a label rename
+// or delete, asks for one trailing read. An answer is kept only for the
+// user and the turn it was asked for.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -18,6 +18,7 @@ import type {
 import type { ExternalTaskRow } from "../../shared/contracts/external-task.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
+import { externalTasksHref, type TasksShow } from "../lib/hrefs.ts";
 import { api } from "./api.ts";
 import {
   ALL_CLOSED,
@@ -25,6 +26,7 @@ import {
   type ClosedFilter,
   type ClosedPages,
   dropTask,
+  readClosedRow,
   reconcile,
   sameClosed,
   type TaskLists,
@@ -39,7 +41,7 @@ import { onSocketEvent } from "./socket.ts";
 // the project's unfinished tasks, null while not loaded
 export const externalTasks = signal<ExternalTaskRow[] | null>(null);
 export const externalTasksError = signal<Failure | null>(null);
-// how many are done or cancelled, so the card shows only while some are
+// how many are done or canceled, so the card shows only while some are
 export const closedCount = signal(0);
 // what the closed pages are read under
 export const closedFilter = signal<ClosedFilter>(ALL_CLOSED);
@@ -66,12 +68,18 @@ let closedTurn = 0;
 // is asked again
 let listMoves = 0;
 let closes = 0;
+// label renames and deletes of the project held, so a read out across
+// one, a first one too, is asked again
+let relabels = 0;
 // the highest revision applied per task, so an answer read before a
 // move never brings back what the task was
 const latest = new Map<string, number>();
 // deleted tasks: a row read before its delete never joins again
 const gone = new Set<string>();
 const idle = { loading: false, error: null };
+// the tab's last view and search per project, for the pages that lead
+// back to it
+const views = new Map<string, { show: TasksShow | null; q: string }>();
 // the reads are hoisted, so the flights exist before the user effect runs
 const listFlight = new Flight(reloadList);
 const closedFlight = new Flight(reloadClosed);
@@ -84,6 +92,7 @@ effect(() => {
   kept.clear();
   latest.clear();
   gone.clear();
+  views.clear();
   listTurn++;
   closedTurn++;
   listFlight.stop();
@@ -153,6 +162,7 @@ export async function loadExternalTasks(projectId: string): Promise<void> {
   projectFor = projectId;
   externalTasksError.value = null;
   const moves = listMoves;
+  const labeled = relabels;
   try {
     const body = await api<ExternalTasksResponse>(listPath(projectId));
     if (owner !== forUser || listTurn !== turn) return;
@@ -174,6 +184,7 @@ export async function loadExternalTasks(projectId: string): Promise<void> {
     // word, so one more read settles it
     if (
       listMoves !== moves ||
+      relabels !== labeled ||
       body.tasks.some((t) => latestOf(t.id) > t.revision)
     ) {
       listFlight.ask();
@@ -207,6 +218,7 @@ async function readClosed(more: boolean): Promise<void> {
   const forUser = owner;
   const turn = ++closedTurn;
   const closed = closes;
+  const labeled = relabels;
   const filter = closedFilter.value;
   closedMore.value = { loading: true, error: null };
   try {
@@ -224,13 +236,15 @@ async function readClosed(more: boolean): Promise<void> {
     const base = more
       ? rows.reduce(upsertClosed, now?.rows ?? [])
       : rows.reduce(
-          upsertClosed,
+          readClosedRow,
           (now?.rows ?? []).filter((t) => rows.some((r) => r.id === t.id)),
         );
     closedPages.value = { rows: base, next: body.next };
     closedMore.value = idle;
     // a task closed while the first page was out is on neither list
-    if (!more && closes !== closed) closedFlight.ask();
+    if (!more && (closes !== closed || relabels !== labeled)) {
+      closedFlight.ask();
+    }
   } catch (err) {
     if (owner === forUser && closedTurn === turn) {
       closedMore.value = { loading: false, error: failure(err) };
@@ -259,6 +273,33 @@ export function filterClosed(filter: ClosedFilter): Promise<void> {
   closedPages.value = null;
   closedMore.value = idle;
   return closedFlight.run(() => readClosed(false));
+}
+
+export function rememberTasksView(
+  projectId: string,
+  view: { show: TasksShow | null; q: string },
+): void {
+  views.set(projectId, view);
+}
+
+// the tab as the user last had it, else on the view given
+export function tasksTabHref(
+  projectId: string,
+  show: TasksShow | null = null,
+): string {
+  const view = views.get(projectId) ?? { show, q: "" };
+  return externalTasksHref(projectId, view.show, view.q);
+}
+
+// the closed pages a view shows: a new filter starts again, the one
+// held is read only while none is
+export function showClosed(
+  projectId: string,
+  filter: ClosedFilter,
+): Promise<void> {
+  if (!sameClosed(filter, closedFilter.value)) return filterClosed(filter);
+  if (closedPages.value === null) return loadClosedTasks(projectId);
+  return Promise.resolve();
 }
 
 // a row from a frame or an answer into the lists; while none is held
@@ -299,7 +340,9 @@ export function onExternalTasksSocket(ev: SocketEvent): void {
   // a held list of a project off screen is loaded again when opened
   if (
     ev.type === "revoked" ||
-    ((ev.type === "externalTask" || ev.type === "externalTaskDeleted") &&
+    ((ev.type === "externalTask" ||
+      ev.type === "externalTaskDeleted" ||
+      ev.type === "projectLabels") &&
       ev.projectId !== projectFor)
   ) {
     kept.delete(ev.projectId);
@@ -310,6 +353,14 @@ export function onExternalTasksSocket(ev: SocketEvent): void {
       break;
     case "externalTaskDeleted":
       forgetTask(ev.taskId, ev.projectId);
+      break;
+    // no row moved, so only a read shows the labels as they are now
+    case "projectLabels":
+      if (ev.projectId === projectFor) {
+        relabels++;
+        if (externalTasks.value !== null) listFlight.ask();
+        if (closedPages.value !== null) closedFlight.ask();
+      }
       break;
     case "revoked":
       if (ev.projectId === projectFor) {

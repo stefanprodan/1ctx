@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { AccessKeyStore } from "../../../src/server/access/key-store.ts";
 import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import type { AccessKeysResponse } from "../../../src/shared/api/profile.ts";
@@ -13,6 +14,7 @@ import {
   testApp,
 } from "../../helpers/app.ts";
 import { emailApp, MARIA_PASSWORD } from "../../helpers/links.ts";
+import { META } from "../mcp-server/helper.ts";
 
 async function setup() {
   const logs = collectLogs();
@@ -57,14 +59,14 @@ describe("access key routes", () => {
       expect(await b.list()).toEqual({ keys: [], limit: 5 });
       const own = b.app.projects.personal(b.user.id)!;
       const first = await createKey(b.client, {
-        name: "a",
+        name: "claude-code",
         scope: "read",
         projectIds: [own.id],
         days: 90,
       });
       b.app.now.value++;
       const second = await createKey(b.client, {
-        name: "b".repeat(64),
+        name: "b".repeat(80),
         days: 365,
       });
       expect(second.token).not.toBe(first.token);
@@ -91,7 +93,7 @@ describe("access key routes", () => {
       expect(JSON.stringify(listed)).not.toContain(first.token);
       expect(JSON.stringify(listed)).not.toContain("tokenHash");
       const sameName = await b.client.call("POST", "/api/profile/keys", {
-        body: { ...KEY_REQUEST, name: "a" },
+        body: { ...KEY_REQUEST, name: "claude-code" },
       });
       expect(sameName.status).toBe(409);
       expect(await sameName.json()).toEqual({
@@ -139,7 +141,7 @@ describe("access key routes", () => {
       ]);
       expect(JSON.stringify(b.logs.events)).not.toContain(first.token);
       expect(JSON.stringify(b.logs.events)).not.toContain(second.token);
-      await createKey(b.client, { name: "a" });
+      await createKey(b.client, { name: "claude-code" });
     } finally {
       await b.app.shutdown();
     }
@@ -202,9 +204,17 @@ describe("access key routes", () => {
     null,
     [],
     {},
-    ...["", "x".repeat(65), " leading", "trailing ", "two\nlines", 7].map(
-      (name) => ({ ...KEY_REQUEST, name }),
-    ),
+    ...[
+      "",
+      "x",
+      "x".repeat(81),
+      "Laptop",
+      "admin seed 2026-10-13T18:54",
+      " leading",
+      "trailing ",
+      "two\nlines",
+      7,
+    ].map((name) => ({ ...KEY_REQUEST, name })),
     ...["admin", null, 1].map((scope) => ({ ...KEY_REQUEST, scope })),
     ...[0, 31, 30.5, "30", null].map((days) => ({ ...KEY_REQUEST, days })),
     ...[[], ["id", "id"], [1], [null], "id", ["a/b"]].map((projectIds) => ({
@@ -228,6 +238,72 @@ describe("access key routes", () => {
       }
     });
   }
+
+  test("names a key by the agent name rule, with its words", async () => {
+    const b = await setup();
+    try {
+      for (const name of [
+        "Laptop",
+        "admin seed 2026-10-13T18:54",
+        "x",
+        "x".repeat(81),
+      ]) {
+        const res = await b.client.call("POST", "/api/profile/keys", {
+          body: { ...KEY_REQUEST, name },
+        });
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({
+          error:
+            "name must be 2 to 80 lowercase letters, digits, dashes and underscores",
+        });
+      }
+      expect(b.stored()).toEqual([]);
+      expect(
+        (await createKey(b.client, { name: "claude-code" })).key.name,
+      ).toBe("claude-code");
+    } finally {
+      await b.app.shutdown();
+    }
+  });
+
+  test("a key named before the rule lists, authenticates and revokes", async () => {
+    const b = await setup();
+    try {
+      const { key, token } = new AccessKeyStore(b.app.db).create(
+        b.user.id,
+        { ...KEY_REQUEST, name: "My Laptop key" },
+        b.app.now.value,
+      );
+      expect((await b.list()).keys.map((k) => k.name)).toEqual([
+        "My Laptop key",
+      ]);
+      const listed = await b.admin.call("GET", `/api/users/${b.user.id}/keys`);
+      expect((await listed.json()).keys[0].name).toBe("My Laptop key");
+      const ping = (bearer: string) =>
+        b.app.client().call("POST", "/mcp", {
+          raw: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tools/list",
+            params: { _meta: META },
+          }),
+          headers: {
+            authorization: `Bearer ${bearer}`,
+            "mcp-protocol-version": "2026-07-28",
+            "mcp-method": "tools/list",
+          },
+          origin: null,
+        });
+      expect((await ping(token)).status).toBe(200);
+      expect(
+        (await b.client.call("DELETE", `/api/profile/keys/${key.id}`)).status,
+      ).toBe(204);
+      expect((await ping(token)).status).toBe(401);
+      expect(b.stored()).toEqual([]);
+    } finally {
+      await b.app.shutdown();
+    }
+  });
 
   test("requires every create field and a visible project, with no partial key", async () => {
     const b = await setup();

@@ -4,6 +4,10 @@
 @layer tokens, base, owners;
 
 @layer owners {
+  /* the icon keeps its size when the search shares a head */
+  .search-icon {
+    flex-shrink: 0;
+  }
   .search {
     display: flex;
     align-items: center;

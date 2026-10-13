@@ -193,7 +193,9 @@ describe("GET /api/projects/:id", () => {
             role: "admin",
           },
         ],
-        labels: app.projects.labels(project.id),
+        labels: app.projects
+          .labels(project.id)
+          .map((label) => ({ ...label, tasks: 0 })),
       },
     });
     expect(app.projects.labels(project.id).map((label) => label.name)).toEqual([

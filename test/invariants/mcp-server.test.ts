@@ -257,6 +257,7 @@ describe("the composed inbound MCP endpoint", () => {
         "list",
         "show",
         "claim",
+        "unclaim",
         "report",
       ]);
       expect(writeKnowledge.inputSchema.properties.action.enum).toContain(

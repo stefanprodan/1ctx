@@ -290,7 +290,7 @@ describe("knowledge routes", () => {
         const words = (await result.json()).error;
         expect(words).toContain(
           name === file.name
-            ? "a file named docs/x.md exists"
+            ? "a file with this name exists"
             : "conflicts with file",
         );
       }

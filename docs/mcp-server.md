@@ -50,14 +50,29 @@ the inbound counterpart of the remote MCP clients in `docs/mcp.md`.
   newest first, optionally since an ISO 8601 time. Children carry their
   parent's id; take any row's session id, including a child's, to `read` its
   Markdown transcript. Page routes still do not open a child by its id.
-- `tasks` lists work handed to the agent, open by default or filtered by state.
-  On a write key, `held=true` keeps this key's claims and marks one answered
-  when a member answered after its last report. `show` reads the current brief, linked file
-  revisions and newest entries. A write key also gets `claim` and `report`;
-  report takes the task and claim ids, an agent entry kind, text and optional
-  HTTP(S) links. Claim and show say after how many idle hours a silent claim is
-  unclaimed. In a live session the agent asks its user directly; only an
-  unattended agent reports a question, ends its run and checks next run.
+- `tasks` lists work handed to the agent, `todo` by default or filtered by
+  `states` (`todo`, `in_progress`, `awaiting_input`, `done`, `canceled`; an
+  old word answers 400) and by `labels`, 1 to 3 names shaped as a save
+  shapes them, keeping tasks that carry any of them. The filter is
+  agreement, not a fence: a key still claims any task it reaches. On a write
+  key, `held=true` keeps this key's claims, ignoring labels, and marks one
+  answered when a member answered after its last report. `show` reads the
+  title, labels, linked files by name, id, revision and last change, and
+  newest entries;
+  the brief is in the files, read with `knowledge read`. A write key also
+  gets `claim`, `unclaim` and `report`. Report takes the task and claim ids,
+  `progress`, `question` or `result`, text and optional HTTP(S) links;
+  unclaim takes the task and claim ids and a text saying why, and a retry
+  answers the first. Claim and show say after how many idle hours a task in
+  progress is unclaimed. In a live session the agent asks its user
+  directly; only an unattended agent reports a question, ends its run and
+  checks next run.
+- A first `tasks list` page (no `after`, not `held`) that names a
+  `projectId` ends with one line before its footer, `Labels in <project>:
+  build (3 open), fix (1 open).`: every label of the project in name order
+  with its unfinished count, from `openLabelCounts()`, whatever states the
+  page lists. It counts toward the page's 32 KiB. A first page without a
+  `projectId` has none, and its footer says to pass one.
 
 The schemas are JSON Schema adapted by `fromJsonSchema()` with a
 permissive validator. The area's hand-written parsers decide accepted
@@ -86,11 +101,16 @@ answer holds only the file id, name and new revision.
 A task list passes only `reachableProjectIds()`, or one project resolved by the
 access port, to the task store. Show, claim and report resolve the task's
 project before reading or writing it; hidden and missing tasks both answer
-`not found`. Claim and report call `checkKey()` in the transaction and carry
-the key's user, id and copied name. Report kinds are `progress`, `question`,
-`result` and `unclaim`; text is at most 16 KiB and it accepts at most five
-HTTP(S) links of at most 2 KiB each. A claim's own entry, kind `claim`,
-shows in `show` like any other and no report writes one.
+`not found`. Claim, unclaim and report call `checkKey()` in the transaction
+and carry the key's user, id and copied name; a read key's are refused
+before parsing. A refusal is returned through that transaction's commit,
+never thrown through it: a report past the entry bounds ends
+its claim before refusing, and that end must commit. Report kinds are `progress`, `question` and `result`; text
+is at most 16 KiB and it accepts at most five HTTP(S) links of at most 2 KiB
+each. A claim's own entry, kind `claim`,
+shows in `show` like any other and no report writes one; so does a
+member's `edit`, with no text, so an agent reading again sees the brief
+moved.
 `skills/external-tasks/` teaches an outside agent this loop. The binary
 embeds that file and serves it at
 `/.well-known/skills/external-tasks/SKILL.md`, and Connect agents gives the
@@ -135,17 +155,18 @@ stored line that cannot fit with the required header, fence and footer is the
 sole exception: it is sent whole on its own page and the header says so. A live
 read past line 1 needs the revision, and its refusal says where to take it from.
 
-Task lists page by the store's opaque row cursor; show pages entries newest
-first by entry id. Brief text, each entry's text and its links use backtick
-fences longer than every backtick run in the rendered data. A zero-width space
-breaks stored runs longer than 63 backticks so fences and pages stay bounded.
-The rendered value is not byte-exact when this happens. When a maximum brief leaves no
-room for the first entry, the continuation names `before="newest"`: the newest
-entries without the brief. Any other `before` omits the brief too; a null or
-absent one is the first page with it, since strict clients send null for unset
-fields. The result footer is always
-last. Report answers are compact receipts; the caller already has the text and
-links it sent.
+Task lists page by the store's opaque row cursor, and a continuation repeats
+the filters; show pages entries newest first by entry id. Every show page
+carries the task's detail without the row's `last` preview, which the
+entries repeat: a title, three labels and five file names, bounded by
+their caps, so the largest entry still fits beside it (a worst-case test
+pins it). Each entry's text and its links use backtick fences longer
+than every backtick run in the rendered data.
+A zero-width space breaks stored runs longer than 63 backticks so fences and
+pages stay bounded. The rendered value is not byte-exact when this happens.
+No answer carries an entry's `html`: that is the page's alone. The result
+footer is always last. Report and unclaim answers are compact receipts; the
+caller already has the text and links it sent.
 
 A transcript continuation pins its message and UTF-16 `position`. Its one-part
 header names the title, id and text position; its footer carries the next

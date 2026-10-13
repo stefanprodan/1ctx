@@ -126,11 +126,21 @@ const CALLBACKS = {
     `<td class="md-td"${tableAlign(meta?.align)}>${content}</td>`,
 };
 
-// Parser failures keep the reply readable.
-export function renderMarkdown(md: string): string {
+const LINKED = { ...OPTIONS, autolinks: { url: true } } as const;
+
+// Parser failures keep the reply readable. autolinks links bare http(s)
+// URLs, for text people paste links into, such as a task's entries.
+export function renderMarkdown(
+  md: string,
+  options: { autolinks?: boolean } = {},
+): string {
   if (md === "") return "";
   try {
-    return Bun.markdown.render(md, CALLBACKS, OPTIONS);
+    return Bun.markdown.render(
+      md,
+      CALLBACKS,
+      options.autolinks ? LINKED : OPTIONS,
+    );
   } catch {
     return `<p class="md-p">${escapeHtml(md)}</p>`;
   }

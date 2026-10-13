@@ -15,13 +15,16 @@ import { fixture, refuses } from "./fixture.ts";
 
 describe("external task writes", () => {
   const agentStates = {
-    progress: { claimed: "claimed", blocked: "claimed" },
-    question: { claimed: "blocked" },
-    result: { claimed: "done", blocked: "done" },
-    unclaim: { claimed: "open", blocked: "open" },
+    progress: { in_progress: "in_progress", awaiting_input: "in_progress" },
+    question: {
+      in_progress: "awaiting_input",
+      awaiting_input: "awaiting_input",
+    },
+    result: { in_progress: "done", awaiting_input: "done" },
+    unclaim: { in_progress: "todo", awaiting_input: "todo" },
   };
   for (const state of EXTERNAL_TASK_STATES) {
-    for (const kind of AGENT_ENTRY_KINDS) {
+    for (const kind of [...AGENT_ENTRY_KINDS, "unclaim"] as const) {
       test(`agent ${kind} while ${state}`, () => {
         using f = fixture();
         const task = f.task(state);
@@ -30,14 +33,21 @@ describe("external task writes", () => {
           agentStates[kind] as Partial<Record<typeof state, ExternalTaskState>>
         )[state];
         const write = () =>
-          f.area.report(
-            f.key,
-            task.id,
-            task.claimId ?? "missing",
-            kind,
-            "Report.",
-            [],
-          );
+          kind === "unclaim"
+            ? f.area.agentUnclaim(
+                f.key,
+                task.id,
+                task.claimId ?? "missing",
+                "Report.",
+              )
+            : f.area.report(
+                f.key,
+                task.id,
+                task.claimId ?? "missing",
+                kind,
+                "Report.",
+                [],
+              );
         if (state === "done" && kind === "result") {
           expect(write().task).toEqual(f.area.store.byId(task.id)!);
           expect(f.area.store.byId(task.id)!.entries).toBe(task.entries);
@@ -48,8 +58,9 @@ describe("external task writes", () => {
           expect(result.task.state).toBe(expected);
           expect(result.task.revision).toBe(task.revision + 1);
           expect(result.task.editRevision).toBe(task.editRevision);
+          // a question asked again restarts the wait
           expect(result.task.movedAt).toBe(
-            expected === state ? task.movedAt : f.now(),
+            expected === state && kind !== "question" ? task.movedAt : f.now(),
           );
           expect(result.entry).toMatchObject({
             by: { id: f.owner.id, username: "owner" },
@@ -61,10 +72,14 @@ describe("external task writes", () => {
     }
   }
   const memberStates = {
-    answer: { claimed: "claimed", blocked: "claimed" },
-    unclaim: { claimed: "open", blocked: "open" },
-    cancel: { open: "cancelled", claimed: "cancelled", blocked: "cancelled" },
-    reopen: { done: "open", cancelled: "open" },
+    answer: { in_progress: "in_progress", awaiting_input: "in_progress" },
+    unclaim: { in_progress: "todo", awaiting_input: "todo" },
+    cancel: {
+      todo: "canceled",
+      in_progress: "canceled",
+      awaiting_input: "canceled",
+    },
+    reopen: { done: "todo", canceled: "todo" },
   };
   for (const state of EXTERNAL_TASK_STATES) {
     for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
@@ -104,7 +119,7 @@ describe("external task writes", () => {
   }
 
   test.serial(
-    "a claim writes its own entry in its transaction, outside the bound, and ends the mark",
+    "a claim writes its own entry in its transaction, counted in the bound",
     () => {
       using f = fixture();
       const events: BusEvent[] = [];
@@ -112,10 +127,10 @@ describe("external task writes", () => {
         if (event.type === "externalTask.changed") events.push(event);
       }, silent);
       try {
-        const task = f.task("claimed");
-        f.area.report(f.key, task.id, task.claimId!, "unclaim", "Later.", []);
+        const task = f.task("in_progress");
+        f.area.agentUnclaim(f.key, task.id, task.claimId!, "Later.");
         const marked = f.area.store.byId(task.id)!;
-        expect(marked.attentionAt).not.toBeNull();
+        expect(marked.state).toBe("todo");
         expect(() =>
           transact(f.db, () => {
             f.area.claim(f.key, task.id);
@@ -136,16 +151,17 @@ describe("external task writes", () => {
           keyName: "laptop",
           claimId: held.claimId,
           claimEnd: null,
+          chatId: null,
+          chatTitle: null,
           at: f.now(),
         });
         expect(held.task.task).toMatchObject({
+          state: "in_progress",
           entries: marked.entries + 1,
           last: marked.last,
-          // the agent resumed, so the unclaim's mark is done
-          attentionAt: null,
           revision: marked.revision + 1,
         });
-        expect(f.area.store.counted(task.id)).toBe(marked.entries - 1);
+        expect(f.area.store.counted(task.id)).toBe(marked.entries + 1);
         expect(events).toEqual([
           {
             type: "externalTask.changed",
@@ -184,18 +200,18 @@ describe("external task writes", () => {
       409,
       STALE_TASK,
     );
-    expect(f.area.store.claimsCount(task.id)).toBe(1);
+    expect(f.area.store.claimsSinceReopen(task.id)).toBe(1);
     expect(f.area.store.byId(task.id)!.claim?.userId).toBe(f.owner.id);
   });
 
   test("stale member states and unclaim claim ids write nothing", () => {
     using f = fixture();
-    const task = f.task("claimed");
+    const task = f.task("in_progress");
     for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
       refuses(
         () =>
           f.area[kind](f.owner.id, task.id, {
-            state: "open",
+            state: "todo",
             text: "Outdated.",
             claimId: task.claimId!,
           }),
@@ -204,7 +220,7 @@ describe("external task writes", () => {
       );
     }
     f.area.unclaim(f.member.id, task.id, {
-      state: "claimed",
+      state: "in_progress",
       claimId: task.claimId!,
       text: "Start again.",
     });
@@ -213,7 +229,7 @@ describe("external task writes", () => {
     refuses(
       () =>
         f.area.unclaim(f.owner.id, task.id, {
-          state: "claimed",
+          state: "in_progress",
           claimId: task.claimId!,
           text: "Late unclaim.",
         }),
@@ -242,34 +258,55 @@ describe("external task writes", () => {
       using f = fixture();
       const task = f.task(state);
       const run = () =>
-        f.area.edit(task.id, {
+        f.area.edit(f.owner.id, task.id, {
           editRevision: task.editRevision,
-          text: "New brief.",
+          title: "New title",
         });
-      if (state === "done" || state === "cancelled") {
+      if (state === "done" || state === "canceled") {
         refuses(run, 409, `this task is ${state}`);
         return;
       }
       f.advance();
+      const counted = f.area.store.counted(task.id);
       const updated = run();
-      expect(updated.task).toMatchObject({
-        text: "New brief.",
-        briefAt: f.now(),
-      });
+      expect(updated.task).toMatchObject({ briefAt: f.now() });
+      expect(updated.task.task.title).toBe("New title");
+      // the edit is an entry, but no move: the row's last stays
       expect(updated.task.task).toMatchObject({
         revision: task.revision + 1,
         editRevision: task.editRevision + 1,
         claim: task.claim,
-        entries: task.entries,
+        entries: task.entries + 1,
+        last: task.last,
         movedAt: task.movedAt,
       });
+      expect(updated.entries[0]).toEqual({
+        id: expect.any(String),
+        kind: "edit",
+        text: "",
+        links: [],
+        by: { id: f.owner.id, username: "owner" },
+        keyName: null,
+        claimId: null,
+        claimEnd: null,
+        chatId: null,
+        chatTitle: null,
+        at: f.now(),
+      });
+      expect(f.area.store.counted(task.id)).toBe(counted);
       refuses(run, 409, STALE_TASK);
+      // an edit that changes nothing writes nothing
+      const same = f.area.edit(f.owner.id, task.id, {
+        editRevision: task.editRevision + 1,
+        title: "New title",
+      });
+      expect(same.entries).toEqual(updated.entries);
     });
   }
 
-  test("reports, answers and seen move only revision, so a held brief edit still saves", () => {
+  test("reports and answers move only revision, so a held brief edit still saves", () => {
     using f = fixture();
-    const task = f.task("claimed");
+    const task = f.task("in_progress");
     f.area.report(
       f.key,
       task.id,
@@ -278,9 +315,9 @@ describe("external task writes", () => {
       "Need a choice.",
       [],
     );
-    const marked = f.area.show(task.id, null)!;
-    expect(marked.task.task.attentionAt).toBe(f.now());
-    expect(f.area.show(task.id, null)).toEqual(marked);
+    const asked = f.area.show(task.id, null)!;
+    expect(asked.task.task.state).toBe("awaiting_input");
+    expect(f.area.show(task.id, null)).toEqual(asked);
     const continued = f.area.report(
       f.key,
       task.id,
@@ -289,56 +326,61 @@ describe("external task writes", () => {
       "Found a way.",
       [],
     );
-    // moving past its own question takes the question's mark away
-    expect(continued.task.state).toBe("claimed");
-    expect(continued.task.attentionAt).toBeNull();
+    expect(continued.task.state).toBe("in_progress");
     const answered = f.area.answer(f.owner.id, task.id, {
-      state: "claimed",
+      state: "in_progress",
       text: "Agreed.",
     });
-    expect(answered.task.task.state).toBe("claimed");
+    expect(answered.task.task.state).toBe("in_progress");
     expect(answered.task.task.revision).toBe(continued.task.revision + 1);
-    const body = { attentionAt: marked.task.task.attentionAt! };
-    const seen = f.area.seen(task.id, body);
-    expect(answered.task.task.attentionAt).toBeNull();
-    expect(seen.task.task.revision).toBe(answered.task.task.revision);
-    expect(seen.task.task.attentionAt).toBeNull();
-    expect(f.area.seen(task.id, body)).toEqual(seen);
-    expect(seen.task.task.editRevision).toBe(task.editRevision);
-    const edited = f.area.edit(task.id, {
+    expect(answered.task.task.editRevision).toBe(task.editRevision);
+    const edited = f.area.edit(f.owner.id, task.id, {
       editRevision: task.editRevision,
       title: "Updated",
     });
 
     expect(edited.task.task.editRevision).toBe(task.editRevision + 1);
     expect(
-      f.area.edit(task.id, { editRevision: edited.task.task.editRevision }),
+      f.area.edit(f.owner.id, task.id, {
+        editRevision: edited.task.task.editRevision,
+      }),
     ).toEqual(edited);
   });
 
-  test("seen leaves a newer attention mark and its revision unchanged", () => {
+  test("a question while one waits keeps the task awaiting input from the new question", () => {
     using f = fixture();
-    const task = f.task("blocked");
-    f.advance();
-    f.area.report(f.key, task.id, task.claimId!, "result", "Finished.", []);
-    const before = f.area.show(task.id, null)!;
-    expect(f.area.seen(task.id, { attentionAt: task.attentionAt! })).toEqual(
-      before,
+    const task = f.task("awaiting_input");
+    f.advance(1000);
+    const again = f.area.report(
+      f.key,
+      task.id,
+      task.claimId!,
+      "question",
+      "And which name?",
+      [],
     );
-    expect(f.area.show(task.id, null)).toEqual(before);
+    expect(again.task).toMatchObject({
+      state: "awaiting_input",
+      movedAt: f.now(),
+      revision: task.revision + 1,
+    });
+    expect(again.task.claim?.id).toBe(task.claimId!);
   });
 
   test("create and edit store trimmed titles and a whitespace-only edit is a no-op", () => {
     using f = fixture();
     const task = f.create("  Do the work \t");
     expect(task.title).toBe("Do the work");
-    const edited = f.area.edit(task.id, {
+    const edited = f.area.edit(f.owner.id, task.id, {
       editRevision: 0,
       title: "  New title  ",
     });
     expect(edited.task.task.title).toBe("New title");
     expect(
-      f.area.edit(task.id, { editRevision: 1, title: " New title " }),
+      f.area.edit(f.owner.id, task.id, {
+        editRevision: 1,
+        title: " New title ",
+      }),
     ).toEqual(edited);
     expect(
       f.db
@@ -349,20 +391,19 @@ describe("external task writes", () => {
     ).toBe("New title");
   });
 
-  for (const kind of ["answer", "unclaim", "cancel", "reopen"] as const) {
-    test(`member ${kind} clears attention`, () => {
+  for (const kind of ["answer", "unclaim", "cancel"] as const) {
+    test(`member ${kind} takes a task off Home`, () => {
       using f = fixture();
-      const task = f.task(kind === "reopen" ? "done" : "blocked");
-      expect(task.attentionAt).not.toBeNull();
+      const task = f.task("awaiting_input");
+      expect(f.area.waiting([f.projectId]).count).toBe(1);
       f.advance();
       const result = f.area[kind](f.member.id, task.id, {
         state: task.state,
         claimId: task.claimId!,
         text: "Member acted.",
       });
-      expect(result.task.task.attentionAt).toBeNull();
       expect(result.task.task.revision).toBe(task.revision + 1);
-      expect(f.area.attention([f.projectId])).toEqual({ tasks: [], count: 0 });
+      expect(f.area.waiting([f.projectId])).toEqual({ tasks: [], count: 0 });
     });
   }
 
@@ -399,7 +440,7 @@ describe("external task writes", () => {
         ).toThrow("rollback");
         expect(events).toEqual([]);
         expect(f.area.store.byId(task.id)).toEqual(task);
-        expect(f.area.store.claimsCount(task.id)).toBe(0);
+        expect(f.area.store.claimsSinceReopen(task.id)).toBe(0);
         const held = f.area.claim(f.key, task.id);
         f.area.report(
           f.key,
@@ -410,7 +451,7 @@ describe("external task writes", () => {
           [],
         );
         f.area.answer(f.owner.id, task.id, {
-          state: "claimed",
+          state: "in_progress",
           text: "A hint.",
         });
         expect(events.map((event) => event.type)).toEqual(
@@ -428,35 +469,45 @@ describe("external task writes", () => {
   );
 });
 
-test("an agent moving past its question unmarks the task, a result keeps the mark", () => {
+test("Home lists only tasks awaiting input, oldest question first; progress and a result take them off", () => {
   using f = fixture();
-  const moved = f.task("blocked");
+  const first = f.task("awaiting_input");
   f.advance(1000);
-  const finished = f.task("blocked");
-  expect(f.area.attention([f.projectId]).tasks.map((r) => r.id)).toEqual([
-    finished.id,
-    moved.id,
+  const second = f.task("awaiting_input");
+  f.advance(1000);
+  f.task("in_progress");
+  f.task("todo");
+  f.task("done");
+  f.task("canceled");
+  expect(f.area.waiting([f.projectId])).toMatchObject({
+    tasks: [{ id: first.id }, { id: second.id }],
+    count: 2,
+  });
+  expect(f.area.waiting([f.otherProjectId])).toEqual({ tasks: [], count: 0 });
+  // a question asked again goes to the back of the line
+  f.advance(1000);
+  f.area.report(f.key, first.id, first.claimId!, "question", "Still?", []);
+  expect(f.area.waiting([f.projectId]).tasks.map((r) => r.id)).toEqual([
+    second.id,
+    first.id,
   ]);
-  f.advance(1000);
   const progress = f.area.report(
     f.key,
-    moved.id,
-    moved.claimId!,
+    first.id,
+    first.claimId!,
     "progress",
     "Found a way.",
     [],
   );
-  expect(progress.task).toMatchObject({ state: "claimed", attentionAt: null });
+  expect(progress.task.state).toBe("in_progress");
   const result = f.area.report(
     f.key,
-    finished.id,
-    finished.claimId!,
+    second.id,
+    second.claimId!,
     "result",
     "Done without an answer.",
     [],
   );
-  expect(result.task).toMatchObject({ state: "done", attentionAt: f.now() });
-  expect(f.area.attention([f.projectId]).tasks.map((r) => r.id)).toEqual([
-    finished.id,
-  ]);
+  expect(result.task.state).toBe("done");
+  expect(f.area.waiting([f.projectId])).toEqual({ tasks: [], count: 0 });
 });

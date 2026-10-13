@@ -78,7 +78,7 @@ describe("knowledge rename", () => {
       s.knowledge.create(s.projectId, s.author, "dir/c.md", "three");
       expect(() =>
         s.knowledge.rename(s.projectId, s.author, file.id, "b.md", 1),
-      ).toThrow(new Conflict("a file named b.md exists"));
+      ).toThrow(new Conflict("a file with this name exists"));
       expect(() =>
         s.knowledge.rename(s.projectId, s.author, file.id, "dir", 1),
       ).toThrow(new Conflict("dir/c.md conflicts with file dir"));

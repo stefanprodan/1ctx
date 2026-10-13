@@ -25,16 +25,20 @@ import type {
   KnowledgeListResponse,
   KnowledgeSearchResponse,
 } from "../../../src/shared/api/knowledge.ts";
-import type {
-  ExternalTaskDetail,
-  ExternalTaskEntry,
-  ExternalTaskRow,
+import {
+  type ExternalTaskDetail,
+  type ExternalTaskEntry,
+  type ExternalTaskRow,
+  MAX_TASK_FILES,
+  MAX_TASK_LABELS,
 } from "../../../src/shared/contracts/external-task.ts";
 import type {
   KnowledgeFileView,
   KnowledgeVersion,
 } from "../../../src/shared/contracts/knowledge.ts";
+import { MAX_LABEL_NAME } from "../../../src/shared/contracts/label.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
+import { MAX_KNOWLEDGE_NAME, MAX_TITLE } from "../../../src/shared/words.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 export const project = {
@@ -92,14 +96,14 @@ export const externalTaskRow = (
   id: "task00000001",
   projectId: project.id,
   title: "Review the proposal",
-  scope: "MCP tool",
-  state: "open",
+  labels: ["build"],
+  state: "todo",
   revision: 1,
   editRevision: 1,
   claim: null,
   last: null,
   entries: 0,
-  attentionAt: null,
+  claimLimit: false,
   createdBy: { id: "user00000001", username: "casey" },
   createdAt: 100,
   movedAt: 200,
@@ -117,6 +121,8 @@ export const externalTaskEntry = (
   keyName: "laptop",
   claimId: "claim0000001",
   claimEnd: null,
+  chatId: null,
+  chatTitle: null,
   at: 300,
   ...overrides,
 });
@@ -125,18 +131,50 @@ export const externalTaskDetail = (
   row: ExternalTaskRow = externalTaskRow(),
 ): ExternalTaskDetail => ({
   task: row,
-  text: "Read the proposal and report the findings.",
   files: [
     {
       fileId: "file00000001",
       name: "notes/readme.md",
       revision: 7,
+      changedAt: 250,
       deleted: false,
     },
   ],
   briefAt: 100,
   chatId: null,
   chatTitle: null,
+});
+
+// the largest detail a task can carry, so a page leaves its entries
+// the least room
+export const largestDetail = (): ExternalTaskDetail => ({
+  ...externalTaskDetail(
+    externalTaskRow({
+      title: "\u{1F600}".repeat(MAX_TITLE),
+      labels: Array.from({ length: MAX_TASK_LABELS }, (_, index) =>
+        `${index}`.padEnd(MAX_LABEL_NAME, "x"),
+      ),
+      state: "in_progress",
+      claim: {
+        id: "claim0000001",
+        keyId: "key000000001",
+        userId: "user00000001",
+        username: "casey",
+        keyName: "laptop",
+        startedAt: 300,
+        activeAt: 300,
+      },
+    }),
+  ),
+  files: Array.from({ length: MAX_TASK_FILES }, (_, index) => ({
+    fileId: `file${String(index).padStart(8, "0")}`,
+    name: `${index}`.padEnd(MAX_KNOWLEDGE_NAME, "n"),
+    revision: 1_000_000,
+    // the widest time an ISO string takes
+    changedAt: Date.UTC(275_000, 0),
+    deleted: false,
+  })),
+  chatId: "session00001",
 });
 
 export const externalTaskShow = (
@@ -194,6 +232,14 @@ type TaskCall =
   | { action: "list"; input: Parameters<TasksPort["list"]>[0] }
   | { action: "show"; taskId: string; before: string | null }
   | { action: "claim"; key: TaskKey; taskId: string }
+  | { action: "openLabelCounts"; projectId: string }
+  | {
+      action: "unclaim";
+      key: TaskKey;
+      taskId: string;
+      claimId: string;
+      text: string;
+    }
   | {
       action: "report";
       key: TaskKey;
@@ -234,6 +280,7 @@ type State = {
     next: string | null;
   };
   taskShow: TaskShow | null;
+  taskLabels: { name: string; open: number }[];
   taskClaimId: string;
   taskReport: { entry: ExternalTaskEntry; task: ExternalTaskRow };
   taskCalls: TaskCall[];
@@ -261,6 +308,11 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
     taskProjects: { task00000001: project.id },
     taskList: { rows: [{ ...externalTaskRow(), answered: false }], next: null },
     taskShow: externalTaskShow(),
+    taskLabels: [
+      { name: "build", open: 3 },
+      { name: "fix", open: 1 },
+      { name: "plan", open: 0 },
+    ],
     taskClaimId: "claim0000001",
     taskReport: {
       entry: externalTaskEntry({ kind: "result", claimEnd: "done" }),
@@ -316,9 +368,23 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
           next: state.taskList.next,
         };
       },
+      openLabelCounts: (projectId) => {
+        state.taskCalls.push({ action: "openLabelCounts", projectId });
+        return state.taskLabels;
+      },
       show: (taskId, before) => {
         state.taskCalls.push({ action: "show", taskId, before });
         return state.taskShow;
+      },
+      agentUnclaim: (taskKey, taskId, claimId, text) => {
+        state.taskCalls.push({
+          action: "unclaim",
+          key: taskKey,
+          taskId,
+          claimId,
+          text,
+        });
+        return state.taskReport;
       },
       claim: (taskKey, taskId) => {
         state.taskCalls.push({ action: "claim", key: taskKey, taskId });

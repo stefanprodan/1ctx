@@ -51,7 +51,7 @@ export function Search(
   };
   return (
     <label class="search">
-      <Icon name="search" size={14} />
+      <Icon name="search" size={14} class="search-icon" />
       <input
         class="search-input"
         type="search"

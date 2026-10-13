@@ -79,6 +79,8 @@ const EXPECTED_IDS = [
   "0065-external-task-scope-unclaim",
   "0066-external-task-cancelled",
   "0067-project-labels",
+  "0068-external-tasks-restart",
+  "0069-external-task-labels",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2359,7 +2361,9 @@ describe("the schema", () => {
         expect.objectContaining({ name: "external_tasks_closed" }),
         expect.objectContaining({ name: "external_tasks_expired" }),
       ]);
-      expect(migrate(db)).toEqual(expectedFrom("0066-external-task-cancelled"));
+      expect(migrate(db, MIGRATIONS.slice(0, 66))).toEqual([
+        "0066-external-task-cancelled",
+      ]);
       const [tasks, claims, entries] = tables.map(rows);
       expect(tasks).toEqual(
         before[0]!.map((row) => ({
@@ -2496,7 +2500,7 @@ describe("the schema", () => {
       expect(db.query("select task_id from external_task_files").all()).toEqual(
         [],
       );
-      expect(migrate(db)).toEqual([]);
+      expect(migrate(db, MIGRATIONS.slice(0, 66))).toEqual([]);
     } finally {
       db.close();
     }
@@ -2567,6 +2571,135 @@ describe("the schema", () => {
           )
           .get()!.n,
       ).toBe(0);
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0068 and 0069 start external tasks over with labels and five states, leaving knowledge files", () => {
+    const db = seed(MIGRATIONS.slice(0, 67));
+    const tables = [
+      "external_tasks",
+      "external_task_files",
+      "external_task_claims",
+      "external_task_entries",
+    ];
+    const count = (table: string) =>
+      db.query<{ n: number }, []>(`select count(*) as n from ${table}`).get()!
+        .n;
+    const columns = (table: string) =>
+      db
+        .query<{ name: string }, []>(
+          `select name from pragma_table_info('${table}')`,
+        )
+        .all()
+        .map((row) => row.name);
+    const tableSql = (table: string) =>
+      db
+        .query<{ sql: string }, [string]>(
+          "select sql from sqlite_schema where type = 'table' and name = ?",
+        )
+        .get(table)!
+        .sql.replace(/\s+/g, " ");
+    try {
+      db.exec(`
+        insert into project_labels (id, project_id, name, created_at)
+          values ('l1', 'p', 'build', 0);
+        insert into knowledge_files (id, project_id, name, kind, text, bytes,
+            lines, digest, tokens, revision, author_kind, author_id,
+            author_name, origin, created_at, updated_at)
+          values ('f1', 'p', 'brief.md', 'md', 'Brief', 5, 1, 'd1', 1, 1,
+            'user', 'u', 'user', 'page', 0, 0);
+        insert into external_tasks (id, project_id, title, text, scope, state,
+            created_by, created_at, brief_at, moved_at, attention_at)
+          values ('t1', 'p', 'Held', 'Brief', 'part A', 'open', 'u', 0, 0, 0,
+            5), ('t2', 'p', 'Gone', 'Brief', null, 'cancelled', 'u', 0, 0, 9,
+            null);
+        insert into external_task_files (task_id, file_id, position)
+          values ('t1', 'f1', 0), ('t2', 'f1', 0);
+        insert into external_task_claims (id, task_id, user_id, key_id,
+            key_name, started_at, active_at)
+          values ('c1', 't1', 'u', 'k1', 'laptop', 1, 1);
+        update external_tasks set state = 'blocked', claim_id = 'c1'
+          where id = 't1';
+        insert into external_task_entries (id, task_id, claim_id, kind, text,
+            links, user_id, key_name, claim_end, at)
+          values ('e1', 't1', 'c1', 'claim', '', '[]', 'u', 'laptop', null, 1),
+          ('e2', 't1', 'c1', 'question', 'Which?', '[]', 'u', 'laptop', null,
+            2), ('e3', 't2', null, 'cancel', '', '[]', 'u', null, null, 9);
+      `);
+      const files = db.query("select * from knowledge_files").all();
+      expect(migrate(db)).toEqual(expectedFrom("0068-external-tasks-restart"));
+      for (const table of [...tables, "external_task_labels"]) {
+        expect(count(table)).toBe(0);
+      }
+      expect(db.query("select * from knowledge_files").all()).toEqual(files);
+      for (const gone of ["scope", "text", "attention_at"]) {
+        expect(columns("external_tasks")).not.toContain(gone);
+      }
+      expect(tableSql("external_tasks")).toContain(
+        "check (state in ('todo', 'in_progress', 'awaiting_input', 'done', 'canceled'))",
+      );
+      expect(tableSql("external_task_claims")).toContain(
+        "check (end_reason in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle', 'limit'))",
+      );
+      expect(tableSql("external_task_entries")).toContain(
+        "check (claim_end in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle', 'limit'))",
+      );
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      const labelId = db
+        .query<{ id: string }, []>(
+          "select id from project_labels where project_id = 'p' and name = 'build'",
+        )
+        .get()!.id;
+      db.exec(`
+        insert into external_tasks (id, project_id, title, state, created_by,
+            created_at, brief_at, moved_at)
+          values ('t3', 'p', 'New', 'canceled', 'u', 0, 0, 0);
+        insert into external_task_files (task_id, file_id, position)
+          values ('t3', 'f1', 0);
+        insert into external_task_labels (task_id, label_id, position)
+          values ('t3', '${labelId}', 0);
+        insert into external_task_claims (id, task_id, user_id, key_id,
+            key_name, started_at, active_at, ended_at, end_reason)
+          values ('c3', 't3', 'u', 'k1', 'laptop', 1, 1, 2, 'canceled');
+        insert into external_task_entries (id, task_id, claim_id, kind, text,
+            links, user_id, key_name, claim_end, at)
+          values ('e4', 't3', 'c3', 'cancel', '', '[]', 'u', null, 'canceled',
+            2);
+        insert into external_task_entries (id, task_id, claim_id, kind, text,
+            links, user_id, key_name, claim_end, chat_id, at)
+          values ('e5', 't3', null, 'edit', '', '[]', 'u', null, null,
+            'gone-chat', 3);
+        update external_task_claims set end_reason = 'limit' where id = 'c3';
+      `);
+      expect(
+        db
+          .query<{ name: string }, []>(
+            "select name from sqlite_schema where name = 'external_task_entries_agent'",
+          )
+          .get(),
+      ).not.toBeNull();
+      for (const sql of [
+        "update external_tasks set state = 'cancelled' where id = 't3'",
+        "update external_tasks set state = 'open' where id = 't3'",
+        "update external_tasks set state = 'in_progress' where id = 't3'",
+        "update external_task_claims set end_reason = 'cancelled' where id = 'c3'",
+        "update external_task_entries set claim_end = 'cancelled' where id = 'e4'",
+      ]) {
+        expect(() => db.exec(sql)).toThrow(/CHECK/);
+      }
+      expect(() =>
+        db.exec(
+          "insert into external_task_labels (task_id, label_id, position) values ('t3', 'no-label', 1)",
+        ),
+      ).toThrow(/FOREIGN KEY/);
+      // a label goes off its tasks, a task takes its links with it
+      db.query("delete from project_labels where id = ?").run(labelId);
+      expect(count("external_task_labels")).toBe(0);
+      db.exec("delete from external_tasks where id = 't3'");
+      for (const table of tables) expect(count(table)).toBe(0);
       expect(migrate(db)).toEqual([]);
     } finally {
       db.close();

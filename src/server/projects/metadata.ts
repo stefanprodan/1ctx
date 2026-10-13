@@ -10,6 +10,7 @@ import { MAX_LABELS_PER_PROJECT } from "../../shared/contracts/label.ts";
 import type { ProjectDetail } from "../../shared/contracts/project.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
+import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
@@ -33,18 +34,26 @@ export type MetadataDeps = {
   detail(project: ProjectRow): ProjectDetail;
 };
 
+// a label rename or delete changes what the project's tasks show
+const labelsChanged = (projectId: string): BusEvent => ({
+  type: "project.labels",
+  data: { projectId },
+});
+
 export function metadataRoutes(deps: MetadataDeps): RouteDescriptor[] {
   // visibility is read again inside each write, so a member removed
-  // meanwhile writes nothing
+  // meanwhile writes nothing; events publish after the commit
   const write = (
     principal: Principal,
     id: string,
-    change: (project: ProjectRow) => ProjectRow,
+    change: (project: ProjectRow, events: BusEvent[]) => ProjectRow,
     status = 200,
   ): Response => {
     const project = transact(deps.db, () => {
       const current = deps.access.project(principal, id);
-      return { result: deps.detail(change(current)) };
+      const events: BusEvent[] = [];
+      const result = deps.detail(change(current, events));
+      return { result, events };
     });
     const body: ProjectResponse = { project };
     return json(body, status);
@@ -118,7 +127,7 @@ export function metadataRoutes(deps: MetadataDeps): RouteDescriptor[] {
         const principal = ctx.principal!;
         deps.access.project(principal, ctx.params.id);
         const change = parseUpdateLabel(await jsonBody(req));
-        return write(principal, ctx.params.id, (project) => {
+        return write(principal, ctx.params.id, (project, events) => {
           const before = findLabel(project.id, ctx.params.labelId);
           const name = change.name ?? before.name;
           nameFree(project.id, name, before.id);
@@ -128,23 +137,25 @@ export function metadataRoutes(deps: MetadataDeps): RouteDescriptor[] {
               description: change.description ?? before.description,
             }),
           );
+          if (name !== before.name) events.push(labelsChanged(project.id));
           return project;
         });
       },
     },
     {
-      // a project always offers one label to pick. Once items link
-      // labels, their links go in this transaction too
+      // a project always offers one label to pick. The label comes off
+      // its tasks by the cascade, in this transaction
       method: "DELETE",
       path: "/api/projects/:id/labels/:labelId",
       policy: "authenticated",
       handle(_req, ctx) {
-        return write(ctx.principal!, ctx.params.id, (project) => {
+        return write(ctx.principal!, ctx.params.id, (project, events) => {
           const label = findLabel(project.id, ctx.params.labelId);
           if (deps.store.labelCount(project.id) <= 1) {
             throw new Conflict("a project keeps at least one label");
           }
           deps.store.removeLabel(project.id, label.id);
+          events.push(labelsChanged(project.id));
           return project;
         });
       },

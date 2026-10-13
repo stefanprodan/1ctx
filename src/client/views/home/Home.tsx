@@ -25,8 +25,8 @@ import { Page } from "../../ui/Page.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { Feed, startChat } from "./Feed.tsx";
 import { composeProjectOf, dateLine, greeting } from "./Home.model.ts";
-import { MarkedTasks } from "./MarkedTasks.tsx";
 import { NotSent } from "./NotSent.tsx";
+import { WaitingTasks } from "./WaitingTasks.tsx";
 import { WeekAside } from "./WeekAside.tsx";
 
 export function Home() {
@@ -68,7 +68,7 @@ export function Home() {
           />
         )}
         <NotSent now={now} />
-        <MarkedTasks now={now} />
+        <WaitingTasks now={now} />
         {/* the feed waits for the list that places the composer above it
             and names each row's project, or it draws twice and jumps */}
         {(projects.value !== null || projectsError.value !== null) && (

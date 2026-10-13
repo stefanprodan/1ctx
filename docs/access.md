@@ -75,9 +75,10 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   create response shows the token once; lists and logs never do.
   The secrets rules below govern files, not these login-like credentials.
 - **Only the owner mints a key.** `GET/POST /api/profile/keys` list and
-  create; `DELETE /api/profile/keys/:id` revokes. A name is 1..64
-  characters on one line with no edge spaces, unique per user (409
-  when taken). Scope is `read` or `write`, lifetime 30, 90 or 365 days.
+  create; `DELETE /api/profile/keys/:id` revokes. A name follows the
+  agent name rule (`isName`, 2 to 80 lowercase letters, digits, dashes
+  and underscores), unique per user (409 when taken). Scope is `read`
+  or `write`, lifetime 30, 90 or 365 days.
   `projectIds` is null for all visible projects, or a non-empty distinct
   list the owner sees now. Admins list and revoke through
   `GET /api/users/:id/keys` and `DELETE /api/users/:id/keys/:keyId`,
@@ -232,8 +233,10 @@ from `emailOn` in `GET /api/me`.
   project; a duplicate name, the 21st and the last label's delete are
   a 409. Every new project, team or personal, gets `DEFAULT_LABELS` in
   the transaction that makes it, unless an admin's create names its
-  own `labels`. Once items link labels, a delete removes the links in
-  its transaction.
+  own `labels`. A delete takes the label off its external tasks by the
+  cascade, in its transaction; the detail counts each label's tasks
+  (`tasks`), and a rename or delete publishes `project.labels`
+  (`docs/external-tasks.md`).
 - **Deleting a team project is refused while a chat runs.** It takes
   the chats and keeps their usage.
 - **Repositories follow the same split** (`docs/repos.md`). Anyone who

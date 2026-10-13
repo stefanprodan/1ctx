@@ -37,7 +37,14 @@ export function fixture() {
   const otherProjectId = projects.personal(member.id)!.id;
   const key = { userId: owner.id, keyId: "key", keyName: "laptop" };
   const otherKey = { userId: member.id, keyId: "other-key", keyName: "other" };
-  const files = new Map<string, { name: string; revision: number }>();
+  // every task links the brief file of its project unless told otherwise
+  const files = new Map<
+    string,
+    { name: string; revision: number; updatedAt?: number }
+  >([
+    [`${projectId}/brief`, { name: "brief.md", revision: 1 }],
+    [`${otherProjectId}/brief`, { name: "brief.md", revision: 1 }],
+  ]);
   const deleted = new Map<string, string>();
   let now = DAY;
   const limits = { idle: 24, days: 365 };
@@ -54,7 +61,11 @@ export function fixture() {
     chatOpens: () => true,
     homeProjectIds: () => [projectId],
     knowledge: {
-      file: (projectId, fileId) => files.get(`${projectId}/${fileId}`) ?? null,
+      // a file set with no write time last changed at the start
+      file: (projectId, fileId) => {
+        const file = files.get(`${projectId}/${fileId}`);
+        return file === undefined ? null : { updatedAt: 0, ...file };
+      },
       deletedName: (projectId, fileId) =>
         deleted.get(`${projectId}/${fileId}`) ?? null,
     },
@@ -63,34 +74,38 @@ export function fixture() {
   const create = (title = "Do the work", project = projectId) =>
     area.create(owner.id, project, {
       title,
-      text: "Read the brief.",
-      fileIds: [],
+      labels: ["build"],
+      fileIds: ["brief"],
     }).task.task;
-  const task = (state: ExternalTaskState = "open") => {
+  const task = (state: ExternalTaskState = "todo") => {
     const row = create();
     let claimId: string | null = null;
-    if (state === "claimed" || state === "blocked" || state === "done") {
+    if (
+      state === "in_progress" ||
+      state === "awaiting_input" ||
+      state === "done"
+    ) {
       claimId = area.claim(key, row.id).claimId;
     }
-    if (state === "blocked")
+    if (state === "awaiting_input")
       area.report(key, row.id, claimId!, "question", "Which path?", []);
     if (state === "done")
       area.report(key, row.id, claimId!, "result", "Finished.", []);
-    if (state === "cancelled") area.cancel(owner.id, row.id, { state: "open" });
+    if (state === "canceled") area.cancel(owner.id, row.id, { state: "todo" });
     return { ...area.store.byId(row.id)!, claimId };
   };
-  // fills to count entries of the 250 bound, which claims do not join
+  // fills to count agent entries, the ones the 250 bound counts
   const fillEntries = (id: string, count: number) =>
     transact(db, () => {
       const have = area.store.counted(id);
       for (let i = have; i < count; i++) {
         area.store.append(id, {
           claimId: null,
-          kind: "answer",
+          kind: "progress",
           text: `entry ${i}`,
           links: [],
           userId: owner.id,
-          keyName: null,
+          keyName: key.keyName,
           claimEnd: null,
           at: now,
         });

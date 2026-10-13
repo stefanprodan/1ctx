@@ -2,20 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
+import { MAX_MOVE_BODY } from "../../../src/server/external-tasks/parse.ts";
 import {
-  MAX_MOVE_BODY,
-  MAX_TASK_BODY,
-} from "../../../src/server/external-tasks/parse.ts";
-import {
-  MAX_BRIEF_BYTES,
   MAX_ENTRY_BYTES,
-  MAX_SCOPE,
   MAX_TASK_FILES,
+  MAX_TASK_LABELS,
 } from "../../../src/server/external-tasks/rules.ts";
+import { MAX_BODY } from "../../../src/server/lib/body.ts";
 import { MAX_SEARCH, MAX_TITLE } from "../../../src/shared/words.ts";
 import { httpFixture } from "./http-fixture.ts";
 
-test("create and edit reject unknown fields, wrong types, oversized values and foreign files", async () => {
+test("create and edit reject unknown fields, wrong types, oversized values, foreign files and labels, never naming one", async () => {
   await using f = await httpFixture();
   const id = (await f.create()).task.task.id;
   const personal = f.app.projects.personal(f.creator.user.id)!.id;
@@ -34,11 +31,23 @@ test("create and edit reject unknown fields, wrong types, oversized values and f
     { title: " \t" },
     { title: "two\nlines" },
     { title: "x".repeat(MAX_TITLE + 1) },
-    { text: 1 },
-    { text: "x".repeat(MAX_BRIEF_BYTES + 1) },
-    { scope: false },
-    { scope: "x".repeat(MAX_SCOPE + 1) },
+    { text: "The old brief." },
+    { scope: "part B" },
+    { labels: null },
+    { labels: "build" },
+    { labels: [1] },
+    { labels: [] },
+    { labels: ["build", "build"] },
+    { labels: ["build", " BUILD"] },
+    {
+      labels: ["build", "fix", "plan", "research"].slice(
+        0,
+        MAX_TASK_LABELS + 1,
+      ),
+    },
+    { labels: ["secret-name"] },
     { fileIds: null },
+    { fileIds: [] },
     { fileIds: [1] },
     { fileIds: [""] },
     { fileIds: ["missing"] },
@@ -52,7 +61,12 @@ test("create and edit reject unknown fields, wrong types, oversized values and f
   ];
   for (const fields of badFields) {
     const create = await f.member.client.call("POST", f.base, {
-      body: { title: "Title", text: "", fileIds: [], ...fields },
+      body: {
+        title: "Title",
+        labels: ["build"],
+        fileIds: [f.briefId],
+        ...fields,
+      },
     });
     expect(create.status, JSON.stringify(fields).slice(0, 100)).toBe(400);
     const edit = await f.member.client.call(
@@ -63,15 +77,27 @@ test("create and edit reject unknown fields, wrong types, oversized values and f
       },
     );
     expect(edit.status).toBe(400);
+    // a refusal names the field, never a label's or a file's name
+    for (const response of [create, edit]) {
+      expect(JSON.stringify(await response.json())).not.toContain(
+        "secret-name",
+      );
+    }
   }
+  const unknown = await f.member.client.call("POST", f.base, {
+    body: { title: "Title", labels: ["secret-name"], fileIds: [f.briefId] },
+  });
+  expect(await unknown.json()).toEqual({
+    error: "labels must name this project's labels",
+  });
   for (const body of [
     null,
     [],
     "text",
     {},
-    { title: "Title", text: "" },
-    { title: "Title", fileIds: [] },
-    { text: "", fileIds: [] },
+    { title: "Title", labels: ["build"] },
+    { title: "Title", fileIds: [f.briefId] },
+    { labels: ["build"], fileIds: [f.briefId] },
   ]) {
     expect((await f.member.client.call("POST", f.base, { body })).status).toBe(
       400,
@@ -108,7 +134,7 @@ test("moves validate their state, text and unclaim claim before changing the tas
   const base = `/api/external-tasks/${id}`;
   for (const move of ["answer", "unclaim", "cancel", "reopen"] as const) {
     const valid = {
-      state: "claimed",
+      state: "in_progress",
       text: "A note.",
       ...(move === "unclaim" ? { claimId: claim.claimId } : {}),
     };
@@ -162,14 +188,11 @@ test("moves validate their state, text and unclaim claim before changing the tas
     expect(
       (
         await f.member.client.call("POST", `${base}/unclaim`, {
-          body: { state: "claimed", text: "Unclaim.", claimId },
+          body: { state: "in_progress", text: "Unclaim.", claimId },
         })
       ).status,
     ).toBe(400);
   }
-  expect(
-    (await f.member.client.call("POST", `${base}/seen`, { body: {} })).status,
-  ).toBe(400);
   expect((await f.show(id)).entries.map((entry) => entry.kind)).toEqual([
     "claim",
   ]);
@@ -190,8 +213,10 @@ test("queries reject unknown, repeated and malformed parameters", async () => {
     [f.base, "?closed=1&q=a&q=b"],
     [f.base, `?closed=1&q=${"a".repeat(MAX_SEARCH + 1)}`],
     [f.base, "?closed=1&state=open"],
+    [f.base, "?closed=1&state=cancelled"],
+    [f.base, "?closed=1&state=todo"],
     [f.base, "?closed=1&state="],
-    [f.base, "?closed=1&state=done&state=cancelled"],
+    [f.base, "?closed=1&state=done&state=canceled"],
     [f.base, "?extra=1"],
     [detail, "?before="],
     [detail, "?before=bad"],
@@ -199,9 +224,10 @@ test("queries reject unknown, repeated and malformed parameters", async () => {
     [detail, "?before=abcdefghijkl"],
     [detail, "?extra=1"],
     ["/api/external-tasks", ""],
-    ["/api/external-tasks", "?attention=0"],
-    ["/api/external-tasks", "?attention=1&attention=1"],
-    ["/api/external-tasks", "?attention=1&extra=1"],
+    ["/api/external-tasks", "?attention=1"],
+    ["/api/external-tasks", "?waiting=0"],
+    ["/api/external-tasks", "?waiting=1&waiting=1"],
+    ["/api/external-tasks", "?waiting=1&extra=1"],
   ]) {
     expect((await f.member.client.call("GET", `${path}${query}`)).status).toBe(
       400,
@@ -216,60 +242,23 @@ test("queries reject unknown, repeated and malformed parameters", async () => {
   ).toBe(400);
 });
 
-test("seen requires only a non-negative safe integer attention mark", async () => {
-  await using f = await httpFixture();
-  const id = (await f.create()).task.task.id;
-  const path = `/api/external-tasks/${id}/seen`;
-  for (const body of [
-    undefined,
-    null,
-    [],
-    "",
-    {},
-    { attentionAt: null },
-    { attentionAt: "1" },
-    { attentionAt: true },
-    { attentionAt: -1 },
-    { attentionAt: 0.5 },
-    { attentionAt: Number.MAX_SAFE_INTEGER + 1 },
-    { attentionAt: 1, state: "open" },
-  ]) {
-    expect((await f.member.client.call("POST", path, { body })).status).toBe(
-      400,
-    );
-  }
-  for (const attentionAt of [0, Number.MAX_SAFE_INTEGER]) {
-    const response = await f.member.client.call("POST", path, {
-      body: { attentionAt },
-    });
-    expect(response.status).toBe(200);
-    expect((await response.json()).task.task.revision).toBe(0);
-  }
-});
-
 test("body caps reject declared and streamed excess while exact byte bounds accept JSON escapes", async () => {
   await using f = await httpFixture();
-  const made = await f.create({
-    title: "x".repeat(MAX_TITLE),
-    scope: "x".repeat(MAX_SCOPE),
-    text: "\u0001".repeat(MAX_BRIEF_BYTES),
-  });
-  expect(made.task.text).toHaveLength(MAX_BRIEF_BYTES);
+  const made = await f.create({ title: "x".repeat(MAX_TITLE) });
   const id = made.task.task.id;
   f.app.externalTasks.claim(await f.key(), id);
   const answer = await f.member.client.call(
     "POST",
     `/api/external-tasks/${id}/answer`,
     {
-      body: { state: "claimed", text: "\u0001".repeat(MAX_ENTRY_BYTES) },
+      body: { state: "in_progress", text: "\u0001".repeat(MAX_ENTRY_BYTES) },
     },
   );
   expect(answer.status).toBe(200);
   for (const [method, path, cap] of [
-    ["POST", f.base, MAX_TASK_BODY],
-    ["PATCH", `/api/external-tasks/${id}`, MAX_TASK_BODY],
+    ["POST", f.base, MAX_BODY],
+    ["PATCH", `/api/external-tasks/${id}`, MAX_BODY],
     ["POST", `/api/external-tasks/${id}/answer`, MAX_MOVE_BODY],
-    ["POST", `/api/external-tasks/${id}/seen`, 1024],
   ] as const) {
     expect(
       (await f.member.client.call(method, path, { raw: "x".repeat(cap + 1) }))

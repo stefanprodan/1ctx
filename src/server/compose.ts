@@ -333,6 +333,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
       endForUser: (userId, projectIds) =>
         externalTasks.endForUser(userId, projectIds),
     },
+    taskLabels: {
+      labelTasks: (projectId) => externalTasks.labelTasks(projectId),
+    },
     sessions: {
       count: (projectId) => sessions.store.count(projectId),
       running: (projectId) => sessions.store.running(projectId),

@@ -9,7 +9,7 @@ import { createKey } from "../../helpers/access-keys.ts";
 import type { TestApp, TestClient } from "../../helpers/app.ts";
 import { emailApp, MARIA_PASSWORD } from "../../helpers/links.ts";
 import { createTeam } from "../../helpers/projects.ts";
-import { httpFixture } from "./http-fixture.ts";
+import { briefFile, httpFixture } from "./http-fixture.ts";
 
 async function keyFor(client: TestClient, userId: string): Promise<TaskKey> {
   const { key } = await createKey(client);
@@ -19,20 +19,12 @@ async function keyFor(client: TestClient, userId: string): Promise<TaskKey> {
 function hold(app: TestApp, key: TaskKey, projectId: string, blocked = false) {
   const id = app.externalTasks.create(key.userId, projectId, {
     title: "Do the work",
-    text: "Read the brief.",
-    fileIds: [],
+    labels: ["build"],
+    fileIds: [briefFile(app, projectId, key.userId)],
   }).task.task.id;
   const { claimId } = app.externalTasks.claim(key, id);
   if (blocked) {
-    const report = app.externalTasks.report(
-      key,
-      id,
-      claimId,
-      "question",
-      "Which path?",
-      [],
-    );
-    app.externalTasks.seen(id, { attentionAt: report.task.attentionAt! });
+    app.externalTasks.report(key, id, claimId, "question", "Which path?", []);
   }
   return { id, claimId };
 }
@@ -85,9 +77,9 @@ async function atomicEnding(
     for (const [i, held] of ended.entries()) {
       const current = tasks.show(held.id, null)!;
       expect(current.task.task).toMatchObject({
-        state: "open",
+        state: "todo",
         claim: null,
-        attentionAt: app.now.value,
+        movedAt: app.now.value,
         revision: before[i]!.task.task.revision + 1,
         editRevision: before[i]!.task.task.editRevision,
         entries: before[i]!.task.task.entries + 1,

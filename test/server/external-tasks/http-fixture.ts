@@ -14,11 +14,35 @@ import {
   collectLogs,
   hashPassword,
   ORIGIN,
+  type TestApp,
   type TestClient,
   testApp,
 } from "../../helpers/app.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { recordingConn } from "../../helpers/socket.ts";
+
+// a task's required brief: the project's brief.md, made once by the user
+export function briefFile(
+  app: { knowledge: TestApp["knowledge"] },
+  projectId: string,
+  userId: string,
+): string {
+  const held = app.knowledge.store.fileNamed(projectId, "brief.md");
+  if (held !== null) return held.id;
+  return app.knowledge.create(
+    projectId,
+    {
+      kind: "user",
+      id: userId,
+      name: "user",
+      sessionId: null,
+      origin: null,
+      keyName: null,
+    },
+    "brief.md",
+    "# Brief",
+  ).id;
+}
 
 export async function httpFixture() {
   const logs = collectLogs();
@@ -49,6 +73,24 @@ export async function httpFixture() {
   ]);
   const projectId = project.id;
   const base = `/api/projects/${projectId}/external-tasks`;
+  // a knowledge file of the project, by its id, made once
+  const file = async (
+    name: string,
+    project = projectId,
+    client = creator.client,
+  ) => {
+    const held = app.knowledge.store.fileNamed(project, name);
+    if (held !== null) return held.id;
+    const response = await client.call(
+      "POST",
+      `/api/projects/${project}/knowledge`,
+      { body: { name, text: `# ${name}` } },
+    );
+    expect(response.status).toBe(201);
+    return (await response.json()).file.id as string;
+  };
+  // the file every task links unless told otherwise
+  const briefId = await file("brief.md");
   const create = async (
     fields: Partial<CreateExternalTaskRequest> = {},
     client = creator.client,
@@ -60,8 +102,8 @@ export async function httpFixture() {
       {
         body: {
           title: "Check the work",
-          text: "Read the brief.",
-          fileIds: [],
+          labels: ["build"],
+          fileIds: [briefId],
           ...fields,
         },
       },
@@ -116,6 +158,8 @@ export async function httpFixture() {
     outsider,
     projectId,
     base,
+    file,
+    briefId,
     create,
     show,
     key,

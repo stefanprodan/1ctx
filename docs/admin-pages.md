@@ -65,6 +65,10 @@ reporting.
   while an agent or a decider runs on it, since the server refuses.
 - **The admin's own user page has no Reset password nor Disable.**
   `roleLock()` fixes their role and the last admin's.
+- **A user page lists the user's access keys from `userKeys`,** read
+  again after a revoke (whatever its answer), a reset and a disable,
+  which delete them. No admin page makes a key. The row is
+  `views/keys/` (`docs/views.md`).
 - **The MCP tab's prompt preview is `promptPreview()`** over
   `offeredServers()` and `promptSnapshot()` from `shared/mcp.ts`, the
   bytes a send would carry. Never compute it apart.

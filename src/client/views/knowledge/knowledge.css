@@ -196,21 +196,13 @@
   }
 
   @media (max-width: 719px) {
-    /* the search has its own line, the rest the next */
+    /* one line, as every card's head: the search takes what the
+       list's dropdown and the buttons leave */
     .knowledge-head {
-      padding-bottom: var(--space-3);
-    }
-    .knowledge-head-ask {
-      padding-top: var(--space-3);
+      flex-wrap: nowrap;
     }
     .knowledge-search {
-      flex-basis: 100%;
-    }
-    .knowledge-lists {
-      margin-left: var(--space-4);
-    }
-    .knowledge-acts {
-      margin-left: auto;
+      min-width: 0;
     }
     .knowledge-hit {
       padding-left: var(--space-4);

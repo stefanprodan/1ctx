@@ -10,78 +10,200 @@ import type {
   PatchExternalTaskRequest,
 } from "../../../shared/api/external-tasks.ts";
 import {
-  type ExternalTaskClaim,
   type ExternalTaskDetail,
   type ExternalTaskEntry,
   type ExternalTaskFile,
   type ExternalTaskRow,
-  MAX_BRIEF_BYTES,
-  MAX_SCOPE,
   MAX_TASK_FILES,
+  MAX_TASK_LABELS,
 } from "../../../shared/contracts/external-task.ts";
+import { normalizeKnowledgePath } from "../../../shared/knowledge.ts";
 import {
-  type EntryKind,
+  type ClaimEnd,
   type ExternalTaskState,
   hasLineBreak,
   MAX_TITLE,
 } from "../../../shared/words.ts";
 import { clock, longDate } from "../../lib/format.ts";
-import type { IconName } from "../../lib/icons.tsx";
+import { externalTasksHref, type TasksShow } from "../../lib/hrefs.ts";
+import { plainLine } from "../../lib/plain.ts";
 
 export const INTRO = "Work for an agent you run outside 1ctx.";
 export const UNCLAIMED = "Ask your agent to claim this task.";
-
-export const claimWords = (claim: ExternalTaskClaim): string =>
-  `claimed by ${claim.username} via ${claim.keyName}`;
-
-// the state as a row's sub and the brief's line say it
-export function stateLine(
-  row: Pick<ExternalTaskRow, "state" | "claim">,
-): string {
-  if (row.state === "claimed" && row.claim !== null) {
-    return claimWords(row.claim);
-  }
-  if (row.state === "blocked" && row.claim !== null) {
-    return `blocked · ${claimWords(row.claim)}`;
-  }
-  return row.state;
-}
-
-// a row's line: the icon and the section say open, done and cancelled
-export const rowLine = (row: Pick<ExternalTaskRow, "state" | "claim">) =>
-  row.state === "claimed" || row.state === "blocked" ? stateLine(row) : "";
-
-export const ENTRY_WORDS: Record<EntryKind, string> = {
-  claim: "Claimed",
-  progress: "Progress",
-  question: "Question",
-  result: "Result",
-  unclaim: "Unclaimed",
-  answer: "Answer",
-  cancel: "Cancelled",
-  reopen: "Reopened",
-};
+export const CLAIM_LIMIT =
+  "Agents can't claim this task again. Cancel and reopen it to start over.";
 
 export const GONE_USER = "a deleted user";
 
-// who wrote an entry: an agent through a key, a member, or 1ctx itself;
-// a key outlives its deleted user
-export function entryBy(
-  entry: Pick<ExternalTaskEntry, "by" | "keyName">,
-): string {
-  const who = entry.by === null ? null : `@${entry.by.username}`;
-  if (entry.keyName !== null) return `${who ?? GONE_USER} via ${entry.keyName}`;
-  return who ?? "1ctx";
+type Who = Pick<ExternalTaskEntry, "kind" | "by" | "keyName" | "claimEnd">;
+
+// 1ctx's release says why in a word; its text says it whole
+const SWEEP_REASONS: Partial<Record<ClaimEnd, string>> = {
+  idle: "idle",
+  access_gone: "access gone",
+  limit: "limit reached",
+};
+
+// the reason of an unclaim 1ctx made, null for any other entry
+export function sweepReason(
+  entry: Pick<ExternalTaskEntry, "kind" | "claimEnd">,
+): string | null {
+  if (entry.kind !== "unclaim" || entry.claimEnd === null) return null;
+  return SWEEP_REASONS[entry.claimEnd] ?? null;
 }
 
-// the row's second line: the latest entry, cut by the server; none
-// before the first
-export function lastLine(row: Pick<ExternalTaskRow, "last">): string | null {
-  if (row.last === null) return null;
-  const text = row.last.text.replace(/\s+/g, " ").trim();
-  return text === ""
-    ? ENTRY_WORDS[row.last.kind]
-    : `${ENTRY_WORDS[row.last.kind]}: ${text}`;
+// who wrote an entry: an agent through a key, a member, or 1ctx on its
+// own releases; with no user otherwise, the user was deleted, and a key
+// outlives them
+export function entryBy(entry: Who): string {
+  const who =
+    entry.by !== null
+      ? `@${entry.by.username}`
+      : sweepReason(entry) !== null
+        ? "1ctx"
+        : GONE_USER;
+  return entry.keyName === null ? who : `${who} via ${entry.keyName}`;
+}
+
+// who opened a task; a deleted creator is named as one
+export const openerOf = (row: Pick<ExternalTaskRow, "createdBy">): string =>
+  row.createdBy === null ? GONE_USER : `@${row.createdBy.username}`;
+
+// a row's second line, who moved it last: the question a task awaits,
+// who holds it, who opened, gave back or reopened it, who closed it; a
+// todo task no agent may claim again says so instead
+export function rowLine(
+  row: Pick<
+    ExternalTaskRow,
+    "state" | "claim" | "last" | "createdBy" | "claimLimit"
+  >,
+): string {
+  const last = row.last;
+  if (row.state === "todo" && row.claimLimit) return "Claim limit reached";
+  switch (row.state) {
+    case "awaiting_input":
+      if (last?.kind === "question") return plainLine(last.text);
+      break;
+    case "done":
+      if (last?.kind === "result") return `Done by ${entryBy(last)}`;
+      return "Done";
+    case "canceled":
+      if (last?.kind === "cancel") return `Canceled by ${entryBy(last)}`;
+      return "Canceled";
+    case "todo":
+      if (last?.kind === "reopen") return `Reopened by ${entryBy(last)}`;
+      if (last?.kind === "unclaim") {
+        const reason = sweepReason(last);
+        return `Unclaimed by ${entryBy(last)}${reason === null ? "" : `, ${reason}`}`;
+      }
+      return `Opened by ${openerOf(row)}`;
+    default:
+      break;
+  }
+  return row.claim === null
+    ? ""
+    : `Claimed by @${row.claim.username} via ${row.claim.keyName}`;
+}
+
+// the line under a task's title: when it last moved, never who
+export function movedWords(
+  row: Pick<ExternalTaskRow, "state" | "last">,
+): string {
+  switch (row.state) {
+    case "awaiting_input":
+      return "Asked";
+    case "in_progress":
+      return "Updated";
+    case "done":
+      return "Done";
+    case "canceled":
+      return "Canceled";
+    default:
+      return row.last?.kind === "reopen"
+        ? "Reopened"
+        : row.last?.kind === "unclaim"
+          ? "Unclaimed"
+          : "Opened";
+  }
+}
+
+// the tab's view and search as the address carries them: ?show=done or
+// ?show=canceled, else Open, and ?q=
+export function tasksAddressOf(search: string): {
+  show: TasksShow | null;
+  q: string;
+} {
+  const params = new URLSearchParams(search);
+  const show = params.get("show");
+  return {
+    show: show === "done" || show === "canceled" ? show : null,
+    q: params.get("q")?.trim() ?? "",
+  };
+}
+
+// the view a task in this state is listed on, null for Open
+export const showOf = (state: ExternalTaskState): TasksShow | null =>
+  state === "done" || state === "canceled" ? state : null;
+
+const VIEWS: { show: TasksShow | null; label: string }[] = [
+  { show: null, label: "Open" },
+  { show: "done", label: "Done" },
+  { show: "canceled", label: "Canceled" },
+];
+
+// the switch: each view's address, keeping the search
+export function tasksSwitch(
+  projectId: string,
+  show: TasksShow | null,
+  q: string,
+): { label: string; on: boolean; href: string }[] {
+  return VIEWS.map((view) => ({
+    label: view.label,
+    on: view.show === show,
+    href: externalTasksHref(projectId, view.show, q),
+  }));
+}
+
+// the tab's groups, in the order of whose turn it is
+export const GROUPS = [
+  { state: "awaiting_input", label: "Awaiting input" },
+  { state: "in_progress", label: "In progress" },
+  { state: "todo", label: "Todo" },
+] as const satisfies readonly { state: ExternalTaskState; label: string }[];
+
+export type GroupState = (typeof GROUPS)[number]["state"];
+
+// a group shows this many rows, then Show more adds as many again
+export const GROUP_ROWS = 20;
+
+export type TaskGroup = {
+  state: GroupState;
+  label: string;
+  rows: ExternalTaskRow[];
+  total: number;
+  more: boolean;
+};
+
+// the unfinished rows as the tab draws them: each state that has a row,
+// cut to what its Show more has opened
+export function groupsOf(
+  rows: readonly ExternalTaskRow[],
+  shown: Partial<Record<GroupState, number>>,
+): TaskGroup[] {
+  return GROUPS.flatMap(({ state, label }) => {
+    const all = rows.filter((row) => row.state === state);
+    if (all.length === 0) return [];
+    const limit = shown[state] ?? GROUP_ROWS;
+    return [
+      {
+        state,
+        label,
+        rows: all.slice(0, limit),
+        total: all.length,
+        more: all.length > limit,
+      },
+    ];
+  });
 }
 
 // an entry's link is a link only when it is a web address
@@ -94,40 +216,54 @@ export function webLink(text: string): boolean {
   }
 }
 
+// a name's room under a segment's 80 characters, its .md after it
+const TASK_FILE_NAME = 77;
+
+// the path New file starts with: the title made a name as an upload's
+// is, under tasks/, cut to fit; empty when no letter of it is left. A
+// path the draft already links, the file just made, takes -2, -3, ...
+export function taskFilePath(
+  title: string,
+  taken: readonly string[] = [],
+): string {
+  const name = taskFileName(title);
+  if (name === "") return "";
+  for (let n = 1; ; n++) {
+    const end = n === 1 ? "" : `-${n}`;
+    const base = name
+      .slice(0, TASK_FILE_NAME - end.length)
+      .replace(/[.-]+$/, "");
+    const path = `tasks/${base}${end}.md`;
+    if (!taken.includes(path)) return path;
+  }
+}
+
+function taskFileName(title: string): string {
+  // a slash in a title is a word, never a folder
+  let raw = Array.from(title.replace(/[\\/]/g, "-"));
+  for (; raw.length > 0; raw = raw.slice(0, -1)) {
+    const result = normalizeKnowledgePath(raw.join(""));
+    if (!result.ok && result.reason !== "too-long") return "";
+    if (!result.ok || result.name.length > TASK_FILE_NAME) continue;
+    return result.name.replace(/\.md$/, "").replace(/^[.-]+|[.-]+$/g, "");
+  }
+  return "";
+}
+
 // a linked file by its name; a deleted one keeps the name history had
 export function fileLabel(file: Pick<ExternalTaskFile, "name" | "deleted">) {
   if (!file.deleted && file.name !== null) return file.name;
   return file.name === null ? "a deleted file" : `deleted: ${file.name}`;
 }
 
-// the icon and its colour: a mark wins, then the state's own; a closed
-// task keeps its own, as its mark only lists a result to read
-export function taskIcon(row: Pick<ExternalTaskRow, "state" | "attentionAt">): {
-  name: IconName;
-  status: "running" | "done" | "attention" | "stopped" | null;
-} {
-  const marked = row.attentionAt !== null ? "attention" : null;
-  switch (row.state) {
-    case "blocked":
-      return { name: "question", status: "attention" };
-    case "claimed":
-      return { name: "play", status: marked ?? "running" };
-    case "done":
-      return { name: "check", status: "done" };
-    case "cancelled":
-      return { name: "cancelled", status: "stopped" };
-    default:
-      return { name: "task-open", status: marked };
-  }
-}
-
 // when the idle sweep unclaims this claim, from its last report on the
-// sweep's own basis; a blocked task waits for a member and never idles
+// sweep's own basis; a task awaiting input waits for a member and never
+// idles
 export function claimDeadline(
   task: Pick<ExternalTaskRow, "state" | "claim">,
   idleHours: number,
 ): number | null {
-  if (task.state !== "claimed" || task.claim === null) return null;
+  if (task.state !== "in_progress" || task.claim === null) return null;
   return task.claim.activeAt + idleHours * 3_600_000;
 }
 
@@ -153,14 +289,15 @@ export function chatName(title: string): string {
 }
 
 // what the page offers in a state: the brief is edited and the task
-// cancelled until it closes, a claimed task unclaimed while held, an answer
-// given while blocked, a closed task reopened; delete always
+// canceled until it closes, a held task unclaimed, an answer given while
+// it awaits input, a closed task reopened; delete always
 export function movesOf(state: ExternalTaskState) {
-  const open = state === "open" || state === "claimed" || state === "blocked";
+  const held = state === "in_progress" || state === "awaiting_input";
+  const open = held || state === "todo";
   return {
     edit: open,
-    answer: state === "blocked",
-    unclaim: state === "claimed" || state === "blocked",
+    answer: state === "awaiting_input",
+    unclaim: held,
     cancel: open,
     reopen: !open,
   };
@@ -180,7 +317,7 @@ export const MOVE_WORDS: Record<
   },
   cancel: {
     label: "Cancel task",
-    going: "Cancelling",
+    going: "Canceling",
     required: false,
   },
   reopen: {
@@ -191,28 +328,73 @@ export const MOVE_WORDS: Record<
 };
 
 // the brief's form
+export const NO_LABEL = "Pick at least one label.";
+
 export type Draft = {
   title: string;
-  scope: string;
-  text: string;
+  labels: string[];
   fileIds: string[];
 };
 
 export function draftOf(detail: ExternalTaskDetail | null): Draft {
-  if (detail === null) return { title: "", scope: "", text: "", fileIds: [] };
+  if (detail === null) return { title: "", labels: [], fileIds: [] };
   return {
     title: detail.task.title,
-    scope: detail.task.scope ?? "",
-    text: detail.text,
+    labels: detail.task.labels,
     fileIds: detail.files.map((f) => f.fileId),
   };
+}
+
+type LabelRef = { id: string; name: string };
+
+// the ids a task's label names stand for among the project's labels as
+// the form opened; a name the project no longer has is left out
+export function labelIdsOf(
+  names: readonly string[],
+  labels: readonly LabelRef[],
+): string[] {
+  return names.flatMap((name) => {
+    const label = labels.find((l) => l.name === name);
+    return label === undefined ? [] : [label.id];
+  });
+}
+
+// the picked labels by their names now: a label renamed since it was
+// picked takes its new name, a deleted one goes
+export function labelNamesOf(
+  ids: readonly string[],
+  labels: readonly LabelRef[],
+): string[] {
+  return ids.flatMap((id) => {
+    const label = labels.find((l) => l.id === id);
+    return label === undefined ? [] : [label.name];
+  });
+}
+
+// a label picked joins the others, once and at most MAX_TASK_LABELS;
+// a pick deleted from the project since leaves first, so it never
+// holds a place the form shows as free
+export function pickLabel(
+  ids: readonly string[],
+  id: string,
+  labels: readonly LabelRef[],
+): string[] {
+  const live = ids.filter((l) => labels.some((label) => label.id === l));
+  if (!labels.some((label) => label.id === id)) return live;
+  if (live.includes(id) || live.length >= MAX_TASK_LABELS) return live;
+  return [...live, id];
+}
+
+// a file made in the form joins its links, once and within the bound
+export function withFile(draft: Draft, fileId: string): Draft {
+  if (draft.fileIds.includes(fileId)) return draft;
+  if (draft.fileIds.length >= MAX_TASK_FILES) return draft;
+  return { ...draft, fileIds: [...draft.fileIds, fileId] };
 }
 
 // the links are in order, so an order changed is a change
 const sameOrder = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((id, i) => id === b[i]);
-
-const bytes = (text: string) => new TextEncoder().encode(text).length;
 
 // the checks the server makes too, so a refusal is at its field at once
 export function requestOf(
@@ -229,32 +411,18 @@ export function requestOf(
       field: "title",
     };
   }
-  const scope = draft.scope.trim();
-  if (scope.length > MAX_SCOPE || hasLineBreak(scope)) {
+  if (draft.labels.length === 0) return { problem: NO_LABEL, field: "labels" };
+  if (draft.labels.length > MAX_TASK_LABELS) {
     return {
-      problem: `a scope is one line of at most ${MAX_SCOPE} characters`,
-      field: "scope",
+      problem: `labels: pick 1 to ${MAX_TASK_LABELS}`,
+      field: "labels",
     };
   }
-  if (draft.text.trim() === "") {
-    return { problem: "the brief is required", field: "text" };
-  }
-  if (bytes(draft.text) > MAX_BRIEF_BYTES) {
-    return {
-      problem: `the brief is at most ${MAX_BRIEF_BYTES / 1024} KiB`,
-      field: "text",
-    };
-  }
-  if (draft.fileIds.length > MAX_TASK_FILES) {
-    return { problem: `at most ${MAX_TASK_FILES} files`, field: "files" };
+  if (draft.fileIds.length === 0 || draft.fileIds.length > MAX_TASK_FILES) {
+    return { problem: `link 1 to ${MAX_TASK_FILES} files`, field: "files" };
   }
   return {
-    body: {
-      title,
-      text: draft.text,
-      scope: scope === "" ? null : scope,
-      fileIds: draft.fileIds,
-    },
+    body: { title, labels: draft.labels, fileIds: draft.fileIds },
   };
 }
 
@@ -269,8 +437,7 @@ export function patchOf(
   return {
     editRevision,
     ...(body.title === was.title ? {} : { title: body.title }),
-    ...((body.scope ?? "") === was.scope ? {} : { scope: body.scope ?? null }),
-    ...(body.text === was.text ? {} : { text: body.text }),
+    ...(sameOrder(body.labels, was.labels) ? {} : { labels: body.labels }),
     ...(sameOrder(body.fileIds, was.fileIds) ? {} : { fileIds: body.fileIds }),
   };
 }
@@ -279,8 +446,7 @@ export function dirtyOf(draft: Draft, detail: ExternalTaskDetail | null) {
   const was = draftOf(detail);
   return (
     draft.title !== was.title ||
-    draft.scope !== was.scope ||
-    draft.text !== was.text ||
+    !sameOrder(draft.labels, was.labels) ||
     !sameOrder(draft.fileIds, was.fileIds)
   );
 }
@@ -289,8 +455,7 @@ export function dirtyOf(draft: Draft, detail: ExternalTaskDetail | null) {
 export function taskFieldOf(message: string): string | undefined {
   const word = message.trim().toLowerCase();
   if (word.startsWith("a title") || word.startsWith("title")) return "title";
-  if (word.startsWith("a scope") || word.startsWith("scope")) return "scope";
-  if (word.startsWith("the brief") || word.startsWith("text")) return "text";
+  if (word.startsWith("labels")) return "labels";
   if (word.includes("file")) return "files";
   return undefined;
 }

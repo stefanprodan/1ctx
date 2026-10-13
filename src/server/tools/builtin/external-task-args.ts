@@ -21,11 +21,11 @@ export type Move = "answer" | "unclaim" | "cancel" | "reopen";
 
 export const READ_ACTIONS = {
   list: ["action", "states", "after"],
-  show: ["action", "id", "before", "entry", "offset", "ref"],
+  show: ["action", "id", "before", "entry", "offset"],
 } as const;
 const WRITE_ACTIONS = {
-  create: ["action", "title", "text", "scope", "files"],
-  edit: ["action", "id", "editRevision", "title", "text", "scope", "files"],
+  create: ["action", "title", "labels", "files"],
+  edit: ["action", "id", "editRevision", "title", "labels", "files"],
   answer: ["action", "id", "state", "claimId", "text"],
   unclaim: ["action", "id", "state", "claimId", "text"],
   cancel: ["action", "id", "state", "claimId", "text"],
@@ -42,7 +42,6 @@ export type Call =
       before: string | null;
       entry: string | null;
       offset: number | null;
-      ref: number | null;
     }
   | { action: "create"; body: CreateExternalTaskRequest; files: string[] }
   | {
@@ -80,10 +79,9 @@ function stateOf(value: unknown): ExternalTaskState {
 function brief(args: Record<string, unknown>) {
   const out: Partial<CreateExternalTaskRequest> = {};
   if (args.title !== undefined) out.title = text(args.title, "title");
-  if (args.text !== undefined) out.text = text(args.text, "text");
-  if (args.scope !== undefined) {
-    const scope = args.scope === null ? "" : text(args.scope, "scope").trim();
-    out.scope = scope === "" ? null : scope;
+  if (args.labels !== undefined) {
+    if (!Array.isArray(args.labels)) throw new Error("labels must be a list");
+    out.labels = args.labels.map((label) => text(label, "a label"));
   }
   let files: string[] | null = null;
   if (args.files !== undefined) {
@@ -132,18 +130,13 @@ export function parseExternalTaskArgs(
   }
   if (action === "create") {
     const { out, files } = brief(args);
-    if (out.title === undefined || out.text === undefined) {
-      throw new Error("create needs a title and a text");
+    if (out.title === undefined || out.labels === undefined || files === null) {
+      throw new Error("create needs a title, labels and files");
     }
     return {
       action,
-      body: {
-        title: out.title,
-        text: out.text,
-        scope: out.scope ?? null,
-        fileIds: [],
-      },
-      files: files ?? [],
+      body: { title: out.title, labels: out.labels, fileIds: [] },
+      files,
     };
   }
   if (typeof args.id !== "string" || args.id.trim() === "") {
@@ -155,28 +148,21 @@ export function parseExternalTaskArgs(
       args.entry === undefined ? null : text(args.entry, "entry").trim();
     const offset =
       args.offset === undefined ? null : whole(args.offset, "offset");
-    const ref = args.ref === undefined ? null : whole(args.ref, "ref");
-    if (entry !== null && ref !== null) {
-      throw new Error("ref goes with the brief, never an entry");
-    }
-    if (offset === null && (entry !== null || ref !== null)) {
-      throw new Error("entry and ref go with an offset, from the note");
-    }
-    if (offset !== null && entry === null && ref === null) {
-      throw new Error("an offset needs the entry or the ref from the note");
+    if ((offset === null) !== (entry === null)) {
+      throw new Error("entry and offset go together, from the note");
     }
     if (offset !== null && args.before !== undefined) {
       throw new Error("before pages the entries; leave out offset");
     }
     const before =
       args.before === undefined ? null : text(args.before, "before").trim();
-    return { action, id, before, entry, offset, ref };
+    return { action, id, before, entry, offset };
   }
   if (action === "edit") {
     const editRevision = whole(args.editRevision, "editRevision");
     const { out, files } = brief(args);
     if (Object.keys(out).length === 0 && files === null) {
-      throw new Error("edit needs a title, text, scope or files to change");
+      throw new Error("edit needs a title, labels or files to change");
     }
     return { action, id, body: { ...out, editRevision }, files };
   }

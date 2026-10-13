@@ -63,7 +63,7 @@ describe("knowledge store and area", () => {
     try {
       const file = area.create(projectId, author, "docs/x", "old");
       expect(() => area.create(projectId, author, "docs/x", "new")).toThrow(
-        "a file named docs/x exists",
+        "a file with this name exists",
       );
       expect(() => area.create(projectId, author, "docs", "new")).toThrow(
         Conflict,
