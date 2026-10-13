@@ -14,7 +14,9 @@ the external task pages in `docs/external-task-pages.md`.
   loads for anyone, once per address. `reload()` runs it again. A route
   whose filter or search needs less than its whole load names a
   `loadQuery`, run in its place when only the query moved on the same
-  path; arriving, a new user and `reload()` run `load`.
+  path; arriving, a new user and `reload()` run `load`. The feed's
+  search and pick on Home and a project's Feed tab read only the
+  session list, since nothing else on those pages reads the query.
 - **Every route is one `lazy()` entry in `app/routes.ts`.** The rail
   is computed from that table.
 - **Only the latest answer lands.** A later load or a write

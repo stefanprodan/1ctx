@@ -130,6 +130,15 @@ export type Route = {
   nav?: { label: string; icon: IconName; order: number };
 };
 
+// the feed's list under the address's search and pick, on Home (no
+// project) and a project's Feed tab
+const feedList = (project: string | null, query: URLSearchParams) =>
+  loadList({
+    project,
+    q: query.get("q")?.trim() ?? "",
+    ...listPick(pickOf(`?${query.toString()}`)),
+  });
+
 // a project page's head, tabs and aside
 const frame = (id: string) => [
   loadProject(id),
@@ -270,9 +279,7 @@ export const ROUTES: Route[] = [
     // the picked one or the personal; it comes from the rail's list,
     // waited for only when none is held
     load: async (_params, query) => {
-      const q = query.get("q")?.trim() ?? "";
-      const pick = listPick(pickOf(`?${query.toString()}`));
-      const rows = loadList({ project: null, q, ...pick });
+      const rows = feedList(null, query);
       const spent = loadWeek();
       const unsent = loadNotSent();
       const marked = loadWaitingTasks();
@@ -291,6 +298,9 @@ export const ROUTES: Route[] = [
         target === null ? Promise.resolve() : loadUploads(target.id),
       ]);
     },
+    // a search or a pick reads only the feed: nothing else on the page
+    // reads the query
+    loadQuery: (_params, query) => feedList(null, query),
     nav: { label: "Home", icon: "home", order: 1 },
   },
   {
@@ -352,14 +362,12 @@ export const ROUTES: Route[] = [
     load: async (params, query) => {
       await Promise.all([
         ...frame(params.id),
-        loadList({
-          project: params.id,
-          q: query.get("q")?.trim() ?? "",
-          ...listPick(pickOf(`?${query.toString()}`)),
-        }),
+        feedList(params.id, query),
         loadUploads(params.id),
       ]);
     },
+    // as Home's: a search or a pick reads only the feed
+    loadQuery: (params, query) => feedList(params.id, query),
   },
   {
     path: "/projects/:id/automations",
