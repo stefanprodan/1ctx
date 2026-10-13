@@ -174,6 +174,7 @@ describe("provision knowledge preflight", () => {
         () => ({
           caps: { ...DEFAULT_LIMITS, ...caps },
           live,
+          labels: [],
         }),
         { key: () => "ok", list: () => [] },
       );

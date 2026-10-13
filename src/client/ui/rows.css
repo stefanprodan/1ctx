@@ -199,6 +199,10 @@
     color: var(--faint);
     cursor: default;
   }
+  /* inside, so a list's clipped edge never cuts the ring */
+  .rows-button:focus-visible {
+    outline-offset: -1px;
+  }
 
   .rows-go {
     color: var(--dim);
@@ -217,6 +221,13 @@
     color: var(--faint);
   }
   .rows-go:hover .rows-go-arrow {
+    color: var(--fg);
+  }
+  .rows-button-edit {
+    flex-shrink: 0;
+    color: var(--faint);
+  }
+  .rows-button:hover:not(:disabled) .rows-button-edit {
     color: var(--fg);
   }
 
@@ -293,6 +304,10 @@
   .rows-sub-wrap {
     overflow-wrap: anywhere;
     white-space: normal;
+  }
+  .rows-sub-prose {
+    font-family: var(--sans);
+    font-size: var(--text-small);
   }
   .rows-meta {
     flex-shrink: 1;
@@ -654,10 +669,6 @@
        beside it wraps to its own line */
     .rows-title {
       min-width: min(160px, 100%);
-    }
-    /* details that wrap read best whole width, the end under them */
-    .rows-title:has(> .rows-sub-wrap) {
-      min-width: 100%;
     }
     .rows-line-end > .rows-toggle {
       flex: 1 1 0;

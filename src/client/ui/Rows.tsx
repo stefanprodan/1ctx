@@ -218,10 +218,13 @@ export function RowsGo({
 export function RowsButton({
   onClick,
   disabled,
+  edit,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
+  // a pencil at the end, so a row that opens its form says so on a phone
+  edit?: boolean;
   children: ComponentChildren;
 }) {
   return (
@@ -233,6 +236,7 @@ export function RowsButton({
         onClick={onClick}
       >
         {children}
+        {edit && <Icon name="pencil" size={14} class="rows-button-edit" />}
       </button>
     </div>
   );
@@ -397,6 +401,7 @@ export function RowsTitle({
   subWide,
   lines,
   wrap,
+  prose,
 }: {
   name: ComponentChildren;
   sub?: ComponentChildren;
@@ -408,6 +413,8 @@ export function RowsTitle({
   // the sub lines wrap whole rather than ellipsize, for details that
   // mean nothing cut
   wrap?: boolean;
+  // a sub of words someone wrote, in the body font
+  prose?: boolean;
 }) {
   const subClass = `rows-sub${wrap ? " rows-sub-wrap" : ""}`;
   return (
@@ -419,7 +426,7 @@ export function RowsTitle({
       </span>
       {sub !== undefined && (
         <span
-          class={`${subClass}${bad ? " rows-bad" : ""}${subWide ? " rows-sub-wide" : ""}`}
+          class={`${subClass}${bad ? " rows-bad" : ""}${subWide ? " rows-sub-wide" : ""}${prose ? " rows-sub-prose" : ""}`}
         >
           {sub}
         </span>

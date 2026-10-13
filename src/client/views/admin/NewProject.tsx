@@ -14,6 +14,13 @@ import { adminProjectHref, PROJECTS_HREF } from "../../lib/hrefs.ts";
 import { nameProblem, nameTaken } from "../../lib/names.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { Page } from "../../ui/Page.tsx";
+import { LabelDrafts } from "../projects/LabelDrafts.tsx";
+import {
+  defaultDrafts,
+  labelsBody,
+  labelsProblem,
+  type NewLabel,
+} from "../projects/Labels.model.ts";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
 import {
   DESCRIPTION_PLACEHOLDER,
@@ -41,11 +48,13 @@ export function NewProject() {
 function Form() {
   const name = useSignal("");
   const description = useSignal("");
+  const labels = useSignal<NewLabel[]>(defaultDrafts());
   const save = useSave(async () => {
     const from = address();
     const created = await createProject({
       name: name.value.trim(),
       description: description.value.trim(),
+      labels: labelsBody(labels.value),
     });
     if (address() === from) navigate(adminProjectHref(created.id));
   }, projectFieldOf);
@@ -68,7 +77,8 @@ function Form() {
       onSubmit={() =>
         void save.run(
           at("name", nameProblem(name.value)) ??
-            at("description", descriptionProblem(description.value)),
+            at("description", descriptionProblem(description.value)) ??
+            labelsProblem(labels.value),
         )
       }
     >
@@ -92,6 +102,14 @@ function Form() {
           onInput={(value) => {
             description.value = value;
             save.touch();
+          }}
+        />
+        <LabelDrafts
+          class="pair-wide"
+          drafts={labels.value}
+          save={save}
+          onChange={(next) => {
+            labels.value = next;
           }}
         />
       </div>

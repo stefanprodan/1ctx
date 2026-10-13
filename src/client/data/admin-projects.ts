@@ -19,7 +19,7 @@ import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { ApiError, api } from "./api.ts";
 import { me } from "./me.ts";
-import { keepProject, loadProjects } from "./projects.ts";
+import { keepProject, loadProjects, onProjectSaved } from "./projects.ts";
 import { usageSlot } from "./slot.ts";
 import { onSocketEvent } from "./socket.ts";
 
@@ -297,3 +297,14 @@ function onAccessChanged(event: SocketEvent): void {
 }
 
 onSocketEvent(onAccessChanged);
+
+// a metadata write from a project's Settings tab: the admin page shows
+// what was held of it, so it shows the answer
+onProjectSaved((project) => {
+  if (owner !== me.value?.id || project.kind !== "team") return;
+  seen.set(project.id, project);
+  if (adminProject.value?.id === project.id) {
+    detailTurn++;
+    adminProject.value = project;
+  }
+});

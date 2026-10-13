@@ -62,6 +62,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "visits",
     "projects",
     "memberships",
+    "project_labels",
     "providers",
     "agents",
     "deciders",

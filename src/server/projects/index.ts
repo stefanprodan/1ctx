@@ -18,6 +18,7 @@ import {
 } from "./routes.ts";
 import { type ProjectRow, ProjectStore } from "./store.ts";
 
+export { parseLabelDescription, parseLabelName } from "./parse.ts";
 export { type ProjectRow, ProjectStore } from "./store.ts";
 export { visible } from "./visible.ts";
 

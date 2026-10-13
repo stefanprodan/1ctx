@@ -5,6 +5,7 @@
 // projects under Projects, and the two pages render their rows.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { signal } from "@preact/signals";
 import { options } from "preact";
 import { render } from "preact-render-to-string";
 import { projectHere } from "../../../src/client/app/Rail.model.ts";
@@ -13,13 +14,15 @@ import { path } from "../../../src/client/app/router.ts";
 import { adminProject } from "../../../src/client/data/admin-projects.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
+  addLabel,
+  changeLabel,
   loadProject,
   loadProjects,
   project,
   projectError,
   projects,
   projectsError,
-  savePersonalProject,
+  saveAbout,
 } from "../../../src/client/data/projects.ts";
 import { repoLists } from "../../../src/client/data/repos.ts";
 import {
@@ -28,6 +31,8 @@ import {
   projectAgents,
 } from "../../../src/client/data/sessions.ts";
 import { daysFailed } from "../../../src/client/data/usage.ts";
+import type { OpenLabel } from "../../../src/client/views/projects/Labels.model.ts";
+import { LabelRows } from "../../../src/client/views/projects/Labels.tsx";
 import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   aboutLine,
@@ -90,13 +95,76 @@ describe("the projects entity", () => {
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
         members: [casey],
+        labels: [],
       };
       project.value = { ...saved, description: "" };
       projectError.value = { words: "stale failure", status: 500 };
       answer = () => ({ project: saved, projects: [saved] });
-      await savePersonalProject({ description: "Scratch work" });
+      await saveAbout("p1", { description: "Scratch work" });
       expect(project.value).toEqual(saved);
       expect(projectError.value).toBeNull();
+    },
+  );
+
+  test.serial(
+    "an earlier write's late answer never covers a later one's",
+    async () => {
+      const base = {
+        ...personal,
+        description: "",
+        chats: 0,
+        knowledge: { files: 0, tokens: 0 },
+        latestFiles: [],
+        members: [casey],
+        labels: [{ id: "l1", name: "build", description: "" }],
+      };
+      project.value = base;
+      const releases: ((response: Response) => void)[] = [];
+      globalThis.fetch = (() =>
+        new Promise<Response>((resolve) => {
+          releases.push(resolve);
+        })) as unknown as typeof fetch;
+      const first = changeLabel("p1", "l1", { description: "New work" });
+      const second = saveAbout("p1", { description: "Scratch work" });
+      const older = {
+        ...base,
+        labels: [{ id: "l1", name: "build", description: "New work" }],
+      };
+      const newer = { ...older, description: "Scratch work" };
+      releases[1]!(Response.json({ project: newer }));
+      await second;
+      releases[0]!(Response.json({ project: older }));
+      await first;
+      expect(project.value).toEqual(newer);
+    },
+  );
+
+  test.serial(
+    "an earlier write's answer lands when a later one is refused",
+    async () => {
+      const base = {
+        ...personal,
+        description: "",
+        chats: 0,
+        knowledge: { files: 0, tokens: 0 },
+        latestFiles: [],
+        members: [casey],
+        labels: [{ id: "l1", name: "build", description: "" }],
+      };
+      project.value = base;
+      const releases: ((response: Response) => void)[] = [];
+      globalThis.fetch = (() =>
+        new Promise<Response>((resolve) => {
+          releases.push(resolve);
+        })) as unknown as typeof fetch;
+      const first = saveAbout("p1", { description: "Scratch work" });
+      const second = addLabel("p1", { name: "build" });
+      releases[1]!(Response.json({ error: "name is taken" }, { status: 409 }));
+      await second.catch(() => undefined);
+      const saved = { ...base, description: "Scratch work" };
+      releases[0]!(Response.json({ project: saved }));
+      await first;
+      expect(project.value).toEqual(saved);
     },
   );
 
@@ -135,6 +203,7 @@ describe("the projects entity", () => {
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
       members: [casey],
+      labels: [],
     };
     me.value = null;
     expect(projects.value).toBeNull();
@@ -598,6 +667,7 @@ describe("the pages", () => {
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
       members: [casey],
+      labels: [],
     };
     projectAgents.value = [];
     const html = render(<Project params={{ id: "p1" }} />);
@@ -630,6 +700,7 @@ describe("the pages", () => {
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
       members: [casey],
+      labels: [],
     };
     let html = render(<Project params={{ id: "p1" }} />);
     expect(html).toContain('<p class="split-note">Incidents and pages</p>');
@@ -657,6 +728,7 @@ describe("the pages", () => {
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
       members: [casey],
+      labels: [],
     };
     const html = render(<Settings params={{ id: "p1" }} />);
     expect(html).toContain(
@@ -685,6 +757,7 @@ describe("the pages", () => {
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
       members: [casey],
+      labels: [],
     });
     const podinfo: RepoView = {
       id: "r1",
@@ -708,36 +781,98 @@ describe("the pages", () => {
       repoLists.value = new Map();
     });
 
-    test.serial("a member reads the description and the rows", () => {
-      project.value = teamRow();
-      repoLists.value = new Map([["p2", [podinfo]]]);
-      let html = render(<Settings params={{ id: "p2" }} />);
-      expect(html).toContain(
-        'class="tabs-tab tabs-tab-on" href="/projects/p2/settings"',
-      );
-      expect(html).toContain(
-        '<p class="projects-about">Incidents and pages</p>',
-      );
-      expect(html).not.toContain("<form");
-      expect(html).not.toContain('name="description"');
-      expect(html).toContain(TEAM_HINT);
-      expect(html).not.toContain(PUBLIC_HINT);
-      expect(html).toContain(">github.com/stefanprodan/podinfo<");
-      expect(html).toContain(">default branch<");
-      expect(html).toContain(
-        '>Ready at 3f2a1c9</span>, <span class="repos-fact">364 files<',
-      );
-      expect(html).not.toContain("Add repository");
-      expect(html).not.toContain(">Refresh<");
-      expect(html).not.toContain(">Change<");
-      expect(html).not.toContain("<button");
-      project.value = { ...teamRow(), description: "" };
-      repoLists.value = new Map([["p2", []]]);
-      html = render(<Settings params={{ id: "p2" }} />);
-      expect(html).toContain("No description yet.");
-      expect(html).toContain("projects-about-none");
-      expect(html).toContain("No repositories yet.");
-      expect(html).not.toContain("<button");
+    test.serial(
+      "a member edits the description and the labels and reads the rows",
+      () => {
+        project.value = {
+          ...teamRow(),
+          labels: [
+            { id: "l1", name: "build", description: "New work" },
+            { id: "l2", name: "fix", description: "" },
+          ],
+        };
+        repoLists.value = new Map([["p2", [podinfo]]]);
+        let html = render(<Settings params={{ id: "p2" }} />);
+        expect(html).toContain(
+          'class="tabs-tab tabs-tab-on" href="/projects/p2/settings"',
+        );
+        // a team project's description is required, its name is not here
+        expect(html).toContain('name="description"');
+        expect(html).toContain('aria-required="true"');
+        expect(html).toContain(">Incidents and pages</textarea>");
+        expect(html).not.toContain('name="name"');
+        expect(html).toContain(">Labels<");
+        expect(html).toContain("Add label");
+        expect(html).toContain(">build<");
+        // a description is prose, the name mono
+        expect(html).toContain(
+          'class="rows-sub rows-sub-wrap rows-sub-prose">New work<',
+        );
+        expect(html).toContain(">fix<");
+        // both rows open the labels' form; the repository's is read-only
+        expect(html.match(/class="rows-line rows-button"/g)).toHaveLength(2);
+        expect(html.match(/class="rows-button-edit"/g)).toHaveLength(2);
+        expect(html).not.toContain(">Change<");
+        expect(html).toContain(TEAM_HINT);
+        expect(html).not.toContain(PUBLIC_HINT);
+        expect(html).toContain(">github.com/stefanprodan/podinfo<");
+        expect(html).toContain(">default branch<");
+        expect(html).toContain(
+          '>Ready at 3f2a1c9</span>, <span class="repos-fact">364 files<',
+        );
+        expect(html).not.toContain("Add repository");
+        expect(html).not.toContain(">Refresh<");
+        repoLists.value = new Map([["p2", []]]);
+        html = render(<Settings params={{ id: "p2" }} />);
+        expect(html).toContain("No repositories yet.");
+      },
+    );
+
+    test.serial("a project at the cap offers no Add label", () => {
+      project.value = {
+        ...teamRow(),
+        labels: Array.from({ length: 20 }, (_, i) => ({
+          id: `l${i}`,
+          name: `label-${i}`,
+          description: "",
+        })),
+      };
+      const html = render(<Settings params={{ id: "p2" }} />);
+      expect(html).not.toContain("Add label");
+      expect(html).toContain("At most 20 labels.");
+    });
+
+    test.serial("a click on a label row opens its form", () => {
+      const shown = {
+        ...teamRow(),
+        labels: [
+          { id: "l1", name: "build", description: "New work" },
+          { id: "l2", name: "fix", description: "" },
+        ],
+      };
+      const open = signal<OpenLabel>(null);
+      const previous = options.vnode;
+      const clicks: (() => void)[] = [];
+      options.vnode = (v) => {
+        previous?.(v);
+        const props = v.props as Record<string, unknown>;
+        if (v.type === "button" && props.class === "rows-line rows-button") {
+          clicks.push(props.onClick as () => void);
+        }
+      };
+      try {
+        render(<LabelRows project={shown} open={open} />);
+      } finally {
+        options.vnode = previous;
+      }
+      clicks[1]?.();
+      expect(open.value).toEqual(shown.labels[1]!);
+      const html = render(<LabelRows project={shown} open={open} />);
+      expect(html).toContain('name="name"');
+      expect(html).toContain('value="fix"');
+      expect(html).toContain(">Delete<");
+      // the other row waits while the form is open
+      expect(html).toContain('class="rows-line rows-button" disabled');
     });
 
     test.serial("an admin edits the description and the rows", () => {
@@ -752,15 +887,18 @@ describe("the pages", () => {
       expect(html).not.toContain('name="name"');
       expect(html).toContain(TEAM_HINT);
       expect(html).toContain("Add repository");
-      expect(html).toContain(">Refresh<");
-      expect(html).toContain(">Change<");
+      // the row opens its form, where Refresh is
+      expect(html).toContain('class="rows-line rows-button"');
+      expect(html).not.toContain(">Refresh<");
+      expect(html).not.toContain(">Change<");
     });
 
     test.serial(
-      "an admin's save sends the description alone and lands on both pages",
+      "a save sends the description alone and lands on both pages",
       async () => {
         me.value = { ...casey, role: "admin" };
         project.value = teamRow();
+        adminProject.value = teamRow();
         const saved = { ...teamRow(), description: "Pages only" };
         const sent: { url: string; method?: string; body: unknown }[] = [];
         globalThis.fetch = (async (url: string, init?: RequestInit) => {
@@ -800,7 +938,7 @@ describe("the pages", () => {
         await settle();
         expect(sent).toEqual([
           {
-            url: "/api/projects/p2",
+            url: "/api/projects/p2/about",
             method: "PATCH",
             body: { description: "Pages only" },
           },
@@ -810,8 +948,7 @@ describe("the pages", () => {
       },
     );
 
-    test.serial("an admin's empty description is refused at once", async () => {
-      me.value = { ...casey, role: "admin" };
+    test.serial("an empty team description is refused at once", async () => {
       project.value = teamRow();
       let calls = 0;
       globalThis.fetch = (async () => {
@@ -853,6 +990,7 @@ describe("the pages", () => {
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
       members: [casey],
+      labels: [],
     };
     projectAgents.value = [];
     const html = render(<Members params={{ id: "p1" }} />);
@@ -871,6 +1009,7 @@ describe("the pages", () => {
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
         members: [casey],
+        labels: [],
       };
       projectAgents.value = [];
       expect(render(<Members params={{ id: "p1" }} />)).not.toContain("Manage");
@@ -890,6 +1029,7 @@ describe("the pages", () => {
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
       members: [casey],
+      labels: [],
     };
     projectAgents.value = null;
     let html = render(<Members params={{ id: "p1" }} />);

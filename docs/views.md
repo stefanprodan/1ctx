@@ -198,12 +198,18 @@ Flagged.
   one view, so a tab change keeps the head and its Activity card
   mounted. The Directory loads every list on each tab, so every tab
   carries a count.
-- **Every project has a Settings tab,** a team's after Members. An
-  admin writes a team project's description and repositories there
-  through the admin page's routes and entities, and a member reads
-  them; the name is the admin page's alone. The answer to an admin's
-  project write goes through `keepProject()`, so both pages show one
-  row.
+- **Every project has a Settings tab,** a team's after Members. Every
+  user who sees the project writes its description and its labels
+  there (`views/projects/Labels.tsx`). An admin writes a team project's
+  repositories through the admin page's routes and entities, and a
+  member reads them; the name is the admin page's alone. Every project
+  write's answer goes through `keepProject()`, and a metadata write's
+  through `onProjectSaved()` too, so both pages show one row.
+- **A label row is its button** (`RowsButton`): a click opens its
+  form, with no buttons on the row, and every row waits while a form
+  is open.
+- **The last label has no Delete,** and Add label goes at the cap; the
+  server refuses both anyway.
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted in its provider's wire shape; the client never
   counts tokens.
@@ -216,6 +222,9 @@ Flagged.
   leaves out the key and the kind. A team's member gets `edit` off: the
   rows with their state, no control. The Key select lists the `http-`
   files from `credentialKeys`, after None.
+- **An editor's row is its button,** opening its form, as a label's
+  does. Refresh sits in the form's foot beside Delete, and its refusal
+  is the form's notice.
 - **A row's state is read again while it waits or fetches.** No frame
   says a fetch ended, so `watchRepos()` reads the list every
   `REPO_POLL_MS` while a row is pending or fetching and the tab is
@@ -226,7 +235,7 @@ Flagged.
 - **A failed read keeps the rows** with `RowsFailed` above them and
   polls on until a read succeeds; a 403 or 404 drops them.
 - **A change sends only what changed** (`patchBody()`) against the row
-  as Change opened it: a rename alone never fetches the tree again, and
+  as its form opened it: a rename alone never fetches the tree again, and
   a field another admin changed since is never sent back. A row gone
   from the list closes its form.
 

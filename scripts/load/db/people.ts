@@ -5,6 +5,7 @@
 // admins and members, team and personal projects, the fake MCP servers
 // with their tools, skills, the decider, and the automations.
 
+import { DEFAULT_LABELS } from "../../../src/shared/contracts/label.ts";
 import { SERVERS, toolDef } from "../catalog.ts";
 import { int, pick, rng, weighted } from "../random.ts";
 import { FAKE, fakeMcpUrl } from "../shapes.ts";
@@ -177,16 +178,26 @@ export function people(b: Build) {
     const owner = team.members[0]!;
     const about = prose(rng(i + 77), 120);
     b.q.project.run(team.id, "team", team.name, about, owner.id, clock.start);
+    labels(b, team.id, clock.start);
     for (const m of team.members) b.q.member.run(team.id, m.id, clock.start);
     b.bump("memberships", team.members.length);
   }
   for (const u of b.users) {
     u.personal = b.newId();
     b.q.project.run(u.personal, "personal", "personal", "", u.id, clock.start);
+    labels(b, u.personal, clock.start);
     // the owner is a member of their personal project, as the app makes it
     b.q.member.run(u.personal, u.id, clock.start);
   }
   b.bump("projects", b.teams.length + b.users.length);
+}
+
+// every project starts with the four, as the app makes them
+function labels(b: Build, projectId: string, at: number): void {
+  for (const label of DEFAULT_LABELS) {
+    b.q.label.run(b.newId(), projectId, label.name, label.description, at);
+  }
+  b.bump("project_labels", DEFAULT_LABELS.length);
 }
 
 export const teamsOf = (b: Build, u: User) =>

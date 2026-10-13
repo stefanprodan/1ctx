@@ -69,7 +69,8 @@ open row's body or a meta. The shared shapes are below.
   and the arrow shows only from 720 wide.
 - **Details that mean nothing cut wrap.** `RowsTitle`'s `wrap` stacks
   the sub and its `lines` whole, one fact each (a repository's URL,
-  ref and state), and on a phone puts the row's end under them.
+  ref and state). Its `prose` draws a sub someone wrote (a label's
+  description) in the body font; a sub is mono otherwise.
 - **A folder tree is `RowsTree`,** over `treeOf()` in `lib/tree.ts`.
   An outcome log is `RowsLog` with its group, line and more parts.
 - **A paged list ends in `ShowMore`** from `feed/FeedCard.tsx` while

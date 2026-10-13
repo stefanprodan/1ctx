@@ -78,6 +78,7 @@ const EXPECTED_IDS = [
   "0064-external-task-claim-entries",
   "0065-external-task-scope-unclaim",
   "0066-external-task-cancelled",
+  "0067-project-labels",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2495,6 +2496,77 @@ describe("the schema", () => {
       expect(db.query("select task_id from external_task_files").all()).toEqual(
         [],
       );
+      expect(migrate(db)).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0067 gives every project the four labels and keeps every project", () => {
+    const db = seed(MIGRATIONS.slice(0, 66));
+    try {
+      db.exec(`
+        insert into projects (id, kind, name, description, owner_id, created_at)
+          values ('t', 'team', 'ops', 'Pages', 'u', 500);
+      `);
+      const projects = () =>
+        db.query("select * from projects order by id").all();
+      const before = projects();
+      expect(migrate(db)).toEqual(expectedFrom("0067-project-labels"));
+      expect(projects()).toEqual(before);
+      const rows = db
+        .query<
+          {
+            id: string;
+            project_id: string;
+            name: string;
+            description: string;
+            created_at: number;
+          },
+          []
+        >("select * from project_labels order by project_id, name")
+        .all();
+      const four = [
+        ["build", "New work or a change to existing work"],
+        ["fix", "A defect or failure to correct"],
+        ["plan", "A proposal or design to decide on"],
+        ["research", "Investigation or analysis, no change made"],
+      ];
+      expect(rows.map(({ id: _, ...row }) => row)).toEqual([
+        ...four.map(([name, description]) => ({
+          project_id: "p",
+          name,
+          description,
+          created_at: 0,
+        })),
+        ...four.map(([name, description]) => ({
+          project_id: "t",
+          name,
+          description,
+          created_at: 500,
+        })),
+      ]);
+      expect(rows.every((row) => /^[0-9a-z]{12}$/.test(row.id))).toBe(true);
+      expect(new Set(rows.map((row) => row.id)).size).toBe(8);
+      const insert = (name: string) =>
+        db
+          .query(
+            "insert into project_labels (id, project_id, name, created_at) values (?, 't', ?, 0)",
+          )
+          .run(`l-${name}`, name);
+      expect(() => insert("fix")).toThrow(/UNIQUE/);
+      for (const bad of ["", "Ops", "back end", "-ops", "x".repeat(25)]) {
+        expect(() => insert(bad)).toThrow(/CHECK/);
+      }
+      insert("9-ops-");
+      db.exec("delete from projects where id = 't'");
+      expect(
+        db
+          .query<{ n: number }, []>(
+            "select count(*) as n from project_labels where project_id = 't'",
+          )
+          .get()!.n,
+      ).toBe(0);
       expect(migrate(db)).toEqual([]);
     } finally {
       db.close();

@@ -49,7 +49,12 @@ export function memberOptions(
     }));
 }
 
+// a new project's label is refused by its place: "labels.2.name must be"
+const LABEL_FIELD = /^labels\.\d+\.(name|description)\b/;
+
 export function projectFieldOf(message: string): string | undefined {
+  const label = LABEL_FIELD.exec(message);
+  if (label !== null) return label[0];
   if (message.startsWith("name")) return "name";
   if (message.startsWith("description")) return "description";
   return undefined;

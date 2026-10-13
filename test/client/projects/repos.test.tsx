@@ -494,9 +494,10 @@ describe("the list", () => {
         line(facts("Failed: not found"), true),
     );
     expect(html).toContain("Fetching");
-    expect(html.match(/>Change</g)).toHaveLength(3);
-    expect(html.match(/>Refresh</g)).toHaveLength(3);
-    // a row holding buttons is never a link
+    // each row is the button that opens its form, with none of its own
+    expect(html.match(/class="rows-line rows-button"/g)).toHaveLength(3);
+    expect(html).not.toContain(">Change<");
+    expect(html).not.toContain(">Refresh<");
     expect(html).not.toContain("<a ");
     expect(html).not.toContain(CAP_LINE);
   });
@@ -521,7 +522,7 @@ describe("the list", () => {
     expect(html).toContain("Add repository");
   });
 
-  test.serial("Add and Change open the form in place", () => {
+  test.serial("Add and a row open the form in place", () => {
     held("p2", [repo({ ref: "main", ignore: "*.md\n" })]);
     const adding = render(
       <RepoRows target={team} list={reposOf("p2")} open={signal("new")} />,
@@ -542,9 +543,10 @@ describe("the list", () => {
     expect(changing).toContain('value="main"');
     expect(changing).toContain(">Save<");
     expect(changing).toContain(">Delete<");
+    expect(changing).toContain(">Refresh<");
     expect(changing).toContain(">Cancel<");
-    // the row's own buttons give way to the form
-    expect(changing).not.toContain(">Change<");
+    // the row gives way to the form
+    expect(changing).not.toContain("rows-button");
     submitsInForms(changing);
   });
 });
@@ -580,6 +582,69 @@ describe("the form", () => {
       method: "PATCH",
       body: { name: "info" },
     });
+  });
+
+  test.serial("a click on a row opens its form", () => {
+    held("p2", [repo(), repo({ id: "r2", name: "flux2" })]);
+    const open = signal<RepoView | "new" | null>(null);
+    const previous = options.vnode;
+    const clicks: (() => void)[] = [];
+    options.vnode = (v) => {
+      previous?.(v);
+      const props = v.props as Record<string, unknown>;
+      if (v.type === "button" && props.class === "rows-line rows-button") {
+        clicks.push(props.onClick as () => void);
+      }
+    };
+    try {
+      render(<RepoRows target={team} list={reposOf("p2")} open={open} />);
+    } finally {
+      options.vnode = previous;
+    }
+    clicks[1]?.();
+    expect(open.value).toEqual(repo({ id: "r2", name: "flux2" }));
+    const html = render(
+      <RepoRows target={team} list={reposOf("p2")} open={open} />,
+    );
+    expect(html).toContain('name="url"');
+    // the other row waits while the form is open
+    expect(html).toContain('class="rows-line rows-button" disabled');
+  });
+
+  test.serial("Refresh in the form asks for a fetch", async () => {
+    held("p2", [repo()]);
+    answer = () => Response.json({ repo: repo({ state: "pending" }) });
+    const previous = options.vnode;
+    let onRefresh: (() => void) | undefined;
+    options.vnode = (v) => {
+      previous?.(v);
+      const props = v.props as Record<string, unknown>;
+      if (v.type === "button" && props.children === "Refresh") {
+        onRefresh = props.onClick as () => void;
+      }
+    };
+    try {
+      render(
+        <RepoRows target={team} list={reposOf("p2")} open={signal(repo())} />,
+      );
+    } finally {
+      options.vnode = previous;
+    }
+    onRefresh?.();
+    await settle();
+    expect(sent(0)).toEqual({
+      url: "/api/projects/p2/repos/r1/refresh",
+      method: "POST",
+      body: undefined,
+    });
+    // a row already fetching offers none
+    held("p2", [repo({ state: "fetching" })]);
+    const html = render(
+      <RepoRows target={team} list={reposOf("p2")} open={signal(repo())} />,
+    );
+    expect(html).toContain(
+      '<button type="button" class="btn" disabled>Refresh<',
+    );
   });
 
   test.serial("a row deleted elsewhere closes its form", () => {

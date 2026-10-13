@@ -28,16 +28,19 @@ export function TextField({
   required,
   save,
   wide,
+  prose,
   onInput,
 }: {
   label: string;
   name: string;
   value: string;
-  placeholder: string;
+  placeholder?: string;
   hint?: string;
   required?: boolean;
   save: Save;
   wide?: boolean;
+  // a sentence rather than a key or an address, in the body font
+  prose?: boolean;
   onInput: (value: string) => void;
 }) {
   const invalid = save.fieldError(name) !== null;
@@ -46,10 +49,10 @@ export function TextField({
       <span class={`label${required ? " label-required" : ""}`}>{label}</span>
       <input
         name={name}
-        class="credentials-mono"
+        class={prose ? undefined : "credentials-mono"}
         aria-required={required ? "true" : undefined}
         autocomplete="off"
-        spellcheck={false}
+        spellcheck={prose ? undefined : false}
         placeholder={placeholder}
         aria-invalid={invalid || undefined}
         disabled={save.busy}
