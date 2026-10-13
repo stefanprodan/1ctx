@@ -1,15 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An external task's page: the brief (its state with the state's icon,
-// the chat it was made in, the text cut to a few lines, the linked
-// files, a deleted one marked), edited in place while the task is
-// unfinished; the member's moves; the answer box while blocked; then
-// the timeline. An edit shows only the form: the moves, the answer box
-// and the timeline wait under it, a draft kept. The aside has the
-// scope, who made it and when, and while claimed when the idle sweep
-// unclaims it; on a phone the scope and that time sit under the files.
-// Frames keep it current, and a mark is cleared once it is read.
+// An external task's page. The title is its heading, with one line
+// under it saying the state and when it last moved, and on a phone the
+// labels. A move's box opens at the top of the body; then, while todo,
+// the notice to claim it, a done task's result, the files, and the
+// activity. An edit shows only the form: the rest waits under it, a
+// draft kept. The aside has the labels, who holds the claim and when it
+// ends, and when the task was made and edited. Frames keep it current.
 
 import { useSignal } from "@preact/signals";
 import type {
@@ -25,11 +23,9 @@ import {
 } from "../../data/external-task.ts";
 import { project } from "../../data/projects.ts";
 import { ago, longDate } from "../../lib/format.ts";
-import { chatHref, externalTasksHref, userHref } from "../../lib/hrefs.ts";
-import { Icon } from "../../lib/icons.tsx";
+import { externalTasksHref, userHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { Page } from "../../ui/Page.tsx";
-import { RowsGo, RowsLine, RowsList, RowsTitle } from "../../ui/Rows.tsx";
 import {
   AsideHandle,
   AsideLine,
@@ -37,96 +33,83 @@ import {
   AsideSection,
   Split,
 } from "../../ui/Split.tsx";
-import { fileHref } from "../knowledge/Knowledge.model.ts";
+import { TaskFiles } from "./ExternalTaskFiles.tsx";
 import { TaskForm } from "./ExternalTaskForm.tsx";
-import { Answer, TaskMoves } from "./ExternalTaskMoves.tsx";
 import {
-  chatName,
+  Answer,
+  HeadMoves,
+  MoveBoxes,
+  type MoveState,
+  useMoveState,
+} from "./ExternalTaskMoves.tsx";
+import { TaskStateIcon, TaskTags } from "./ExternalTaskRow.tsx";
+import {
   claimDeadline,
   deadlineTime,
-  fileLabel,
-  stateLine,
-  taskIcon,
+  movedWords,
   UNCLAIMED,
 } from "./ExternalTasks.model.ts";
 import { ConnectNotice } from "./ExternalTasks.tsx";
-import { Timeline } from "./ExternalTaskTimeline.tsx";
+import { Activity, Body, QUESTION_ID, Who } from "./ExternalTaskTimeline.tsx";
 import "./external-tasks.css";
 
-// the chat's title and link only when the server says the reader may
-// open it
-function MadeIn({ detail }: { detail: ExternalTaskDetail }) {
-  if (detail.chatId === null) return null;
-  return (
-    <p class="external-tasks-brief-foot">
-      {detail.chatTitle === null ? (
-        <span>Made in a chat</span>
-      ) : (
-        <span class="external-tasks-chat">
-          <span>Made in</span>
-          <a class="cut" href={chatHref(detail.chatId)}>
-            {chatName(detail.chatTitle)}
-          </a>
-        </span>
-      )}
-    </p>
-  );
+// the router takes every in-app click and drops a hash, so the jump to
+// the waiting question scrolls here
+export function jumpToQuestion(event: Event): void {
+  event.preventDefault();
+  document
+    .getElementById(QUESTION_ID)
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-// the state's icon in its colour, then its words, for the phone line
-function State({ task }: { task: ExternalTaskDetail["task"] }) {
-  const icon = taskIcon(task);
+// the title as the page's heading, then where the task stands
+function Head({ task, now }: { task: ExternalTaskRow; now: number }) {
+  const words = EXTERNAL_TASK_STATE_WORDS[task.state];
   return (
-    <span class="external-tasks-state">
-      <Icon
-        name={icon.name}
-        size={14}
-        class={`external-tasks-state-icon${icon.status === null ? "" : ` status-${icon.status}`}`}
-      />
-      <span>{stateLine(task)}</span>
-    </span>
-  );
-}
-
-function Brief({
-  detail,
-  idle,
-  now,
-}: {
-  detail: ExternalTaskDetail;
-  idle: number;
-  now: number;
-}) {
-  const task = detail.task;
-  const deadline = claimDeadline(task, idle);
-  return (
-    <section class="card external-tasks-brief">
-      {detail.files.length > 0 && (
-        <RowsList>
-          {detail.files.map((file) =>
-            file.deleted ? (
-              <RowsLine key={file.fileId} flush off>
-                <RowsTitle name={fileLabel(file)} mono />
-              </RowsLine>
-            ) : (
-              <RowsGo
-                key={file.fileId}
-                href={fileHref(task.projectId, file.fileId)}
-              >
-                <RowsTitle name={fileLabel(file)} mono />
-              </RowsGo>
-            ),
+    <header class="external-tasks-head">
+      <h2 class="external-tasks-title">{task.title}</h2>
+      <p class="external-tasks-status">
+        <span class="external-tasks-status-state">
+          <TaskStateIcon state={task.state} size={16} />
+          {task.state === "awaiting_input" ? (
+            <a
+              class="external-tasks-status-jump"
+              href={`#${QUESTION_ID}`}
+              onClick={jumpToQuestion}
+            >
+              {words}
+            </a>
+          ) : (
+            words
           )}
-        </RowsList>
-      )}
-      <p class="external-tasks-brief-foot external-tasks-brief-narrow">
-        <State task={task} />
-        {deadline !== null && (
-          <span>Claim ends {deadlineTime(deadline, now)}</span>
-        )}
-        {task.labels.length > 0 && <span>{task.labels.join(", ")}</span>}
+        </span>
+        <span class="external-tasks-status-faint">
+          {movedWords(task)} {ago(task.movedAt, now)}
+        </span>
       </p>
-      <MadeIn detail={detail} />
+      {task.labels.length > 0 && (
+        <p class="external-tasks-head-labels external-tasks-narrow">
+          <TaskTags labels={task.labels} />
+        </p>
+      )}
+    </header>
+  );
+}
+
+// a done task leads with its result, whole
+function Result({ page, now }: { page: TaskPage; now: number }) {
+  if (page.detail.task.state !== "done") return null;
+  const entry = page.entries.find((e) => e.kind === "result");
+  if (entry === undefined) return null;
+  return (
+    <section class="card external-tasks-result" aria-label="Result">
+      <p class="external-tasks-result-head">
+        <TaskStateIcon state="done" size={14} />
+        <span class="external-tasks-result-kind">Result</span>
+        <Who username={entry.by?.username ?? null} keyName={entry.keyName} />
+        <span class="external-tasks-when">{ago(entry.at, now)}</span>
+      </p>
+      <Body entry={entry} />
     </section>
   );
 }
@@ -144,9 +127,13 @@ function Aside({
   const deadline = claimDeadline(task, idle);
   return (
     <AsideSection label="Task">
-      <AsideLine label="State">
-        {EXTERNAL_TASK_STATE_WORDS[task.state]}
-      </AsideLine>
+      {task.labels.length > 0 && (
+        <AsideLine label="Labels">
+          <span class="external-tasks-aside-labels">
+            <TaskTags labels={task.labels} />
+          </span>
+        </AsideLine>
+      )}
       {task.claim !== null && (
         <AsideLine label="Claimed by">
           <AsideHandle
@@ -159,17 +146,9 @@ function Aside({
       {deadline !== null && (
         <AsideLine label="Claim ends">{deadlineTime(deadline, now)}</AsideLine>
       )}
-      {task.labels.length > 0 && (
-        <AsideLine label="Labels">{task.labels.join(", ")}</AsideLine>
-      )}
-      {task.createdBy !== null && (
-        <AsideLine label="Created by" href={userHref(task.createdBy.username)}>
-          @{task.createdBy.username}
-        </AsideLine>
-      )}
       <AsideLine label="Created">{longDate(task.createdAt)}</AsideLine>
       {detail.briefAt > task.createdAt && (
-        <AsideLine label="Brief edited">{ago(detail.briefAt, now)}</AsideLine>
+        <AsideLine label="Edited">{ago(detail.briefAt, now)}</AsideLine>
       )}
     </AsideSection>
   );
@@ -180,19 +159,19 @@ export function TaskNotice({ state }: Pick<ExternalTaskRow, "state">) {
   return state === "todo" ? <ConnectNotice words={UNCLAIMED} /> : undefined;
 }
 
-// the page under its title: the brief or its form, then the rest, which
+// the page under its head: the title or the form, then the rest, which
 // an open form hides without dropping a draft
 export function TaskBody({
   page,
+  moves,
   now,
   edit,
-  onEdit,
   onClose,
 }: {
   page: TaskPage;
+  moves: MoveState;
   now: number;
   edit: boolean;
-  onEdit: () => void;
   onClose: () => void;
 }) {
   const task = page.detail.task;
@@ -200,7 +179,6 @@ export function TaskBody({
     <Split
       aside={<Aside detail={page.detail} idle={page.idleHours} now={now} />}
     >
-      {!edit && TaskNotice(task)}
       {edit ? (
         <TaskForm
           key={task.id}
@@ -210,51 +188,73 @@ export function TaskBody({
           onSaved={onClose}
         />
       ) : (
-        <Brief detail={page.detail} idle={page.idleHours} now={now} />
+        <Head task={task} now={now} />
       )}
       <div class="external-tasks-rest" hidden={edit}>
-        <TaskMoves task={task} onEdit={edit ? null : onEdit} />
-        <Answer
-          key={task.id}
-          task={task}
-          question={
-            page.entries.find((e) => e.kind === "question")?.text ?? null
-          }
+        <MoveBoxes task={task} moves={moves} />
+        {TaskNotice(task)}
+        <Result page={page} now={now} />
+        <TaskFiles detail={page.detail} />
+        <Activity
+          page={page}
+          now={now}
+          answer={<Answer task={task} text={moves.answer} />}
         />
-        <Timeline page={page} now={now} />
       </div>
     </Split>
   );
 }
 
+// keyed by the task, so a box, an answer's draft or an open form never
+// follows the reader to another task
 export function ExternalTask({ params }: { params: Params }) {
   const id = params.id ?? "";
+  return <TaskScreen key={id} id={id} />;
+}
+
+function TaskScreen({ id }: { id: string }) {
   const page = taskPage.value?.id === id ? taskPage.value : null;
   const error = taskError.value;
   const editing = useSignal<string | null>(null);
+  const moves = useMoveState();
   const now = useNow(60_000);
   const task = page?.detail.task ?? null;
   const shown =
     task !== null && project.value?.id === task.projectId
       ? project.value
       : null;
+  const tab = task === null ? undefined : externalTasksHref(task.projectId);
   return (
     <Page
-      crumb={shown?.name ?? "Project"}
-      crumbHref={task === null ? undefined : externalTasksHref(task.projectId)}
-      title={task?.title ?? "External task"}
+      steps={[{ label: shown?.name ?? "Project", href: tab }]}
+      split
+      title="External tasks"
+      titleHref={tab}
+      actions={
+        task === null ? undefined : (
+          <HeadMoves
+            task={task}
+            moves={moves}
+            onEdit={
+              editing.value === id
+                ? null
+                : () => {
+                    editing.value = id;
+                  }
+            }
+          />
+        )
+      }
       loading={page === null && error === null}
       error={page === null ? error : null}
     >
       {page !== null && (
         <TaskBody
           page={page}
+          moves={moves}
           now={now}
           // an edit belongs to the task it opened on
           edit={editing.value === id}
-          onEdit={() => {
-            editing.value = id;
-          }}
           onClose={() => {
             editing.value = null;
           }}

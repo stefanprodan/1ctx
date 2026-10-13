@@ -1,24 +1,40 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An external task's page: the state with its icon, the chat it was made
-// in by name only when the reader may open it, the scope in the aside and
-// on a phone, the claim's idle deadline, an edit hiding the rest, and
-// a cancel.
+// An external task's page: the title as its heading with the state's
+// line, a done task's result first, the files opening in place, the
+// aside's labels, claim and idle deadline, the head's moves, an edit
+// hiding the rest, and the form's labels and files.
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { signal } from "@preact/signals";
 import { render } from "preact-render-to-string";
 import type { TaskPage } from "../../../src/client/data/external-task.ts";
-import { Icon } from "../../../src/client/lib/icons.tsx";
 import {
+  taskFileKey,
+  taskFiles,
+} from "../../../src/client/data/external-task-files.ts";
+import { project } from "../../../src/client/data/projects.ts";
+import { Save } from "../../../src/client/lib/save.ts";
+import {
+  jumpToQuestion,
   TaskBody,
   TaskNotice,
 } from "../../../src/client/views/projects/ExternalTask.tsx";
+import { TaskFiles } from "../../../src/client/views/projects/ExternalTaskFiles.tsx";
+import { TaskForm } from "../../../src/client/views/projects/ExternalTaskForm.tsx";
+import {
+  HeadMoves,
+  type MoveState,
+} from "../../../src/client/views/projects/ExternalTaskMoves.tsx";
+import { NO_LABEL } from "../../../src/client/views/projects/ExternalTasks.model.ts";
 import type {
   ExternalTaskClaim,
   ExternalTaskDetail,
+  ExternalTaskPageEntry,
   ExternalTaskRow,
 } from "../../../src/shared/contracts/external-task.ts";
+import type { ProjectDetail } from "../../../src/shared/contracts/project.ts";
 
 const HOUR = 3_600_000;
 const NOW = new Date(2026, 9, 12, 9, 0).getTime();
@@ -53,6 +69,7 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
 const page = (
   task: ExternalTaskRow = row(),
   changes: Partial<ExternalTaskDetail> = {},
+  entries: ExternalTaskPageEntry[] = [],
 ): TaskPage => ({
   id: task.id,
   detail: {
@@ -63,42 +80,55 @@ const page = (
     chatTitle: null,
     ...changes,
   },
-  entries: [],
+  entries,
   next: null,
   idleHours: 24,
   more: { loading: false, error: null },
   read: task.revision,
 });
 
-const draw = (p: TaskPage, edit = false) =>
+const moves = (): MoveState => ({
+  opened: signal(null),
+  asking: signal(false),
+  answer: signal(""),
+  save: new Save(async () => {}),
+});
+
+const draw = (p: TaskPage, edit = false, held: MoveState = moves()) =>
   render(
-    <TaskBody
-      page={p}
-      now={NOW}
-      edit={edit}
-      onEdit={() => {}}
-      onClose={() => {}}
-    />,
+    <TaskBody page={p} moves={held} now={NOW} edit={edit} onClose={() => {}} />,
   );
 
-// the aside's State line
-const state = (html: string) =>
-  html.match(
-    /<div class="split-line split-pair"><span class="split-label">State<\/span><span class="split-strong">.*?<\/div>/,
-  )?.[0] ?? "";
-const brief = (html: string) =>
-  html.match(
-    /<section class="card external-tasks-brief">.*?<\/section>/,
-  )?.[0] ?? "";
 const aside = (html: string) =>
   html.slice(html.indexOf('<div class="split-aside">'));
-const narrow = (html: string) =>
-  html.match(
-    /<p class="external-tasks-brief-foot external-tasks-brief-narrow">.*?<\/p>/,
-  )?.[0] ?? "";
+const head = (html: string) =>
+  html.match(/<header class="external-tasks-head">.*?<\/header>/)?.[0] ?? "";
+
+const PROJECT: ProjectDetail = {
+  id: "p1",
+  kind: "team",
+  name: "infra",
+  createdAt: 0,
+  memberCount: 1,
+  description: "",
+  members: [],
+  labels: [
+    { id: "l1", name: "build", description: "", tasks: 1 },
+    { id: "l2", name: "fix", description: "", tasks: 0 },
+    { id: "l3", name: "plan", description: "", tasks: 0 },
+  ],
+  chats: 0,
+  knowledge: { files: 0, tokens: 0 },
+  latestFiles: [],
+};
+
+afterEach(() => {
+  project.value = null;
+  taskFiles.value = new Map();
+});
 
 describe("the notice", () => {
-  test("an open task asks for an agent to claim it and links Connect agents", () => {
+  test("a todo task asks for an agent to claim it", () => {
     const html = render(<TaskNotice state="todo" />);
     expect(html).toContain("Ask your agent to claim this task.");
     expect(html).toContain('<a class="btn btn-small" href="/connect">');
@@ -110,152 +140,291 @@ describe("the notice", () => {
     ] as const) {
       expect(TaskNotice({ state })).toBeUndefined();
     }
-    // the page draws it above the brief, and an edit hides it
-    const open = draw(page());
-    expect(open.indexOf("Ask your agent")).toBeLessThan(
-      open.indexOf("external-tasks-brief"),
-    );
-    expect(draw(page(), true)).not.toContain("Ask your agent");
-  });
-});
-
-describe("the state", () => {
-  test("leads the aside and the phone line with its icon, never the brief", () => {
-    const html = draw(page(row({ state: "in_progress", claim })));
-    const icon = render(
-      <Icon
-        name="play"
-        size={14}
-        class="external-tasks-state-icon status-running"
-      />,
-    );
-    expect(state(html)).toBe(
-      '<div class="split-line split-pair"><span class="split-label">State</span><span class="split-strong">In progress</span></div>',
-    );
-    expect(aside(html)).toContain(
-      '<div class="split-line split-pair"><span class="split-label">Claimed by</span><span class="split-strong"><a class="split-handle" href="/users/stefan">@stefan</a> via <span class="split-word" title="laptop">laptop</span></span></div>',
-    );
-    expect(narrow(html)).toContain(icon);
-    expect(narrow(html)).toContain("<span>claimed by stefan via laptop</span>");
-    expect(brief(html).replace(narrow(html), "")).not.toContain("claimed by");
-    const open = draw(page());
-    expect(state(open)).toContain(">Todo</span>");
-    expect(narrow(open)).toContain(
-      render(
-        <Icon name="task-open" size={14} class="external-tasks-state-icon" />,
-      ),
+    expect(draw(page(), true)).toContain(
+      '<div class="external-tasks-rest" hidden>',
     );
   });
 });
 
-describe("the chat it was made in", () => {
-  test("links only the chat's name, when the reader may open it", () => {
-    const named = draw(
-      page(row(), { chatId: "s1", chatTitle: "Plan the sweep" }),
+describe("the head", () => {
+  test("the title is the heading, then the state and when it moved", () => {
+    const html = head(draw(page(row({ state: "in_progress", claim }))));
+    expect(html).toContain(
+      '<h2 class="external-tasks-title">Wire the sweep</h2>',
     );
-    expect(named).toContain(
-      '<span class="external-tasks-chat"><span>Made in</span><a class="cut" href="/chat/s1">Plan the sweep</a></span>',
-    );
-    // Made in ends the brief panel, after the text
-    expect(named.indexOf("Made in")).toBeGreaterThan(
-      named.indexOf("external-tasks-brief-text"),
-    );
-    const hidden = draw(page(row(), { chatId: "s1", chatTitle: null }));
-    expect(hidden).toContain("<span>Made in a chat</span>");
-    expect(hidden).not.toContain("/chat/s1");
-    expect(draw(page())).not.toContain("Made in");
-    expect(draw(page(row(), { chatId: "s1", chatTitle: "" }))).toContain(
-      '<a class="cut" href="/chat/s1">Untitled chat</a>',
-    );
+    expect(html).toContain("In progress");
+    expect(html).toContain("Updated 2h ago");
+    // never who
+    expect(html).not.toContain("stefan");
   });
-});
 
-describe("the labels", () => {
-  test("sit in the aside and the phone line, after the state", () => {
+  test("awaiting input links to the question, in the attention colour", () => {
+    const html = head(draw(page(row({ state: "awaiting_input", claim }))));
+    expect(html).toContain(
+      '<a class="external-tasks-status-jump" href="#question">Awaiting input</a>',
+    );
+    expect(html).toContain("Asked 2h ago");
+    expect(html).toContain("status-attention");
+  });
+
+  test.serial("the jump scrolls to the question, past the router", () => {
+    const scrolled: unknown[] = [];
+    const real = globalThis.document;
+    globalThis.document = {
+      getElementById: (id: string) =>
+        id === "question"
+          ? { scrollIntoView: (how: unknown) => scrolled.push(how) }
+          : null,
+    } as unknown as Document;
+    let prevented = false;
+    try {
+      jumpToQuestion({
+        preventDefault: () => {
+          prevented = true;
+        },
+      } as Event);
+    } finally {
+      globalThis.document = real;
+    }
+    // the router skips a click already handled, so the hash never drops
+    expect(prevented).toBe(true);
+    expect(scrolled).toEqual([{ behavior: "smooth", block: "start" }]);
+  });
+
+  test("the labels sit under it for a phone, and in the aside", () => {
     const html = draw(page(row({ labels: ["build", "fix"] })));
-    expect(state(html)).not.toContain("build");
-    expect(aside(html)).toContain(
-      '<div class="split-line split-pair"><span class="split-label">Labels</span><span class="split-strong">build, fix</span></div>',
+    expect(head(html)).toContain(
+      '<p class="external-tasks-head-labels external-tasks-narrow"><span class="tag external-tasks-tag">build</span><span class="tag external-tasks-tag">fix</span></p>',
     );
-    expect(narrow(html)).toContain("<span>build, fix</span>");
-    const none = draw(page());
-    expect(aside(none)).not.toContain("Labels");
+    expect(aside(html)).toContain('<span class="split-label">Labels</span>');
+    expect(aside(html)).toContain(
+      '<span class="tag external-tasks-tag">fix</span>',
+    );
+    expect(aside(draw(page()))).not.toContain("Labels");
   });
 });
 
-describe("the idle deadline", () => {
-  // a line of its own, dated as Created is when it is not today
-  const words = (when: string) =>
+describe("the answer box", () => {
+  const asked: ExternalTaskPageEntry = {
+    id: "e2",
+    kind: "question",
+    text: "Which branch?",
+    html: '<p class="md-p">Which branch?</p>',
+    links: [],
+    by: { id: "u1", username: "stefan" },
+    keyName: "laptop",
+    claimId: "c1",
+    claimEnd: null,
+    at: NOW - HOUR,
+  };
+
+  test("its draft is the page's, so folding the question keeps it", () => {
+    const held = moves();
+    held.answer.value = "Use main";
+    const html = draw(
+      page(row({ state: "awaiting_input", claim }), {}, [asked]),
+      false,
+      held,
+    );
+    // one box, at the foot of the waiting question, showing the draft
+    expect(html.match(/aria-label="Answer"/g)).toHaveLength(1);
+    expect(html).toContain(">Use main</textarea>");
+    expect(html.indexOf('id="question"')).toBeLessThan(
+      html.indexOf('aria-label="Answer"'),
+    );
+  });
+
+  test("with no question among those read, the box still shows", () => {
+    const html = draw(page(row({ state: "awaiting_input", claim })));
+    expect(html.match(/aria-label="Answer"/g)).toHaveLength(1);
+  });
+});
+
+describe("the aside", () => {
+  const ends = (when: string) =>
     `<span class="split-label">Claim ends</span><span class="split-strong">${when}</span>`;
 
-  test("is the claim's last activity plus the limit, only while claimed", () => {
-    const html = draw(page(row({ state: "in_progress", claim })));
-    expect(aside(html)).toContain(words("13 October 2026, 08:00"));
-    expect(narrow(html)).toContain(
-      "<span>Claim ends 13 October 2026, 08:00</span>",
+  test("names the claim and when the idle sweep ends it, never the state", () => {
+    const html = aside(draw(page(row({ state: "in_progress", claim }))));
+    expect(html).toContain(
+      '<div class="split-line split-pair"><span class="split-label">Claimed by</span><span class="split-strong"><a class="split-handle" href="/users/stefan">@stefan</a> via <span class="split-word" title="laptop">laptop</span></span></div>',
     );
-    expect(html).not.toContain("Opens again");
+    expect(html).toContain(ends("13 October 2026, 08:00"));
+    expect(html).not.toContain(">State<");
+    expect(html).not.toContain("Created by");
+    expect(html).toContain(">Created<");
     for (const task of [
       row(),
       row({ state: "awaiting_input", claim }),
       row({ state: "done" }),
     ]) {
-      expect(draw(page(task))).not.toContain("Unclaimed at");
       expect(draw(page(task))).not.toContain("Claim ends");
     }
   });
 
-  test("moves on with a report", () => {
-    const reported = { ...claim, activeAt: NOW };
-    const html = draw(page(row({ state: "in_progress", claim: reported })));
-    expect(aside(html)).toContain(words("13 October 2026, 09:00"));
-    expect(aside(html)).not.toContain(words("13 October 2026, 08:00"));
+  test("says when the brief was edited", () => {
+    const task = row();
+    const html = aside(draw(page(task, { briefAt: NOW - HOUR })));
+    expect(html).toContain('<span class="split-label">Edited</span>');
+  });
+});
+
+describe("a done task", () => {
+  test("leads with its result, whole, before the files", () => {
+    const result: ExternalTaskPageEntry = {
+      id: "e2",
+      kind: "result",
+      text: "Shipped in #12",
+      html: '<p class="md-p">Shipped in #12</p>',
+      links: ["https://example.test/pr/12"],
+      by: { id: "u1", username: "stefan" },
+      keyName: "laptop",
+      claimId: "c1",
+      claimEnd: "done",
+      at: NOW - HOUR,
+    };
+    const html = draw(
+      page(
+        row({ state: "done" }),
+        {
+          files: [
+            { fileId: "f1", name: "plan.md", revision: 1, deleted: false },
+          ],
+        },
+        [result],
+      ),
+    );
+    expect(html).toContain('aria-label="Result"');
+    expect(html).toContain(
+      '<span class="external-tasks-line-user cut">@stefan</span>',
+    );
+    expect(html).toContain('<p class="md-p">Shipped in #12</p>');
+    expect(html).toContain('href="https://example.test/pr/12"');
+    expect(html.indexOf('aria-label="Result"')).toBeLessThan(
+      html.indexOf("plan.md"),
+    );
+    expect(
+      draw(page(row({ state: "in_progress", claim }), {}, [result])),
+    ).not.toContain('aria-label="Result"');
+  });
+});
+
+describe("the files", () => {
+  const files: ExternalTaskDetail["files"] = [
+    { fileId: "f1", name: "plan.md", revision: 3, deleted: false },
+    { fileId: "f2", name: "old.md", revision: null, deleted: true },
+  ];
+
+  test("each opens in place, its pencil the way to its page", () => {
+    const html = render(<TaskFiles detail={page(row(), { files }).detail} />);
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toMatch(/href="[^"]*\/files\/f1" aria-label="Edit plan.md"/);
+    // a deleted file keeps its row, drawn as a live one so the two line
+    // up, with no way to open it
+    expect(html).toContain(
+      '<div class="external-tasks-file-row external-tasks-file-row-off"><span class="external-tasks-file-go external-tasks-file-gone">',
+    );
+    expect(html).toContain(
+      '<span class="external-tasks-file-name cut">deleted: old.md</span>',
+    );
+    expect(html).not.toContain("/files/f2");
+    expect(taskFileKey("f1", 3)).not.toBe(taskFileKey("f1", 4));
+  });
+
+  test("none, no card", () => {
+    expect(render(<TaskFiles detail={page().detail} />)).toBe("");
+  });
+});
+
+describe("the head's moves", () => {
+  const head = (task: ExternalTaskRow, editing = false) =>
+    render(
+      <HeadMoves
+        task={task}
+        moves={moves()}
+        onEdit={editing ? null : () => {}}
+      />,
+    );
+
+  test("a closed task's Reopen is the one button, the rest in More", () => {
+    for (const state of ["done", "canceled"] as const) {
+      const html = head(row({ state }));
+      expect(html).toContain("Reopen</button>");
+      expect(html).toContain('aria-label="More"');
+    }
+    const open = head(row());
+    expect(open).not.toContain("Reopen");
+    expect(open).toContain('aria-label="More"');
+  });
+
+  test("an open form leaves no move in the head", () => {
+    expect(head(row(), true)).toBe("");
   });
 });
 
 describe("an edit", () => {
-  test("shows only the form, the moves, answer and timeline hidden", () => {
+  test("shows only the form, the rest hidden with its answer box", () => {
     const blocked = row({ state: "awaiting_input", claim });
     const shown = draw(page(blocked));
     expect(shown).toContain('<div class="external-tasks-rest">');
-    expect(shown).toContain("external-tasks-brief");
+    expect(shown).toContain('class="external-tasks-head"');
     const editing = draw(page(blocked), true);
     expect(editing).toContain('<div class="external-tasks-rest" hidden>');
-    expect(editing).not.toContain('external-tasks-brief"');
-    expect(shown).not.toContain("page-notice");
+    expect(editing).not.toContain('class="external-tasks-head"');
     expect(editing).toContain('class="external-tasks-form"');
-    // the hidden rest still holds the moves, the answer box and the
-    // timeline, so a draft answer survives the edit
     const rest = editing.slice(
       editing.indexOf('<div class="external-tasks-rest" hidden>'),
     );
-    expect(rest).toContain('class="external-tasks-actions"');
     expect(rest).toContain('aria-label="Answer"');
-    expect(rest).toContain("Timeline");
-    // moves stay off: no Edit while the form is open
-    expect(rest).not.toContain(">Edit</button>");
-    expect(shown).toContain("Edit</button>");
+    expect(rest).toContain("Activity");
   });
 });
 
-describe("a cancel", () => {
-  test("is Cancel task on a live task, and a cancelled one says so and reopens", () => {
-    const open = draw(page());
-    expect(open).toContain(
-      `${render(<Icon name="cancelled" size={12} />)}Cancel task</button>`,
+describe("the form", () => {
+  const form = (detail: ExternalTaskDetail | null) =>
+    render(
+      <TaskForm
+        projectId="p1"
+        detail={detail}
+        onCancel={() => {}}
+        onSaved={() => {}}
+      />,
     );
-    const cancelled = draw(page(row({ state: "canceled" })));
-    expect(narrow(cancelled)).toContain(
-      render(
-        <Icon
-          name="cancelled"
-          size={14}
-          class="external-tasks-state-icon status-stopped"
-        />,
-      ),
-    );
-    expect(state(cancelled)).toContain(">Canceled</span>");
-    expect(cancelled).not.toContain("Cancel task");
-    expect(cancelled).toContain("Reopen</button>");
+
+  test("picks labels from the project, at most three", () => {
+    project.value = PROJECT;
+    const html = form(page(row({ labels: ["build"] })).detail);
+    expect(html).toContain("Add label");
+    expect(html).toContain("build");
+    const full = form(page(row({ labels: ["build", "fix", "plan"] })).detail);
+    expect(full).toContain('title="At most 3 labels"');
+    // a name the project no longer has is not shown as picked
+    const gone = form(page(row({ labels: ["build", "old"] })).detail);
+    expect(gone).not.toContain("Remove old");
+    expect(gone).toContain('aria-label="Remove build"');
+  });
+
+  test("a task with no label left opens asking for one", () => {
+    project.value = PROJECT;
+    const html = form(page(row({ labels: [] })).detail);
+    expect(html).toContain(`<span class="field-error">${NO_LABEL}</span>`);
+    // a new task waits for its first save to say so
+    expect(form(null)).not.toContain(NO_LABEL);
+  });
+
+  test("files link from the project or are made here, at most five", () => {
+    const files = Array.from({ length: 5 }, (_, i) => ({
+      fileId: `f${i}`,
+      name: `f${i}.md`,
+      revision: 1,
+      deleted: false,
+    }));
+    const full = form(page(row({ labels: ["build"] }), { files }).detail);
+    expect(full).toContain("Link file");
+    expect(full).toContain("New file</button>");
+    expect(full.match(/title="At most 5 files"/g)).toHaveLength(2);
+    // the scope and the text are gone
+    expect(full).not.toContain("Scope");
+    expect(full).not.toContain('name="text"');
   });
 });

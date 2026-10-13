@@ -470,6 +470,7 @@ test("a new claim leaves the last entry the unclaim before it, on every read", (
     at: f.now() - 1,
     by: { id: f.owner.id, username: "owner" },
     keyName: "laptop",
+    claimEnd: "unclaimed" as const,
   };
   expect(held.task.task.last).toEqual(last);
   expect(f.area.store.byId(task.id)!.last).toEqual(last);

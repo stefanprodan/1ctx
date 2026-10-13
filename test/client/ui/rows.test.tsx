@@ -259,6 +259,20 @@ describe("the system's other parts", () => {
     expect(add).toContain('<span class="rows-add-words">New task</span>');
   });
 
+  test("with no filter on, the dropdown names the set, so any pick counts", () => {
+    const html = render(
+      <RowsFilters
+        label="Lists"
+        filters={[
+          { label: "Files", on: false, onPick: noop },
+          { label: "Deleted", on: false, onPick: noop },
+        ]}
+      />,
+    );
+    expect(html).toContain('<span class="select-label cut">Lists</span>');
+    expect(html).not.toContain('<span class="select-label cut">Files</span>');
+  });
+
   test("a small switch in a head becomes the dropdown, elsewhere it stays", () => {
     const options = [
       { value: "a", label: "Current" },

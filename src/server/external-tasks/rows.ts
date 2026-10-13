@@ -27,7 +27,7 @@ export const TASK_SELECT = `select t.id, t.project_id, t.title, t.state,
       8192, 8193, 8194, 8195, 8196, 8197, 8198, 8199, 8200, 8201, 8202,
       8232, 8233, 8239, 8287, 12288, 65279)), 1, 600) as last_text,
     e.at as last_at, e.user_id as last_user, eu.username as last_username,
-    e.key_name as last_key,
+    e.key_name as last_key, e.claim_end as last_end,
     (select count(*) from external_task_entries where task_id = t.id) as entries,
     exists (select 1 from external_task_entries a
       where a.task_id = t.id and a.kind = 'answer'
@@ -100,6 +100,7 @@ export type RawTask = {
   last_user: string | null;
   last_username: string | null;
   last_key: string | null;
+  last_end: ClaimEnd | null;
   entries: number;
   answered: number;
 };
@@ -149,6 +150,7 @@ export const taskRow = (raw: RawTask): ExternalTaskRow => ({
               ? null
               : { id: raw.last_user, username: raw.last_username ?? "" },
           keyName: raw.last_key,
+          claimEnd: raw.last_end,
         },
   entries: raw.entries,
   createdBy:

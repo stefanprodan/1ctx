@@ -45,14 +45,17 @@ export type ExternalTaskRow = {
   revision: number;
   editRevision: number;
   claim: ExternalTaskClaim | null;
-  // the latest entry but a claim, its text cut to MAX_LAST_LINE; by and
-  // keyName are null when 1ctx wrote it, keyName also for a member
+  // the latest entry but a claim, its text cut to MAX_LAST_LINE; by is
+  // null when 1ctx wrote it or its user was deleted, keyName for a
+  // member; claimEnd as on the entry, idle or access_gone on 1ctx's
+  // releases
   last: {
     kind: EntryKind;
     text: string;
     at: number;
     by: ExternalTaskUser | null;
     keyName: string | null;
+    claimEnd: ClaimEnd | null;
   } | null;
   entries: number;
   createdBy: ExternalTaskUser | null;

@@ -209,7 +209,9 @@ Flagged.
   form, with no buttons on the row, and every row waits while a form
   is open.
 - **The last label has no Delete,** and Add label goes at the cap; the
-  server refuses both anyway.
+  server refuses both anyway. The delete ask says how many external
+  tasks carry the label, closed ones too (`deleteAsk()` over the
+  detail's `tasks`).
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted in its provider's wire shape; the client never
   counts tokens.

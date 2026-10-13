@@ -18,10 +18,12 @@ import {
   changeLabel,
   loadProject,
   loadProjects,
+  onProjectsSocket,
   project,
   projectError,
   projects,
   projectsError,
+  refreshProject,
   saveAbout,
 } from "../../../src/client/data/projects.ts";
 import { repoLists } from "../../../src/client/data/repos.ts";
@@ -85,6 +87,83 @@ afterEach(() => {
 });
 
 describe("the projects entity", () => {
+  test.serial(
+    "a label frame reads the shown project again, so forms pick new names",
+    async () => {
+      const shown = {
+        ...personal,
+        description: "",
+        chats: 0,
+        knowledge: { files: 0, tokens: 0 },
+        latestFiles: [],
+        members: [casey],
+        labels: [{ id: "l1", name: "build", description: "", tasks: 1 }],
+      };
+      project.value = shown;
+      const renamed = {
+        ...shown,
+        labels: [{ id: "l1", name: "backend", description: "", tasks: 1 }],
+      };
+      const asked: string[] = [];
+      globalThis.fetch = (async (url: string) => {
+        asked.push(url);
+        return Response.json({ project: renamed });
+      }) as unknown as typeof fetch;
+      // another project's frame reads nothing
+      onProjectsSocket({ type: "projectLabels", projectId: "p9" });
+      expect(asked).toEqual([]);
+      onProjectsSocket({ type: "projectLabels", projectId: "p1" });
+      await settle();
+      expect(asked).toEqual(["/api/projects/p1"]);
+      expect(project.value?.labels[0]?.name).toBe("backend");
+    },
+  );
+
+  test.serial(
+    "a failed read in the background keeps the project shown, unless gone",
+    async () => {
+      const shown = {
+        ...personal,
+        description: "",
+        chats: 0,
+        knowledge: { files: 0, tokens: 0 },
+        latestFiles: [],
+        members: [casey],
+        labels: [{ id: "l1", name: "build", description: "", tasks: 1 }],
+      };
+      let status = 503;
+      globalThis.fetch = (async () =>
+        Response.json(
+          { error: "busy" },
+          { status },
+        )) as unknown as typeof fetch;
+      project.value = shown;
+      projectError.value = null;
+      // a draft on the page stays: no error page takes its place
+      await refreshProject("p1");
+      expect(project.value).toEqual(shown);
+      expect(projectError.value).toBeNull();
+      globalThis.fetch = (async () => {
+        throw new TypeError("network down");
+      }) as unknown as typeof fetch;
+      await refreshProject("p1");
+      expect(project.value).toEqual(shown);
+      expect(projectError.value).toBeNull();
+      for (status of [403, 404]) {
+        globalThis.fetch = (async () =>
+          Response.json(
+            { error: "gone" },
+            { status },
+          )) as unknown as typeof fetch;
+        project.value = shown;
+        projectError.value = null;
+        await refreshProject("p1");
+        expect(project.value).toBeNull();
+        expect(projectError.value).toMatchObject({ status });
+      }
+    },
+  );
+
   test.serial(
     "a save replaces the project and clears a stale failure",
     async () => {

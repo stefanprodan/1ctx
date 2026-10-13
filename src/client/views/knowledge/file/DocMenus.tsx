@@ -17,14 +17,7 @@ import "./docpage.css";
 
 export type MoreAction = {
   label: string;
-  icon:
-    | "clock"
-    | "copy"
-    | "download"
-    | "arrow-right"
-    | "plus"
-    | "trash"
-    | "upload";
+  icon: IconName;
   danger?: boolean;
   href?: string;
   onPick?: () => void;

@@ -24,7 +24,9 @@ export function RowsFilters({
   label: string;
   filters: RowsFilter[];
 }) {
-  const on = filters.find((f) => f.on) ?? filters[0];
+  // with none on (a search over the lists), the dropdown names the set,
+  // so picking any filter is a change
+  const on = filters.find((f) => f.on);
   return (
     <>
       <span class="rows-filters-pick">
@@ -32,6 +34,7 @@ export function RowsFilters({
           label={label}
           quiet
           value={on?.label ?? ""}
+          placeholder={label}
           options={filters.map((f) => ({ value: f.label, label: f.label }))}
           onChange={(value) => {
             const f = filters.find((choice) => choice.label === value);

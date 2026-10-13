@@ -83,7 +83,8 @@ open row's body or a meta. The shared shapes are below.
 - **A card head is one line on a phone.** Its filters are
   `RowsFilters`, short words, and a small `Seg` in a head takes `head`;
   under 720 either is a compact outlined dropdown of the same choices
-  (`Select`'s `quiet`). A head's `RowsAdd` shows only its plus there,
+  (`Select`'s `quiet`), naming the set while no filter is on, so any
+  pick is a change. A head's `RowsAdd` shows only its plus there,
   keeping its name for readers. The search takes what is left and its
   icon keeps its size; no head wraps.
 - **A page with an aside is `ui/Split.tsx`.** Aside content is
@@ -279,6 +280,11 @@ One helper per job, never a copy in a view.
   constant or builder there, never a literal in a view.
 - **A name is a link to its page** wherever it is drawn, except inside
   a row that is itself a link.
+- **A one-line summary of Markdown is `plainLine()`** in
+  `lib/plain.ts`: the first line with words as a reader sees it, link
+  words, code without backticks, no emphasis, heading, quote or list
+  marks. A line left empty (a bare `#`, an image with no alt, a code
+  fence) gives way to the next.
 - **Other single homes:** a menu is `useMenu()` in `lib/menu.ts`; the
   browser's zone `browserZone()` in `lib/zone.ts`; picked ids
   `sameIds()` and `toggledId()` in `lib/ids.ts`; a skipped pick's

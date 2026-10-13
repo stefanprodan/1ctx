@@ -1,21 +1,24 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An external task's timeline: every kind drawn with its own icon, the
-// author an agent, a member, a deleted user's key or 1ctx, an answer naming its question, and
-// colour only on a question still waiting for a member.
+// An external task's activity: oldest first, one line per entry with its
+// icon and verb, who on the moves that change who holds the task, 1ctx's
+// releases by their reason, an answer naming its question, colour only
+// on a question still waiting, which starts open with the answer box,
+// and on a task in progress the latest report open.
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import type { TaskPage } from "../../../src/client/data/external-task.ts";
 import { Icon } from "../../../src/client/lib/icons.tsx";
-import { ENTRY_WORDS } from "../../../src/client/views/projects/ExternalTasks.model.ts";
+import { sweepReason } from "../../../src/client/views/projects/ExternalTasks.model.ts";
 import {
+  activityOf,
   ENTRY_ICONS,
-  entryWords,
   timelineOf,
+  VERBS,
 } from "../../../src/client/views/projects/ExternalTaskTimeline.model.ts";
-import { Timeline } from "../../../src/client/views/projects/ExternalTaskTimeline.tsx";
+import { Activity } from "../../../src/client/views/projects/ExternalTaskTimeline.tsx";
 import type {
   ExternalTaskClaim,
   ExternalTaskEntry,
@@ -85,18 +88,25 @@ const page = (
     chatId: null,
     chatTitle: null,
   },
-  entries: written.toReversed().map((entry) => ({ ...entry, html: "" })),
+  entries: written
+    .toReversed()
+    .map((entry) => ({ ...entry, html: `<p class="md-p">${entry.text}</p>` })),
   next: null,
   idleHours: 24,
   more: { loading: false, error: null },
   read: row.revision,
 });
 
-// one rendered entry, by its row
-const rows = (html: string) => html.split('class="rows-item"').slice(1);
+const ANSWER = <p class="answer-box">answer here</p>;
 
-describe("the timeline", () => {
-  test("draws every kind with its own icon and word", () => {
+const draw = (p: TaskPage) =>
+  render(<Activity page={p} now={100} answer={ANSWER} />);
+
+// one rendered line, oldest first, after the Opened line
+const rows = (html: string) => html.split("<li").slice(2);
+
+describe("the activity", () => {
+  test("draws every kind oldest first with its own icon and verb", () => {
     const written = [
       entry("claim"),
       entry("progress"),
@@ -111,122 +121,200 @@ describe("the timeline", () => {
       [...ENTRY_KINDS].toSorted(),
     );
     expect(new Set(Object.values(ENTRY_ICONS)).size).toBe(ENTRY_KINDS.length);
-    const drawn = rows(
-      render(<Timeline page={page(written, task())} now={100} />),
+    const html = draw(page(written, task({ state: "canceled", claim: null })));
+    expect(html).toContain(
+      '<span class="external-tasks-line-verb">Opened</span>',
     );
+    const drawn = rows(html);
     expect(drawn).toHaveLength(written.length);
-    written.toReversed().forEach((e, i) => {
-      const html = drawn[i]!;
-      const icon = render(
-        <Icon
-          name={ENTRY_ICONS[e.kind]}
-          size={14}
-          class="external-tasks-kind-icon"
-        />,
+    written.forEach((e, i) => {
+      const line = drawn[i]!;
+      expect(line).toContain(
+        `<span class="external-tasks-line-verb">${VERBS[e.kind]}</span>`,
       );
-      expect(html).toContain(icon);
-      expect(html).toContain(`${entryWords(e)}</span>`);
+      if (e.kind === "claim") {
+        // a claim wears the in-progress ring
+        expect(line).toContain("external-tasks-ring");
+      } else {
+        expect(line).toContain(
+          render(
+            <Icon
+              name={ENTRY_ICONS[e.kind]}
+              size={14}
+              class="external-tasks-line-icon"
+            />,
+          ),
+        );
+      }
     });
-    expect(ENTRY_WORDS.claim).toBe("Claimed");
   });
 
-  test("names a sweep's unclaim by its reason after a comma", () => {
-    const [access, idle, member] = rows(
-      render(
-        <Timeline
-          page={page([
-            entry("unclaim", { claimEnd: "unclaimed", claimId: "c1" }),
-            entry("unclaim", { by: null, claimEnd: "idle", claimId: "c2" }),
+  test("names who only on the moves that change who holds the task", () => {
+    const [claimed, reported, unclaimed, answered] = rows(
+      draw(
+        page([
+          entry("claim"),
+          entry("progress"),
+          entry("unclaim", { claimEnd: "unclaimed", keyName: null }),
+          entry("answer"),
+        ]),
+      ),
+    );
+    expect(claimed).toContain(
+      '<span class="external-tasks-line-user cut">@stefan</span><span class="external-tasks-line-via">via</span><span class="tag external-tasks-key" title="laptop-claude">laptop-claude</span>',
+    );
+    expect(reported).not.toContain("external-tasks-line-who");
+    expect(unclaimed).toContain("@stefan");
+    expect(unclaimed).not.toContain("laptop-claude");
+    expect(answered).toContain("@stefan");
+    // users are plain words, never a link inside the line
+    expect(claimed).not.toContain("href=");
+  });
+
+  test("1ctx's release reads Unclaimed by 1ctx with its reason", () => {
+    const [idle, gone, deleted] = rows(
+      draw(
+        page(
+          [
+            entry("unclaim", {
+              by: null,
+              keyName: null,
+              claimEnd: "idle",
+              text: "after 1 day without a report",
+            }),
             entry("unclaim", {
               by: null,
               keyName: null,
               claimEnd: "access_gone",
-              claimId: "c3",
+              text: "access ended",
             }),
-          ])}
-          now={100}
-        />,
+            entry("unclaim", { by: null, keyName: "laptop-claude" }),
+          ],
+          task({ state: "todo", claim: null }),
+        ),
       ),
     );
-    expect(access).toContain("Unclaimed, access gone</span>");
-    expect(idle).toContain("Unclaimed, idle</span>");
-    expect(member).toContain("Unclaimed</span>");
-  });
-
-  test("tells an agent, a member, a deleted user's key and 1ctx apart", () => {
-    const [gone, agent, member, system] = rows(
-      render(
-        <Timeline
-          page={page([
-            entry("unclaim", { by: null, claimEnd: "idle" }),
-            entry("answer"),
-            entry("claim"),
-            entry("claim", { by: null }),
-          ])}
-          now={100}
-        />,
-      ),
+    expect(idle).toContain(
+      '<span class="external-tasks-line-via">by</span><span class="external-tasks-by-faint">1ctx</span>',
+    );
+    expect(idle).toContain(
+      '<span class="external-tasks-line-text cut">idle</span>',
     );
     expect(gone).toContain(
-      '<span class="external-tasks-by-faint">a deleted user</span> via <span class="tag">laptop-claude</span>',
+      '<span class="external-tasks-line-text cut">access gone</span>',
     );
-    expect(gone).toContain('title="a deleted user via laptop-claude"');
-    expect(gone).not.toContain(">1ctx<");
-    expect(agent).toContain('href="/users/stefan"');
-    expect(agent).toContain('<span class="rows-handle">@stefan</span>');
-    expect(agent).toContain(' via <span class="tag">laptop-claude</span>');
-    expect(agent).toContain('title="@stefan via laptop-claude"');
-    expect(member).toContain('<span class="rows-handle">@stefan</span>');
-    expect(member).not.toContain('class="tag"');
-    expect(system).toContain(
-      '<span class="external-tasks-by-faint">1ctx</span>',
+    expect(deleted).toContain(
+      '<span class="external-tasks-by-faint">a deleted user</span>',
     );
-    expect(system).not.toContain("rows-handle");
+    expect(sweepReason({ kind: "unclaim", claimEnd: "unclaimed" })).toBeNull();
   });
 
-  test("colours only a question still waiting, and never green", () => {
+  test("a member since deleted is never 1ctx", () => {
+    const base = page(
+      [
+        entry("answer", { by: null }),
+        entry("reopen", { by: null }),
+        entry("unclaim", { by: null, claimEnd: "unclaimed" }),
+      ],
+      task({ state: "todo", claim: null, createdBy: null }),
+    );
+    const html = draw(base);
+    expect(html).not.toContain(">1ctx<");
+    // the Opened line and each of the three
+    expect(html.match(/>a deleted user</g)).toHaveLength(4);
+  });
+
+  test("the waiting question starts open, coloured, with the answer box", () => {
     const asked = [
       entry("claim"),
-      entry("question", { text: "Which\nbranch?" }),
+      entry("question", { text: "Which `branch`?\nmore" }),
     ];
-    const waiting = render(
-      <Timeline
-        page={page(asked, task({ state: "awaiting_input" }))}
-        now={100}
-      />,
-    );
+    const waiting = draw(page(asked, task({ state: "awaiting_input" })));
     expect(waiting.match(/status-attention/g)).toHaveLength(1);
-    expect(rows(waiting)[0]).toContain("status-attention");
-    const answered = render(
-      <Timeline
-        page={page([...asked, entry("answer", { text: "Main." })])}
-        now={100}
-      />,
-    );
+    const question = rows(waiting)[1]!;
+    expect(question).toContain('id="question"');
+    expect(question).toContain('aria-expanded="true"');
+    expect(question).toContain("external-tasks-line-body");
+    expect(question).toContain("answer here");
+    // answered, nothing waits and no box shows
+    const answered = draw(page([...asked, entry("answer", { text: "Main." })]));
     expect(answered).not.toContain("status-");
-    const [answer] = rows(answered);
-    expect(answer).toContain('class="external-tasks-entry-pair cut"');
-    expect(answer).toContain("Which branch?</p>");
-    const done = render(
-      <Timeline
-        page={page(
-          [...asked, entry("result", { claimEnd: "done" })],
+    expect(answered).not.toContain("answer here");
+    // the answer, opened, names its question on one line
+    const read = activityOf(
+      page([...asked, entry("answer", { text: "Main." })]).entries,
+      task(),
+    );
+    expect(read[2]!.question).toBe("Which branch?");
+  });
+
+  test("on a task in progress the latest report starts open", () => {
+    const lines = rows(
+      draw(
+        page([
+          entry("claim"),
+          entry("progress", { text: "First" }),
+          entry("progress", { text: "Second" }),
+        ]),
+      ),
+    );
+    expect(lines[1]).toContain('aria-expanded="false"');
+    expect(lines[2]).toContain('aria-expanded="true"');
+    expect(lines[2]).toContain('<p class="md-p">Second</p>');
+    // a closed task opens none
+    const done = rows(
+      draw(
+        page(
+          [entry("claim"), entry("result", { claimEnd: "done" })],
           task({ state: "done", claim: null }),
-        )}
-        now={100}
-      />,
+        ),
+      ),
     );
-    expect(done).not.toContain("status-");
-    const moved = render(
-      <Timeline
-        page={page(
-          [...asked, entry("progress")],
-          task({ state: "in_progress" }),
-        )}
-        now={100}
-      />,
+    expect(done.join("")).not.toContain('aria-expanded="true"');
+  });
+
+  test("a line with no words is no button", () => {
+    const [claimed] = rows(draw(page([entry("claim")])));
+    expect(claimed).not.toContain("<button");
+  });
+
+  test("earlier entries load with Show earlier, in the Opened line's place", () => {
+    const html = draw({ ...page([entry("progress")]), next: "e0" });
+    expect(html).toContain("Show earlier");
+    expect(html).not.toContain(">Opened<");
+  });
+
+  test("the Opened line names the chat only when the reader may open it", () => {
+    const base = page([]);
+    const named = draw({
+      ...base,
+      detail: { ...base.detail, chatId: "s1", chatTitle: "Plan it" },
+    });
+    expect(named).toContain('href="/chat/s1"');
+    expect(named).toContain(">Plan it</a>");
+    const hidden = draw({
+      ...base,
+      detail: { ...base.detail, chatId: "s1", chatTitle: null },
+    });
+    expect(hidden).toContain("<span>a chat</span>");
+    expect(hidden).not.toContain("/chat/s1");
+  });
+
+  test("a line's words are the text's first line as a reader sees it", () => {
+    const read = activityOf(
+      [
+        entry("result", {
+          text: "See [the brief](https://x.test/b) and `a_b`\nmore",
+        }),
+      ],
+      task({ state: "done", claim: null }),
     );
-    expect(moved).not.toContain("status-attention");
+    expect(read[0]!.line).toBe("See the brief and a_b");
+    const open = activityOf(
+      [entry("progress", { text: "" })],
+      task({ state: "in_progress" }),
+    );
+    expect(open[0]!.open).toBe(false);
   });
 });
 

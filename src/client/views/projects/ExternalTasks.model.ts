@@ -10,7 +10,6 @@ import type {
   PatchExternalTaskRequest,
 } from "../../../shared/api/external-tasks.ts";
 import {
-  type ExternalTaskClaim,
   type ExternalTaskDetail,
   type ExternalTaskEntry,
   type ExternalTaskFile,
@@ -19,71 +18,145 @@ import {
   MAX_TASK_LABELS,
 } from "../../../shared/contracts/external-task.ts";
 import {
-  type EntryKind,
-  EXTERNAL_TASK_STATE_WORDS,
+  type ClaimEnd,
   type ExternalTaskState,
   hasLineBreak,
   MAX_TITLE,
 } from "../../../shared/words.ts";
 import { clock, longDate } from "../../lib/format.ts";
-import type { IconName } from "../../lib/icons.tsx";
+import { plainLine } from "../../lib/plain.ts";
 
 export const INTRO = "Work for an agent you run outside 1ctx.";
 export const UNCLAIMED = "Ask your agent to claim this task.";
 
-export const claimWords = (claim: ExternalTaskClaim): string =>
-  `claimed by ${claim.username} via ${claim.keyName}`;
-
-// the state as a row's sub and the brief's line say it
-export function stateLine(
-  row: Pick<ExternalTaskRow, "state" | "claim">,
-): string {
-  if (row.state === "in_progress" && row.claim !== null) {
-    return claimWords(row.claim);
-  }
-  if (row.state === "awaiting_input" && row.claim !== null) {
-    return `awaiting input · ${claimWords(row.claim)}`;
-  }
-  return EXTERNAL_TASK_STATE_WORDS[row.state].toLowerCase();
-}
-
-// a row's line: the icon and the section say todo, done and canceled
-export const rowLine = (row: Pick<ExternalTaskRow, "state" | "claim">) =>
-  row.state === "in_progress" || row.state === "awaiting_input"
-    ? stateLine(row)
-    : "";
-
-export const ENTRY_WORDS: Record<EntryKind, string> = {
-  claim: "Claimed",
-  progress: "Progress",
-  question: "Question",
-  result: "Result",
-  unclaim: "Unclaimed",
-  answer: "Answer",
-  cancel: "Canceled",
-  reopen: "Reopened",
-};
-
 export const GONE_USER = "a deleted user";
 
-// who wrote an entry: an agent through a key, a member, or 1ctx itself;
-// a key outlives its deleted user
-export function entryBy(
-  entry: Pick<ExternalTaskEntry, "by" | "keyName">,
-): string {
-  const who = entry.by === null ? null : `@${entry.by.username}`;
-  if (entry.keyName !== null) return `${who ?? GONE_USER} via ${entry.keyName}`;
-  return who ?? "1ctx";
+type Who = Pick<ExternalTaskEntry, "kind" | "by" | "keyName" | "claimEnd">;
+
+// 1ctx's release says why in a word; its text says it whole
+const SWEEP_REASONS: Partial<Record<ClaimEnd, string>> = {
+  idle: "idle",
+  access_gone: "access gone",
+};
+
+// the reason of an unclaim 1ctx made, null for any other entry
+export function sweepReason(
+  entry: Pick<ExternalTaskEntry, "kind" | "claimEnd">,
+): string | null {
+  if (entry.kind !== "unclaim" || entry.claimEnd === null) return null;
+  return SWEEP_REASONS[entry.claimEnd] ?? null;
 }
 
-// the row's second line: the latest entry, cut by the server; none
-// before the first
-export function lastLine(row: Pick<ExternalTaskRow, "last">): string | null {
-  if (row.last === null) return null;
-  const text = row.last.text.replace(/\s+/g, " ").trim();
-  return text === ""
-    ? ENTRY_WORDS[row.last.kind]
-    : `${ENTRY_WORDS[row.last.kind]}: ${text}`;
+// who wrote an entry: an agent through a key, a member, or 1ctx on its
+// own releases; with no user otherwise, the user was deleted, and a key
+// outlives them
+export function entryBy(entry: Who): string {
+  const who =
+    entry.by !== null
+      ? `@${entry.by.username}`
+      : sweepReason(entry) !== null
+        ? "1ctx"
+        : GONE_USER;
+  return entry.keyName === null ? who : `${who} via ${entry.keyName}`;
+}
+
+// who opened a task; a deleted creator is named as one
+export const openerOf = (row: Pick<ExternalTaskRow, "createdBy">): string =>
+  row.createdBy === null ? GONE_USER : `@${row.createdBy.username}`;
+
+// a row's second line, who moved it last: the question a task awaits,
+// who holds it, who opened, gave back or reopened it, who closed it
+export function rowLine(
+  row: Pick<ExternalTaskRow, "state" | "claim" | "last" | "createdBy">,
+): string {
+  const last = row.last;
+  switch (row.state) {
+    case "awaiting_input":
+      if (last?.kind === "question") return plainLine(last.text);
+      break;
+    case "done":
+      if (last?.kind === "result") return `Done by ${entryBy(last)}`;
+      return "Done";
+    case "canceled":
+      if (last?.kind === "cancel") return `Canceled by ${entryBy(last)}`;
+      return "Canceled";
+    case "todo":
+      if (last?.kind === "reopen") return `Reopened by ${entryBy(last)}`;
+      if (last?.kind === "unclaim") {
+        const reason = sweepReason(last);
+        return `Unclaimed by ${entryBy(last)}${reason === null ? "" : `, ${reason}`}`;
+      }
+      return `Opened by ${openerOf(row)}`;
+    default:
+      break;
+  }
+  return row.claim === null
+    ? ""
+    : `Claimed by @${row.claim.username} via ${row.claim.keyName}`;
+}
+
+// the line under a task's title: when it last moved, never who
+export function movedWords(
+  row: Pick<ExternalTaskRow, "state" | "last">,
+): string {
+  switch (row.state) {
+    case "awaiting_input":
+      return "Asked";
+    case "in_progress":
+      return "Updated";
+    case "done":
+      return "Done";
+    case "canceled":
+      return "Canceled";
+    default:
+      return row.last?.kind === "reopen"
+        ? "Reopened"
+        : row.last?.kind === "unclaim"
+          ? "Unclaimed"
+          : "Opened";
+  }
+}
+
+// the tab's groups, in the order of whose turn it is
+export const GROUPS = [
+  { state: "awaiting_input", label: "Awaiting input" },
+  { state: "in_progress", label: "In progress" },
+  { state: "todo", label: "Todo" },
+] as const satisfies readonly { state: ExternalTaskState; label: string }[];
+
+export type GroupState = (typeof GROUPS)[number]["state"];
+
+// a group shows this many rows, then Show more adds as many again
+export const GROUP_ROWS = 20;
+
+export type TaskGroup = {
+  state: GroupState;
+  label: string;
+  rows: ExternalTaskRow[];
+  total: number;
+  more: boolean;
+};
+
+// the unfinished rows as the tab draws them: each state that has a row,
+// cut to what its Show more has opened
+export function groupsOf(
+  rows: readonly ExternalTaskRow[],
+  shown: Partial<Record<GroupState, number>>,
+): TaskGroup[] {
+  return GROUPS.flatMap(({ state, label }) => {
+    const all = rows.filter((row) => row.state === state);
+    if (all.length === 0) return [];
+    const limit = shown[state] ?? GROUP_ROWS;
+    return [
+      {
+        state,
+        label,
+        rows: all.slice(0, limit),
+        total: all.length,
+        more: all.length > limit,
+      },
+    ];
+  });
 }
 
 // an entry's link is a link only when it is a web address
@@ -100,25 +173,6 @@ export function webLink(text: string): boolean {
 export function fileLabel(file: Pick<ExternalTaskFile, "name" | "deleted">) {
   if (!file.deleted && file.name !== null) return file.name;
   return file.name === null ? "a deleted file" : `deleted: ${file.name}`;
-}
-
-// the state's icon and its colour; only awaiting input asks a member
-export function taskIcon(row: Pick<ExternalTaskRow, "state">): {
-  name: IconName;
-  status: "running" | "done" | "attention" | "stopped" | null;
-} {
-  switch (row.state) {
-    case "awaiting_input":
-      return { name: "question", status: "attention" };
-    case "in_progress":
-      return { name: "play", status: "running" };
-    case "done":
-      return { name: "check", status: "done" };
-    case "canceled":
-      return { name: "cancelled", status: "stopped" };
-    default:
-      return { name: "task-open", status: null };
-  }
 }
 
 // when the idle sweep unclaims this claim, from its last report on the
@@ -193,6 +247,8 @@ export const MOVE_WORDS: Record<
 };
 
 // the brief's form
+export const NO_LABEL = "Pick at least one label.";
+
 export type Draft = {
   title: string;
   labels: string[];
@@ -206,6 +262,53 @@ export function draftOf(detail: ExternalTaskDetail | null): Draft {
     labels: detail.task.labels,
     fileIds: detail.files.map((f) => f.fileId),
   };
+}
+
+type LabelRef = { id: string; name: string };
+
+// the ids a task's label names stand for among the project's labels as
+// the form opened; a name the project no longer has is left out
+export function labelIdsOf(
+  names: readonly string[],
+  labels: readonly LabelRef[],
+): string[] {
+  return names.flatMap((name) => {
+    const label = labels.find((l) => l.name === name);
+    return label === undefined ? [] : [label.id];
+  });
+}
+
+// the picked labels by their names now: a label renamed since it was
+// picked takes its new name, a deleted one goes
+export function labelNamesOf(
+  ids: readonly string[],
+  labels: readonly LabelRef[],
+): string[] {
+  return ids.flatMap((id) => {
+    const label = labels.find((l) => l.id === id);
+    return label === undefined ? [] : [label.name];
+  });
+}
+
+// a label picked joins the others, once and at most MAX_TASK_LABELS;
+// a pick deleted from the project since leaves first, so it never
+// holds a place the form shows as free
+export function pickLabel(
+  ids: readonly string[],
+  id: string,
+  labels: readonly LabelRef[],
+): string[] {
+  const live = ids.filter((l) => labels.some((label) => label.id === l));
+  if (!labels.some((label) => label.id === id)) return live;
+  if (live.includes(id) || live.length >= MAX_TASK_LABELS) return live;
+  return [...live, id];
+}
+
+// a file made in the form joins its links, once and within the bound
+export function withFile(draft: Draft, fileId: string): Draft {
+  if (draft.fileIds.includes(fileId)) return draft;
+  if (draft.fileIds.length >= MAX_TASK_FILES) return draft;
+  return { ...draft, fileIds: [...draft.fileIds, fileId] };
 }
 
 // the links are in order, so an order changed is a change
@@ -227,7 +330,8 @@ export function requestOf(
       field: "title",
     };
   }
-  if (draft.labels.length === 0 || draft.labels.length > MAX_TASK_LABELS) {
+  if (draft.labels.length === 0) return { problem: NO_LABEL, field: "labels" };
+  if (draft.labels.length > MAX_TASK_LABELS) {
     return {
       problem: `labels: pick 1 to ${MAX_TASK_LABELS}`,
       field: "labels",

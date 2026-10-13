@@ -126,7 +126,7 @@ test("the hourly sweep reads live idle limits and spares claims awaiting input a
     state: "todo",
     claim: null,
     movedAt: f.app.now.value,
-    last: { kind: "unclaim", by: null, keyName: null },
+    last: { kind: "unclaim", by: null, keyName: null, claimEnd: "idle" },
   });
   expect(unclaimed.entries[0]).toMatchObject({
     kind: "unclaim",

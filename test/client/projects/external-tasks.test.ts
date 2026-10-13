@@ -19,6 +19,15 @@ import {
   taskPage,
 } from "../../../src/client/data/external-task.ts";
 import {
+  HELD_FILES,
+  onTaskFilesSocket,
+  openTaskFile,
+  readsOnOpen,
+  taskFileKey,
+  taskFileRead,
+  taskFiles,
+} from "../../../src/client/data/external-task-files.ts";
+import {
   closedCount,
   closedFilter,
   closedPages,
@@ -38,22 +47,30 @@ import {
   waitingTasks,
 } from "../../../src/client/data/waiting-tasks.ts";
 import {
+  createAndLink,
+  makeTaskFile,
+} from "../../../src/client/views/projects/ExternalTaskNewFile.tsx";
+import {
   chatName,
   claimDeadline,
-  claimWords,
   deadlineTime,
   draftOf,
   entryBy,
   fileLabel,
-  lastLine,
+  GROUP_ROWS,
+  groupsOf,
+  labelIdsOf,
+  labelNamesOf,
+  movedWords,
   movesOf,
+  NO_LABEL,
   patchOf,
+  pickLabel,
   requestOf,
   rowLine,
-  stateLine,
   taskFieldOf,
-  taskIcon,
   webLink,
+  withFile,
 } from "../../../src/client/views/projects/ExternalTasks.model.ts";
 import type {
   ExternalTaskResponse,
@@ -65,8 +82,9 @@ import {
   type ExternalTaskRow,
   MAX_TASK_FILES,
 } from "../../../src/shared/contracts/external-task.ts";
+import type { KnowledgeFile } from "../../../src/shared/contracts/knowledge.ts";
 import type { SocketEvent } from "../../../src/shared/socket.ts";
-import { MAX_TITLE } from "../../../src/shared/words.ts";
+import { type ClaimEnd, MAX_TITLE } from "../../../src/shared/words.ts";
 
 const claim = {
   id: "c1",
@@ -110,65 +128,182 @@ const detail = (
 });
 
 describe("the words", () => {
-  test("a claim names its user and key", () => {
-    expect(claimWords(claim)).toBe("claimed by stefan via laptop-claude");
-    expect(stateLine(row({ state: "in_progress", claim }))).toBe(
-      "claimed by stefan via laptop-claude",
+  test("a row's second line says who moved it last, per state", () => {
+    const by = { id: "u2", username: "ana" };
+    const last = (
+      kind: NonNullable<ExternalTaskRow["last"]>["kind"],
+      who: {
+        by: typeof by | null;
+        keyName: string | null;
+        claimEnd?: ClaimEnd;
+      },
+      text = "",
+    ): ExternalTaskRow["last"] => ({
+      kind,
+      text,
+      at: 5,
+      claimEnd: null,
+      ...who,
+    });
+    // awaiting input: the question, on one line
+    expect(
+      rowLine(
+        row({
+          state: "awaiting_input",
+          claim,
+          last: last(
+            "question",
+            { by, keyName: "laptop" },
+            "Which `branch`?\nmore",
+          ),
+        }),
+      ),
+    ).toBe("Which branch?");
+    expect(rowLine(row({ state: "in_progress", claim }))).toBe(
+      "Claimed by @stefan via laptop-claude",
     );
-    expect(stateLine(row({ state: "awaiting_input", claim }))).toBe(
-      "awaiting input · claimed by stefan via laptop-claude",
-    );
-    expect(stateLine(row({ state: "done" }))).toBe("done");
-    expect(stateLine(row({ state: "todo" }))).toBe("todo");
+    // todo: who opened it, else who reopened or gave it back last
+    expect(rowLine(row())).toBe("Opened by @stefan");
+    expect(rowLine(row({ createdBy: null }))).toBe("Opened by a deleted user");
+    expect(
+      rowLine(row({ last: last("reopen", { by, keyName: null }, "again") })),
+    ).toBe("Reopened by @ana");
+    expect(
+      rowLine(row({ last: last("unclaim", { by, keyName: "laptop" }) })),
+    ).toBe("Unclaimed by @ana via laptop");
+    // only 1ctx's own releases name it, with their reason
+    expect(
+      rowLine(
+        row({
+          last: last("unclaim", { by: null, keyName: null, claimEnd: "idle" }),
+        }),
+      ),
+    ).toBe("Unclaimed by 1ctx, idle");
+    expect(
+      rowLine(
+        row({
+          last: last("unclaim", {
+            by: null,
+            keyName: null,
+            claimEnd: "access_gone",
+          }),
+        }),
+      ),
+    ).toBe("Unclaimed by 1ctx, access gone");
+    // a member since deleted is never 1ctx
+    expect(
+      rowLine(
+        row({
+          last: last("unclaim", {
+            by: null,
+            keyName: null,
+            claimEnd: "unclaimed",
+          }),
+        }),
+      ),
+    ).toBe("Unclaimed by a deleted user");
+    expect(
+      rowLine(row({ last: last("reopen", { by: null, keyName: null }) })),
+    ).toBe("Reopened by a deleted user");
+    // a reopen not the latest entry says nothing of it
+    expect(
+      rowLine(row({ last: last("progress", { by, keyName: "laptop" }) })),
+    ).toBe("Opened by @stefan");
+    expect(
+      rowLine(
+        row({
+          state: "done",
+          last: last("result", { by, keyName: "laptop" }, "Shipped"),
+        }),
+      ),
+    ).toBe("Done by @ana via laptop");
+    expect(
+      rowLine(
+        row({ state: "canceled", last: last("cancel", { by, keyName: null }) }),
+      ),
+    ).toBe("Canceled by @ana");
+    expect(
+      rowLine(
+        row({
+          state: "canceled",
+          last: last("cancel", { by: null, keyName: null }),
+        }),
+      ),
+    ).toBe("Canceled by a deleted user");
   });
 
-  test("a row names only a claim, the icon says the rest", () => {
-    expect(rowLine(row({ state: "awaiting_input", claim }))).toBe(
-      "awaiting input · claimed by stefan via laptop-claude",
+  test("the page's line says when the task last moved, never who", () => {
+    expect(movedWords(row({ state: "awaiting_input" }))).toBe("Asked");
+    expect(movedWords(row({ state: "in_progress" }))).toBe("Updated");
+    expect(movedWords(row({ state: "done" }))).toBe("Done");
+    expect(movedWords(row({ state: "canceled" }))).toBe("Canceled");
+    expect(movedWords(row())).toBe("Opened");
+    const at = { text: "", at: 1, by: null, keyName: null, claimEnd: null };
+    expect(movedWords(row({ last: { kind: "reopen", ...at } }))).toBe(
+      "Reopened",
     );
-    expect(rowLine(row({ state: "in_progress", claim }))).toBe(
-      "claimed by stefan via laptop-claude",
+    expect(movedWords(row({ last: { kind: "unclaim", ...at } }))).toBe(
+      "Unclaimed",
     );
-    for (const state of ["todo", "done", "canceled"] as const) {
-      expect(rowLine(row({ state }))).toBe("");
-    }
+  });
+
+  test("the tab groups by whose turn it is, twenty rows a group", () => {
+    const many = (state: ExternalTaskRow["state"], n: number) =>
+      Array.from({ length: n }, (_, i) => row({ id: `${state}${i}`, state }));
+    const rows = [
+      ...many("todo", 3),
+      ...many("in_progress", 45),
+      ...many("awaiting_input", 1),
+    ];
+    const groups = groupsOf(rows, {});
+    expect(groups.map((g) => g.label)).toEqual([
+      "Awaiting input",
+      "In progress",
+      "Todo",
+    ]);
+    const progress = groups[1]!;
+    expect(progress.total).toBe(45);
+    expect(progress.rows).toHaveLength(GROUP_ROWS);
+    expect(progress.more).toBe(true);
+    expect(groups[2]!.more).toBe(false);
+    // Show more adds twenty, then the rest
+    expect(groupsOf(rows, { in_progress: 40 })[1]!.rows).toHaveLength(40);
+    const all = groupsOf(rows, { in_progress: 60 })[1]!;
+    expect(all.rows).toHaveLength(45);
+    expect(all.more).toBe(false);
+    // a state with no row has no group
+    expect(groupsOf(many("todo", 2), {}).map((g) => g.state)).toEqual(["todo"]);
   });
 
   test("an entry names who wrote it", () => {
     const by = { id: "u1", username: "stefan" };
-    expect(entryBy({ by: null, keyName: null })).toBe("1ctx");
-    expect(entryBy({ by: null, keyName: "laptop-claude" })).toBe(
+    const e = (
+      changes: Partial<Pick<ExternalTaskEntry, "by" | "keyName" | "kind">> & {
+        claimEnd?: ClaimEnd | null;
+      },
+    ) => ({
+      kind: "answer" as ExternalTaskEntry["kind"],
+      by: null,
+      keyName: null,
+      claimEnd: null,
+      ...changes,
+    });
+    // 1ctx only on its own releases; any other entry with no user had one
+    expect(entryBy(e({ kind: "unclaim", claimEnd: "idle" }))).toBe("1ctx");
+    expect(entryBy(e({ kind: "unclaim", claimEnd: "access_gone" }))).toBe(
+      "1ctx",
+    );
+    expect(entryBy(e({}))).toBe("a deleted user");
+    expect(entryBy(e({ kind: "unclaim", claimEnd: "unclaimed" }))).toBe(
+      "a deleted user",
+    );
+    expect(entryBy(e({ keyName: "laptop-claude" }))).toBe(
       "a deleted user via laptop-claude",
     );
-    expect(entryBy({ by, keyName: null })).toBe("@stefan");
-    expect(entryBy({ by, keyName: "laptop-claude" })).toBe(
+    expect(entryBy(e({ by }))).toBe("@stefan");
+    expect(entryBy(e({ by, keyName: "laptop-claude" }))).toBe(
       "@stefan via laptop-claude",
     );
-  });
-
-  test("the last line is the latest entry on one line", () => {
-    // no line at all before the first entry
-    expect(lastLine(row())).toBeNull();
-    expect(
-      lastLine(
-        row({
-          last: {
-            kind: "question",
-            text: "Which\nbranch?",
-            at: 1,
-            by: null,
-            keyName: null,
-          },
-        }),
-      ),
-    ).toBe("Question: Which branch?");
-    expect(
-      lastLine(
-        row({
-          last: { kind: "cancel", text: "", at: 1, by: null, keyName: null },
-        }),
-      ),
-    ).toBe("Canceled");
   });
 
   test("a deleted file is marked, by its name while history has it", () => {
@@ -238,20 +373,6 @@ describe("the words", () => {
     // a short title ending in … was written so
     expect(chatName("What if we…")).toBe("What if we…");
   });
-
-  test("only a task awaiting input takes the attention colour", () => {
-    expect(taskIcon(row({ state: "in_progress" })).status).toBe("running");
-    expect(taskIcon(row({ state: "done" })).status).toBe("done");
-    expect(taskIcon(row({ state: "awaiting_input" }))).toEqual({
-      name: "question",
-      status: "attention",
-    });
-    expect(taskIcon(row({ state: "canceled" })).name).toBe("cancelled");
-  });
-
-  test("a todo task waits for a claim, never a clock", () => {
-    expect(taskIcon(row())).toEqual({ name: "task-open", status: null });
-  });
 });
 
 describe("the moves", () => {
@@ -311,6 +432,21 @@ describe("the brief's form", () => {
         fileIds: Array.from({ length: MAX_TASK_FILES + 1 }, (_, i) => `f${i}`),
       }),
     ).toMatchObject({ field: "files" });
+  });
+
+  test("a task whose labels were all deleted sends no edit until it has one", () => {
+    const bare = detail({ task: row({ labels: [] }) });
+    // even a title alone is refused here, as the server would
+    expect(requestOf({ ...draftOf(bare), title: "Renamed" })).toEqual({
+      problem: NO_LABEL,
+      field: "labels",
+    });
+    const picked = requestOf({ ...draftOf(bare), labels: ["fix"] });
+    if (!("body" in picked)) throw new Error("refused");
+    expect(patchOf(picked.body, bare, 2)).toEqual({
+      editRevision: 2,
+      labels: ["fix"],
+    });
   });
 
   test("a title is sent trimmed", () => {
@@ -1119,4 +1255,238 @@ describe("the entity", () => {
       expect(taskPage.value?.detail.task.state).toBe("canceled");
     },
   );
+});
+
+describe("the form's files and labels", () => {
+  const labelsOf = (...ids: string[]) =>
+    ids.map((id) => ({ id, name: `label ${id}` }));
+
+  test("a label picked joins once, at most three", () => {
+    const all = labelsOf("l1", "l2", "a", "b", "c", "d");
+    expect(pickLabel(["l1"], "l2", all)).toEqual(["l1", "l2"]);
+    expect(pickLabel(["l1"], "l1", all)).toEqual(["l1"]);
+    expect(pickLabel(["a", "b", "c"], "d", all)).toEqual(["a", "b", "c"]);
+  });
+
+  test("a label deleted since the form opened frees its place", () => {
+    expect(pickLabel(["a", "b", "c"], "d", labelsOf("a", "b", "d"))).toEqual([
+      "a",
+      "b",
+      "d",
+    ]);
+    expect(pickLabel(["a", "b", "c"], "d", labelsOf("d"))).toEqual(["d"]);
+    // a label deleted before the pick lands is not picked
+    expect(pickLabel(["a"], "d", labelsOf("a"))).toEqual(["a"]);
+  });
+
+  test("a file joins once, at most five", () => {
+    const draft = { title: "", labels: [], fileIds: ["f1"] };
+    expect(withFile(draft, "f2").fileIds).toEqual(["f1", "f2"]);
+    expect(withFile(draft, "f1")).toBe(draft);
+    const full = { ...draft, fileIds: ["1", "2", "3", "4", "5"] };
+    expect(withFile(full, "6")).toBe(full);
+  });
+
+  test.serial(
+    "New file makes the file through the knowledge route and links it",
+    async () => {
+      answer = (method, url) =>
+        method === "POST" && url === "/api/projects/p1/knowledge"
+          ? Response.json(
+              {
+                file: {
+                  id: "f9",
+                  projectId: "p1",
+                  name: "briefs/sweep.md",
+                  kind: "md",
+                  bytes: 5,
+                  lines: 1,
+                  tokens: 2,
+                  revision: 1,
+                  author: null,
+                  createdAt: 1,
+                  updatedAt: 1,
+                },
+              },
+              { status: 201 },
+            )
+          : Response.json({ error: "no" }, { status: 404 });
+      const id = await makeTaskFile("p1", " briefs/sweep.md ", "# Plan");
+      expect(calls).toEqual([
+        {
+          call: "POST /api/projects/p1/knowledge",
+          body: { name: "briefs/sweep.md", text: "# Plan" },
+        },
+      ]);
+      const draft = { title: "Sweep", labels: ["build"], fileIds: ["f1"] };
+      const linked = withFile(draft, id);
+      expect(linked.fileIds).toEqual(["f1", "f9"]);
+      expect(requestOf(linked)).toEqual({
+        body: { title: "Sweep", labels: ["build"], fileIds: ["f1", "f9"] },
+      });
+    },
+  );
+
+  test.serial("a file opened in place is read once per revision", async () => {
+    answer = () =>
+      Response.json({
+        file: { text: "# Plan", html: '<h1 class="md-h1">Plan</h1>' },
+      });
+    await openTaskFile("p1", "f1", 3);
+    await openTaskFile("p1", "f1", 3);
+    expect(calls.map((c) => c.call)).toEqual([
+      "GET /api/projects/p1/knowledge/files/f1",
+    ]);
+    expect(taskFileRead("f1", 3)).toEqual({
+      state: "done",
+      html: '<h1 class="md-h1">Plan</h1>',
+      text: "# Plan",
+    });
+    // a file written since is read again
+    await openTaskFile("p1", "f1", 4);
+    expect(calls).toHaveLength(2);
+  });
+
+  test.serial(
+    "a failed file read is read again when its row opens",
+    async () => {
+      let fail = true;
+      answer = () =>
+        fail
+          ? Response.json({ error: "busy" }, { status: 503 })
+          : Response.json({ file: { text: "x", html: null } });
+      expect(readsOnOpen(taskFileRead("f1", 7))).toBe(true);
+      await openTaskFile("p1", "f1", 7);
+      expect(taskFileRead("f1", 7)?.state).toBe("failed");
+      expect(readsOnOpen(taskFileRead("f1", 7))).toBe(true);
+      fail = false;
+      await openTaskFile("p1", "f1", 7);
+      expect(taskFileRead("f1", 7)?.state).toBe("done");
+      expect(readsOnOpen(taskFileRead("f1", 7))).toBe(false);
+      expect(readsOnOpen({ state: "loading" })).toBe(false);
+    },
+  );
+
+  test.serial("the files opened in place stay bounded", async () => {
+    answer = () => Response.json({ file: { text: "x", html: null } });
+    for (let i = 0; i < HELD_FILES + 4; i++) {
+      await openTaskFile("p1", `f${i}`, 1);
+    }
+    expect(taskFiles.value.size).toBe(HELD_FILES);
+    // the least recent went first
+    expect(taskFiles.value.has(taskFileKey("f0", 1))).toBe(false);
+    expect(taskFiles.value.has(taskFileKey(`f${HELD_FILES + 3}`, 1))).toBe(
+      true,
+    );
+  });
+
+  test("labels are held by id, so renames and reused names stay right", () => {
+    const opened = detail({ task: row({ labels: ["build"] }) });
+    const before = [
+      { id: "l1", name: "build" },
+      { id: "l2", name: "fix" },
+    ];
+    const ids = labelIdsOf(draftOf(opened).labels, before);
+    expect(ids).toEqual(["l1"]);
+    // build is renamed backend, then a new label takes the name build
+    const after = [
+      { id: "l1", name: "backend" },
+      { id: "l2", name: "fix" },
+      { id: "l3", name: "build" },
+    ];
+    expect(labelNamesOf(ids, after)).toEqual(["backend"]);
+    // picking the new build picks it, never the old one
+    const picked = pickLabel(ids, "l3", after);
+    expect(labelNamesOf(picked, after)).toEqual(["backend", "build"]);
+    // a title-only save sends no stale name
+    const live = {
+      ...draftOf(opened),
+      title: "Renamed",
+      labels: labelNamesOf(ids, after),
+    };
+    const request = requestOf(live);
+    if (!("body" in request)) throw new Error("refused");
+    const now = detail({ task: row({ labels: ["backend"], title: "Wire" }) });
+    expect(patchOf(request.body, now, 1)).toEqual({
+      editRevision: 1,
+      title: "Renamed",
+    });
+    // a deleted label leaves the picks
+    expect(labelNamesOf(["l1", "l2"], [after[1]!])).toEqual(["fix"]);
+    expect(labelIdsOf(["gone"], before)).toEqual([]);
+  });
+
+  test.serial(
+    "a knowledge frame for an opened file drops it, a read out lands nowhere",
+    async () => {
+      answer = () => Response.json({ file: { text: "old", html: null } });
+      await openTaskFile("p1", "f1", 3);
+      await openTaskFile("p1", "f2", 1);
+      expect(taskFileRead("f1", 3)?.state).toBe("done");
+      onTaskFilesSocket({
+        type: "knowledge",
+        projectId: "p1",
+        deleted: false,
+        file: { id: "f1" } as KnowledgeFile,
+      });
+      expect(taskFileRead("f1", 3)).toBeUndefined();
+      expect(taskFileRead("f2", 1)?.state).toBe("done");
+      // a read started before a write keeps nothing
+      hold = true;
+      const read = openTaskFile("p1", "f1", 3);
+      onTaskFilesSocket({
+        type: "knowledge",
+        projectId: "p1",
+        deleted: true,
+        file: { id: "f1" } as KnowledgeFile,
+      });
+      await unclaim();
+      await read;
+      expect(taskFileRead("f1", 3)).toBeUndefined();
+    },
+  );
+
+  test.serial(
+    "a revoked project drops its files, a read out lands nowhere",
+    async () => {
+      answer = () => Response.json({ file: { text: "x", html: null } });
+      await openTaskFile("p1", "f1", 1);
+      await openTaskFile("p2", "f9", 1);
+      hold = true;
+      const read = openTaskFile("p1", "f2", 1);
+      onTaskFilesSocket({ type: "revoked", projectId: "p1" });
+      await unclaim();
+      await read;
+      expect(taskFileRead("f1", 1)).toBeUndefined();
+      expect(taskFileRead("f2", 1)).toBeUndefined();
+      expect(taskFileRead("f9", 1)?.state).toBe("done");
+    },
+  );
+
+  test("the form hears a file is being made until it is linked", async () => {
+    const said: string[] = [];
+    let made: (id: string) => void = () => {};
+    const done = createAndLink(
+      () =>
+        new Promise<string>((resolve) => {
+          made = resolve;
+        }),
+      {
+        creating: (busy) => said.push(busy ? "creating" : "idle"),
+        created: (id) => said.push(`linked ${id}`),
+      },
+    );
+    // the task cannot save while the file is out
+    expect(said).toEqual(["creating"]);
+    made("f9");
+    await done;
+    expect(said).toEqual(["creating", "linked f9", "idle"]);
+    // a refused create frees the form with nothing linked
+    const failed: string[] = [];
+    await createAndLink(() => Promise.reject(new Error("taken")), {
+      creating: (busy) => failed.push(busy ? "creating" : "idle"),
+      created: (id) => failed.push(`linked ${id}`),
+    }).catch(() => {});
+    expect(failed).toEqual(["creating", "idle"]);
+  });
 });

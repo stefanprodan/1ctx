@@ -24,7 +24,8 @@ import type {
 } from "../../shared/contracts/project.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { api } from "./api.ts";
+import { ApiError, api } from "./api.ts";
+import { Flight } from "./flight.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { onSocketEvent } from "./socket.ts";
@@ -81,11 +82,22 @@ export async function loadProjects(): Promise<void> {
   }
 }
 
-export async function loadProject(id: string): Promise<void> {
-  const turn = wanted.turn + 1;
-  wanted = { id, turn };
+export function loadProject(id: string): Promise<void> {
   projectError.value = null;
   if (project.value?.id !== id) project.value = kept.get(id) ?? null;
+  return readProject(id, false);
+}
+
+// the project shown read again in the background: a failure keeps it,
+// so a page drawn on it, a draft included, stays, unless it is gone
+export const refreshProject = (id: string) => readProject(id, true);
+
+const gone = (err: unknown) =>
+  err instanceof ApiError && (err.status === 403 || err.status === 404);
+
+async function readProject(id: string, quiet: boolean): Promise<void> {
+  const turn = wanted.turn + 1;
+  wanted = { id, turn };
   try {
     const body = await api<ProjectResponse>(
       `/api/projects/${encodeURIComponent(id)}`,
@@ -94,7 +106,7 @@ export async function loadProject(id: string): Promise<void> {
     kept.set(id, body.project);
     project.value = body.project;
   } catch (err) {
-    if (wanted.turn !== turn) return;
+    if (wanted.turn !== turn || (quiet && !gone(err))) return;
     // a held copy of a project no longer seen goes with it
     kept.delete(id);
     if (project.value?.id === id) project.value = null;
@@ -166,11 +178,24 @@ export function keepProject(saved: ProjectDetail): void {
   }
 }
 
-function onAccessChanged(event: SocketEvent): void {
+// the project shown read again, a burst of label frames costing one
+// read out and one trailing
+const labelsFlight = new Flight(async () => {
+  const id = project.value?.id;
+  if (id !== undefined) await refreshProject(id);
+});
+
+export function onProjectsSocket(event: SocketEvent): void {
   if (event.type === "revoked") kept.delete(event.projectId);
   if (event.type === "granted" || event.type === "revoked") {
     void loadProjects();
   }
+  // a label renamed or deleted elsewhere: the forms pick from the
+  // project's labels, so the one shown reads them again
+  if (event.type === "projectLabels") {
+    if (project.value?.id === event.projectId) labelsFlight.ask();
+    else kept.delete(event.projectId);
+  }
 }
 
-onSocketEvent(onAccessChanged);
+onSocketEvent(onProjectsSocket);

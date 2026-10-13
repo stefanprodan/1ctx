@@ -166,8 +166,9 @@ const PATHS = {
   // bare, as a row already rings its icon
   question:
     "M5.25 5.75a2.75 2.75 0 1 1 4.1 2.4c-.8.45-1.35 1.1-1.35 2v.6M8 13h.01",
-  // the row's ring makes it the won't do sign
-  cancelled: "M12.5 3.5 3.5 12.5",
+  // the canceled task's ring and cross, as its state icon draws it
+  cancelled:
+    "M14.25 8a6.25 6.25 0 1 1-12.5 0 6.25 6.25 0 1 1 12.5 0zM6 6l4 4m0-4-4 4",
   // a bookmark: what the project's memory keeps
   memory: "M4.5 2.5h7v11L8 11l-3.5 2.5z",
   // the database file: the admin's Storage page

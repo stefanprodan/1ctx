@@ -80,9 +80,10 @@ follow `docs/external-task-pages.md`.
   again and again stays at most 250. `MAX_CLAIMS` counts the claims
   since the last reopen (`claimsSinceReopen()`), against an agent that
   loops; a reopen starts it again.
-- A row's `last` carries its entry's user and key (`by`, `keyName`),
-  both null when 1ctx wrote it; a release by 1ctx tells `idle` from
-  `access_gone` by the entry's `claimEnd`.
+- A row's `last` carries its entry's user, key and claim end (`by`,
+  `keyName`, `claimEnd`). `by` is null when 1ctx wrote it or the user
+  was deleted; only a `claimEnd` of `idle` or `access_gone` says 1ctx
+  wrote it.
 - Every agent entry and every entry ending a claim carries its claim
   id, including member unclaims and cancels, and idle or access unclaims.
   Answers, reopens and cancels of open tasks have none. The entry stores

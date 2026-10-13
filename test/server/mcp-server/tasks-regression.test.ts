@@ -90,6 +90,7 @@ describe("the inbound MCP tasks regressions", () => {
             at: 9_000 - index,
             by: { id: "user00000001", username: "casey" },
             keyName: "laptop",
+            claimEnd: null,
           },
         }),
         answered: false,
@@ -365,6 +366,7 @@ describe("the final inbound MCP task fixes", () => {
             at: 9_000 - index,
             by: { id: "user00000001", username: "casey" },
             keyName: "laptop",
+            claimEnd: null,
           },
         }),
         answered: false,
@@ -490,6 +492,7 @@ describe("the largest show and claim pages", () => {
         at: 300,
         by: { id: "user00000001", username: "casey" },
         keyName: "laptop",
+        claimEnd: null,
       };
       state.taskShow = {
         ...externalTaskShow(),
