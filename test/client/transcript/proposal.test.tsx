@@ -359,14 +359,15 @@ describe("the instructions as drawn", () => {
     ]);
   });
 
+  // past DIFF_CELLS no table is built: the middle is all removed, then all added
   test("a long text changed at both ends stays bounded", () => {
     const lines = Array.from({ length: 16_000 }, (_, i) => `step ${i}`);
     const after = [...lines];
     after[0] = "new first";
     after[lines.length - 1] = "new last";
-    const start = performance.now();
     const diff = lineDiff(lines.join("\n"), after.join("\n"));
-    expect(performance.now() - start).toBeLessThan(1000);
+    expect(diff.some((line) => line.kind === "same")).toBe(false);
+    expect(diff.filter((line) => line.kind === "removed")).toHaveLength(16_000);
     expect(diff.filter((line) => line.kind === "added")).toHaveLength(16_000);
     expect(diff[0]).toEqual({ kind: "removed", text: "step 0" });
     expect(diff.at(-1)).toEqual({ kind: "added", text: "new last" });

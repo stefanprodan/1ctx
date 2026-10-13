@@ -6,6 +6,7 @@ import type {
   DaysUsageResponse,
   WeekUsageResponse,
 } from "../../shared/api/usage.ts";
+import { browserClock, type DayClock } from "../lib/now.ts";
 import { browserZone } from "../lib/zone.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
@@ -24,6 +25,14 @@ const MIN_RELOAD = 60_000;
 
 let owner: string | null = null;
 let weekTurn = 0;
+let clock: DayClock = browserClock;
+
+// a test's clock for the midnight reloads; answers the one it replaced
+export function setUsageClock(next: DayClock): DayClock {
+  const was = clock;
+  clock = next;
+  return was;
+}
 
 // its own turn, so loads of the year and of the recent weeks never
 // discard each other, and its own midnight timer
@@ -31,23 +40,23 @@ function daysEntity(weeks: number | null) {
   const answer = signal<DaysUsageResponse | null>(null);
   const failed = signal(false);
   let turn = 0;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let cancel: (() => void) | null = null;
 
   const clear = () => {
-    if (timer === null) return;
-    clearTimeout(timer);
-    timer = null;
+    if (cancel === null) return;
+    cancel();
+    cancel = null;
   };
   const arm = (until: number) => {
     clear();
     const delay = Math.min(
       MAX_TIMEOUT,
-      Math.max(MIN_RELOAD, until - Date.now() + MIDNIGHT_SLACK),
+      Math.max(MIN_RELOAD, until - clock.now() + MIDNIGHT_SLACK),
     );
-    timer = setTimeout(() => {
-      timer = null;
+    cancel = clock.after(delay, () => {
+      cancel = null;
       void load();
-    }, delay);
+    });
   };
 
   async function load(): Promise<void> {
@@ -72,7 +81,7 @@ function daysEntity(weeks: number | null) {
         clear();
         failed.value = true;
       } else {
-        arm(Date.now());
+        arm(clock.now());
       }
     }
   }

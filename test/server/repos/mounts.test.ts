@@ -22,6 +22,8 @@ import {
   type HostAnswer,
   NEXT_COMMIT,
   redirect,
+  rowWrites,
+  settledState,
   tarball,
   tarResponse,
 } from "../../helpers/repos.ts";
@@ -101,6 +103,7 @@ function setup(options: Options = {}) {
     freeSpace: () => options.free ?? Number.MAX_SAFE_INTEGER,
   });
   repos.start();
+  const writes = rowWrites(repos.store);
   const add = (projectId: string, fields: Partial<RepoFields> = {}) =>
     repos.store.create(
       projectId,
@@ -120,6 +123,7 @@ function setup(options: Options = {}) {
     dir,
     repos,
     host,
+    writes,
     logs: logs.events,
     limits,
     keys,
@@ -504,7 +508,7 @@ test("a cached tree mounts while other fetches hold every slot", async () => {
   const cold = repos.prepare("p2", { waitMs: 20 });
   const colder = repos.prepare("p3", { waitMs: 20 });
   tick(60_001);
-  const cached = await repos.prepare("p1", { waitMs: 200 });
+  const cached = await repos.prepare("p1");
   expect(cached.mounts.map((mount) => mount.commit)).toEqual([COMMIT]);
   open();
   // a cold tree past its wait: the turn goes on, never stuck on a slot
@@ -530,7 +534,7 @@ test("without a cache directory nothing is fetched and no row changes", async ()
 });
 
 test("startup sets a fetching row pending, clears tmp/ and fetches what waits", async () => {
-  const { repos, add, dir } = setup({
+  const { repos, add, dir, writes } = setup({
     answers: { [ARCHIVE]: tarResponse(tree()) },
   });
   const row = add("p1");
@@ -539,27 +543,29 @@ test("startup sets a fetching row pending, clears tmp/ and fetches what waits", 
   repos.start();
   expect(repos.byId(row.id)?.state).toBe("pending");
   expect(readdirSync(join(dir, "tmp"))).toEqual([]);
-  for (let i = 0; i < 200; i++) {
-    if ([row, waiting].every((r) => repos.byId(r.id)?.state === "ready")) break;
-    await Bun.sleep(5);
-  }
-  expect(repos.byId(row.id)?.state).toBe("ready");
-  expect(repos.byId(waiting.id)?.state).toBe("ready");
+  expect(await settledState(repos.store, writes, row.id)).toBe("ready");
+  expect(await settledState(repos.store, writes, waiting.id)).toBe("ready");
 });
 
 test("the drain ends every fetch and writes no row after", async () => {
+  let reached = () => {};
+  const asked = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
   const answers: Record<string, HostAnswer> = {
     [ARCHIVE]: (_call, init) =>
       new Promise<Response>((_, reject) => {
         init.signal?.addEventListener("abort", () =>
           reject(new Error("aborted")),
         );
+        reached();
       }),
   };
   const { repos, add } = setup({ answers });
   const row = add("p1");
   const turn = repos.prepare("p1", { waitMs: 5_000 });
-  await Bun.sleep(5);
+  // the drain lands while the host has the request
+  await asked;
   repos.close();
   expect((await turn).notices).toEqual([
     { repoId: row.id, name: "widgets", reason: "host unreachable" },
@@ -575,9 +581,16 @@ test("a job that ends while it waits for its slots gives them back, unremembered
     grant = resolve;
   });
   let late = true;
+  let given = 0;
+  // the stuck job ends once its process slot is asked for
+  let asked = () => {};
   // a process slot granted only after the job ended
   const acquire = async () => {
-    if (late) await granted;
+    if (late) {
+      asked();
+      await granted;
+    }
+    given++;
     held++;
     let released = false;
     return () => {
@@ -587,29 +600,39 @@ test("a job that ends while it waits for its slots gives them back, unremembered
     };
   };
   let stuck = 0;
+  const ends: Promise<unknown>[] = [];
   const { repos, add } = setup({
     answers: { [`${five}/archive/HEAD.tar.gz`]: tarResponse(tree()) },
     acquire,
     jobs: (base) => (job, onEvent, signal) => {
       if (!job.url.includes("/stuck")) return base(job, onEvent, signal);
       stuck++;
+      const waiting = late
+        ? new Promise<void>((resolve) => {
+            asked = resolve;
+          })
+        : Promise.resolve();
       // like the worker at its deadline: ended, never waiting on the go
       void onEvent({ commit: COMMIT, etag: null, published: false });
-      return new Promise((resolve) =>
-        setTimeout(
-          () => resolve({ ok: false, error: "host unreachable", status: null }),
-          20,
-        ),
-      );
+      const end = waiting.then(() => ({
+        ok: false as const,
+        error: "host unreachable" as const,
+        status: null,
+      }));
+      ends.push(end);
+      return end;
     },
   });
   add("p1", { name: "one", url: "https://git.test/acme/stuck1" });
   add("p2", { name: "two", url: "https://git.test/acme/stuck2" });
-  await repos.prepare("p1", { waitMs: 200 });
-  await repos.prepare("p2", { waitMs: 200 });
+  await repos.prepare("p1", { waitMs: 5_000 });
+  await repos.prepare("p2", { waitMs: 5_000 });
+  await Promise.all(ends);
   late = false;
   grant();
-  await Bun.sleep(10);
+  await Bun.sleep(0);
+  // both slots were granted after their jobs ended, and given back
+  expect(given).toBe(2);
   expect(held).toBe(0);
   // and their rows never blamed the host
   for (const project of ["p1", "p2"]) {
@@ -619,12 +642,12 @@ test("a job that ends while it waits for its slots gives them back, unremembered
   }
   // both fetch slots came back too
   add("p3", { name: "five", url: five });
-  const fresh = await repos.prepare("p3", { waitMs: 1_000 });
+  const fresh = await repos.prepare("p3");
   expect(fresh.mounts.map((mount) => mount.name)).toEqual(["five"]);
   expect(held).toBe(0);
   // a death in the queue says nothing of the host: tried again at once
   const before = stuck;
-  await repos.prepare("p1", { waitMs: 200 });
+  await repos.prepare("p1");
   expect(stuck).toBe(before + 1);
 });
 
@@ -657,7 +680,7 @@ test("a signer joins another's fetch for its tree, never its failure", async () 
       return new Response("no", { status: 403 });
     },
   };
-  const { repos, host, add, keys } = setup({ answers });
+  const { repos, host, add, keys, writes } = setup({ answers });
   keys["http-a"] = "key-a";
   keys["http-b"] = "key-b";
   const a = add("p1", { ref: "main", keyName: "http-a" });
@@ -665,8 +688,10 @@ test("a signer joins another's fetch for its tree, never its failure", async () 
   expect((await repos.prepare("p1", { waitMs: 5 })).notices[0]?.reason).toBe(
     "fetching",
   );
+  // marked fetching right before it joins the fetch in flight
+  const joined = writes((w) => w.id === b.id && w.state === "fetching");
   const second = repos.prepare("p2", { waitMs: 5_000 });
-  await Bun.sleep(5);
+  await joined;
   deny();
   const mounted = await second;
   expect(mounted.mounts[0]?.commit).toBe(COMMIT);
@@ -721,7 +746,7 @@ test("a fetch that ends after its row changed leaves the row alone", async () =>
     },
     [github.archiveUrl("new")]: tarResponse(tree(NEXT_COMMIT)),
   };
-  const { repos, add, dir } = setup({ answers });
+  const { repos, add, writes } = setup({ answers });
   const row = add("p1", { ref: "old" });
   expect((await repos.prepare("p1", { waitMs: 5 })).notices[0]?.reason).toBe(
     "fetching",
@@ -736,13 +761,10 @@ test("a fetch that ends after its row changed leaves the row alone", async () =>
   expect(fresh.mounts[0]?.commit).toBe(NEXT_COMMIT);
   fresh.release();
   const before = repos.byId(row.id);
+  // the old fetch's last write, refused since the row changed
+  const late = writes((w) => w.id === row.id && w.state === "ready");
   go();
-  const published = new Bun.Glob(`trees/*/${COMMIT}-*/tree.json`);
-  for (let i = 0; i < 200; i++) {
-    if ([...published.scanSync(dir)].length > 0) break;
-    await Bun.sleep(5);
-  }
-  await Bun.sleep(20);
+  expect(await late).toEqual({ id: row.id, state: "ready", written: false });
   expect(repos.byId(row.id)).toEqual(before);
   expect(before).toMatchObject({
     ref: "new",
@@ -763,7 +785,7 @@ test("a tree over the caps for one signer is over them for another", async () =>
       return tarResponse(tree(COMMIT, 20));
     },
   };
-  const { repos, host, add, keys } = setup({
+  const { repos, host, add, keys, writes } = setup({
     answers,
     limits: { repoFiles: 5 },
   });
@@ -774,8 +796,10 @@ test("a tree over the caps for one signer is over them for another", async () =>
   expect((await repos.prepare("p1", { waitMs: 5 })).notices[0]?.reason).toBe(
     "fetching",
   );
+  // marked fetching right before it joins the fetch in flight
+  const joined = writes((w) => w.id === b.id && w.state === "fetching");
   const second = repos.prepare("p2", { waitMs: 5_000 });
-  await Bun.sleep(5);
+  await joined;
   refuse();
   expect((await second).notices).toEqual([
     { repoId: b.id, name: "widgets", reason: "over the size cap" },
