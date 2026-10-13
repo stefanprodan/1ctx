@@ -19,6 +19,7 @@ export const COMMAND_WORKER = new URL(
 export function setup(
   overrides: Partial<KnowledgeCaps> = {},
   worker = COMMAND_WORKER,
+  backstopMs?: number,
 ) {
   const { area: knowledge, ...base } = knowledgeSetup(overrides);
   const phases: { sessionId: string; phase: string }[] = [];
@@ -29,6 +30,7 @@ export function setup(
     limits: { current: () => ({ ...base.caps }) },
     log: silent,
     worker,
+    ...(backstopMs ? { backstopMs } : {}),
     onCommandPhase: (sessionId, phase) => {
       phases.push({ sessionId, phase });
       for (const wake of [...waking]) wake();
@@ -101,14 +103,14 @@ export function afterMountRead(s: Setup, write: () => void) {
 
 // Resolves once a command of the chat reports the phase, consuming the
 // report, so a test cancels a command known to be running rather than
-// one it hopes has started; fails past a bounded startup wait.
+// one it hopes has started; the test's timeout bounds a worker that
+// never starts.
 export function untilPhase(
   s: Setup,
   phase: "run" | "diff" = "run",
   sessionId = s.session.id,
-  timeoutMs = 10_000,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const check = () => {
       const at = s.phases.findIndex(
         (seen) => seen.sessionId === sessionId && seen.phase === phase,
@@ -116,36 +118,21 @@ export function untilPhase(
       if (at < 0) return;
       s.phases.splice(at, 1);
       s.waking.delete(check);
-      clearTimeout(timer);
       resolve();
     };
-    const timer = setTimeout(() => {
-      s.waking.delete(check);
-      reject(new Error(`no ${phase} phase within ${timeoutMs} ms`));
-    }, timeoutMs);
     s.waking.add(check);
     check();
   });
 }
 
 // a phase reported by a command worker, for tests that drive the
-// workers directly; a bounded startup wait as above
-export function phaseWatch(timeoutMs = 10_000) {
-  let reached: () => void = () => {};
-  const running = new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error(`no run phase within ${timeoutMs} ms`)),
-      timeoutMs,
-    );
-    reached = () => {
-      clearTimeout(timer);
-      resolve();
-    };
-  });
+// workers directly
+export function phaseWatch() {
+  const running = Promise.withResolvers<void>();
   return {
     phase: (phase: "run" | "diff") => {
-      if (phase === "run") reached();
+      if (phase === "run") running.resolve();
     },
-    running,
+    running: running.promise,
   };
 }

@@ -27,6 +27,25 @@ done
 
 cd "$DIR"
 
+# the first error line of each unhandled error, with the checkout's path
+# taken out, or "unhandled error" when there is none
+error_lines() {
+  awk 'function close_block() {
+         if (want) print "unhandled error"
+         want = 0; dashes = 0
+       }
+       /^# Unhandled error/ { close_block(); want = 1; next }
+       want && /^-+$/ { if (++dashes == 2) close_block(); next }
+       want && /^([A-Z][A-Za-z]*)?[Ee]rror: / { print; want = 0; dashes = 0 }
+       END { close_block() }' "$LOG" |
+    sed "s|$DIR/||g" || true
+}
+
+# the listed failures and load errors, the count line left out
+expected() {
+  grep -vc '^(errors) ' "$LIST" || true
+}
+
 # one run of the suite: its counts printed, its failures and load errors
 # in $LOG.now
 run() {
@@ -55,15 +74,7 @@ run() {
   # count line keeps a repeated message strict.
   {
     echo "(errors) ${errors:-0}"
-    awk 'function close_block() {
-           if (want) print "unhandled error"
-           want = 0; dashes = 0
-         }
-         /^# Unhandled error/ { close_block(); want = 1; next }
-         want && /^-+$/ { if (++dashes == 2) close_block(); next }
-         want && /^([A-Z][A-Za-z]*)?[Ee]rror: / { print; want = 0; dashes = 0 }
-         END { close_block() }' "$LOG" |
-      sed "s|$DIR/||g" || true
+    error_lines
     grep '^(fail)' "$LOG" | sed -E 's/ \[[0-9.]+m?s\]$//' || true
   } | LC_ALL=C sort -u >"$LOG.now"
 }
@@ -78,18 +89,33 @@ if $update; then
     exit 1
   fi
   cp "$LOG.now" "$LIST"
-  echo "vendor-test: wrote $(wc -l <"$LIST" | tr -d ' ') expected failures"
+  echo "vendor-test: wrote $(expected) expected failures"
   exit 0
 fi
 
 if ! diff -u "$LIST" "$LOG.now"; then
   # what bun said before each new failure or load error, best effort,
   # since the list keeps only names and first lines
+  changed=$(LC_ALL=C comm -3 "$LIST" "$LOG.now" | grep -v '(errors) ' || true)
+  if [[ -z $changed ]]; then
+    # only the count moved: a listed error repeats, so show every one
+    echo "the first error line of each unhandled error:"
+    error_lines | sort | uniq -c
+  fi
   LC_ALL=C comm -13 "$LIST" "$LOG.now" | while IFS= read -r line; do
     case $line in
     "(errors) "*) ;;
     "unhandled error")
-      grep -a -A 20 '^# Unhandled error' "$LOG" | head -60 || true
+      # only the blocks with no error line, the ones named so
+      awk 'function close_block() {
+             if (want) printf "%s", block
+             want = 0; dashes = 0; block = ""
+           }
+           /^# Unhandled error/ { close_block(); want = 1; block = $0 "\n"; next }
+           want && /^-+$/ { block = block $0 "\n"; if (++dashes == 2) close_block(); next }
+           want && /^([A-Z][A-Za-z]*)?[Ee]rror: / { want = 0; dashes = 0; block = ""; next }
+           want { block = block $0 "\n" }
+           END { close_block() }' "$LOG" | head -60 || true
       ;;
     *)
       sed "s|$DIR/||g" "$LOG" | grep -aF -B 30 -- "$line" |
@@ -100,4 +126,4 @@ if ! diff -u "$LIST" "$LOG.now"; then
   echo "vendor-test: failures differ from vendor/just-bash-failures.txt" >&2
   exit 1
 fi
-echo "vendor-test: ok, $(wc -l <"$LIST" | tr -d ' ') expected failures"
+echo "vendor-test: ok, $(expected) expected failures"

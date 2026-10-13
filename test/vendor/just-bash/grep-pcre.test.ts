@@ -175,17 +175,27 @@ describe("grep -P's refusals", () => {
     });
   }
 
-  test("a hostile pattern on a long line finishes in linear time", async () => {
-    const line = `${"a".repeat(10_000)}\n`;
-    const started = performance.now();
-    const result = await run(
-      "grep -cP '(a|aa)*(?=b)' hay; grep -cP '(\\w+\\s?)*$' hay",
-      {
-        "/work/hay": line,
-      },
-    );
-    expect(result.stdout).toBe("0\n1\n");
-    expect(performance.now() - started).toBeLessThan(5_000);
+  // A backtracking engine takes exponential steps on these patterns, so
+  // a native RegExp that runs one fails the test at its first step.
+  test.serial("a hostile pattern on a long line runs on RE2", async () => {
+    const exec = RegExp.prototype.exec;
+    RegExp.prototype.exec = function (this: RegExp, text: string) {
+      const source = this.source;
+      if (source.includes("a|aa") || source.includes("\\w+\\s?")) {
+        throw new Error(`a backtracking engine ran ${source}`);
+      }
+      return exec.call(this, text);
+    };
+    try {
+      const result = await run(
+        "grep -cP '(a|aa)*(?=b)' hay; grep -cP '(\\w+\\s?)*$' hay",
+        { "/work/hay": `${"a".repeat(10_000)}\n` },
+      );
+      expect(result.stderr).toBe("");
+      expect(result.stdout).toBe("0\n1\n");
+    } finally {
+      RegExp.prototype.exec = exec;
+    }
   });
 });
 

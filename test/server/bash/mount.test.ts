@@ -13,6 +13,7 @@ import {
   run,
   type Setup,
   setup,
+  untilPhase,
 } from "./helpers.ts";
 
 const create = (s: Setup, name: string, text: string) =>
@@ -413,19 +414,26 @@ describe("bash command mounts", () => {
         { length: PROCESS_SLOTS },
         () => new AbortController(),
       );
+      const sessions = controllers.map(() => first.makeSession().id);
       const pending = controllers.map((controller, i) =>
         run(
           first,
-          `echo x > file${i}; sleep 5`,
-          callCaps,
+          `echo x > file${i}; sleep 30`,
+          // held until aborted, never freed by their own deadline
+          { ...callCaps, callTimeoutMs: 60_000 },
           controller.signal,
-          first.makeSession().id,
+          sessions[i],
         ),
       );
       try {
-        await Bun.sleep(30);
+        // every slot is held once each command runs
+        for (const id of sessions) await untilPhase(first, "run", id);
         let finished = false;
-        const fifth = run(second, "echo queued > queued").then((result) => {
+        // waits for a slot, never for its own deadline
+        const fifth = run(second, "echo queued > queued", {
+          ...callCaps,
+          callTimeoutMs: 60_000,
+        }).then((result) => {
           finished = true;
           return result;
         });
