@@ -216,14 +216,15 @@ optional words on when, `attention_guidance` (`MAX_ATTENTION_GUIDANCE`).
   tools, `ownMemory` or not. One request on the run's agent and model:
   its own system prompt and the run's record (`runner/run-record.ts`,
   no note), the ask and the automation's words
-  (`runner/attention-packet.ts`), `needs_attention` alone
+  (`runner/attention-packet.ts`), the `attention` verdict alone
   (`docs/tools.md`), with thinking off, or the least effort for a model
   that must think, as compaction asks (`leastThinking()`): thinking, a
-  model wrote the call out as text. Only the call marks; text is never
-  read for one.
-  At most `ATTENTION_ROUNDS` (2): "ok" ends the step, while a refused
-  call or any other text is asked again once (`asksAgain()`, the text
-  with `ATTENTION_AGAIN` as a request-local message).
+  model wrote the call out as text. Only a `needed: true` call marks;
+  `needed: false` answers no, and text is never read for either.
+  At most `ATTENTION_ROUNDS` (2): a valid verdict ends the step, while
+  text or a round with no valid verdict is asked again once
+  (`asksAgain()`, the text with `ATTENTION_AGAIN` as a request-local
+  message). Two rounds with no valid verdict mark nothing.
 - **The step is part of the run.** Its rows are work from
   `attentionRound`, which is also `memoryRound`, the first round after
   the answer, up to `memoryFrom`, the memory phase's own start; its
@@ -245,7 +246,8 @@ optional words on when, `attention_guidance` (`MAX_ATTENTION_GUIDANCE`).
   `runner/attention.ts` asks the `run-attention` decision
   (`docs/providers.md`) from `endSend()` after `finalizeSend` committed,
   only for a run that ended `finish` with no mark of the step or the
-  runner (`asksDecider()`), never a chat. It reads the last done
+  runner (`asksDecider()`), after a `needed: false` too, never a
+  chat. It reads the last done
   `answer` (`sessions.runAnswer()`) when the ask starts; none means no
   ask. The
   automation's words, when set, replace the needs-attention option's

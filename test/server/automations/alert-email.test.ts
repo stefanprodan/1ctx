@@ -61,8 +61,8 @@ const flag = (reason: string) => (script: Script) => {
   script.toolRound([
     {
       id: "c1",
-      name: "needs_attention",
-      arguments: JSON.stringify({ reason }),
+      name: "attention",
+      arguments: JSON.stringify({ needed: true, reason }),
     },
   ]);
   script.end();

@@ -36,6 +36,7 @@ import {
   createAutomation as create,
   settleRun,
   startRun,
+  verdict,
 } from "../../helpers/automations.ts";
 import {
   chatApp,
@@ -399,6 +400,47 @@ describe("a finished run", () => {
     await chat.app.shutdown();
   });
 
+  test("is asked after its agent's needed false, as after no mark", async () => {
+    const { chat, asked } = await deciderApp();
+    const automation = await createAutomation(chat);
+    const { sessionId, main } = await startRun(chat, automation.id);
+    await answerRun(chat, main, ANSWER, verdict());
+    await settleRun(chat, sessionId);
+    await chat.app.runner.settled();
+    expect(asked).toHaveLength(1);
+    expect(
+      chat.app.sessions
+        .messages(sessionId)
+        .filter((row) => row.kind === "tool")
+        .map((row) => [row.toolName, row.content]),
+    ).toEqual([["attention", "Checked."]]);
+    expect(mark(chat, sessionId)).toMatchObject({
+      attention: 0.9802,
+      attention_by: "judge",
+    });
+    await chat.app.shutdown();
+  });
+
+  test("is asked after two text rounds with no verdict", async () => {
+    const { chat, asked } = await deciderApp();
+    const automation = await createAutomation(chat);
+    const { sessionId, main } = await startRun(chat, automation.id);
+    await answerRun(chat, main, ANSWER, (step) =>
+      step.reply("attention: Payments service is unhealthy"),
+    );
+    const again = await waitScript(chat.scripted, 3);
+    again.reply("No attention needed.");
+    await settleRun(chat, sessionId);
+    await chat.app.runner.settled();
+    expect(chat.scripted.scripts).toHaveLength(3);
+    expect(asked).toHaveLength(1);
+    expect(mark(chat, sessionId)).toMatchObject({
+      attention: 0.9802,
+      attention_by: "judge",
+    });
+    await chat.app.shutdown();
+  });
+
   test("is not asked once its agent marked it, and keeps the agent's mark", async () => {
     const { chat, asked } = await deciderApp();
     const automation = await createAutomation(chat);
@@ -407,8 +449,11 @@ describe("a finished run", () => {
       step.toolRound([
         {
           id: "c1",
-          name: "needs_attention",
-          arguments: JSON.stringify({ reason: "podinfo is not ready" }),
+          name: "attention",
+          arguments: JSON.stringify({
+            needed: true,
+            reason: "podinfo is not ready",
+          }),
         },
       ]);
       step.end();
@@ -892,7 +937,7 @@ describe("the asks", () => {
           ...base,
           attentionOffered: {
             ...base.offered,
-            attention: { guidance: "", reason: "r" },
+            attention: { guidance: "", reason: "r", answered: true },
           },
         },
       }),

@@ -354,9 +354,7 @@ describe("a run's child", () => {
       }
       await settled(chat, run.sessionId);
       const steps = chat.scripted.scripts.slice(3).map((s) => toolNames(s));
-      expect(steps.some((names) => names.includes("needs_attention"))).toBe(
-        true,
-      );
+      expect(steps.some((names) => names.includes("attention"))).toBe(true);
       expect(steps.some((names) => names.includes("memory_edit"))).toBe(true);
       const [childId] = childrenOf(chat, run.sessionId);
       expect(

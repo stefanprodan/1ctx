@@ -3,7 +3,7 @@
 //
 // A run's attention step: after the main rounds of a finished run, before
 // its memory phase, the run's own model is asked over the run's record
-// whether a user needs to act, with needs_attention alone on offer
+// whether a user needs to act, with the attention verdict alone on offer
 // (attention-packet.ts). Its rows are work after the answer, drawn with
 // the memory phase's in one group. Its reason waits on the step's handle
 // and is written with the run's end (marks.ts), so the ending envelope
@@ -126,7 +126,7 @@ function stepRequest(
   };
 }
 
-// the round's calls in order, so a later reason replaces an earlier one;
+// the round's calls in order, so a later verdict replaces an earlier one;
 // any other name is refused by the step's set
 async function runCalls(
   deps: AttentionStepDeps,
@@ -215,16 +215,16 @@ export async function attentionStep(
       });
       const round = send.round;
       if (controller.signal.aborted || round === null) break;
-      // text never marks: "ok" ends the step, anything else is asked
-      // again once, the reply kept as the step's work
+      // text is never read for a verdict: it is asked again once, the
+      // reply kept as the step's work
       if (round.calls.length === 0) {
-        if (!asksAgain(rounds, round, false)) break;
+        if (!asksAgain(rounds, false)) break;
         deps.writer.finishRound(send, []);
         again = true;
       } else {
         again = false;
         if (!(await callRound(deps, send, offered, controller.signal))) break;
-        if (!asksAgain(rounds, round, handle.reason !== null)) break;
+        if (!asksAgain(rounds, handle.answered)) break;
       }
       nextRound(send, deps.writer.startRound(send), "attention");
     }
@@ -241,8 +241,9 @@ export async function attentionStep(
     send.ending.signal.removeEventListener("abort", stop);
   }
   if (controller.signal.aborted) {
-    // a reason made before the abort is dropped with the rest
+    // a verdict made before the abort is dropped with the rest
     handle.reason = null;
+    handle.answered = false;
     if (timedOut) {
       send.attentionStopped = false;
       send.attentionError = "the attention step ran out of time";
@@ -255,5 +256,6 @@ export async function attentionStep(
     }
   } else if (send.attentionError !== null) {
     handle.reason = null;
+    handle.answered = false;
   }
 }

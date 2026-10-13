@@ -450,12 +450,12 @@ export const AUTOMATION_TOOL = "automation";
 // the tools the server writes itself, besides the web ones, by name;
 // none has a switch, each follows what its send has
 export const BUILTIN_TOOLS = [
+  "attention",
   "bash",
   "datetime",
   "mcp_call",
   "mcp_describe",
   "memory_edit",
-  "needs_attention",
   "skill",
   "skill_file",
 ] as const;

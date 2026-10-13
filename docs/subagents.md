@@ -108,7 +108,7 @@ is its root.
   message is `task`, written by the parent's user.
 - **Its offer is `childOffered()`** (`tools/offer.ts`), taken with the
   parent's as `policy.childOffered`: the main offer less `delegate`,
-  `memory_edit`, `email_user`, `visualize`, `needs_attention`,
+  `memory_edit`, `email_user`, `visualize`, `attention`,
   `automation` and `external_task` when the parent is a run (the
   scope's `origin`), the write actions of both otherwise, its MCP
   links read alone so `offeredServers()` drops the write side, a bash
