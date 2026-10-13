@@ -464,7 +464,7 @@ describe("the page's own writes", () => {
       name: "plans/a.md",
       text: "text 3\n",
     });
-    answer(`POST ${base}`, { error: "A file named plans/a.md exists." }, 409);
+    answer(`POST ${base}`, { error: "a file with this name exists" }, 409);
     const refused = await restoreFile("p1", "f1", "plans/a.md").catch(
       (err: unknown) => err,
     );

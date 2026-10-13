@@ -131,14 +131,14 @@ test("the steps skip deletes, the newest leading to the file as it is", () => {
 });
 
 test("the path field owns the name's refusals, the head the rest", () => {
-  expect(pathFieldOf("a file named plans/x.md exists")).toBe("path");
+  expect(pathFieldOf("a file with this name exists")).toBe("path");
   expect(pathFieldOf("plans/x.md conflicts with file plans")).toBe("path");
   expect(pathFieldOf("the file is named x.md already")).toBe("path");
   expect(pathFieldOf("name must be 1 to 8 path segments")).toBe("path");
   expect(pathFieldOf("x.md is 9 bytes, the limit is 4")).toBeUndefined();
   expect(pathFieldOf("apps/x.yaml is at revision 7")).toBeUndefined();
   expect(isStale(409, "apps/x.yaml is at revision 7")).toBe(true);
-  expect(isStale(409, "a file named x exists")).toBe(false);
+  expect(isStale(409, "a file with this name exists")).toBe(false);
 });
 
 test("a typed path and the query's numbers", () => {

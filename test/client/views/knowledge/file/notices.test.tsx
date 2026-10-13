@@ -52,14 +52,14 @@ test("a refusal names the action and carries the status", () => {
   const html = render(
     <ProblemNotice
       problem={{
-        error: "a file named x.md exists",
+        error: "a file with this name exists",
         action: "restore",
         status: 409,
       }}
     />,
   );
   expect(html.replace(/<[^>]*>/g, "")).toBe(
-    "Could not restore. A file named x.md exists. HTTP 409",
+    "Could not restore. A file with this name exists. HTTP 409",
   );
 });
 
