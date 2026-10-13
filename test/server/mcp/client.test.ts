@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { errorFields } from "../../../src/server/lib/log.ts";
 import { withClient } from "../../../src/server/mcp/client.ts";
 import { discover, fingerprint } from "../../../src/server/mcp/discover.ts";
+import { rejection } from "../../helpers/async.ts";
 import { fixture, mcpFetch } from "./fake.ts";
 
 const URL = "https://hands.test/mcp";
@@ -79,9 +80,11 @@ function callFetch(
 // A fetcher that aborts the shared controller when it first sees `method`,
 // then never resolves, so the request is only ended when the transport is
 // closed. `cancelled` reports that the closed transport aborted the request.
-// when the abort fired: an abort is timed from there, since the
-// requests before it slow down with the machine, not with the abort
-type Cancelled = { value: boolean; at: number };
+type Cancelled = { value: boolean };
+
+// under the test's own timeout, so a broken abort fails as a timeout
+// within it, and far past the abort, which comes in the same request
+const DEADLINE_MS = 10_000;
 
 function abortAt(
   method: string,
@@ -95,7 +98,6 @@ function abortAt(
     if (request.method === "DELETE") return base(request);
     const body = (await request.clone().json()) as { method?: string };
     if (body.method !== method) return base(request);
-    cancelled.at = Date.now();
     controller.abort(new Error("stopped"));
     return new Promise<Response>((_resolve, reject) => {
       const stop = () => {
@@ -196,27 +198,31 @@ describe("MCP SDK client", () => {
         isError: true,
       },
     });
-    await expect(
-      withClient(
-        { fetcher: fake.fetcher, version: "test" },
-        { url: URL },
-        key,
-        options(),
-        async (client) => {
-          const result = await client.callTool(
-            "echo",
-            {},
-            {
-              name: "echo",
-              inputSchema: { type: "object", properties: {} },
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher: fake.fetcher, version: "test" },
+            { url: URL },
+            key,
+            options(),
+            async (client) => {
+              const result = await client.callTool(
+                "echo",
+                {},
+                {
+                  name: "echo",
+                  inputSchema: { type: "object", properties: {} },
+                },
+                { signal: options().signal, timeoutMs: 2_000 },
+              );
+              const part = result.content?.[0];
+              throw new Error(typeof part?.text === "string" ? part.text : "");
             },
-            { signal: options().signal, timeoutMs: 2_000 },
-          );
-          const part = result.content?.[0];
-          throw new Error(typeof part?.text === "string" ? part.text : "");
-        },
-      ),
-    ).rejects.toThrow("echo [redacted]");
+          ),
+        )
+      ).message,
+    ).toContain("echo [redacted]");
     expect(fake.requests[0].headers.get("authorization")).toBe(`Bearer ${key}`);
   });
 
@@ -324,17 +330,20 @@ describe("MCP SDK client", () => {
         else request.signal.addEventListener("abort", stop, { once: true });
       });
     }) as typeof fetch;
-    const started = Date.now();
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        null,
-        { ...options(), timeoutMs: 100 },
-        async (client) => client.listTools(),
-      ),
-    ).rejects.toThrow("MCP request timed out");
-    expect(Date.now() - started).toBeLessThan(1_000);
+    // the list hangs until the deadline ends it, or the test times out
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            null,
+            { ...options(), timeoutMs: 100 },
+            async (client) => client.listTools(),
+          ),
+        )
+      ).message,
+    ).toContain("MCP request timed out");
   });
 
   test("keeps the abort listener through hanging session cleanup", async () => {
@@ -357,32 +366,35 @@ describe("MCP SDK client", () => {
         else request.signal.addEventListener("abort", stop, { once: true });
       });
     }) as typeof fetch;
-    const started = Date.now();
-    await expect(
-      withClient(
+    // the cleanup hangs until the deadline ends it, or the test times out
+    expect(
+      await withClient(
         { fetcher, version: "test" },
         { url: URL },
         null,
         { ...options(), timeoutMs: 100 },
         async () => "done",
       ),
-    ).resolves.toBe("done");
+    ).toBe("done");
     expect(deleteEnded).toBeTrue();
-    expect(Date.now() - started).toBeLessThan(1_000);
   });
 
   test("maps a 401 to the key refusal", async () => {
     const fetcher = (async () =>
       new Response("no", { status: 401 })) as unknown as typeof fetch;
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        "wrong-key",
-        options(),
-        async () => null,
-      ),
-    ).rejects.toThrow("the MCP server refused the key");
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            "wrong-key",
+            options(),
+            async () => null,
+          ),
+        )
+      ).message,
+    ).toContain("the MCP server refused the key");
   });
 
   test("refuses a declared response over the shared budget", async () => {
@@ -399,15 +411,19 @@ describe("MCP SDK client", () => {
         }),
         { headers: { "content-length": "1000" } },
       )) as unknown as typeof fetch;
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        null,
-        { ...options(), bodyBytes: 100 },
-        async () => null,
-      ),
-    ).rejects.toThrow("the MCP server's answer is over 100 bytes");
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            null,
+            { ...options(), bodyBytes: 100 },
+            async () => null,
+          ),
+        )
+      ).message,
+    ).toContain("the MCP server's answer is over 100 bytes");
     expect(cancelled).toBeTrue();
   });
 
@@ -496,19 +512,23 @@ describe("MCP SDK client", () => {
         error: { code: -32020, message: "header mismatch: owner" },
       }),
     );
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        null,
-        options(),
-        async (client) =>
-          client.callTool("echo", {}, definition, {
-            signal: options().signal,
-            timeoutMs: 2_000,
-          }),
-      ),
-    ).rejects.toThrow("header mismatch");
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            null,
+            options(),
+            async (client) =>
+              client.callTool("echo", {}, definition, {
+                signal: options().signal,
+                timeoutMs: 2_000,
+              }),
+          ),
+        )
+      ).message,
+    ).toContain("header mismatch");
     // The probe reached the fake; the mismatched call was answered once and
     // never listed tools or retried.
     expect(requests.map((request) => request.method)).toEqual([
@@ -540,7 +560,9 @@ describe("MCP SDK client", () => {
         },
       }),
     );
-    await expect(runCall(fetcher)).rejects.toThrow("input_required");
+    expect((await rejection(runCall(fetcher))).message).toContain(
+      "input_required",
+    );
   });
 
   test("puts a non-401 status in the words", async () => {
@@ -550,7 +572,7 @@ describe("MCP SDK client", () => {
         recorded,
         () => new Response("boom", { status }),
       );
-      await expect(runCall(fetcher)).rejects.toThrow(
+      expect((await rejection(runCall(fetcher))).message).toContain(
         `the MCP server answered ${status}`,
       );
     }
@@ -610,74 +632,91 @@ describe("MCP SDK client", () => {
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
     const controller = new AbortController();
-    const cancelled: Cancelled = { value: false, at: 0 };
+    const cancelled: Cancelled = { value: false };
     const fetcher = abortAt(
       "server/discover",
       fake.fetcher,
       controller,
       cancelled,
     );
-    await expect(
+    const stopped = await rejection(
       withClient(
         { fetcher, version: "test" },
         { url: URL },
         null,
-        { ...options(), signal: controller.signal },
+        {
+          ...options(),
+          signal: controller.signal,
+          timeoutMs: DEADLINE_MS,
+        },
         async (client) => client.listTools(),
       ),
-    ).rejects.toThrow();
+    );
+    // the stop's own error, never the deadline's
+    expect(stopped.message).not.toContain("timed out");
     expect(cancelled.value).toBeTrue();
-    expect(Date.now() - cancelled.at).toBeLessThan(1_000);
   });
 
   test("aborts during the legacy handshake, closing the transport at once", async () => {
     const recorded = await fixture("flux-docs");
     const fake = mcpFetch({ era: "legacy", recorded });
     const controller = new AbortController();
-    const cancelled: Cancelled = { value: false, at: 0 };
+    const cancelled: Cancelled = { value: false };
     const fetcher = abortAt("initialize", fake.fetcher, controller, cancelled);
-    await expect(
+    const stopped = await rejection(
       withClient(
         { fetcher, version: "test" },
         { url: URL },
         null,
-        { ...options(), signal: controller.signal },
+        {
+          ...options(),
+          signal: controller.signal,
+          timeoutMs: DEADLINE_MS,
+        },
         async (client) => client.listTools(),
       ),
-    ).rejects.toThrow();
+    );
+    // the stop's own error, never the deadline's
+    expect(stopped.message).not.toContain("timed out");
     expect(cancelled.value).toBeTrue();
-    expect(Date.now() - cancelled.at).toBeLessThan(1_000);
   });
 
   test("aborts mid-call, closing the transport at once", async () => {
     const recorded = await fixture();
     const fake = mcpFetch({ recorded });
     const controller = new AbortController();
-    const cancelled: Cancelled = { value: false, at: 0 };
+    const cancelled: Cancelled = { value: false };
     const fetcher = abortAt("tools/call", fake.fetcher, controller, cancelled);
     // the caller's abort is a stop, never the SDK's request timeout
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        null,
-        { ...options(), signal: controller.signal },
-        async (client) =>
-          client.callTool("echo", {}, definition, {
-            signal: options().signal,
-            timeoutMs: 2_000,
-          }),
-      ),
-    ).rejects.toThrow("the MCP call was stopped");
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            null,
+            {
+              ...options(),
+              signal: controller.signal,
+              timeoutMs: DEADLINE_MS,
+            },
+            async (client) =>
+              client.callTool("echo", {}, definition, {
+                signal: options().signal,
+                timeoutMs: DEADLINE_MS,
+              }),
+          ),
+        )
+      ).message,
+    ).toContain("the MCP call was stopped");
     expect(cancelled.value).toBeTrue();
-    expect(Date.now() - cancelled.at).toBeLessThan(1_000);
   });
 
   test("a stop stays a stop when the session cleanup outlasts the deadline", async () => {
     const recorded = await fixture("flux-docs");
     const fake = mcpFetch({ era: "legacy", recorded, sessionId: "session-1" });
     const controller = new AbortController();
-    const cancelled: Cancelled = { value: false, at: 0 };
+    const cancelled: Cancelled = { value: false };
     const stopped = abortAt("tools/call", fake.fetcher, controller, cancelled);
     let deletes = 0;
     // a DELETE that never answers holds the cleanup to the deadline,
@@ -692,19 +731,23 @@ describe("MCP SDK client", () => {
       deletes++;
       return new Promise<Response>(() => {});
     }) as typeof fetch;
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        null,
-        { ...options(), signal: controller.signal, timeoutMs: 300 },
-        async (client) =>
-          client.callTool("echo", {}, definition, {
-            signal: options().signal,
-            timeoutMs: 2_000,
-          }),
-      ),
-    ).rejects.toThrow("the MCP call was stopped");
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            null,
+            { ...options(), signal: controller.signal, timeoutMs: 300 },
+            async (client) =>
+              client.callTool("echo", {}, definition, {
+                signal: options().signal,
+                timeoutMs: 2_000,
+              }),
+          ),
+        )
+      ).message,
+    ).toContain("the MCP call was stopped");
     expect(cancelled.value).toBeTrue();
     expect(deletes).toBe(1);
   });
@@ -758,15 +801,19 @@ describe("MCP streamed response budget", () => {
       new Response("x".repeat(101), {
         headers: { "content-type": "application/json" },
       })) as unknown as typeof fetch;
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        null,
-        { ...options(), bodyBytes: 100 },
-        async () => null,
-      ),
-    ).rejects.toThrow("the MCP server's answer is over 100 bytes");
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            null,
+            { ...options(), bodyBytes: 100 },
+            async () => null,
+          ),
+        )
+      ).message,
+    ).toContain("the MCP server's answer is over 100 bytes");
   });
 
   test("keeps the byte-cap error for an oversized HTTP error body", async () => {
@@ -775,15 +822,19 @@ describe("MCP streamed response budget", () => {
         status: 500,
         headers: { "content-type": "text/plain" },
       })) as unknown as typeof fetch;
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        null,
-        { ...options(), bodyBytes: 100 },
-        async () => null,
-      ),
-    ).rejects.toThrow("the MCP server's answer is over 100 bytes");
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            null,
+            { ...options(), bodyBytes: 100 },
+            async () => null,
+          ),
+        )
+      ).message,
+    ).toContain("the MCP server's answer is over 100 bytes");
   });
 
   // the deadline is far past the test's own timeout: an over-budget
@@ -813,15 +864,19 @@ describe("MCP streamed response budget", () => {
         { headers: { "content-type": "text/event-stream" } },
       );
     }) as typeof fetch;
-    await expect(
-      withClient(
-        { fetcher, version: "test" },
-        { url: URL },
-        null,
-        { ...options(), bodyBytes: 100, timeoutMs: 60_000 },
-        async (client) => client.listTools(),
-      ),
-    ).rejects.toThrow("the MCP server's answer is over 100 bytes");
+    expect(
+      (
+        await rejection(
+          withClient(
+            { fetcher, version: "test" },
+            { url: URL },
+            null,
+            { ...options(), bodyBytes: 100, timeoutMs: 60_000 },
+            async (client) => client.listTools(),
+          ),
+        )
+      ).message,
+    ).toContain("the MCP server's answer is over 100 bytes");
     expect(transportClosed).toBeTrue();
   });
 });

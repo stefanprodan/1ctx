@@ -13,7 +13,14 @@ import { FINALIZE_RETRY_MS } from "../../src/server/runner/index.ts";
 import { cutText } from "../../src/server/sessions/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import { collectLogs } from "../helpers/app.ts";
-import { chatApp, startChat, tick } from "../helpers/chat.ts";
+import {
+  chatApp,
+  freed,
+  ringing,
+  startChat,
+  tick,
+  until,
+} from "../helpers/chat.ts";
 
 function envelopes() {
   const seen: Extract<BusEvent, { type: "session.changed" }>["data"][] = [];
@@ -312,6 +319,10 @@ describe("finishTool rollback", () => {
         | ((value: { content: string; error: boolean }) => void)
         | null = null;
       let siblingAborted = false;
+      let firstStarted!: () => void;
+      const first = new Promise<void>((resolve) => {
+        firstStarted = resolve;
+      });
       const tools: Tools = {
         capabilities: () => [],
         serverNames: () => [],
@@ -340,17 +351,14 @@ describe("finishTool rollback", () => {
           if (call.id === "first") {
             return new Promise((resolve) => {
               release = resolve;
+              firstStarted();
             });
           }
+          // only the abort ends it, so a missed abort hangs the test
           return new Promise((resolve) => {
-            const timer = setTimeout(
-              () => resolve({ content: "did not abort", error: false }),
-              1000,
-            );
             ctx.signal.addEventListener(
               "abort",
               () => {
-                clearTimeout(timer);
                 siblingAborted = true;
                 resolve({ content: "aborted", error: true, interrupted: true });
               },
@@ -379,7 +387,7 @@ describe("finishTool rollback", () => {
           },
         ]);
         script.end();
-        for (let i = 0; i < 50 && release === null; i++) await tick();
+        await first;
         expect(release).not.toBeNull();
         expect(
           chat.app.sessions
@@ -395,11 +403,7 @@ describe("finishTool rollback", () => {
           throw new Error("touch failed after the tool update");
         };
         release!({ content: "first result", error: false });
-
-        for (let i = 0; i < 50; i++) {
-          if (chat.app.runner.registry.get(sessionId) === null) break;
-          await tick();
-        }
+        await freed(chat.app, sessionId);
         const rows = chat.app.sessions
           .messages(sessionId)
           .filter((row) => row.kind === "tool");
@@ -477,13 +481,11 @@ describe("finalizeSend rollback", () => {
       },
     ]);
     script.end();
-    for (let i = 0; i < 50; i++) {
-      const tool = chat.app.sessions
-        .messages(sessionId)
-        .find((row) => row.kind === "tool");
-      if (tool?.status === "streaming") break;
-      await tick();
-    }
+    await until(
+      () =>
+        chat.app.sessions.messages(sessionId).find((row) => row.kind === "tool")
+          ?.status === "streaming",
+    );
 
     const store = chat.app.sessions;
     const original = store.finishSend.bind(store);
@@ -494,10 +496,7 @@ describe("finalizeSend rollback", () => {
       return original(id, fields);
     };
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    await tick();
-    chat.app.now.value += FINALIZE_RETRY_MS;
-    await tick();
-    await tick();
+    await ringing(chat.app, freed(chat.app, sessionId), FINALIZE_RETRY_MS);
     store.finishSend = original;
 
     expect(attempts).toBe(2);
@@ -533,10 +532,7 @@ describe("new tool transaction rollback", () => {
       name: "datetime",
       arguments: '{"timezone":"UTC"}',
     });
-    for (let i = 0; i < 20; i++) {
-      if (chat.app.runner.registry.get(sessionId) === null) break;
-      await tick();
-    }
+    await freed(chat.app, sessionId);
 
     expect(chat.app.sessions.byId(sessionId)?.revision).toBe(2);
     expect(chat.app.sessions.message(detail.messages[1].id)).toMatchObject({
@@ -568,10 +564,7 @@ describe("new tool transaction rollback", () => {
     script.finish("tool_calls");
     script.usage({ prompt: 12, completion: 3 });
     script.end();
-    for (let i = 0; i < 20; i++) {
-      if (chat.app.runner.registry.get(sessionId) === null) break;
-      await tick();
-    }
+    await freed(chat.app, sessionId);
 
     const rows = chat.app.sessions.messages(sessionId);
     expect(rows.filter((row) => row.kind === "tool")).toEqual([]);
@@ -611,10 +604,7 @@ describe("new tool transaction rollback", () => {
     script.finish("tool_calls");
     script.usage();
     script.end();
-    for (let i = 0; i < 30; i++) {
-      if (chat.app.runner.registry.get(sessionId) === null) break;
-      await tick();
-    }
+    await freed(chat.app, sessionId);
 
     const replies = chat.app.sessions
       .messages(sessionId)

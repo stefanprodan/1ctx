@@ -12,6 +12,7 @@ import { createAutomation } from "../../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
+  sessionSettled,
   startChat,
   tick,
   waitScript,
@@ -148,12 +149,7 @@ describe("a drain's scheduler", () => {
     });
     expect(fired.nextAt).toBeGreaterThan(due);
     script.reply("done");
-    for (let i = 0; i < 100; i++) {
-      if (next.sessions.byId(fired.lastRunSessionId!)?.status !== "running") {
-        break;
-      }
-      await tick();
-    }
+    await sessionSettled(next, fired.lastRunSessionId!);
     await next.shutdown();
   });
 
@@ -199,10 +195,7 @@ describe("a drain's scheduler", () => {
     });
     script.reply("done");
     const session = fired.lastRunSessionId!;
-    for (let i = 0; i < 100; i++) {
-      if (next.sessions.byId(session)?.status !== "running") break;
-      await tick();
-    }
+    await sessionSettled(next, session);
     await next.shutdown();
   });
 

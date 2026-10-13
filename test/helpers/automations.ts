@@ -3,7 +3,12 @@
 
 import type { AutomationSummary } from "../../src/shared/contracts/automation.ts";
 import type { AttentionMode } from "../../src/shared/words.ts";
-import { type ChatApp, type Script, tick, waitScript } from "./chat.ts";
+import {
+  type ChatApp,
+  type Script,
+  sessionSettled,
+  waitScript,
+} from "./chat.ts";
 
 // set to off unless the test names a mode, so a finished run asks no
 // attention step of the scripted provider
@@ -86,14 +91,9 @@ export async function startRun(
   return { sessionId: detail.session.id as string, main: await pending };
 }
 
-// wait until the session is no longer running and answer its row
-export async function settleRun(chat: ChatApp, sessionId: string) {
-  for (let i = 0; i < 200; i++) {
-    const session = chat.app.sessions.byId(sessionId);
-    if (session?.status !== "running") return session;
-    await tick();
-  }
-  throw new Error("run did not settle");
+// the session's row once it is no longer running
+export function settleRun(chat: ChatApp, sessionId: string) {
+  return sessionSettled(chat.app, sessionId);
 }
 
 // a run's answer, then its attention step's reply, "ok" unless the test

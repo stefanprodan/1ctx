@@ -30,6 +30,7 @@ import {
   type ChatApp,
   chatApp,
   type Script,
+  sessionSettled,
   startChat,
   tick,
 } from "../helpers/chat.ts";
@@ -795,10 +796,7 @@ describe("automation socket events", () => {
     );
     const sessionId = (await started.json()).session.id;
     (await pending).reply("done");
-    for (let i = 0; i < 100; i++) {
-      if (chat.app.sessions.byId(sessionId)?.status !== "running") break;
-      await tick();
-    }
+    await sessionSettled(chat.app, sessionId);
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
     chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));

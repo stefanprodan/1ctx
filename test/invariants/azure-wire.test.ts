@@ -12,15 +12,17 @@ import {
   type ReasoningDetail,
 } from "../../src/server/providers/index.ts";
 import { type Answer, azureFetch, refusal, stream } from "../helpers/azure.ts";
-import { AZURE_MODEL, type ChatApp, chatApp, tick } from "../helpers/chat.ts";
+import {
+  AZURE_MODEL,
+  type ChatApp,
+  chatApp,
+  ringing,
+  sessionSettled,
+} from "../helpers/chat.ts";
 
+// a retry's first backoff rings on the fake clock as it is made
 async function settle(chat: ChatApp, sessionId: string): Promise<void> {
-  for (let i = 0; i < 400; i++) {
-    if (chat.app.sessions.byId(sessionId)?.status !== "running") return;
-    chat.app.now.value += 200;
-    await tick();
-  }
-  throw new Error(`chat ${sessionId} did not settle`);
+  await ringing(chat.app, sessionSettled(chat.app, sessionId), 2_000);
 }
 
 async function azureChat() {

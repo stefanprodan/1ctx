@@ -3,17 +3,12 @@
 
 import { expect } from "bun:test";
 import { EXHAUSTED_LINE } from "../../src/server/runner/context.ts";
-import { type ChatApp, tick } from "./chat.ts";
+import { type ChatApp, idle, ringing } from "./chat.ts";
 
-// The fake clock lets a finalize retry resolve while the loop settles;
-// once no send is active there is nothing left to wait for.
+// once no send is active, ringing the fake clock's short sleeps, as a
+// finalize retry's pause, within times * 200 ms of each
 export async function settle(chat: ChatApp, times = 6) {
-  for (let i = 0; i < times; i++) {
-    await tick();
-    chat.app.now.value += 200;
-    await tick();
-    if (chat.app.runner.registry.values().length === 0) return;
-  }
+  await ringing(chat.app, idle(chat.app), times * 200);
 }
 
 export function shape(chat: ChatApp, sessionId: string) {

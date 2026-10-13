@@ -11,9 +11,9 @@ import {
   type ChatApp,
   chatApp,
   FLASH,
+  idle,
   type Script,
   startChat,
-  tick,
 } from "../helpers/chat.ts";
 
 const DAY_MS = 86_400_000;
@@ -28,9 +28,7 @@ async function finish(
   script.finish();
   script.usage({ prompt, completion });
   script.end();
-  for (let i = 0; i < 100 && chat.app.runner.registry.size > 0; i++) {
-    await tick();
-  }
+  await idle(chat.app);
   expect(chat.app.runner.registry.size).toBe(0);
 }
 

@@ -20,19 +20,15 @@ import {
   type ChatApp,
   chatApp,
   type Script,
+  sessionSettled,
   setLimits,
   startChat,
-  tick,
   waitScript,
 } from "../../helpers/chat.ts";
 import { stage } from "./uploads-helpers.ts";
 
 async function settled(chat: ChatApp, id: string) {
-  for (let i = 0; i < 400; i++) {
-    if (chat.app.sessions.byId(id)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("send did not settle");
+  await sessionSettled(chat.app, id);
 }
 
 // a team chat the member started, its first turn answered

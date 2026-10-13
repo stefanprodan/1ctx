@@ -452,7 +452,6 @@ describe("the tool loop", () => {
     });
     next.toolRound([time("other", "Europe/Paris")]);
     next.end();
-    await settle(chat);
     const answer = await waitScript(chat.scripted, 5);
     answer.reply("moved on");
     await settle(chat, 10);
@@ -578,8 +577,8 @@ describe("the tool loop", () => {
     const { detail, script, sessionId } = await startChat(chat, "shut");
     script.toolRound([time("c1")]);
     script.end();
-    // let the first round's tool run and round 2 start
-    await settle(chat);
+    // the first round's tool ran and round 2 started
+    await waitScript(chat.scripted, 2);
     await chat.app.shutdown();
     const send = chat.app.sessions.send(detail.send.id)!;
     expect(send).toMatchObject({ status: "stopped", cause: "shutdown" });

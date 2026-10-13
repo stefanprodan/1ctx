@@ -8,12 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { createAutomation } from "../../helpers/automations.ts";
-import {
-  type ChatApp,
-  setLimits,
-  startChat,
-  tick,
-} from "../../helpers/chat.ts";
+import { type ChatApp, setLimits, startChat } from "../../helpers/chat.ts";
 import {
   childFor,
   delegateCall,
@@ -28,9 +23,11 @@ import { seedServer } from "../mcp/switches.helpers.ts";
 
 const children = (chat: ChatApp) => chat.scripted.scripts.filter(isChild);
 
-// a few turns of the loop with nothing new arriving
-async function quiet(chat: ChatApp, count: number) {
-  for (let i = 0; i < 40; i++) await tick();
+// the last delegate call waits for a place, so it cannot ask; every
+// call takes or waits for its place in the turn the round launches
+function quiet(chat: ChatApp, parentId: string, count: number) {
+  const parent = chat.app.runner.registry.get(parentId)!;
+  expect(parent.children.waiting).toHaveLength(1);
   expect(chat.scripted.scripts.length).toBe(count);
 }
 
@@ -61,7 +58,7 @@ describe("subagents at once", () => {
       const alpha = childFor(started, "alpha");
       const beta = childFor(started, "beta");
       expect(chat.app.runner.registry.extraStreams).toBe(1);
-      await quiet(chat, 3);
+      quiet(chat, sessionId, 3);
       beta.reply("beta done");
       const third = await scriptsFrom(chat, 4);
       const gamma = childFor(third, "gamma");
@@ -106,7 +103,7 @@ describe("subagents at once", () => {
       script.end();
       const first = await scriptsFrom(chat, 5);
       expect(isChild(first[4]!)).toBe(true);
-      await quiet(chat, 5);
+      quiet(chat, sessionId, 5);
       expect(chat.app.runner.registry.extraStreams).toBe(0);
       first[4]!.reply("first done");
       const second = await scriptsFrom(chat, 6);
@@ -138,7 +135,7 @@ describe("subagents at once", () => {
       });
       await fired(chat, "first-run");
       await fired(chat, "second-run");
-      await fired(chat, "the-parent");
+      const parentId = await fired(chat, "the-parent");
       const parent = (await scriptsFrom(chat, 3))[2]!;
       parent.toolRound([
         delegateCall("d1", "task alpha"),
@@ -147,7 +144,7 @@ describe("subagents at once", () => {
       parent.end();
       const first = await scriptsFrom(chat, 4);
       expect(isChild(first[3]!)).toBe(true);
-      await quiet(chat, 4);
+      quiet(chat, parentId, 4);
       expect(chat.app.runner.registry.extraStreams).toBe(0);
       // a user's chat still gets the last place
       await startChat(chat, "a user's turn");

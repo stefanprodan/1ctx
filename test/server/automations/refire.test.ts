@@ -19,6 +19,7 @@ import {
 import {
   type ChatApp,
   chatApp,
+  sessionSettled,
   setLimits,
   tick,
   waitScript,
@@ -82,10 +83,7 @@ const restart = (chat: ChatApp, activate = true) =>
 async function finish(next: TestApp, chat: ChatApp, id: string) {
   const sessionId = next.automations.byId(id)!.lastRunSessionId!;
   chat.scripted.scripts.at(-1)!.reply("done");
-  for (let i = 0; i < 200; i++) {
-    if (next.sessions.byId(sessionId)?.status !== "running") break;
-    await tick();
-  }
+  await sessionSettled(next, sessionId);
   await next.shutdown();
 }
 

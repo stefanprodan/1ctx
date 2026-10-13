@@ -12,10 +12,10 @@ import {
   type ChatApp,
   chatApp,
   FLASH,
+  freed,
   type Script,
   setLimits,
   startChat,
-  tick,
   waitScript,
 } from "../../helpers/chat.ts";
 
@@ -28,11 +28,7 @@ const users = (script: Script) =>
 
 async function free(chat: ChatApp, sessionId: string) {
   await settleRun(chat, sessionId);
-  for (let i = 0; i < 400; i++) {
-    if (chat.app.runner.registry.get(sessionId) === null) return;
-    await tick();
-  }
-  throw new Error("the lock was not let go");
+  await freed(chat.app, sessionId);
 }
 
 async function turn(chat: ChatApp, sessionId: string, message: string) {

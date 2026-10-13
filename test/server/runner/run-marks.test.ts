@@ -39,7 +39,6 @@ import {
   type Script,
   setLimits,
   startChat,
-  tick,
   waitScript,
 } from "../../helpers/chat.ts";
 
@@ -305,7 +304,6 @@ describe("the attention step", () => {
       const last = await waitScript(chat.scripted, 6);
       calling(flag("first line\nsecond line", "c2"))(last);
       expect((await settleRun(chat, twice.sessionId))?.status).toBe("done");
-      for (let i = 0; i < 5; i++) await tick();
       expect(chat.scripted.scripts).toHaveLength(6);
       expect(markOf(chat, twice.sessionId)).toEqual(NONE);
       const refused = chat.app.sessions
@@ -376,14 +374,12 @@ describe("the attention step", () => {
       const again = await waitScript(chat.scripted, 3);
       again.reply("needs_attention: Payments service is unhealthy");
       expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
-      for (let i = 0; i < 5; i++) await tick();
       expect(chat.scripted.scripts).toHaveLength(3);
       expect(markOf(chat, run.sessionId)).toEqual(NONE);
 
       const ok = await startRun(chat, automation.id);
       await answerRun(chat, ok.main, "All good.", (step) => step.reply("OK."));
       expect((await settleRun(chat, ok.sessionId))?.status).toBe("done");
-      for (let i = 0; i < 5; i++) await tick();
       expect(chat.scripted.scripts).toHaveLength(5);
       expect(markOf(chat, ok.sessionId)).toEqual(NONE);
     } finally {
@@ -573,7 +569,6 @@ describe("the attention step", () => {
       const run = await startRun(chat, off.id);
       run.main.reply("All good.");
       await settleRun(chat, run.sessionId);
-      for (let i = 0; i < 5; i++) await tick();
       expect(chat.scripted.scripts).toHaveLength(1);
       expect(chat.app.sessions.lastSend(run.sessionId)).toMatchObject({
         memoryRound: null,
@@ -653,7 +648,6 @@ describe("the runner marks, with no step", () => {
       expect(markOf(chat, spent.sessionId)?.attention_reason).toBe(
         LIMIT_REASON,
       );
-      for (let i = 0; i < 5; i++) await tick();
       // no step after any of them: two requests for the spent run alone
       expect(chat.scripted.scripts).toHaveLength(4);
       expect(chat.app.sessions.lastSend(spent.sessionId)?.attentionRound).toBe(

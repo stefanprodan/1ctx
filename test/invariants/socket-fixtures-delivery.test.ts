@@ -27,7 +27,7 @@ describe("socket fixtures for delivery", () => {
     watch(chat, first, sessionId);
     chat.scripted.scripts[0] &&
       toolRound(chat.scripted.scripts[0], [call("c1")]);
-    await settle(chat, 4);
+    await fake.ran("c1");
     const res = await chat.member.call("GET", `/api/sessions/${sessionId}`);
     const detail = await res.json();
     const conn = await watcher(chat);
@@ -52,8 +52,9 @@ describe("socket fixtures for delivery", () => {
     );
     watch(chat, first, sessionId);
     toolRound(chat.scripted.scripts[0], [call("c1")]);
-    await settle(chat, 4);
     const r2 = await waitScript(chat.scripted, 2);
+    // past the stream's write interval, so the partial reply is saved
+    chat.app.now.value += 250;
     r2.content("answering now\n\n");
     await tick();
     await tick();
@@ -72,7 +73,7 @@ describe("socket fixtures for delivery", () => {
     r2.finish();
     r2.usage();
     r2.end();
-    await settle(chat, 8);
+    await settle(chat);
     chat.app.socket.dispose();
   });
 
@@ -90,7 +91,7 @@ describe("socket fixtures for delivery", () => {
     script.finish();
     script.usage();
     script.end();
-    await settle(chat, 8);
+    await settle(chat);
     const res = await chat.member.call("GET", `/api/sessions/${sessionId}`);
     const finalDetail = await res.json();
     writeLines("stale-envelope", [
@@ -138,7 +139,7 @@ describe("socket fixtures for delivery", () => {
     chat.scripted.scripts[0].finish();
     chat.scripted.scripts[0].usage();
     chat.scripted.scripts[0].end();
-    await settle(chat, 8);
+    await settle(chat);
     const res = await chat.member.call("GET", `/api/sessions/${sessionId}`);
     const detail = await res.json();
     const conn2 = await watcher(chat);

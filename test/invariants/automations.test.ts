@@ -12,17 +12,13 @@ import {
 } from "../../src/shared/contracts/automation.ts";
 import { hashPassword } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
-import { chatApp, tick } from "../helpers/chat.ts";
+import { chatApp, sessionSettled, tick } from "../helpers/chat.ts";
 
 async function settle(
   chat: Awaited<ReturnType<typeof chatApp>>,
   sessionId: string,
 ) {
-  for (let i = 0; i < 100; i++) {
-    if (chat.app.sessions.byId(sessionId)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("run did not settle");
+  await sessionSettled(chat.app, sessionId);
 }
 
 describe("automations", () => {

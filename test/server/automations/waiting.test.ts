@@ -6,9 +6,11 @@
 // start that refuses on cue.
 
 import { describe, expect, test } from "bun:test";
+import { MINUTE_MS } from "../../../src/server/lib/clock.ts";
 import { type Event, RunCapacity } from "../../../src/server/runner/index.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
 import { collectLogs, testApp } from "../../helpers/app.ts";
+import { settle } from "../../helpers/async.ts";
 import {
   automationBody,
   createAutomation,
@@ -20,12 +22,18 @@ import {
   chatApp,
   setLimits,
   startChat,
-  tick,
   waitScript,
 } from "../../helpers/chat.ts";
 
 const HOUR = 3_600_000;
 const FAR = 1000 * HOUR;
+
+// once the scheduler's loop sleeps again, its pass over; no other loop
+// of the app sleeps a minute or less from now
+const asleep = (chat: ChatApp) => {
+  const now = chat.app.now.value;
+  return chat.app.slept((at) => at > now && at <= now + MINUTE_MS);
+};
 
 const setDue = (chat: ChatApp, id: string, at: number) =>
   chat.app.db
@@ -99,7 +107,7 @@ async function stopped() {
   const logs = collectLogs();
   const chat = await chatApp({ logFactory: logs.logFactory });
   chat.app.automationScheduler.stop();
-  await tick();
+  await settle();
   return { chat, logs };
 }
 
@@ -140,9 +148,9 @@ describe("a fire waiting for a free place", () => {
     const due = chat.app.now.value;
     setDue(chat, waiting.id, due);
 
+    const resting = asleep(chat);
     chat.app.automationScheduler.start();
-    await tick();
-    await tick();
+    await resting;
     expect(chat.scripted.scripts).toHaveLength(4);
     expect(row(chat, waiting.id).nextAt).toBe(due);
 
@@ -306,14 +314,17 @@ describe("a fire waiting for a free place", () => {
     const start = fakeStart(chat, (event) =>
       event.project.id === chat.projectId ? "project" : null,
     );
+    // the loop sleeps until the later row, not again and again
+    const resting = chat.app.slept((at) => at === now + 100);
     chat.app.automationScheduler.start();
-    for (let i = 0; i < 5; i++) await tick();
+    await resting;
     expect(start.calls).toEqual([blocked.id]);
 
     const pending = chat.scripted.next();
     chat.app.now.value = now + 100;
+    const again = asleep(chat);
     const script = await pending;
-    for (let i = 0; i < 5; i++) await tick();
+    await again;
     expect(start.calls).toEqual([blocked.id, later.id]);
     expect(row(chat, blocked.id).nextAt).toBe(now);
     start.restore();
@@ -334,8 +345,9 @@ describe("a fire waiting for a free place", () => {
       refusals--;
       return "project";
     });
+    const resting = asleep(chat);
     chat.app.automationScheduler.start();
-    for (let i = 0; i < 5; i++) await tick();
+    await resting;
     expect(start.calls).toEqual([waiting.id]);
     const pending = chat.scripted.next();
     chat.app.now.value = now + 60_000;
@@ -381,9 +393,9 @@ describe("a fire waiting for a free place", () => {
     const held = await holdSlot(chat);
     const waiting = await createAutomation(chat, { name: "waiting" });
     setDue(chat, waiting.id, chat.app.now.value);
+    const resting = asleep(chat);
     chat.app.automationScheduler.start();
-    await tick();
-    await tick();
+    await resting;
     expect(chat.scripted.scripts).toHaveLength(4);
 
     await setLimits(chat, { ...LOW, sendsRunning: 8 });
@@ -408,12 +420,14 @@ describe("a fire waiting for a free place", () => {
     const start = fakeStart(chat, (event) =>
       event.automation.id === waiting.id && full ? "process" : null,
     );
+    const resting = asleep(chat);
     chat.app.automationScheduler.start();
-    for (let i = 0; i < 5; i++) await tick();
+    await resting;
     expect(start.calls).toEqual([waiting.id]);
-    // room without a wake is not seen before the pass interval
+    // room without a wake is not seen before the pass interval: the loop
+    // sleeps until a wake or its pass interval
     full = false;
-    for (let i = 0; i < 5; i++) await tick();
+    await settle();
     expect(start.calls).toEqual([waiting.id]);
 
     // a chat whose rows fail to write frees its place
@@ -439,8 +453,9 @@ describe("a fire waiting for a free place", () => {
     // a fire prepared and then abandoned frees its place
     full = true;
     setDue(chat, waiting.id, due);
+    const woken = asleep(chat);
     chat.app.automationScheduler.wake();
-    for (let i = 0; i < 5; i++) await tick();
+    await woken;
     expect(start.calls).toHaveLength(3);
     full = false;
     setDue(chat, other.id, due);
@@ -477,11 +492,12 @@ describe("a fire waiting for a free place", () => {
     setDue(chat, waiting.id, due);
     let full = true;
     const start = fakeStart(chat, () => (full ? "process" : null));
+    const resting = asleep(chat);
     chat.app.automationScheduler.start();
-    for (let i = 0; i < 5; i++) await tick();
+    await resting;
     expect(start.calls).toEqual([waiting.id]);
     full = false;
-    for (let i = 0; i < 5; i++) await tick();
+    await settle();
     expect(start.calls).toEqual([waiting.id]);
 
     const sessions = chat.app.sessions;
@@ -516,8 +532,9 @@ describe("a fire waiting for a free place", () => {
     const two = await createAutomation(chat, { name: "two" });
     setDue(chat, one.id, due);
     setDue(chat, two.id, due);
+    const resting = asleep(chat);
     chat.app.automationScheduler.start();
-    for (let i = 0; i < 5; i++) await tick();
+    await resting;
     expect(chat.scripted.scripts).toHaveLength(4);
 
     const [a, b] = held.held;
@@ -525,7 +542,12 @@ describe("a fire waiting for a free place", () => {
     b!.script.reply("done");
     await setLimits(chat, { ...LOW, sendsRunning: 8 });
     await waitScript(chat.scripted, 6);
-    for (let i = 0; i < 20; i++) await tick();
+    await settleRun(chat, a!.sessionId);
+    await settleRun(chat, b!.sessionId);
+    // one more whole pass finds nothing left to start
+    const done = asleep(chat);
+    chat.app.automationScheduler.wake();
+    await done;
     expect(chat.scripted.scripts).toHaveLength(6);
     for (const id of [one.id, two.id]) {
       expect(row(chat, id)).toMatchObject({
@@ -717,12 +739,12 @@ describe("a fire waiting for a free place", () => {
     const waiting = await createAutomation(chat, { name: "waiting" });
     const due = chat.app.now.value;
     setDue(chat, waiting.id, due);
+    const resting = asleep(chat);
     chat.app.automationScheduler.start();
-    await tick();
+    await resting;
     const before = row(chat, waiting.id);
 
     await chat.app.shutdown();
-    for (let i = 0; i < 5; i++) await tick();
     expect(chat.scripted.scripts).toHaveLength(4);
     expect(chat.app.sessions.byId(held.sessionId)?.status).not.toBe("running");
     // the wait is dropped for a deferral that keeps the due time

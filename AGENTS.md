@@ -121,7 +121,10 @@ with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`,
 `ANTHROPIC_URL`) and fails every other, and a fake email sender that
-keeps every message. `smtp.ts` is a fake SMTP server on loopback.
+keeps every message; `sleeping`, `slept` and `commandPhase` await the
+fake clock and a command's phase. In `chat.ts`, `until`, `idle`,
+`freed`, `sessionSettled` and `ringing` await bus events, sends
+letting go and the fake clock's due sleeps. `smtp.ts` is a fake SMTP server on loopback.
 `chat.ts` drives a chat with a scripted provider stream. `auth-cases.ts`
 is the authorization matrix.
 
@@ -259,7 +262,10 @@ fixture under `test/fixtures/structure/`.
   Linux CI runs the files in parallel, each in a fresh global, so a
   test sets what it reads itself. Local runs take the files one by one.
   A test's clock counts its neighbours' work, so the default timeout
-  is 20 s.
+  is 20 s. No test asserts elapsed time or lets a real sleep, timer or
+  poll budget decide it: a fake clock, an awaited event or counted
+  work. A promise that may never settle takes a plain `await`, never
+  `expect(p).rejects` or `.resolves`, where Bun's timeout never fires.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
 - **UI copy is short and plain.** No em-dashes anywhere. A send (one
