@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// needs_attention's reason is one line of 1 to 200 characters, counted
-// as characters, cleaned of control characters, and never a placeholder;
-// its description adds the automation's words when it has them.
+// attention is a verdict: needed true takes a reason of one line of 1 to
+// 200 characters, counted as characters, cleaned of control characters,
+// and never a placeholder; needed false drops any reason. Its
+// description adds the automation's words when it has them.
 
 import { describe, expect, test } from "bun:test";
 import {
@@ -65,23 +66,97 @@ describe("the reason", () => {
 });
 
 describe("the tool", () => {
-  test("answers Marked. and keeps the last reason", async () => {
-    const handle = { guidance: "", reason: null as string | null };
+  const fresh = () => ({
+    guidance: "",
+    reason: null as string | null,
+    answered: false,
+  });
+
+  test("takes needed and a reason, needed alone required", () => {
+    const tool = makeAttentionTool(fresh());
+    expect(tool.name).toBe("attention");
+    expect(tool.parameters).toEqual({
+      type: "object",
+      properties: {
+        needed: { type: "boolean" },
+        reason: { type: "string" },
+      },
+      required: ["needed"],
+      additionalProperties: false,
+    });
+  });
+
+  test("answers Marked. for true and keeps the last reason", async () => {
+    const handle = fresh();
     const tool = makeAttentionTool(handle);
     expect(tool.description).toBe(ATTENTION_DESCRIPTION);
     const ctx = {} as Parameters<typeof tool.run>[1];
-    expect(await tool.run({ reason: "first" }, ctx)).toBe("Marked.");
-    expect(await tool.run({ reason: "second" }, ctx)).toBe("Marked.");
-    expect(handle.reason).toBe("second");
-    await expect(tool.run({ reason: "" }, ctx)).rejects.toThrow(
-      "reason must be one line.",
+    expect(await tool.run({ needed: true, reason: "first" }, ctx)).toBe(
+      "Marked.",
+    );
+    expect(await tool.run({ needed: true, reason: "second" }, ctx)).toBe(
+      "Marked.",
+    );
+    expect(handle).toEqual({ guidance: "", reason: "second", answered: true });
+  });
+
+  test("answers Checked. for false and drops its reason", async () => {
+    const handle = fresh();
+    const tool = makeAttentionTool(handle);
+    const ctx = {} as Parameters<typeof tool.run>[1];
+    expect(
+      await tool.run({ needed: false, reason: "No proposals deleted" }, ctx),
+    ).toBe("Checked.");
+    expect(handle).toEqual({ guidance: "", reason: null, answered: true });
+  });
+
+  test("the last valid verdict holds", async () => {
+    const handle = fresh();
+    const tool = makeAttentionTool(handle);
+    const ctx = {} as Parameters<typeof tool.run>[1];
+    await tool.run({ needed: true, reason: "flux is behind" }, ctx);
+    await tool.run({ needed: false }, ctx);
+    expect(handle.reason).toBeNull();
+    await tool.run({ needed: true, reason: "flux is behind" }, ctx);
+    expect(handle.reason).toBe("flux is behind");
+    await expect(tool.run({ needed: false, reason: 3 }, ctx)).resolves.toBe(
+      "Checked.",
+    );
+    expect(handle.reason).toBeNull();
+  });
+
+  test("refuses a bad needed or a bad reason on true", async () => {
+    const handle = fresh();
+    const tool = makeAttentionTool(handle);
+    const ctx = {} as Parameters<typeof tool.run>[1];
+    for (const needed of [undefined, "true", 1, null]) {
+      await expect(
+        tool.run({ needed, reason: "flux is behind" }, ctx),
+      ).rejects.toThrow("needed must be true or false.");
+    }
+    await expect(tool.run({ needed: true }, ctx)).rejects.toThrow(
+      "needed true takes a one-line reason.",
     );
     await expect(
-      tool.run({ reason: "placeholder-not-called" }, ctx),
+      tool.run({ needed: true, reason: "a\nb" }, ctx),
+    ).rejects.toThrow("reason must be one line.");
+    await expect(
+      tool.run({ needed: true, reason: "placeholder-not-called" }, ctx),
     ).rejects.toThrow(
       "reason must say what a user should act on, not a placeholder.",
     );
-    expect(handle.reason).toBe("second");
+    expect(handle.answered).toBeFalse();
+    await tool.run({ needed: true, reason: "kept" }, ctx);
+    await expect(tool.run({ needed: true, reason: "" }, ctx)).rejects.toThrow(
+      "reason must be one line.",
+    );
+    expect(handle).toEqual({ guidance: "", reason: "kept", answered: true });
+  });
+
+  test("states the cap and the verdict in its description", () => {
+    expect(ATTENTION_DESCRIPTION).toBe(
+      `Give your verdict on this run. needed true, with a one-line reason a user reads, at most ${MAX_ATTENTION_REASON} characters, when the run found something a user should act on, or could not do its job; needed false, with no reason, when it did not. The task may say when. A later call replaces the verdict.`,
+    );
   });
 
   test("adds the automation's words to its description", () => {

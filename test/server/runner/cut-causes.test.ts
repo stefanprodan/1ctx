@@ -59,7 +59,7 @@ function memoryHandle(): MemoryHandle {
   };
 }
 
-// a fake tools port: datetime in the main rounds, needs_attention in
+// a fake tools port: datetime in the main rounds, attention in
 // the attention step, memory_edit in the memory phase, each run by run
 function phaseTools(run: Tools["run"]): Tools {
   return {
@@ -75,8 +75,12 @@ function phaseTools(run: Tools["run"]): Tools {
     ) => {
       if (scope?.phase === "attention") {
         return {
-          ...base(["needs_attention"]),
-          attention: { guidance: "when it fails", reason: null },
+          ...base(["attention"]),
+          attention: {
+            guidance: "when it fails",
+            reason: null,
+            answered: false,
+          },
         };
       }
       if (scope?.phase === "memory") {

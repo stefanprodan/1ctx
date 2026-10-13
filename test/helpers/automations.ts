@@ -96,13 +96,30 @@ export function settleRun(chat: ChatApp, sessionId: string) {
   return sessionSettled(chat.app, sessionId);
 }
 
-// a run's answer, then its attention step's reply, "ok" unless the test
-// drives it; the step's script
+// the attention step's verdict call, closed: needed false unless a
+// reason is given
+export function verdict(reason?: string, id = "v1") {
+  return (script: Script) => {
+    script.toolRound([
+      {
+        id,
+        name: "attention",
+        arguments: JSON.stringify(
+          reason === undefined ? { needed: false } : { needed: true, reason },
+        ),
+      },
+    ]);
+    script.end();
+  };
+}
+
+// a run's answer, then its attention step's verdict, needed false unless
+// the test drives it; the step's script
 export async function answerRun(
   chat: ChatApp,
   main: Script,
   answer: string,
-  step: (script: Script) => void = (script) => script.reply("ok"),
+  step: (script: Script) => void = verdict(),
 ): Promise<Script> {
   const before = chat.scripted.scripts.length;
   main.reply(answer);

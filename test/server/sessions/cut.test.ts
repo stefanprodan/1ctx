@@ -53,7 +53,7 @@ describe("the cut text", () => {
     for (const name of [
       "memory_edit",
       "email_user",
-      "needs_attention",
+      "attention",
       "visualize",
       "made_up",
     ]) {

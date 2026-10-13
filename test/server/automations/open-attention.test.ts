@@ -38,8 +38,8 @@ const flag = (reason: string) => (script: Script) => {
   script.toolRound([
     {
       id: "c1",
-      name: "needs_attention",
-      arguments: JSON.stringify({ reason }),
+      name: "attention",
+      arguments: JSON.stringify({ needed: true, reason }),
     },
   ]);
   script.end();
@@ -101,6 +101,53 @@ const dismiss = (chat: ChatApp, id: string) =>
   chat.member.call("POST", `/api/automations/${id}/dismiss`);
 
 describe("an automation's open alert", () => {
+  test("a needed false closes it and its reason reaches nothing", async () => {
+    const chat = await chatApp();
+    chat.app.automationScheduler.stop();
+    try {
+      const automation = await createAutomation(chat, {
+        attentionMode: "agent",
+      });
+      const id = automation.id;
+      await markedRun(chat, id, "podinfo is not ready");
+      expect((await summary(chat, id)).alert?.reason).toBe(
+        "podinfo is not ready",
+      );
+      chat.app.now.value += 60_000;
+      const run = await startRun(chat, id);
+      await answerRun(chat, run.main, "All good.", (script) => {
+        script.toolRound([
+          {
+            id: "c1",
+            name: "attention",
+            arguments: JSON.stringify({
+              needed: false,
+              reason: "No proposals were deleted",
+            }),
+          },
+        ]);
+        script.end();
+      });
+      expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
+      expect((await summary(chat, id)).alert).toBeNull();
+      expect(since(chat, id)).toBeNull();
+      const session = await chat.member.call(
+        "GET",
+        `/api/sessions/${run.sessionId}`,
+      );
+      // the call's own row keeps what the model wrote, as every call's
+      // does; the mark and the alert never read it
+      expect((await session.json()).session).toMatchObject({
+        attention: null,
+        attentionReason: null,
+        attentionSource: null,
+        attentionBy: null,
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test.serial(
     "opens once, joins, closes, holds on a stop and reopens",
     async () => {

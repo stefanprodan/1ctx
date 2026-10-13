@@ -477,7 +477,7 @@ describe("a run cut by its deadline before its memory phase", () => {
   });
 });
 
-// a fake tools port whose attention step offers needs_attention alone
+// a fake tools port whose attention step offers attention alone
 function attentionTools(run: Tools["run"]): Tools {
   const base = fakeTools(["datetime"], run);
   return {
@@ -489,12 +489,12 @@ function attentionTools(run: Tools["run"]): Tools {
         ...offered,
         tools: [
           {
-            name: "needs_attention",
+            name: "attention",
             description: "mark",
             parameters: { type: "object" },
           },
         ],
-        attention: { guidance: "when it fails", reason: null },
+        attention: { guidance: "when it fails", reason: null, answered: false },
       };
     },
   } as Tools;
@@ -502,8 +502,8 @@ function attentionTools(run: Tools["run"]): Tools {
 
 const MARK = {
   id: "mark",
-  name: "needs_attention",
-  arguments: '{"reason":"podinfo is not ready"}',
+  name: "attention",
+  arguments: '{"needed":true,"reason":"podinfo is not ready"}',
 };
 
 describe("the work after a run's answer", () => {
@@ -530,7 +530,7 @@ describe("the work after a run's answer", () => {
       const [row] = toolRows(chat, run.sessionId);
       expect(row).toMatchObject({
         status: "stopped",
-        toolName: "needs_attention",
+        toolName: "attention",
         content: cutText("stop", "write", false),
       });
       // the run's own end stays its answer's

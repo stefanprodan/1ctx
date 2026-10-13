@@ -531,7 +531,7 @@ describe("forged proposals", () => {
       main.script.reply("Done.");
       const attention = await waitScript(chat.scripted, nextCount);
       const step = await round(chat, attention, [create()]);
-      expect(step.answers[0]).toContain("only needs_attention");
+      expect(step.answers[0]).toContain("only attention");
       const memoryCount = chat.scripted.scripts.length + 1;
       step.script.reply("ok");
       const memory = await waitScript(chat.scripted, memoryCount);

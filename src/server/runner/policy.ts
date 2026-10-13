@@ -112,7 +112,7 @@ export type SendPolicy = {
   skillsOff: string[];
   web: WebSnapshot | null;
   memoryOffered: Offered | null;
-  // the attention step's set, needs_attention alone, for a run whose
+  // the attention step's set, attention alone, for a run whose
   // automation is not off on a model that takes tools
   attentionOffered: Offered | null;
   // a subagent's set, taken with the send's, when it offers delegate

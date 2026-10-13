@@ -61,12 +61,12 @@ describe("tools administration", () => {
     expect(codeJson(tool.parametersHtml)).toEqual(tool.parameters);
     expect(tool.tokens).toBeGreaterThan(0);
     expect(body.builtin.map((t: { name: string }) => t.name)).toEqual([
+      "attention",
       "bash",
       "datetime",
       "mcp_call",
       "mcp_describe",
       "memory_edit",
-      "needs_attention",
       "skill",
       "skill_file",
       "webfetch",

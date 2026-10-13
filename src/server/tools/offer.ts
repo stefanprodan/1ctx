@@ -180,7 +180,7 @@ function memoryFor(
 function attentionFor(scope: MemoryScope | undefined): AttentionHandle | null {
   const attention = scope?.automation?.attention ?? null;
   if (scope?.phase !== "attention" || attention === null) return null;
-  return { guidance: attention.guidance, reason: null };
+  return { guidance: attention.guidance, reason: null, answered: false };
 }
 
 const EMPTY: Omit<Offered, "tools" | "memory"> = {

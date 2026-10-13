@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A run's own mark: needs_attention is never offered in the main rounds,
-// only alone in the attention step after a finished run, whose reason is
-// written with the run's end; the runner marks a failure, a deadline and
+// A run's own mark: attention is never offered in the main rounds,
+// only alone in the attention step after a finished run, whose verdict
+// is written with the run's end, a true one alone marking; the runner marks a failure, a deadline and
 // a spent budget with no model. The step has two rounds at most, refuses
 // any other tool, and its failure, its window or a Stop marks nothing and
 // never fails the run. An automation whose mode is off has no step.
@@ -54,15 +54,22 @@ const names = (script: Script) => tools(script).map((tool) => tool.name);
 const messages = (script: Script) =>
   script.body.messages as { role: string; content: string | null }[];
 
-const flag = (reason: unknown, id = "c1", name = "needs_attention") => ({
+const flag = (reason: unknown, id = "c1", name = "attention") => ({
   id,
   name,
-  arguments: JSON.stringify({ reason }),
+  arguments: JSON.stringify({ needed: true, reason }),
+});
+
+// needed false, with a reason that must never be kept
+const clear = (id = "c1") => ({
+  id,
+  name: "attention",
+  arguments: JSON.stringify({ needed: false, reason: "No proposals deleted" }),
 });
 
 // a step round of calls, closed
 const calling =
-  (...calls: ReturnType<typeof flag>[]) =>
+  (...calls: { id: string; name: string; arguments: string }[]) =>
   (script: Script) => {
     script.toolRound(calls);
     script.end();
@@ -101,22 +108,20 @@ const agentMode = (chat: ChatApp, fields = {}) =>
   createAutomation(chat, { attentionMode: "agent", ...fields });
 
 describe("the main rounds", () => {
-  test("never offer needs_attention, in a run, a chat or the memory phase", async () => {
+  test("never offer attention, in a run, a chat or the memory phase", async () => {
     const chat = await chatApp();
     try {
       const started = await startChat(chat);
-      expect(names(started.script)).not.toContain("needs_attention");
+      expect(names(started.script)).not.toContain("attention");
       started.script.reply("hello");
       await settleRun(chat, started.sessionId);
 
       const own = await agentMode(chat, { ownMemory: true });
       const run = await startRun(chat, own.id);
-      expect(names(run.main)).not.toContain("needs_attention");
-      expect(JSON.stringify(run.main.body.messages)).not.toContain(
-        "needs_attention",
-      );
+      expect(names(run.main)).not.toContain("attention");
+      expect(JSON.stringify(run.main.body.messages)).not.toContain("attention");
       const step = await answerRun(chat, run.main, "All good.");
-      expect(names(step)).toEqual(["needs_attention"]);
+      expect(names(step)).toEqual(["attention"]);
       const phase = await waitScript(chat.scripted, 4);
       expect(names(phase)).toEqual(["memory_edit"]);
       phase.reply("Nothing to keep.");
@@ -142,7 +147,7 @@ describe("the attention step", () => {
       expect(step.body.reasoning_effort).toBeUndefined();
       expect(tools(step)).toEqual([
         expect.objectContaining({
-          name: "needs_attention",
+          name: "attention",
           description: ATTENTION_DESCRIPTION,
         }),
       ]);
@@ -155,7 +160,7 @@ describe("the attention step", () => {
       expect(user?.content).toContain("<task>\ncheck the system\n</task>");
       expect(user?.content).toContain("<answer>\nAll good.\n</answer>");
       expect(user?.content).toEndWith(
-        `${ATTENTION_ASK}\n\nWhen it does not, reply with the word ok.`,
+        `${ATTENTION_ASK}\n\nWhen it does not, call attention with needed false.`,
       );
       expect(user?.content).not.toContain("memory_edit");
       await settleRun(chat, run.sessionId);
@@ -168,7 +173,7 @@ describe("the attention step", () => {
       const other = await startRun(chat, guided.id);
       const asked = await answerRun(chat, other.main, "All good.");
       expect(messages(asked)[1]?.content).toEndWith(
-        `${ATTENTION_ASK} When it needs attention: Only when Flux is behind the latest release.\n\nWhen it does not, reply with the word ok.`,
+        `${ATTENTION_ASK} When it needs attention: Only when Flux is behind the latest release.\n\nWhen it does not, call attention with needed false.`,
       );
       await settleRun(chat, other.sessionId);
     } finally {
@@ -196,7 +201,7 @@ describe("the attention step", () => {
         const rows = chat.app.sessions.messages(run.sessionId);
         const tool = rows.find((row) => row.kind === "tool");
         expect(tool).toMatchObject({
-          toolName: "needs_attention",
+          toolName: "attention",
           content: "Marked.",
           round: 2,
         });
@@ -252,20 +257,133 @@ describe("the attention step", () => {
     }
   });
 
-  test("a text reply marks nothing and keeps its row after the answer", async () => {
+  test("needed false marks nothing, drops its reason and keeps its rows after the answer", async () => {
     const chat = await chatApp();
     try {
       const automation = await agentMode(chat);
       const run = await startRun(chat, automation.id);
-      await answerRun(chat, run.main, "All good.");
-      expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
+      await answerRun(chat, run.main, "All good.", calling(clear()));
+      const settled = await settleRun(chat, run.sessionId);
+      expect(settled?.status).toBe("done");
+      expect(chat.scripted.scripts).toHaveLength(2);
       expect(markOf(chat, run.sessionId)).toEqual(NONE);
+      expect(settled).toMatchObject({
+        attention: null,
+        attentionReason: null,
+      });
       const step = chat.app.sessions
         .messages(run.sessionId)
         .filter((row) => row.round === 2);
       expect(step).toMatchObject([
-        { kind: "reply", slot: "work", content: "ok", status: "done" },
+        { kind: "reply", slot: "work", status: "done" },
+        {
+          kind: "tool",
+          toolName: "attention",
+          content: "Checked.",
+          status: "done",
+        },
       ]);
+      expect(
+        chat.app.db
+          .query<{ n: number }, [string]>(
+            "select count(*) as n from sessions where attention_reason like ?",
+          )
+          .get("%No proposals%")?.n,
+      ).toBe(0);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("the last valid verdict of the step holds", async () => {
+    const chat = await chatApp();
+    try {
+      const automation = await agentMode(chat);
+      const cleared = await startRun(chat, automation.id);
+      await answerRun(
+        chat,
+        cleared.main,
+        "Flux is failing.",
+        calling(flag("flux-system is not ready"), clear("c2")),
+      );
+      await settleRun(chat, cleared.sessionId);
+      expect(markOf(chat, cleared.sessionId)).toEqual(NONE);
+
+      const marked = await startRun(chat, automation.id);
+      await answerRun(
+        chat,
+        marked.main,
+        "Flux is failing.",
+        calling(clear(), flag("flux-system is not ready", "c2")),
+      );
+      await settleRun(chat, marked.sessionId);
+      expect(markOf(chat, marked.sessionId)).toEqual(
+        AGENT("flux-system is not ready"),
+      );
+
+      // a refused call after a valid verdict leaves it and ends the step
+      const kept = await startRun(chat, automation.id);
+      await answerRun(
+        chat,
+        kept.main,
+        "Flux is failing.",
+        calling(flag("flux-system is not ready"), flag("", "c2")),
+      );
+      await settleRun(chat, kept.sessionId);
+      expect(markOf(chat, kept.sessionId)).toEqual(
+        AGENT("flux-system is not ready"),
+      );
+
+      // a round that failed, then needed false in the second
+      const late = await startRun(chat, automation.id);
+      await answerRun(chat, late.main, "Flux is failing.", calling(flag("")));
+      const again = await waitScript(
+        chat.scripted,
+        chat.scripted.scripts.length + 1,
+      );
+      calling(clear("c2"))(again);
+      await settleRun(chat, late.sessionId);
+      expect(markOf(chat, late.sessionId)).toEqual(NONE);
+      // 2 requests each for the first three runs, 3 for the last
+      expect(chat.scripted.scripts).toHaveLength(9);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a bad needed or a missing reason is written again", async () => {
+    const chat = await chatApp();
+    try {
+      const automation = await agentMode(chat);
+      const run = await startRun(chat, automation.id);
+      await answerRun(
+        chat,
+        run.main,
+        "Flux is failing.",
+        calling(
+          { id: "c1", name: "attention", arguments: '{"needed":"yes"}' },
+          { id: "c2", name: "attention", arguments: '{"needed":true}' },
+        ),
+      );
+      const again = await waitScript(chat.scripted, 3);
+      expect(messages(again).slice(2)).toEqual([
+        expect.objectContaining({ role: "assistant" }),
+        {
+          role: "tool",
+          tool_call_id: "c1",
+          content: "Error: needed must be true or false.",
+        },
+        {
+          role: "tool",
+          tool_call_id: "c2",
+          content: "Error: needed true takes a one-line reason.",
+        },
+      ]);
+      calling(flag("flux-system is not ready", "c3"))(again);
+      await settleRun(chat, run.sessionId);
+      expect(markOf(chat, run.sessionId)).toEqual(
+        AGENT("flux-system is not ready"),
+      );
     } finally {
       await chat.app.shutdown();
     }
@@ -283,7 +401,7 @@ describe("the attention step", () => {
         calling(flag("placeholder-not-called")),
       );
       const again = await waitScript(chat.scripted, 3);
-      expect(names(again)).toEqual(["needs_attention"]);
+      expect(names(again)).toEqual(["attention"]);
       expect(messages(again).slice(2)).toEqual([
         expect.objectContaining({ role: "assistant" }),
         {
@@ -329,17 +447,17 @@ describe("the attention step", () => {
         "Payments is down.",
         (step) =>
           step.reply(
-            "needs_attention: Payments service is unhealthy, 0 of 3 pods Ready",
+            "attention: Payments service is unhealthy, 0 of 3 pods Ready",
           ),
       );
       expect(messages(first)).toHaveLength(2);
       const again = await waitScript(chat.scripted, 3);
-      expect(names(again)).toEqual(["needs_attention"]);
+      expect(names(again)).toEqual(["attention"]);
       expect(messages(again).slice(2)).toEqual([
         expect.objectContaining({
           role: "assistant",
           content:
-            "needs_attention: Payments service is unhealthy, 0 of 3 pods Ready",
+            "attention: Payments service is unhealthy, 0 of 3 pods Ready",
         }),
         { role: "user", content: ATTENTION_AGAIN },
       ]);
@@ -369,18 +487,25 @@ describe("the attention step", () => {
       const automation = await agentMode(chat);
       const run = await startRun(chat, automation.id);
       await answerRun(chat, run.main, "Payments is down.", (step) =>
-        step.reply("needs_attention: Payments service is unhealthy"),
+        step.reply("attention: Payments service is unhealthy"),
       );
       const again = await waitScript(chat.scripted, 3);
-      again.reply("needs_attention: Payments service is unhealthy");
+      again.reply("attention: Payments service is unhealthy");
       expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
       expect(chat.scripted.scripts).toHaveLength(3);
       expect(markOf(chat, run.sessionId)).toEqual(NONE);
 
+      // "ok" is no answer: it is asked again, and a verdict ends it
       const ok = await startRun(chat, automation.id);
       await answerRun(chat, ok.main, "All good.", (step) => step.reply("OK."));
+      const verdict = await waitScript(chat.scripted, 6);
+      expect(messages(verdict).at(-1)).toEqual({
+        role: "user",
+        content: ATTENTION_AGAIN,
+      });
+      calling(clear())(verdict);
       expect((await settleRun(chat, ok.sessionId))?.status).toBe("done");
-      expect(chat.scripted.scripts).toHaveLength(5);
+      expect(chat.scripted.scripts).toHaveLength(6);
       expect(markOf(chat, ok.sessionId)).toEqual(NONE);
     } finally {
       await chat.app.shutdown();
@@ -409,11 +534,11 @@ describe("the attention step", () => {
         .filter((row) => row.kind === "tool");
       expect(rows.map((row) => [row.toolName, row.status])).toEqual([
         ["bash", "failed"],
-        ["needs_attention", "done"],
-        ["needs_attention", "done"],
+        ["attention", "done"],
+        ["attention", "done"],
       ]);
       expect(rows[0]?.error).toBe(
-        "Error: only needs_attention is offered in this step.",
+        "Error: only attention is offered in this step.",
       );
       expect(markOf(chat, run.sessionId)?.attention_reason).toBe(
         "podinfo and flux-system are failing",
@@ -470,7 +595,7 @@ describe("the attention step", () => {
         step.toolCall({
           index: 0,
           id: "c1",
-          name: "needs_attention",
+          name: "attention",
           arguments: "",
         });
       });
@@ -523,9 +648,7 @@ describe("the attention step", () => {
       );
       const phase = await waitScript(chat.scripted, 3);
       expect(messages(phase)[0]?.content).toBe(memorySystem("daily-run"));
-      expect(JSON.stringify(phase.body.messages)).not.toContain(
-        "needs_attention",
-      );
+      expect(JSON.stringify(phase.body.messages)).not.toContain("attention");
       phase.reply("Nothing to keep.");
       expect((await settleRun(chat, run.sessionId))?.status).toBe("done");
       expect(markOf(chat, run.sessionId)).toEqual(
