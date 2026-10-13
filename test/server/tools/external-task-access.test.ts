@@ -94,7 +94,6 @@ describe("external task tool access", () => {
     const calls: Record<string, unknown>[] = [
       { action: "show", id: other.id },
       { action: "show", id: other.id, before: entryId },
-      { action: "show", id: other.id, offset: 0, ref: 0 },
       { action: "show", id: other.id, entry: entryId, offset: 0 },
       { action: "edit", id: other.id, editRevision: 0, title: "Mine" },
       { action: "edit", id: other.id, editRevision: 0, files: [] },
@@ -159,7 +158,19 @@ describe("external task tool access", () => {
     for (const args of [
       { action: "list" },
       { action: "show", id: task.id },
-      { action: "create", title: "T", labels: ["build"] },
+      {
+        action: "create",
+        title: "T",
+        labels: ["build"],
+        files: ["/knowledge/brief.md"],
+      },
+      // a missing path answers as an existing one: the names stay hidden
+      {
+        action: "create",
+        title: "T",
+        labels: ["build"],
+        files: ["/knowledge/nope.md"],
+      },
       { action: "answer", id: task.id, state: "awaiting_input", text: "x" },
     ]) {
       const result = await call(f, port, args);

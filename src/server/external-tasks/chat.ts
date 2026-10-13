@@ -51,6 +51,13 @@ export function chatTasks(deps: ChatDeps) {
     });
   }
   return {
+    // before anything is read by name, such as a file path on create
+    sees,
+    // every label of the project in name order, with its unfinished tasks
+    labels(actor: ChatActor) {
+      sees(actor);
+      return store.openLabelCounts(actor.projectId);
+    },
     list(
       actor: ChatActor,
       states: ExternalTaskState[],

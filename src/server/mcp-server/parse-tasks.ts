@@ -5,7 +5,9 @@ import {
   MAX_ENTRY_BYTES,
   MAX_ENTRY_LINKS,
   MAX_LINK_BYTES,
+  MAX_TASK_LABELS,
 } from "../../shared/contracts/external-task.ts";
+import { isLabelName, shapeLabelName } from "../../shared/contracts/label.ts";
 import {
   AGENT_ENTRY_KINDS,
   type AgentEntryKind,
@@ -18,15 +20,13 @@ import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { optionalBoolean, optionalId, requiredId } from "./parse-values.ts";
 
-// the entries from the newest, without the brief: a client that sends
-// null for an unset field still gets the brief on its first show
-export const NEWEST = "newest";
-
 export type TasksInput =
   | {
       action: "list";
       projectId: string | null;
       states: ExternalTaskState[];
+      // shaped names, any of them; empty for every task
+      labels: string[];
       held: boolean;
       after: string | null;
     }
@@ -35,9 +35,15 @@ export type TasksInput =
       projectId: string | null;
       taskId: string;
       before: string | null;
-      includeBrief: boolean;
     }
   | { action: "claim"; projectId: string | null; taskId: string }
+  | {
+      action: "unclaim";
+      projectId: string | null;
+      taskId: string;
+      claimId: string;
+      text: string;
+    }
   | {
       action: "report";
       projectId: string | null;
@@ -84,6 +90,23 @@ function taskStates(value: unknown): ExternalTaskState[] {
     );
   }
   return [...new Set(value)];
+}
+
+// a filter, not a check: a name no task carries lists none
+function taskLabels(value: unknown): string[] {
+  if (value === undefined || value === null) return [];
+  const rule = `labels must have 1 to ${MAX_TASK_LABELS} label names`;
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MAX_TASK_LABELS ||
+    !value.every((name) => typeof name === "string")
+  ) {
+    throw new BadRequest(rule);
+  }
+  const names = value.map(shapeLabelName);
+  if (!names.every(isLabelName)) throw new BadRequest(rule);
+  return [...new Set(names)];
 }
 
 function reportKind(value: unknown): AgentEntryKind {
@@ -148,6 +171,7 @@ export function parseTasks(value: unknown, canHold: boolean): TasksInput {
     "action",
     "projectId",
     "states",
+    "labels",
     "held",
     "after",
     "taskId",
@@ -161,19 +185,21 @@ export function parseTasks(value: unknown, canHold: boolean): TasksInput {
     "list",
     "show",
     "claim",
+    "unclaim",
     "report",
   ] as const);
   if (picked === "list") {
     fields(
       value,
       canHold
-        ? ["action", "projectId", "states", "held", "after"]
-        : ["action", "projectId", "states", "after"],
+        ? ["action", "projectId", "states", "labels", "held", "after"]
+        : ["action", "projectId", "states", "labels", "after"],
     );
     return {
       action: picked,
       projectId: optionalId(head.projectId, "projectId"),
       states: taskStates(head.states),
+      labels: taskLabels(head.labels),
       held: canHold ? optionalBoolean(head.held, "held") : false,
       after: listCursor(head.after),
     };
@@ -182,19 +208,26 @@ export function parseTasks(value: unknown, canHold: boolean): TasksInput {
   const projectId = optionalId(head.projectId, "projectId");
   if (picked === "show") {
     fields(value, ["action", "projectId", "taskId", "before"]);
-    const newest = head.before === NEWEST;
-    const before = newest ? null : optionalId(head.before, "before");
     return {
       action: picked,
       projectId,
       taskId,
-      before,
-      includeBrief: !newest && before === null,
+      before: optionalId(head.before, "before"),
     };
   }
   if (picked === "claim") {
     fields(value, ["action", "projectId", "taskId"]);
     return { action: picked, projectId, taskId };
+  }
+  if (picked === "unclaim") {
+    fields(value, ["action", "projectId", "taskId", "claimId", "text"]);
+    return {
+      action: picked,
+      projectId,
+      taskId,
+      claimId: requiredId(head.claimId, "claimId"),
+      text: reportText(head.text),
+    };
   }
   fields(value, [
     "action",

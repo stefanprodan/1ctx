@@ -6,6 +6,7 @@
 // counts. The store builds
 // on them with the single rows, the claims and the writes.
 
+import { shapeLabelName } from "../../shared/contracts/label.ts";
 import type { ExternalTaskState } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -160,7 +161,10 @@ export class ExternalTaskLists {
     const states: ExternalTaskState[] = input.states.length
       ? input.states
       : ["todo"];
-    const labels = input.labels.length === 0 ? null : input.labels;
+    const labels =
+      input.labels.length === 0
+        ? null
+        : [...new Set(input.labels.map(shapeLabelName))];
     const filters = [...new Set(input.projectIds)].flatMap((projectId) =>
       [...new Set(states)].map((state) => ({
         where: `t.project_id = ? and t.state = ? and ${closed(state) ? CLOSED : UNFINISHED}${labels === null ? "" : ` and ${LABELED}`}`,

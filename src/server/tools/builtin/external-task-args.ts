@@ -21,7 +21,7 @@ export type Move = "answer" | "unclaim" | "cancel" | "reopen";
 
 export const READ_ACTIONS = {
   list: ["action", "states", "after"],
-  show: ["action", "id", "before", "entry", "offset", "ref"],
+  show: ["action", "id", "before", "entry", "offset"],
 } as const;
 const WRITE_ACTIONS = {
   create: ["action", "title", "labels", "files"],
@@ -42,7 +42,6 @@ export type Call =
       before: string | null;
       entry: string | null;
       offset: number | null;
-      ref: number | null;
     }
   | { action: "create"; body: CreateExternalTaskRequest; files: string[] }
   | {
@@ -131,13 +130,13 @@ export function parseExternalTaskArgs(
   }
   if (action === "create") {
     const { out, files } = brief(args);
-    if (out.title === undefined || out.labels === undefined) {
-      throw new Error("create needs a title and labels");
+    if (out.title === undefined || out.labels === undefined || files === null) {
+      throw new Error("create needs a title, labels and files");
     }
     return {
       action,
       body: { title: out.title, labels: out.labels, fileIds: [] },
-      files: files ?? [],
+      files,
     };
   }
   if (typeof args.id !== "string" || args.id.trim() === "") {
@@ -149,22 +148,15 @@ export function parseExternalTaskArgs(
       args.entry === undefined ? null : text(args.entry, "entry").trim();
     const offset =
       args.offset === undefined ? null : whole(args.offset, "offset");
-    const ref = args.ref === undefined ? null : whole(args.ref, "ref");
-    if (entry !== null && ref !== null) {
-      throw new Error("ref goes with the brief, never an entry");
-    }
-    if (offset === null && (entry !== null || ref !== null)) {
-      throw new Error("entry and ref go with an offset, from the note");
-    }
-    if (offset !== null && entry === null && ref === null) {
-      throw new Error("an offset needs the entry or the ref from the note");
+    if ((offset === null) !== (entry === null)) {
+      throw new Error("entry and offset go together, from the note");
     }
     if (offset !== null && args.before !== undefined) {
       throw new Error("before pages the entries; leave out offset");
     }
     const before =
       args.before === undefined ? null : text(args.before, "before").trim();
-    return { action, id, before, entry, offset, ref };
+    return { action, id, before, entry, offset };
   }
   if (action === "edit") {
     const editRevision = whole(args.editRevision, "editRevision");

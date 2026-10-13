@@ -87,24 +87,32 @@ errors and cuts every tool shares are in `docs/tools.md`.
   and stays on the page.
 - **`create` opens the task at once, with no draft.** The creator is the
   chat's user and the chat is linked; a regenerate leaves the task, as
-  it leaves a file bash wrote. `files` are paths as under `/knowledge`,
-  resolved by name to ids. An edit's `files` replace the links, and a
-  linked file's id from `show` keeps it, a deleted one included.
+  it leaves a file bash wrote. It takes a title, `labels` (1 to 3 of the
+  project's label names) and `files` (1 to 5), and no text: the brief
+  is the files, so the agent writes a plan with bash first and names its
+  path. A refused label answers with the project's label names, never
+  the name given. `files` are paths as under `/knowledge`, resolved by
+  name to ids only after the user is checked to still see the project,
+  so one who lost it learns no file name. An edit's `labels` and
+  `files` replace the task's, and a linked file's id from `show` keeps
+  it, a deleted one included.
 - **Every move names what the agent read.** `edit` names `editRevision`;
   `answer`, `unclaim`, `cancel` and `reopen` the state, `unclaim` also its
   `claimId`, which `answer` and `cancel` may name too and are then held
   to. A stale one answers that the task changed, nothing written.
 - **Task text is quoted as data.** An outside agent wrote the entries.
-  The brief and each entry's text and links go through `asSent()` and
-  are fenced past any backticks; `list` gives the title, scope and last
-  entry as JSON strings. The description asks for writes only on the
-  user's ask in the chat, never on file, page or entry text.
+  Each entry's text and links go through `asSent()` and are fenced past
+  any backticks; `list` gives the title, labels and last entry as JSON.
+  No answer carries an entry's `html`. The description asks for writes
+  only on the user's ask in the chat, never on file, page or entry
+  text.
 - **Every page fits the call's `resultCut`.** `list` pages by the area's
-  `(moved_at, id)` cursor with `after`, open, claimed and blocked unless
-  `states` says otherwise. `show` gives the brief on its first page, then
-  entries newest first, as many as fit, read on with `before` (an entry
-  id, or `newest` for entries without the brief). A brief, or a page's
-  first entry, longer than the room is cut and read on with `offset`:
-  the brief with `ref`, its edit revision, starting again at 0 once it
-  moved; an entry with `entry`, its id. Times are in the chat user's
-  zone. The notes and links are the result's `tail`.
+  `(moved_at, id)` cursor with `after`, `todo`, `in_progress` and
+  `awaiting_input` unless `states` says otherwise; its first page ends
+  with `Labels in this project: build (3 open), ...`, every label with
+  its unfinished count (`openLabelCounts()`). `show` gives the
+  title, labels, linked files and claim on every page, then entries
+  newest first, as many as fit, read on with `before`, an entry id. A
+  page's first entry longer than the room is cut and read on with
+  `entry`, its id, and `offset`. Times are in the chat user's zone. The
+  notes and links are the result's `tail`.

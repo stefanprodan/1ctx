@@ -10,6 +10,7 @@ import {
   externalTaskShow,
   fixture,
   json,
+  largestDetail,
   modern,
   project,
   soleText,
@@ -50,6 +51,7 @@ describe("the inbound MCP tasks regressions", () => {
     const { area, send, state } = fixture("write");
     state.taskShow = {
       ...externalTaskShow(),
+      task: largestDetail(),
       entries: [
         externalTaskEntry({
           text: "x".repeat(MAX_ENTRY_BYTES),
@@ -250,6 +252,7 @@ describe("the inbound MCP tasks regressions", () => {
     expect(Buffer.byteLength(entry)).toBe(MAX_ENTRY_BYTES);
     state.taskShow = {
       ...externalTaskShow(),
+      task: largestDetail(),
       entries: [externalTaskEntry({ text: entry })],
     };
     const first = soleText(
@@ -325,6 +328,7 @@ describe("the final inbound MCP task fixes", () => {
     const links = Array.from({ length: 5 }, () => "`".repeat(2048));
     state.taskShow = {
       ...externalTaskShow(),
+      task: largestDetail(),
       entries: [externalTaskEntry({ text: entry, links })],
     };
     for (const action of ["show", "claim"] as const) {
@@ -392,7 +396,7 @@ describe("the final inbound MCP task fixes", () => {
     await write.area.close();
   });
 
-  test("keeps the brief paging switch private", async () => {
+  test("refuses the old brief paging switch", async () => {
     for (const scope of ["read", "write"] as const) {
       const current = fixture(scope);
       const tools = await json(await current.send(modern("tools/list")));
@@ -465,4 +469,50 @@ describe("a first show with before null", () => {
     expect(text).toContain("Task detail: ");
     await area.close();
   });
+});
+
+describe("the largest show and claim pages", () => {
+  // the row's last-entry preview is the page's first entry, so a wide
+  // start would be sent twice if the detail kept it
+  for (const [name, start] of [
+    ["CJK", "中".repeat(600)],
+    ["emoji", "\u{1F600}".repeat(600)],
+  ] as const) {
+    test(`fit one page with a maximum entry opening with 600 ${name} characters`, async () => {
+      const { area, send, state } = fixture("write");
+      const rest = MAX_ENTRY_BYTES - Buffer.byteLength(start);
+      const text = start + "x".repeat(rest);
+      expect(Buffer.byteLength(text)).toBe(MAX_ENTRY_BYTES);
+      const detail = largestDetail();
+      detail.task.last = {
+        kind: "progress",
+        text: start,
+        at: 300,
+        by: { id: "user00000001", username: "casey" },
+        keyName: "laptop",
+      };
+      state.taskShow = {
+        ...externalTaskShow(),
+        task: detail,
+        entries: [externalTaskEntry({ text, links: boundaryLinks })],
+      };
+      for (const action of ["show", "claim"] as const) {
+        const answer = await toolCall(send, "tasks", {
+          action,
+          taskId: "task00000001",
+        });
+        const page = soleText(answer);
+        expect(answer.result.isError).toBeUndefined();
+        expect(Buffer.byteLength(page)).toBeLessThanOrEqual(MCP_PAGE_BYTES);
+        expect(page).toContain("Entry: ");
+        expect(page).toEndWith("End of task task00000001.");
+        const shown = JSON.parse(page.match(/^Task detail: (.*)$/m)![1]!);
+        expect(shown.task.last).toBeUndefined();
+        if (action === "claim") {
+          expect(page).toStartWith("Claim claim0000001 for task");
+        }
+      }
+      await area.close();
+    });
+  }
 });

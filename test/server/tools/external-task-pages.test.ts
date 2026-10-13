@@ -127,7 +127,12 @@ describe("the arguments", () => {
     using f = fixture();
     const result = await call(
       f,
-      { action: "create", title: "T", labels: ["build"] },
+      {
+        action: "create",
+        title: "T",
+        labels: ["build"],
+        files: ["/knowledge/brief.md"],
+      },
       DEFAULT_LIMITS.resultCut,
       true,
     );
@@ -142,11 +147,20 @@ describe("pages", () => {
   test("a task has no brief text to read on: the agent reads its files", async () => {
     using f = fixture();
     const id = f.create("Long").id;
-    const result = await call(f, { action: "show", id, offset: 0, ref: 0 });
-    expect(result.content).toBe(
-      "Error: a task has no brief text: read its linked files",
-    );
-    expect(await ok(f, { action: "show", id })).not.toContain("Its brief");
+    for (const [args, error] of [
+      [{ offset: 0, ref: 0 }, "Error: ref is not a field of show"],
+      [{ offset: 0 }, "Error: entry and offset go together, from the note"],
+      [
+        { before: "newest" },
+        "Error: before must be an entry id from this task's show",
+      ],
+    ] as const) {
+      const result = await call(f, { action: "show", id, ...args });
+      expect(result.content).toBe(error);
+    }
+    const shown = await ok(f, { action: "show", id });
+    expect(shown).not.toContain("Its brief");
+    expect(shown).toContain("Linked files, the brief, which its agent reads");
   });
 
   test("entries page newest first by before, never skipping or repeating", async () => {
@@ -188,11 +202,7 @@ describe("pages", () => {
     const held = f.task("in_progress");
     const long = "word ".repeat(600).trim();
     f.area.report(f.key, held.id, held.claimId!, "progress", long, []);
-    const first = await ok(
-      f,
-      { action: "show", id: held.id, before: "newest" },
-      1200,
-    );
+    const first = await ok(f, { action: "show", id: held.id }, 1200);
     expect(first).not.toContain("Its brief");
     const entry = /^Entry (\w+): progress/m.exec(first)![1]!;
     let read = quotedAfter(first, "Its text");
@@ -214,6 +224,25 @@ describe("pages", () => {
       offset: 0,
     });
     expect(result.content).toBe("Error: no entry with that id on this task");
+  });
+
+  test("a first list page ends with the project's labels, a later one does not", async () => {
+    using f = fixture();
+    expect(await ok(f, { action: "list" })).toBe(
+      "This project has no external tasks that are todo, in_progress, awaiting_input.\n\nLabels in this project: build (0 open), fix (0 open), plan (0 open), research (0 open).",
+    );
+    f.create("One");
+    f.advance();
+    f.create("Two");
+    const first = await ok(f, { action: "list" }, 550);
+    const lines = first.split("\n");
+    expect(lines.at(-2)).toBe(
+      "Labels in this project: build (2 open), fix (0 open), plan (0 open), research (0 open).",
+    );
+    const after = /after ([\w.]+)\.$/m.exec(first)![1]!;
+    const later = await ok(f, { action: "list", after }, 550);
+    expect(later).not.toContain("Labels in");
+    expect(later).toEndWith("The end of the list.");
   });
 
   test("list pages by cursor under the cut", async () => {
@@ -271,11 +300,7 @@ describe("show and moves", () => {
       [],
     ).entry.id;
     // the long one is cut on its own page, the claim's entry older still
-    const cut = await ok(
-      f,
-      { action: "show", id: held.id, before: "newest" },
-      1200,
-    );
+    const cut = await ok(f, { action: "show", id: held.id }, 1200);
     expect(cut).toContain("cut: characters 0 to");
     expect(cut).toContain(`before ${longId}.`);
     const last = await ok(
@@ -292,18 +317,30 @@ describe("show and moves", () => {
     expect(last).not.toContain("More entries");
     // a different text, since a repeat of the last entry adds none
     f.area.report(f.key, held.id, held.claimId!, "progress", `${long}.`, []);
-    const newer = await ok(
-      f,
-      { action: "show", id: held.id, before: "newest" },
-      1200,
-    );
+    const newer = await ok(f, { action: "show", id: held.id }, 1200);
     const shownId = /^Entry (\w+): progress/m.exec(newer)![1]!;
     expect(newer).toContain(`before ${shownId}.`);
   });
 
+  test("entries read as their plain text, never the page's HTML", async () => {
+    using f = fixture();
+    const held = f.task("in_progress");
+    const text = "**Half** done, see https://example.test/pull/1";
+    f.area.report(f.key, held.id, held.claimId!, "progress", text, []);
+    for (const args of [{ action: "list" }, { action: "show", id: held.id }]) {
+      const content = await ok(f, args);
+      expect(content).toContain("Half");
+      expect(content).not.toMatch(/<strong>|<a |"html"/);
+    }
+    expect(await ok(f, { action: "show", id: held.id })).toContain(
+      "**Half** done",
+    );
+  });
+
   test("only a task in progress says when it is unclaimed", async () => {
     using f = fixture();
-    const idle = "A claimed task is unclaimed after 24 hours without a report.";
+    const idle =
+      "A task in progress is unclaimed after 24 hours without a report.";
     for (const state of [
       "todo",
       "awaiting_input",

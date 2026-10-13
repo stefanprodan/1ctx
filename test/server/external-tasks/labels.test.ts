@@ -145,3 +145,33 @@ test("report never gives a task back: unclaim is its own action", () => {
     back,
   );
 });
+
+test("a list filter matches any label by its shaped name, and held ignores it", () => {
+  using f = fixture();
+  const make = (labels: string[]) =>
+    f.area.create(f.owner.id, f.projectId, {
+      title: "Work",
+      labels,
+      fileIds: ["brief"],
+    }).task.task.id;
+  const build = make(["build"]);
+  const fix = make(["fix"]);
+  make(["plan"]);
+  const list = (labels: string[], held = false) =>
+    f.area
+      .list({
+        projectIds: [f.projectId],
+        states: ["todo", "in_progress"],
+        labels,
+        held: held ? f.key : null,
+        after: null,
+        limit: 50,
+      })
+      .rows.map((row) => row.id)
+      .sort();
+  expect(list([" Build"])).toEqual([build]);
+  expect(list(["BUILD ", "fix"])).toEqual([build, fix].sort());
+  expect(list(["nothing"])).toEqual([]);
+  f.area.claim(f.key, fix);
+  expect(list(["build"], true)).toEqual([fix]);
+});

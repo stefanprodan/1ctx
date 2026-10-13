@@ -140,14 +140,14 @@ export type TaskShow = {
 };
 
 // access is the caller's: the tool checks the key reaches the task's
-// project (projectOf) before show, claim or report, and passes only
-// reachable projects to list. A refusal throws HttpError with the
+// project (projectOf) before show, claim, unclaim or report, and passes
+// only reachable projects to list. A refusal throws HttpError with the
 // state's words; a stale or ended claim answers 409, a missing task 404
 export type TasksPort = {
   projectOf(taskId: string): string | null;
   // projectIds already narrowed to the key's; held keeps only the
-  // key's open claims and ignores states. Rows carry no brief text;
-  // after is the cursor of the row before, latest move first
+  // key's open claims and ignores states and labels; after is the
+  // cursor of the row before, latest move first
   list(input: {
     projectIds: string[];
     states: ExternalTaskState[];
@@ -157,12 +157,14 @@ export type TasksPort = {
     after: string | null;
     limit: number;
   }): { rows: TaskListRow[]; next: string | null };
+  // every label of the project in name order, with its unfinished tasks
+  openLabelCounts(projectId: string): { name: string; open: number }[];
   show(taskId: string, before: string | null): TaskShow | null;
-  // open to claimed; the same key holding it answers that claim again
+  // todo to in progress; the same key holding it answers that claim again
   claim(key: TaskKey, taskId: string): TaskShow & { claimId: string };
   // the claim must belong to taskId; a live retry must repeat both the
-  // claim's and task's last entry. A result or unclaim retry answers
-  // the original end even after later task entries
+  // claim's and task's last entry. A result retry answers the original
+  // end even after later task entries
   report(
     key: TaskKey,
     taskId: string,
@@ -170,6 +172,14 @@ export type TasksPort = {
     kind: AgentEntryKind,
     text: string,
     links: string[],
+  ): { entry: ExternalTaskEntry; task: ExternalTaskRow };
+  // the claim's key gives the task back with a note; a retry answers
+  // the first unclaim, as a repeated result does
+  agentUnclaim(
+    key: TaskKey,
+    taskId: string,
+    claimId: string,
+    text: string,
   ): { entry: ExternalTaskEntry; task: ExternalTaskRow };
 };
 

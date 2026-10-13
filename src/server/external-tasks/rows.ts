@@ -52,7 +52,8 @@ export type TaskListRow = ExternalTaskRow & {
 export type ListInput = {
   projectIds: string[];
   states: ExternalTaskState[];
-  // label names, any of them; empty for every task
+  // label names, any of them, shaped before they match; empty for
+  // every task
   labels: string[];
   held: TaskKey | null;
   after: string | null;

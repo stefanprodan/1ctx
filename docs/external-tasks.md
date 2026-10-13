@@ -92,12 +92,12 @@ follow `docs/external-task-pages.md`.
   again while awaiting input, never another report or an answer. Every
   change still advances `revision`; a label rename or delete moves none.
   Agent lists merge indexed project/state id pages by move time and id,
-  then hydrate only the chosen page in one query; a label filter (any of
-  the names) is an `exists` on each. Held lists start at the key's open
-  claims and ignore labels. Every row carries its own cursor, alongside
-  the page's `next`. List reads bound the last entry preview after
-  trimming leading whitespace in SQL. Home's read seeks the unfinished
-  index by project and state.
+  then hydrate only the chosen page in one query; a label filter (any
+  of the names, shaped first) is an `exists` on each. Held lists start
+  at the key's open claims and ignore labels. Every row carries its own
+  cursor, alongside the page's `next`. List reads bound the last entry
+  preview after trimming leading whitespace in SQL. Home's read seeks
+  the unfinished index by project and state.
 - `openLabelCounts(projectId)` is every label of the project in name
   order with its unfinished task count, one grouped count over at most
   `MAX_UNFINISHED` tasks; `labelTasks(projectId)` counts every task per
@@ -113,7 +113,9 @@ follow `docs/external-task-pages.md`.
   Visibility comes from the access port's `visibleProjectIds(userId)`.
 - Create stores the chat id; nothing deletes the task with the chat.
   `task()` reads the row and the file ids without entries; `entry()`
-  reads one entry by id, scoped to its task.
+  reads one entry by id, scoped to its task. `sees()` checks the user
+  still sees the project, before the tool reads a file by name;
+  `labels()` is the project's `openLabelCounts()`.
 - An answer or cancel may name the claim it saw, and is then refused as
   stale when that is not the current claim.
 

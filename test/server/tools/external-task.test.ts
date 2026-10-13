@@ -208,6 +208,73 @@ describe("a chat's external tasks", () => {
     }
   });
 
+  test("create links a file bash wrote and checks labels and files, naming no label", async () => {
+    const chat = await app();
+    try {
+      const { script } = await startChat(chat);
+      const wrote = chat.scripted.next();
+      script.toolRound([
+        {
+          id: "b1",
+          name: "bash",
+          arguments: JSON.stringify({
+            command:
+              "mkdir -p /knowledge/plans && echo 'The plan.' > /knowledge/plans/new.md",
+          }),
+        },
+      ]);
+      script.end();
+      const tasks = chat.app.externalTasks;
+      const brief = (labels: string[], files: string[]) => ({
+        action: "create",
+        title: "Port the parser",
+        labels,
+        files,
+      });
+      const step = await round(chat, await wrote, [
+        brief(["secret-label"], ["/knowledge/plans/new.md"]),
+        brief(["build"], []),
+        brief(["build"], Array(6).fill("/knowledge/plans/new.md")),
+        { action: "create", title: "No files", labels: ["build"] },
+        brief(["build", "a", "b", "c"], ["/knowledge/plans/new.md"]),
+        brief([" Build", "FIX"], ["/knowledge/plans/new.md"]),
+      ]);
+      const names =
+        "Error: labels must be 1 to 3 of this project's labels: build, fix, plan, research";
+      expect(step.answers[0]).toBe(names);
+      expect(step.answers.join("\n")).not.toContain("secret");
+      expect(step.answers[1]).toBe("Error: choose 1 to 5 distinct files");
+      expect(step.answers[2]).toBe("Error: choose 1 to 5 distinct files");
+      expect(step.answers[3]).toBe(
+        "Error: create needs a title, labels and files",
+      );
+      expect(step.answers[4]).toBe(names);
+      expect(step.answers[5]).toContain("Labels: build, fix.");
+      expect(step.answers[5]).toContain(
+        "Linked files: /knowledge/plans/new.md.",
+      );
+      const [task] = tasks.byProject(chat.projectId).tasks;
+      expect(task!.labels).toEqual(["build", "fix"]);
+      expect(tasks.show(task!.id, null)!.task.files).toMatchObject([
+        { name: "plans/new.md", deleted: false },
+      ]);
+
+      const edited = await round(chat, step.next, [
+        { action: "edit", id: task!.id, editRevision: 0, labels: ["nope"] },
+        { action: "edit", id: task!.id, editRevision: 0, files: [] },
+        { action: "edit", id: task!.id, editRevision: 0, labels: ["plan"] },
+      ]);
+      expect(edited.answers[0]).toBe(names);
+      expect(edited.answers[0]).not.toContain("nope");
+      expect(edited.answers[1]).toBe("Error: choose 1 to 5 distinct files");
+      expect(edited.answers[2]).toContain("now edit revision 1");
+      expect(tasks.store.byId(task!.id)!.labels).toEqual(["plan"]);
+      await finish(chat, edited.next);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("edit adds a link and a stale edit revision is refused", async () => {
     const chat = await app();
     try {
