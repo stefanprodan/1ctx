@@ -24,6 +24,7 @@ import {
   MAX_TITLE,
 } from "../../../shared/words.ts";
 import { clock, longDate } from "../../lib/format.ts";
+import { externalTasksHref, type TasksShow } from "../../lib/hrefs.ts";
 import { plainLine } from "../../lib/plain.ts";
 
 export const INTRO = "Work for an agent you run outside 1ctx.";
@@ -115,6 +116,43 @@ export function movedWords(
           ? "Unclaimed"
           : "Opened";
   }
+}
+
+// the tab's view and search as the address carries them: ?show=done or
+// ?show=canceled, else Open, and ?q=
+export function tasksAddressOf(search: string): {
+  show: TasksShow | null;
+  q: string;
+} {
+  const params = new URLSearchParams(search);
+  const show = params.get("show");
+  return {
+    show: show === "done" || show === "canceled" ? show : null,
+    q: params.get("q")?.trim() ?? "",
+  };
+}
+
+// the view a task in this state is listed on, null for Open
+export const showOf = (state: ExternalTaskState): TasksShow | null =>
+  state === "done" || state === "canceled" ? state : null;
+
+const VIEWS: { show: TasksShow | null; label: string }[] = [
+  { show: null, label: "Open" },
+  { show: "done", label: "Done" },
+  { show: "canceled", label: "Canceled" },
+];
+
+// the switch: each view's address, keeping the search
+export function tasksSwitch(
+  projectId: string,
+  show: TasksShow | null,
+  q: string,
+): { label: string; on: boolean; href: string }[] {
+  return VIEWS.map((view) => ({
+    label: view.label,
+    on: view.show === show,
+    href: externalTasksHref(projectId, view.show, q),
+  }));
 }
 
 // the tab's groups, in the order of whose turn it is

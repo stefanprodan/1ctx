@@ -8,6 +8,9 @@
 // page, which names the state and the claim it shows.
 
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
+import { reload, startLoading } from "../../../src/client/app/loading.ts";
+import { path, query } from "../../../src/client/app/router.ts";
+import { match } from "../../../src/client/app/routes.ts";
 import {
   deleteExternalTask,
   loadExternalTask,
@@ -38,6 +41,7 @@ import {
   loadExternalTasks,
   loadMoreClosed,
   onExternalTasksSocket,
+  tasksTabHref,
 } from "../../../src/client/data/external-tasks.ts";
 import { TRAIL_MS } from "../../../src/client/data/flight.ts";
 import { me } from "../../../src/client/data/me.ts";
@@ -46,6 +50,7 @@ import {
   onWaitingSocket,
   waitingTasks,
 } from "../../../src/client/data/waiting-tasks.ts";
+import { externalTasksHref } from "../../../src/client/lib/hrefs.ts";
 import {
   createAndLink,
   makeTaskFile,
@@ -68,7 +73,10 @@ import {
   pickLabel,
   requestOf,
   rowLine,
+  showOf,
   taskFieldOf,
+  tasksAddressOf,
+  tasksSwitch,
   webLink,
   withFile,
 } from "../../../src/client/views/projects/ExternalTasks.model.ts";
@@ -273,6 +281,56 @@ describe("the words", () => {
     expect(all.more).toBe(false);
     // a state with no row has no group
     expect(groupsOf(many("todo", 2), {}).map((g) => g.state)).toEqual(["todo"]);
+  });
+
+  test("the tab's view and search are in the address", () => {
+    const cases: [string, ReturnType<typeof tasksAddressOf>][] = [
+      ["", { show: null, q: "" }],
+      ["?show=done", { show: "done", q: "" }],
+      ["?show=canceled&q=sweep", { show: "canceled", q: "sweep" }],
+      ["?q=%20sweep%20", { show: null, q: "sweep" }],
+      // an unknown view is Open, a blank search none
+      ["?show=closed&q=", { show: null, q: "" }],
+      ["?show=DONE", { show: null, q: "" }],
+    ];
+    for (const [search, want] of cases) {
+      expect(tasksAddressOf(search), search).toEqual(want);
+    }
+    const tab = "/projects/p%201/external-tasks";
+    expect(externalTasksHref("p 1")).toBe(tab);
+    expect(externalTasksHref("p 1", "done")).toBe(`${tab}?show=done`);
+    expect(externalTasksHref("p 1", null, " a b ")).toBe(`${tab}?q=a+b`);
+    expect(externalTasksHref("p 1", "canceled", "x")).toBe(
+      `${tab}?show=canceled&q=x`,
+    );
+    expect(externalTasksHref("p 1", null, "  ")).toBe(tab);
+    // what one builds the other reads back
+    expect(tasksAddressOf("?show=canceled&q=a+b")).toEqual({
+      show: "canceled",
+      q: "a b",
+    });
+  });
+
+  test("the switch goes to each view, keeping the search", () => {
+    const tab = "/projects/p1/external-tasks";
+    expect(tasksSwitch("p1", "done", "sweep")).toEqual([
+      { label: "Open", on: false, href: `${tab}?q=sweep` },
+      { label: "Done", on: true, href: `${tab}?show=done&q=sweep` },
+      { label: "Canceled", on: false, href: `${tab}?show=canceled&q=sweep` },
+    ]);
+    expect(tasksSwitch("p1", null, "").map((v) => [v.on, v.href])).toEqual([
+      [true, tab],
+      [false, `${tab}?show=done`],
+      [false, `${tab}?show=canceled`],
+    ]);
+  });
+
+  test("a task is listed on the view of its state", () => {
+    expect(showOf("done")).toBe("done");
+    expect(showOf("canceled")).toBe("canceled");
+    for (const state of ["todo", "in_progress", "awaiting_input"] as const) {
+      expect(showOf(state)).toBeNull();
+    }
   });
 
   test("an entry names who wrote it", () => {
@@ -904,6 +962,110 @@ describe("the entity", () => {
       }
     },
   );
+
+  test.serial(
+    "the tab's route reads the closed page its address names",
+    async () => {
+      answer = (_method, url) =>
+        url.includes("closed=1")
+          ? Response.json({
+              tasks: [row({ id: "d1", state: "done" })],
+              next: null,
+            })
+          : url === "/api/projects/p1/external-tasks"
+            ? Response.json(listAnswer([row()]))
+            : Response.json({ error: "no" }, { status: 404 });
+      const load = match("/projects/p1/external-tasks")!;
+      const run = (search: string) =>
+        load.route.load!(load.params, new URLSearchParams(search));
+      const closedGets = () =>
+        calls.filter((c) => c.call.includes("closed=1")).map((c) => c.call);
+      // Open reads no closed page, whatever it searches
+      await run("q=sweep");
+      expect(closedGets()).toEqual([]);
+      expect(externalTasks.value?.map((t) => t.id)).toEqual(["t1"]);
+      await run("show=done&q=sweep");
+      expect(closedGets()).toEqual([
+        "GET /api/projects/p1/external-tasks?closed=1&q=sweep&state=done",
+      ]);
+      expect(closedFilter.value).toEqual({ q: "sweep", state: "done" });
+      expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["d1"]);
+      // back on the same view the pages held are drawn, not read again
+      await run("show=done&q=sweep");
+      expect(closedGets()).toHaveLength(1);
+      await run("show=canceled");
+      expect(closedGets()[1]).toBe(
+        "GET /api/projects/p1/external-tasks?closed=1&state=canceled",
+      );
+      // another project reads its own
+      const other = match("/projects/p2/external-tasks")!;
+      await other.route.load!(other.params, new URLSearchParams("show=done"));
+      expect(closedGets()[2]).toBe(
+        "GET /api/projects/p2/external-tasks?closed=1&state=done",
+      );
+    },
+  );
+
+  test.serial(
+    "a pick or a search on the tab reads only the closed page",
+    async () => {
+      answer = (_method, url) =>
+        url.includes("closed=1")
+          ? Response.json({ tasks: [], next: null })
+          : url === "/api/projects/p1/external-tasks"
+            ? Response.json(listAnswer([row()]))
+            : Response.json({ error: "no" }, { status: 404 });
+      const tab = "/projects/p1/external-tasks";
+      const go = async (search: string) => {
+        calls = [];
+        query.value = search;
+        await settle();
+        return calls.map((c) => c.call);
+      };
+      path.value = tab;
+      query.value = "";
+      const stop = startLoading();
+      try {
+        await settle();
+        // arriving is the whole load: the project, its lists, the week
+        const arrival = calls.map((c) => c.call);
+        expect(arrival).toContain("GET /api/projects/p1");
+        expect(arrival).toContain("GET /api/projects/p1/external-tasks");
+        expect(arrival).toHaveLength(6);
+        // Open filters the list it holds, word by word
+        for (const typed of ["?q=s", "?q=sw", "?q=sweep"]) {
+          expect(await go(typed)).toEqual([]);
+        }
+        expect(await go("?show=done&q=sweep")).toEqual([
+          "GET /api/projects/p1/external-tasks?closed=1&q=sweep&state=done",
+        ]);
+        expect(await go("?show=done&q=sweeps")).toEqual([
+          "GET /api/projects/p1/external-tasks?closed=1&q=sweeps&state=done",
+        ]);
+        expect(await go("?q=sweeps")).toEqual([]);
+        // the tab as left is where its pages lead back
+        expect(tasksTabHref("p1", "done")).toBe(`${tab}?q=sweeps`);
+        await go("?show=canceled&q=x");
+        expect(tasksTabHref("p1")).toBe(`${tab}?show=canceled&q=x`);
+        // reload is the whole load again, all but the rail's list
+        calls = [];
+        await reload();
+        expect(calls.map((c) => c.call).sort()).toEqual(
+          arrival.filter((c) => c !== "GET /api/projects").sort(),
+        );
+      } finally {
+        stop();
+        path.value = "/";
+        query.value = "";
+      }
+    },
+  );
+
+  test.serial("with no tab left, its pages lead to the view given", () => {
+    const tab = "/projects/p9/external-tasks";
+    expect(tasksTabHref("p9")).toBe(tab);
+    expect(tasksTabHref("p9", "canceled")).toBe(`${tab}?show=canceled`);
+  });
 
   test.serial(
     "a closed search and state go to the server, a later page keeps them",

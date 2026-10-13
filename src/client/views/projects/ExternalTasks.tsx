@@ -6,30 +6,32 @@
 // grouped by whose turn it is and searched on the page; Done and
 // Canceled are the server's pages, searched by it, newest first. While
 // the project has no task a notice says what they are, linking Connect
-// agents.
+// agents. The view and the search live in the address
+// (`tasksAddressOf()`), so a task's crumb comes back to them; the
+// route reads the closed page they name.
 
-import { type Signal, useSignal } from "@preact/signals";
+import { useSignal } from "@preact/signals";
 import { Fragment } from "preact";
-import { useEffect } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
-import { navigate } from "../../app/router.ts";
+import { navigate, query } from "../../app/router.ts";
 import {
   closedCount,
-  closedFilter,
   closedMore,
   closedPages,
   externalTasks,
   externalTasksError,
-  filterClosed,
-  loadClosedTasks,
   loadMoreClosed,
 } from "../../data/external-tasks.ts";
-import { sameClosed, taskFields } from "../../data/external-tasks-rows.ts";
+import { taskFields } from "../../data/external-tasks-rows.ts";
 import { ShowMore } from "../../feed/FeedCard.tsx";
-import { newExternalTaskHref } from "../../lib/hrefs.ts";
+import {
+  externalTasksHref,
+  newExternalTaskHref,
+  type TasksShow,
+} from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
-import { useListSearch } from "../../lib/search.ts";
+import { searchList } from "../../lib/search.ts";
 import { PageNotice } from "../../ui/Page.tsx";
 import {
   RowsAdd,
@@ -47,17 +49,11 @@ import {
   type GroupState,
   groupsOf,
   INTRO,
+  tasksAddressOf,
+  tasksSwitch,
 } from "./ExternalTasks.model.ts";
 import { Frame } from "./Frame.tsx";
 import "./external-tasks.css";
-
-export type TasksView = "open" | "done" | "canceled";
-
-const VIEWS: { value: TasksView; label: string }[] = [
-  { value: "open", label: "Open" },
-  { value: "done", label: "Done" },
-  { value: "canceled", label: "Canceled" },
-];
 
 export function TasksIntro() {
   return <ConnectNotice words={INTRO} />;
@@ -151,43 +147,43 @@ function OpenRows({
   ));
 }
 
+// the view and the search as the address has them; a pick or a search
+// replaces the address, as the feed's do
 export function TasksCard({
   projectId,
-  view,
+  show,
+  q,
   now,
 }: {
   projectId: string;
-  view: Signal<TasksView>;
+  show: TasksShow | null;
+  q: string;
   now: number;
 }) {
-  const { q, shown, count } = useListSearch(
-    externalTasks.value ?? [],
-    taskFields,
-  );
-  const closed = view.value !== "open";
-  // a closed view is the server's pages under the same search
-  useEffect(() => {
-    if (view.value === "open") return;
-    const filter = { q: q.value, state: view.value };
-    if (!sameClosed(filter, closedFilter.value)) void filterClosed(filter);
-    else if (closedPages.value === null) void loadClosedTasks(projectId);
-  }, [q.value, view.value, projectId]);
-  const searching = q.value.trim() !== "";
+  const { shown, count } = searchList(externalTasks.value ?? [], q, taskFields);
+  const closed = show !== null;
+  const searching = q !== "";
   return (
     <RowsCard
       label="External tasks"
-      search={<Search query={q} placeholder="Search tasks" />}
+      search={
+        <Search
+          value={q}
+          onChange={(next) =>
+            navigate(externalTasksHref(projectId, show, next), true)
+          }
+          placeholder="Search tasks"
+        />
+      }
       count={closed || !searching ? undefined : count}
       action={
         <>
           <RowsFilters
             label="Show"
-            filters={VIEWS.map((choice) => ({
+            filters={tasksSwitch(projectId, show, q).map((choice) => ({
               label: choice.label,
-              on: view.value === choice.value,
-              onPick: () => {
-                view.value = choice.value;
-              },
+              on: choice.on,
+              onPick: () => navigate(choice.href, true),
             }))}
           />
           <RowsAdd
@@ -200,7 +196,7 @@ export function TasksCard({
       {closed ? (
         <ClosedRows now={now} searching={searching} />
       ) : (
-        <OpenRows now={now} q={q.value} shown={shown} />
+        <OpenRows now={now} q={q} shown={shown} />
       )}
     </RowsCard>
   );
@@ -209,7 +205,7 @@ export function TasksCard({
 export function ExternalTasks({ params }: { params: Params }) {
   const id = params.id ?? "";
   const now = useNow(60_000);
-  const view = useSignal<TasksView>("open");
+  const { show, q } = tasksAddressOf(query.value);
   return (
     <Frame id={id} tab="external-tasks">
       {(project) => (
@@ -217,7 +213,7 @@ export function ExternalTasks({ params }: { params: Params }) {
           {externalTasks.value?.length === 0 && closedCount.value === 0 && (
             <TasksIntro />
           )}
-          <TasksCard projectId={project.id} view={view} now={now} />
+          <TasksCard projectId={project.id} show={show} q={q} now={now} />
         </>
       )}
     </Frame>

@@ -21,6 +21,7 @@ import {
   taskError,
   taskPage,
 } from "../../data/external-task.ts";
+import { tasksTabHref } from "../../data/external-tasks.ts";
 import { project } from "../../data/projects.ts";
 import { ago, longDate } from "../../lib/format.ts";
 import { externalTasksHref, userHref } from "../../lib/hrefs.ts";
@@ -47,6 +48,7 @@ import {
   claimDeadline,
   deadlineTime,
   movedWords,
+  showOf,
   UNCLAIMED,
 } from "./ExternalTasks.model.ts";
 import { ConnectNotice } from "./ExternalTasks.tsx";
@@ -224,12 +226,18 @@ function TaskScreen({ id }: { id: string }) {
       ? project.value
       : null;
   const tab = task === null ? undefined : externalTasksHref(task.projectId);
+  // back to the tab as it was left, else to the view the task is
+  // listed on, which a move changes
+  const view =
+    task === null
+      ? undefined
+      : tasksTabHref(task.projectId, showOf(task.state));
   return (
     <Page
       steps={[{ label: shown?.name ?? "Project", href: tab }]}
       split
       title="External tasks"
-      titleHref={tab}
+      titleHref={view}
       actions={
         task === null ? undefined : (
           <HeadMoves

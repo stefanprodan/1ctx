@@ -19,7 +19,7 @@ import {
   deleteExternalTask,
   moveExternalTask,
 } from "../../data/external-task.ts";
-import { externalTasksHref } from "../../lib/hrefs.ts";
+import { tasksTabHref } from "../../data/external-tasks.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useSave } from "../../lib/save.ts";
 import { CodeTag } from "../../ui/CodeTag.tsx";
@@ -232,7 +232,7 @@ export function MoveBoxes({
   const remove = async () => {
     const projectId = task.projectId;
     if (await save.act("delete", () => deleteExternalTask(task.id))) {
-      navigate(externalTasksHref(projectId));
+      navigate(tasksTabHref(projectId));
     }
   };
   const notice = save.notice();

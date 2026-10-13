@@ -7,9 +7,11 @@
 // re-render, since a signal effect runs before Preact schedules one.
 // The rail's own need, the project list, loads here once per signed-in
 // user. An entity module keeps its own guards against an answer that
-// is no longer wanted; this only decides when a load starts. reload()
-// runs the current route's load again, for the socket to call when it
-// learns the entity on screen changed.
+// is no longer wanted; this only decides when a load starts. When only
+// the query moved on the same path a route's `loadQuery`, if it has
+// one, runs in place of `load`. reload() runs the current route's full
+// load again, for the socket to call when it learns the entity on
+// screen changed.
 
 import { effect } from "@preact/signals";
 import { me } from "../data/me.ts";
@@ -26,23 +28,23 @@ let current: { run: () => Promise<void>; owner: object } | null = null;
 export function startLoading(routes: Route[] = ROUTES): () => void {
   const owner = {};
   let last = { user: "", pathname: "", search: "" };
-  const start = (
-    m: Match,
-    load: NonNullable<Route["load"]>,
-    search: string,
-  ) => {
-    const run = async () => {
-      // a load reports its failure through its entity; one that throws
-      // instead, before or after its promise, is a bug in it, reported
-      // and not left as an unhandled rejection
-      try {
-        await load(m.params, new URLSearchParams(search));
-      } catch (err) {
-        console.error(`load for ${m.route.path} failed: ${String(err)}`);
-      }
-    };
+  const start = (m: Match, search: string, queryOnly: boolean) => {
+    const runOf =
+      (load: NonNullable<Route["load"]>) => async (): Promise<void> => {
+        // a load reports its failure through its entity; one that throws
+        // instead, before or after its promise, is a bug in it, reported
+        // and not left as an unhandled rejection
+        try {
+          await load(m.params, new URLSearchParams(search));
+        } catch (err) {
+          console.error(`load for ${m.route.path} failed: ${String(err)}`);
+        }
+      };
+    const { load, loadQuery } = m.route;
+    if (load === undefined) return;
+    const run = runOf(load);
     current = { run, owner };
-    void run();
+    void (queryOnly && loadQuery !== undefined ? runOf(loadQuery) : run)();
   };
   const dispose = effect(() => {
     // the user's id, role and password state, not the row: a profile
@@ -64,6 +66,10 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
     }
     const newUser = user !== last.user;
     const moved = pathname !== last.pathname || search !== last.search;
+    // the effect also runs again for the same address (a role change):
+    // that is a whole load, not a query one
+    const queryOnly =
+      !newUser && pathname === last.pathname && search !== last.search;
     last = { user, pathname, search };
     const m = match(pathname, routes);
     // the rail's projects, whichever page the sign in happened on; the
@@ -73,7 +79,7 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
     // loads once per address and a sign in on it does not read it again
     if (m?.route.role === "public") {
       if (moved) current = null;
-      if (moved && m.route.load !== undefined) start(m, m.route.load, search);
+      if (moved) start(m, search, queryOnly);
       return;
     }
     current = null;
@@ -82,7 +88,7 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
     if (row.mustChangePassword && m?.route.path !== "/profile") return;
     if (m === null || m.route.load === undefined) return;
     if (m.route.role === "admin" && row.role !== "admin") return;
-    start(m, m.route.load, search);
+    start(m, search, queryOnly);
   });
   return () => {
     if (current?.owner === owner) current = null;

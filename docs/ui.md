@@ -11,7 +11,10 @@ the external task pages in `docs/external-task-pages.md`.
   view reads signals. A route names its `load` in `app/routes.ts`,
   and `app/loading.ts` starts it when the path, the query or the
   signed-in user changes, before the view renders. A public route's
-  loads for anyone, once per address. `reload()` runs it again.
+  loads for anyone, once per address. `reload()` runs it again. A route
+  whose filter or search needs less than its whole load names a
+  `loadQuery`, run in its place when only the query moved on the same
+  path; arriving, a new user and `reload()` run `load`.
 - **Every route is one `lazy()` entry in `app/routes.ts`.** The rail
   is computed from that table.
 - **Only the latest answer lands.** A later load or a write

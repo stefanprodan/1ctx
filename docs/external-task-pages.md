@@ -24,7 +24,18 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   while the project has no task. Open is the unfinished list, searched
   on the page (title, labels, users), with a count only while searching.
   Done and Canceled are the server's closed pages under the same
-  search, read when picked, newest first, with Show more.
+  search, newest first, with Show more.
+- **The tab's view and search are its address** (`tasksAddressOf()`,
+  `externalTasksHref()`): `?show=done` or `?show=canceled`, none for
+  Open, and `?q=`; anything else is Open, a blank search none. A pick
+  or a search replaces the address, as the feed's do, keeping the
+  other; the search waits for `Search`'s pause in typing. Arriving
+  reads the whole tab; after that a pick or a search reads only the
+  closed page it names (`loadQuery`), and nothing on Open.
+- **The tab's pages lead back to it as it was left** (`tasksTabHref()`,
+  the last view and search per project): the task's crumb, the New
+  task form's crumb and Cancel, and a delete. With none kept, the crumb
+  opens the view the task is listed on and the rest Open.
 - **Open is grouped by whose turn it is** (`groupsOf()`): Awaiting
   input, In progress, Todo, latest move first, each under a quiet label
   heading with its count. A group shows `GROUP_ROWS` (20), then Show
@@ -53,8 +64,10 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   the count the total, each row naming its project. A task leaves it
   when it leaves the state; nothing else reaches Home.
 - **The task's page opens with the title as its heading.** The crumb is
-  the project, then External tasks; the head is held to the main
-  column (`split`). One line under the title says the state with its
+  the project, then External tasks, back to the tab as it was left,
+  else on the view the task is listed on (`showOf()`: Done, Canceled,
+  else Open), following a move; the head is held to the main column
+  (`split`). One line under the title says the state with its
   ring and when it last moved (`movedWords()`: Asked, Updated, Done,
   Canceled, Opened, Reopened, Unclaimed), never who; awaiting input
   links to the question. The router takes every in-app click and drops

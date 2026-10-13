@@ -111,9 +111,23 @@ export function externalTaskHref(id: string): string {
 export const projectSettingsHref = (projectId: string): string =>
   `/projects/${encodeURIComponent(projectId)}/settings`;
 
-// a project's External tasks tab, and its New page
-export function externalTasksHref(projectId: string): string {
-  return `/projects/${encodeURIComponent(projectId)}/external-tasks`;
+// the closed views of a project's External tasks tab; with none it is
+// Open
+export type TasksShow = "done" | "canceled";
+
+// a project's External tasks tab on a view and a search, and its New
+// page
+export function externalTasksHref(
+  projectId: string,
+  show: TasksShow | null = null,
+  q = "",
+): string {
+  const params = new URLSearchParams();
+  if (show !== null) params.set("show", show);
+  if (q.trim() !== "") params.set("q", q.trim());
+  const search = params.toString();
+  const tab = `/projects/${encodeURIComponent(projectId)}/external-tasks`;
+  return search === "" ? tab : `${tab}?${search}`;
 }
 export const newExternalTaskHref = (projectId: string): string =>
   `${externalTasksHref(projectId)}/new`;

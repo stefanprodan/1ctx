@@ -18,6 +18,7 @@ import type {
 import type { ExternalTaskRow } from "../../shared/contracts/external-task.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
+import { externalTasksHref, type TasksShow } from "../lib/hrefs.ts";
 import { api } from "./api.ts";
 import {
   ALL_CLOSED,
@@ -76,6 +77,9 @@ const latest = new Map<string, number>();
 // deleted tasks: a row read before its delete never joins again
 const gone = new Set<string>();
 const idle = { loading: false, error: null };
+// the tab's last view and search per project, for the pages that lead
+// back to it
+const views = new Map<string, { show: TasksShow | null; q: string }>();
 // the reads are hoisted, so the flights exist before the user effect runs
 const listFlight = new Flight(reloadList);
 const closedFlight = new Flight(reloadClosed);
@@ -88,6 +92,7 @@ effect(() => {
   kept.clear();
   latest.clear();
   gone.clear();
+  views.clear();
   listTurn++;
   closedTurn++;
   listFlight.stop();
@@ -268,6 +273,33 @@ export function filterClosed(filter: ClosedFilter): Promise<void> {
   closedPages.value = null;
   closedMore.value = idle;
   return closedFlight.run(() => readClosed(false));
+}
+
+export function rememberTasksView(
+  projectId: string,
+  view: { show: TasksShow | null; q: string },
+): void {
+  views.set(projectId, view);
+}
+
+// the tab as the user last had it, else on the view given
+export function tasksTabHref(
+  projectId: string,
+  show: TasksShow | null = null,
+): string {
+  const view = views.get(projectId) ?? { show, q: "" };
+  return externalTasksHref(projectId, view.show, view.q);
+}
+
+// the closed pages a view shows: a new filter starts again, the one
+// held is read only while none is
+export function showClosed(
+  projectId: string,
+  filter: ClosedFilter,
+): Promise<void> {
+  if (!sameClosed(filter, closedFilter.value)) return filterClosed(filter);
+  if (closedPages.value === null) return loadClosedTasks(projectId);
+  return Promise.resolve();
 }
 
 // a row from a frame or an answer into the lists; while none is held

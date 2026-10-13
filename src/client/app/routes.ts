@@ -40,7 +40,11 @@ import {
   loadUserPage,
 } from "../data/directory.ts";
 import { loadExternalTask } from "../data/external-task.ts";
-import { loadExternalTasks } from "../data/external-tasks.ts";
+import {
+  loadExternalTasks,
+  rememberTasksView,
+  showClosed,
+} from "../data/external-tasks.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadLink } from "../data/links.ts";
@@ -92,6 +96,7 @@ import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers, loadUserUsage, users } from "../data/users.ts";
 import { loadWaitingTasks } from "../data/waiting-tasks.ts";
+import type { TasksShow } from "../lib/hrefs.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { DECISION_WORDS } from "../views/admin/Decisions.model.ts";
 import {
@@ -100,6 +105,7 @@ import {
   pickOf,
 } from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
+import { tasksAddressOf } from "../views/projects/ExternalTasks.model.ts";
 import { type Lazy, lazy } from "./lazy.ts";
 import type { Params } from "./params.ts";
 
@@ -117,6 +123,10 @@ export type Route = {
   // matches, with the query for a view filtered by it; a view never
   // fetches
   load?: (params: Params, query: URLSearchParams) => Promise<void>;
+  // run in place of load when only the query moved on the same path,
+  // for a view whose filter needs less than a whole reload; arriving
+  // and reload() still run load
+  loadQuery?: (params: Params, query: URLSearchParams) => Promise<void>;
   nav?: { label: string; icon: IconName; order: number };
 };
 
@@ -131,6 +141,16 @@ const frame = (id: string) => [
 const framed = async (params: Params) => {
   await Promise.all(frame(params.id));
 };
+
+// the External tasks tab's view and search, kept for the pages that
+// lead back to it
+const tasksView = (params: Params, query: URLSearchParams) => {
+  const view = tasksAddressOf(`?${query.toString()}`);
+  rememberTasksView(params.id, view);
+  return view;
+};
+const closedOf = (projectId: string, show: TasksShow | null, q: string) =>
+  show === null ? Promise.resolve() : showClosed(projectId, { q, state: show });
 
 // the automation's two tabs share one view, so a tab change keeps the
 // page mounted instead of drawing it again
@@ -359,7 +379,18 @@ export const ROUTES: Route[] = [
     ),
     title: () => "External tasks",
     role: "authenticated",
-    load: framed,
+    // ?show=done or ?show=canceled reads that closed page under ?q=;
+    // Open searches the list on the page. The frame comes first, so
+    // the closed read is for this project
+    load: async (params, query) => {
+      const { show, q } = tasksView(params, query);
+      await Promise.all([...frame(params.id), closedOf(params.id, show, q)]);
+    },
+    // a pick or a search reads only the closed page it names
+    loadQuery: async (params, query) => {
+      const { show, q } = tasksView(params, query);
+      await closedOf(params.id, show, q);
+    },
   },
   {
     path: "/projects/:id/memory",

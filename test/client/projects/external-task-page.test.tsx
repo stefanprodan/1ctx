@@ -9,20 +9,28 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { signal } from "@preact/signals";
 import { render } from "preact-render-to-string";
-import type { TaskPage } from "../../../src/client/data/external-task.ts";
+import {
+  type TaskPage,
+  taskPage,
+} from "../../../src/client/data/external-task.ts";
 import {
   taskFileKey,
   taskFiles,
 } from "../../../src/client/data/external-task-files.ts";
+import { rememberTasksView } from "../../../src/client/data/external-tasks.ts";
 import { project } from "../../../src/client/data/projects.ts";
 import { Save } from "../../../src/client/lib/save.ts";
 import {
+  ExternalTask,
   jumpToQuestion,
   TaskBody,
   TaskNotice,
 } from "../../../src/client/views/projects/ExternalTask.tsx";
 import { TaskFiles } from "../../../src/client/views/projects/ExternalTaskFiles.tsx";
-import { TaskForm } from "../../../src/client/views/projects/ExternalTaskForm.tsx";
+import {
+  NewExternalTask,
+  TaskForm,
+} from "../../../src/client/views/projects/ExternalTaskForm.tsx";
 import {
   HeadMoves,
   type MoveState,
@@ -124,7 +132,41 @@ const PROJECT: ProjectDetail = {
 
 afterEach(() => {
   project.value = null;
+  taskPage.value = null;
   taskFiles.value = new Map();
+});
+
+describe("the crumb", () => {
+  // the External tasks crumb, the head's one link styled as the title
+  const crumb = (state: ExternalTaskRow["state"], projectId = "p1") => {
+    taskPage.value = page(row({ state, projectId }));
+    const html = render(<ExternalTask params={{ id: "t1" }} />);
+    return html
+      .match(/<a class="page-crumb-on[^"]*" href="([^"]*)"/)?.[1]
+      ?.replaceAll("&amp;", "&");
+  };
+
+  test.serial("returns to the view the task is listed on", () => {
+    const tab = "/projects/p1/external-tasks";
+    expect(crumb("done")).toBe(`${tab}?show=done`);
+    expect(crumb("canceled")).toBe(`${tab}?show=canceled`);
+    // a reopen or any open state lands on Open
+    for (const state of ["todo", "in_progress", "awaiting_input"] as const) {
+      expect(crumb(state)).toBe(tab);
+    }
+  });
+
+  test.serial("returns to the tab as it was left, the form too", () => {
+    const tab = "/projects/p7/external-tasks";
+    rememberTasksView("p7", { show: "canceled", q: "sweep" });
+    expect(crumb("done", "p7")).toBe(`${tab}?show=canceled&q=sweep`);
+    expect(crumb("todo", "p7")).toBe(`${tab}?show=canceled&q=sweep`);
+    project.value = { ...PROJECT, id: "p7" };
+    const form = render(<NewExternalTask params={{ id: "p7" }} />);
+    expect(form).toContain(
+      `class="page-crumb-up" href="${tab}?show=canceled&amp;q=sweep"`,
+    );
+  });
 });
 
 describe("the notice", () => {

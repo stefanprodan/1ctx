@@ -220,6 +220,31 @@ describe("startLoading", () => {
     expect(calls).toEqual(["thing a", "thing a q=pods"]);
   });
 
+  test("a query change runs loadQuery when the route has one", async () => {
+    const { routes, calls } = table();
+    const lighter: Route[] = [
+      {
+        ...routes[1],
+        loadQuery: async (params, q) => {
+          calls.push(`query ${params.id} q=${q.get("q")}`);
+        },
+      },
+    ];
+    me.value = casey;
+    path.value = "/things/a";
+    stop = startLoading(lighter);
+    query.value = "?q=pods";
+    expect(calls).toEqual(["thing a", "query a q=pods"]);
+    // reload, another path and a new user are arrivals: the full load
+    await reload();
+    expect(calls.at(-1)).toBe("thing a q=pods");
+    path.value = "/things/b";
+    expect(calls.at(-1)).toBe("thing b q=pods");
+    me.value = { ...casey, id: "u2" };
+    expect(calls.at(-1)).toBe("thing b q=pods");
+    expect(calls).toHaveLength(5);
+  });
+
   test("reload runs the current route's load again, or nothing", async () => {
     const { routes, calls } = table();
     me.value = casey;

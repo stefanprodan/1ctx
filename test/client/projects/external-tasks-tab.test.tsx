@@ -8,8 +8,9 @@
 // labels as tags.
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { signal } from "@preact/signals";
+import type { VNode } from "preact";
 import { render } from "preact-render-to-string";
+import { path, query } from "../../../src/client/app/router.ts";
 import {
   closedCount,
   closedFilter,
@@ -17,11 +18,11 @@ import {
   externalTasks,
 } from "../../../src/client/data/external-tasks.ts";
 import { ALL_CLOSED } from "../../../src/client/data/external-tasks-rows.ts";
+import type { TasksShow } from "../../../src/client/lib/hrefs.ts";
 import { TaskRow } from "../../../src/client/views/projects/ExternalTaskRow.tsx";
 import {
   TasksCard,
   TasksIntro,
-  type TasksView,
 } from "../../../src/client/views/projects/ExternalTasks.tsx";
 import type { ExternalTaskRow } from "../../../src/shared/contracts/external-task.ts";
 
@@ -42,8 +43,8 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   ...changes,
 });
 
-const card = (view: TasksView = "open") =>
-  render(<TasksCard projectId="p1" view={signal(view)} now={2_000} />);
+const card = (show: TasksShow | null = null, q = "") =>
+  render(<TasksCard projectId="p1" show={show} q={q} now={2_000} />);
 
 afterEach(() => {
   externalTasks.value = null;
@@ -105,6 +106,19 @@ describe("the card", () => {
     expect(html).toContain("Show more");
   });
 
+  test.serial("Open searches the list on the page, with a count", () => {
+    externalTasks.value = [
+      row({ id: "a", title: "Wire the sweep" }),
+      row({ id: "b", title: "Draw the tab" }),
+    ];
+    const html = card(null, "sweep");
+    expect(html).toContain('value="sweep"');
+    expect(html).toContain('href="/external-tasks/a"');
+    expect(html).not.toContain('href="/external-tasks/b"');
+    expect(html).toContain("rows-count");
+    expect(card(null, "nothing")).toContain("No task matches.");
+  });
+
   test.serial("a project with none open says so", () => {
     externalTasks.value = [];
     expect(card()).toContain("No open tasks.");
@@ -119,6 +133,7 @@ describe("the card", () => {
     };
     const html = card("done");
     expect(html).toContain('aria-pressed="true">Done<');
+    expect(html).toContain('aria-pressed="false">Open<');
     expect(html).toContain('href="/external-tasks/d1"');
     expect(html).not.toContain('href="/external-tasks/t1"');
     expect(html).toContain("Show more");
@@ -127,6 +142,68 @@ describe("the card", () => {
   test.serial("a closed view with none says so", () => {
     closedPages.value = { rows: [], next: null };
     expect(card("canceled")).toContain("None yet.");
+    // the server searched, so the page counts nothing
+    const searched = card("canceled", "sweep");
+    expect(searched).toContain("No task matches.");
+    expect(searched).not.toContain("rows-count");
+  });
+});
+
+describe("the address", () => {
+  const realLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
+  const realHistory = Object.getOwnPropertyDescriptor(globalThis, "history");
+  const restore = (
+    name: "location" | "history",
+    was: PropertyDescriptor | undefined,
+  ) => {
+    if (was === undefined) Reflect.deleteProperty(globalThis, name);
+    else Object.defineProperty(globalThis, name, was);
+  };
+
+  test.serial("a search and a pick replace it, never push", () => {
+    const moves: string[] = [];
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: { origin: "http://test.invalid", pathname: "/", search: "" },
+    });
+    Object.defineProperty(globalThis, "history", {
+      configurable: true,
+      value: {
+        pushState: (_s: unknown, _u: string, to: string) => {
+          moves.push(`push ${to}`);
+        },
+        replaceState: (_s: unknown, _u: string, to: string) => {
+          moves.push(`replace ${to}`);
+        },
+      },
+    });
+    try {
+      // the card's own handlers, as the box and the switch call them
+      type Props = {
+        search: VNode<{ onChange: (q: string) => void }>;
+        action: VNode<{
+          children: VNode<{ filters: { onPick: () => void }[] }>[];
+        }>;
+      };
+      const card = TasksCard({
+        projectId: "p1",
+        show: "done",
+        q: "",
+        now: 2_000,
+      }) as VNode<Props>;
+      card.props.search.props.onChange("sweep");
+      card.props.action.props.children[0]!.props.filters[2]!.onPick();
+      const tab = "/projects/p1/external-tasks";
+      expect(moves).toEqual([
+        `replace ${tab}?show=done&q=sweep`,
+        `replace ${tab}?show=canceled`,
+      ]);
+    } finally {
+      restore("location", realLocation);
+      restore("history", realHistory);
+      path.value = "/";
+      query.value = "";
+    }
   });
 });
 

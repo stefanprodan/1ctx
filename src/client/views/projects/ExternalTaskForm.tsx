@@ -24,9 +24,10 @@ import {
   createExternalTask,
   editExternalTask,
 } from "../../data/external-task.ts";
+import { tasksTabHref } from "../../data/external-tasks.ts";
 import { knowledgeOf, listErrors } from "../../data/knowledge.ts";
 import { project, projectError } from "../../data/projects.ts";
-import { externalTaskHref, externalTasksHref } from "../../lib/hrefs.ts";
+import { externalTaskHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useArrivalFocus, useFocusField, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -323,7 +324,7 @@ export function NewExternalTask({ params }: { params: Params }) {
   return (
     <Page
       crumb={shown?.name ?? "Project"}
-      crumbHref={externalTasksHref(id)}
+      crumbHref={tasksTabHref(id)}
       title="New external task"
       loading={shown === null && error === null}
       error={error}
@@ -334,7 +335,7 @@ export function NewExternalTask({ params }: { params: Params }) {
             key={id}
             projectId={id}
             detail={null}
-            onCancel={() => navigate(externalTasksHref(id))}
+            onCancel={() => navigate(tasksTabHref(id))}
             onSaved={(taskId) => navigate(externalTaskHref(taskId))}
           />
         </Split>
