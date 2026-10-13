@@ -47,6 +47,7 @@ import {
 } from "../data/external-tasks.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
+import { loadKnowledgePath } from "../data/knowledge-path.ts";
 import { loadLink } from "../data/links.ts";
 import {
   loadAllUsage,
@@ -440,6 +441,22 @@ export const ROUTES: Route[] = [
         loadProject(params.id),
         loadProjectAgents(params.id),
         loadDocPage(params.id, params.fileId, query),
+      ]);
+    },
+  },
+  {
+    // ?name= is the file's name, from a /knowledge/ path in a reply;
+    // the view moves to the file's page once the name is read
+    path: "/projects/:id/knowledge/path",
+    view: lazy(() =>
+      import("../views/knowledge/file/DocPage.tsx").then((m) => m.PathDoc),
+    ),
+    title: () => "Knowledge",
+    role: "authenticated",
+    load: async (params, query) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadKnowledgePath(params.id, query.get("name") ?? ""),
       ]);
     },
   },

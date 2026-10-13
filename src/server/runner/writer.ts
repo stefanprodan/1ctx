@@ -65,7 +65,8 @@ export type WriterDeps = {
   // a chat's snapshot of the project's note, started with its first send
   // and dropped by a summary, inside the caller's transaction
   views: StartDeps["views"] & { end(sessionId: string): void };
-  render: (markdown: string) => string;
+  // a reply links knowledge paths to its session's project
+  render: (markdown: string, options: { project: string }) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
   alerts: AlertsPort;
@@ -188,6 +189,7 @@ export class Writer {
     const result = transact(this.deps.db, () => {
       const reply = finishReplyRow(
         this.deps,
+        send,
         round,
         "done",
         null,

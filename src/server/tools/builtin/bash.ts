@@ -155,7 +155,7 @@ export type BashToolOptions = {
 };
 
 const OPEN_WORDS =
-  "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. ";
+  "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. To point to one, write its /knowledge/ path. ";
 
 // a send's bash description as a subagent's, whatever was added after:
 // no open, and the subagent's own credential words

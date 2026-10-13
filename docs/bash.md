@@ -242,7 +242,9 @@ of that shell that shows a file on the chat page.
 - **`open` copies a mounted text file onto the chat page.** HTML and SVG
   become a visual when the admin's Visuals switch was on at send start
   and the text fits `VISUAL_FRAME_BYTES`, Markdown is rendered, the rest
-  is code.
+  is code. Its line in the description tells the agent to write a
+  file's `/knowledge/` path to point the user to it, which the reply
+  links (`docs/ui.md`), and to open it only to show it.
 - **A refused `open` stops nothing.** Outside the trees, a symlink, a
   directory, past `knowledgeFileBytes`, non-text, or past
   `MAX_OPENS_PER_COMMAND`. The copies are `opened_files` rows written in

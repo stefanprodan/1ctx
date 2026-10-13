@@ -226,6 +226,16 @@ open row's body or a meta. The shared shapes are below.
   place; in an installed app (`display-mode: standalone`) the router's
   `inApp()` still opens a page of the app in place, so it never leaves
   the app.
+- **A `/knowledge/<name>` path links only with a `project`.** The
+  runner's replies and a task's entries pass one; every other render
+  keeps paths as text. A plain path in prose or a link's target links
+  to `/projects/<project>/knowledge/path?name=`, whose page reads the
+  file of that name at the click and replaces itself with the file's
+  page. A path in code, a link's label, a web address or glued to an
+  inline element stays text. Bun hands code and labels to `text` too
+  and splits a run at `_` and `*`, so `text` marks its runs, code and
+  links drop the marks, and paths are matched on the joined runs.
+  Source without `/knowledge/` renders as with no project.
 - **The address picks what the rail shows.** Under an admin address it
   shows the admin panel's zones (Monitor, Access, Config) from
   `app/zones.ts`; an admin page lives under its zone's address and

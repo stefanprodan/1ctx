@@ -229,6 +229,11 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         ),
       };
     },
+    fileIdByName(projectId, name) {
+      const row = store.byName(projectId, name);
+      if (row === null) throw new NotFound();
+      return row.id;
+    },
     versions(projectId, fileId) {
       const versions = store.versions(projectId, fileId);
       if (!versions.length && store.byId(projectId, fileId) === null) {
