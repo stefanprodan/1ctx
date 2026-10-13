@@ -195,7 +195,9 @@ export function stateWords(repo: RepoView): StateWords {
       if (repo.ignored !== null && repo.ignored > 0) {
         parts.push(`${commas(repo.ignored)} ignored`);
       }
-      return { text: parts.join(", "), bad: false };
+      // a tree with nothing kept mounts an empty folder, most often rules
+      // that ignore a parent of what they meant to keep
+      return { text: parts.join(", "), bad: repo.files === 0 };
     }
   }
 }
