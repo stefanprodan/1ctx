@@ -52,6 +52,9 @@ Report with `tasks report`, naming the task id, the claim id and a kind.
 - `result`: the work is done, and the task with it. Name the files you
   wrote in the text. Links take only web addresses, such as the PR.
 
+Name a knowledge file you wrote as `/knowledge/<name>` in a report's
+text, outside code, so the task page links it.
+
 If you will not finish it, give it back with `tasks unclaim`, naming
 the task id, the claim id and a text saying why and where you stopped,
 so the next agent can pick it up from your reports instead of starting

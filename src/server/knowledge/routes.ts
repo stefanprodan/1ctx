@@ -6,6 +6,7 @@ import type {
   KnowledgeFileDetailResponse,
   KnowledgeFileResponse,
   KnowledgeListResponse,
+  KnowledgePathResponse,
   KnowledgeSearchResponse,
   KnowledgeUploadResult,
   KnowledgeVersionDetailResponse,
@@ -23,6 +24,7 @@ import { MAX_KNOWLEDGE_BODY } from "./limits.ts";
 import {
   parseCreate,
   parseId,
+  parsePath,
   parseRename,
   parseReplace,
   parseSearch,
@@ -47,6 +49,8 @@ export type KnowledgePort = {
   ): Promise<KnowledgeUploadResult>;
   list(projectId: string): KnowledgeListResponse;
   read(projectId: string, fileId: string): KnowledgeFileDetailResponse["file"];
+  // the live file of that name; a deleted or renamed one is not found
+  fileIdByName(projectId: string, name: string): string;
   versions(
     projectId: string,
     fileId: string,
@@ -211,6 +215,21 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           file: deps.knowledge.read(
             project.id,
             parseId(ctx.params.fileId, "fileId"),
+          ),
+        };
+        return json(body);
+      },
+    },
+    {
+      method: "GET",
+      path: "/api/projects/:id/knowledge/path",
+      policy: "authenticated",
+      handle(req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const body: KnowledgePathResponse = {
+          fileId: deps.knowledge.fileIdByName(
+            project.id,
+            parsePath(new URL(req.url)),
           ),
         };
         return json(body);

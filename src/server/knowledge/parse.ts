@@ -71,6 +71,12 @@ export function parseRename(body: unknown): RenameKnowledgeFileRequest {
   };
 }
 
+export function parsePath(url: URL): string {
+  const name = queryParams(url, ["name"])("name");
+  if (name === null) throw new BadRequest("name must appear once");
+  return parseName(name);
+}
+
 export type SearchQuery = { q: string; after: string | null };
 
 export function parseSearch(url: URL): SearchQuery {

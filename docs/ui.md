@@ -223,7 +223,14 @@ open row's body or a meta. The shared shapes are below.
   relative link but `/automations/<id>`, `/automations/<id>/memory`,
   `/run/<id>`, `/chat/<id>` and `/external-tasks/<id>` (`APP_HREF` in
   `render/markdown.ts`), without a target, so the router takes them in
-  place; in an installed app (`display-mode: standalone`) the router's
+  place. Given a `project`, as the runner's replies and a task's entries
+  are, it also links `/knowledge/<name>`, a plain path in prose or a
+  link's target, to `/projects/<project>/knowledge/path?name=`, whose
+  page reads the file of that name now and replaces itself with the
+  file's page; a path in code, a link's label or a web address stays
+  text. Bun hands code and labels to `text` as well and splits a run at
+  `_` and `*`, so `text` marks its runs, code and links drop the marks,
+  and the paths are matched on the joined runs. In an installed app (`display-mode: standalone`) the router's
   `inApp()` still opens a page of the app in place, so it never leaves
   the app.
 - **The address picks what the rail shows.** Under an admin address it

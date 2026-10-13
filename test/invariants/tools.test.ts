@@ -238,9 +238,9 @@ test("bash documents open and snapshots the Visuals row", async () => {
     (tool: { name: string }) => tool.name === "bash",
   );
   expect(bash.description).toContain(
-    "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out.",
+    "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. To point to one, write its /knowledge/ path.",
   );
-  expect(bash.tokens).toBe(449);
+  expect(bash.tokens).toBe(461);
 
   const first = await startChat(chat, "first");
   const active = chat.app.runner.registry.get(first.sessionId)!;

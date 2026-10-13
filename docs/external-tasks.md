@@ -61,7 +61,8 @@ follow `docs/external-task-pages.md`.
   link reads its name from deletion history, or null after pruning.
 - Create answers 201; edits and moves answer the detail shape. The
   page's routes add each entry's `html`, its text rendered once per read
-  by `renderMarkdown` with bare http(s) URLs linked (`show.ts`); the
+  by `renderMarkdown` with bare http(s) URLs and the task project's
+  `/knowledge/` paths linked (`show.ts`); the
   area's own reads, which the `tasks` tool and the chat tool use, keep
   plain text. The detail's `chatTitle` is set only when the caller may
   open the chat by the chat route's own check (the `chatOpens` port); an

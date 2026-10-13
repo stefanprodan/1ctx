@@ -36,11 +36,12 @@ export function notRun(reason: string): string {
 export type ReplyRowsDeps = {
   sessions: SessionsPort;
   usage: { record(fields: UsageFields): unknown };
-  render: (markdown: string) => string;
+  render: (markdown: string, options: { project: string }) => string;
 };
 
 export function finishReplyRow(
   deps: ReplyRowsDeps,
+  send: ActiveSend,
   round: RoundState,
   status: Exclude<SessionStatus, "running">,
   error: string | null,
@@ -56,7 +57,7 @@ export function finishReplyRow(
     content: round.content,
     reasoning: round.reasoning,
     reasoningDetails: round.reasoningDetails,
-    html: deps.render(round.content),
+    html: deps.render(round.content, { project: send.projectId }),
     status,
     error,
     finishReason,
@@ -132,6 +133,7 @@ export function cutCalls(
 ): Message[] {
   const reply = finishReplyRow(
     deps,
+    send,
     round,
     "done",
     null,
@@ -258,6 +260,7 @@ export function finalizeRound(
   recordUsage(deps, send, round, now);
   return finishReplyRow(
     deps,
+    send,
     round,
     after?.status ?? status,
     after ? after.error : error,

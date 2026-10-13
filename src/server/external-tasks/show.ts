@@ -81,11 +81,15 @@ export const taskShow =
     };
   };
 
-// rendered once per read, with bare URLs linked
+// rendered once per read, with bare URLs and the task project's
+// knowledge paths linked
 export const forPage = (read: TaskRead): ExternalTaskResponse => ({
   ...read,
   entries: read.entries.map((entry) => ({
     ...entry,
-    html: renderMarkdown(entry.text, { autolinks: true }),
+    html: renderMarkdown(entry.text, {
+      autolinks: true,
+      project: read.task.task.projectId,
+    }),
   })),
 });

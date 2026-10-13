@@ -16,6 +16,9 @@ bash. An upload adds files to it, or attaches them to a chat message.
   the last live summary, so history outlives its file.
 - **Every lookup is by project and id.** A route resolves
   `access.project()` first, so a foreign id answers as a missing one.
+  The one lookup by name, `GET /api/projects/:id/knowledge/path?name=`,
+  answers the live file's id for a reply's `/knowledge/` link; a
+  deleted or renamed file is a 404, a bad name a 400.
 - **Names form a mountable tree.** No live name is a path prefix of
   another (`checkNames()`), on every write path: create, rename,
   uploads and a command's commit.

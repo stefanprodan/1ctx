@@ -35,7 +35,7 @@ export const htmlEvery = (htmlLength: number): number =>
 export type StreamDeps = {
   clock: Clock;
   sessions: Pick<SessionsPort, "writeReply">;
-  render: (markdown: string) => string;
+  render: (markdown: string, options: { project: string }) => string;
   stream: (sessionId: string, frame: SocketEvent) => void;
 };
 
@@ -154,7 +154,9 @@ export function streamDelta(
     if (end === null) return;
     round.lastHtmlAt = now;
     round.htmlAt = end;
-    round.html = deps.render(round.content.slice(0, end));
+    round.html = deps.render(round.content.slice(0, end), {
+      project: send.projectId,
+    });
     send.seq++;
     deps.stream(send.sessionId, {
       type: "html",

@@ -2,20 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A knowledge file's page, addressed by id so a rename keeps its links,
-// and the new file's page. The project's tabs are not drawn here; the
-// crumb leads back. What the page is follows from what the file's load
-// said: the file (FileView.tsx), a deleted file's last text, or no file.
+// the new file's page and the page a /knowledge/ path's link opens.
+// The project's tabs are not drawn here; the crumb leads back. What
+// the page is follows from what the file's load said: the file
+// (FileView.tsx), a deleted file's last text, or no file.
 
-import { useRef } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type { KnowledgeDeleted } from "../../../../shared/contracts/knowledge.ts";
 import type { Params } from "../../../app/params.ts";
-import { query } from "../../../app/router.ts";
+import { navigate, query } from "../../../app/router.ts";
 import { knowledgeOf, listErrors } from "../../../data/knowledge.ts";
 import { docFileOf } from "../../../data/knowledge-file.ts";
+import {
+  type PathAnswer,
+  pathAnswer,
+  pathKey,
+} from "../../../data/knowledge-path.ts";
 import { project, projectError } from "../../../data/projects.ts";
 import { useNow } from "../../../lib/now.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
 import { Page } from "../../../ui/Page.tsx";
+import { fileHref } from "../Knowledge.model.ts";
 import { DeletedDoc, NotFound } from "./Deleted.tsx";
 import { crumbSteps, liveFolders } from "./DocPage.model.ts";
 import { FileView } from "./FileView.tsx";
@@ -125,4 +132,24 @@ export function NewDoc({ params }: { params: Params }) {
       folder={folder}
     />
   );
+}
+
+// a /knowledge/ path a reply links: the file's page in place of this
+// one, so Back returns to the reply
+export function PathDoc({ params }: { params: Params }) {
+  const projectId = params.id ?? "";
+  const name = new URLSearchParams(query.value).get("name") ?? "";
+  const held = pathAnswer.value;
+  const answer: PathAnswer =
+    held?.key === pathKey(projectId, name) ? held.answer : { state: "loading" };
+  const fileId = answer.state === "found" ? answer.fileId : null;
+  useEffect(() => {
+    if (fileId !== null) navigate(fileHref(projectId, fileId), true);
+  }, [projectId, fileId]);
+  const projectName = projectNameOf(projectId);
+  const error = answer.state === "failed" ? answer.failure : projectError.value;
+  if (answer.state === "missing" && projectName !== null && error === null) {
+    return <NotFound projectId={projectId} projectName={projectName} />;
+  }
+  return <Page title="Knowledge" loading={error === null} error={error} />;
 }

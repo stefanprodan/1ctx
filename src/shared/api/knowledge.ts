@@ -46,6 +46,9 @@ export type KnowledgeFileResponse = { file: KnowledgeFile };
 
 export type KnowledgeFileDetailResponse = { file: KnowledgeFileView };
 
+// the file a /knowledge/ path names now, for a link in a reply
+export type KnowledgePathResponse = { fileId: string };
+
 export type ReplaceKnowledgeFileRequest = { text: string; revision: number };
 
 export type RenameKnowledgeFileRequest = { name: string; revision: number };

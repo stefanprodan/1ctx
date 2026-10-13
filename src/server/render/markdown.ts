@@ -4,6 +4,7 @@
 // Markdown is rendered on the server so the client receives safe HTML and
 // ships no parser. Model output is untrusted, making this the safety boundary.
 
+import { isKnowledgeName } from "../../shared/words.ts";
 import { ID_SHAPE } from "../lib/ids.ts";
 import { highlight } from "./highlight.ts";
 
@@ -61,6 +62,45 @@ function codeBlock(text: string, info: string | undefined): string {
     `<div class="md-block" data-lang="${escapeHtml(lang)}">` +
     `<div class="md-block-head"><span class="md-block-lang">${escapeHtml(lang)}</span>${COPY_BLOCK}</div>` +
     `${pre}</div>`
+  );
+}
+
+// Bun passes the text of inline code, fenced blocks and link labels
+// through text too, and splits a run at a "_" or "*", so text marks its
+// runs with tags no escaped text can hold; code and links drop the marks
+// and the paths are matched once the neighbouring runs are joined
+const MARK_OPEN = "<kp>";
+const MARK_CLOSE = "</kp>";
+const MARKS = /<\/?kp>/g;
+const MARKED_RUN = /<kp>([^<]*)<\/kp>/g;
+const unmark = (content: string) => content.replace(MARKS, "");
+// a plain path in prose: at a run's start, after white space or "(",
+// over the name's characters
+const PROSE_PATH = /(^|[\s(])\/knowledge\/([A-Za-z0-9._/-]+)/g;
+// what may follow a path's run: a letter, digit or "%" would mean the
+// run was cut out of a longer word, which is never linked
+const PATH_FOLLOWER = /[\p{L}\p{N}\p{M}%]/u;
+const LINK_PATH = /^\/knowledge\/(.+)$/;
+
+const pathHref = (project: string, name: string) =>
+  `/projects/${encodeURIComponent(project)}/knowledge/path?name=${encodeURIComponent(name)}`;
+
+// no target, so the client's router takes the click in place
+const pathAnchor = (project: string, name: string, label: string) =>
+  `<a class="md-link md-path" href="${escapeHtml(pathHref(project, name))}">${label}</a>`;
+
+function linkPaths(run: string, project: string): string {
+  return run.replace(
+    PROSE_PATH,
+    (whole, lead: string, raw: string, at: number) => {
+      const after = run[at + whole.length];
+      if (after !== undefined && PATH_FOLLOWER.test(after)) return whole;
+      // a trailing "." ends the sentence, not the name
+      const name = raw.replace(/\.+$/, "");
+      if (!isKnowledgeName(name)) return whole;
+      const path = `/knowledge/${name}`;
+      return `${lead}${pathAnchor(project, name, path)}${raw.slice(name.length)}`;
+    },
   );
 }
 
@@ -126,21 +166,49 @@ const CALLBACKS = {
     `<td class="md-td"${tableAlign(meta?.align)}>${content}</td>`,
 };
 
+// the callbacks that link knowledge paths to the project's file pages
+function pathCallbacks(project: string) {
+  return {
+    ...CALLBACKS,
+    text: (content: string) =>
+      `${MARK_OPEN}${escapeHtml(content)}${MARK_CLOSE}`,
+    codespan: (content: string) => CALLBACKS.codespan(unmark(content)),
+    code: (content: string, meta?: { language?: string }) =>
+      CALLBACKS.code(unmark(content), meta),
+    link: (content: string, meta: { href: string; title?: string }) => {
+      const label = unmark(content);
+      const name = LINK_PATH.exec(meta.href)?.[1];
+      if (name === undefined || !isKnowledgeName(name)) {
+        return CALLBACKS.link(label, meta);
+      }
+      return pathAnchor(project, name, label);
+    },
+    image: (content: string, meta: { src: string }) =>
+      CALLBACKS.image(unmark(content), meta),
+  };
+}
+
 const LINKED = { ...OPTIONS, autolinks: { url: true } } as const;
+
+type RenderOptions = { autolinks?: boolean; project?: string };
 
 // Parser failures keep the reply readable. autolinks links bare http(s)
 // URLs, for text people paste links into, such as a task's entries.
+// project links /knowledge/ paths to that project's files; without it
+// they stay text.
 export function renderMarkdown(
   md: string,
-  options: { autolinks?: boolean } = {},
+  options: RenderOptions = {},
 ): string {
   if (md === "") return "";
+  const parse = options.autolinks ? LINKED : OPTIONS;
   try {
-    return Bun.markdown.render(
-      md,
-      CALLBACKS,
-      options.autolinks ? LINKED : OPTIONS,
-    );
+    const project = options.project;
+    if (project === undefined) return Bun.markdown.render(md, CALLBACKS, parse);
+    return Bun.markdown
+      .render(md, pathCallbacks(project), parse)
+      .replaceAll(`${MARK_CLOSE}${MARK_OPEN}`, "")
+      .replace(MARKED_RUN, (_, run: string) => linkPaths(run, project));
   } catch {
     return `<p class="md-p">${escapeHtml(md)}</p>`;
   }
