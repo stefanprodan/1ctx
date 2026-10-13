@@ -147,6 +147,12 @@ describe("the words", () => {
     expect(stateWords(repo({ files: 1, ignored: 1_200 })).text).toBe(
       "Ready at 3f2a1c9, 1 file, 1,200 ignored",
     );
+    // rules that keep nothing read as a fault
+    expect(stateWords(repo({ files: 0, ignored: 364 }))).toEqual({
+      text: "Ready at 3f2a1c9, 0 files, 364 ignored",
+      bad: true,
+    });
+    expect(stateWords(repo()).bad).toBe(false);
     const failed = stateWords(repo({ state: "failed", error: "no access" }));
     expect(failed).toEqual({
       text: "Failed: no access",

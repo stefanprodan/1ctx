@@ -225,6 +225,8 @@ Flagged.
 - **An editor's row is its button,** opening its form, as a label's
   does. Refresh sits in the form's foot beside Delete, and its refusal
   is the form's notice.
+- **A ready row that kept no file is drawn as a fault,** since its ignore
+  rules most often exclude a parent of what they meant to keep.
 - **A row's state is read again while it waits or fetches.** No frame
   says a fetch ended, so `watchRepos()` reads the list every
   `REPO_POLL_MS` while a row is pending or fetching and the tab is
