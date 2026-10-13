@@ -5,6 +5,8 @@
 // place. A click reads the file and shows it rendered under its row,
 // plain text when it is not Markdown; the pencil at the row's end is
 // the only way to the file's page. A deleted file keeps its row, off.
+// The rows are Knowledge's file rows: the icon by kind, the path cut at
+// its folder first, when it last changed at the right.
 
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -17,18 +19,22 @@ import {
   readsOnOpen,
   taskFileRead,
 } from "../../data/external-task-files.ts";
+import { ago } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { RowsCard, RowsFailed } from "../../ui/Rows.tsx";
-import { fileHref } from "../knowledge/Knowledge.model.ts";
+import { fileHref, fileIcon } from "../knowledge/Knowledge.model.ts";
+import { PathName } from "../knowledge/PathName.tsx";
 import { fileLabel } from "./ExternalTasks.model.ts";
 import "../../transcript/md.css";
 
 function FileRow({
   projectId,
   file,
+  now,
 }: {
   projectId: string;
   file: ExternalTaskFile;
+  now: number;
 }) {
   const open = useSignal(false);
   const name = fileLabel(file);
@@ -54,10 +60,22 @@ function FileRow({
           type="button"
           class="external-tasks-file-go"
           aria-expanded={open.value}
+          title={name}
           onClick={toggle}
         >
-          <Icon name="file-text" size={14} class="external-tasks-file-icon" />
-          <span class="external-tasks-file-name cut">{name}</span>
+          <Icon
+            name={fileIcon(name)}
+            size={14}
+            class="external-tasks-file-icon"
+          />
+          <span class="external-tasks-file-name">
+            <PathName name={name} />
+          </span>
+          {file.changedAt !== null && (
+            <span class="external-tasks-file-when">
+              {ago(file.changedAt, now)}
+            </span>
+          )}
         </button>
         <a
           class="btn-icon"
@@ -89,7 +107,13 @@ function FileRow({
   );
 }
 
-export function TaskFiles({ detail }: { detail: ExternalTaskDetail }) {
+export function TaskFiles({
+  detail,
+  now,
+}: {
+  detail: ExternalTaskDetail;
+  now: number;
+}) {
   if (detail.files.length === 0) return null;
   const projectId = detail.task.projectId;
   return (
@@ -99,20 +123,37 @@ export function TaskFiles({ detail }: { detail: ExternalTaskDetail }) {
           // drawn as a live row is, so its icon and name line up
           <div key={file.fileId} class="rows-item external-tasks-file">
             <div class="external-tasks-file-row external-tasks-file-row-off">
-              <span class="external-tasks-file-go external-tasks-file-gone">
+              <span
+                class="external-tasks-file-go external-tasks-file-gone"
+                title={fileLabel(file)}
+              >
                 <Icon
-                  name="file-text"
+                  name={fileIcon(file.name ?? "")}
                   size={14}
                   class="external-tasks-file-icon"
                 />
-                <span class="external-tasks-file-name cut">
-                  {fileLabel(file)}
-                </span>
+                {file.name === null ? (
+                  <span class="external-tasks-file-name cut">
+                    {fileLabel(file)}
+                  </span>
+                ) : (
+                  <>
+                    <span class="external-tasks-file-word">deleted:</span>
+                    <span class="external-tasks-file-name">
+                      <PathName name={file.name} />
+                    </span>
+                  </>
+                )}
               </span>
             </div>
           </div>
         ) : (
-          <FileRow key={file.fileId} projectId={projectId} file={file} />
+          <FileRow
+            key={file.fileId}
+            projectId={projectId}
+            file={file}
+            now={now}
+          />
         ),
       )}
     </RowsCard>

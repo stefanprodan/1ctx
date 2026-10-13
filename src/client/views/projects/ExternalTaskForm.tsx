@@ -285,6 +285,8 @@ export function TaskForm({
           {newFile.value && (
             <NewTaskFile
               projectId={projectId}
+              title={d.title}
+              taken={d.fileIds.map((id) => nameOf(id))}
               disabled={save.busy}
               onCreating={(busy) => {
                 creating.value = busy;

@@ -19,6 +19,7 @@ import {
 } from "../../../src/client/data/external-task-files.ts";
 import { rememberTasksView } from "../../../src/client/data/external-tasks.ts";
 import { project } from "../../../src/client/data/projects.ts";
+import { Icon } from "../../../src/client/lib/icons.tsx";
 import { Save } from "../../../src/client/lib/save.ts";
 import {
   ExternalTask,
@@ -35,6 +36,7 @@ import {
   HeadMoves,
   type MoveState,
 } from "../../../src/client/views/projects/ExternalTaskMoves.tsx";
+import { NewTaskFile } from "../../../src/client/views/projects/ExternalTaskNewFile.tsx";
 import { NO_LABEL } from "../../../src/client/views/projects/ExternalTasks.model.ts";
 import type {
   ExternalTaskClaim,
@@ -357,9 +359,12 @@ describe("a done task", () => {
     );
     expect(html).toContain('aria-label="Result"');
     expect(html).toContain(
-      '<span class="external-tasks-line-user cut">@stefan</span>',
+      '<a class="external-tasks-line-user cut" href="/users/stefan">@stefan</a>',
     );
-    expect(html).toContain('<p class="md-p">Shipped in #12</p>');
+    // its headings at the words' size, scoped to the entry
+    expect(html).toContain(
+      '<div class="md-wide external-tasks-md external-tasks-entry"><p class="md-p">Shipped in #12</p>',
+    );
     expect(html).toContain('href="https://example.test/pr/12"');
     expect(html.indexOf('aria-label="Result"')).toBeLessThan(
       html.indexOf("plan.md"),
@@ -374,14 +379,21 @@ describe("the files", () => {
   const files: ExternalTaskDetail["files"] = [
     {
       fileId: "f1",
-      name: "plan.md",
+      name: "plans/plan.md",
       revision: 3,
-      changedAt: 1,
+      changedAt: NOW - 2 * HOUR,
       deleted: false,
     },
     {
       fileId: "f2",
-      name: "old.md",
+      name: "src/old.ts",
+      revision: null,
+      changedAt: null,
+      deleted: true,
+    },
+    {
+      fileId: "f3",
+      name: null,
       revision: null,
       changedAt: null,
       deleted: true,
@@ -389,23 +401,44 @@ describe("the files", () => {
   ];
 
   test("each opens in place, its pencil the way to its page", () => {
-    const html = render(<TaskFiles detail={page(row(), { files }).detail} />);
-    expect(html).toContain('aria-expanded="false"');
-    expect(html).toMatch(/href="[^"]*\/files\/f1" aria-label="Edit plan.md"/);
+    const html = render(
+      <TaskFiles detail={page(row(), { files }).detail} now={NOW} />,
+    );
+    expect(html).toContain('aria-expanded="false" title="plans/plan.md"');
+    expect(html).toMatch(
+      /href="[^"]*\/files\/f1" aria-label="Edit plans\/plan.md"/,
+    );
+    // Knowledge's row: the icon by the file's kind, the folder cut first
+    const icon = (name: "file-text" | "code") =>
+      render(<Icon name={name} size={14} class="external-tasks-file-icon" />);
+    expect(html).toContain(icon("file-text"));
+    expect(html).toContain(icon("code"));
+    expect(html).toContain(
+      '<span class="external-tasks-file-name"><span class="knowledge-path"><span class="knowledge-dir cut">plans/</span><span class="cut">plan.md</span></span></span>',
+    );
     // a deleted file keeps its row, drawn as a live one so the two line
     // up, with no way to open it
     expect(html).toContain(
-      '<div class="external-tasks-file-row external-tasks-file-row-off"><span class="external-tasks-file-go external-tasks-file-gone">',
+      '<div class="external-tasks-file-row external-tasks-file-row-off"><span class="external-tasks-file-go external-tasks-file-gone" title="deleted: src/old.ts">',
     );
     expect(html).toContain(
-      '<span class="external-tasks-file-name cut">deleted: old.md</span>',
+      '<span class="external-tasks-file-word">deleted:</span><span class="external-tasks-file-name"><span class="knowledge-path"><span class="knowledge-dir cut">src/</span><span class="cut">old.ts</span></span></span>',
+    );
+    expect(html).toContain(
+      '<span class="external-tasks-file-name cut">a deleted file</span>',
     );
     expect(html).not.toContain("/files/f2");
+    // when it last changed, at the right before the pencil; a deleted
+    // file says none
+    expect(html).toContain(
+      '<span class="external-tasks-file-when">2h ago</span></button><a class="btn-icon"',
+    );
+    expect(html.match(/external-tasks-file-when/g)).toHaveLength(1);
     expect(taskFileKey("f1", 3)).not.toBe(taskFileKey("f1", 4));
   });
 
   test("none, no card", () => {
-    expect(render(<TaskFiles detail={page().detail} />)).toBe("");
+    expect(render(<TaskFiles detail={page().detail} now={NOW} />)).toBe("");
   });
 });
 
@@ -500,5 +533,30 @@ describe("the form", () => {
     // the scope and the text are gone
     expect(full).not.toContain("Scope");
     expect(full).not.toContain('name="text"');
+  });
+
+  test("a new file's path starts as the title under tasks/", () => {
+    // an empty value is left out of the markup
+    const path = (title: string, taken: string[] = []) =>
+      render(
+        <NewTaskFile
+          projectId="p1"
+          title={title}
+          taken={taken}
+          disabled={false}
+          onCreating={() => {}}
+          onCreated={() => {}}
+          onClose={() => {}}
+        />,
+      )
+        .match(/<input name="path"[^>]*>/)?.[0]
+        .match(/ value="([^"]*)"/)?.[1] ?? "";
+    expect(path("Wire the sweep")).toBe("tasks/wire-the-sweep.md");
+    expect(path("")).toBe("");
+    expect(path("日本語")).toBe("");
+    // a second New file steps past the one just made
+    expect(path("Wire the sweep", ["tasks/wire-the-sweep.md"])).toBe(
+      "tasks/wire-the-sweep-2.md",
+    );
   });
 });

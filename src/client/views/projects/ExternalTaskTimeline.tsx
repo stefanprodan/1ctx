@@ -6,15 +6,17 @@
 // first line of its words, and when. A line with words opens them under
 // it on a click, rendered as Markdown with the links the text leaves
 // out. The waiting question starts open with the answer box at its
-// foot; on a task in progress the latest report starts open. Earlier
-// entries load with Show earlier at the top.
+// foot and folds once it stops waiting; on a task in progress the
+// latest report starts open. Earlier entries load with Show earlier at
+// the top.
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
+import { useRef } from "preact/hooks";
 import type { ExternalTaskPageEntry } from "../../../shared/contracts/external-task.ts";
 import { loadMoreEntries, type TaskPage } from "../../data/external-task.ts";
 import { ago } from "../../lib/format.ts";
-import { chatHref } from "../../lib/hrefs.ts";
+import { chatHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { RowsFailed, RowsMore } from "../../ui/Rows.tsx";
 import { TaskStateIcon } from "./ExternalTaskRow.tsx";
@@ -27,6 +29,7 @@ import {
 import {
   activityOf,
   ENTRY_ICONS,
+  foldOf,
   REPORTS,
   VERBS,
 } from "./ExternalTaskTimeline.model.ts";
@@ -41,7 +44,7 @@ export function Body({ entry }: { entry: ExternalTaskPageEntry }) {
   return (
     <>
       <div
-        class="md-wide external-tasks-md"
+        class="md-wide external-tasks-md external-tasks-entry"
         // the server renders the markdown with raw HTML off: render/ is
         // the safety boundary
         dangerouslySetInnerHTML={{ __html: entry.html }}
@@ -67,9 +70,8 @@ export function Body({ entry }: { entry: ExternalTaskPageEntry }) {
   );
 }
 
-// who made a move, as plain words: the line is the click target, so no
-// link sits inside it; 1ctx, on its own releases, and a deleted user
-// faint
+// who made a move: the user leads to their page in the text's colour;
+// 1ctx, on its own releases, and a deleted user faint and no link
 export function Who({
   username,
   keyName,
@@ -87,7 +89,9 @@ export function Who({
       ) : username === null ? (
         <span class="external-tasks-by-faint">{GONE_USER}</span>
       ) : (
-        <span class="external-tasks-line-user cut">@{username}</span>
+        <a class="external-tasks-line-user cut" href={userHref(username)}>
+          @{username}
+        </a>
       )}
       {keyName !== null && (
         <>
@@ -110,6 +114,7 @@ function Line({
   at,
   now,
   open: start = false,
+  waiting = false,
   id,
   children,
 }: {
@@ -122,37 +127,49 @@ function Line({
   at: number;
   now: number;
   open?: boolean;
+  // the question a member is waited on
+  waiting?: boolean;
   id?: string;
   children?: ComponentChildren;
 }) {
   const open = useSignal(start);
+  const was = useRef(waiting);
+  if (was.current !== waiting) {
+    open.value = foldOf(open.peek(), was.current, waiting);
+    was.current = waiting;
+  }
   const body = children !== undefined && children !== null;
-  const words = (
-    <>
-      {icon}
-      <span class="external-tasks-line-verb">{verb}</span>
-      {who}
-      {place}
-      <span class="external-tasks-line-text cut">{open.value ? "" : text}</span>
-      <span class="external-tasks-when">{ago(at, now)}</span>
-    </>
-  );
+  // with words, the verb is the toggle and covers the line, so the
+  // user's link inside it stays a link of its own
   return (
     <li id={id} class={id === undefined ? undefined : "external-tasks-jump"}>
-      {body ? (
-        <button
-          type="button"
-          class="external-tasks-line external-tasks-line-go"
-          aria-expanded={open.value}
-          onClick={() => {
-            open.value = !open.value;
-          }}
-        >
-          {words}
-        </button>
-      ) : (
-        <div class="external-tasks-line">{words}</div>
-      )}
+      <div
+        class={`external-tasks-line${body ? " external-tasks-line-go" : ""}`}
+      >
+        {icon}
+        {body ? (
+          <button
+            type="button"
+            class="external-tasks-line-verb external-tasks-line-toggle"
+            // the words hide while open, so the name carries them
+            aria-label={text === "" ? verb : `${verb}: ${text}`}
+            aria-expanded={open.value}
+            onClick={() => {
+              open.value = !open.value;
+            }}
+          >
+            {verb}
+          </button>
+        ) : (
+          <span class="external-tasks-line-verb">{verb}</span>
+        )}
+        {who}
+        {place}
+        <span class="external-tasks-line-text cut">
+          {open.value ? "" : text}
+        </span>
+        <span class="external-tasks-when">{ago(at, now)}</span>
+      </div>
       {body && open.value && (
         <div class="external-tasks-line-body">{children}</div>
       )}
@@ -264,6 +281,7 @@ export function Activity({
               at={entry.at}
               now={now}
               open={line.open}
+              waiting={line.waiting}
               id={line.waiting ? QUESTION_ID : undefined}
             >
               {entry.text === "" ? null : (

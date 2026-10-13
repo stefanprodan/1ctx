@@ -20,6 +20,7 @@ import {
   TASK_DELETED,
   taskError,
   taskPage,
+  withFileFrame,
 } from "../../../src/client/data/external-task.ts";
 import {
   HELD_FILES,
@@ -75,6 +76,7 @@ import {
   rowLine,
   showOf,
   taskFieldOf,
+  taskFilePath,
   tasksAddressOf,
   tasksSwitch,
   webLink,
@@ -761,6 +763,215 @@ describe("the entity", () => {
     });
     expect(waitingTasks.value).toEqual({ tasks: [], count: 0 });
   });
+
+  // a server whose file f1 moves on with each write: a read answers the
+  // file as it was when the read started, and while held a call waits
+  // for release(), which answers the latest call first, so an older
+  // read lands last
+  const fileServer = () => {
+    const state = {
+      file: { name: "plan.md", revision: 3, updatedAt: 1, deleted: false },
+      task: row(),
+      reads: 0,
+      held: false,
+    };
+    const gates: (() => void)[] = [];
+    const linkOf = () => ({
+      fileId: "f1",
+      name: state.file.name,
+      revision: state.file.deleted ? null : state.file.revision,
+      changedAt: state.file.deleted ? null : state.file.updatedAt,
+      deleted: state.file.deleted,
+    });
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      calls.push({ call: `${method} ${url}`, body: undefined });
+      if (method === "POST" && url === "/api/external-tasks/t1/cancel") {
+        state.task = {
+          ...state.task,
+          state: "canceled",
+          revision: state.task.revision + 1,
+        };
+      }
+      const page =
+        url.startsWith("/api/external-tasks/t1") &&
+        (method === "GET" || url.endsWith("/cancel"));
+      if (method === "GET" && page) state.reads++;
+      const answer: ExternalTaskResponse = {
+        ...pageAnswer(state.task),
+        task: detail({ task: state.task, files: [linkOf()] }),
+      };
+      if (state.held) await new Promise<void>((open) => gates.push(open));
+      return page
+        ? Response.json(answer)
+        : Response.json({ error: "no" }, { status: 404 });
+    }) as unknown as typeof fetch;
+    // the write lands on the server, then its frame on the page
+    const write = (changes: Partial<typeof state.file>) => {
+      state.file = { ...state.file, ...changes };
+      send({
+        type: "knowledge",
+        projectId: "p1",
+        file: {
+          id: "f1",
+          projectId: "p1",
+          name: state.file.name,
+          kind: "md",
+          bytes: 5,
+          lines: 1,
+          tokens: 2,
+          revision: state.file.revision,
+          author: {
+            kind: "user",
+            id: "u1",
+            name: "stefan",
+            sessionId: null,
+            origin: null,
+            keyName: null,
+          },
+          createdAt: 1,
+          updatedAt: state.file.updatedAt,
+        },
+        deleted: state.file.deleted,
+      });
+    };
+    const release = async () => {
+      state.held = false;
+      for (const open of gates.splice(0).toReversed()) {
+        open();
+        await flush();
+      }
+      // past the flight's pause, so a trailing read runs and lands
+      for (let i = 0; i < 3; i++) {
+        jest.advanceTimersByTime(TRAIL_MS);
+        await flush();
+      }
+    };
+    return { state, write, release };
+  };
+  const linked = () => taskPage.value?.detail.files[0];
+  // the flight's pause on a fake clock
+  const faked = async (body: () => Promise<void>) => {
+    jest.useFakeTimers();
+    try {
+      await body();
+    } finally {
+      jest.useRealTimers();
+    }
+  };
+  const RENAMED = {
+    fileId: "f1",
+    name: "plans/new.md",
+    revision: 4,
+    changedAt: 5_000,
+    deleted: false,
+  };
+  const rename = { name: "plans/new.md", revision: 4, updatedAt: 5_000 };
+
+  test.serial(
+    "a linked file's write patches its row at once, then reads the page",
+    () =>
+      faked(async () => {
+        const server = fileServer();
+        await loadExternalTask("t1");
+        await server.release();
+        const before = server.state.reads;
+        server.write(rename);
+        expect(linked()).toEqual(RENAMED);
+        await server.release();
+        expect(server.state.reads).toBe(before + 1);
+        expect(linked()).toEqual(RENAMED);
+        // an older frame, another file or another project leaves the page
+        const held = taskPage.value!;
+        for (const [id, projectId, revision] of [
+          ["f2", "p1", 9],
+          ["f1", "p2", 9],
+          ["f1", "p1", 3],
+        ] as const) {
+          const frame = { id, projectId, name: "x.md", revision, updatedAt: 9 };
+          expect(withFileFrame(held, frame as KnowledgeFile, false)).toBe(held);
+        }
+        server.write({ deleted: true });
+        expect(linked()).toEqual({
+          fileId: "f1",
+          name: "plans/new.md",
+          revision: null,
+          changedAt: null,
+          deleted: true,
+        });
+        await server.release();
+        expect(linked()?.deleted).toBe(true);
+      }),
+  );
+
+  test.serial(
+    "a rename during a page read outlives the read's older answer",
+    () =>
+      faked(async () => {
+        const server = fileServer();
+        await loadExternalTask("t1");
+        await server.release();
+        server.state.held = true;
+        const read = loadExternalTask("t1");
+        server.write(rename);
+        expect(linked()).toEqual(RENAMED);
+        await server.release();
+        await read;
+        await server.release();
+        expect(linked()).toEqual(RENAMED);
+      }),
+  );
+
+  test.serial("a delete during a page read is never undone by its answer", () =>
+    faked(async () => {
+      const server = fileServer();
+      await loadExternalTask("t1");
+      await server.release();
+      server.state.held = true;
+      const read = loadExternalTask("t1");
+      server.write({ deleted: true });
+      expect(linked()?.deleted).toBe(true);
+      await server.release();
+      await read;
+      await server.release();
+      expect(linked()?.deleted).toBe(true);
+      expect(linked()?.changedAt).toBeNull();
+    }),
+  );
+
+  test.serial(
+    "a write before the first read answers is read once it lands",
+    () =>
+      faked(async () => {
+        const server = fileServer();
+        server.state.held = true;
+        const read = loadExternalTask("t1");
+        expect(taskPage.value).toBeNull();
+        server.write(rename);
+        await server.release();
+        await read;
+        await server.release();
+        expect(linked()).toEqual(RENAMED);
+        // the read out, then one after the write
+        expect(server.state.reads).toBe(2);
+      }),
+  );
+
+  test.serial("a write during a member's move outlives the move's answer", () =>
+    faked(async () => {
+      const server = fileServer();
+      await loadExternalTask("t1");
+      await server.release();
+      server.state.held = true;
+      const move = moveExternalTask("t1", "cancel", { state: "todo" });
+      server.write(rename);
+      await server.release();
+      await move;
+      await server.release();
+      expect(taskPage.value?.detail.task.state).toBe("canceled");
+      expect(linked()).toEqual(RENAMED);
+    }),
+  );
 
   test.serial(
     "a label renamed or deleted reads the tab, the page and Home again",
@@ -1463,6 +1674,46 @@ describe("the form's files and labels", () => {
     expect(pickLabel(["a", "b", "c"], "d", labelsOf("d"))).toEqual(["d"]);
     // a label deleted before the pick lands is not picked
     expect(pickLabel(["a"], "d", labelsOf("a"))).toEqual(["a"]);
+  });
+
+  test("a new file's path is the title made a name under tasks/", () => {
+    const cases: [string, string][] = [
+      ["Wire the sweep", "tasks/wire-the-sweep.md"],
+      ["  Fix   the  gaps  ", "tasks/fix-the-gaps.md"],
+      ["Café déjà vu: Straße", "tasks/cafe-deja-vu-strasse.md"],
+      ["Fix #12 & ship!!", "tasks/fix-12-ship.md"],
+      ["Fix 日本 bug", "tasks/fix-bug.md"],
+      ["../../etc/passwd", "tasks/etc-passwd.md"],
+      ["a/b\\c", "tasks/a-b-c.md"],
+      ["README.md", "tasks/readme.md"],
+      ["...hidden", "tasks/hidden.md"],
+      // nothing left to name it by
+      ["", ""],
+      ["   ", ""],
+      ["日本語", ""],
+      ["..", ""],
+      ["!?#", ""],
+    ];
+    for (const [title, path] of cases) expect(taskFilePath(title)).toBe(path);
+    // a path the draft already links, the file just made, takes a number
+    expect(taskFilePath("Wire it", ["tasks/wire-it.md"])).toBe(
+      "tasks/wire-it-2.md",
+    );
+    expect(
+      taskFilePath("Wire it", ["tasks/wire-it.md", "tasks/wire-it-2.md"]),
+    ).toBe("tasks/wire-it-3.md");
+    expect(taskFilePath("Wire it", ["plan.md"])).toBe("tasks/wire-it.md");
+    // within the name's room, the number kept
+    const long = taskFilePath("x".repeat(80));
+    const next = taskFilePath("x".repeat(80), [long]);
+    expect(next).toBe(`tasks/${"x".repeat(75)}-2.md`);
+    // a long title is cut to fit a name's 80 characters with its .md
+    for (const title of ["x".repeat(80), "ß".repeat(79), "a-".repeat(40)]) {
+      const path = taskFilePath(title);
+      const name = path.slice("tasks/".length);
+      expect(name.length).toBeLessThanOrEqual(80);
+      expect(name).toMatch(/^[a-z0-9][a-z0-9.-]*[a-z0-9]\.md$/);
+    }
   });
 
   test("a file joins once, at most five", () => {

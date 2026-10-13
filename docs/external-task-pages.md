@@ -65,7 +65,8 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   question first: five rows, then Show more by twenty within the read,
   the count the total, each row naming its project. A task leaves it
   when it leaves the state; nothing else reaches Home.
-- **The task's page opens with the title as its heading.** The crumb is
+- **The task's page opens with the title as its heading,** at
+  `--text-body`, semibold. The crumb is
   the project, then External tasks, back to the tab as it was left,
   else on the view the task is listed on (`showOf()`: Done, Canceled,
   else Open), following a move; the head is held to the main column
@@ -85,9 +86,17 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   can't claim this task again. Cancel and reopen it to start over.",
   with no link), a done task's result card
   (`Result by @user via key`, the time, the whole Markdown and the links
-  the text leaves out), the files, then the activity.
-- **Files are a card of rows that open in place.** A click reads the
-  file once per revision (`data/external-task-files.ts`, the least
+  the text leaves out), the files, then the activity. Headings in an
+  entry's or the result's Markdown are at the words' size
+  (`external-tasks-entry`), under the title; a file read and the chat
+  keep theirs.
+- **Files are a card of rows that open in place,** drawn as Knowledge's
+  file rows: 34 px, the icon by the file's kind (`fileIcon()`), the
+  full path in mono through `PathName`, so a long one cuts its folder
+  before its name, a deleted one's after its `deleted:` word, and when
+  it last changed (`changedAt`) at the right as Knowledge's `ago()`,
+  hidden on a phone; a deleted one says none. A click reads the file
+  once per revision (`data/external-task-files.ts`, the least
   recent past `HELD_FILES` dropped, a file's reads gone on its knowledge
   frame and a project's on its revoke, a read out for either landing
   nowhere; an open row reads again, and a failed read is read again when
@@ -106,16 +115,22 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   `claimEnd`. The words
   are the text's first line through `plainLine()`, cut, as is a row's
   question. Who gives way before the words and the time, the key first,
-  cut with an ellipsis, so the time stays at the right at 390. A line with words is a button that
-  opens them under it, rendered by the server, with the links the text
-  leaves out; an answer names its question on one line (`timelineOf()`).
-  The waiting question starts open with the answer box at its foot,
-  whose draft lives in the page's move state, so folding the line keeps
-  it; with no question among those read the box sits under the list. On
-  a task in progress the latest report starts open. Earlier entries
-  load with Show earlier at the top. A claim wears the in-progress
-  ring; only the waiting question's icon takes `--attention`. Users are
-  plain text, never the brand colour.
+  cut with an ellipsis, so the time stays at the right at 390. A line
+  with words opens them under it on a click, rendered by the server,
+  with the links the text leaves out; its verb is the button, named by
+  the verb and the words, covering the line under its links and key. An answer names its question on one
+  line (`timelineOf()`). The waiting question starts open with the
+  answer box at its foot, whose draft lives in the page's move state,
+  so folding the line keeps it; with no question among those read the
+  box sits under the list. Once it stops waiting (an answer, progress
+  or a result) the line the page opened folds (`foldOf()`), and what
+  the reader opens after stays; an answered question never starts
+  open. On a task in progress the latest report starts open. Earlier
+  entries load with Show earlier at the top. A claim wears the
+  in-progress ring; only the waiting question's icon takes
+  `--attention`. A user's handle, here and on the result, links to
+  their page in the text's colour, never the brand colour; 1ctx and a
+  deleted user are plain text.
 - **The page's state is keyed by the task:** a box, an answer's draft or
   an open form never follows the reader to another task.
 - **The aside is Labels, Claimed by and Claim ends while held, Created
@@ -129,7 +144,11 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
 - **The form is the title, 1 to 3 labels and 1 to 5 files.** Labels and
   files are picked in a `Finder` from the project's lists, each picked
   one a row with Remove. New file, beside Link file, opens a path and
-  text inside the Files section; its Create makes the file at once
+  text inside the Files section, the path starting as
+  `tasks/<title>.md` (`taskFilePath()`: the title through the upload
+  sanitizer, cut to fit, empty when nothing is left, `-2`, `-3` and on
+  when the draft already links it) and following the title until the
+  user types one; its Create makes the file at once
   through the knowledge route and links it to the draft, and the file
   stays in Knowledge whatever the task does. A task whose labels were
   all deleted opens with the labels field asking for one, and no edit
@@ -142,4 +161,9 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   (`createAndLink()`). An edit sends what changed and the edit revision
   the form opened on.
 - **A frame adding an entry or editing the brief reads the page again,**
-  keeping older entries. Nothing marks a task and a read clears nothing.
+  keeping older entries. A knowledge frame for a linked file patches
+  its row in place by the file's revision (`withFileFrame()`) and reads
+  the page through its flight. A file write moves no task revision, so
+  a read, a first visit or a move out while a frame for the project
+  landed reads the page once more, and the last read starts after the
+  last write. Nothing marks a task and a read clears nothing.

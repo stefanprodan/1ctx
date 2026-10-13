@@ -3,7 +3,8 @@
 //
 // How the activity reads its entries: each kind's icon and verb, the
 // question an answer follows, the one question still waiting for a
-// member, and which lines start open.
+// member, which lines start open, and the question folding once it
+// stops waiting.
 
 import type {
   ExternalTaskEntry,
@@ -102,7 +103,7 @@ export type ActivityLine<E extends ExternalTaskEntry = ExternalTaskEntry> =
     // reader sees it
     line: string;
     // opened under it at first: the waiting question, and on a task in
-    // progress the latest report with words
+    // progress the latest report with words but an answered question
     open: boolean;
   };
 
@@ -119,6 +120,19 @@ export function activityOf<E extends ExternalTaskEntry>(
   return lines.toReversed().map((l) => ({
     ...l,
     line: sweepReason(l.entry) ?? plainLine(l.entry.text),
-    open: l.entry.text !== "" && (l.waiting || l === latest),
+    open:
+      l.entry.text !== "" &&
+      (l.waiting || (l === latest && l.entry.kind !== "question")),
   }));
+}
+
+// a line's open state once its question's wait changes: the line the
+// page opened as the waiting question folds when nothing waits on it,
+// and what the reader opened by hand after stays
+export function foldOf(
+  open: boolean,
+  waited: boolean,
+  waiting: boolean,
+): boolean {
+  return waited && !waiting ? false : open;
 }

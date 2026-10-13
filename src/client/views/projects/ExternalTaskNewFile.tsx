@@ -6,7 +6,8 @@
 // once through the knowledge route and hands its id to the form, which
 // links it. The file is the project's on its own: cancelling the task
 // leaves it in Knowledge. It sits inside the task's form, so its
-// buttons never submit it and Enter in the path creates the file.
+// buttons never submit it and Enter in the path creates the file. The
+// path follows the task's title until the user types one.
 
 import { useSignal } from "@preact/signals";
 import { addFile } from "../../data/knowledge.ts";
@@ -18,6 +19,7 @@ import {
   pathReady,
   shapePath,
 } from "../knowledge/file/DocPage.model.ts";
+import { taskFilePath } from "./ExternalTasks.model.ts";
 
 // the file made through the knowledge route, by its id
 export async function makeTaskFile(
@@ -47,22 +49,31 @@ export async function createAndLink(
 
 export function NewTaskFile({
   projectId,
+  title,
+  taken,
   disabled,
   onCreating,
   onCreated,
   onClose,
 }: {
   projectId: string;
+  // the task's title, which names the file until a path is typed
+  title: string;
+  // the draft's linked files, which the path starting from the title
+  // steps past
+  taken: readonly string[];
   // while the task's form saves
   disabled: boolean;
   onCreating: (busy: boolean) => void;
   onCreated: (fileId: string) => void;
   onClose: () => void;
 }) {
-  const path = useSignal("");
+  // null until the user types a path
+  const typed = useSignal<string | null>(null);
   const text = useSignal("");
   const save = useSave(async () => {}, pathFieldOf);
-  const name = path.value.trim();
+  const path = typed.value ?? taskFilePath(title, taken);
+  const name = path.trim();
   const off = disabled || save.busy;
   const create = async () => {
     if (!pathReady(name) || off) return;
@@ -86,10 +97,10 @@ export function NewTaskFile({
           autocapitalize="off"
           aria-invalid={invalid || undefined}
           disabled={off}
-          value={path.value}
+          value={path}
           onInput={(ev) => {
             save.touch();
-            path.value = shapePath(ev.currentTarget.value);
+            typed.value = shapePath(ev.currentTarget.value);
           }}
           onKeyDown={(ev) => {
             if (ev.key !== "Enter") return;

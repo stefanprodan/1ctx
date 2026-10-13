@@ -17,6 +17,7 @@ import {
   MAX_TASK_FILES,
   MAX_TASK_LABELS,
 } from "../../../shared/contracts/external-task.ts";
+import { normalizeKnowledgePath } from "../../../shared/knowledge.ts";
 import {
   type ClaimEnd,
   type ExternalTaskState,
@@ -213,6 +214,40 @@ export function webLink(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+// a name's room under a segment's 80 characters, its .md after it
+const TASK_FILE_NAME = 77;
+
+// the path New file starts with: the title made a name as an upload's
+// is, under tasks/, cut to fit; empty when no letter of it is left. A
+// path the draft already links, the file just made, takes -2, -3, ...
+export function taskFilePath(
+  title: string,
+  taken: readonly string[] = [],
+): string {
+  const name = taskFileName(title);
+  if (name === "") return "";
+  for (let n = 1; ; n++) {
+    const end = n === 1 ? "" : `-${n}`;
+    const base = name
+      .slice(0, TASK_FILE_NAME - end.length)
+      .replace(/[.-]+$/, "");
+    const path = `tasks/${base}${end}.md`;
+    if (!taken.includes(path)) return path;
+  }
+}
+
+function taskFileName(title: string): string {
+  // a slash in a title is a word, never a folder
+  let raw = Array.from(title.replace(/[\\/]/g, "-"));
+  for (; raw.length > 0; raw = raw.slice(0, -1)) {
+    const result = normalizeKnowledgePath(raw.join(""));
+    if (!result.ok && result.reason !== "too-long") return "";
+    if (!result.ok || result.name.length > TASK_FILE_NAME) continue;
+    return result.name.replace(/\.md$/, "").replace(/^[.-]+|[.-]+$/g, "");
+  }
+  return "";
 }
 
 // a linked file by its name; a deleted one keeps the name history had

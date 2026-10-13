@@ -62,7 +62,7 @@
   }
   .external-tasks-title {
     margin: 0;
-    font-size: var(--text-title);
+    font-size: var(--text-body);
     font-weight: 600;
     line-height: 1.3;
     overflow-wrap: anywhere;
@@ -143,8 +143,14 @@
     --text-body: var(--text-input);
     min-width: 0;
   }
+  /* an entry's or a result's headings at its words' size, under the
+     task's title; a file read keeps the document's */
+  .external-tasks-entry {
+    --text-title: var(--text-input);
+  }
 
-  /* a linked file opens in place; the pencil leads to its page */
+  /* a linked file opens in place; the pencil leads to its page. The
+     row is Knowledge's file row: 34 px, the name in mono */
   .external-tasks-file {
     display: flex;
     flex-direction: column;
@@ -165,9 +171,9 @@
     display: flex;
     flex: 1 1 0;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-2);
     min-width: 0;
-    min-height: 44px;
+    min-height: 34px;
     padding: 0 var(--space-4);
     border: 0;
     background: none;
@@ -186,8 +192,27 @@
     color: var(--faint);
   }
   .external-tasks-file-name {
+    min-width: 0;
     font-family: var(--mono);
-    font-size: var(--text-input);
+    font-size: var(--text-mono);
+  }
+  .external-tasks-file-word {
+    flex-shrink: 0;
+  }
+  /* when it last changed, as Knowledge's rows say it; a phone leaves
+     it out */
+  .external-tasks-file-when {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding-left: var(--space-3);
+    font-size: var(--text-small);
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  @media (max-width: 719px) {
+    .external-tasks-file-when {
+      display: none;
+    }
   }
   .external-tasks-file-body {
     padding: var(--space-2) var(--space-4) var(--space-4);
@@ -249,10 +274,32 @@
     scroll-margin-top: calc(2 * var(--space-6));
   }
   .external-tasks-line-go {
+    position: relative;
     cursor: pointer;
   }
   .external-tasks-line-go:hover {
     background: var(--hover);
+  }
+  .external-tasks-line-go:has(.external-tasks-line-toggle:focus-visible) {
+    outline: 1px solid var(--brand);
+    outline-offset: -1px;
+  }
+  /* the verb opens the words; its cover makes the whole line the
+     target, below the links in it */
+  .external-tasks-line-toggle {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+  .external-tasks-line-toggle:focus-visible {
+    outline: none;
+  }
+  .external-tasks-line-toggle::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
   }
   .external-tasks-line-icon {
     flex-shrink: 0;
@@ -280,11 +327,24 @@
   }
   /* a name keeps its place up to a cap; the key gives way first */
   .external-tasks-line-user {
+    position: relative;
+    z-index: 1;
     flex-shrink: 0;
     max-width: 14ch;
     color: var(--fg);
   }
+  /* a link in the text's colour shows itself under the pointer */
+  .external-tasks-line-user:hover,
+  .external-tasks-line-user:focus-visible,
+  .external-tasks-line-chat:hover,
+  .external-tasks-line-chat:focus-visible {
+    color: var(--fg);
+    text-decoration: underline;
+  }
+  /* above the line's cover, so a cut key's title shows */
   .external-tasks-key {
+    position: relative;
+    z-index: 1;
     flex: 0 4 auto;
     min-width: 0;
     overflow: hidden;
@@ -304,6 +364,8 @@
     min-width: 0;
   }
   .external-tasks-line-chat {
+    position: relative;
+    z-index: 1;
     min-width: 0;
     color: var(--fg);
   }

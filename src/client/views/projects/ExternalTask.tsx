@@ -206,7 +206,7 @@ export function TaskBody({
         <MoveBoxes task={task} moves={moves} />
         {TaskNotice(task)}
         <Result page={page} now={now} />
-        <TaskFiles detail={page.detail} />
+        <TaskFiles detail={page.detail} now={now} />
         <Activity
           page={page}
           now={now}

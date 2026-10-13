@@ -4,8 +4,9 @@
 // An external task's activity: oldest first, one line per entry with its
 // icon and verb, who on the moves that change who holds the task, 1ctx's
 // releases by their reason, an answer naming its question, colour only
-// on a question still waiting, which starts open with the answer box,
-// and on a task in progress the latest report open.
+// on a question still waiting, which starts open with the answer box
+// and folds once it stops waiting, and on a task in progress the latest
+// report open.
 
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -15,6 +16,7 @@ import { sweepReason } from "../../../src/client/views/projects/ExternalTasks.mo
 import {
   activityOf,
   ENTRY_ICONS,
+  foldOf,
   timelineOf,
   VERBS,
 } from "../../../src/client/views/projects/ExternalTaskTimeline.model.ts";
@@ -133,8 +135,9 @@ describe("the activity", () => {
     expect(drawn).toHaveLength(written.length);
     written.forEach((e, i) => {
       const line = drawn[i]!;
-      expect(line).toContain(
-        `<span class="external-tasks-line-verb">${VERBS[e.kind]}</span>`,
+      // a span, or the toggle when the line has words
+      expect(line).toMatch(
+        new RegExp(`class="external-tasks-line-verb[^>]*>${VERBS[e.kind]}<`),
       );
       if (e.kind === "claim") {
         // a claim wears the in-progress ring
@@ -165,14 +168,22 @@ describe("the activity", () => {
       ),
     );
     expect(claimed).toContain(
-      '<span class="external-tasks-line-user cut">@stefan</span><span class="external-tasks-line-via">via</span><span class="tag external-tasks-key" title="laptop-claude">laptop-claude</span>',
+      '<a class="external-tasks-line-user cut" href="/users/stefan">@stefan</a><span class="external-tasks-line-via">via</span><span class="tag external-tasks-key" title="laptop-claude">laptop-claude</span>',
     );
     expect(reported).not.toContain("external-tasks-line-who");
     expect(unclaimed).toContain("@stefan");
     expect(unclaimed).not.toContain("laptop-claude");
-    expect(answered).toContain("@stefan");
-    // users are plain words, never a link inside the line
-    expect(claimed).not.toContain("href=");
+    expect(answered).toContain('href="/users/stefan">@stefan</a>');
+    // with words the verb is the toggle, so the user's link is no
+    // button's child
+    const line = answered.slice(
+      0,
+      answered.indexOf("external-tasks-line-body"),
+    );
+    // named by its verb and its words, which hide while it is open
+    expect(line).toContain(
+      '<button type="button" class="external-tasks-line-verb external-tasks-line-toggle" aria-label="Answered: answer text" aria-expanded="false">Answered</button>',
+    );
   });
 
   test("1ctx's release reads Unclaimed by 1ctx with its reason", () => {
@@ -210,6 +221,8 @@ describe("the activity", () => {
     expect(deleted).toContain(
       '<span class="external-tasks-by-faint">a deleted user</span>',
     );
+    // neither 1ctx nor a deleted user leads anywhere
+    expect([idle, gone, deleted].join("")).not.toContain("/users/");
     expect(sweepReason({ kind: "unclaim", claimEnd: "unclaimed" })).toBeNull();
   });
 
@@ -236,6 +249,8 @@ describe("the activity", () => {
     expect(limit).toContain(
       '<span class="external-tasks-line-text cut">limit reached</span>',
     );
+    // 1ctx leads nowhere
+    expect(limit).not.toContain("/users/");
   });
 
   test("an edit is one line, Edited by @user, and in the chat it came through", () => {
@@ -256,7 +271,9 @@ describe("the activity", () => {
       expect(line).toContain(
         '<span class="external-tasks-line-verb">Edited</span>',
       );
-      expect(line).toContain("@stefan");
+      expect(line).toContain(
+        '<a class="external-tasks-line-user cut" href="/users/stefan">@stefan</a>',
+      );
       // no words, so nothing opens under it
       expect(line).not.toContain("aria-expanded");
     }
@@ -267,7 +284,7 @@ describe("the activity", () => {
     expect(hidden).toContain(
       '<span class="external-tasks-line-via">in</span><span>a chat</span>',
     );
-    expect(hidden).not.toContain("href=");
+    expect(hidden).not.toContain("/chat/");
   });
 
   test("a member since deleted is never 1ctx", () => {
@@ -295,6 +312,8 @@ describe("the activity", () => {
     const question = rows(waiting)[1]!;
     expect(question).toContain('id="question"');
     expect(question).toContain('aria-expanded="true"');
+    // open, its words are gone from the line but not from its name
+    expect(question).toContain('aria-label="Asked: Which branch?"');
     expect(question).toContain("external-tasks-line-body");
     expect(question).toContain("answer here");
     // answered, nothing waits and no box shows
@@ -307,6 +326,31 @@ describe("the activity", () => {
       task(),
     );
     expect(read[2]!.question).toBe("Which branch?");
+    // the answered question, though the latest report, and the answer
+    // start closed
+    expect(read.map((line) => line.open)).toEqual([false, false, false]);
+  });
+
+  test("a question folds once it stops waiting, then stays as left", () => {
+    // the waiting question, opened by the page, folds when answered
+    expect(foldOf(true, true, false)).toBe(false);
+    // folded by hand while it waited, it stays folded
+    expect(foldOf(false, true, false)).toBe(false);
+    // opened by hand after, a later frame leaves it open
+    expect(foldOf(true, false, false)).toBe(true);
+    expect(foldOf(false, false, false)).toBe(false);
+    // a question asked again waits again, as the reader left it
+    expect(foldOf(false, false, true)).toBe(false);
+    // progress or a result moves it on: the question starts closed
+    const asked = [entry("claim"), entry("question", { text: "Which?" })];
+    for (const [more, row] of [
+      [entry("progress"), task()],
+      [entry("result", { claimEnd: "done" }), task({ state: "done" })],
+    ] as const) {
+      const lines = activityOf(page([...asked, more], row).entries, row);
+      expect(lines[1]!.waiting).toBe(false);
+      expect(lines[1]!.open).toBe(false);
+    }
   });
 
   test("on a task in progress the latest report starts open", () => {
