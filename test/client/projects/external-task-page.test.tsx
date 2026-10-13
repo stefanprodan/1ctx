@@ -37,14 +37,13 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  scope: null,
-  state: "open",
+  labels: [],
+  state: "todo",
   revision: 1,
   editRevision: 0,
   claim: null,
   last: null,
   entries: 0,
-  attentionAt: null,
   createdBy: { id: "u1", username: "stefan" },
   createdAt: NOW - 2 * HOUR,
   movedAt: NOW - 2 * HOUR,
@@ -58,7 +57,6 @@ const page = (
   id: task.id,
   detail: {
     task,
-    text: "Do the thing",
     files: [],
     briefAt: task.createdAt,
     chatId: null,
@@ -101,10 +99,15 @@ const narrow = (html: string) =>
 
 describe("the notice", () => {
   test("an open task asks for an agent to claim it and links Connect agents", () => {
-    const html = render(<TaskNotice state="open" />);
+    const html = render(<TaskNotice state="todo" />);
     expect(html).toContain("Ask your agent to claim this task.");
     expect(html).toContain('<a class="btn btn-small" href="/connect">');
-    for (const state of ["claimed", "blocked", "done", "cancelled"] as const) {
+    for (const state of [
+      "in_progress",
+      "awaiting_input",
+      "done",
+      "canceled",
+    ] as const) {
       expect(TaskNotice({ state })).toBeUndefined();
     }
     // the page draws it above the brief, and an edit hides it
@@ -118,7 +121,7 @@ describe("the notice", () => {
 
 describe("the state", () => {
   test("leads the aside and the phone line with its icon, never the brief", () => {
-    const html = draw(page(row({ state: "claimed", claim })));
+    const html = draw(page(row({ state: "in_progress", claim })));
     const icon = render(
       <Icon
         name="play"
@@ -127,7 +130,7 @@ describe("the state", () => {
       />,
     );
     expect(state(html)).toBe(
-      '<div class="split-line split-pair"><span class="split-label">State</span><span class="split-strong">claimed</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">State</span><span class="split-strong">In progress</span></div>',
     );
     expect(aside(html)).toContain(
       '<div class="split-line split-pair"><span class="split-label">Claimed by</span><span class="split-strong"><a class="split-handle" href="/users/stefan">@stefan</a> via <span class="split-word" title="laptop">laptop</span></span></div>',
@@ -136,7 +139,7 @@ describe("the state", () => {
     expect(narrow(html)).toContain("<span>claimed by stefan via laptop</span>");
     expect(brief(html).replace(narrow(html), "")).not.toContain("claimed by");
     const open = draw(page());
-    expect(state(open)).toContain(">open</span>");
+    expect(state(open)).toContain(">Todo</span>");
     expect(narrow(open)).toContain(
       render(
         <Icon name="task-open" size={14} class="external-tasks-state-icon" />,
@@ -167,17 +170,16 @@ describe("the chat it was made in", () => {
   });
 });
 
-describe("the scope", () => {
-  test("sits in the aside and the phone line, after the state", () => {
-    const html = draw(page(row({ scope: "part B" })));
-    expect(state(html)).not.toContain("part B");
+describe("the labels", () => {
+  test("sit in the aside and the phone line, after the state", () => {
+    const html = draw(page(row({ labels: ["build", "fix"] })));
+    expect(state(html)).not.toContain("build");
     expect(aside(html)).toContain(
-      '<div class="split-line split-pair"><span class="split-label">Scope</span><span class="split-strong">part B</span></div>',
+      '<div class="split-line split-pair"><span class="split-label">Labels</span><span class="split-strong">build, fix</span></div>',
     );
-    expect(narrow(html)).toContain("<span>Scope: part B</span>");
+    expect(narrow(html)).toContain("<span>build, fix</span>");
     const none = draw(page());
-    expect(aside(none)).not.toContain("Scope");
-    expect(narrow(none)).not.toContain("Scope");
+    expect(aside(none)).not.toContain("Labels");
   });
 });
 
@@ -187,7 +189,7 @@ describe("the idle deadline", () => {
     `<span class="split-label">Claim ends</span><span class="split-strong">${when}</span>`;
 
   test("is the claim's last activity plus the limit, only while claimed", () => {
-    const html = draw(page(row({ state: "claimed", claim })));
+    const html = draw(page(row({ state: "in_progress", claim })));
     expect(aside(html)).toContain(words("13 October 2026, 08:00"));
     expect(narrow(html)).toContain(
       "<span>Claim ends 13 October 2026, 08:00</span>",
@@ -195,7 +197,7 @@ describe("the idle deadline", () => {
     expect(html).not.toContain("Opens again");
     for (const task of [
       row(),
-      row({ state: "blocked", claim }),
+      row({ state: "awaiting_input", claim }),
       row({ state: "done" }),
     ]) {
       expect(draw(page(task))).not.toContain("Unclaimed at");
@@ -205,7 +207,7 @@ describe("the idle deadline", () => {
 
   test("moves on with a report", () => {
     const reported = { ...claim, activeAt: NOW };
-    const html = draw(page(row({ state: "claimed", claim: reported })));
+    const html = draw(page(row({ state: "in_progress", claim: reported })));
     expect(aside(html)).toContain(words("13 October 2026, 09:00"));
     expect(aside(html)).not.toContain(words("13 October 2026, 08:00"));
   });
@@ -213,7 +215,7 @@ describe("the idle deadline", () => {
 
 describe("an edit", () => {
   test("shows only the form, the moves, answer and timeline hidden", () => {
-    const blocked = row({ state: "blocked", claim });
+    const blocked = row({ state: "awaiting_input", claim });
     const shown = draw(page(blocked));
     expect(shown).toContain('<div class="external-tasks-rest">');
     expect(shown).toContain("external-tasks-brief");
@@ -242,7 +244,7 @@ describe("a cancel", () => {
     expect(open).toContain(
       `${render(<Icon name="cancelled" size={12} />)}Cancel task</button>`,
     );
-    const cancelled = draw(page(row({ state: "cancelled" })));
+    const cancelled = draw(page(row({ state: "canceled" })));
     expect(narrow(cancelled)).toContain(
       render(
         <Icon
@@ -252,7 +254,7 @@ describe("a cancel", () => {
         />,
       ),
     );
-    expect(state(cancelled)).toContain(">cancelled</span>");
+    expect(state(cancelled)).toContain(">Canceled</span>");
     expect(cancelled).not.toContain("Cancel task");
     expect(cancelled).toContain("Reopen</button>");
   });

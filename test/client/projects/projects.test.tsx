@@ -116,7 +116,7 @@ describe("the projects entity", () => {
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
         members: [casey],
-        labels: [{ id: "l1", name: "build", description: "" }],
+        labels: [{ id: "l1", name: "build", description: "", tasks: 0 }],
       };
       project.value = base;
       const releases: ((response: Response) => void)[] = [];
@@ -128,7 +128,9 @@ describe("the projects entity", () => {
       const second = saveAbout("p1", { description: "Scratch work" });
       const older = {
         ...base,
-        labels: [{ id: "l1", name: "build", description: "New work" }],
+        labels: [
+          { id: "l1", name: "build", description: "New work", tasks: 0 },
+        ],
       };
       const newer = { ...older, description: "Scratch work" };
       releases[1]!(Response.json({ project: newer }));
@@ -149,7 +151,7 @@ describe("the projects entity", () => {
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
         members: [casey],
-        labels: [{ id: "l1", name: "build", description: "" }],
+        labels: [{ id: "l1", name: "build", description: "", tasks: 0 }],
       };
       project.value = base;
       const releases: ((response: Response) => void)[] = [];
@@ -787,8 +789,8 @@ describe("the pages", () => {
         project.value = {
           ...teamRow(),
           labels: [
-            { id: "l1", name: "build", description: "New work" },
-            { id: "l2", name: "fix", description: "" },
+            { id: "l1", name: "build", description: "New work", tasks: 0 },
+            { id: "l2", name: "fix", description: "", tasks: 0 },
           ],
         };
         repoLists.value = new Map([["p2", [podinfo]]]);
@@ -835,6 +837,7 @@ describe("the pages", () => {
           id: `l${i}`,
           name: `label-${i}`,
           description: "",
+          tasks: 0,
         })),
       };
       const html = render(<Settings params={{ id: "p2" }} />);
@@ -846,8 +849,8 @@ describe("the pages", () => {
       const shown = {
         ...teamRow(),
         labels: [
-          { id: "l1", name: "build", description: "New work" },
-          { id: "l2", name: "fix", description: "" },
+          { id: "l1", name: "build", description: "New work", tasks: 0 },
+          { id: "l2", name: "fix", description: "", tasks: 0 },
         ],
       };
       const open = signal<OpenLabel>(null);

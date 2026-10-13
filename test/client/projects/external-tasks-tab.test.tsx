@@ -26,14 +26,13 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  scope: null,
-  state: "open",
+  labels: [],
+  state: "todo",
   revision: 1,
   editRevision: 0,
   claim: null,
   last: null,
   entries: 0,
-  attentionAt: null,
   createdBy: { id: "u1", username: "stefan" },
   createdAt: 1_000,
   movedAt: 1_000,
@@ -60,7 +59,7 @@ describe("the notice", () => {
 
 describe("the current tasks", () => {
   test.serial("a search box and the count beside New external task", () => {
-    externalTasks.value = [row(), row({ id: "t2", state: "blocked" })];
+    externalTasks.value = [row(), row({ id: "t2", state: "awaiting_input" })];
     const html = render(<CurrentTasks projectId="p1" now={2_000} />);
     expect(html).toContain('placeholder="Search current tasks"');
     expect(html).toContain('<span class="rows-count" aria-live="polite">2<');
@@ -75,13 +74,13 @@ describe("the current tasks", () => {
   });
 });
 
-describe("the done and cancelled tasks", () => {
+describe("the done and canceled tasks", () => {
   test.serial("hidden while the project has none and nothing is set", () => {
     closedPages.value = { rows: [], next: null };
     expect(render(<FinishedTasks now={2_000} />)).toBe("");
   });
 
-  test.serial("a search and All, Done, Cancelled, with no count", () => {
+  test.serial("a search and All, Done, Canceled, with no count", () => {
     closedCount.value = 1;
     closedPages.value = {
       rows: [row({ id: "d1", state: "done" })],
@@ -90,7 +89,7 @@ describe("the done and cancelled tasks", () => {
     const html = render(<FinishedTasks now={2_000} />);
     expect(html).toContain('placeholder="Search finished tasks"');
     expect(html).not.toContain("rows-count");
-    for (const label of ["All", "Done", "Cancelled"]) {
+    for (const label of ["All", "Done", "Canceled"]) {
       expect(html).toContain(`>${label}</button>`);
     }
     expect(html).toContain('aria-pressed="true">All<');
@@ -99,10 +98,10 @@ describe("the done and cancelled tasks", () => {
   });
 
   test.serial("a filter with no match says so", () => {
-    closedFilter.value = { q: "", state: "cancelled" };
+    closedFilter.value = { q: "", state: "canceled" };
     closedPages.value = { rows: [], next: null };
     const html = render(<FinishedTasks now={2_000} />);
     expect(html).toContain("No external task matches.");
-    expect(html).toContain('aria-pressed="true">Cancelled<');
+    expect(html).toContain('aria-pressed="true">Canceled<');
   });
 });

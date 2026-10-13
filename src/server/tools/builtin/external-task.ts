@@ -9,7 +9,6 @@
 import type {
   CreateExternalTaskRequest,
   ExternalTaskMoveRequest,
-  ExternalTaskResponse,
   PatchExternalTaskRequest,
 } from "../../../shared/api/external-tasks.ts";
 import {
@@ -34,6 +33,7 @@ import {
 import {
   type Answer,
   createdText,
+  type ExternalTaskResponse,
   editedText,
   listText,
   movedText,
@@ -58,11 +58,8 @@ export type ExternalTasksPort = {
   ): { rows: (ExternalTaskRow & { cursor: string })[]; next: string | null };
   // each of these answers not found for a task of another project
   show(actor: Actor, id: string, before: string | null): ExternalTaskResponse;
-  // the row, the brief's text and the linked file ids, without entries
-  task(
-    actor: Actor,
-    id: string,
-  ): { row: ExternalTaskRow; text: string; fileIds: string[] };
+  // the row and the linked file ids, without entries
+  task(actor: Actor, id: string): { row: ExternalTaskRow; fileIds: string[] };
   entry(actor: Actor, id: string, entryId: string): ExternalTaskEntry;
   create(
     actor: Actor,
@@ -216,12 +213,13 @@ export function makeExternalTaskTool(
               text: {
                 type: "string",
                 description:
-                  "The brief, the answer, or why for unclaim, cancel or reopen.",
+                  "The answer, or why for unclaim, cancel or reopen.",
               },
-              scope: {
-                type: "string",
+              labels: {
+                type: "array",
+                items: { type: "string" },
                 description:
-                  "For create or edit, which piece of the linked files it covers, such as part B or the server side.",
+                  "For create or edit, 1 to 3 of the project's label names.",
               },
               files: {
                 type: "array",
@@ -303,25 +301,17 @@ function run(
           cut,
         });
       }
-      const { row, text } = port.task(actor, call.id);
-      if (call.entry !== null) {
-        return readOnText({
-          row,
-          label: `Entry ${call.entry}'s text`,
-          text: port.entry(actor, call.id, call.entry).text,
-          offset: call.offset,
-          ref: null,
-          again: `show, id ${row.id}, entry ${call.entry}`,
-          cut,
-        });
+      const { row } = port.task(actor, call.id);
+      if (call.entry === null) {
+        throw new Error("a task has no brief text: read its linked files");
       }
       return readOnText({
         row,
-        label: "Its brief",
-        text,
+        label: `Entry ${call.entry}'s text`,
+        text: port.entry(actor, call.id, call.entry).text,
         offset: call.offset,
-        ref: { given: call.ref!, now: row.editRevision },
-        again: `show, id ${row.id}, ref ${row.editRevision}`,
+        ref: null,
+        again: `show, id ${row.id}, entry ${call.entry}`,
         cut,
       });
     }

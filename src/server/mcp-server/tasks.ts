@@ -52,7 +52,7 @@ const taskRow = (row: ExternalTaskRow | TaskListRow, keyId: string) => ({
   id: row.id,
   projectId: row.projectId,
   title: asSent(row.title),
-  scope: row.scope === null ? null : asSent(row.scope),
+  labels: row.labels.map(asSent),
   state: row.state,
   revision: row.revision,
   editRevision: row.editRevision,
@@ -62,7 +62,6 @@ const taskRow = (row: ExternalTaskRow | TaskListRow, keyId: string) => ({
       ? null
       : { ...row.last, text: asSent(row.last.text), at: iso(row.last.at) },
   entries: row.entries,
-  attentionAt: row.attentionAt === null ? null : iso(row.attentionAt),
   createdBy: row.createdBy,
   createdAt: iso(row.createdAt),
   movedAt: iso(row.movedAt),
@@ -130,10 +129,7 @@ function detailChunk(detail: ExternalTaskDetail, keyId: string): string {
     briefAt: iso(detail.briefAt),
     chatId: detail.chatId,
   };
-  return `Task detail: ${jsonLine(metadata)}\n${dataBlock(
-    "Brief text",
-    asSent(detail.text),
-  )}`;
+  return `Task detail: ${jsonLine(metadata)}`;
 }
 
 const entryReceipt = (entry: ExternalTaskEntry) => entryMetadata(entry, true);
@@ -241,6 +237,7 @@ export function tasksTool(
     const found = deps.tasks.list({
       projectIds,
       states: input.states,
+      labels: [],
       held: input.held ? key : null,
       after: input.after,
       limit: LIST_ROWS,

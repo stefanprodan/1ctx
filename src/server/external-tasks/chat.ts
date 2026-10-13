@@ -8,7 +8,6 @@
 import type {
   CreateExternalTaskRequest,
   ExternalTaskMoveRequest,
-  ExternalTaskResponse,
   PatchExternalTaskRequest,
 } from "../../shared/api/external-tasks.ts";
 import type { ExternalTaskEntry } from "../../shared/contracts/external-task.ts";
@@ -17,6 +16,7 @@ import { type Db, transact } from "../db/index.ts";
 import { NotFound } from "../lib/errors.ts";
 import type { taskActions } from "./actions.ts";
 import type { TaskListRow } from "./rows.ts";
+import type { TaskRead } from "./show.ts";
 import type { ExternalTaskStore } from "./store.ts";
 
 // the chat's user and project
@@ -28,7 +28,7 @@ type ChatDeps = {
   db: Db;
   store: ExternalTaskStore;
   visibleProjectIds(userId: string): string[] | null;
-  show(id: string, before: string | null): ExternalTaskResponse | null;
+  show(id: string, before: string | null): TaskRead | null;
   actions: ReturnType<typeof taskActions>;
 };
 
@@ -61,27 +61,20 @@ export function chatTasks(deps: ChatDeps) {
       return store.list({
         projectIds: [actor.projectId],
         states,
+        labels: [],
         held: null,
         after,
         limit,
       });
     },
-    show(
-      actor: ChatActor,
-      id: string,
-      before: string | null,
-    ): ExternalTaskResponse {
+    show(actor: ChatActor, id: string, before: string | null): TaskRead {
       inProject(actor, id);
       return deps.show(id, before)!;
     },
-    // the row, the brief's text and the linked ids, without entries
+    // the row and the linked ids, without entries
     task(actor: ChatActor, id: string) {
       inProject(actor, id);
-      return {
-        row: store.byId(id)!,
-        text: store.brief(id)!.text,
-        fileIds: store.fileIds(id),
-      };
+      return { row: store.byId(id)!, fileIds: store.fileIds(id) };
     },
     entry(actor: ChatActor, id: string, entryId: string): ExternalTaskEntry {
       inProject(actor, id);
@@ -93,7 +86,7 @@ export function chatTasks(deps: ChatDeps) {
       actor: ChatActor,
       body: CreateExternalTaskRequest,
       chatId: string,
-    ): ExternalTaskResponse =>
+    ): TaskRead =>
       write(
         () => sees(actor),
         () => deps.actions.create(actor.userId, actor.projectId, body, chatId),
@@ -102,7 +95,7 @@ export function chatTasks(deps: ChatDeps) {
       actor: ChatActor,
       id: string,
       body: PatchExternalTaskRequest,
-    ): ExternalTaskResponse =>
+    ): TaskRead =>
       write(
         () => inProject(actor, id),
         () => deps.actions.edit(id, body),
@@ -112,7 +105,7 @@ export function chatTasks(deps: ChatDeps) {
       id: string,
       move: ChatMove,
       body: ExternalTaskMoveRequest,
-    ): ExternalTaskResponse =>
+    ): TaskRead =>
       write(
         () => inProject(actor, id),
         () => deps.actions[move](actor.userId, id, body),

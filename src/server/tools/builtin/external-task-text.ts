@@ -6,7 +6,7 @@
 // reports; each page fits the call's result cut, and a text longer than
 // what is left is read on by offset.
 
-import type { ExternalTaskResponse } from "../../../shared/api/external-tasks.ts";
+import type { ExternalTaskResponse as ApiResponse } from "../../../shared/api/external-tasks.ts";
 import type {
   ExternalTaskClaim,
   ExternalTaskEntry,
@@ -23,10 +23,18 @@ import {
 } from "./automation-text.ts";
 
 export type Answer = { body: string; tail: string };
+// a task's read as the tool shows it: entries as plain text
+export type ExternalTaskResponse = Omit<ApiResponse, "entries"> & {
+  entries: ExternalTaskEntry[];
+};
 // a time in the chat user's zone
 export type Time = (ms: number) => string;
 
-export const UNFINISHED: ExternalTaskState[] = ["open", "claimed", "blocked"];
+export const UNFINISHED: ExternalTaskState[] = [
+  "todo",
+  "in_progress",
+  "awaiting_input",
+];
 // show's before for the entries from the newest, without the brief
 export const NEWEST = "newest";
 
@@ -52,12 +60,9 @@ function claimText(claim: ExternalTaskClaim, time: Time): string {
 export function listLine(row: ExternalTaskRow, time: Time): string {
   const parts = [
     `${titleOf(row)} id ${row.id}`,
-    ...(row.scope === null
-      ? []
-      : [`scope ${JSON.stringify(asSent(row.scope))}`]),
+    `labels ${JSON.stringify(row.labels)}`,
     row.state,
     row.claim === null ? "not claimed" : `claim ${claimText(row.claim, time)}`,
-    ...(row.attentionAt === null ? [] : ["needs a member"]),
     `moved ${time(row.movedAt)}`,
     `${row.entries} ${row.entries === 1 ? "entry" : "entries"}`,
     row.last === null
@@ -145,13 +150,12 @@ function headText(
   const files = detail.files.map(fileLine);
   return [
     `External task ${titleOf(row)}, id ${row.id}, ${row.state}`,
-    `Scope: ${row.scope === null ? "none" : JSON.stringify(asSent(row.scope))}`,
+    `Labels: ${row.labels.length === 0 ? "none" : row.labels.join(", ")}`,
     made(detail, chatId, time),
     `Brief edited ${time(detail.briefAt)}, edit revision ${row.editRevision}`,
     `Claim: ${row.claim === null ? "none" : claimText(row.claim, time)}`,
-    `Needs a member: ${row.attentionAt === null ? "no" : `since ${time(row.attentionAt)}`}`,
     `Entries: ${row.entries}`,
-    ...(row.state === "claimed"
+    ...(row.state === "in_progress"
       ? [
           `A claimed task is unclaimed after ${plural(shown.idleHours, "hour")} without a report.`,
         ]
@@ -223,17 +227,6 @@ export function showText(input: {
   let room = input.cut - head.length - longest.length - 4;
   const parts = [head];
   const notes: string[] = [];
-  if (input.before === null) {
-    const brief = asSent(shown.task.text);
-    const fence = fenceFor(brief);
-    const empty = quoted("Its brief", "", fence).length + 2;
-    const page = pageOf(brief, 0, Infinity, Math.max(1, room - empty));
-    parts.push(quoted("Its brief", page.text, fence));
-    room -= empty + page.text.length;
-    if (page.to < page.total) {
-      notes.push(briefNote(row.id, page, row.editRevision));
-    }
-  }
   let last: string | null = null;
   for (const entry of shown.entries) {
     const text = asSent(entry.text);
@@ -317,7 +310,7 @@ export function readOnText(input: {
 const VERBS = {
   answer: "Answered",
   unclaim: "Unclaimed",
-  cancel: "Cancelled",
+  cancel: "Canceled",
   reopen: "Reopened",
 } as const;
 
@@ -348,8 +341,8 @@ export function movedText(
 ): Answer {
   const row = shown.task.task;
   const kept =
-    move === "answer" && from === "claimed"
-      ? " The answer is kept and the task stays claimed."
+    move === "answer" && from === "in_progress"
+      ? " The answer is kept and the task stays in progress."
       : "";
   return {
     body: `${VERBS[move]} external task ${titleOf(row)}, id ${row.id}, now ${row.state}.${kept}`,

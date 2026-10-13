@@ -81,7 +81,7 @@ export function timelineOf(
     }
   }
   if (
-    task.state === "blocked" &&
+    task.state === "awaiting_input" &&
     asked !== null &&
     !answered &&
     task.claim !== null &&

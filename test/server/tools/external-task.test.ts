@@ -21,6 +21,7 @@ import {
 } from "../../helpers/chat.ts";
 import { allowSubagents, toolNames } from "../../helpers/subagents.ts";
 import { settle } from "../../helpers/tool-loop.ts";
+import { briefFile } from "../external-tasks/http-fixture.ts";
 
 async function app(): Promise<ChatApp> {
   const chat = await chatApp();
@@ -70,8 +71,8 @@ async function knowledgeFile(chat: ChatApp, name: string): Promise<string> {
 const made = (chat: ChatApp, projectId = chat.projectId, title = "Port it") =>
   chat.app.externalTasks.create(chat.memberId, projectId, {
     title,
-    text: "Port the parser.",
-    fileIds: [],
+    labels: ["build"],
+    fileIds: [briefFile(chat.app, projectId, chat.memberId)],
   }).task.task;
 
 async function memberKey(chat: ChatApp): Promise<TaskKey & { token: string }> {
@@ -168,16 +169,15 @@ describe("a chat's external tasks", () => {
         {
           action: "create",
           title: "Port the parser",
-          text: "Follow the plan.",
-          scope: "B",
+          labels: ["build"],
           files: ["/knowledge/plans/port.md"],
         },
       ]);
       expect(answers[0]).toStartWith('Created external task "Port the parser"');
       const [task] = chat.app.externalTasks.byProject(chat.projectId).tasks;
       expect(task).toMatchObject({
-        state: "open",
-        scope: "B",
+        state: "todo",
+        labels: ["build"],
         createdBy: { id: chat.memberId },
       });
       expect(answers[0]).toContain(`(/external-tasks/${task!.id})`);
@@ -201,7 +201,7 @@ describe("a chat's external tasks", () => {
       expect(response.status).toBe(201);
       await finish(chat, await regenerated);
       const kept = chat.app.externalTasks.show(task!.id, null)!.task;
-      expect(kept.task.state).toBe("open");
+      expect(kept.task.state).toBe("todo");
       expect(kept.chatId).toBe(sessionId);
     } finally {
       await chat.app.shutdown();
@@ -216,7 +216,7 @@ describe("a chat's external tasks", () => {
       const task = chat.app.externalTasks.create(
         chat.memberId,
         chat.projectId,
-        { title: "Port it", text: "Port.", fileIds: [first] },
+        { title: "Port it", labels: ["build"], fileIds: [first] },
       ).task.task;
       const { script } = await startChat(chat);
       const { answers, next } = await round(chat, script, [
@@ -254,86 +254,91 @@ describe("a chat's external tasks", () => {
       const entries = () => tasks.store.byId(task.id)!.entries;
       const { script } = await startChat(chat);
       let step = await round(chat, script, [
-        { action: "answer", id: task.id, state: "claimed", text: "Left." },
+        { action: "answer", id: task.id, state: "in_progress", text: "Left." },
       ]);
       expect(step.answers[0]).toContain("changed since you read it");
       // the claim and the question
       expect(entries()).toBe(2);
       step = await round(chat, step.next, [
-        { action: "answer", id: task.id, state: "blocked", text: "Left." },
+        {
+          action: "answer",
+          id: task.id,
+          state: "awaiting_input",
+          text: "Left.",
+        },
       ]);
-      expect(step.answers[0]).toContain("now claimed");
-      expect(tasks.store.byId(task.id)!.state).toBe("claimed");
+      expect(step.answers[0]).toContain("now in_progress");
+      expect(tasks.store.byId(task.id)!.state).toBe("in_progress");
 
       step = await round(chat, step.next, [
-        { action: "unclaim", id: task.id, state: "claimed", claimId: "x" },
+        { action: "unclaim", id: task.id, state: "in_progress", claimId: "x" },
       ]);
       expect(step.answers[0]).toContain("unclaim needs a text saying why");
       step = await round(chat, step.next, [
         {
           action: "release",
           id: task.id,
-          state: "claimed",
+          state: "in_progress",
           claimId: first,
           text: "Too slow.",
         },
       ]);
       expect(step.answers[0]).toContain("action must be");
-      expect(tasks.store.byId(task.id)!.state).toBe("claimed");
+      expect(tasks.store.byId(task.id)!.state).toBe("in_progress");
       step = await round(chat, step.next, [
         {
           action: "unclaim",
           id: task.id,
-          state: "claimed",
+          state: "in_progress",
           claimId: first,
           text: "Too slow.",
         },
       ]);
-      expect(step.answers[0]).toContain("now open");
+      expect(step.answers[0]).toContain("now todo");
       const second = tasks.claim(key, task.id).claimId;
       const held = entries();
       step = await round(chat, step.next, [
         {
           action: "unclaim",
           id: task.id,
-          state: "claimed",
+          state: "in_progress",
           claimId: first,
           text: "Too slow.",
         },
-        { action: "cancel", id: task.id, state: "open" },
-        { action: "reopen", id: task.id, state: "cancelled", text: "Again." },
+        { action: "cancel", id: task.id, state: "todo" },
+        { action: "reopen", id: task.id, state: "canceled", text: "Again." },
       ]);
       for (const answer of step.answers) {
         expect(answer).toContain("changed since you read it");
       }
       expect(tasks.store.byId(task.id)!).toMatchObject({
-        state: "claimed",
+        state: "in_progress",
         claim: { id: second },
         entries: held,
       });
 
       step = await round(chat, step.next, [
-        { action: "drop", id: task.id, state: "claimed" },
+        { action: "drop", id: task.id, state: "in_progress" },
       ]);
       expect(step.answers[0]).toContain("action must be");
-      expect(tasks.store.byId(task.id)!.state).toBe("claimed");
+      expect(tasks.store.byId(task.id)!.state).toBe("in_progress");
       step = await round(chat, step.next, [
-        { action: "cancel", id: task.id, state: "claimed" },
+        { action: "cancel", id: task.id, state: "in_progress" },
       ]);
-      expect(step.answers[0]).toContain("now cancelled");
+      expect(step.answers[0]).toContain("now canceled");
       step = await round(chat, step.next, [
         { action: "reopen", id: task.id, state: "dropped", text: "Again." },
       ]);
       expect(step.answers[0]).toContain("state must be one of");
-      expect(tasks.store.byId(task.id)!.state).toBe("cancelled");
+      expect(tasks.store.byId(task.id)!.state).toBe("canceled");
       step = await round(chat, step.next, [
         { action: "reopen", id: task.id, state: "done", text: "Again." },
       ]);
       expect(step.answers[0]).toContain("changed since you read it");
       step = await round(chat, step.next, [
-        { action: "reopen", id: task.id, state: "cancelled", text: "Again." },
+        { action: "reopen", id: task.id, state: "canceled", text: "Again." },
       ]);
-      expect(step.answers[0]).toContain("now open");
+      expect(step.answers[0]).toContain("now todo");
       await finish(chat, step.next);
     } finally {
       await chat.app.shutdown();
@@ -377,7 +382,7 @@ describe("a chat's external tasks", () => {
       const { script } = await startChat(chat);
       const { answers, next } = await round(chat, script, [
         { action: "list" },
-        { action: "list", states: ["open", "claimed", "done"] },
+        { action: "list", states: ["todo", "in_progress", "done"] },
         { action: "show", id: own.id },
         { action: "show", id: other.id },
       ]);

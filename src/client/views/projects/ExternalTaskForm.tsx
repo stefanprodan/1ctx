@@ -12,7 +12,6 @@ import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import {
   type ExternalTaskDetail,
-  MAX_SCOPE,
   MAX_TASK_FILES,
 } from "../../../shared/contracts/external-task.ts";
 import { MAX_TITLE } from "../../../shared/words.ts";
@@ -129,39 +128,7 @@ export function TaskForm({
             />
             <FieldError save={save} field="title" />
           </label>
-          <label class="field">
-            <span class="label">Scope</span>
-            <input
-              name="scope"
-              aria-invalid={invalid("scope") || undefined}
-              autocomplete="off"
-              maxLength={MAX_SCOPE}
-              disabled={off}
-              value={d.scope}
-              onInput={(e) =>
-                set({ scope: (e.currentTarget as HTMLInputElement).value })
-              }
-            />
-            <FieldError save={save} field="scope" />
-          </label>
         </div>
-      </Section>
-      <Section title="Brief" text="What the agent should do">
-        <label class="field">
-          <textarea
-            name="text"
-            aria-label="Brief"
-            aria-required="true"
-            aria-invalid={invalid("text") || undefined}
-            rows={8}
-            disabled={off}
-            value={d.text}
-            onInput={(e) =>
-              set({ text: (e.currentTarget as HTMLTextAreaElement).value })
-            }
-          />
-          <FieldError save={save} field="text" />
-        </label>
       </Section>
       <Section title="Files" text="Knowledge files the agent reads">
         <div class="field">

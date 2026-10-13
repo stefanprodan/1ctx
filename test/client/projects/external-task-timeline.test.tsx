@@ -60,14 +60,13 @@ const task = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  scope: null,
-  state: "claimed",
+  labels: [],
+  state: "in_progress",
   revision: 1,
   editRevision: 0,
   claim: claim("c1"),
   last: null,
   entries: 0,
-  attentionAt: null,
   createdBy: stefan,
   createdAt: 0,
   movedAt: 0,
@@ -81,13 +80,12 @@ const page = (
   id: row.id,
   detail: {
     task: { ...row, entries: written.length },
-    text: "Brief",
     files: [],
     briefAt: 0,
     chatId: null,
     chatTitle: null,
   },
-  entries: written.toReversed(),
+  entries: written.toReversed().map((entry) => ({ ...entry, html: "" })),
   next: null,
   idleHours: 24,
   more: { loading: false, error: null },
@@ -192,7 +190,10 @@ describe("the timeline", () => {
       entry("question", { text: "Which\nbranch?" }),
     ];
     const waiting = render(
-      <Timeline page={page(asked, task({ state: "blocked" }))} now={100} />,
+      <Timeline
+        page={page(asked, task({ state: "awaiting_input" }))}
+        now={100}
+      />,
     );
     expect(waiting.match(/status-attention/g)).toHaveLength(1);
     expect(rows(waiting)[0]).toContain("status-attention");
@@ -218,7 +219,10 @@ describe("the timeline", () => {
     expect(done).not.toContain("status-");
     const moved = render(
       <Timeline
-        page={page([...asked, entry("progress")], task({ state: "claimed" }))}
+        page={page(
+          [...asked, entry("progress")],
+          task({ state: "in_progress" }),
+        )}
         now={100}
       />,
     );
@@ -278,7 +282,7 @@ describe("the timeline's reading", () => {
       entry("progress"),
       entry("question", { text: "Second?" }),
     ];
-    const blocked = task({ state: "blocked" });
+    const blocked = task({ state: "awaiting_input" });
     expect(read(asked, blocked).map((line) => line.waiting)).toEqual([
       false,
       false,
@@ -287,14 +291,14 @@ describe("the timeline's reading", () => {
     ]);
     // the agent's own progress moves it on: nothing waits any more
     expect(
-      read([...asked, entry("progress")], task({ state: "claimed" })).some(
+      read([...asked, entry("progress")], task({ state: "in_progress" })).some(
         (line) => line.waiting,
       ),
     ).toBe(false);
     expect(
       read(
         [entry("claim"), entry("question")],
-        task({ state: "blocked", claim: claim("c2") }),
+        task({ state: "awaiting_input", claim: claim("c2") }),
       ).some((line) => line.waiting),
     ).toBe(false);
   });

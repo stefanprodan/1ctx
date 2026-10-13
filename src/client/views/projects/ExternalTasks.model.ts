@@ -15,12 +15,12 @@ import {
   type ExternalTaskEntry,
   type ExternalTaskFile,
   type ExternalTaskRow,
-  MAX_BRIEF_BYTES,
-  MAX_SCOPE,
   MAX_TASK_FILES,
+  MAX_TASK_LABELS,
 } from "../../../shared/contracts/external-task.ts";
 import {
   type EntryKind,
+  EXTERNAL_TASK_STATE_WORDS,
   type ExternalTaskState,
   hasLineBreak,
   MAX_TITLE,
@@ -38,18 +38,20 @@ export const claimWords = (claim: ExternalTaskClaim): string =>
 export function stateLine(
   row: Pick<ExternalTaskRow, "state" | "claim">,
 ): string {
-  if (row.state === "claimed" && row.claim !== null) {
+  if (row.state === "in_progress" && row.claim !== null) {
     return claimWords(row.claim);
   }
-  if (row.state === "blocked" && row.claim !== null) {
-    return `blocked · ${claimWords(row.claim)}`;
+  if (row.state === "awaiting_input" && row.claim !== null) {
+    return `awaiting input · ${claimWords(row.claim)}`;
   }
-  return row.state;
+  return EXTERNAL_TASK_STATE_WORDS[row.state].toLowerCase();
 }
 
-// a row's line: the icon and the section say open, done and cancelled
+// a row's line: the icon and the section say todo, done and canceled
 export const rowLine = (row: Pick<ExternalTaskRow, "state" | "claim">) =>
-  row.state === "claimed" || row.state === "blocked" ? stateLine(row) : "";
+  row.state === "in_progress" || row.state === "awaiting_input"
+    ? stateLine(row)
+    : "";
 
 export const ENTRY_WORDS: Record<EntryKind, string> = {
   claim: "Claimed",
@@ -58,7 +60,7 @@ export const ENTRY_WORDS: Record<EntryKind, string> = {
   result: "Result",
   unclaim: "Unclaimed",
   answer: "Answer",
-  cancel: "Cancelled",
+  cancel: "Canceled",
   reopen: "Reopened",
 };
 
@@ -100,34 +102,33 @@ export function fileLabel(file: Pick<ExternalTaskFile, "name" | "deleted">) {
   return file.name === null ? "a deleted file" : `deleted: ${file.name}`;
 }
 
-// the icon and its colour: a mark wins, then the state's own; a closed
-// task keeps its own, as its mark only lists a result to read
-export function taskIcon(row: Pick<ExternalTaskRow, "state" | "attentionAt">): {
+// the state's icon and its colour; only awaiting input asks a member
+export function taskIcon(row: Pick<ExternalTaskRow, "state">): {
   name: IconName;
   status: "running" | "done" | "attention" | "stopped" | null;
 } {
-  const marked = row.attentionAt !== null ? "attention" : null;
   switch (row.state) {
-    case "blocked":
+    case "awaiting_input":
       return { name: "question", status: "attention" };
-    case "claimed":
-      return { name: "play", status: marked ?? "running" };
+    case "in_progress":
+      return { name: "play", status: "running" };
     case "done":
       return { name: "check", status: "done" };
-    case "cancelled":
+    case "canceled":
       return { name: "cancelled", status: "stopped" };
     default:
-      return { name: "task-open", status: marked };
+      return { name: "task-open", status: null };
   }
 }
 
 // when the idle sweep unclaims this claim, from its last report on the
-// sweep's own basis; a blocked task waits for a member and never idles
+// sweep's own basis; a task awaiting input waits for a member and never
+// idles
 export function claimDeadline(
   task: Pick<ExternalTaskRow, "state" | "claim">,
   idleHours: number,
 ): number | null {
-  if (task.state !== "claimed" || task.claim === null) return null;
+  if (task.state !== "in_progress" || task.claim === null) return null;
   return task.claim.activeAt + idleHours * 3_600_000;
 }
 
@@ -153,14 +154,15 @@ export function chatName(title: string): string {
 }
 
 // what the page offers in a state: the brief is edited and the task
-// cancelled until it closes, a claimed task unclaimed while held, an answer
-// given while blocked, a closed task reopened; delete always
+// canceled until it closes, a held task unclaimed, an answer given while
+// it awaits input, a closed task reopened; delete always
 export function movesOf(state: ExternalTaskState) {
-  const open = state === "open" || state === "claimed" || state === "blocked";
+  const held = state === "in_progress" || state === "awaiting_input";
+  const open = held || state === "todo";
   return {
     edit: open,
-    answer: state === "blocked",
-    unclaim: state === "claimed" || state === "blocked",
+    answer: state === "awaiting_input",
+    unclaim: held,
     cancel: open,
     reopen: !open,
   };
@@ -180,7 +182,7 @@ export const MOVE_WORDS: Record<
   },
   cancel: {
     label: "Cancel task",
-    going: "Cancelling",
+    going: "Canceling",
     required: false,
   },
   reopen: {
@@ -193,17 +195,15 @@ export const MOVE_WORDS: Record<
 // the brief's form
 export type Draft = {
   title: string;
-  scope: string;
-  text: string;
+  labels: string[];
   fileIds: string[];
 };
 
 export function draftOf(detail: ExternalTaskDetail | null): Draft {
-  if (detail === null) return { title: "", scope: "", text: "", fileIds: [] };
+  if (detail === null) return { title: "", labels: [], fileIds: [] };
   return {
     title: detail.task.title,
-    scope: detail.task.scope ?? "",
-    text: detail.text,
+    labels: detail.task.labels,
     fileIds: detail.files.map((f) => f.fileId),
   };
 }
@@ -211,8 +211,6 @@ export function draftOf(detail: ExternalTaskDetail | null): Draft {
 // the links are in order, so an order changed is a change
 const sameOrder = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((id, i) => id === b[i]);
-
-const bytes = (text: string) => new TextEncoder().encode(text).length;
 
 // the checks the server makes too, so a refusal is at its field at once
 export function requestOf(
@@ -229,32 +227,17 @@ export function requestOf(
       field: "title",
     };
   }
-  const scope = draft.scope.trim();
-  if (scope.length > MAX_SCOPE || hasLineBreak(scope)) {
+  if (draft.labels.length === 0 || draft.labels.length > MAX_TASK_LABELS) {
     return {
-      problem: `a scope is one line of at most ${MAX_SCOPE} characters`,
-      field: "scope",
+      problem: `labels: pick 1 to ${MAX_TASK_LABELS}`,
+      field: "labels",
     };
   }
-  if (draft.text.trim() === "") {
-    return { problem: "the brief is required", field: "text" };
-  }
-  if (bytes(draft.text) > MAX_BRIEF_BYTES) {
-    return {
-      problem: `the brief is at most ${MAX_BRIEF_BYTES / 1024} KiB`,
-      field: "text",
-    };
-  }
-  if (draft.fileIds.length > MAX_TASK_FILES) {
-    return { problem: `at most ${MAX_TASK_FILES} files`, field: "files" };
+  if (draft.fileIds.length === 0 || draft.fileIds.length > MAX_TASK_FILES) {
+    return { problem: `link 1 to ${MAX_TASK_FILES} files`, field: "files" };
   }
   return {
-    body: {
-      title,
-      text: draft.text,
-      scope: scope === "" ? null : scope,
-      fileIds: draft.fileIds,
-    },
+    body: { title, labels: draft.labels, fileIds: draft.fileIds },
   };
 }
 
@@ -269,8 +252,7 @@ export function patchOf(
   return {
     editRevision,
     ...(body.title === was.title ? {} : { title: body.title }),
-    ...((body.scope ?? "") === was.scope ? {} : { scope: body.scope ?? null }),
-    ...(body.text === was.text ? {} : { text: body.text }),
+    ...(sameOrder(body.labels, was.labels) ? {} : { labels: body.labels }),
     ...(sameOrder(body.fileIds, was.fileIds) ? {} : { fileIds: body.fileIds }),
   };
 }
@@ -279,8 +261,7 @@ export function dirtyOf(draft: Draft, detail: ExternalTaskDetail | null) {
   const was = draftOf(detail);
   return (
     draft.title !== was.title ||
-    draft.scope !== was.scope ||
-    draft.text !== was.text ||
+    !sameOrder(draft.labels, was.labels) ||
     !sameOrder(draft.fileIds, was.fileIds)
   );
 }
@@ -289,8 +270,7 @@ export function dirtyOf(draft: Draft, detail: ExternalTaskDetail | null) {
 export function taskFieldOf(message: string): string | undefined {
   const word = message.trim().toLowerCase();
   if (word.startsWith("a title") || word.startsWith("title")) return "title";
-  if (word.startsWith("a scope") || word.startsWith("scope")) return "scope";
-  if (word.startsWith("the brief") || word.startsWith("text")) return "text";
+  if (word.startsWith("labels")) return "labels";
   if (word.includes("file")) return "files";
   return undefined;
 }

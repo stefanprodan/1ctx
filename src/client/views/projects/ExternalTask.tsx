@@ -16,6 +16,7 @@ import type {
   ExternalTaskDetail,
   ExternalTaskRow,
 } from "../../../shared/contracts/external-task.ts";
+import { EXTERNAL_TASK_STATE_WORDS } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import {
   type TaskPage,
@@ -27,8 +28,6 @@ import { ago, longDate } from "../../lib/format.ts";
 import { chatHref, externalTasksHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
-import { useCut } from "../../lib/resize.ts";
-import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsGo, RowsLine, RowsList, RowsTitle } from "../../ui/Rows.tsx";
 import {
@@ -99,26 +98,9 @@ function Brief({
   now: number;
 }) {
   const task = detail.task;
-  const { el, open, long } = useCut<HTMLParagraphElement>([detail.text]);
   const deadline = claimDeadline(task, idle);
   return (
     <section class="card external-tasks-brief">
-      <div class="external-tasks-brief-text">
-        <Fold
-          cut={long.value && !open.value}
-          onOpen={() => {
-            open.value = true;
-          }}
-          label="Show all"
-        >
-          <p
-            ref={el}
-            class={`external-tasks-brief-body${open.value ? "" : " clamp"}`}
-          >
-            {detail.text}
-          </p>
-        </Fold>
-      </div>
       {detail.files.length > 0 && (
         <RowsList>
           {detail.files.map((file) =>
@@ -142,7 +124,7 @@ function Brief({
         {deadline !== null && (
           <span>Claim ends {deadlineTime(deadline, now)}</span>
         )}
-        {task.scope !== null && <span>Scope: {task.scope}</span>}
+        {task.labels.length > 0 && <span>{task.labels.join(", ")}</span>}
       </p>
       <MadeIn detail={detail} />
     </section>
@@ -162,7 +144,9 @@ function Aside({
   const deadline = claimDeadline(task, idle);
   return (
     <AsideSection label="Task">
-      <AsideLine label="State">{task.state}</AsideLine>
+      <AsideLine label="State">
+        {EXTERNAL_TASK_STATE_WORDS[task.state]}
+      </AsideLine>
       {task.claim !== null && (
         <AsideLine label="Claimed by">
           <AsideHandle
@@ -175,7 +159,9 @@ function Aside({
       {deadline !== null && (
         <AsideLine label="Claim ends">{deadlineTime(deadline, now)}</AsideLine>
       )}
-      {task.scope !== null && <AsideLine label="Scope">{task.scope}</AsideLine>}
+      {task.labels.length > 0 && (
+        <AsideLine label="Labels">{task.labels.join(", ")}</AsideLine>
+      )}
       {task.createdBy !== null && (
         <AsideLine label="Created by" href={userHref(task.createdBy.username)}>
           @{task.createdBy.username}
@@ -189,9 +175,9 @@ function Aside({
   );
 }
 
-// an open task waits for an agent, so the page says where to connect one
+// a todo task waits for an agent, so the page says where to connect one
 export function TaskNotice({ state }: Pick<ExternalTaskRow, "state">) {
-  return state === "open" ? <ConnectNotice words={UNCLAIMED} /> : undefined;
+  return state === "todo" ? <ConnectNotice words={UNCLAIMED} /> : undefined;
 }
 
 // the page under its title: the brief or its form, then the rest, which

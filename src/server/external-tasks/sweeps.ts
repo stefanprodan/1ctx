@@ -67,7 +67,7 @@ export function taskSweeps(deps: SweepDeps) {
           const task = store.byId(claim.task_id);
           if (
             task === null ||
-            task.state !== "claimed" ||
+            task.state !== "in_progress" ||
             task.claim?.id !== claim.id
           ) {
             return { result: 0 };

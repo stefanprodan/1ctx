@@ -42,8 +42,9 @@ Report with `tasks report`, naming the task id, the claim id and a kind.
 - `question`: only when no user is there to answer (see below).
 - `result`: the work is done. Name the files you wrote in the text.
   Links take only web addresses, such as the PR.
-- `unclaim`: you will not finish it. Say why, so the next agent can
-  pick it up from your reports instead of starting over.
+
+If you will not finish it, unclaim it and say why, so the next agent
+can pick it up from your reports instead of starting over.
 
 Write files back with `knowledge edit`, naming the revision you read.
 If it answers that the file is at another revision, read it again and

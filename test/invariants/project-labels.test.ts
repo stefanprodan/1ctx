@@ -210,6 +210,7 @@ describe("a project's labels", () => {
       id: infra.id,
       name: "ops",
       description: "Clusters",
+      tasks: 0,
     });
     const redescribed = await casey.client.call(
       "PATCH",
@@ -220,6 +221,7 @@ describe("a project's labels", () => {
       id: infra.id,
       name: "ops",
       description: "",
+      tasks: 0,
     });
     const deleted = await casey.client.call(
       "DELETE",

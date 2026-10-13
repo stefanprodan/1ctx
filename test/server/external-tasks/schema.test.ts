@@ -25,10 +25,11 @@ test("the schema checks the shared closed words and keeps history independent of
     expect(sql("external_task_claims")).toContain(`'${end}'`);
     expect(sql("external_task_entries")).toContain(`'${end}'`);
   }
-  const task = f.task("claimed");
+  const task = f.task("in_progress");
   for (const statement of [
     "update external_tasks set state = 'invalid'",
     "update external_tasks set state = 'open'",
+    "update external_tasks set state = 'claimed'",
     "update external_tasks set revision = -1",
     "update external_tasks set edit_revision = -1",
     "update external_task_claims set end_reason = 'access gone'",
@@ -45,6 +46,7 @@ test("the schema checks the shared closed words and keeps history independent of
   for (const table of [
     "external_tasks",
     "external_task_files",
+    "external_task_labels",
     "external_task_claims",
     "external_task_entries",
   ]) {
@@ -65,7 +67,7 @@ test("the schema checks the shared closed words and keeps history independent of
   for (const name of [
     "external_tasks_unfinished",
     "external_tasks_closed",
-    "external_tasks_attention",
+    "external_task_labels_label",
     "external_task_claims_open",
     "external_task_entries_task",
   ])
@@ -80,15 +82,15 @@ test("the schema checks the shared closed words and keeps history independent of
   ).toThrow();
 });
 
-test("deleting a task or its project cascades through claims, entries and file links", () => {
+test("deleting a task or its project cascades through claims, entries, file and label links", () => {
   using f = fixture();
-  const one = f.task("claimed");
-  const two = f.task("claimed");
+  const one = f.task("in_progress");
+  const two = f.task("in_progress");
   for (const task of [one, two]) {
     f.area.report(f.key, task.id, task.claimId!, "progress", "Started.", []);
     f.db
       .query(
-        "insert into external_task_files (task_id, file_id, position) values (?, 'deleted-file', 0)",
+        "insert into external_task_files (task_id, file_id, position) values (?, 'deleted-file', 1)",
       )
       .run(task.id);
   }
@@ -102,6 +104,7 @@ test("deleting a task or its project cascades through claims, entries and file l
   for (const table of [
     "external_tasks",
     "external_task_files",
+    "external_task_labels",
     "external_task_claims",
     "external_task_entries",
   ]) {
@@ -118,7 +121,7 @@ test("a missing originating chat leaves the stored task and is not a live link",
   const made = f.area.create(
     f.owner.id,
     f.projectId,
-    { title: "From chat", text: "Keep it", fileIds: [] },
+    { title: "From chat", labels: ["build"], fileIds: ["brief"] },
     "gone-chat",
   );
   expect(made.task.chatId).toBeNull();

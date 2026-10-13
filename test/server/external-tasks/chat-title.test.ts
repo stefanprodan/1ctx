@@ -11,6 +11,7 @@ import { hashPassword } from "../../helpers/app.ts";
 import { chatApp, startChat } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { settle } from "../../helpers/tool-loop.ts";
+import { briefFile } from "./http-fixture.ts";
 
 test("a task's chat title reaches only a reader who may open the chat", async () => {
   const chat = await chatApp();
@@ -47,7 +48,11 @@ test("a task's chat title reaches only a reader who may open the chat", async ()
       chat.app.externalTasks.create(
         chat.memberId,
         team.id,
-        { title: "Port it", text: "Port the parser.", fileIds: [] },
+        {
+          title: "Port it",
+          labels: ["build"],
+          fileIds: [briefFile(chat.app, team.id, chat.memberId)],
+        },
         chatId,
       ).task.task.id;
     const shared = made(teamChat);
@@ -79,7 +84,7 @@ test("a task's chat title reaches only a reader who may open the chat", async ()
     const cancelled = await other.call(
       "POST",
       `/api/external-tasks/${hidden}/cancel`,
-      { body: { state: "open" } },
+      { body: { state: "todo" } },
     );
     expect(cancelled.status).toBe(200);
     const answer = await cancelled.text();
@@ -88,7 +93,7 @@ test("a task's chat title reaches only a reader who may open the chat", async ()
     const reopened = await chat.member.call(
       "POST",
       `/api/external-tasks/${hidden}/reopen`,
-      { body: { state: "cancelled", text: "Again." } },
+      { body: { state: "canceled", text: "Again." } },
     );
     expect(reopened.status).toBe(200);
     expect((await reopened.json()).task.chatTitle).toBe("Private notes");

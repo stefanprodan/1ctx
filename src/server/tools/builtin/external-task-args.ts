@@ -24,8 +24,8 @@ export const READ_ACTIONS = {
   show: ["action", "id", "before", "entry", "offset", "ref"],
 } as const;
 const WRITE_ACTIONS = {
-  create: ["action", "title", "text", "scope", "files"],
-  edit: ["action", "id", "editRevision", "title", "text", "scope", "files"],
+  create: ["action", "title", "labels", "files"],
+  edit: ["action", "id", "editRevision", "title", "labels", "files"],
   answer: ["action", "id", "state", "claimId", "text"],
   unclaim: ["action", "id", "state", "claimId", "text"],
   cancel: ["action", "id", "state", "claimId", "text"],
@@ -80,10 +80,9 @@ function stateOf(value: unknown): ExternalTaskState {
 function brief(args: Record<string, unknown>) {
   const out: Partial<CreateExternalTaskRequest> = {};
   if (args.title !== undefined) out.title = text(args.title, "title");
-  if (args.text !== undefined) out.text = text(args.text, "text");
-  if (args.scope !== undefined) {
-    const scope = args.scope === null ? "" : text(args.scope, "scope").trim();
-    out.scope = scope === "" ? null : scope;
+  if (args.labels !== undefined) {
+    if (!Array.isArray(args.labels)) throw new Error("labels must be a list");
+    out.labels = args.labels.map((label) => text(label, "a label"));
   }
   let files: string[] | null = null;
   if (args.files !== undefined) {
@@ -132,17 +131,12 @@ export function parseExternalTaskArgs(
   }
   if (action === "create") {
     const { out, files } = brief(args);
-    if (out.title === undefined || out.text === undefined) {
-      throw new Error("create needs a title and a text");
+    if (out.title === undefined || out.labels === undefined) {
+      throw new Error("create needs a title and labels");
     }
     return {
       action,
-      body: {
-        title: out.title,
-        text: out.text,
-        scope: out.scope ?? null,
-        fileIds: [],
-      },
+      body: { title: out.title, labels: out.labels, fileIds: [] },
       files: files ?? [],
     };
   }
@@ -176,7 +170,7 @@ export function parseExternalTaskArgs(
     const editRevision = whole(args.editRevision, "editRevision");
     const { out, files } = brief(args);
     if (Object.keys(out).length === 0 && files === null) {
-      throw new Error("edit needs a title, text, scope or files to change");
+      throw new Error("edit needs a title, labels or files to change");
     }
     return { action, id, body: { ...out, editRevision }, files };
   }

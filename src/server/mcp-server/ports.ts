@@ -151,6 +151,8 @@ export type TasksPort = {
   list(input: {
     projectIds: string[];
     states: ExternalTaskState[];
+    // label names, any of them; empty for every task
+    labels: string[];
     held: TaskKey | null;
     after: string | null;
     limit: number;

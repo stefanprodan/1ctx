@@ -14,7 +14,13 @@ import {
   type TaskKey,
   taskRow,
 } from "./rows.ts";
-import type { Brief } from "./rules.ts";
+
+// a brief as stored: the shaped title, label ids and file ids, in order
+export type StoredBrief = {
+  title: string;
+  labelIds: string[];
+  fileIds: string[];
+};
 
 export class ExternalTaskStore extends ExternalTaskEntries {
   byId(id: string): ExternalTaskRow | null {
@@ -35,18 +41,13 @@ export class ExternalTaskStore extends ExternalTaskEntries {
   }
 
   // the chat's title is for a reader who may open it: show() decides
-  brief(id: string) {
+  made(id: string) {
     const raw = this.db
       .query<
-        {
-          text: string;
-          brief_at: number;
-          chat_id: string | null;
-          chat_title: string | null;
-        },
+        { brief_at: number; chat_id: string | null; chat_title: string | null },
         [string]
       >(
-        `select t.text, t.brief_at, s.id as chat_id, s.title as chat_title
+        `select t.brief_at, s.id as chat_id, s.title as chat_title
         from external_tasks t left join sessions s on s.id = t.chat_id
         where t.id = ?`,
       )
@@ -54,11 +55,32 @@ export class ExternalTaskStore extends ExternalTaskEntries {
     return raw === null
       ? null
       : {
-          text: raw.text,
           briefAt: raw.brief_at,
           chatId: raw.chat_id,
           chatTitle: raw.chat_title,
         };
+  }
+
+  labelIds(id: string): string[] {
+    return this.db
+      .query<{ label_id: string }, [string]>(
+        "select label_id from external_task_labels where task_id = ? order by position",
+      )
+      .all(id)
+      .map((row) => row.label_id);
+  }
+
+  // the project's labels by name, for the names given that it holds
+  projectLabels(projectId: string, names: readonly string[]) {
+    return new Map(
+      this.db
+        .query<{ id: string; name: string }, [string, string]>(
+          `select id, name from project_labels where project_id = ?
+          and name in (select value from json_each(?))`,
+        )
+        .all(projectId, JSON.stringify(names))
+        .map((row) => [row.name, row.id]),
+    );
   }
 
   fileIds(id: string): string[] {
@@ -84,21 +106,13 @@ export class ExternalTaskStore extends ExternalTaskEntries {
       .get(id);
   }
 
-  claimsCount(taskId: string): number {
-    return this.db
-      .query<{ n: number }, [string]>(
-        "select count(*) as n from external_task_claims where task_id = ?",
-      )
-      .get(taskId)!.n;
-  }
-
   openClaims(cutoff?: number): OpenClaim[] {
     const idle =
       cutoff === undefined
         ? ""
         : `and c.active_at <= ?
       and exists (select 1 from external_tasks t
-        where t.id = c.task_id and t.state = 'claimed' and t.claim_id = c.id)`;
+        where t.id = c.task_id and t.state = 'in_progress' and t.claim_id = c.id)`;
     return this.db
       .query<OpenClaim, number[]>(
         `select c.id, c.task_id, c.key_id from external_task_claims c
@@ -139,7 +153,7 @@ export class ExternalTaskStore extends ExternalTaskEntries {
   create(
     projectId: string,
     userId: string,
-    brief: Brief,
+    brief: StoredBrief,
     now: number,
     chatId: string | null,
   ): string {
@@ -147,43 +161,37 @@ export class ExternalTaskStore extends ExternalTaskEntries {
     this.db
       .query(
         `insert into external_tasks
-        (id, project_id, title, text, scope, created_by, chat_id, created_at, brief_at, moved_at)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, project_id, title, created_by, chat_id, created_at, brief_at, moved_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(
-        id,
-        projectId,
-        brief.title,
-        brief.text,
-        brief.scope,
-        userId,
-        chatId,
-        now,
-        now,
-        now,
-      );
-    this.setFiles(id, brief.fileIds);
+      .run(id, projectId, brief.title, userId, chatId, now, now, now);
+    this.setLinks(id, brief);
     return id;
   }
 
-  private setFiles(id: string, fileIds: string[]): void {
-    this.db.query("delete from external_task_files where task_id = ?").run(id);
-    const insert = this.db.query(
-      "insert into external_task_files (task_id, file_id, position) values (?, ?, ?)",
-    );
-    fileIds.forEach((fileId, position) => {
-      insert.run(id, fileId, position);
-    });
+  private setLinks(id: string, brief: StoredBrief): void {
+    for (const [table, column, ids] of [
+      ["external_task_files", "file_id", brief.fileIds],
+      ["external_task_labels", "label_id", brief.labelIds],
+    ] as const) {
+      this.db.query(`delete from ${table} where task_id = ?`).run(id);
+      const insert = this.db.query(
+        `insert into ${table} (task_id, ${column}, position) values (?, ?, ?)`,
+      );
+      ids.forEach((linked, position) => {
+        insert.run(id, linked, position);
+      });
+    }
   }
 
-  edit(id: string, brief: Brief, now: number): void {
+  edit(id: string, brief: StoredBrief, now: number): void {
     this.db
       .query(
-        `update external_tasks set title = ?, text = ?, scope = ?, brief_at = ?,
+        `update external_tasks set title = ?, brief_at = ?,
         revision = revision + 1, edit_revision = edit_revision + 1 where id = ?`,
       )
-      .run(brief.title, brief.text, brief.scope, now, id);
-    this.setFiles(id, brief.fileIds);
+      .run(brief.title, now, id);
+    this.setLinks(id, brief);
   }
 
   startClaim(taskId: string, key: TaskKey, now: number): string {
@@ -222,31 +230,22 @@ export class ExternalTaskStore extends ExternalTaskEntries {
       .run(JSON.stringify(row), claimId);
   }
 
+  // moved says the entry moves the task's time even in the same state,
+  // as a question asked again while awaiting input does
   move(
     id: string,
     state: ExternalTaskState,
     claimId: string | null,
-    attentionAt: number | null,
     now: number,
+    moved = false,
   ): void {
     this.db
       .query(
-        `update external_tasks set state = ?, claim_id = ?, attention_at = ?,
-        moved_at = case when state <> ? then ? else moved_at end,
+        `update external_tasks set state = ?, claim_id = ?,
+        moved_at = case when state <> ? or ? then ? else moved_at end,
         revision = revision + 1 where id = ?`,
       )
-      .run(state, claimId, attentionAt, state, now, id);
-  }
-
-  seen(id: string, attentionAt: number): boolean {
-    return (
-      this.db
-        .query(
-          `update external_tasks set attention_at = null, revision = revision + 1
-          where id = ? and attention_at = ?`,
-        )
-        .run(id, attentionAt).changes > 0
-    );
+      .run(state, claimId, state, moved ? 1 : 0, now, id);
   }
 
   delete(id: string): void {

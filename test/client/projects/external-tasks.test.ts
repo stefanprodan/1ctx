@@ -4,16 +4,14 @@
 // External tasks on the page: the words of a row and an entry, the
 // moves each state offers, the brief's checks and what an edit sends;
 // and the entity: frames by the revision rule, a close that never comes
-// back with a list read before it, Home's marked rows, and the task's
-// page, which clears its mark with seen and names the state and the
-// claim it shows.
+// back with a list read before it, Home's waiting rows, and the task's
+// page, which names the state and the claim it shows.
 
 import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import {
   deleteExternalTask,
   loadExternalTask,
   loadMoreEntries,
-  markSeen,
   moveExternalTask,
   onExternalTaskSocket,
   TASK_DELETED,
@@ -33,12 +31,12 @@ import {
   onExternalTasksSocket,
 } from "../../../src/client/data/external-tasks.ts";
 import { TRAIL_MS } from "../../../src/client/data/flight.ts";
-import {
-  loadMarkedTasks,
-  markedTasks,
-  onMarkedSocket,
-} from "../../../src/client/data/marked-tasks.ts";
 import { me } from "../../../src/client/data/me.ts";
+import {
+  loadWaitingTasks,
+  onWaitingSocket,
+  waitingTasks,
+} from "../../../src/client/data/waiting-tasks.ts";
 import {
   chatName,
   claimDeadline,
@@ -87,14 +85,13 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   id: "t1",
   projectId: "p1",
   title: "Wire the sweep",
-  scope: null,
-  state: "open",
+  labels: ["build"],
+  state: "todo",
   revision: 1,
   editRevision: 0,
   claim: null,
   last: null,
   entries: 0,
-  attentionAt: null,
   createdBy: { id: "u1", username: "stefan" },
   createdAt: 1_000,
   movedAt: 1_000,
@@ -105,7 +102,6 @@ const detail = (
   changes: Partial<ExternalTaskDetail> = {},
 ): ExternalTaskDetail => ({
   task: row(),
-  text: "Do the thing",
   files: [{ fileId: "f1", name: "plan.md", revision: 3, deleted: false }],
   briefAt: 1_000,
   chatId: null,
@@ -116,23 +112,24 @@ const detail = (
 describe("the words", () => {
   test("a claim names its user and key", () => {
     expect(claimWords(claim)).toBe("claimed by stefan via laptop-claude");
-    expect(stateLine(row({ state: "claimed", claim }))).toBe(
+    expect(stateLine(row({ state: "in_progress", claim }))).toBe(
       "claimed by stefan via laptop-claude",
     );
-    expect(stateLine(row({ state: "blocked", claim }))).toBe(
-      "blocked · claimed by stefan via laptop-claude",
+    expect(stateLine(row({ state: "awaiting_input", claim }))).toBe(
+      "awaiting input · claimed by stefan via laptop-claude",
     );
     expect(stateLine(row({ state: "done" }))).toBe("done");
+    expect(stateLine(row({ state: "todo" }))).toBe("todo");
   });
 
   test("a row names only a claim, the icon says the rest", () => {
-    expect(rowLine(row({ state: "blocked", claim }))).toBe(
-      "blocked · claimed by stefan via laptop-claude",
+    expect(rowLine(row({ state: "awaiting_input", claim }))).toBe(
+      "awaiting input · claimed by stefan via laptop-claude",
     );
-    expect(rowLine(row({ state: "claimed", claim }))).toBe(
+    expect(rowLine(row({ state: "in_progress", claim }))).toBe(
       "claimed by stefan via laptop-claude",
     );
-    for (const state of ["open", "done", "cancelled"] as const) {
+    for (const state of ["todo", "done", "canceled"] as const) {
       expect(rowLine(row({ state }))).toBe("");
     }
   });
@@ -154,12 +151,24 @@ describe("the words", () => {
     expect(lastLine(row())).toBeNull();
     expect(
       lastLine(
-        row({ last: { kind: "question", text: "Which\nbranch?", at: 1 } }),
+        row({
+          last: {
+            kind: "question",
+            text: "Which\nbranch?",
+            at: 1,
+            by: null,
+            keyName: null,
+          },
+        }),
       ),
     ).toBe("Question: Which branch?");
-    expect(lastLine(row({ last: { kind: "cancel", text: "", at: 1 } }))).toBe(
-      "Cancelled",
-    );
+    expect(
+      lastLine(
+        row({
+          last: { kind: "cancel", text: "", at: 1, by: null, keyName: null },
+        }),
+      ),
+    ).toBe("Canceled");
   });
 
   test("a deleted file is marked, by its name while history has it", () => {
@@ -180,17 +189,22 @@ describe("the words", () => {
 
   test("a claim's deadline is its last activity plus the idle limit, only while claimed", () => {
     const hour = 3_600_000;
-    const claimed = row({ state: "claimed", claim });
+    const claimed = row({ state: "in_progress", claim });
     expect(claimDeadline(claimed, 24)).toBe(2_000 + 24 * hour);
     expect(claimDeadline(claimed, 1)).toBe(2_000 + hour);
     // a report moves it on
     expect(
       claimDeadline({ ...claimed, claim: { ...claim, activeAt: 9_000 } }, 24),
     ).toBe(9_000 + 24 * hour);
-    for (const state of ["open", "blocked", "done", "cancelled"] as const) {
+    for (const state of [
+      "todo",
+      "awaiting_input",
+      "done",
+      "canceled",
+    ] as const) {
       expect(
         claimDeadline(
-          row({ state, claim: state === "blocked" ? claim : null }),
+          row({ state, claim: state === "awaiting_input" ? claim : null }),
           24,
         ),
       ).toBeNull();
@@ -225,44 +239,38 @@ describe("the words", () => {
     expect(chatName("What if we…")).toBe("What if we…");
   });
 
-  test("a mark wins an unfinished icon's colour, a result keeps done's", () => {
-    expect(taskIcon(row({ state: "claimed" })).status).toBe("running");
-    expect(taskIcon(row({ state: "done", attentionAt: 5 })).status).toBe(
-      "done",
-    );
-    expect(taskIcon(row({ state: "open", attentionAt: 5 })).status).toBe(
-      "attention",
-    );
-    expect(taskIcon(row({ state: "blocked" })).name).toBe("question");
-    expect(taskIcon(row({ state: "cancelled" })).name).toBe("cancelled");
-  });
-
-  test("an open task waits for a claim, never a clock", () => {
-    expect(taskIcon(row())).toEqual({ name: "task-open", status: null });
-    expect(taskIcon(row({ attentionAt: 5 }))).toEqual({
-      name: "task-open",
+  test("only a task awaiting input takes the attention colour", () => {
+    expect(taskIcon(row({ state: "in_progress" })).status).toBe("running");
+    expect(taskIcon(row({ state: "done" })).status).toBe("done");
+    expect(taskIcon(row({ state: "awaiting_input" }))).toEqual({
+      name: "question",
       status: "attention",
     });
+    expect(taskIcon(row({ state: "canceled" })).name).toBe("cancelled");
+  });
+
+  test("a todo task waits for a claim, never a clock", () => {
+    expect(taskIcon(row())).toEqual({ name: "task-open", status: null });
   });
 });
 
 describe("the moves", () => {
   test("each state offers what a member may do", () => {
-    expect(movesOf("open")).toEqual({
+    expect(movesOf("todo")).toEqual({
       edit: true,
       answer: false,
       unclaim: false,
       cancel: true,
       reopen: false,
     });
-    expect(movesOf("blocked")).toEqual({
+    expect(movesOf("awaiting_input")).toEqual({
       edit: true,
       answer: true,
       unclaim: true,
       cancel: true,
       reopen: false,
     });
-    expect(movesOf("claimed").unclaim).toBe(true);
+    expect(movesOf("in_progress").unclaim).toBe(true);
     expect(movesOf("done")).toEqual({
       edit: false,
       answer: false,
@@ -270,14 +278,14 @@ describe("the moves", () => {
       cancel: false,
       reopen: true,
     });
-    expect(movesOf("cancelled").reopen).toBe(true);
+    expect(movesOf("canceled").reopen).toBe(true);
   });
 });
 
 describe("the brief's form", () => {
-  const draft = { title: "Sweep", scope: "", text: "Do it", fileIds: [] };
+  const draft = { title: "Sweep", labels: ["build"], fileIds: ["f1"] };
 
-  test("a title is required and one line, the brief is required", () => {
+  test("a title is required and one line, labels and files are required", () => {
     expect(requestOf({ ...draft, title: " " })).toEqual({
       problem: "a title is required",
       field: "title",
@@ -288,8 +296,14 @@ describe("the brief's form", () => {
     expect(requestOf({ ...draft, title: "x".repeat(81) })).toMatchObject({
       field: "title",
     });
-    expect(requestOf({ ...draft, text: "  " })).toMatchObject({
-      field: "text",
+    expect(requestOf({ ...draft, labels: [] })).toMatchObject({
+      field: "labels",
+    });
+    expect(requestOf({ ...draft, labels: ["a", "b", "c", "d"] })).toMatchObject(
+      { field: "labels" },
+    );
+    expect(requestOf({ ...draft, fileIds: [] })).toMatchObject({
+      field: "files",
     });
     expect(
       requestOf({
@@ -299,33 +313,35 @@ describe("the brief's form", () => {
     ).toMatchObject({ field: "files" });
   });
 
-  test("an empty scope is sent as none", () => {
-    expect(requestOf({ ...draft, title: " Sweep ", scope: " " })).toEqual({
-      body: { title: "Sweep", text: "Do it", scope: null, fileIds: [] },
+  test("a title is sent trimmed", () => {
+    expect(requestOf({ ...draft, title: " Sweep " })).toEqual({
+      body: { title: "Sweep", labels: ["build"], fileIds: ["f1"] },
     });
   });
 
   test("an edit sends only what changed, and the revision it opened on", () => {
     const opened = detail();
-    const body = { ...draftOf(opened), text: "Do it now" };
+    const body = { ...draftOf(opened), labels: ["build", "fix"] };
     const request = requestOf(body);
     if (!("body" in request)) throw new Error("refused");
     expect(patchOf(request.body, opened, 4)).toEqual({
       editRevision: 4,
-      text: "Do it now",
+      labels: ["build", "fix"],
     });
-    const unlinked = requestOf({ ...draftOf(opened), fileIds: [] });
-    if (!("body" in unlinked)) throw new Error("refused");
-    expect(patchOf(unlinked.body, opened, 4)).toEqual({
+    const relinked = requestOf({ ...draftOf(opened), fileIds: ["f2"] });
+    if (!("body" in relinked)) throw new Error("refused");
+    expect(patchOf(relinked.body, opened, 4)).toEqual({
       editRevision: 4,
-      fileIds: [],
+      fileIds: ["f2"],
     });
   });
 
   test("a server refusal finds its field", () => {
     expect(taskFieldOf("a title is one line")).toBe("title");
-    expect(taskFieldOf("the brief is at most 16 KiB")).toBe("text");
-    expect(taskFieldOf("at most 10 files")).toBe("files");
+    expect(
+      taskFieldOf("labels must name 1 to 3 distinct labels of the project"),
+    ).toBe("labels");
+    expect(taskFieldOf("choose 1 to 5 distinct files")).toBe("files");
     expect(taskFieldOf("changed since you opened it")).toBeUndefined();
   });
 });
@@ -402,7 +418,7 @@ const frame = (task: ExternalTaskRow): SocketEvent => ({
 const send = (ev: SocketEvent) => {
   onExternalTasksSocket(ev);
   onExternalTaskSocket(ev);
-  onMarkedSocket(ev);
+  onWaitingSocket(ev);
 };
 
 beforeEach(() => {
@@ -445,7 +461,7 @@ describe("the entity", () => {
         Response.json(
           listAnswer([
             row({ id: "a", revision: 2 }),
-            row({ id: "b", state: "blocked", revision: 1 }),
+            row({ id: "b", state: "awaiting_input", revision: 1 }),
           ]),
         );
       await loadExternalTasks("p1");
@@ -482,89 +498,155 @@ describe("the entity", () => {
       return realAnswer(init?.method ?? "GET", url);
     }) as unknown as typeof fetch;
     const load = loadExternalTasks("p1");
-    send(frame(row({ id: "a", revision: 2, state: "cancelled", entries: 1 })));
+    send(frame(row({ id: "a", revision: 2, state: "canceled", entries: 1 })));
     unclaim();
     await load;
     expect(externalTasks.value).toEqual([]);
   });
 
-  test.serial("Home's marked rows follow the frames", async () => {
+  test.serial("Home's waiting rows follow the frames", async () => {
+    const waits = { state: "awaiting_input", claim } as const;
     answer = () =>
       Response.json({
-        tasks: [row({ id: "a", attentionAt: 10 })],
+        tasks: [row({ id: "a", ...waits, movedAt: 20 })],
         count: 1,
         projectIds: HOME,
       });
-    await loadMarkedTasks();
-    expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["a"]);
-    onMarkedSocket(
-      frame(row({ id: "b", projectId: "p9", attentionAt: 20, revision: 2 })),
+    await loadWaitingTasks();
+    expect(waitingTasks.value?.tasks.map((t) => t.id)).toEqual(["a"]);
+    onWaitingSocket(
+      frame(
+        row({ id: "b", projectId: "p9", ...waits, movedAt: 10, revision: 2 }),
+      ),
     );
-    expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["b", "a"]);
+    // the oldest question first
+    expect(waitingTasks.value?.tasks.map((t) => t.id)).toEqual(["b", "a"]);
     // a project the read did not cover, an admin's other team, stays off
-    onMarkedSocket(
-      frame(row({ id: "c", projectId: "p8", attentionAt: 30, revision: 2 })),
+    onWaitingSocket(
+      frame(row({ id: "c", projectId: "p8", ...waits, revision: 2 })),
     );
-    expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["b", "a"]);
-    onMarkedSocket(frame(row({ id: "a", revision: 2 })));
-    expect(markedTasks.value).toEqual({
-      tasks: [row({ id: "b", projectId: "p9", attentionAt: 20, revision: 2 })],
+    expect(waitingTasks.value?.tasks.map((t) => t.id)).toEqual(["b", "a"]);
+    // an answer moves it on and off the card
+    onWaitingSocket(
+      frame(row({ id: "a", state: "in_progress", claim, revision: 2 })),
+    );
+    expect(waitingTasks.value).toEqual({
+      tasks: [
+        row({ id: "b", projectId: "p9", ...waits, movedAt: 10, revision: 2 }),
+      ],
       count: 1,
     });
-    onMarkedSocket({
+    onWaitingSocket({
       type: "externalTaskDeleted",
       projectId: "p9",
       taskId: "b",
     });
-    expect(markedTasks.value).toEqual({ tasks: [], count: 0 });
+    expect(waitingTasks.value).toEqual({ tasks: [], count: 0 });
   });
 
   test.serial(
-    "a page read with a mark clears it with seen, a GET never",
+    "a label renamed or deleted reads the tab, the page and Home again",
     async () => {
-      const marked = row({ attentionAt: 50, state: "blocked", claim });
-      answer = (method, url) =>
-        url === "/api/external-tasks/t1" || url.endsWith("/seen")
-          ? Response.json(
-              pageAnswer(
-                method === "POST"
-                  ? { ...marked, attentionAt: null, revision: 2 }
-                  : marked,
-              ),
-            )
-          : Response.json({ error: "no" }, { status: 404 });
-      await loadExternalTask("t1");
-      await settle();
-      expect(calls.map((c) => c.call)).toContain(
-        "POST /api/external-tasks/t1/seen",
-      );
-      expect(taskPage.value?.detail.task.attentionAt).toBeNull();
-      calls = [];
       answer = (_method, url) =>
         url === "/api/external-tasks/t1"
-          ? Response.json(pageAnswer(row({ revision: 3 })))
-          : Response.json({ error: "no" }, { status: 404 });
+          ? Response.json(pageAnswer(row()))
+          : url === "/api/external-tasks?waiting=1"
+            ? Response.json({ tasks: [], count: 0, projectIds: HOME })
+            : Response.json(listAnswer([row()]));
+      await loadExternalTasks("p1");
       await loadExternalTask("t1");
+      await loadWaitingTasks();
+      calls = [];
+      // no row moved, so the reads answer the new names at the same revision
+      answer = (_method, url) =>
+        url === "/api/external-tasks/t1"
+          ? Response.json(pageAnswer(row({ labels: ["bug"] })))
+          : url === "/api/external-tasks?waiting=1"
+            ? Response.json({ tasks: [], count: 0, projectIds: HOME })
+            : Response.json(listAnswer([row({ labels: ["bug"] })]));
+      send({ type: "projectLabels", projectId: "p1" });
       await settle();
-      expect(calls.map((c) => c.call)).not.toContain(
-        "POST /api/external-tasks/t1/seen",
-      );
+      await settle();
+      expect(calls.map((c) => c.call).sort()).toEqual([
+        "GET /api/external-tasks/t1",
+        "GET /api/external-tasks?waiting=1",
+        "GET /api/projects/p1/external-tasks",
+      ]);
+      expect(externalTasks.value?.[0]?.labels).toEqual(["bug"]);
+      expect(taskPage.value?.detail.task.labels).toEqual(["bug"]);
+      // another project's labels read nothing here
+      calls = [];
+      send({ type: "projectLabels", projectId: "p5" });
+      await settle();
+      expect(calls).toEqual([]);
+    },
+  );
+
+  test.serial(
+    "a label renamed while the first reads are out reads each again",
+    async () => {
+      // answers read before the rename carry the old name
+      let renamed = false;
+      const labels = () => (renamed ? ["bug"] : ["fix"]);
+      answer = (_method, url) =>
+        url === "/api/external-tasks/t1"
+          ? Response.json(pageAnswer(row({ labels: labels() })))
+          : url === "/api/external-tasks?waiting=1"
+            ? Response.json({ tasks: [], count: 0, projectIds: HOME })
+            : url.includes("closed=1")
+              ? Response.json({
+                  tasks: [row({ id: "d", state: "done", labels: labels() })],
+                  next: null,
+                })
+              : Response.json(listAnswer([row({ labels: labels() })]));
+      jest.useFakeTimers();
+      try {
+        hold = true;
+        const loads = [
+          loadExternalTasks("p1"),
+          loadExternalTask("t1"),
+          loadWaitingTasks(),
+        ];
+        send({ type: "projectLabels", projectId: "p1" });
+        await unclaimFaked();
+        await Promise.all(loads);
+        hold = true;
+        const closed = loadClosedTasks("p1");
+        send({ type: "projectLabels", projectId: "p1" });
+        await unclaimFaked();
+        await closed;
+        renamed = true;
+        expect(externalTasks.value?.[0]?.labels).toEqual(["fix"]);
+        jest.advanceTimersByTime(TRAIL_MS);
+        await flush();
+        // the second rename, during the closed page, asks the held list
+        // and page once more too
+        expect(gets("/api/projects/p1/external-tasks")).toBe(3);
+        expect(gets("/api/external-tasks/t1")).toBe(3);
+        expect(gets("/api/projects/p1/external-tasks?closed=1")).toBe(2);
+        expect(gets("/api/external-tasks?waiting=1")).toBe(2);
+        expect(externalTasks.value?.[0]?.labels).toEqual(["bug"]);
+        expect(closedPages.value?.rows[0]?.labels).toEqual(["bug"]);
+        expect(taskPage.value?.detail.task.labels).toEqual(["bug"]);
+      } finally {
+        jest.useRealTimers();
+      }
     },
   );
 
   test.serial("an unclaim names the state and the claim shown", async () => {
-    const held = row({ state: "claimed", claim, revision: 4 });
+    const held = row({ state: "in_progress", claim, revision: 4 });
     answer = () =>
-      Response.json(pageAnswer({ ...held, state: "open", claim: null }));
+      Response.json(pageAnswer({ ...held, state: "todo", claim: null }));
     await moveExternalTask("t1", "unclaim", {
-      state: "claimed",
+      state: "in_progress",
       claimId: "c1",
       text: "wrong plan",
     });
     expect(calls).toEqual([
       {
         call: "POST /api/external-tasks/t1/unclaim",
-        body: { state: "claimed", claimId: "c1", text: "wrong plan" },
+        body: { state: "in_progress", claimId: "c1", text: "wrong plan" },
       },
     ]);
   });
@@ -579,7 +661,7 @@ describe("the entity", () => {
     send(frame(row({ revision: 2, entries: 1 })));
     await settle();
     expect(calls.map((c) => c.call)).toContain("GET /api/external-tasks/t1");
-    // a seen frame moves the row and reads nothing
+    // an already seen entry count moves the row and reads nothing
     calls = [];
     send(frame(row({ revision: 9, entries: 1 })));
     await settle();
@@ -625,7 +707,7 @@ describe("the entity", () => {
         : Response.json({ error: "no" }, { status: 404 });
     hold = true;
     const load = loadExternalTask("t1");
-    send(frame(row({ revision: 5, state: "claimed", claim })));
+    send(frame(row({ revision: 5, state: "in_progress", claim })));
     await unclaim();
     await load;
     await settle();
@@ -638,7 +720,7 @@ describe("the entity", () => {
       answer = () => Response.json(listAnswer([row({ id: "a" })]));
       hold = true;
       const load = loadExternalTasks("p1");
-      send(frame(row({ id: "a", revision: 2, state: "claimed", claim })));
+      send(frame(row({ id: "a", revision: 2, state: "in_progress", claim })));
       send(frame(row({ id: "b", revision: 1 })));
       expect(gets("/api/projects/p1/external-tasks")).toBe(1);
       await unclaim();
@@ -739,7 +821,7 @@ describe("the entity", () => {
               tasks: [
                 row({
                   id: url.includes("q=old") ? "old" : "new",
-                  state: "cancelled",
+                  state: "canceled",
                 }),
               ],
               next: null,
@@ -763,9 +845,7 @@ describe("the entity", () => {
       expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["new"]);
       // a frame the filter does not take stays off the pages
       send(
-        frame(
-          row({ id: "x", title: "other", state: "cancelled", revision: 2 }),
-        ),
+        frame(row({ id: "x", title: "other", state: "canceled", revision: 2 })),
       );
       expect(closedPages.value?.rows.map((t) => t.id)).toEqual(["new"]);
     },
@@ -776,18 +856,36 @@ describe("the entity", () => {
     async () => {
       answer = () =>
         Response.json({
-          tasks: [row({ id: "a", attentionAt: 10, revision: 1 })],
+          tasks: [
+            row({
+              id: "a",
+              state: "awaiting_input",
+              claim,
+              movedAt: 10,
+              revision: 1,
+            }),
+          ],
           count: 1,
           projectIds: HOME,
         });
       hold = true;
-      const load = loadMarkedTasks();
-      send(frame(row({ id: "b", attentionAt: 20, revision: 2 })));
-      send(frame(row({ id: "a", attentionAt: null, revision: 2 })));
+      const load = loadWaitingTasks();
+      send(
+        frame(
+          row({
+            id: "b",
+            state: "awaiting_input",
+            claim,
+            movedAt: 20,
+            revision: 2,
+          }),
+        ),
+      );
+      send(frame(row({ id: "a", revision: 2 })));
       await unclaim();
       await load;
-      expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["b"]);
-      expect(markedTasks.value?.count).toBe(1);
+      expect(waitingTasks.value?.tasks.map((t) => t.id)).toEqual(["b"]);
+      expect(waitingTasks.value?.count).toBe(1);
     },
   );
 
@@ -795,15 +893,25 @@ describe("the entity", () => {
     "Home keeps a frame from a project the read out is adding",
     async () => {
       answer = () => Response.json({ tasks: [], count: 0, projectIds: ["p1"] });
-      await loadMarkedTasks();
+      await loadWaitingTasks();
       answer = () =>
         Response.json({ tasks: [], count: 0, projectIds: ["p1", "p7"] });
       hold = true;
-      const load = loadMarkedTasks();
-      send(frame(row({ id: "n", projectId: "p7", attentionAt: 20 })));
+      const load = loadWaitingTasks();
+      send(
+        frame(
+          row({
+            id: "n",
+            projectId: "p7",
+            state: "awaiting_input",
+            claim,
+            movedAt: 20,
+          }),
+        ),
+      );
       await unclaim();
       await load;
-      expect(markedTasks.value?.tasks.map((t) => t.id)).toEqual(["n"]);
+      expect(waitingTasks.value?.tasks.map((t) => t.id)).toEqual(["n"]);
     },
   );
 
@@ -812,43 +920,35 @@ describe("the entity", () => {
     async () => {
       answer = () => Response.json({ tasks: [], count: 0, projectIds: ["p1"] });
       hold = true;
-      const load = loadMarkedTasks();
-      send(frame(row({ id: "x", projectId: "p8", attentionAt: 20 })));
+      const load = loadWaitingTasks();
+      send(
+        frame(
+          row({
+            id: "x",
+            projectId: "p8",
+            state: "awaiting_input",
+            claim,
+            movedAt: 20,
+          }),
+        ),
+      );
       await unclaim();
       await load;
-      expect(markedTasks.value?.tasks).toEqual([]);
+      expect(waitingTasks.value?.tasks).toEqual([]);
     },
   );
 
   test.serial("Home reads again once cleared rows thin the card", async () => {
     answer = () =>
       Response.json({
-        tasks: [row({ id: "a", attentionAt: 10 })],
+        tasks: [row({ id: "a", state: "awaiting_input", claim, movedAt: 10 })],
         count: 60,
         projectIds: HOME,
       });
-    await loadMarkedTasks();
-    send(frame(row({ id: "a", attentionAt: null, revision: 2 })));
+    await loadWaitingTasks();
+    send(frame(row({ id: "a", revision: 2 })));
     await settle();
-    expect(gets("/api/external-tasks?attention=1")).toBe(2);
-  });
-
-  test.serial("seen names the mark the page read", async () => {
-    answer = (_method, url) =>
-      url === "/api/external-tasks/t1" || url.endsWith("/seen")
-        ? Response.json(pageAnswer(row({ attentionAt: 50 })))
-        : Response.json({ error: "no" }, { status: 404 });
-    await loadExternalTask("t1");
-    await settle();
-    expect(calls.find((c) => c.call.endsWith("/seen"))).toEqual({
-      call: "POST /api/external-tasks/t1/seen",
-      body: { attentionAt: 50 },
-    });
-    calls = [];
-    await markSeen("t1", 70);
-    expect(calls).toEqual([
-      { call: "POST /api/external-tasks/t1/seen", body: { attentionAt: 70 } },
-    ]);
+    expect(gets("/api/external-tasks?waiting=1")).toBe(2);
   });
 
   test.serial(
@@ -863,21 +963,22 @@ describe("the entity", () => {
       answer = () =>
         Response.json({
           ...pageAnswer(
-            row({ revision: 2, entries: 1, state: "blocked", claim }),
+            row({ revision: 2, entries: 1, state: "awaiting_input", claim }),
           ),
           entries: [question],
         });
       hold = true;
-      // the question's frame asks for the page; the seen's frame overtakes
-      send(frame(row({ revision: 2, entries: 1, state: "blocked", claim })));
+      // the question's frame asks for the page; a newer frame overtakes it
+      send(
+        frame(row({ revision: 2, entries: 1, state: "awaiting_input", claim })),
+      );
       send(
         frame(
           row({
             revision: 3,
             entries: 1,
-            state: "blocked",
+            state: "awaiting_input",
             claim,
-            attentionAt: null,
           }),
         ),
       );
@@ -953,44 +1054,49 @@ describe("the entity", () => {
     },
   );
 
-  test.serial(
-    "Home's frames replayed past 50 rows read the count again",
-    async () => {
-      const fifty = Array.from({ length: 50 }, (_, i) =>
-        row({ id: `a${i}`, attentionAt: 100 - i }),
-      );
-      answer = () =>
-        Response.json({ tasks: fifty, count: 60, projectIds: HOME });
-      jest.useFakeTimers();
-      try {
-        hold = true;
-        const load = loadMarkedTasks();
-        send(frame(row({ id: "b", attentionAt: 500, revision: 2 })));
-        await unclaimFaked();
-        await load;
-        expect(gets("/api/external-tasks?attention=1")).toBe(1);
-        // the flight's pause, then the count again
-        jest.advanceTimersByTime(TRAIL_MS);
-        await flush();
-        expect(gets("/api/external-tasks?attention=1")).toBe(2);
-      } finally {
-        jest.useRealTimers();
-      }
-    },
-  );
+  test.serial("Home's frames past 50 rows read the count again", async () => {
+    const waits = { state: "awaiting_input", claim } as const;
+    // oldest question first, as the server answers
+    const fifty = Array.from({ length: 50 }, (_, i) =>
+      row({ id: `a${String(i).padStart(2, "0")}`, ...waits, movedAt: 100 + i }),
+    );
+    answer = () => Response.json({ tasks: fifty, count: 60, projectIds: HOME });
+    jest.useFakeTimers();
+    try {
+      hold = true;
+      const load = loadWaitingTasks();
+      // a frame during the read, sorting past the rows held
+      send(frame(row({ id: "b", ...waits, movedAt: 500, revision: 2 })));
+      await unclaimFaked();
+      await load;
+      expect(gets("/api/external-tasks?waiting=1")).toBe(1);
+      // the flight's pause, then the count again
+      jest.advanceTimersByTime(TRAIL_MS);
+      await flush();
+      expect(gets("/api/external-tasks?waiting=1")).toBe(2);
+      // a frame once read, past the rows held, may be counted already
+      send(frame(row({ id: "c", ...waits, movedAt: 600, revision: 2 })));
+      await flush();
+      jest.advanceTimersByTime(TRAIL_MS);
+      await flush();
+      expect(gets("/api/external-tasks?waiting=1")).toBe(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 
   test.serial(
     "Home reads the count again after a delete past its rows",
     async () => {
       const fifty = Array.from({ length: 50 }, (_, i) =>
-        row({ id: `a${i}`, attentionAt: 100 - i }),
+        row({ id: `a${i}`, state: "awaiting_input", claim, movedAt: 100 - i }),
       );
       answer = () =>
         Response.json({ tasks: fifty, count: 60, projectIds: HOME });
-      await loadMarkedTasks();
+      await loadWaitingTasks();
       send({ type: "externalTaskDeleted", projectId: "p1", taskId: "zz" });
       await settle();
-      expect(gets("/api/external-tasks?attention=1")).toBe(2);
+      expect(gets("/api/external-tasks?waiting=1")).toBe(2);
     },
   );
 
@@ -1008,9 +1114,9 @@ describe("the entity", () => {
       expect(taskPage.value?.id).toBe("t1");
       // and their own move lands on the page
       answer = () =>
-        Response.json(pageAnswer(row({ revision: 2, state: "cancelled" })));
-      await moveExternalTask("t1", "cancel", { state: "open" });
-      expect(taskPage.value?.detail.task.state).toBe("cancelled");
+        Response.json(pageAnswer(row({ revision: 2, state: "canceled" })));
+      await moveExternalTask("t1", "cancel", { state: "todo" });
+      expect(taskPage.value?.detail.task.state).toBe("canceled");
     },
   );
 });

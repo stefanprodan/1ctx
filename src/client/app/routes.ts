@@ -44,7 +44,6 @@ import { loadClosedTasks, loadExternalTasks } from "../data/external-tasks.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadLink } from "../data/links.ts";
-import { loadMarkedTasks } from "../data/marked-tasks.ts";
 import {
   loadAllUsage,
   loadMcp,
@@ -92,6 +91,7 @@ import { loadTools, loadVisualsUsage, loadWebUsage } from "../data/tools.ts";
 import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers, loadUserUsage, users } from "../data/users.ts";
+import { loadWaitingTasks } from "../data/waiting-tasks.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { DECISION_WORDS } from "../views/admin/Decisions.model.ts";
 import {
@@ -255,7 +255,7 @@ export const ROUTES: Route[] = [
       const rows = loadList({ project: null, q, ...pick });
       const spent = loadWeek();
       const unsent = loadNotSent();
-      const marked = loadMarkedTasks();
+      const marked = loadWaitingTasks();
       const listed = loadProjects();
       if (projects.value === null) await listed;
       const target = composeProjectOf(projects.value, homeProjectId.value);

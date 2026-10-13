@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An external task as the wire exposes it: work a member hands to an
-// agent that runs outside 1ctx, with linked knowledge files, claimed
-// through a user's access key and reported on until it closes. The
-// revision moves on every change to the row, and a client applies a
-// frame only when its revision is above the one it holds. The edit
-// revision moves only when the brief is edited; an edit names the one
-// it started from, so an agent's reports never make it stale.
+// agent that runs outside 1ctx, briefed by its title and linked
+// knowledge files, sorted by its project's labels, claimed through a
+// user's access key and reported on until it closes. The revision moves
+// on every change to the row, and a client applies a frame only when its
+// revision is above the one it holds. The edit revision moves only when
+// the brief is edited; an edit names the one it started from, so an
+// agent's reports never make it stale.
 
 import type {
   AgentEntryKind,
@@ -16,7 +17,7 @@ import type {
   ExternalTaskState,
 } from "../words.ts";
 
-// the claim a task is held under, while it is claimed or blocked
+// the claim a task is held under, while in progress or awaiting input
 export type ExternalTaskClaim = {
   id: string;
   keyId: string;
@@ -26,28 +27,38 @@ export type ExternalTaskClaim = {
   keyName: string;
   startedAt: number;
   // the claim or its last report or answer; the idle sweep unclaims a
-  // claimed task externalTaskIdleHours after it
+  // task in progress externalTaskIdleHours after it
   activeAt: number;
 };
+
+// a user as an entry or a row names them
+export type ExternalTaskUser = { id: string; username: string };
 
 // a row of the project's list, Home's section and a frame
 export type ExternalTaskRow = {
   id: string;
   projectId: string;
   title: string;
-  scope: string | null;
+  // the names of its project's labels it carries, in the order picked
+  labels: string[];
   state: ExternalTaskState;
   revision: number;
   editRevision: number;
   claim: ExternalTaskClaim | null;
-  // the latest entry, its text cut to MAX_LAST_LINE
-  last: { kind: EntryKind; text: string; at: number } | null;
+  // the latest entry but a claim, its text cut to MAX_LAST_LINE; by and
+  // keyName are null when 1ctx wrote it, keyName also for a member
+  last: {
+    kind: EntryKind;
+    text: string;
+    at: number;
+    by: ExternalTaskUser | null;
+    keyName: string | null;
+  } | null;
   entries: number;
-  // since when it needs a member, null when it does not
-  attentionAt: number | null;
-  createdBy: { id: string; username: string } | null;
+  createdBy: ExternalTaskUser | null;
   createdAt: number;
-  // the last state change, or creation; on a closed task it is the close
+  // the last state change, a question asked again while awaiting input,
+  // or creation; on a closed task it is the close
   movedAt: number;
 };
 
@@ -67,20 +78,24 @@ export type ExternalTaskEntry = {
   text: string;
   links: string[];
   // null when 1ctx wrote it
-  by: { id: string; username: string } | null;
+  by: ExternalTaskUser | null;
   // the key an agent's entry came through
   keyName: string | null;
   // the claim this entry belongs to or ends, including member/system ends
   claimId: string | null;
-  // set on the entry that ended a claim
+  // set on the entry that ended a claim: idle or access_gone tells which
+  // of 1ctx's releases it was
   claimEnd: ClaimEnd | null;
   at: number;
 };
 
-// the brief and its files; the entries page beside it
+// an entry as the task's page reads it, its text rendered as Markdown
+// with bare URLs linked
+export type ExternalTaskPageEntry = ExternalTaskEntry & { html: string };
+
+// the brief's files and where it was made; the entries page beside it
 export type ExternalTaskDetail = {
   task: ExternalTaskRow;
-  text: string;
   files: ExternalTaskFile[];
   // when the brief was last edited, the create at first
   briefAt: number;
@@ -90,31 +105,27 @@ export type ExternalTaskDetail = {
   chatTitle: string | null;
 };
 
-// the moves a member makes on the page; `seen` clears the mark
-export const MEMBER_MOVES = [
-  "answer",
-  "unclaim",
-  "cancel",
-  "reopen",
-  "seen",
-] as const;
+// the moves a member makes on the page
+export const MEMBER_MOVES = ["answer", "unclaim", "cancel", "reopen"] as const;
 export type MemberMove = (typeof MEMBER_MOVES)[number];
 
 export type { AgentEntryKind };
 
-// bounds (decision 27): the brief and an entry fit show's 32 KiB page
-export const MAX_TASK_FILES = 10;
-export const MAX_SCOPE = 80;
-export const MAX_BRIEF_BYTES = 16 * 1024;
+// bounds: an entry fits show's 32 KiB page
+export const MAX_TASK_FILES = 5;
+export const MAX_TASK_LABELS = 3;
 export const MAX_ENTRY_BYTES = 16 * 1024;
 export const MAX_ENTRY_LINKS = 5;
 export const MAX_LINK_BYTES = 2048;
+// every entry counts, claims too, so a task reopened again and again
+// stays bounded
 export const MAX_ENTRIES = 250;
 // from here a task takes only the moves that end a claim or close it
 export const CLOSING_ENTRIES = 240;
+// claims since the last reopen, against an agent that loops
 export const MAX_CLAIMS = 20;
 export const MAX_UNFINISHED = 500;
-// Home's section; the count says how many more are marked
+// Home's section; the count says how many more await input
 export const ATTENTION_ROWS = 50;
 export const ENTRIES_PAGE = 50;
 export const CLOSED_PAGE = 50;

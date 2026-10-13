@@ -24,6 +24,7 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
+    // Home's ?waiting=1; without it the query is refused, after the login
     method: "GET",
     path: "/api/external-tasks",
     expect: { anonymous: 401, member: 400, admin: 400 },
@@ -36,7 +37,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/projects/:id/external-tasks",
-    body: { title: "Check the work", text: "", fileIds: [] },
+    body: { title: "Check the work", labels: ["build"], fileIds: ["file"] },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
@@ -48,30 +49,25 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/external-tasks/:id/answer",
-    body: { state: "blocked", text: "Go ahead." },
+    body: { state: "awaiting_input", text: "Go ahead." },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     method: "POST",
     path: "/api/external-tasks/:id/unclaim",
-    body: { state: "claimed", claimId: "none", text: "Try later." },
+    body: { state: "in_progress", claimId: "none", text: "Try later." },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     method: "POST",
     path: "/api/external-tasks/:id/cancel",
-    body: { state: "open" },
+    body: { state: "todo" },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     method: "POST",
     path: "/api/external-tasks/:id/reopen",
     body: { state: "done", text: "Try again." },
-    expect: { anonymous: 401, member: 404, admin: 404 },
-  },
-  {
-    method: "POST",
-    path: "/api/external-tasks/:id/seen",
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {

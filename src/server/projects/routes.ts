@@ -57,6 +57,12 @@ export type TaskClaimsPort = {
   endForUser(userId: string, projectIds: readonly string[]): BusEvent[];
 };
 
+// how many external tasks carry each of the project's labels, by label
+// id, closed ones too: an area built later
+export type TaskLabelsPort = {
+  labelTasks(projectId: string): Map<string, number>;
+};
+
 // the knowledge base's counts for the detail, an area built later
 export type KnowledgePort = {
   counts(projectId: string): KnowledgeCounts;
@@ -74,6 +80,7 @@ export type RoutesDeps = {
   users: UsersPort;
   sessions: SessionsPort;
   taskClaims: TaskClaimsPort;
+  taskLabels: TaskLabelsPort;
   knowledge: KnowledgePort;
   usage: UsagePort;
   clock: Clock;
@@ -97,11 +104,14 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     members.sort((a, b) =>
       a.username < b.username ? -1 : a.username > b.username ? 1 : 0,
     );
+    const uses = deps.taskLabels.labelTasks(project.id);
     return {
       ...summary(project, members.length),
       description: project.description,
       members,
-      labels: deps.store.labels(project.id),
+      labels: deps.store
+        .labels(project.id)
+        .map((label) => ({ ...label, tasks: uses.get(label.id) ?? 0 })),
       chats: deps.sessions.count(project.id),
       knowledge: deps.knowledge.counts(project.id),
       latestFiles: deps.knowledge.latest(project.id, LATEST_FILES),

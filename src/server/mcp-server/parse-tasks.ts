@@ -72,7 +72,7 @@ const listCursor = (value: unknown): string | null => {
 };
 
 function taskStates(value: unknown): ExternalTaskState[] {
-  if (value === undefined) return ["open"];
+  if (value === undefined) return ["todo"];
   if (
     !Array.isArray(value) ||
     value.length === 0 ||

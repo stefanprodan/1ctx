@@ -104,7 +104,7 @@ export function Answer({
     });
     text.value = "";
   });
-  if (task.state !== "blocked" && text.value === "") return null;
+  if (task.state !== "awaiting_input" && text.value === "") return null;
   return (
     <form
       class="card external-tasks-box"

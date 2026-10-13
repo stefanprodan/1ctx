@@ -46,7 +46,7 @@ import "./external-tasks.css";
 const STATES: { value: ClosedFilter["state"]; label: string }[] = [
   { value: null, label: "All" },
   { value: "done", label: "Done" },
-  { value: "cancelled", label: "Cancelled" },
+  { value: "canceled", label: "Canceled" },
 ];
 
 export function FinishedTasks({ now }: { now: number }) {
@@ -63,7 +63,7 @@ export function FinishedTasks({ now }: { now: number }) {
   }
   return (
     <RowsCard
-      label="Done and cancelled"
+      label="Done and canceled"
       search={
         <Search
           value={filter.q}

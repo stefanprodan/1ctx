@@ -67,13 +67,26 @@ export class ExternalTaskEntries extends ExternalTaskLists {
     return raw ? entryRow(raw) : null;
   }
 
-  // the entries the 250 bound counts: claims are bounded by MAX_CLAIMS
+  // the entries the 250 bound counts: every one, claims too
   counted(taskId: string): number {
     return this.db
       .query<{ n: number }, [string]>(
-        "select count(*) as n from external_task_entries where task_id = ? and kind <> 'claim'",
+        "select count(*) as n from external_task_entries where task_id = ?",
       )
       .get(taskId)!.n;
+  }
+
+  // the claims MAX_CLAIMS counts: those since the task's last reopen,
+  // by their claim entries, which append in order
+  claimsSinceReopen(taskId: string): number {
+    return this.db
+      .query<{ n: number }, [string, string]>(
+        `select count(*) as n from external_task_entries
+        where task_id = ? and kind = 'claim' and rowid > coalesce(
+          (select max(rowid) from external_task_entries
+            where task_id = ? and kind = 'reopen'), 0)`,
+      )
+      .get(taskId, taskId)!.n;
   }
 
   append(

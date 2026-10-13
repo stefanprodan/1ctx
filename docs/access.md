@@ -232,8 +232,10 @@ from `emailOn` in `GET /api/me`.
   project; a duplicate name, the 21st and the last label's delete are
   a 409. Every new project, team or personal, gets `DEFAULT_LABELS` in
   the transaction that makes it, unless an admin's create names its
-  own `labels`. Once items link labels, a delete removes the links in
-  its transaction.
+  own `labels`. A delete takes the label off its external tasks by the
+  cascade, in its transaction; the detail counts each label's tasks
+  (`tasks`), and a rename or delete publishes `project.labels`
+  (`docs/external-tasks.md`).
 - **Deleting a team project is refused while a chat runs.** It takes
   the chats and keeps their usage.
 - **Repositories follow the same split** (`docs/repos.md`). Anyone who

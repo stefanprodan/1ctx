@@ -51,6 +51,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
   external: [
     "external_tasks",
     "external_task_files",
+    "external_task_labels",
     "external_task_claims",
     "external_task_entries",
   ],

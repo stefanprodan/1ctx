@@ -27,8 +27,7 @@ export function TaskRow({
   const claim = [project == null ? "" : `#${project}`, rowLine(row)]
     .filter((part) => part !== "")
     .join(" · ");
-  // the scope is free text as long as the title, so never beside it
-  const [sub, ...lines] = [row.scope, claim, lastLine(row)]
+  const [sub, ...lines] = [claim, lastLine(row)]
     .filter((text) => text !== null && text !== "")
     .map((text) => ({ text }));
   return (

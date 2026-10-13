@@ -25,6 +25,7 @@ import {
 } from "../../helpers/automations.ts";
 import { type ChatApp, chatApp, startChat } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
+import { briefFile } from "../external-tasks/http-fixture.ts";
 
 const mapped = () => Object.values(STORAGE_TABLES).flat();
 
@@ -85,15 +86,21 @@ describe("the storage scan", () => {
     const { externalTasks: tasks, db } = chat.app;
     const key = { userId: chat.memberId, keyId: "key", keyName: "terminal" };
     let closed = 0;
-    for (const state of ["open", "claimed", "blocked", "done", "cancelled"]) {
+    const brief = briefFile(chat.app, chat.projectId, chat.memberId);
+    for (const state of [
+      "todo",
+      "in_progress",
+      "awaiting_input",
+      "done",
+      "canceled",
+    ]) {
       const made = tasks.create(chat.memberId, chat.projectId, {
         title: state,
-        text: "Brief \u00e9",
-        scope: "Part",
-        fileIds: [],
+        labels: ["build"],
+        fileIds: [brief],
       });
       const id = made.task.task.id;
-      if (state === "open") continue;
+      if (state === "todo") continue;
       const { claimId } = tasks.claim(key, id);
       tasks.report(
         key,
@@ -101,20 +108,18 @@ describe("the storage scan", () => {
         claimId,
         state === "done"
           ? "result"
-          : state === "blocked"
+          : state === "awaiting_input"
             ? "question"
             : "progress",
         "Report \u00e9",
         ["https://example.test/result"],
       );
-      if (state === "cancelled")
-        tasks.cancel(chat.memberId, id, { state: "claimed" });
-      if (state !== "done" && state !== "cancelled") continue;
+      if (state === "canceled")
+        tasks.cancel(chat.memberId, id, { state: "in_progress" });
+      if (state !== "done" && state !== "canceled") continue;
       const detail = tasks.show(id, null)!;
       closed += Buffer.byteLength(
         state +
-          detail.task.text +
-          "Part" +
           detail.entries
             .map((entry) => entry.text + JSON.stringify(entry.links))
             .join("") +

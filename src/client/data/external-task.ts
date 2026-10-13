@@ -5,8 +5,8 @@
 // page at a time; and every write on a task. A write keeps the server's
 // row in the lists (data/external-tasks.ts) and on the page. A frame
 // that adds an entry or edits the brief reads the page again, as does
-// an answer older than a frame seen while it was out. A mark is cleared
-// once the page is read, never by the read itself.
+// an answer older than a frame seen while it was out, and a label of its
+// project renamed or deleted.
 
 import { effect, signal } from "@preact/signals";
 import type {
@@ -17,7 +17,7 @@ import type {
 } from "../../shared/api/external-tasks.ts";
 import type {
   ExternalTaskDetail,
-  ExternalTaskEntry,
+  ExternalTaskPageEntry,
   MemberMove,
 } from "../../shared/contracts/external-task.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
@@ -36,7 +36,7 @@ import { onSocketEvent } from "./socket.ts";
 export type TaskPage = {
   id: string;
   detail: ExternalTaskDetail;
-  entries: ExternalTaskEntry[];
+  entries: ExternalTaskPageEntry[];
   next: string | null;
   idleHours: number;
   more: { loading: boolean; error: Failure | null };
@@ -60,6 +60,13 @@ let moreTurn = 0;
 // clears it, since a grant made while the socket was down sends no frame
 let revokes = 0;
 const revokedAt = new Map<string, number>();
+// label renames and deletes by project, numbered, so a read that learns
+// its project only from the answer asks again for one that came while
+// it was out
+let relabels = 0;
+const relabeledAt = new Map<string, number>();
+const relabeledSince = (projectId: string, since: number) =>
+  (relabeledAt.get(projectId) ?? 0) > since;
 const idle = { loading: false, error: null };
 // the read is hoisted, so the flight exists before the user effect runs
 const pageFlight = new Flight(refreshPage);
@@ -149,6 +156,7 @@ export async function loadExternalTask(id: string): Promise<void> {
   const forUser = owner;
   const turn = ++pageTurn;
   const started = revokes;
+  const labeled = relabels;
   pageFlight.stop();
   taskError.value = null;
   if (taskPage.value?.id !== id) taskPage.value = pages.get(id) ?? null;
@@ -177,8 +185,7 @@ export async function loadExternalTask(id: string): Promise<void> {
   takePage(body, started);
   takeTask(body.task.task);
   const projectId = body.task.task.projectId;
-  const mark = body.task.task.attentionAt;
-  if (mark !== null) void markSeen(id, mark).catch(() => {});
+  if (relabeledSince(projectId, labeled)) pageFlight.ask();
   await Promise.all([loadProject(projectId), loadKnowledge(projectId)]);
 }
 
@@ -263,7 +270,7 @@ export async function editExternalTask(
 // claim it shows
 export async function moveExternalTask(
   id: string,
-  move: Exclude<MemberMove, "seen">,
+  move: MemberMove,
   request: ExternalTaskMoveRequest,
 ): Promise<ExternalTaskResponse> {
   const forUser = owner;
@@ -275,20 +282,6 @@ export async function moveExternalTask(
   );
   takeAnswer(body, forUser, started);
   return body;
-}
-
-// the mark the page read: one set since is left for the next look
-export async function markSeen(id: string, attentionAt: number): Promise<void> {
-  const forUser = owner;
-  const started = revokes;
-  const body = await api<Partial<ExternalTaskResponse>>(
-    `${taskPath(id)}/seen`,
-    "POST",
-    { attentionAt },
-  );
-  if (body.task !== undefined) {
-    takeAnswer(body as ExternalTaskResponse, forUser, started);
-  }
 }
 
 export async function deleteExternalTask(id: string): Promise<void> {
@@ -344,6 +337,11 @@ export function onExternalTaskSocket(ev: SocketEvent): void {
       break;
     case "granted":
       revokedAt.delete(ev.projectId);
+      break;
+    // a label renamed or deleted moves no revision: the page reads it
+    case "projectLabels":
+      relabeledAt.set(ev.projectId, ++relabels);
+      if (page?.detail.task.projectId === ev.projectId) pageFlight.ask();
       break;
     default:
       break;

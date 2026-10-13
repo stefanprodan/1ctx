@@ -92,14 +92,13 @@ export const externalTaskRow = (
   id: "task00000001",
   projectId: project.id,
   title: "Review the proposal",
-  scope: "MCP tool",
-  state: "open",
+  labels: ["build"],
+  state: "todo",
   revision: 1,
   editRevision: 1,
   claim: null,
   last: null,
   entries: 0,
-  attentionAt: null,
   createdBy: { id: "user00000001", username: "casey" },
   createdAt: 100,
   movedAt: 200,
@@ -125,7 +124,6 @@ export const externalTaskDetail = (
   row: ExternalTaskRow = externalTaskRow(),
 ): ExternalTaskDetail => ({
   task: row,
-  text: "Read the proposal and report the findings.",
   files: [
     {
       fileId: "file00000001",

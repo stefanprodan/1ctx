@@ -4,7 +4,6 @@
 import type {
   CreateExternalTaskRequest,
   ExternalTaskMoveRequest,
-  ExternalTaskSeenRequest,
   PatchExternalTaskRequest,
 } from "../../shared/api/external-tasks.ts";
 import type { MemberMove } from "../../shared/contracts/external-task.ts";
@@ -16,15 +15,13 @@ import type { ClosedFilter } from "./lists.ts";
 import {
   checkBrief,
   checkEntry,
-  MAX_BRIEF_BYTES,
   MAX_ENTRY_BYTES,
   parseCursor,
 } from "./rules.ts";
 
 // JSON can escape each byte of text as six characters.
-export const MAX_TASK_BODY = 6 * MAX_BRIEF_BYTES + 4096;
 export const MAX_MOVE_BODY = 6 * MAX_ENTRY_BYTES + 1024;
-const BRIEF_KEYS = ["title", "text", "scope", "fileIds"];
+const BRIEF_KEYS = ["title", "labels", "fileIds"];
 const ENTRY_ID = new RegExp(`^${ID_SHAPE}$`);
 
 function text(value: unknown, name: string): string {
@@ -35,28 +32,24 @@ function text(value: unknown, name: string): string {
 function briefValues(body: Record<string, unknown>) {
   const out: Partial<CreateExternalTaskRequest> = {};
   if (Object.hasOwn(body, "title")) out.title = text(body.title, "title");
-  if (Object.hasOwn(body, "text")) out.text = text(body.text, "text");
-  if (Object.hasOwn(body, "scope")) {
-    out.scope = body.scope === null ? null : text(body.scope, "scope");
+  for (const key of ["labels", "fileIds"] as const) {
+    if (!Object.hasOwn(body, key)) continue;
+    const list = body[key];
+    if (!Array.isArray(list)) throw new BadRequest(`${key} must be a list`);
+    out[key] = list.map((item) => text(item, key));
   }
-  if (Object.hasOwn(body, "fileIds")) {
-    if (!Array.isArray(body.fileIds)) {
-      throw new BadRequest("fileIds must be a list");
-    }
-    out.fileIds = body.fileIds.map((id) => text(id, "fileId"));
-  }
+  // what a patch leaves out stands in as valid, checked on the task
   checkBrief({
     title: out.title ?? "Task",
-    text: out.text ?? "",
-    scope: out.scope ?? null,
-    fileIds: out.fileIds ?? [],
+    labels: out.labels ?? ["kept"],
+    fileIds: out.fileIds ?? ["kept"],
   });
   return out;
 }
 
 export function parseCreateTask(body: unknown): CreateExternalTaskRequest {
   const parsed = fields(body, BRIEF_KEYS);
-  for (const key of ["title", "text", "fileIds"]) {
+  for (const key of BRIEF_KEYS) {
     if (!Object.hasOwn(parsed, key)) {
       throw new BadRequest(`missing field ${key}`);
     }
@@ -64,8 +57,7 @@ export function parseCreateTask(body: unknown): CreateExternalTaskRequest {
   const values = briefValues(parsed);
   return {
     title: values.title!,
-    text: values.text!,
-    scope: values.scope ?? null,
+    labels: values.labels!,
     fileIds: values.fileIds!,
   };
 }
@@ -88,7 +80,7 @@ export function parsePatchTask(body: unknown): PatchExternalTaskRequest {
 
 export function parseMoveTask(
   body: unknown,
-  move: Exclude<MemberMove, "seen">,
+  move: MemberMove,
 ): ExternalTaskMoveRequest {
   const parsed = fields(
     body,
@@ -109,7 +101,7 @@ export function parseMoveTask(
 }
 
 // ?closed=1&q=&state=&after=: the closed pages, narrowed by a search
-// and done or cancelled
+// and done or canceled
 export function parseProjectTasks(url: URL): {
   closed: boolean;
   after: string | null;
@@ -135,8 +127,8 @@ export function parseProjectTasks(url: URL): {
   if (after !== null) parseCursor(after);
   if (q !== null && q.length > MAX_SEARCH)
     throw new BadRequest("q is too long");
-  if (state !== null && state !== "done" && state !== "cancelled") {
-    throw new BadRequest("state must be done or cancelled");
+  if (state !== null && state !== "done" && state !== "canceled") {
+    throw new BadRequest("state must be done or canceled");
   }
   return {
     closed: closed !== null,
@@ -153,20 +145,8 @@ export function parseTaskDetail(url: URL): string | null {
   return before;
 }
 
-export function parseTaskAttention(url: URL): void {
-  if (queryParams(url, ["attention"])("attention") !== "1") {
-    throw new BadRequest("attention must be 1");
+export function parseTaskWaiting(url: URL): void {
+  if (queryParams(url, ["waiting"])("waiting") !== "1") {
+    throw new BadRequest("waiting must be 1");
   }
-}
-
-export function parseSeenTask(body: unknown): ExternalTaskSeenRequest {
-  const { attentionAt } = fields(body, ["attentionAt"]);
-  if (
-    typeof attentionAt !== "number" ||
-    !Number.isSafeInteger(attentionAt) ||
-    attentionAt < 0
-  ) {
-    throw new BadRequest("attentionAt must be a non-negative integer");
-  }
-  return { attentionAt };
 }

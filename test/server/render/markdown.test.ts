@@ -208,3 +208,21 @@ describe("renderMarkdown", () => {
     }
   });
 });
+
+describe("renderMarkdown with autolinks", () => {
+  test("links bare http(s) URLs only when asked, never other schemes", () => {
+    const text =
+      "See https://example.com/pr/1. and www.example.com or javascript:alert(1)";
+    expect(renderMarkdown(text)).not.toContain("<a ");
+    const linked = renderMarkdown(text, { autolinks: true });
+    expect(linked).toContain(
+      '<a class="md-link" href="https://example.com/pr/1" target="_blank" rel="noopener">https://example.com/pr/1</a>.',
+    );
+    expect(linked).not.toContain('href="www.example.com"');
+    expect(linked).not.toContain('href="javascript');
+    // a written link stays as written
+    expect(
+      renderMarkdown("[the PR](https://example.com/pr/2)", { autolinks: true }),
+    ).toContain('href="https://example.com/pr/2"');
+  });
+});

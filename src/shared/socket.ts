@@ -128,6 +128,9 @@ export type SocketEvent =
   // an external task's row after any change, by the revision rule
   | { type: "externalTask"; projectId: string; task: ExternalTaskRow }
   | { type: "externalTaskDeleted"; projectId: string; taskId: string }
+  // a label of the project was renamed or deleted: what shows its
+  // external tasks reads them again
+  | { type: "projectLabels"; projectId: string }
   // the project's deleted files and their history are gone
   | { type: "knowledgeEmptied"; projectId: string }
   // the connection may now see the project

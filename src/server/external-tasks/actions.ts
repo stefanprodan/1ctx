@@ -4,18 +4,19 @@
 import type {
   CreateExternalTaskRequest,
   ExternalTaskMoveRequest,
-  ExternalTaskResponse,
-  ExternalTaskSeenRequest,
   PatchExternalTaskRequest,
 } from "../../shared/api/external-tasks.ts";
 import {
   type ExternalTaskRow,
   STALE_TASK,
 } from "../../shared/contracts/external-task.ts";
-import type {
-  AgentEntryKind,
-  ClaimEnd,
-  EntryKind,
+import { shapeLabelName } from "../../shared/contracts/label.ts";
+import {
+  AGENT_ENTRY_KINDS,
+  type AgentEntryKind,
+  type ClaimEnd,
+  type EntryKind,
+  isAgentEntryKind,
 } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
@@ -33,16 +34,10 @@ import {
   checkRoom,
   checkUnfinished,
   closed,
+  isState,
 } from "./rules.ts";
-import type { ExternalTaskStore } from "./store.ts";
-
-export type KnowledgePort = {
-  file(
-    projectId: string,
-    fileId: string,
-  ): { name: string; revision: number } | null;
-  deletedName(projectId: string, fileId: string): string | null;
-};
+import type { KnowledgePort, TaskRead } from "./show.ts";
+import type { ExternalTaskStore, StoredBrief } from "./store.ts";
 
 export const taskChanged = (task: ExternalTaskRow): BusEvent => ({
   type: "externalTask.changed",
@@ -78,7 +73,7 @@ export function writeEntry(
     kind === "result"
       ? "done"
       : kind === "cancel" && task.claim !== null
-        ? "cancelled"
+        ? "canceled"
         : kind === "unclaim"
           ? actor === "idle" || actor === "access_gone"
             ? actor
@@ -99,19 +94,13 @@ export function writeEntry(
     keyName: actor === "agent" ? claim!.keyName : null,
     claimEnd: end,
   });
-  const marked =
-    kind === "question" ||
-    kind === "result" ||
-    (kind === "unclaim" && actor !== "member");
-  // only a question marks a blocked task, so the agent moving past it
-  // takes the mark away
-  const unblocked = kind === "progress" && task.state === "blocked";
+  // a question asked again restarts the wait Home orders by
   store.move(
     task.id,
     state,
     end === null ? (claim?.id ?? null) : null,
-    actor === "member" || unblocked ? null : marked ? at : task.attentionAt,
     at,
+    kind === "question",
   );
   const row = required(store, task.id);
   if (actor === "agent") store.remember(claim!.id, row);
@@ -127,7 +116,7 @@ type ActionsDeps = {
     id: string,
     before: string | null,
     viewer?: Principal | null,
-  ): ExternalTaskResponse | null;
+  ): TaskRead | null;
 };
 
 // a route's moves answer the detail its viewer may read
@@ -138,13 +127,82 @@ export function taskActions(deps: ActionsDeps) {
     if (found === null) throw new NotFound("no such external task");
     return found;
   };
-  const files = (projectId: string, ids: string[], kept: string[] = []) => {
-    for (const id of ids) {
+  // the brief as stored: a new file link names a live file of the
+  // project, a kept one may name a file deleted since; every label is
+  // one of the project's, by its shaped name
+  const stored = (
+    projectId: string,
+    brief: Brief,
+    kept: string[] = [],
+  ): StoredBrief => {
+    checkBrief(brief);
+    for (const id of brief.fileIds) {
       if (!kept.includes(id) && deps.knowledge.file(projectId, id) === null) {
         throw new BadRequest("no such knowledge file");
       }
     }
+    const names = brief.labels.map(shapeLabelName);
+    const ids = store.projectLabels(projectId, names);
+    const labelIds = names.map((name) => ids.get(name));
+    if (labelIds.some((id) => id === undefined)) {
+      throw new BadRequest("labels must name this project's labels");
+    }
+    return {
+      title: brief.title.trim(),
+      labelIds: labelIds as string[],
+      fileIds: brief.fileIds,
+    };
   };
+  // the claim's own entry: a report, or the agent giving the task back
+  const agentEntry = (
+    key: TaskKey,
+    taskId: string,
+    claimId: string,
+    kind: AgentEntryKind | "unclaim",
+    text: string,
+    links: string[],
+  ) =>
+    transact(db, () => {
+      const claim = store.claimById(claimId);
+      if (claim === null) throw new NotFound("no such external task");
+      if (
+        claim.task_id !== taskId ||
+        claim.key_id !== key.keyId ||
+        claim.user_id !== key.userId
+      ) {
+        throw new Conflict(STALE_TASK);
+      }
+      const task = required(store, taskId);
+      const last = store.lastEntry(claimId, claim.ended_at === null);
+      const identical =
+        last !== null &&
+        last.kind === kind &&
+        last.text === text &&
+        JSON.stringify(last.links) === JSON.stringify(links);
+      const endedByAgent =
+        (kind === "result" && claim.end_reason === "done") ||
+        (kind === "unclaim" && claim.end_reason === "unclaimed");
+      if (
+        (identical && claim.ended_at === null) ||
+        (endedByAgent && last?.kind === kind && last.keyName !== null)
+      ) {
+        if (claim.last_task === null) throw new Error("missing task retry row");
+        const previous: ExternalTaskRow = JSON.parse(claim.last_task);
+        return { result: { entry: last, task: previous } };
+      }
+      if (claim.ended_at !== null || task.claim?.id !== claimId) {
+        throw new Conflict(STALE_TASK);
+      }
+      const result = writeEntry(store, task, {
+        actor: "agent",
+        kind,
+        text,
+        links,
+        userId: key.userId,
+        at: deps.clock(),
+      });
+      return { result, events: [taskChanged(result.task)] };
+    });
   const member = (
     userId: string,
     id: string,
@@ -188,10 +246,7 @@ export function taskActions(deps: ActionsDeps) {
       chatId: string | null = null,
     ) {
       return transact(db, () => {
-        const brief = { ...body, scope: body.scope ?? null };
-        checkBrief(brief);
-        brief.title = brief.title.trim();
-        files(projectId, brief.fileIds);
+        const brief = stored(projectId, body);
         checkUnfinished(store.unfinishedCount(projectId));
         const id = store.create(projectId, userId, brief, deps.clock(), chatId);
         const result = detail(id);
@@ -207,23 +262,22 @@ export function taskActions(deps: ActionsDeps) {
         const task = required(store, id);
         if (task.editRevision !== body.editRevision)
           throw new Conflict(STALE_TASK);
-        if (closed(task.state))
-          throw new Conflict(`this task is ${task.state}`);
-        const old: Brief = {
+        if (closed(task.state)) throw new Conflict(isState(task.state));
+        const old: StoredBrief = {
           title: task.title,
-          text: store.brief(id)!.text,
-          scope: task.scope,
+          labelIds: store.labelIds(id),
           fileIds: store.fileIds(id),
         };
-        const brief: Brief = {
-          title: body.title ?? old.title,
-          text: body.text ?? old.text,
-          scope: body.scope === undefined ? old.scope : body.scope,
-          fileIds: body.fileIds ?? old.fileIds,
-        };
-        checkBrief(brief);
-        brief.title = brief.title.trim();
-        files(task.projectId, brief.fileIds, old.fileIds);
+        // a task whose labels were all deleted takes one at its next edit
+        const brief = stored(
+          task.projectId,
+          {
+            title: body.title ?? old.title,
+            labels: body.labels ?? task.labels,
+            fileIds: body.fileIds ?? old.fileIds,
+          },
+          old.fileIds,
+        );
         if (JSON.stringify(brief) === JSON.stringify(old))
           return { result: detail(id, viewer) };
         store.edit(id, brief, deps.clock());
@@ -255,19 +309,6 @@ export function taskActions(deps: ActionsDeps) {
       body: ExternalTaskMoveRequest,
       viewer: Principal | null = null,
     ) => member(userId, id, "reopen", body, viewer),
-    seen(
-      id: string,
-      body: ExternalTaskSeenRequest,
-      viewer: Principal | null = null,
-    ) {
-      return transact(db, () => {
-        required(store, id);
-        if (!store.seen(id, body.attentionAt))
-          return { result: detail(id, viewer) };
-        const result = detail(id, viewer);
-        return { result, events: [taskChanged(result.task.task)] };
-      });
-    },
     delete(id: string) {
       return transact(db, () => {
         const task = required(store, id);
@@ -295,7 +336,7 @@ export function taskActions(deps: ActionsDeps) {
         }
         checkMove(task.state, "claim", "agent");
         checkRoom(store.counted(id), "claim");
-        checkClaims(store.claimsCount(id));
+        checkClaims(store.claimsSinceReopen(id));
         const now = deps.clock();
         const claimId = store.startClaim(id, key, now);
         store.append(id, {
@@ -308,12 +349,13 @@ export function taskActions(deps: ActionsDeps) {
           claimEnd: null,
           at: now,
         });
-        // only an unclaim can mark an open task, and work resuming ends it
-        store.move(id, "claimed", claimId, null, now);
+        store.move(id, "in_progress", claimId, now);
         const result = { ...detail(id), claimId };
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
+    // a retry of the same report answers the first; report never gives
+    // a task back, unclaim does
     report(
       key: TaskKey,
       taskId: string,
@@ -322,48 +364,20 @@ export function taskActions(deps: ActionsDeps) {
       text: string,
       links: string[],
     ) {
-      return transact(db, () => {
-        const claim = store.claimById(claimId);
-        if (claim === null) throw new NotFound("no such external task");
-        if (
-          claim.task_id !== taskId ||
-          claim.key_id !== key.keyId ||
-          claim.user_id !== key.userId
-        ) {
-          throw new Conflict(STALE_TASK);
-        }
-        const task = required(store, taskId);
-        const last = store.lastEntry(claimId, claim.ended_at === null);
-        const identical =
-          last !== null &&
-          last.kind === kind &&
-          last.text === text &&
-          JSON.stringify(last.links) === JSON.stringify(links);
-        const endedByReport =
-          (kind === "result" && claim.end_reason === "done") ||
-          (kind === "unclaim" && claim.end_reason === "unclaimed");
-        if (
-          (identical && claim.ended_at === null) ||
-          (endedByReport && last?.kind === kind && last.keyName !== null)
-        ) {
-          if (claim.last_task === null)
-            throw new Error("missing task retry row");
-          const previous: ExternalTaskRow = JSON.parse(claim.last_task);
-          return { result: { entry: last, task: previous } };
-        }
-        if (claim.ended_at !== null || task.claim?.id !== claimId) {
-          throw new Conflict(STALE_TASK);
-        }
-        const result = writeEntry(store, task, {
-          actor: "agent",
-          kind,
-          text,
-          links,
-          userId: key.userId,
-          at: deps.clock(),
-        });
-        return { result, events: [taskChanged(result.task)] };
-      });
+      if (!isAgentEntryKind(kind)) {
+        throw new BadRequest(
+          `kind must be one of ${AGENT_ENTRY_KINDS.join(", ")}`,
+        );
+      }
+      return agentEntry(key, taskId, claimId, kind, text, links);
     },
+    // the claim's key gives the task back with a note; a retry answers
+    // the first unclaim, even after later entries
+    agentUnclaim: (
+      key: TaskKey,
+      taskId: string,
+      claimId: string,
+      text: string,
+    ) => agentEntry(key, taskId, claimId, "unclaim", text, []),
   };
 }
