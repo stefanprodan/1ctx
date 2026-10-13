@@ -8,7 +8,7 @@
 // page, which clears its mark with seen and names the state and the
 // claim it shows.
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import {
   deleteExternalTask,
   loadExternalTask,
@@ -32,6 +32,7 @@ import {
   loadMoreClosed,
   onExternalTasksSocket,
 } from "../../../src/client/data/external-tasks.ts";
+import { TRAIL_MS } from "../../../src/client/data/flight.ts";
 import {
   loadMarkedTasks,
   markedTasks,
@@ -349,6 +350,20 @@ const gets = (path: string) =>
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+// a settle under fake timers, where a zero timeout never fires alone
+const flush = async () => {
+  for (let i = 0; i < 4; i++) {
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+};
+
+// the held calls answered, with the flight's pause on a fake clock
+const unclaimFaked = async () => {
+  hold = false;
+  for (const open of gates.splice(0)) open();
+  await flush();
+};
+
 const listAnswer = (tasks: ExternalTaskRow[]): ExternalTasksResponse => ({
   tasks,
   closed: 2,
@@ -654,14 +669,21 @@ describe("the entity", () => {
           ? Response.json({ tasks: [], next: null })
           : Response.json(listAnswer([row({ id: "a" })]));
       await loadExternalTasks("p1");
-      hold = true;
-      const load = loadClosedTasks("p1");
-      send(frame(row({ id: "a", revision: 2, state: "done", entries: 1 })));
-      await unclaim();
-      await load;
-      // the flight's pause, then the page again
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      expect(gets("/api/projects/p1/external-tasks?closed=1")).toBe(2);
+      jest.useFakeTimers();
+      try {
+        hold = true;
+        const load = loadClosedTasks("p1");
+        send(frame(row({ id: "a", revision: 2, state: "done", entries: 1 })));
+        await unclaimFaked();
+        await load;
+        expect(gets("/api/projects/p1/external-tasks?closed=1")).toBe(1);
+        // the flight's pause, then the page again
+        jest.advanceTimersByTime(TRAIL_MS);
+        await flush();
+        expect(gets("/api/projects/p1/external-tasks?closed=1")).toBe(2);
+      } finally {
+        jest.useRealTimers();
+      }
     },
   );
 
@@ -939,13 +961,21 @@ describe("the entity", () => {
       );
       answer = () =>
         Response.json({ tasks: fifty, count: 60, projectIds: HOME });
-      hold = true;
-      const load = loadMarkedTasks();
-      send(frame(row({ id: "b", attentionAt: 500, revision: 2 })));
-      await unclaim();
-      await load;
-      await new Promise((resolve) => setTimeout(resolve, 350));
-      expect(gets("/api/external-tasks?attention=1")).toBe(2);
+      jest.useFakeTimers();
+      try {
+        hold = true;
+        const load = loadMarkedTasks();
+        send(frame(row({ id: "b", attentionAt: 500, revision: 2 })));
+        await unclaimFaked();
+        await load;
+        expect(gets("/api/external-tasks?attention=1")).toBe(1);
+        // the flight's pause, then the count again
+        jest.advanceTimersByTime(TRAIL_MS);
+        await flush();
+        expect(gets("/api/external-tasks?attention=1")).toBe(2);
+      } finally {
+        jest.useRealTimers();
+      }
     },
   );
 

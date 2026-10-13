@@ -4,7 +4,7 @@
 import { expect, test } from "bun:test";
 import { UsageStore } from "../../../src/server/usage/index.ts";
 import type { AccessBoardResponse } from "../../../src/shared/api/access.ts";
-import { chatApp, startChat, tick } from "../../helpers/chat.ts";
+import { chatApp, idle, startChat } from "../../helpers/chat.ts";
 import { watcher } from "../../helpers/socket.ts";
 
 type Chat = Awaited<ReturnType<typeof chatApp>>;
@@ -76,20 +76,14 @@ test("the board names the team projects with a turn in the window", async () => 
   });
   const started = await startChat(chat, "hi", chat.member, busy);
   started.script.reply("done");
-  for (
-    let i = 0;
-    i < 50 && !(await board(chat)).activeProjectIds.includes(busy);
-    i++
-  ) {
-    await tick();
-  }
+  await idle(chat.app);
   const ids = (await board(chat)).activeProjectIds;
   expect(ids).toContain(busy);
   expect(ids).not.toContain(quiet);
   // a personal project is never named, however busy
   const own = await startChat(chat);
   own.script.reply("done");
-  await tick();
+  await idle(chat.app);
   expect((await board(chat)).activeProjectIds).toEqual([busy]);
 });
 

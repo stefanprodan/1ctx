@@ -46,6 +46,25 @@ export function watch(chat: ChatApp, conn: FakeConn, sessionId: string): void {
   chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));
 }
 
+// the first frame sent from now on that matches
+export function nextFrame(
+  conn: FakeConn,
+  match: (frame: SocketEvent) => boolean,
+): Promise<SocketEvent> {
+  const send = conn.send;
+  return new Promise((resolve) => {
+    conn.send = (text) => {
+      const sent = send(text);
+      const frame = conn.frames.at(-1)!;
+      if (match(frame)) {
+        conn.send = send;
+        resolve(frame);
+      }
+      return sent;
+    };
+  });
+}
+
 export function frames<T extends SocketEvent["type"]>(
   conn: FakeConn,
   type: T,

@@ -4,7 +4,8 @@
 // Milliseconds since the epoch, as a port so a test can move time.
 
 export type Clock = (() => number) & {
-  sleep?: (ms: number) => Promise<void>;
+  // the signal aborts when the sleep is cancelled
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 };
 
 export const wallClock: Clock = () => Date.now();
@@ -35,18 +36,21 @@ export function localMinute(timeZone: string): (ms: number) => string {
 
 export type Sleep = { promise: Promise<void>; cancel: () => void };
 
-// resolves after ms on the clock; the cancel clears a real timer, and a
-// clock's own sleep is left to resolve unheard
+// resolves after ms on the clock; the cancel clears a real timer and
+// aborts a clock's own sleep
 export function sleep(clock: Clock, ms: number): Sleep {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // only a clock's own sleep hears it, so a real timer makes none
+  const cancelled = clock.sleep === undefined ? null : new AbortController();
   return {
     promise:
-      clock.sleep?.(ms) ??
+      clock.sleep?.(ms, cancelled?.signal) ??
       new Promise<void>((resolve) => {
         timer = setTimeout(resolve, ms);
       }),
     cancel: () => {
       if (timer !== undefined) clearTimeout(timer);
+      cancelled?.abort();
     },
   };
 }

@@ -68,14 +68,14 @@ describe("the vendored just-bash", () => {
   });
 
   test("a response over the size cap is refused and its body cancelled", async () => {
-    let cancelled = false;
+    const cancelled = Promise.withResolvers<void>();
     const s = serve(() => {
       const body = new ReadableStream<Uint8Array>({
         pull(controller) {
           controller.enqueue(new Uint8Array(1024));
         },
         cancel() {
-          cancelled = true;
+          cancelled.resolve();
         },
       });
       return new Response(body, { headers: { "content-length": "1048576" } });
@@ -86,8 +86,7 @@ describe("the vendored just-bash", () => {
       }).exec(`curl -sS ${s.url}/`);
       expect(result.exitCode).not.toBe(0);
       // the server sees the abort a moment after the client lets go
-      for (let i = 0; i < 50 && !cancelled; i++) await Bun.sleep(10);
-      expect(cancelled).toBe(true);
+      await cancelled.promise;
     } finally {
       s.stop();
     }

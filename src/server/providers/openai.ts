@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { MINUTE_MS } from "../lib/clock.ts";
+import { type Clock, MINUTE_MS, sleep, wallClock } from "../lib/clock.ts";
 import { messageOf } from "../lib/errors.ts";
 import { tokens } from "../lib/tokens.ts";
 import { chatEvents } from "./frames.ts";
@@ -330,8 +330,8 @@ export type StreamOptions = {
   headers?: Record<string, string>;
   // shorter in a test
   headersTimeoutMs?: number;
-  // shorter in a test
-  silenceMs?: number;
+  // the silence limit's clock, a test's own
+  silenceClock?: Clock;
   // asked after each frame: the wire's terminal event came, so the read
   // ends there, for a wire that sends no [DONE]
   ended?: () => boolean;
@@ -401,21 +401,17 @@ export async function* streamChat(
   let heard = false;
   try {
     while (!done) {
-      let timer: ReturnType<typeof setTimeout> | undefined;
       const read = reader.read().then(
         (value) => ({ value }),
         (error) => ({ error }),
       );
-      const silence = options.thinking?.()
+      const timer = options.thinking?.()
         ? null
-        : new Promise<{ silent: true }>((resolve) => {
-            timer = setTimeout(
-              () => resolve({ silent: true }),
-              options.silenceMs ?? CHAT_SILENCE_TIMEOUT_MS,
-            );
-          });
+        : sleep(options.silenceClock ?? wallClock, CHAT_SILENCE_TIMEOUT_MS);
+      const silence =
+        timer?.promise.then(() => ({ silent: true as const })) ?? null;
       const result = await (silence ? Promise.race([read, silence]) : read);
-      if (timer) clearTimeout(timer);
+      timer?.cancel();
       if ("silent" in result) {
         controller.abort(new Error("the provider was silent for 5 min"));
         yield { kind: "error", message: "the provider was silent for 5 min" };

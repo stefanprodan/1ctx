@@ -97,7 +97,7 @@ export type Mcp = {
   switchableBy(
     agents: { id: string; servers: AgentServer[] }[],
   ): Record<string, SwitchableServer[]>;
-  refreshSoon(id: string, observed: string): void;
+  refreshSoon(id: string, observed: string): Promise<void>;
   start(): void;
   close(): Promise<void>;
   agentServers(agentId: string): AgentServer[];
@@ -273,7 +273,7 @@ export function mcpArea(deps: McpDeps): Mcp {
       return withClient(deps, server, key, options, async (client) => {
         const observed = identityOf(client.info(), key).fingerprint;
         if (observed !== server.fingerprint) {
-          coordinator.refreshSoon(server.id, observed);
+          void coordinator.refreshSoon(server.id, observed);
         }
         const definition: ListedTool = {
           name: tool.name,

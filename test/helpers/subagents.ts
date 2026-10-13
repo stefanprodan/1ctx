@@ -6,7 +6,7 @@
 
 import { SUBAGENT_LINE } from "../../src/server/runner/prompt.ts";
 import type { Message } from "../../src/shared/contracts/session.ts";
-import { type ChatApp, chatApp, type Script, tick } from "./chat.ts";
+import { type ChatApp, chatApp, type Script, sessionSettled } from "./chat.ts";
 
 export async function subagentApp(
   options: Parameters<typeof chatApp>[0] = {},
@@ -53,19 +53,13 @@ export const toolNames = (script: Script) =>
 export const lastResult = (script: Script) =>
   wire(script).findLast((message) => message.role === "tool")?.content ?? "";
 
-// the scripts that arrived, past the first `from`, until count are in
+// the scripts that arrived, once count are in
 export async function scriptsFrom(
   chat: ChatApp,
   count: number,
-  tries = 800,
 ): Promise<Script[]> {
-  for (let i = 0; i < tries; i++) {
-    if (chat.scripted.scripts.length >= count) return chat.scripted.scripts;
-    await tick();
-  }
-  throw new Error(
-    `only ${chat.scripted.scripts.length} chat requests, wanted ${count}`,
-  );
+  await chat.scripted.reached(count);
+  return chat.scripted.scripts;
 }
 
 // the child script whose task holds the word
@@ -82,16 +76,8 @@ export const childFor = (scripts: Script[], word: string): Script => {
 };
 
 export async function settled(chat: ChatApp, sessionId: string) {
-  for (let i = 0; i < 800; i++) {
-    if (
-      chat.app.sessions.byId(sessionId)?.status !== "running" &&
-      chat.app.runner.registry.get(sessionId) === null
-    ) {
-      return chat.app.sessions.byId(sessionId)!;
-    }
-    await tick();
-  }
-  throw new Error("the send did not settle");
+  await sessionSettled(chat.app, sessionId);
+  return chat.app.sessions.byId(sessionId)!;
 }
 
 // the subagent sessions under a root, oldest first

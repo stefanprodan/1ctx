@@ -48,80 +48,74 @@ describe("xargs -t", () => {
   });
 });
 
+// A fetch that holds each request until the shell stops starting more,
+// so its peak is what xargs runs at once on any runner; the held ones
+// end newest first.
+function heldFetch(body: (url: string) => string) {
+  const held: (() => void)[] = [];
+  const seen = { arrivals: 0, running: 0, peak: 0 };
+  // the shell is in memory: turns of the event loop with no new request
+  // mean it waits on the held ones
+  const settle = async (arrivals: number) => {
+    for (let i = 0; i < 10; i++) await Bun.sleep(0);
+    if (arrivals !== seen.arrivals) return;
+    for (const release of held.splice(0).reverse()) release();
+  };
+  const fetch: SecureFetch = async (url) => {
+    seen.running++;
+    seen.peak = Math.max(seen.peak, seen.running);
+    const arrivals = ++seen.arrivals;
+    await new Promise<void>((resolve) => {
+      held.push(resolve);
+      void settle(arrivals);
+    });
+    seen.running--;
+    return {
+      status: 200,
+      statusText: "OK",
+      headers: {},
+      body: new TextEncoder().encode(body(url)),
+      url,
+    };
+  };
+  return { fetch, seen };
+}
+
 describe("xargs -P", () => {
   test("runs commands at once and keeps their output in input order", async () => {
-    let running = 0;
-    let peak = 0;
-    // the later a command starts, the sooner it ends
-    const fetch: SecureFetch = async (url) => {
-      running++;
-      peak = Math.max(peak, running);
-      await Bun.sleep(10 * (5 - Number(url.slice(-1))));
-      running--;
-      return {
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        body: new TextEncoder().encode(`${url.slice(-1)}\n`),
-        url,
-      };
-    };
+    const { fetch, seen } = heldFetch((url) => `${url.slice(-1)}\n`);
     const bash = new Bash({ cwd: "/work", fetch });
     const result = await bash.exec(
       "printf '1\\n2\\n3\\n4\\n' | xargs -P 4 -I{} curl -sS http://files.test/{}",
     );
     expect(result.stdout).toBe("1\n2\n3\n4\n");
-    expect(peak).toBe(4);
+    expect(seen.peak).toBe(4);
   });
 
   test("caps -P at 16", async () => {
-    let running = 0;
-    let peak = 0;
-    const fetch: SecureFetch = async (url) => {
-      running++;
-      peak = Math.max(peak, running);
-      await Bun.sleep(20);
-      running--;
-      return {
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        body: new TextEncoder().encode(url),
-        url,
-      };
-    };
+    const { fetch, seen } = heldFetch((url) => url);
     const bash = new Bash({ cwd: "/work", fetch });
     const result = await bash.exec(
       "seq 40 | xargs -P 0 -I{} curl -sS -o /dev/null http://files.test/{}",
     );
     expect(result.exitCode).toBe(0);
-    expect(peak).toBe(16);
+    expect(seen.peak).toBe(16);
   });
 
   test("gives each running command its own slot", async () => {
-    const result = await run(
-      "printf 'a\\nb\\nc\\nd\\n' | xargs -P2 -n1 --process-slot-var=SLOT sh -c 'echo $SLOT; sleep 0.1'",
+    // each command holds its slot until both run
+    const { fetch, seen } = heldFetch(() => "");
+    const bash = new Bash({ cwd: "/work", fetch });
+    const result = await bash.exec(
+      "printf 'a\\nb\\nc\\nd\\n' | xargs -P2 -n1 --process-slot-var=SLOT sh -c 'echo $SLOT; curl -sS http://files.test/$SLOT'",
     );
     expect(result.stdout.split("\n").sort().join(" ")).toBe(" 0 0 1 1");
+    expect(seen.peak).toBe(2);
   });
 
   // the staging chat that fetched a repository's files, 12 at a time
   test("fetches 51 files 12 at a time", async () => {
-    let running = 0;
-    let peak = 0;
-    const fetch: SecureFetch = async (url) => {
-      running++;
-      peak = Math.max(peak, running);
-      await Bun.sleep(40);
-      running--;
-      return {
-        status: 200,
-        statusText: "OK",
-        headers: {},
-        body: new TextEncoder().encode(`body of ${url}\n`),
-        url,
-      };
-    };
+    const { fetch, seen } = heldFetch((url) => `body of ${url}\n`);
     const names = Array.from(
       { length: 51 },
       (_, i) => `src/dir${i % 5}/file ${i}.ts`,
@@ -136,7 +130,7 @@ describe("xargs -P", () => {
     );
     expect(result.stderr).toBe("");
     expect(result.exitCode).toBe(0);
-    expect(peak).toBe(12);
+    expect(seen.peak).toBe(12);
     for (const name of names) {
       expect(await bash.fs.readFile(`/work/1ctx/${name}`)).toBe(
         `body of http://files.test/${name}\n`,

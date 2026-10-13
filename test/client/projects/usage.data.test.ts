@@ -7,16 +7,16 @@ import {
   days,
   loadDays,
   loadWeek,
+  setUsageClock,
   week,
 } from "../../../src/client/data/usage.ts";
+import { browserClock } from "../../../src/client/lib/now.ts";
 import type {
   DaysUsageResponse,
   WeekUsageResponse,
 } from "../../../src/shared/api/usage.ts";
 
 const realFetch = globalThis.fetch;
-const realSetTimeout = globalThis.setTimeout;
-const realClearTimeout = globalThis.clearTimeout;
 let user = 0;
 
 const weekOne: WeekUsageResponse = {
@@ -72,7 +72,7 @@ function deferredResponse(): {
 }
 
 async function settle(): Promise<void> {
-  await new Promise((resolve) => realSetTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 beforeEach(() => {
@@ -80,8 +80,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  globalThis.setTimeout = realSetTimeout;
-  globalThis.clearTimeout = realClearTimeout;
+  setUsageClock(browserClock);
   me.value = undefined;
   await settle();
   globalThis.fetch = realFetch;
@@ -154,28 +153,24 @@ describe("the usage entities", () => {
         { handler: () => void; delay: number | undefined }
       >();
       const cleared: number[] = [];
-      globalThis.setTimeout = ((
-        handler: TimerHandler,
-        delay?: number,
-      ): ReturnType<typeof setTimeout> => {
-        const id = ++timerId;
-        if (typeof handler !== "function")
-          throw new Error("timer is not a function");
-        timers.set(id, { handler: () => handler(), delay });
-        return id as unknown as ReturnType<typeof setTimeout>;
-      }) as unknown as typeof setTimeout;
-      globalThis.clearTimeout = ((id?: ReturnType<typeof setTimeout>) => {
-        const value = Number(id);
-        cleared.push(value);
-        timers.delete(value);
-      }) as typeof clearTimeout;
+      setUsageClock({
+        now: () => 1_000_000,
+        after(delay, handler) {
+          const id = ++timerId;
+          timers.set(id, { handler, delay });
+          return () => {
+            cleared.push(id);
+            timers.delete(id);
+          };
+        },
+      });
 
       let calls = 0;
       const urls: string[] = [];
       globalThis.fetch = (async (url: string) => {
         calls++;
         urls.push(url);
-        return Response.json(dayAnswer(calls, Date.now() + 1_000));
+        return Response.json(dayAnswer(calls, 1_001_000));
       }) as unknown as typeof fetch;
 
       await loadDays();

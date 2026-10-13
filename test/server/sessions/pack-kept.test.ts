@@ -462,7 +462,8 @@ describe("the kept files job at its edges", () => {
         expect(
           every.mock.calls.filter(([, ms]) => ms === KEPT_PASS_MS),
         ).toHaveLength(1);
-        await Bun.sleep(5);
+        // shares a pass start began, so none is still to land
+        await job.pass();
         expect(packedOf(s, late)).toEqual([0]);
       } finally {
         every.mockRestore();

@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import {
   applyEdits,
   type KnowledgeEdit,
@@ -167,14 +167,20 @@ describe("knowledge edits", () => {
     );
   });
 
-  // counting every overlapping match costs matches times old's length
-  test("a long old on repetitive text stops at its second match", () => {
+  // counting every overlapping match costs matches times old's length;
+  // the spy patches String.prototype, so the test is serial
+  test.serial("a long old on repetitive text stops at its second match", () => {
     const text = "a".repeat(256 * 1024);
     const old = "a".repeat(128 * 1024);
-    const started = performance.now();
-    expect(() => applyEdits(text, [{ old, new: "b" }])).toThrow(
-      new BadRequest("edit 1: matches more than once"),
-    );
-    expect(performance.now() - started).toBeLessThan(1000);
+    const search = spyOn(String.prototype, "indexOf");
+    try {
+      expect(() => applyEdits(text, [{ old, new: "b" }])).toThrow(
+        new BadRequest("edit 1: matches more than once"),
+      );
+      const searches = search.mock.calls.filter(([needle]) => needle === old);
+      expect(searches.length).toBe(2);
+    } finally {
+      search.mockRestore();
+    }
   });
 });

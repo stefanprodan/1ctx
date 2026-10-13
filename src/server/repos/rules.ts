@@ -300,6 +300,9 @@ function matchPathname(pattern: IgnorePattern, path: string): boolean {
   return wildmatch(pattern.text, from, path, from, true, 0) === MATCH;
 }
 
+// called once per wildmatch call: a test counts the backtracking with it
+export const wildmatchProbe = { step: () => {} };
+
 const MATCH = 0;
 const NOMATCH = 1;
 const ABORT_ALL = -1;
@@ -326,6 +329,7 @@ function wildmatch(
   pathname: boolean,
   start: number,
 ): number {
+  wildmatchProbe.step();
   for (; pi < p.length; ti++, pi++) {
     let pc = p.charCodeAt(pi);
     let tc = at(t, ti);

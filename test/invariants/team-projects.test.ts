@@ -13,9 +13,9 @@ import {
   type ChatApp,
   chatApp,
   FLASH,
+  idle,
   type Script,
   startChat,
-  tick,
 } from "../helpers/chat.ts";
 import { createTeam } from "../helpers/projects.ts";
 
@@ -85,11 +85,10 @@ async function addMember(chat: ChatApp, projectId: string, userId: string) {
 }
 async function finish(chat: ChatApp, script: Script) {
   script.reply("done");
-  for (let i = 0; i < 200; i++) {
-    if (chat.app.runner.registry.size === 0) return;
-    await tick();
+  await idle(chat.app);
+  if (chat.app.runner.registry.size > 0) {
+    throw new Error("the send did not finish");
   }
-  throw new Error("the send did not finish");
 }
 function count(
   chat: ChatApp,

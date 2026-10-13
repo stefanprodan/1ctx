@@ -27,7 +27,7 @@ describe("socket fixtures for tools", () => {
     toolRound(script, [call("c1")]);
     const r2 = await chat.scripted.next();
     r2.reply("It is noon.");
-    await settle(chat, 10);
+    await settle(chat);
     record("one-tool-round", detail, conn);
     const send = chat.app.sessions.send(detail.send.id)!;
     expect(send).toMatchObject({ status: "done", rounds: 2, toolCalls: 1 });
@@ -81,7 +81,7 @@ describe("socket fixtures for tools", () => {
     ]);
     const r2 = await chat.scripted.next();
     r2.reply("Flux is ready.");
-    await settle(chat, 10);
+    await settle(chat);
     record("mcp-call", detail, conn);
     const row = chat.app.sessions
       .messages(sessionId)
@@ -108,7 +108,7 @@ describe("socket fixtures for tools", () => {
     toolRound(r2, [call("c2", { timezone: "Asia/Tokyo" })]);
     const r3 = await chat.scripted.next();
     r3.reply("done at last");
-    await settle(chat, 14);
+    await settle(chat);
     record("two-tool-rounds", detail, conn);
     const send = chat.app.sessions.send(detail.send.id)!;
     expect(send).toMatchObject({ status: "done", rounds: 3, toolCalls: 2 });
@@ -128,7 +128,7 @@ describe("socket fixtures for tools", () => {
     toolRound(script, [call("c1")]);
     const r2 = await chat.scripted.next();
     r2.reply("It is noon.");
-    await settle(chat, 10);
+    await settle(chat);
     record("narration-before-call", detail, conn);
     const work = chat.app.sessions.messages(sessionId)[1]!;
     expect(work.content).toBe("I will check the clock.");
@@ -146,7 +146,7 @@ describe("socket fixtures for tools", () => {
     toolRound(script, [call("c1")]);
     const r2 = await chat.scripted.next();
     r2.reply("here it is");
-    await settle(chat, 10);
+    await settle(chat);
     record("calls-no-text", detail, conn);
     const work = chat.app.sessions.messages(sessionId)[1]!;
     expect(work.content).toBe("");
@@ -155,9 +155,9 @@ describe("socket fixtures for tools", () => {
 
   test("parallel calls finishing out of order", async () => {
     const fake = fakeTools({
-      c1: { delayTicks: 6, result: { content: "one", error: false } },
-      c2: { delayTicks: 3, result: { content: "two", error: false } },
-      c3: { delayTicks: 1, result: { content: "three", error: false } },
+      c1: { after: "c2", result: { content: "one", error: false } },
+      c2: { after: "c3", result: { content: "two", error: false } },
+      c3: { result: { content: "three", error: false } },
     });
     const chat = await chatApp(fake);
     const conn = await watcher(chat);
@@ -170,7 +170,7 @@ describe("socket fixtures for tools", () => {
     ]);
     const r2 = await chat.scripted.next();
     r2.reply("all done");
-    await settle(chat, 16);
+    await settle(chat);
     record("parallel-out-of-order", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.toolCalls).toBe(3);
     chat.app.socket.dispose();
@@ -187,7 +187,7 @@ describe("socket fixtures for tools", () => {
     toolRound(script, [call("c1")]);
     const r2 = await chat.scripted.next();
     r2.reply("recovered");
-    await settle(chat, 10);
+    await settle(chat);
     record("tool-failed", detail, conn);
     const toolRow = chat.app.sessions
       .messages(sessionId)
@@ -207,7 +207,7 @@ describe("socket fixtures for tools", () => {
     toolRound(script, [call("c1", { url: "http://slow.test" })]);
     const r2 = await chat.scripted.next();
     r2.reply("gave up on the fetch");
-    await settle(chat, 10);
+    await settle(chat);
     record("tool-timeout", detail, conn);
     const toolRow = chat.app.sessions
       .messages(sessionId)
@@ -236,7 +236,7 @@ describe("socket fixtures for tools", () => {
     script.end();
     const r2 = await chat.scripted.next();
     r2.reply("ok");
-    await settle(chat, 10);
+    await settle(chat);
     record("malformed-arguments", detail, conn);
     const toolRow = chat.app.sessions
       .messages(sessionId)
@@ -266,7 +266,7 @@ describe("socket fixtures for tools", () => {
     script.end();
     const r2 = await chat.scripted.next();
     r2.reply("recovered");
-    await settle(chat, 10);
+    await settle(chat);
     record("unknown-tool", detail, conn);
     const toolRow = chat.app.sessions
       .messages(sessionId)
@@ -300,7 +300,7 @@ describe("socket fixtures for tools", () => {
     script.end();
     const r2 = await chat.scripted.next();
     r2.reply("done");
-    await settle(chat, 12);
+    await settle(chat);
     record("duplicate-call-ids", detail, conn);
     expect(
       chat.app.sessions
@@ -313,16 +313,16 @@ describe("socket fixtures for tools", () => {
   test("an abort-ignoring tool", async () => {
     // A result the tool still reports after the abort is its end: kept.
     const fake = fakeTools({
-      c1: { ignoreAbort: 8, result: { content: "late", error: false } },
+      c1: { ignoreAbort: true, result: { content: "late", error: false } },
     });
     const chat = await chatApp(fake);
     const conn = await watcher(chat);
     const { detail, script, sessionId } = await startChat(chat, "ignore abort");
     watch(chat, conn, sessionId);
     toolRound(script, [call("c1")]);
-    await settle(chat, 2);
+    await fake.ran("c1");
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    await settle(chat, 12);
+    await settle(chat);
     record("abort-ignoring-tool", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
     const toolRow = chat.app.sessions
@@ -358,7 +358,7 @@ describe("socket fixtures for tools", () => {
     };
     toolRound(script, [call("c1")]);
     throwOnce = true;
-    await settle(chat, 10);
+    await settle(chat);
     (chat.app.sessions as { finishTool: unknown }).finishTool = original;
     record("finishtool-failure", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("failure");
@@ -401,7 +401,7 @@ describe("socket fixtures for tools", () => {
     ]);
     const r2 = await chat.scripted.next();
     r2.reply("Here is what the skill says.");
-    await settle(chat, 10);
+    await settle(chat);
     record("skill-tool-round", detail, conn);
     const row = chat.app.sessions
       .messages(sessionId)

@@ -9,14 +9,10 @@ import {
   WEB_OFF_LINE,
 } from "../../../src/shared/capabilities.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
-import { chatApp, tick, waitScript } from "../../helpers/chat.ts";
+import { chatApp, sessionSettled, waitScript } from "../../helpers/chat.ts";
 
 async function settled(chat: Awaited<ReturnType<typeof chatApp>>, id: string) {
-  for (let i = 0; i < 200; i++) {
-    if (chat.app.sessions.byId(id)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("send did not settle");
+  await sessionSettled(chat.app, id);
 }
 
 async function create(

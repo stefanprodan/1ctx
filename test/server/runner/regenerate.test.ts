@@ -9,7 +9,12 @@ import { regenerateUsers } from "../../../src/server/runner/regenerate.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import type { ChatApp, Script } from "../../helpers/chat.ts";
-import { chatApp, startChat, tick, waitScript } from "../../helpers/chat.ts";
+import {
+  chatApp,
+  sessionSettled,
+  startChat,
+  waitScript,
+} from "../../helpers/chat.ts";
 
 const timeCall = {
   id: "time-1",
@@ -18,11 +23,7 @@ const timeCall = {
 };
 
 async function settle(chat: ChatApp, sessionId: string): Promise<void> {
-  for (let i = 0; i < 200; i++) {
-    if (chat.app.sessions.byId(sessionId)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error(`chat ${sessionId} did not settle`);
+  await sessionSettled(chat.app, sessionId);
 }
 
 async function finish(

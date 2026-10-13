@@ -17,7 +17,6 @@ import {
   scriptedFetch,
   setLimits,
   startChat,
-  tick,
   waitScript,
 } from "../helpers/chat.ts";
 import { asksAnswer } from "../helpers/tool-loop.ts";
@@ -170,7 +169,7 @@ test("result tails past the window threshold are stored and the turn answers", a
     script.toolRound(calls, { prompt: 14_999, completion: 0 });
     script.end();
     // four commands one after another, each in its own worker
-    const answer = await waitScript(chat.scripted, 2, 800);
+    const answer = await waitScript(chat.scripted, 2);
     expect(asksAnswer(answer.body)).toBe(true);
     expect(chat.app.sessions.messages(sessionId)[1]).toMatchObject({
       slot: "work",
@@ -208,6 +207,10 @@ test("result tails past the window threshold are stored and the turn answers", a
 
 test("stopping a buffered round keeps its completed result and cuts the rest", async () => {
   const started: string[] = [];
+  let bothStarted!: () => void;
+  const both = new Promise<void>((resolve) => {
+    bothStarted = resolve;
+  });
   let aborted = false;
   const chat = await chatApp({
     window: 20_000,
@@ -231,6 +234,7 @@ test("stopping a buffered round keeps its completed result and cuts the rest", a
       }),
       run: async (_offered, call, ctx) => {
         started.push(call.id);
+        if (started.length === 2) bothStarted();
         if (call.id === "first")
           return { content: "a completed result", error: false };
         return new Promise((resolve) => {
@@ -257,7 +261,7 @@ test("stopping a buffered round keeps its completed result and cuts the rest", a
       completion: 100,
     });
     script.end();
-    for (let i = 0; i < 200 && started.length < 2; i++) await tick();
+    await both;
     expect(started).toEqual(["first", "second"]);
     expect(
       chat.app.sessions
@@ -305,7 +309,7 @@ test("oversized round results are stored cut with bash tails and the answer and 
     });
     script.end();
     // ten commands one after another, each in its own worker
-    const answer = await waitScript(chat.scripted, 2, 1_600);
+    const answer = await waitScript(chat.scripted, 2);
     expect(asksAnswer(answer.body)).toBe(true);
     const stored = chat.app.sessions.messages(sessionId);
     expect(stored[1]).toMatchObject({

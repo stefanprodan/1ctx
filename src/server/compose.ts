@@ -18,7 +18,7 @@ import {
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
-import { type BashArea, bashArea } from "./bash/index.ts";
+import { type BashArea, type BashDeps, bashArea } from "./bash/index.ts";
 import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
@@ -117,6 +117,8 @@ export type ComposeOptions = {
   tools?: Tools;
   // a test's command worker entry; the real one by default
   commandWorker?: URL;
+  // each phase a command's worker reports; a test waits on it
+  onCommandPhase?: BashDeps["onCommandPhase"];
   // the repositories' cache directory; none fetches nothing
   cacheDir?: string | null;
   // a test's repository fetches; the fetch worker by default
@@ -443,6 +445,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     worker:
       options.commandWorker ??
       new URL("./bash/command.worker.ts", import.meta.url),
+    ...(options.onCommandPhase
+      ? { onCommandPhase: options.onCommandPhase }
+      : {}),
     knowledge: {
       mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
       mountedUploads: (sessionId) => knowledge.mountedUploads(sessionId),

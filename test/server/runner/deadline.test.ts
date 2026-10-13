@@ -5,19 +5,12 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { STREAM_IDLE_MS } from "../../../src/server/runner/round.ts";
 import { createAutomation } from "../../helpers/automations.ts";
-import { chatApp, startChat, tick } from "../../helpers/chat.ts";
-
-async function settle(
-  app: Awaited<ReturnType<typeof chatApp>>["app"],
-  sessionId: string,
-) {
-  for (let i = 0; i < 100; i++) {
-    const session = app.sessions.byId(sessionId);
-    if (session?.status !== "running") return session;
-    await tick();
-  }
-  throw new Error("run did not settle");
-}
+import {
+  chatApp,
+  sessionSettled,
+  startChat,
+  tick,
+} from "../../helpers/chat.ts";
 
 describe("send deadlines", () => {
   test("stops a run at its deadline", async () => {
@@ -41,7 +34,7 @@ describe("send deadlines", () => {
     expect(messages[0]?.content).not.toContain("You talk to");
 
     chat.app.now.value += 600_000;
-    const ended = await settle(chat.app, detail.session.id);
+    const ended = await sessionSettled(chat.app, detail.session.id);
     expect(ended?.status).toBe("stopped");
     expect(chat.app.sessions.lastSend(detail.session.id)).toMatchObject({
       kind: "run",
@@ -71,7 +64,9 @@ describe("send deadlines", () => {
     await tick();
     expect(chat.app.sessions.byId(started.sessionId)?.status).toBe("running");
     chat.app.now.value += 1;
-    expect((await settle(chat.app, started.sessionId))?.status).toBe("stopped");
+    expect((await sessionSettled(chat.app, started.sessionId))?.status).toBe(
+      "stopped",
+    );
     expect(chat.app.sessions.lastSend(started.sessionId)).toMatchObject({
       kind: "chat",
       cause: "deadline",
@@ -85,7 +80,7 @@ describe("send deadlines", () => {
     const chat = await chatApp();
     const started = await startChat(chat);
     started.script.reply("done");
-    await settle(chat.app, started.sessionId);
+    await sessionSettled(chat.app, started.sessionId);
     chat.app.now.value += DEFAULT_LIMITS.sendDeadlineMs;
     await tick();
     expect(chat.app.sessions.lastSend(started.sessionId)?.cause).toBe("finish");
@@ -99,30 +94,26 @@ describe("send deadlines", () => {
     const detail = await response.json();
     const script = await pending;
     script.reply("done");
-    expect((await settle(chat.app, detail.session.id))?.status).toBe("done");
+    expect((await sessionSettled(chat.app, detail.session.id))?.status).toBe(
+      "done",
+    );
     chat.app.now.value += 600_000;
     await tick();
     expect(chat.app.sessions.lastSend(detail.session.id)?.cause).toBe("finish");
     await chat.app.shutdown();
   });
 
-  test("a finished send is not kept alive by its deadline", async () => {
+  // a pending deadline would hold the whole send until it rang
+  test("a finished send cancels its deadline", async () => {
     const chat = await chatApp();
-    // in a function, so no local of the test reaches the send
-    const finish = async () => {
-      const started = await startChat(chat);
-      const send = chat.app.runner.registry.get(started.sessionId);
-      started.script.reply("done");
-      await settle(chat.app, started.sessionId);
-      return new WeakRef(send ?? {});
-    };
-    const held = [await finish(), await finish(), await finish()];
-    // rings the round's quiet timers, which the fake clock cannot cancel,
-    // and stays well short of the deadline
-    chat.app.now.value += 2 * STREAM_IDLE_MS;
-    for (let i = 0; i < 5; i++) await tick();
-    Bun.gc(true);
-    expect(held.filter((ref) => ref.deref() !== undefined).length).toBe(0);
+    const started = await startChat(chat);
+    const send = chat.app.runner.registry.get(started.sessionId)!;
+    const at = send.startedAt + DEFAULT_LIMITS.sendDeadlineMs;
+    expect(chat.app.sleeping()).toContain(at);
+    started.script.reply("done");
+    // let go after the deadline is cancelled
+    await send.drained;
+    expect(chat.app.sleeping()).not.toContain(at);
     await chat.app.shutdown();
   });
 
@@ -147,7 +138,7 @@ describe("send deadlines", () => {
       chat.app.runner.registry.get(detail.session.id)?.policy.deadlineMs,
     ).toBe(60_000);
     script.reply("done");
-    await settle(chat.app, detail.session.id);
+    await sessionSettled(chat.app, detail.session.id);
     await chat.app.shutdown();
   });
 });

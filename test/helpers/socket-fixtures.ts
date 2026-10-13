@@ -8,7 +8,13 @@ import type { Conn, ConnData } from "../../src/server/web/socket.ts";
 import type { ToolCall } from "../../src/shared/contracts/tool.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
 import { ORIGIN } from "./app.ts";
-import { type ChatApp, type Script, type ToolCallFrame, tick } from "./chat.ts";
+import {
+  type ChatApp,
+  idle,
+  ringing,
+  type Script,
+  type ToolCallFrame,
+} from "./chat.ts";
 
 const DIR = join(import.meta.dir, "..", "fixtures", "socket");
 
@@ -87,12 +93,9 @@ export function write(name: string, first: unknown, conn: FakeConn): void {
 export const record = (name: string, detail: unknown, conn: FakeConn) =>
   write(name, { kind: "detail", detail }, conn);
 
-export async function settle(chat: ChatApp, n = 6) {
-  for (let i = 0; i < n; i++) {
-    await tick();
-    chat.app.now.value += 200;
-    await tick();
-  }
+// once every send has ended, a finalize retry's pause rung on the clock
+export async function settle(chat: ChatApp) {
+  await ringing(chat.app, idle(chat.app), 200);
 }
 
 export const call = (
@@ -106,10 +109,12 @@ export const call = (
 
 export type ToolPlan = {
   result?: ToolResult;
-  delayTicks?: number;
+  // ends only once the named call has ended, so ends land in an order
+  after?: string;
   hang?: boolean;
   onRun?: () => void;
-  ignoreAbort?: number;
+  // reports its result once the abort came
+  ignoreAbort?: boolean;
 };
 
 type FakeToolsCap = {
@@ -126,7 +131,24 @@ type FakeToolsCap = {
 
 export function fakeTools(plans: Record<string, ToolPlan>): {
   tools: FakeToolsCap;
+  // once the call has started
+  ran(id: string): Promise<void>;
 } {
+  const calls = new Map<
+    string,
+    { started: PromiseWithResolvers<void>; ended: PromiseWithResolvers<void> }
+  >();
+  const of = (id: string) => {
+    let call = calls.get(id);
+    if (call === undefined) {
+      call = {
+        started: Promise.withResolvers<void>(),
+        ended: Promise.withResolvers<void>(),
+      };
+      calls.set(id, call);
+    }
+    return call;
+  };
   const schemas: Offered["tools"] = [
     {
       name: "datetime",
@@ -140,6 +162,7 @@ export function fakeTools(plans: Record<string, ToolPlan>): {
     },
   ];
   return {
+    ran: (id) => of(id).started.promise,
     tools: {
       capabilities: () => [],
       serverNames: () => [],
@@ -162,32 +185,50 @@ export function fakeTools(plans: Record<string, ToolPlan>): {
         const plan = plans[c.id] ?? {
           result: { content: `ran ${c.name}`, error: false },
         };
-        if (plan.hang) {
-          // Reject on abort so allSettled releases the send's lock.
-          return new Promise<ToolResult>((_resolve, reject) => {
-            if (ctx.signal.aborted) {
-              reject(new Error("aborted"));
-              return;
-            }
-            ctx.signal.addEventListener(
-              "abort",
-              () => reject(new Error("aborted")),
-              { once: true },
-            );
-          });
+        const call = of(c.id);
+        call.started.resolve();
+        try {
+          return await outcome(plan, c, ctx);
+        } finally {
+          call.ended.resolve();
         }
-        if (plan.ignoreAbort) {
-          for (let i = 0; i < plan.ignoreAbort; i++) await tick();
-          return plan.result ?? { content: "late result", error: false };
-        }
-        if (plan.delayTicks) {
-          for (let i = 0; i < plan.delayTicks; i++) await tick();
-        }
-        plan.onRun?.();
-        return plan.result ?? { content: `ran ${c.name}`, error: false };
       },
     },
   };
+
+  async function outcome(
+    plan: ToolPlan,
+    c: ToolCall,
+    ctx: { signal: AbortSignal },
+  ): Promise<ToolResult> {
+    if (plan.hang) {
+      // Reject on abort so allSettled releases the send's lock.
+      return new Promise<ToolResult>((_resolve, reject) => {
+        if (ctx.signal.aborted) {
+          reject(new Error("aborted"));
+          return;
+        }
+        ctx.signal.addEventListener(
+          "abort",
+          () => reject(new Error("aborted")),
+          { once: true },
+        );
+      });
+    }
+    if (plan.ignoreAbort) {
+      await new Promise((resolve) =>
+        ctx.signal.addEventListener("abort", resolve, { once: true }),
+      );
+      return plan.result ?? { content: "late result", error: false };
+    }
+    if (plan.after !== undefined) {
+      await of(plan.after).ended.promise;
+      // its end written before this one's
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    plan.onRun?.();
+    return plan.result ?? { content: `ran ${c.name}`, error: false };
+  }
 }
 
 export function toolRound(script: Script, calls: ToolCallFrame[]) {

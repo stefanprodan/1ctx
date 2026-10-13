@@ -4,7 +4,12 @@
 import { expect, test } from "bun:test";
 import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
 import type { AgentsResponse } from "../../../src/shared/api/agents.ts";
-import { chatApp, FLASH, startChat, tick } from "../../helpers/chat.ts";
+import {
+  chatApp,
+  FLASH,
+  idle as runnerIdle,
+  startChat,
+} from "../../helpers/chat.ts";
 
 async function activity(chat: Awaited<ReturnType<typeof chatApp>>) {
   const res = await chat.admin.call("GET", "/api/agents");
@@ -24,10 +29,7 @@ test("the agents list says when each agent last ran and what runs now", async ()
   ]);
 
   started.script.reply("done");
-  for (let i = 0; i < 50; i++) {
-    if (!(await activity(chat))[0]?.running) break;
-    await tick();
-  }
+  await runnerIdle(chat.app);
   const after = await activity(chat);
   expect(after).toEqual([
     { agentId: chat.agentId, lastAt: at, running: false },
@@ -44,21 +46,13 @@ test("an agent's usage sums its last 30 days, cost 0 with none and null when unp
   expect(await empty.json()).toMatchObject({ sends: 0, tokens: 0, cost: 0 });
   const started = await startChat(chat);
   started.script.reply("done");
-  for (let i = 0; i < 50; i++) {
-    // the window is [since, until): a row stamped now is not in it yet
-    chat.app.now.value += 1;
-    const res = await chat.admin.call(
-      "GET",
-      `/api/agents/${chat.agentId}/usage`,
-    );
-    const body = (await res.json()) as SendTotalsResponse;
-    if (body.sends === 1) {
-      expect(body.tokens).toBeGreaterThan(0);
-      expect(body.cost).toBeNull();
-      expect(body.until - body.since).toBe(30 * 24 * 60 * 60 * 1000);
-      return;
-    }
-    await tick();
-  }
-  throw new Error("the turn never counted");
+  await runnerIdle(chat.app);
+  // the window is [since, until): a row stamped now is not in it yet
+  chat.app.now.value += 1;
+  const res = await chat.admin.call("GET", `/api/agents/${chat.agentId}/usage`);
+  const body = (await res.json()) as SendTotalsResponse;
+  expect(body.sends).toBe(1);
+  expect(body.tokens).toBeGreaterThan(0);
+  expect(body.cost).toBeNull();
+  expect(body.until - body.since).toBe(30 * 24 * 60 * 60 * 1000);
 });

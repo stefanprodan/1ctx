@@ -82,7 +82,7 @@ describe("process slots", () => {
         });
         expect(heldSessions().has(s.session.id)).toBe(false);
         for (let i = 0; i < PROCESS_SLOTS; i++)
-          slots.push(await acquireProcess(AbortSignal.timeout(1000)));
+          slots.push(await acquireProcess(new AbortController().signal));
         for (const release of slots) release();
         s.knowledge.store.mounted = read;
         expect((await run(s, "true")).error).toBe(false);

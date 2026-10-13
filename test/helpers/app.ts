@@ -307,6 +307,12 @@ export function collectLogs(): {
 export type TestApp = App & {
   db: Db;
   now: { value: number };
+  // when each pending sleep on the fake clock rings
+  sleeping(): number[];
+  // when the next sleep made on the fake clock rings, once one matches
+  slept(match?: (at: number) => boolean): Promise<number>;
+  // once a command of the chat reported the phase, at once if one did
+  commandPhase(sessionId: string, phase: "run" | "diff"): Promise<void>;
   // what the fake fetch was asked
   fetched: FakeCall[];
   // what the fake sender was handed, and its next answer
@@ -360,6 +366,10 @@ export async function testApp(
   const db = options.db ?? memoryDb();
   let current = 1_000_000;
   const sleepers = new Set<{ at: number; resolve: () => void }>();
+  const sleeps = new Set<{
+    match: (at: number) => boolean;
+    resolve: (at: number) => void;
+  }>();
   const now = {
     get value() {
       return current;
@@ -374,11 +384,29 @@ export async function testApp(
     },
   };
   const clock = Object.assign(() => current, {
-    sleep: (ms: number) =>
+    sleep: (ms: number, signal?: AbortSignal) =>
       new Promise<void>((resolve) => {
-        sleepers.add({ at: current + ms, resolve });
+        const sleeper = { at: current + ms, resolve };
+        sleepers.add(sleeper);
+        for (const heard of [...sleeps]) {
+          if (!heard.match(sleeper.at)) continue;
+          sleeps.delete(heard);
+          heard.resolve(sleeper.at);
+        }
+        // a cancelled sleep never rings, as a cleared timer
+        signal?.addEventListener("abort", () => sleepers.delete(sleeper), {
+          once: true,
+        });
       }),
   });
+  const phases = new Set<string>();
+  const phaseWaiters = new Map<string, (() => void)[]>();
+  const onCommandPhase = (sessionId: string, phase: "run" | "diff") => {
+    const key = `${sessionId} ${phase}`;
+    phases.add(key);
+    for (const resolve of phaseWaiters.get(key) ?? []) resolve();
+    phaseWaiters.delete(key);
+  };
   const trustProxy = options.trustProxy ?? false;
   const adminPassword =
     options.adminPassword === undefined
@@ -415,6 +443,7 @@ export async function testApp(
     trustProxy,
     tools: options.tools,
     ...(options.commandWorker ? { commandWorker: options.commandWorker } : {}),
+    onCommandPhase,
     activate: options.activate,
     drainMs: options.drainMs,
     cacheDir: options.cacheDir,
@@ -426,6 +455,15 @@ export async function testApp(
     ...app,
     db,
     now,
+    sleeping: () => [...sleepers].map((sleeper) => sleeper.at),
+    slept: (match = () => true) =>
+      new Promise<number>((resolve) => sleeps.add({ match, resolve })),
+    commandPhase: (sessionId, phase) =>
+      new Promise<void>((resolve) => {
+        const key = `${sessionId} ${phase}`;
+        if (phases.has(key)) return resolve();
+        phaseWaiters.set(key, [...(phaseWaiters.get(key) ?? []), resolve]);
+      }),
     fetched: fake.calls,
     emailSender,
     client(address = "127.0.0.1") {

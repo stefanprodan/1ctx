@@ -1,18 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import {
   ARCHIVE_DEADLINE_MS,
   MAX_ARCHIVE_UPLOAD,
   PROCESS_SLOTS,
 } from "../../../src/server/knowledge/limits.ts";
-import {
-  acquireProcess,
-  acquireUpload,
-} from "../../../src/server/knowledge/queue.ts";
+import * as queue from "../../../src/server/knowledge/queue.ts";
+import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { stage } from "../../../src/server/knowledge/stage.ts";
-import { Conflict } from "../../../src/server/lib/errors.ts";
 import { setup } from "./helpers.ts";
 import { setupUploads, staged, stalledBody } from "./uploads-helpers.ts";
 
@@ -24,18 +21,20 @@ async function holdSlots(count = PROCESS_SLOTS) {
   return releases;
 }
 
-async function waitForUpload(userId: string) {
-  const end = Date.now() + 2000;
-  while (Date.now() < end) {
-    try {
-      acquireUpload(userId)();
-    } catch (error) {
-      if (error instanceof Conflict) return;
-      throw error;
-    }
-    await Bun.sleep(1);
-  }
-  throw new Error("the upload was not admitted");
+// the moment an upload of the user's holds the guard; the spy patches a
+// module export, so every test using it is serial
+function admission(userId: string) {
+  const acquire = queue.acquireUpload;
+  let admit = () => {};
+  const admitted = new Promise<void>((resolve) => {
+    admit = resolve;
+  });
+  const spy = spyOn(queue, "acquireUpload").mockImplementation((id) => {
+    const release = acquire(id);
+    if (id === userId) admit();
+    return release;
+  });
+  return { admitted, restore: () => spy.mockRestore() };
 }
 
 for (const transport of ["composed", "listener"] as const) {
@@ -112,9 +111,10 @@ for (const transport of ["composed", "listener"] as const) {
       const s = await setupUploads(transport);
       const body = stalledBody("first");
       const stop = new AbortController();
+      const watch = admission(s.owner.id);
       const pending = s.upload({ body: body.body, signal: stop.signal });
       try {
-        await waitForUpload(s.owner.id);
+        await watch.admitted;
         const second = await s.upload();
         expect(second.status).toBe(409);
         expect(await second.json()).toEqual({ error: "an upload is running" });
@@ -139,6 +139,7 @@ for (const transport of ["composed", "listener"] as const) {
         expect(await staged(await pending)).toMatchObject({ bytes: 10 });
         expect(await staged(await s.upload())).toMatchObject({ files: 1 });
       } finally {
+        watch.restore();
         body.cleanup();
         stop.abort();
         await pending.catch(() => {});
@@ -153,9 +154,10 @@ for (const transport of ["composed", "listener"] as const) {
       const s = await setupUploads(transport);
       const slots = await holdSlots();
       const stop = new AbortController();
+      const watch = admission(s.owner.id);
       const pending = s.upload({ signal: stop.signal });
       try {
-        await waitForUpload(s.owner.id);
+        await watch.admitted;
         expect((await s.upload()).status).toBe(409);
         s.app.now.value += ARCHIVE_DEADLINE_MS;
         const response = await pending;
@@ -167,6 +169,7 @@ for (const transport of ["composed", "listener"] as const) {
         slots[0]!();
         expect(await staged(await s.upload())).toMatchObject({ files: 1 });
       } finally {
+        watch.restore();
         stop.abort();
         for (const release of slots) release();
         await pending.catch(() => {});
@@ -181,9 +184,10 @@ for (const transport of ["composed", "listener"] as const) {
       const s = await setupUploads(transport);
       const body = stalledBody("prefix");
       const stop = new AbortController();
+      const watch = admission(s.owner.id);
       const pending = s.upload({ body: body.body, signal: stop.signal });
       try {
-        await waitForUpload(s.owner.id);
+        await watch.admitted;
         body.cleanup();
         s.app.now.value += ARCHIVE_DEADLINE_MS;
         const response = await pending;
@@ -194,6 +198,7 @@ for (const transport of ["composed", "listener"] as const) {
         expect((await s.list()).items).toEqual([]);
         expect(await staged(await s.upload())).toMatchObject({ files: 1 });
       } finally {
+        watch.restore();
         body.cleanup();
         stop.abort();
         await pending.catch(() => {});
@@ -250,9 +255,10 @@ test.serial(
       ),
       signal: stop.signal,
     });
+    const watch = admission(s.owner.id);
     const pending = s.send(req);
     try {
-      await waitForUpload(s.owner.id);
+      await watch.admitted;
       expect(pulled).toBe(false);
       stop.abort(new DOMException("client left", "AbortError"));
       const response = await pending;
@@ -263,6 +269,7 @@ test.serial(
       slots[0]!();
       expect(await staged(await s.upload())).toMatchObject({ files: 1 });
     } finally {
+      watch.restore();
       stop.abort();
       for (const release of slots) release();
       await pending.catch(() => {});

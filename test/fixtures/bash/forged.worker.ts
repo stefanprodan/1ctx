@@ -4,16 +4,20 @@
 // A command worker gone wrong, as a command able to post would make it,
 // picked by the job's command. forge: answers for another id, a type
 // outside the protocol, a read past the kept list and one request number
-// sent twice, then one well-formed answer that says how many kept
-// replies came back, and a second answer after it. malformed: an answer
-// of this job in the wrong shape. request: a read request of this job in
-// the wrong shape, then nothing. close: the worker ends
-// itself mid-job. prompt: a good answer at once. refused: a refusal that
-// still carries a doc change.
+// sent twice, then a last read whose reply, the main thread answering in
+// order, follows every earlier one; then one well-formed answer that says
+// how many kept replies came back before it, and a second answer after
+// it. malformed: an answer of this job in the wrong shape. request: a
+// read request of this job in the wrong shape, then nothing. close: the worker ends itself mid-job,
+// once a reply shows its phase was read. prompt: a good answer at once.
+// refused: a refusal that still carries a doc change.
 
 declare var self: Worker;
 
 let replies = 0;
+// the forge's last read
+const LAST = 2;
+let closing = false;
 
 const answer = (stdout: string) => ({
   stdout,
@@ -33,7 +37,14 @@ self.onmessage = (event: MessageEvent) => {
   };
   const id = message.id;
   if (message.type === "kept") {
-    replies++;
+    if (closing) process.exit(0);
+    const request = (message as unknown as { request: number }).request;
+    if (request !== LAST) {
+      replies++;
+      return;
+    }
+    self.postMessage({ type: "done", id, answer: answer(`${replies}`) });
+    self.postMessage({ type: "done", id, answer: answer("late") });
     return;
   }
   const empty = { knowledge: [], written: [], removed: [], cwd: "/tmp" };
@@ -123,7 +134,8 @@ self.onmessage = (event: MessageEvent) => {
   }
   if (command === "close") {
     self.postMessage({ type: "phase", id, phase: "run", notice: "" });
-    setTimeout(() => process.exit(0), 50);
+    closing = true;
+    self.postMessage({ type: "kept", id, request: 0, index: 0 });
     return;
   }
   self.postMessage({ type: "done", id: "another", answer: answer("other") });
@@ -131,9 +143,5 @@ self.onmessage = (event: MessageEvent) => {
   self.postMessage({ type: "kept", id, request: 0, index: 99 });
   self.postMessage({ type: "kept", id, request: 1, index: 0 });
   self.postMessage({ type: "kept", id, request: 1, index: 0 });
-  // the replies land before the answer that counts them
-  setTimeout(() => {
-    self.postMessage({ type: "done", id, answer: answer(`${replies}`) });
-    self.postMessage({ type: "done", id, answer: answer("late") });
-  }, 200);
+  self.postMessage({ type: "kept", id, request: LAST, index: 0 });
 };

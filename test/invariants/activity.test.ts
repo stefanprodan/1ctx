@@ -10,9 +10,9 @@ import type { DirectoryUserDaysResponse } from "../../src/shared/api/directory.t
 import {
   type ChatApp,
   chatApp,
+  idle,
   type Script,
   startChat,
-  tick,
 } from "../helpers/chat.ts";
 
 const DAY = 86_400_000;
@@ -21,9 +21,7 @@ async function finish(chat: ChatApp, script: Script): Promise<void> {
   script.content("done");
   script.finish();
   script.end();
-  for (let i = 0; i < 100 && chat.app.runner.registry.size > 0; i++) {
-    await tick();
-  }
+  await idle(chat.app);
   expect(chat.app.runner.registry.size).toBe(0);
 }
 

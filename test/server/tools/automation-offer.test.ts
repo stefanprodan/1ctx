@@ -18,8 +18,8 @@ import {
   type ChatApp,
   chatApp,
   FLASH,
+  freed,
   type Script,
-  tick,
   waitScript,
 } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
@@ -147,10 +147,7 @@ describe("the offer", () => {
       await chat.makeAgent({ name: "checker", model: FLASH });
       const { script, sessionId } = await start(chat);
       await finish(chat, script);
-      for (let i = 0; i < 400; i++) {
-        if (chat.app.runner.registry.get(sessionId) === null) break;
-        await tick();
-      }
+      await freed(chat.app, sessionId);
       const count = chat.scripted.scripts.length;
       const posted = await chat.member.call(
         "POST",

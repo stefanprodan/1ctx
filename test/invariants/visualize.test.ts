@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import { wireTokens } from "../../src/server/providers/index.ts";
 import type { ToolsResponse } from "../../src/shared/api/tools.ts";
-import { chatApp, NO_TOOLS, startChat, tick } from "../helpers/chat.ts";
+import { chatApp, idle, NO_TOOLS, startChat } from "../helpers/chat.ts";
 
 describe("visual tool administration", () => {
   test("saved hosts change the next schema and its catalog token count", async () => {
@@ -30,9 +30,7 @@ describe("visual tool administration", () => {
       expect(catalog.description).toContain("https://a.test, https://z.test");
       expect(initial.description).not.toContain("https://a.test");
       first.script.reply("done");
-      for (let i = 0; i < 100 && chat.app.runner.registry.size > 0; i++) {
-        await tick();
-      }
+      await idle(chat.app);
       const second = await startChat(chat, "second");
       const offered = chat.app.runner.registry
         .get(second.sessionId)!

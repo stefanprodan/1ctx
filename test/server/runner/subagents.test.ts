@@ -11,10 +11,11 @@ import { testApp } from "../../helpers/app.ts";
 import { createAutomation, startRun } from "../../helpers/automations.ts";
 import {
   chatApp,
+  freed,
   NO_TOOLS,
   setLimits,
   startChat,
-  tick,
+  until,
   waitScript,
 } from "../../helpers/chat.ts";
 import {
@@ -340,15 +341,16 @@ describe("a run's child", () => {
       answer.reply("all good");
       // the attention step and the memory phase, each the parent's alone
       let answered = 3;
-      for (let i = 0; i < 400; i++) {
-        if (chat.app.runner.registry.get(run.sessionId) === null) break;
-        const scripts = chat.scripted.scripts;
-        if (scripts.length > answered) {
-          expect(isChild(scripts[answered]!)).toBe(false);
-          scripts[answered]!.reply("nothing");
-          answered++;
-        }
-        await tick();
+      const done = freed(chat.app, run.sessionId).then(() => null);
+      for (;;) {
+        const next = await Promise.race([
+          done,
+          chat.scripted.reached(answered + 1),
+        ]);
+        if (next === null) break;
+        expect(isChild(next)).toBe(false);
+        next.reply("nothing");
+        answered++;
       }
       await settled(chat, run.sessionId);
       const steps = chat.scripted.scripts.slice(3).map((s) => toolNames(s));
@@ -382,8 +384,7 @@ describe("restart repair", () => {
       script.toolRound([delegateCall("d1", "long task")]);
       script.end();
       await waitScript(chat.scripted, 2);
-      for (let i = 0; i < 50 && childrenOf(chat, sessionId).length === 0; i++)
-        await tick();
+      await until(() => childrenOf(chat, sessionId).length > 0);
       const [childId] = childrenOf(chat, sessionId);
       expect(scratchLeft(chat, childId!)).toBeGreaterThan(0);
       chat.app.automationScheduler.dispose();

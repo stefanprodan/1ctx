@@ -12,7 +12,12 @@ import { chatMarkdown } from "../../src/server/sessions/index.ts";
 import { sanitize } from "../../src/shared/memory.ts";
 import { createKey } from "../helpers/access-keys.ts";
 import { collectLogs, ORIGIN } from "../helpers/app.ts";
-import { type ChatApp, chatApp, setLimits, tick } from "../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  sessionSettled,
+  setLimits,
+} from "../helpers/chat.ts";
 import { createTeam } from "../helpers/projects.ts";
 
 const PAGE_BYTES = 32 * 1024;
@@ -150,11 +155,7 @@ async function createFile(
 }
 
 async function settle(chat: ChatApp, sessionId: string) {
-  for (let index = 0; index < 400; index++) {
-    if (chat.app.sessions.byId(sessionId)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("session did not settle");
+  await sessionSettled(chat.app, sessionId);
 }
 
 describe("the composed inbound MCP endpoint", () => {
@@ -504,14 +505,26 @@ describe("the composed inbound MCP endpoint", () => {
         release = resolve;
       });
       const half = Math.floor(payload.length / 2);
-      const stream = new ReadableStream<Uint8Array>({
-        async start(controller) {
-          controller.enqueue(new TextEncoder().encode(payload.slice(0, half)));
-          await gate;
-          controller.enqueue(new TextEncoder().encode(payload.slice(half)));
-          controller.close();
+      // pulled only when read, so the first pull is the server reading
+      const reading = Promise.withResolvers<void>();
+      let pulls = 0;
+      const stream = new ReadableStream<Uint8Array>(
+        {
+          async pull(controller) {
+            if (pulls++ === 0) {
+              reading.resolve();
+              controller.enqueue(
+                new TextEncoder().encode(payload.slice(0, half)),
+              );
+              return;
+            }
+            await gate;
+            controller.enqueue(new TextEncoder().encode(payload.slice(half)));
+            controller.close();
+          },
         },
-      });
+        { highWaterMark: 0 },
+      );
       const request = new Request(`${ORIGIN}/mcp`, {
         method: "POST",
         headers: {
@@ -525,7 +538,7 @@ describe("the composed inbound MCP endpoint", () => {
         body: stream,
       });
       const pending = chat.app.handle(request, "127.0.0.1");
-      await tick();
+      await reading.promise;
       expect(
         (await chat.member.call("DELETE", `/api/profile/keys/${key.key.id}`))
           .status,

@@ -48,7 +48,7 @@ const job = (command: string, fields: Partial<Job> = {}): Job => ({
 });
 const stops = () => ({
   signal: new AbortController().signal,
-  deadline: AbortSignal.timeout(10_000),
+  deadline: new AbortController().signal,
   chat: "chat",
 });
 
@@ -142,25 +142,14 @@ describe("a command worker's answer is untrusted", () => {
 
 describe("the bridge keeps the shell's behaviour", () => {
   test("a fetch curl gives up on under timeout ends alone", async () => {
-    let aborted = false;
-    const slow: SecureFetch = (url, options) =>
-      new Promise<FetchResult>((resolve, reject) => {
-        const timer = setTimeout(
-          () =>
-            resolve({
-              status: 200,
-              statusText: "OK",
-              headers: {},
-              body: new TextEncoder().encode("late"),
-              url,
-            }),
-          2000,
-        );
+    const aborted = Promise.withResolvers<void>();
+    // never answers, so only curl's timeout ends it
+    const slow: SecureFetch = (_url, options) =>
+      new Promise<FetchResult>((_resolve, reject) => {
         options?.signal?.addEventListener(
           "abort",
           () => {
-            clearTimeout(timer);
-            aborted = true;
+            aborted.resolve();
             reject(new Error("The operation was aborted."));
           },
           { once: true },
@@ -176,8 +165,7 @@ describe("the bridge keeps the shell's behaviour", () => {
       ok: true,
       answer: { stdout: "after\n", exitCode: 0 },
     });
-    for (let i = 0; i < 50 && !aborted; i++) await Bun.sleep(10);
-    expect(aborted).toBe(true);
+    await aborted.promise;
   });
 
   test("a fractional or huge curl timeout reaches the fetch whole", async () => {

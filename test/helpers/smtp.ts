@@ -54,6 +54,8 @@ export function fakeSmtp(
     from: string;
     to: string[];
     secure: boolean;
+    // set on the plain socket once it is upgraded
+    upgraded: boolean;
   };
   const tls = { cert: LOOPBACK_CERT, key: LOOPBACK_KEY };
   const fresh = (secure: boolean): State => ({
@@ -63,9 +65,12 @@ export function fakeSmtp(
     from: "",
     to: [],
     secure,
+    upgraded: false,
   });
   const onData = (socket: Socket<State>, chunk: Uint8Array) => {
     const state = socket.data;
+    // Bun keeps calling the plain handler with the TLS bytes
+    if (state.upgraded) return;
     state.buffer += new TextDecoder().decode(chunk);
     for (;;) {
       const end = state.buffer.indexOf("\r\n");
@@ -127,6 +132,7 @@ export function fakeSmtp(
         socket.end();
       } else if (word === "STARTTLS" && options.starttls && !state.secure) {
         socket.write("220 go ahead\r\n");
+        state.upgraded = true;
         // the session starts over inside TLS, as RFC 3207 says
         socket.upgradeTLS<State>({
           data: fresh(true),

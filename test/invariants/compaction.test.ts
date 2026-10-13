@@ -9,16 +9,18 @@ import type { Tools } from "../../src/server/tools/index.ts";
 import type { Message } from "../../src/shared/contracts/session.ts";
 import { collectLogs } from "../helpers/app.ts";
 import type { ChatApp, Script } from "../helpers/chat.ts";
-import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
+import {
+  chatApp,
+  sessionSettled,
+  startChat,
+  waitScript,
+} from "../helpers/chat.ts";
+import { nextFrame, watch, watcher } from "../helpers/socket.ts";
 
 const HIGH_PROMPT = 1_040_000;
 
 async function settle(chat: ChatApp, sessionId: string): Promise<void> {
-  for (let i = 0; i < 200; i++) {
-    if (chat.app.sessions.byId(sessionId)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error(`chat ${sessionId} did not settle`);
+  await sessionSettled(chat.app, sessionId);
 }
 
 function finish(
@@ -267,16 +269,17 @@ describe("compaction", () => {
     const started = await startChat(chat);
     finish(started.script, "answer", HIGH_PROMPT, 10);
     const summary = await waitScript(chat.scripted, 2);
+    const conn = await watcher(chat);
+    watch(chat, conn, started.sessionId);
+    const streamed = nextFrame(
+      conn,
+      (frame) => frame.type === "delta" && frame.content === "partial summary",
+    );
     summary.content("partial summary");
-    for (let i = 0; i < 20; i++) {
-      if (
-        chat.app.runner.registry.get(started.sessionId)?.round?.content ===
-        "partial summary"
-      ) {
-        break;
-      }
-      await tick();
-    }
+    await streamed;
+    expect(
+      chat.app.runner.registry.get(started.sessionId)?.round?.content,
+    ).toBe("partial summary");
     const stopped = await chat.member.call(
       "POST",
       `/api/sessions/${started.sessionId}/stop`,
@@ -515,9 +518,7 @@ describe("compaction", () => {
       `/api/sessions/${started.sessionId}/compact`,
     );
     expect(response.status).toBe(200);
-    for (let i = 0; i < 200 && chat.scripted.requests.length < 5; i++) {
-      await tick();
-    }
+    await chat.scripted.asked(5);
     const sent = chat.scripted.requests[4]!;
     // the tool result and the stopped turn the measure never saw
     expect(sent.inputTokens).toBeGreaterThan(28_000);

@@ -5,17 +5,19 @@ import { describe, expect, test } from "bun:test";
 import type { Event } from "../../../src/server/runner/index.ts";
 import { collectLogs } from "../../helpers/app.ts";
 import { automationBody, createAutomation } from "../../helpers/automations.ts";
-import { chatApp, setLimits, startChat, tick } from "../../helpers/chat.ts";
+import {
+  chatApp,
+  sessionSettled,
+  setLimits,
+  startChat,
+  tick,
+} from "../../helpers/chat.ts";
 
 async function settle(
   chat: Awaited<ReturnType<typeof chatApp>>,
   sessionId: string,
 ) {
-  for (let i = 0; i < 100; i++) {
-    if (chat.app.sessions.byId(sessionId)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("run did not settle");
+  await sessionSettled(chat.app, sessionId);
 }
 
 describe("automation scheduler", () => {

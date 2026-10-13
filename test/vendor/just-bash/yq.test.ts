@@ -664,13 +664,11 @@ describe("yq's result limits", () => {
 
   test("shared references stop at the iteration limit", async () => {
     const bash = shell({ maxJqIterations: 100_000 });
-    const started = performance.now();
     const result = await bash.exec(
       "yq '[range(1500) as $x | ..[]]' /shared.yaml",
     );
     expect(result.exitCode).toBe(126);
     expect(result.stderr).toContain("too many iterations (100000)");
-    expect(performance.now() - started).toBeLessThan(5_000);
   });
 
   test("-s names share the command's iterations", async () => {

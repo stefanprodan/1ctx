@@ -613,7 +613,9 @@ describe("skills in a send", () => {
     );
     expect((await result.json()).content).toContain("Use ops.");
     expect(skill.files).toHaveLength(1);
-    // the usage routes read the skill each call named from the reply
+    // the usage routes read the skill each call named from the reply; the
+    // window excludes its upper bound, a row stamped now included
+    chat.app.now.value += 1;
     const one = await chat.admin.call("GET", `/api/skills/${skill.id}/usage`);
     expect(await one.json()).toMatchObject({
       loads: 1,

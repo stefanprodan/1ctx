@@ -27,6 +27,7 @@ import type {
   SessionDetail,
 } from "../../../src/shared/contracts/session.ts";
 import { collectLogs } from "../../helpers/app.ts";
+import { rejection } from "../../helpers/async.ts";
 import {
   createAutomation,
   settleRun,
@@ -35,6 +36,7 @@ import {
 import {
   type ChatApp,
   chatApp,
+  sessionSettled,
   setLimits,
   startChat,
   tick,
@@ -342,7 +344,7 @@ describe("every round kind retries", () => {
     const run = await startRun(chat, automation.id);
     chat.scripted.refuse(503, BUSY, { times: 1 });
     run.main.reply("Done.");
-    for (let i = 0; i < 400 && chat.scripted.chats() < 2; i++) await tick();
+    await chat.scripted.asked(2);
     await advance(chat);
     (await waitScript(chat.scripted, 2)).reply("No change.");
     await settleRun(chat, run.sessionId);
@@ -384,7 +386,7 @@ describe("every round kind retries", () => {
       { id: "time", name: "datetime", arguments: '{"timezone":"UTC"}' },
     ]);
     script.end();
-    for (let i = 0; i < 400 && chat.scripted.chats() < 2; i++) await tick();
+    await chat.scripted.asked(2);
     await tick();
     await tick();
     expect(chat.scripted.chats()).toBe(2);
@@ -399,10 +401,7 @@ describe("every round kind retries", () => {
     const chat = await chatApp();
     const { script, sessionId } = await startChat(chat, "question");
     script.reply("answer");
-    for (let i = 0; i < 200; i++) {
-      if (chat.app.sessions.byId(sessionId)?.status !== "running") break;
-      await tick();
-    }
+    await sessionSettled(chat.app, sessionId);
     chat.scripted.refuse(503, BUSY, { times: 1 });
     const compacted = await chat.member.call(
       "POST",
@@ -435,7 +434,7 @@ describe("the working line while a round waits", () => {
       { id: "time", name: "datetime", arguments: '{"timezone":"UTC"}' },
     ]);
     script.end();
-    for (let i = 0; i < 400 && chat.scripted.chats() < 2; i++) await tick();
+    await chat.scripted.asked(2);
     await tick();
     expect(frames(conn, "retry")).toEqual([
       {
@@ -492,6 +491,38 @@ describe("the working line while a round waits", () => {
   });
 });
 
+// quiet timers the test rings by hand; a cancelled one is gone
+function handQuiet() {
+  const armed = new Set<() => void>();
+  let silent = false;
+  const ring = () => {
+    for (const resolve of [...armed]) {
+      armed.delete(resolve);
+      resolve();
+    }
+  };
+  return {
+    sleep: (signal?: AbortSignal) =>
+      new Promise<void>((resolve) => {
+        armed.add(resolve);
+        signal?.addEventListener("abort", () => armed.delete(resolve), {
+          once: true,
+        });
+        if (silent) ring();
+      }),
+    // a silence longer than the window: every timer running now rings
+    ring,
+    // a silence with no end in sight: a timer rings as it starts
+    hush(on: boolean) {
+      silent = on;
+      if (on) ring();
+    },
+  };
+}
+
+// lets in-memory work that was already due run
+const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
 // runRound alone, with a chat port that plays one stream per request
 function round(
   streams: ChatEvent[][],
@@ -500,8 +531,8 @@ function round(
     chat?: (req: ChatRequest, signal: AbortSignal) => AsyncIterable<ChatEvent>;
     // the quiet timer fires at once
     quiet?: boolean;
-    // the quiet timer fires after these real milliseconds
-    idleRealMs?: number;
+    // the quiet timer fires when the test rings it
+    quietBy?: ReturnType<typeof handQuiet>;
     forgetReasoning?: RoundDeps["forgetReasoning"];
     // Stop lands during the first retry's wait
     stopInWait?: boolean;
@@ -512,13 +543,9 @@ function round(
   const sleeps: number[] = [];
   const clock = Object.assign(() => now, {
     // a retry's wait passes at once; the quiet timer never fires
-    sleep: (ms: number) => {
+    sleep: (ms: number, signal?: AbortSignal) => {
       if (ms >= STREAM_IDLE_MS) {
-        if (fields.idleRealMs !== undefined) {
-          return new Promise<void>((resolve) =>
-            setTimeout(resolve, fields.idleRealMs),
-          );
-        }
+        if (fields.quietBy !== undefined) return fields.quietBy.sleep(signal);
         return fields.quiet ? Promise.resolve() : new Promise<void>(() => {});
       }
       if (fields.stopInWait) {
@@ -619,21 +646,26 @@ describe("runRound retries", () => {
           await new Promise(() => {});
         })(),
     });
-    await expect(r.run).rejects.toThrow("the provider went quiet");
+    expect((await rejection(r.run)).message).toContain(
+      "the provider went quiet",
+    );
   });
 
   test("a resend after refused reasoning has no idle cap until it answers", async () => {
     const forgot: string[] = [];
+    const quiet = handQuiet();
     const r = round([], {
-      idleRealMs: 5,
+      quietBy: quiet,
       forgetReasoning: (sessionId, providerId, model) => {
         forgot.push(`${sessionId}/${providerId}/${model}`);
       },
       chat: () =>
         (async function* (): AsyncGenerator<ChatEvent> {
           yield { kind: "reasoningRefused" };
-          // the resend's headers wait
-          await new Promise((resolve) => setTimeout(resolve, 20));
+          // the resend's headers wait longer than the window
+          await flush();
+          quiet.ring();
+          await flush();
           yield* answer;
         })(),
     });
@@ -647,22 +679,38 @@ describe("runRound retries", () => {
   // a gap where Azure sends nothing at all, then the rest
   const azureStream = (
     before: Record<string, unknown>[],
-    gapMs: number,
     after: Record<string, unknown>[],
+    // the silence outlasts the window even once the rest arrives
+    endless = false,
   ) => {
+    const quiet = handQuiet();
+    quiet.hush(true);
     const encoder = new TextEncoder();
     const frame = (body: Record<string, unknown>) =>
       encoder.encode(`event: ${body.type}\ndata: ${JSON.stringify(body)}\n\n`);
+    let gapped = false;
     const fetcher = (async () =>
       new Response(
-        new ReadableStream<Uint8Array>({
-          async start(controller) {
-            for (const body of before) controller.enqueue(frame(body));
-            await new Promise((resolve) => setTimeout(resolve, gapMs));
-            for (const body of after) controller.enqueue(frame(body));
-            controller.close();
+        new ReadableStream<Uint8Array>(
+          {
+            start(controller) {
+              for (const body of before) controller.enqueue(frame(body));
+            },
+            // asked for more with nothing queued, then a turn of the
+            // in-memory work: the round has read the frames before the gap
+            async pull(controller) {
+              if (gapped) return;
+              gapped = true;
+              await flush();
+              if (!endless) quiet.hush(false);
+              try {
+                for (const body of after) controller.enqueue(frame(body));
+                controller.close();
+              } catch {}
+            },
           },
-        }),
+          { highWaterMark: 0 },
+        ),
         { headers: { "content-type": "text/event-stream" } },
       )) as unknown as typeof fetch;
     const provider = providerFor(
@@ -676,9 +724,8 @@ describe("runRound retries", () => {
       },
       { fetcher, secret: () => null },
     );
-    // the idle window is 30 real ms, every gap 100
     return round([], {
-      idleRealMs: 30,
+      quietBy: quiet,
       chat: (req, signal) => provider.chat(req, signal),
     });
   };
@@ -704,10 +751,7 @@ describe("runRound retries", () => {
   const completed = { type: "response.completed", response: {} };
 
   test("a silent start longer than the idle window still answers", async () => {
-    const r = azureStream([opened[0]!, opened[1]!], 100, [
-      text("hi"),
-      completed,
-    ]);
+    const r = azureStream([opened[0]!, opened[1]!], [text("hi"), completed]);
     await r.run;
     expect(r.send.round!.finishReason).toBe("stop");
   });
@@ -723,7 +767,6 @@ describe("runRound retries", () => {
           delta: "thinking",
         },
       ],
-      100,
       [reasoned, text("hi"), completed],
     );
     await r.run;
@@ -731,8 +774,10 @@ describe("runRound retries", () => {
   });
 
   test("after visible text, silence with no reasoning open goes quiet", async () => {
-    const r = azureStream([...opened, reasoned, text("hi")], 100, [completed]);
-    await expect(r.run).rejects.toThrow("the provider went quiet");
+    const r = azureStream([...opened, reasoned, text("hi")], [completed], true);
+    expect((await rejection(r.run)).message).toContain(
+      "the provider went quiet",
+    );
   });
 
   test("a stream left open by its error frame is closed on a retry", async () => {
@@ -825,7 +870,7 @@ describe("runRound retries", () => {
 
   test("two headers timeouts fail the round", async () => {
     const r = round([[timedOut], [timedOut], answer]);
-    await expect(r.run).rejects.toThrow(
+    expect((await rejection(r.run)).message).toContain(
       "local failed: the response headers timed out",
     );
     expect(r.asked()).toBe(2);
@@ -834,7 +879,7 @@ describe("runRound retries", () => {
 
   test("a headers timeout counts toward the three", async () => {
     const r = round([[timedOut], [busy], [busy], [busy], answer]);
-    await expect(r.run).rejects.toThrow("HTTP 503");
+    expect((await rejection(r.run)).message).toContain("HTTP 503");
     expect(r.asked()).toBe(4);
     expect(r.sleeps).toEqual([1000, 2000, 4000]);
     expect(r.shown).toEqual([
@@ -861,7 +906,7 @@ describe("runRound retries", () => {
 
   test("a wait past the deadline is not started", async () => {
     const r = round([[busy], answer], { deadline: 1_000_000 + 1000 });
-    await expect(r.run).rejects.toThrow("HTTP 503");
+    expect((await rejection(r.run)).message).toContain("HTTP 503");
     expect(r.asked()).toBe(1);
     expect(r.sleeps).toEqual([]);
     expect(r.shown).toEqual([]);

@@ -11,8 +11,8 @@ import type { Offered } from "../../src/server/tools/index.ts";
 import {
   type ChatApp,
   chatApp,
+  idle,
   startChat,
-  tick,
   waitScript,
 } from "../helpers/chat.ts";
 import { settle } from "../helpers/tool-loop.ts";
@@ -35,9 +35,7 @@ function codeJson(html: string): unknown {
 
 async function finish(chat: ChatApp, script: { reply(text: string): void }) {
   script.reply("done");
-  for (let i = 0; i < 100 && chat.app.runner.registry.size > 0; i++) {
-    await tick();
-  }
+  await idle(chat.app);
   expect(chat.app.runner.registry.size).toBe(0);
 }
 
@@ -288,6 +286,8 @@ describe("tool usage through the composed app", () => {
         expect(rows.map((row) => [row.toolName, row.status])).toEqual([
           [tool, "failed"],
         ]);
+        // the window excludes its upper bound, a row stamped now included
+        chat.app.now.value += 1;
         const after = await chat.admin.call("GET", `/api/usage/${page}`);
         expect(after.status).toBe(200);
         expect(await after.json()).toMatchObject({ ...counts, failed: 1 });

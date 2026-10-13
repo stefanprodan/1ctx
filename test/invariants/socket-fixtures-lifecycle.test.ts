@@ -29,12 +29,12 @@ import {
 async function restart(
   name: string,
   plans: Record<string, ToolPlan>,
-  build: (chat: ChatApp, sessionId: string, sendId: string) => Promise<void>,
+  build: (chat: ChatApp, fake: ReturnType<typeof fakeTools>) => Promise<void>,
 ) {
   const fake = fakeTools(plans);
   const chat = await chatApp(fake);
-  const { detail, sessionId } = await startChat(chat, name);
-  await build(chat, sessionId, detail.send.id);
+  const { sessionId, detail } = await startChat(chat, name);
+  await build(chat, fake);
   // The first app must not receive events from repair on the shared bus.
   chat.app.socket.dispose();
   const fresh = await compose({
@@ -97,7 +97,7 @@ describe("socket fixtures for lifecycle", () => {
     script.toolCall(call("c1"));
     await tick();
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    await settle(chat, 8);
+    await settle(chat);
     record("stop-work-text", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
     chat.app.socket.dispose();
@@ -113,7 +113,7 @@ describe("socket fixtures for lifecycle", () => {
     await tick();
     await tick();
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    await settle(chat, 8);
+    await settle(chat);
     record("stop-after-call-delta", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
     chat.app.socket.dispose();
@@ -126,9 +126,9 @@ describe("socket fixtures for lifecycle", () => {
     const { detail, script, sessionId } = await startChat(chat, "stop tool");
     watch(chat, conn, sessionId);
     toolRound(script, [call("c1")]);
-    await settle(chat, 4);
+    await fake.ran("c1");
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    await settle(chat, 8);
+    await settle(chat);
     record("stop-during-tool", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
     const last = conn.frames.filter((f) => f.type === "session").at(-1)!;
@@ -154,7 +154,7 @@ describe("socket fixtures for lifecycle", () => {
     await tick();
     await tick();
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    await settle(chat, 8);
+    await settle(chat);
     record("stop-during-answer", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("stop");
     chat.app.socket.dispose();
@@ -172,7 +172,7 @@ describe("socket fixtures for lifecycle", () => {
     const r2 = await chat.scripted.next();
     r2.content("partial");
     r2.end();
-    await settle(chat, 10);
+    await settle(chat);
     record("provider-failure-round2", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("failure");
     chat.app.socket.dispose();
@@ -185,7 +185,7 @@ describe("socket fixtures for lifecycle", () => {
     const { detail, script, sessionId } = await startChat(chat, "shut tool");
     watch(chat, conn, sessionId);
     toolRound(script, [call("c1")]);
-    await settle(chat, 4);
+    await fake.ran("c1");
     await chat.app.shutdown();
     record("shutdown-during-tool", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.cause).toBe("shutdown");
@@ -209,7 +209,7 @@ describe("socket fixtures for lifecycle", () => {
     toolRound(script, [call("c1")]);
     const r2 = await chat.scripted.next();
     r2.reply("would answer");
-    await settle(chat, 12);
+    await settle(chat);
     (chat.app.sessions as { finishSend: unknown }).finishSend = original;
     record("finalization-failure", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.status).toBe("running");
@@ -220,10 +220,10 @@ describe("socket fixtures for lifecycle", () => {
     await restart(
       "restart-during-tools",
       { c1: { hang: true } },
-      async (chat) => {
+      async (chat, fake) => {
         const script = chat.scripted.scripts[0];
         toolRound(script, [call("c1")]);
-        await settle(chat, 4);
+        await fake.ran("c1");
       },
     );
   });
@@ -235,8 +235,9 @@ describe("socket fixtures for lifecycle", () => {
       async (chat) => {
         const script = chat.scripted.scripts[0];
         toolRound(script, [call("c1")]);
-        await settle(chat, 4);
         const r2 = await waitScript(chat.scripted, 2);
+        // past the stream's write interval, so the partial reply is saved
+        chat.app.now.value += 250;
         r2.content("streaming round 2");
         await tick();
         await tick();
@@ -252,7 +253,7 @@ describe("socket fixtures for lifecycle", () => {
         // The earliest post-tool state is an empty streaming round-2 reply.
         const script = chat.scripted.scripts[0];
         toolRound(script, [call("c1")]);
-        await settle(chat, 2);
+        await waitScript(chat.scripted, 2);
       },
     );
   });

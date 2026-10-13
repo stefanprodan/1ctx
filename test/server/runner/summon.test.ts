@@ -18,6 +18,7 @@ import {
   type ChatApp,
   chatApp,
   FLASH,
+  freed,
   type Script,
   startChat,
   tick,
@@ -51,11 +52,7 @@ const system = (script: Script) =>
 // until the chat's lock is let go, so the next message is a turn
 async function free(chat: ChatApp, sessionId: string) {
   await settleRun(chat, sessionId);
-  for (let i = 0; i < 400; i++) {
-    if (chat.app.runner.registry.get(sessionId) === null) return;
-    await tick();
-  }
-  throw new Error("the lock was not let go");
+  await freed(chat.app, sessionId);
 }
 
 async function post(chat: ChatApp, sessionId: string, message: string) {
