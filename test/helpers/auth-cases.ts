@@ -195,12 +195,6 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 400, admin: 400 },
   },
   {
-    method: "PATCH",
-    path: "/api/profile/project",
-    body: { description: "" },
-    expect: { anonymous: 401, member: 200, admin: 200 },
-  },
-  {
     method: "POST",
     path: "/api/profile/password",
     // authenticated: the handler then checks the current password,
@@ -318,6 +312,31 @@ export const AUTH_CASES: AuthCase[] = [
     method: "DELETE",
     path: "/api/projects/:id/members/:userId",
     expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    // a project's metadata: any user who sees the project, through the
+    // project access check, so a project the caller may not see is 404
+    method: "PATCH",
+    path: "/api/projects/:id/about",
+    body: { description: "Incidents and pages" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/labels",
+    body: { name: "ops" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/projects/:id/labels/:labelId",
+    body: { name: "ops" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id/labels/:labelId",
+    expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     // through the project access check: a project the caller may not

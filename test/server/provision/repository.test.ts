@@ -45,7 +45,7 @@ function check(
     inventory(existing),
     () => null,
     { mode: "all", domains: [] },
-    () => ({ caps: DEFAULT_LIMITS, live: [] }),
+    () => ({ caps: DEFAULT_LIMITS, live: [], labels: [] }),
     { key: () => "ok", list: () => [], ...view },
   );
 }

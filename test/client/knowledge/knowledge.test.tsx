@@ -159,6 +159,7 @@ const shown = {
   memberCount: 1,
   description: "",
   members: [],
+  labels: [],
   chats: 2,
   knowledge: { files: 1, tokens: 620 },
   latestFiles: [],

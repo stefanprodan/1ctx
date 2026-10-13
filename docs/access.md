@@ -216,8 +216,24 @@ from `emailOn` in `GET /api/me`.
   a decider's and a user's page count across every project as one
   series. An admin sees a user's usage as their personal project's
   totals alone.
-- **Only admins manage team projects.** An owner only describes their
-  personal project, through `PATCH /api/profile/project`.
+- **Only admins manage team projects:** their name, members and
+  deletion, and the description through `PATCH /api/projects/:id`.
+- **Any user who sees a project writes its metadata,** its description
+  and its labels: a team project's members and every admin, a personal
+  project's owner alone. `PATCH /api/projects/:id/about` takes the
+  description (a team's required), and `POST /api/projects/:id/labels`,
+  `PATCH` and `DELETE` on `.../labels/:labelId` the labels, each
+  through `access.project()` inside its transaction and answering the
+  detail. No chat or `/mcp` tool writes either.
+- **A label is a project's row** (`project_labels`), linked by id so a
+  rename keeps its links. A name is 1 to 24 of `a-z`, `0-9` and `-`,
+  starting with a letter or digit, trimmed and lowercased first; a
+  description one line of at most 100 characters. At most 20 a
+  project; a duplicate name, the 21st and the last label's delete are
+  a 409. Every new project, team or personal, gets `DEFAULT_LABELS` in
+  the transaction that makes it, unless an admin's create names its
+  own `labels`. Once items link labels, a delete removes the links in
+  its transaction.
 - **Deleting a team project is refused while a chat runs.** It takes
   the chats and keeps their usage.
 - **Repositories follow the same split** (`docs/repos.md`). Anyone who

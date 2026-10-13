@@ -23,6 +23,9 @@ export function statements(db: Database) {
     project: q(
       `insert into projects (id, kind, name, description, owner_id, created_at) values (?, ?, ?, ?, ?, ?)`,
     ),
+    label: q(
+      `insert into project_labels (id, project_id, name, description, created_at) values (?, ?, ?, ?, ?)`,
+    ),
     member: q(
       `insert into memberships (project_id, user_id, created_at) values (?, ?, ?)`,
     ),

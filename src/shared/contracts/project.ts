@@ -6,6 +6,7 @@
 
 import type { ProjectKind } from "../words.ts";
 import type { KnowledgeCounts, KnowledgeFile } from "./knowledge.ts";
+import type { ProjectLabel } from "./label.ts";
 import type { UserSummary } from "./user.ts";
 
 export type ProjectSummary = {
@@ -21,6 +22,8 @@ export type ProjectDetail = ProjectSummary & {
   // empty for none
   description: string;
   members: UserSummary[];
+  // by name, MAX_LABELS_PER_PROJECT at most
+  labels: ProjectLabel[];
   chats: number;
   // the knowledge base, for the aside and the tab's count
   knowledge: KnowledgeCounts;

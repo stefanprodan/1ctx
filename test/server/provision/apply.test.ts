@@ -570,6 +570,64 @@ describe("provision through the composed app", () => {
     }
   });
 
+  test("creates and updates listed labels and leaves the rest", async () => {
+    const { app } = await instance();
+    const labels = (id: string) =>
+      app.projects
+        .labels(id)
+        .map(({ name, description }) => ({ name, description }));
+    try {
+      await app.provision.apply(
+        documents(
+          object("Project", "nebula", {
+            description: "A team project.",
+            labels: [{ name: "Ops", description: "Pages" }, { name: "build" }],
+          }),
+          object("Project", "plain", { description: "No labels named." }),
+        ),
+        ignore,
+      );
+      const [nebula, plain] = ["nebula", "plain"].map(
+        (name) =>
+          app.projects
+            .teamProjectIds()
+            .find((id) => app.projects.byId(id)!.name === name)!,
+      );
+      // a new project gets the listed labels, one listing none the four
+      expect(labels(nebula!)).toEqual([
+        { name: "build", description: "" },
+        { name: "ops", description: "Pages" },
+      ]);
+      expect(labels(plain!).map((label) => label.name)).toEqual([
+        "build",
+        "fix",
+        "plan",
+        "research",
+      ]);
+      const ops = app.projects.labels(nebula!).find((l) => l.name === "ops")!;
+      const wanted = documents(
+        object("Project", "nebula", {
+          labels: [{ name: "ops", description: "Paging" }, { name: "infra" }],
+        }),
+      );
+      expect((await app.provision.apply(wanted, ignore)).updated).toBe(1);
+      expect(labels(nebula!)).toEqual([
+        { name: "build", description: "" },
+        { name: "infra", description: "" },
+        { name: "ops", description: "Paging" },
+      ]);
+      // an update keeps the label's id, so its links stay
+      expect(
+        app.projects.labels(nebula!).find((l) => l.name === "ops")!.id,
+      ).toBe(ops.id);
+      const writes = mutations(app.db);
+      expect((await app.provision.apply(wanted, ignore)).unchanged).toBe(1);
+      expect(writes()).toEqual([]);
+    } finally {
+      await app.shutdown();
+    }
+  });
+
   test("clears explicit agent lists while leaving their referenced objects", async () => {
     const { app } = await instance();
     try {

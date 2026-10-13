@@ -56,6 +56,11 @@ reporting.
   first (`deleteAsk()`). The Running card checks the caps' order in
   `collect()` before the server refuses it, and `limitRefusal()` maps a
   server refusal to labels.
+- **A team project's labels are read-only on its admin page,** with
+  Manage linking to the project's Settings tab, where every user who
+  sees it writes them. New project starts with `DEFAULT_LABELS` filled
+  in and editable (`LabelDrafts`), each input named as the server names
+  its refusal (`labels.2.name`).
 - **A provider is never edited, only made and deleted.** Delete is off
   while an agent or a decider runs on it, since the server refuses.
 - **The admin's own user page has no Reset password nor Disable.**

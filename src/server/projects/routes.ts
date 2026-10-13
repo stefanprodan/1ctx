@@ -23,13 +23,18 @@ import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import { lastDays } from "../usage/index.ts";
 import { type UserRow, summary as userSummary } from "../users/index.ts";
+import { metadataRoutes } from "./metadata.ts";
 import {
   parseAddMember,
   parseCreateProject,
-  parseUpdatePersonalProject,
   parseUpdateProject,
 } from "./parse.ts";
-import { type ProjectRow, type ProjectStore, summary } from "./store.ts";
+import {
+  type ProjectRow,
+  type ProjectStore,
+  summary,
+  uniqueViolation,
+} from "./store.ts";
 
 export type AccessPort = {
   project(principal: Principal, id: string): ProjectRow;
@@ -74,12 +79,6 @@ export type RoutesDeps = {
   clock: Clock;
 };
 
-const uniqueViolation = (error: unknown): boolean =>
-  typeof error === "object" &&
-  error !== null &&
-  "code" in error &&
-  error.code === "SQLITE_CONSTRAINT_UNIQUE";
-
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   const findTeam = (id: string): ProjectRow => {
     const project = deps.store.byId(id);
@@ -102,6 +101,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       ...summary(project, members.length),
       description: project.description,
       members,
+      labels: deps.store.labels(project.id),
       chats: deps.sessions.count(project.id),
       knowledge: deps.knowledge.counts(project.id),
       latestFiles: deps.knowledge.latest(project.id, LATEST_FILES),
@@ -125,6 +125,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
     }
   }
   return [
+    ...metadataRoutes({
+      db: deps.db,
+      store: deps.store,
+      access: deps.access,
+      clock: deps.clock,
+      detail,
+    }),
     {
       method: "GET",
       path: "/api/projects",
@@ -145,7 +152,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/projects",
       policy: "admin",
       async handle(req, ctx) {
-        const { name, description } = parseCreateProject(await jsonBody(req));
+        const { name, description, labels } = parseCreateProject(
+          await jsonBody(req),
+        );
         const project = transact(deps.db, () => {
           nameAvailable(name);
           const created = writeName(() =>
@@ -153,6 +162,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
               ownerId: ctx.principal!.userId,
               name,
               description,
+              labels,
               now: deps.clock(),
             }),
           );
@@ -192,24 +202,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
               description: change.description ?? current.description,
             }),
           );
-          if (updated === null) throw new NotFound("no such project");
-          return { result: detail(updated) };
-        });
-        const body: ProjectResponse = { project };
-        return json(body);
-      },
-    },
-    {
-      // the caller's own personal project, the one project a member
-      // describes
-      method: "PATCH",
-      path: "/api/profile/project",
-      policy: "authenticated",
-      async handle(req, ctx) {
-        const { description } = parseUpdatePersonalProject(await jsonBody(req));
-        const userId = ctx.principal!.userId;
-        const project = transact(deps.db, () => {
-          const updated = deps.store.describePersonal(userId, description);
           if (updated === null) throw new NotFound("no such project");
           return { result: detail(updated) };
         });

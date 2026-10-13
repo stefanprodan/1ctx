@@ -21,7 +21,6 @@ import {
   watchRepos,
 } from "../../data/repos.ts";
 import {
-  noticeOf,
   type Save,
   useArrivalFocus,
   useFocusField,
@@ -33,7 +32,7 @@ import { AskDelete, Foot } from "../../ui/Foot.tsx";
 import { Labelled } from "../../ui/Labelled.tsx";
 import {
   RowsAdd,
-  RowsEnd,
+  RowsButton,
   RowsFailed,
   RowsLine,
   RowsList,
@@ -143,9 +142,6 @@ export function RepoRows({
   open: Signal<OpenRepo>;
   edit?: boolean;
 }) {
-  // Refresh writes at once, and a refusal shows on its row
-  const actions = useSave(async () => {});
-  const acting = useSignal<string | null>(null);
   const error = repoErrorOf(target.projectId);
   if (list === null) {
     return error === null ? null : <RowsFailed failure={error} />;
@@ -153,7 +149,6 @@ export function RepoRows({
   const close = () => {
     open.value = null;
   };
-  const notice = actions.notice();
   // a member never has an editor, though one was open when edit turned off
   const opened = edit ? openOf(open.value, list) : null;
   return (
@@ -170,24 +165,20 @@ export function RepoRows({
       {list.map((repo) =>
         opened !== null && opened !== "new" && opened.id === repo.id ? (
           <RowsNew key={repo.id}>
-            <RepoForm target={target} row={opened} onClose={close} />
+            <RepoForm
+              target={target}
+              row={opened}
+              current={repo}
+              onClose={close}
+            />
           </RowsNew>
         ) : (
           <RepoLine
             key={repo.id}
             repo={repo}
             edit={edit}
-            locked={opened !== null || actions.busy}
-            failed={
-              notice !== null && acting.value === repo.id
-                ? noticeOf(notice)
-                : undefined
-            }
-            onRefresh={() => {
-              acting.value = repo.id;
-              void actions.act("refresh", () => refreshRepo(target, repo.id));
-            }}
-            onChange={() => {
+            locked={opened !== null}
+            onOpen={() => {
               open.value = repo;
             }}
           />
@@ -197,67 +188,52 @@ export function RepoRows({
   );
 }
 
+// for an editor the whole row opens its form, where Refresh sits
 function RepoLine({
   repo,
   edit,
   locked,
-  failed,
-  onRefresh,
-  onChange,
+  onOpen,
 }: {
   repo: RepoView;
   edit: boolean;
   locked: boolean;
-  failed: string | undefined;
-  onRefresh: () => void;
-  onChange: () => void;
+  onOpen: () => void;
 }) {
   const state = stateWords(repo);
-  return (
-    <RowsLine flush>
-      <RowsTitle
-        name={repo.name}
-        mono
-        wrap
-        sub={urlText(repo.url)}
-        lines={[
-          { text: refWords(repo.ref) },
-          { text: <StateFacts text={state.text} />, bad: state.bad },
-        ]}
-      />
-      {edit && (
-        <RowsEnd error={failed}>
-          <button
-            type="button"
-            class="btn btn-small"
-            disabled={locked || repo.state === "fetching"}
-            onClick={onRefresh}
-          >
-            Refresh
-          </button>
-          <button
-            type="button"
-            class="btn btn-small"
-            disabled={locked}
-            onClick={onChange}
-          >
-            Change
-          </button>
-        </RowsEnd>
-      )}
-    </RowsLine>
+  const title = (
+    <RowsTitle
+      name={repo.name}
+      mono
+      wrap
+      sub={urlText(repo.url)}
+      lines={[
+        { text: refWords(repo.ref) },
+        { text: <StateFacts text={state.text} />, bad: state.bad },
+      ]}
+    />
+  );
+  return edit ? (
+    <RowsButton edit disabled={locked} onClick={onOpen}>
+      {title}
+    </RowsButton>
+  ) : (
+    <RowsLine flush>{title}</RowsLine>
   );
 }
 
 export function RepoForm({
   target,
   row,
+  current = row,
   onClose,
 }: {
   target: RepoTarget;
   // as it was when the form opened: a change is measured against it, so
   // a field another admin changed since is never sent back
   row: RepoView | null;
+  // as the list holds it now, for Refresh
+  current?: RepoView | null;
   onClose: () => void;
 }) {
   const draft = useSignal<RepoDraft>(draftOf(row));
@@ -310,6 +286,18 @@ export function RepoForm({
         }}
       />
     ) : undefined;
+  const refresh = row !== null && (
+    <button
+      type="button"
+      class="btn"
+      disabled={save.busy || current?.state === "fetching"}
+      onClick={() => {
+        void save.act("refresh", () => refreshRepo(target, row.id));
+      }}
+    >
+      Refresh
+    </button>
+  );
   return (
     <form
       ref={form}
@@ -329,7 +317,14 @@ export function RepoForm({
           save={save}
           dirty={dirty}
           label={row === null ? "Add" : "Save"}
-          start={remove}
+          start={
+            remove && (
+              <>
+                {remove}
+                {refresh}
+              </>
+            )
+          }
           before={
             <button
               type="button"
@@ -346,7 +341,7 @@ export function RepoForm({
   );
 }
 
-// one field per line, as an edit opened by Change is laid out
+// one field per line, as an edit opened from its row is laid out
 export function RepoFields({
   draft: d,
   save,

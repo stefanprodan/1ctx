@@ -1,0 +1,63 @@
+/* A project's labels: the Settings tab's add row and edit form, and the
+   admin create form's editable list. The rows are ui/Rows.tsx. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .labels-head {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .labels-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .labels-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .labels-delete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    width: 100%;
+  }
+  .labels-ask {
+    margin-right: auto;
+    font-size: var(--text-ui);
+    color: var(--fg);
+  }
+  .labels-draft-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .labels-draft {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .labels-draft-name {
+    font-family: var(--mono);
+  }
+
+  /* the width shell.ts calls NARROW: the description under the name */
+  @media (max-width: 719px) {
+    .labels-draft {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .labels-draft-description {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+    /* a label's two lines read as one pair, apart from the next */
+    .labels-draft-row + .labels-draft-row {
+      margin-top: var(--space-3);
+    }
+  }
+}

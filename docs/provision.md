@@ -38,7 +38,7 @@ instance's database, creating or updating what they name.
 - **Omitted fields stay as they are.** Only the fields a document
   names are written.
 - **A supplied list replaces the held one.** A project's `members`
-  adds and removes users to match.
+  adds and removes users to match. `labels` is the exception below.
 - **Objects not named are never deleted.** Nor are knowledge docs a
   folder does not name.
 - **A password and its change flag are creation-only.** Apply never
@@ -78,6 +78,13 @@ instance's database, creating or updating what they name.
   null takes it off; `ignore` is a block string. Preflight checks one
   per project and name, the per-project cap, and that the key file is
   present and usable.
+- **A `Project`'s `labels` never deletes.** Each is a `name` and an
+  optional `description`, matched by name after trimming and
+  lowercasing. A listed label is created, or its description updated;
+  one not listed is left, since a delete would take it off what
+  carries it. A new project gets the listed labels alone, at least one,
+  in place of the defaults. Preflight checks the API's rules and that
+  the held and listed labels stay within the cap of 20.
 - **A `Project`'s `knowledge` is a folder relative to its YAML file.**
   It is never read from stdin, may not leave the file's directory, and
   refuses a symlink. Docs are named by their path and checked with the
