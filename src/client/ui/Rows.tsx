@@ -32,6 +32,7 @@ export function RowsCard({
   live,
   count,
   hintBelow,
+  menus,
   class: extra,
   children,
 }: {
@@ -45,6 +46,8 @@ export function RowsCard({
   // on a phone the hint takes its own line under the label, held even
   // while empty, so a hint that follows the pointer never moves the card
   hintBelow?: boolean;
+  // its rows open menus, which drop past the card's edge
+  menus?: boolean;
   class?: string;
   children?: ComponentChildren;
 }) {
@@ -52,7 +55,9 @@ export function RowsCard({
   const slot = search ?? tabs;
   return (
     <section
-      class={`card rows-card${extra ? ` ${extra}` : ""}`}
+      class={`card rows-card${menus ? " rows-card-menus" : ""}${
+        extra ? ` ${extra}` : ""
+      }`}
       aria-label={slot ? label : undefined}
       aria-labelledby={slot ? undefined : id}
     >

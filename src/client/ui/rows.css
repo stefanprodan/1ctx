@@ -15,6 +15,10 @@
     flex-shrink: 0;
     overflow: hidden;
   }
+  /* no row of it fills to the corners, so a menu may leave it */
+  .rows-card-menus {
+    overflow: visible;
+  }
   .rows-head {
     display: flex;
     align-items: center;

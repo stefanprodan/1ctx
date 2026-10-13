@@ -68,7 +68,8 @@ open row's body or a meta. The shared shapes are below.
   The head, end and controls (`RowsTitle`, `RowsMeta`, `RowsEnd`,
   `RowsSwitch`, `RowsCheck`, `RowsRadio`, `RowsRemove`, `RowsNote`,
   `RowsFailed`, ...) are exported from `Rows.tsx`. The session list's
-  row (`feed/Row.tsx`) is the one row outside Rows.
+  row (`feed/Row.tsx`) is the one row outside Rows. A `RowsCard` whose
+  rows open a More menu takes `menus`, or its edge clips the menu.
 - **A row's meta wraps under its title on a phone,** unless `RowsGo`
   has `side`: then it stays beside the title, as the feed's time does,
   and the arrow shows only from 720 wide.

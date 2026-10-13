@@ -35,14 +35,6 @@ import { NewCard } from "../admin/NewCard.tsx";
 import { AddProject, ProjectRows } from "../admin/ProjectPicks.tsx";
 import { KeyRow } from "../keys/KeyRow.tsx";
 import {
-  createdWords,
-  expired,
-  expiryWords,
-  reachWords,
-  scopeWords,
-  usedWords,
-} from "../keys/Keys.model.ts";
-import {
   capLine,
   createBody,
   DAYS_OPTIONS,
@@ -78,6 +70,7 @@ export function AccessKeys({
   return (
     <RowsCard
       label="Access keys"
+      menus
       count={keys !== null && !off ? `${keys.length} of ${limit}` : undefined}
       action={
         add ? (
@@ -108,11 +101,8 @@ export function AccessKeys({
         <KeyRow
           key={key.id}
           row={key}
-          sub={`${scopeWords(key.scope)} · ${reachWords(key, list)}`}
-          lines={[
-            { text: `${createdWords(key)} · ${usedWords(key, now)}` },
-            { text: expiryWords(key, now), bad: expired(key, now) },
-          ]}
+          projects={list}
+          now={now}
           onRevoke={() => revokeAccessKey(key.id)}
         />
       ))}
@@ -181,9 +171,10 @@ export function KeyFields({
         label="Name"
         name="name"
         value={d.name}
-        placeholder="laptop-claude"
+        placeholder="claude-code"
         hint={`Edits show as @${username} via ${d.name.trim() || "this name"}.`}
         required
+        shaped
         save={save}
         onInput={(name) => set({ name })}
       />

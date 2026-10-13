@@ -75,9 +75,10 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   create response shows the token once; lists and logs never do.
   The secrets rules below govern files, not these login-like credentials.
 - **Only the owner mints a key.** `GET/POST /api/profile/keys` list and
-  create; `DELETE /api/profile/keys/:id` revokes. A name is 1..64
-  characters on one line with no edge spaces, unique per user (409
-  when taken). Scope is `read` or `write`, lifetime 30, 90 or 365 days.
+  create; `DELETE /api/profile/keys/:id` revokes. A name follows the
+  agent name rule (`isName`, 2 to 80 lowercase letters, digits, dashes
+  and underscores), unique per user (409 when taken). Scope is `read`
+  or `write`, lifetime 30, 90 or 365 days.
   `projectIds` is null for all visible projects, or a non-empty distinct
   list the owner sees now. Admins list and revoke through
   `GET /api/users/:id/keys` and `DELETE /api/users/:id/keys/:keyId`,
