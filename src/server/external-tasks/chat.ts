@@ -98,14 +98,16 @@ export function chatTasks(deps: ChatDeps) {
         () => sees(actor),
         () => deps.actions.create(actor.userId, actor.projectId, body, chatId),
       ),
+    // the edit's entry names the chat's user and the chat
     edit: (
       actor: ChatActor,
       id: string,
       body: PatchExternalTaskRequest,
+      chatId: string,
     ): TaskRead =>
       write(
         () => inProject(actor, id),
-        () => deps.actions.edit(id, body),
+        () => deps.actions.edit(actor.userId, id, body, null, chatId),
       ),
     move: (
       actor: ChatActor,

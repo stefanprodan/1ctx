@@ -164,7 +164,8 @@ export type TasksPort = {
   claim(key: TaskKey, taskId: string): TaskShow & { claimId: string };
   // the claim must belong to taskId; a live retry must repeat both the
   // claim's and task's last entry. A result retry answers the original
-  // end even after later task entries
+  // end even after later task entries. Past the entry bounds it ends the
+  // claim, then throws the refusal; a caller's transaction keeps that end
   report(
     key: TaskKey,
     taskId: string,

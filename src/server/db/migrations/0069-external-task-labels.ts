@@ -7,8 +7,9 @@ import type { Migration } from "../migration.ts";
 // labels, and moves through todo, in progress, awaiting input, done and
 // canceled, with no mark. The tables are empty since 0068; tasks lose
 // their text, scope and attention mark, and the claims and entries take
-// the one-l canceled in their checks. A label link names the label's id
-// and goes with the task or the label.
+// the one-l canceled in their checks; a claim may end at the entry
+// limit, and an edit is an entry keeping the chat it came through. A
+// label link names the label's id and goes with the task or the label.
 export const m0069: Migration = {
   id: "0069-external-task-labels",
   rebuild: true,
@@ -61,7 +62,7 @@ export const m0069: Migration = {
         active_at integer not null,
         ended_at integer,
         end_reason text
-          check (end_reason in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle')),
+          check (end_reason in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle', 'limit')),
         last_task text,
         check ((ended_at is null) = (end_reason is null))
       );
@@ -77,13 +78,15 @@ export const m0069: Migration = {
         task_id text not null references external_tasks(id) on delete cascade,
         claim_id text references external_task_claims(id) on delete cascade,
         kind text not null
-          check (kind in ('claim', 'progress', 'question', 'result', 'unclaim', 'answer', 'cancel', 'reopen')),
+          check (kind in ('claim', 'progress', 'question', 'result', 'unclaim', 'answer', 'cancel', 'reopen', 'edit')),
         text text not null,
         links text not null,
         user_id text references users(id) on delete set null,
         key_name text,
         claim_end text
-          check (claim_end in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle')),
+          check (claim_end in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle', 'limit')),
+        -- the chat an edit came through, kept with no key as the task's is
+        chat_id text,
         at integer not null
       );
       -- SQLite appends rowid to this index, breaking ties within a millisecond.
@@ -91,6 +94,12 @@ export const m0069: Migration = {
         on external_task_entries(task_id, at);
       create index external_task_entries_claim
         on external_task_entries(claim_id, at);
+      -- the agent entries the bounds count since the last reopen, sought
+      -- by rowid past any members' entries
+      create index external_task_entries_agent
+        on external_task_entries(task_id) where key_name is not null;
+      create index external_task_entries_reopen
+        on external_task_entries(task_id) where kind = 'reopen';
 
       create table external_task_labels (
         task_id text not null references external_tasks(id) on delete cascade,

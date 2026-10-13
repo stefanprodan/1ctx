@@ -375,11 +375,10 @@ export const EXTERNAL_TASK_STATES = [
   "canceled",
 ] as const;
 export type ExternalTaskState = (typeof EXTERNAL_TASK_STATES)[number];
-export function isExternalTaskState(
+export const isExternalTaskState = (
   value: unknown,
-): value is ExternalTaskState {
-  return EXTERNAL_TASK_STATES.includes(value as ExternalTaskState);
-}
+): value is ExternalTaskState =>
+  EXTERNAL_TASK_STATES.includes(value as ExternalTaskState);
 export const EXTERNAL_TASK_STATE_WORDS: Record<ExternalTaskState, string> = {
   todo: "Todo",
   in_progress: "In progress",
@@ -390,10 +389,9 @@ export const EXTERNAL_TASK_STATE_WORDS: Record<ExternalTaskState, string> = {
 // what the agent holding a claim reports; its unclaim is no report
 export const AGENT_ENTRY_KINDS = ["progress", "question", "result"] as const;
 export type AgentEntryKind = (typeof AGENT_ENTRY_KINDS)[number];
-export function isAgentEntryKind(value: unknown): value is AgentEntryKind {
-  return AGENT_ENTRY_KINDS.includes(value as AgentEntryKind);
-}
-// every timeline entry; an unclaim is the agent's, a member's or 1ctx's
+export const isAgentEntryKind = (value: unknown): value is AgentEntryKind =>
+  AGENT_ENTRY_KINDS.includes(value as AgentEntryKind);
+// every timeline entry; an unclaim is an agent's, a member's or 1ctx's
 export const ENTRY_KINDS = [
   "claim",
   ...AGENT_ENTRY_KINDS,
@@ -401,15 +399,17 @@ export const ENTRY_KINDS = [
   "answer",
   "cancel",
   "reopen",
+  "edit",
 ] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
-// how a claim ended; access_gone when its key or the user's access went
+// how a claim ended: access_gone when access went, limit past the bounds
 export const CLAIM_ENDS = [
   "unclaimed",
   "done",
   "canceled",
   "access_gone",
   "idle",
+  "limit",
 ] as const;
 export type ClaimEnd = (typeof CLAIM_ENDS)[number];
 

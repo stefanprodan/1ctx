@@ -18,7 +18,7 @@ export type KnowledgePort = {
   file(
     projectId: string,
     fileId: string,
-  ): { name: string; revision: number } | null;
+  ): { name: string; revision: number; updatedAt: number } | null;
   deletedName(projectId: string, fileId: string): string | null;
 };
 
@@ -36,7 +36,8 @@ type ShowDeps = {
   chatOpens(principal: Principal, chatId: string): boolean;
 };
 
-// the chat's title only for a viewer who may open the chat
+// a chat's title, the task's and an edit's, only for a viewer who may
+// open the chat, asked once per chat
 export const taskShow =
   (deps: ShowDeps) =>
   (
@@ -47,23 +48,35 @@ export const taskShow =
     const { store } = deps;
     const task = store.byId(id);
     if (task === null) return null;
+    const asked = new Map<string, boolean>();
+    const titled = (chatId: string | null, title: string | null) => {
+      if (viewer === null || chatId === null) return null;
+      let opens = asked.get(chatId);
+      if (opens === undefined) {
+        opens = deps.chatOpens(viewer, chatId);
+        asked.set(chatId, opens);
+      }
+      return opens ? title : null;
+    };
     const { chatTitle, ...made } = store.made(id)!;
-    const opens =
-      viewer !== null &&
-      made.chatId !== null &&
-      deps.chatOpens(viewer, made.chatId);
     const files = store.fileIds(id).map((fileId) => {
       const live = deps.knowledge.file(task.projectId, fileId);
       return {
         fileId,
         name: live?.name ?? deps.knowledge.deletedName(task.projectId, fileId),
         revision: live?.revision ?? null,
+        changedAt: live?.updatedAt ?? null,
         deleted: live === null,
       };
     });
+    const page = store.entries(id, before);
     return {
-      task: { task, files, ...made, chatTitle: opens ? chatTitle : null },
-      ...store.entries(id, before),
+      task: { task, files, ...made, chatTitle: titled(made.chatId, chatTitle) },
+      entries: page.entries.map((entry) => ({
+        ...entry,
+        chatTitle: titled(entry.chatId, entry.chatTitle),
+      })),
+      next: page.next,
       idleHours: deps.externalTaskIdleHours(),
     };
   };

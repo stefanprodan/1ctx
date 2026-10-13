@@ -118,6 +118,7 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   claim: null,
   last: null,
   entries: 0,
+  claimLimit: false,
   createdBy: { id: "u1", username: "stefan" },
   createdAt: 1_000,
   movedAt: 1_000,
@@ -128,7 +129,15 @@ const detail = (
   changes: Partial<ExternalTaskDetail> = {},
 ): ExternalTaskDetail => ({
   task: row(),
-  files: [{ fileId: "f1", name: "plan.md", revision: 3, deleted: false }],
+  files: [
+    {
+      fileId: "f1",
+      name: "plan.md",
+      revision: 3,
+      changedAt: 1,
+      deleted: false,
+    },
+  ],
   briefAt: 1_000,
   chatId: null,
   chatTitle: null,
@@ -198,6 +207,19 @@ describe("the words", () => {
         }),
       ),
     ).toBe("Unclaimed by 1ctx, access gone");
+    const stopped = last("unclaim", {
+      by: null,
+      keyName: null,
+      claimEnd: "limit",
+    });
+    expect(rowLine(row({ last: stopped }))).toBe(
+      "Unclaimed by 1ctx, limit reached",
+    );
+    // a todo task no agent may claim again says so, whoever moved it
+    expect(rowLine(row({ last: stopped, claimLimit: true }))).toBe(
+      "Claim limit reached",
+    );
+    expect(rowLine(row({ claimLimit: true }))).toBe("Claim limit reached");
     // a member since deleted is never 1ctx
     expect(
       rowLine(
@@ -599,6 +621,8 @@ const entryOf = (
   keyName: null,
   claimId: null,
   claimEnd: null,
+  chatId: null,
+  chatTitle: null,
   at: 1_000,
 });
 

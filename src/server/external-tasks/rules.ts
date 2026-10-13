@@ -14,6 +14,7 @@ import {
 } from "../../shared/contracts/external-task.ts";
 import { shapeLabelName } from "../../shared/contracts/label.ts";
 import {
+  type AgentEntryKind,
   type EntryKind,
   EXTERNAL_TASK_STATE_WORDS,
   type ExternalTaskState,
@@ -37,8 +38,11 @@ export {
   MAX_UNFINISHED,
 } from "../../shared/contracts/external-task.ts";
 
-export type Actor = "agent" | "member" | "idle" | "access_gone";
+// limit is 1ctx ending a claim whose agent wrote past the entry bounds
+export type Actor = "agent" | "member" | "idle" | "access_gone" | "limit";
 export type Move = EntryKind;
+// what an agent's key writes, the only moves the entry bounds check
+export type AgentMove = "claim" | AgentEntryKind | "unclaim";
 // labels by name as given, shaped by checkBrief's caller
 export type Brief = {
   title: string;
@@ -74,6 +78,7 @@ const TRANSITIONS: Record<
   // a task awaiting input waits for a member, never idles
   idle: { unclaim: { in_progress: "todo" } },
   access_gone: { unclaim: { in_progress: "todo", awaiting_input: "todo" } },
+  limit: { unclaim: { in_progress: "todo", awaiting_input: "todo" } },
 };
 
 export function transition(
@@ -101,21 +106,28 @@ export function checkMove(
   return next;
 }
 
-export function checkRoom(entries: number, move: Move): void {
-  if (
-    entries >= MAX_ENTRIES ||
-    (entries >= CLOSING_ENTRIES &&
-      move !== "result" &&
-      move !== "unclaim" &&
-      move !== "cancel")
-  ) {
-    throw new Conflict("make a new external task");
-  }
+export const NEW_TASK = "make a new external task";
+
+// the bounds count an agent's entries since the last reopen, against an
+// agent in a loop: past CLOSING_ENTRIES its claim may only finish, until
+// MAX_ENTRIES, or give the task back, which always goes through
+export function roomFor(entries: number, move: AgentMove): boolean {
+  return (
+    move === "unclaim" ||
+    (entries < MAX_ENTRIES && (entries < CLOSING_ENTRIES || move === "result"))
+  );
 }
+
+export function checkRoom(entries: number, move: AgentMove): void {
+  if (!roomFor(entries, move)) throw new Conflict(NEW_TASK);
+}
+
+// the words of 1ctx's unclaim when an agent's write found no room
+export const limitNote = (entries: number) => `after ${entries} agent entries`;
 
 // claims since the task's last reopen
 export function checkClaims(claims: number): void {
-  if (claims >= MAX_CLAIMS) throw new Conflict("make a new external task");
+  if (claims >= MAX_CLAIMS) throw new Conflict(NEW_TASK);
 }
 
 export function checkUnfinished(count: number): void {

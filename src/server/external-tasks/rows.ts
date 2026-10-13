@@ -1,9 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type {
-  ExternalTaskEntry,
-  ExternalTaskRow,
+import {
+  CLOSING_ENTRIES,
+  type ExternalTaskEntry,
+  type ExternalTaskRow,
+  MAX_CLAIMS,
 } from "../../shared/contracts/external-task.ts";
 import type {
   ClaimEnd,
@@ -12,9 +14,24 @@ import type {
 } from "../../shared/words.ts";
 import { lineFrom } from "../sessions/index.ts";
 
+// An agent's entries since the task's last reopen, which the bounds
+// count: those with a key name (claims, reports, its own unclaims), on
+// the agent index by rowid, since entries append in order. A reopen
+// starts both counts again.
+export const agentSince = (task: string, kind?: "claim") => `(select count(*)
+  from external_task_entries where task_id = ${task}
+    and key_name is not null${kind === undefined ? "" : ` and kind = '${kind}'`}
+    and rowid > coalesce((select max(rowid) from external_task_entries
+      where task_id = ${task} and kind = 'reopen'), 0))`;
+
+// the claims MAX_CLAIMS counts
+export const claimsSince = (task: string) => agentSince(task, "claim");
+
 // Match trim()'s whitespace so a bounded preview still reaches its first line.
-// The last entry is a report or a move, never a claim. Labels read their
-// names now, so a rename shows at once.
+// The last entry is a report or a move, never a claim or an edit. Labels
+// read their names now, so a rename shows at once. Only a todo task is
+// read for the caps, the one state they stop: a claim is refused at
+// either.
 export const TASK_SELECT = `select t.id, t.project_id, t.title, t.state,
     t.revision, t.edit_revision, t.claim_id, t.created_by,
     t.created_at, t.moved_at, u.username as creator_name,
@@ -29,6 +46,8 @@ export const TASK_SELECT = `select t.id, t.project_id, t.title, t.state,
     e.at as last_at, e.user_id as last_user, eu.username as last_username,
     e.key_name as last_key, e.claim_end as last_end,
     (select count(*) from external_task_entries where task_id = t.id) as entries,
+    case when t.state = 'todo' then ${claimsSince("t.id")} >= ${MAX_CLAIMS}
+      or ${agentSince("t.id")} >= ${CLOSING_ENTRIES} else 0 end as claim_limit,
     exists (select 1 from external_task_entries a
       where a.task_id = t.id and a.kind = 'answer'
         and a.rowid > coalesce((select rowid from external_task_entries
@@ -41,7 +60,7 @@ export const TASK_SELECT = `select t.id, t.project_id, t.title, t.state,
   left join users cu on cu.id = c.user_id
   left join external_task_entries e on e.rowid =
     (select rowid from external_task_entries where task_id = t.id
-      and kind <> 'claim' order by at desc, rowid desc limit 1)
+      and kind not in ('claim', 'edit') order by at desc, rowid desc limit 1)
   left join users eu on eu.id = e.user_id`;
 
 export type TaskKey = { userId: string; keyId: string; keyName: string };
@@ -102,6 +121,7 @@ export type RawTask = {
   last_key: string | null;
   last_end: ClaimEnd | null;
   entries: number;
+  claim_limit: number;
   answered: number;
 };
 
@@ -115,6 +135,9 @@ export type RawEntry = {
   key_name: string | null;
   claim_id: string | null;
   claim_end: ClaimEnd | null;
+  // the chat an edit came through, while it exists
+  chat: string | null;
+  chat_title: string | null;
   at: number;
 };
 
@@ -153,6 +176,7 @@ export const taskRow = (raw: RawTask): ExternalTaskRow => ({
           claimEnd: raw.last_end,
         },
   entries: raw.entries,
+  claimLimit: raw.claim_limit === 1,
   createdBy:
     raw.created_by === null
       ? null
@@ -164,7 +188,9 @@ export const taskRow = (raw: RawTask): ExternalTaskRow => ({
   movedAt: raw.moved_at,
 });
 
-export const entryRow = (raw: RawEntry): ExternalTaskEntry => ({
+// the chat's title only for the page's read, which show() gates by the
+// reader
+export const entryRow = (raw: RawEntry, titled = false): ExternalTaskEntry => ({
   id: raw.id,
   kind: raw.kind,
   text: raw.text,
@@ -179,5 +205,7 @@ export const entryRow = (raw: RawEntry): ExternalTaskEntry => ({
   keyName: raw.key_name,
   claimId: raw.claim_id,
   claimEnd: raw.claim_end,
+  chatId: raw.chat,
+  chatTitle: titled ? raw.chat_title : null,
   at: raw.at,
 });

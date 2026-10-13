@@ -2642,10 +2642,10 @@ describe("the schema", () => {
         "check (state in ('todo', 'in_progress', 'awaiting_input', 'done', 'canceled'))",
       );
       expect(tableSql("external_task_claims")).toContain(
-        "check (end_reason in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle'))",
+        "check (end_reason in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle', 'limit'))",
       );
       expect(tableSql("external_task_entries")).toContain(
-        "check (claim_end in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle'))",
+        "check (claim_end in ('unclaimed', 'done', 'canceled', 'access_gone', 'idle', 'limit'))",
       );
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
       const labelId = db
@@ -2668,7 +2668,19 @@ describe("the schema", () => {
             links, user_id, key_name, claim_end, at)
           values ('e4', 't3', 'c3', 'cancel', '', '[]', 'u', null, 'canceled',
             2);
+        insert into external_task_entries (id, task_id, claim_id, kind, text,
+            links, user_id, key_name, claim_end, chat_id, at)
+          values ('e5', 't3', null, 'edit', '', '[]', 'u', null, null,
+            'gone-chat', 3);
+        update external_task_claims set end_reason = 'limit' where id = 'c3';
       `);
+      expect(
+        db
+          .query<{ name: string }, []>(
+            "select name from sqlite_schema where name = 'external_task_entries_agent'",
+          )
+          .get(),
+      ).not.toBeNull();
       for (const sql of [
         "update external_tasks set state = 'cancelled' where id = 't3'",
         "update external_tasks set state = 'open' where id = 't3'",

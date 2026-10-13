@@ -45,10 +45,12 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   last (`rowLine()`): the question while awaiting input, `Claimed by
   @user via key` in progress, `Opened by`, `Reopened by` or `Unclaimed
   by` the latest entry's user for todo, `Done by @user via key`,
-  `Canceled by @user`. The time is at the right.
+  `Canceled by @user`; a todo task at the claim cap (`claimLimit`)
+  reads `Claim limit reached` instead. The time is at the right.
 - **1ctx names only its own releases** (`entryBy()`): an unclaim whose
-  `claimEnd` is `idle` or `access_gone` reads `Unclaimed by 1ctx, idle`
-  on a row and `Unclaimed by 1ctx` then `idle` on its activity line.
+  `claimEnd` is `idle`, `access_gone` or `limit` reads `Unclaimed by
+  1ctx, idle` (`access gone`, `limit reached`) on a row and `Unclaimed
+  by 1ctx` then the reason on its activity line.
   Any other entry, or a creator, with no user reads "a deleted user".
 - **The list loads whole, then frames keep it** by revision
   (`data/external-tasks.ts`). The highest revision seen per task keeps
@@ -79,7 +81,9 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   the top of the body. A box keeps the state and the claim from when it
   opened.
 - **The body:** the boxes, a todo task's "Ask your agent to claim this
-  task." notice linking Connect agents, a done task's result card
+  task." notice linking Connect agents (at the claim cap instead "Agents
+  can't claim this task again. Cancel and reopen it to start over.",
+  with no link), a done task's result card
   (`Result by @user via key`, the time, the whole Markdown and the links
   the text leaves out), the files, then the activity.
 - **Files are a card of rows that open in place.** A click reads the
@@ -95,9 +99,11 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   no card and no coloured edge. A move that changes who holds the task
   names who (`by @user via key`): Opened, with the chat it was made in
   when the reader may open it, else "in a chat"; Claimed, Unclaimed,
-  Answered, Canceled, Reopened. An agent's report names no one:
+  Answered, Canceled, Reopened, and Edited, which has no words and adds
+  the chat it came through as Opened does. An agent's report names no one:
   Reported, Asked, Finished. 1ctx's release reads `Unclaimed by 1ctx`
-  with `idle` or `access gone` from the entry's `claimEnd`. The words
+  with `idle`, `access gone` or `limit reached` from the entry's
+  `claimEnd`. The words
   are the text's first line through `plainLine()`, cut, as is a row's
   question. Who gives way before the words and the time, the key first,
   cut with an ellipsis, so the time stays at the right at 390. A line with words is a button that

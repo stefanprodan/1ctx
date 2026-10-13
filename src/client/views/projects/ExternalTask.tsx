@@ -26,7 +26,7 @@ import { project } from "../../data/projects.ts";
 import { ago, longDate } from "../../lib/format.ts";
 import { externalTasksHref, userHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
-import { Page } from "../../ui/Page.tsx";
+import { Page, PageNotice } from "../../ui/Page.tsx";
 import {
   AsideHandle,
   AsideLine,
@@ -45,6 +45,7 @@ import {
 } from "./ExternalTaskMoves.tsx";
 import { TaskStateIcon, TaskTags } from "./ExternalTaskRow.tsx";
 import {
+  CLAIM_LIMIT,
   claimDeadline,
   deadlineTime,
   movedWords,
@@ -156,9 +157,18 @@ function Aside({
   );
 }
 
-// a todo task waits for an agent, so the page says where to connect one
-export function TaskNotice({ state }: Pick<ExternalTaskRow, "state">) {
-  return state === "todo" ? <ConnectNotice words={UNCLAIMED} /> : undefined;
+// a todo task waits for an agent, so the page says where to connect
+// one, or that none may claim it again
+export function TaskNotice({
+  state,
+  claimLimit,
+}: Pick<ExternalTaskRow, "state" | "claimLimit">) {
+  if (state !== "todo") return undefined;
+  return claimLimit ? (
+    <PageNotice words={CLAIM_LIMIT} />
+  ) : (
+    <ConnectNotice words={UNCLAIMED} />
+  );
 }
 
 // the page under its head: the title or the form, then the rest, which

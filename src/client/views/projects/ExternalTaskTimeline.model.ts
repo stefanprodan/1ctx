@@ -26,6 +26,7 @@ export const ENTRY_ICONS: Record<EntryKind, IconName> = {
   answer: "chat",
   cancel: "cancelled",
   reopen: "redo",
+  edit: "pencil",
 };
 
 // what each entry did, as the verb its line opens with
@@ -38,6 +39,7 @@ export const VERBS: Record<EntryKind, string> = {
   answer: "Answered",
   cancel: "Canceled",
   reopen: "Reopened",
+  edit: "Edited",
 };
 
 // an agent's reports belong to the claim above them, so their lines

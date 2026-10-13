@@ -151,6 +151,8 @@ describe("external task writes", () => {
           keyName: "laptop",
           claimId: held.claimId,
           claimEnd: null,
+          chatId: null,
+          chatTitle: null,
           at: f.now(),
         });
         expect(held.task.task).toMatchObject({
@@ -256,7 +258,7 @@ describe("external task writes", () => {
       using f = fixture();
       const task = f.task(state);
       const run = () =>
-        f.area.edit(task.id, {
+        f.area.edit(f.owner.id, task.id, {
           editRevision: task.editRevision,
           title: "New title",
         });
@@ -265,17 +267,40 @@ describe("external task writes", () => {
         return;
       }
       f.advance();
+      const counted = f.area.store.counted(task.id);
       const updated = run();
       expect(updated.task).toMatchObject({ briefAt: f.now() });
       expect(updated.task.task.title).toBe("New title");
+      // the edit is an entry, but no move: the row's last stays
       expect(updated.task.task).toMatchObject({
         revision: task.revision + 1,
         editRevision: task.editRevision + 1,
         claim: task.claim,
-        entries: task.entries,
+        entries: task.entries + 1,
+        last: task.last,
         movedAt: task.movedAt,
       });
+      expect(updated.entries[0]).toEqual({
+        id: expect.any(String),
+        kind: "edit",
+        text: "",
+        links: [],
+        by: { id: f.owner.id, username: "owner" },
+        keyName: null,
+        claimId: null,
+        claimEnd: null,
+        chatId: null,
+        chatTitle: null,
+        at: f.now(),
+      });
+      expect(f.area.store.counted(task.id)).toBe(counted);
       refuses(run, 409, STALE_TASK);
+      // an edit that changes nothing writes nothing
+      const same = f.area.edit(f.owner.id, task.id, {
+        editRevision: task.editRevision + 1,
+        title: "New title",
+      });
+      expect(same.entries).toEqual(updated.entries);
     });
   }
 
@@ -309,14 +334,16 @@ describe("external task writes", () => {
     expect(answered.task.task.state).toBe("in_progress");
     expect(answered.task.task.revision).toBe(continued.task.revision + 1);
     expect(answered.task.task.editRevision).toBe(task.editRevision);
-    const edited = f.area.edit(task.id, {
+    const edited = f.area.edit(f.owner.id, task.id, {
       editRevision: task.editRevision,
       title: "Updated",
     });
 
     expect(edited.task.task.editRevision).toBe(task.editRevision + 1);
     expect(
-      f.area.edit(task.id, { editRevision: edited.task.task.editRevision }),
+      f.area.edit(f.owner.id, task.id, {
+        editRevision: edited.task.task.editRevision,
+      }),
     ).toEqual(edited);
   });
 
@@ -344,13 +371,16 @@ describe("external task writes", () => {
     using f = fixture();
     const task = f.create("  Do the work \t");
     expect(task.title).toBe("Do the work");
-    const edited = f.area.edit(task.id, {
+    const edited = f.area.edit(f.owner.id, task.id, {
       editRevision: 0,
       title: "  New title  ",
     });
     expect(edited.task.task.title).toBe("New title");
     expect(
-      f.area.edit(task.id, { editRevision: 1, title: " New title " }),
+      f.area.edit(f.owner.id, task.id, {
+        editRevision: 1,
+        title: " New title ",
+      }),
     ).toEqual(edited);
     expect(
       f.db

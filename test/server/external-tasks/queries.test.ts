@@ -232,29 +232,33 @@ test("label counts and a task's bounds seek their indexes", () => {
   using f = fixture();
   const task = f.task("in_progress");
   f.task("done");
-  const reads: [() => unknown, RegExp][] = [
+  // an agent's entries since the last reopen: sought by rowid past it
+  const since = [
+    /SEARCH external_task_entries USING INDEX external_task_entries_agent \(task_id=\? AND rowid>\?\)/,
+    /SEARCH external_task_entries USING COVERING INDEX external_task_entries_reopen \(task_id=\?\)/,
+  ];
+  const reads: [() => unknown, RegExp[]][] = [
     [
       () => f.area.openLabelCounts(f.projectId),
-      /SEARCH t USING (COVERING )?INDEX external_tasks_unfinished \(project_id=\?/,
+      [
+        /SEARCH t USING (COVERING )?INDEX external_tasks_unfinished \(project_id=\?/,
+      ],
     ],
     [
       () => f.area.labelTasks(f.projectId),
-      /SEARCH l USING COVERING INDEX external_task_labels_label \(label_id=\?\)/,
+      [
+        /SEARCH l USING COVERING INDEX external_task_labels_label \(label_id=\?\)/,
+      ],
     ],
-    [
-      () => f.area.store.claimsSinceReopen(task.id),
-      /SEARCH external_task_entries USING INDEX external_task_entries_task \(task_id=\?\)/,
-    ],
-    [
-      () => f.area.store.counted(task.id),
-      /SEARCH external_task_entries USING COVERING INDEX external_task_entries_task \(task_id=\?\)/,
-    ],
+    [() => f.area.store.claimsSinceReopen(task.id), since],
+    [() => f.area.store.counted(task.id), since],
   ];
-  for (const [read, index] of reads) {
+  for (const [read, indexes] of reads) {
     for (const sql of queries(f.db, read)) {
       const detail = plan(f.db, sql);
       if (!sql.includes("external_task")) continue;
-      expect(detail.some((line) => index.test(line))).toBe(true);
+      for (const index of indexes)
+        expect(detail.some((line) => index.test(line))).toBe(true);
       expect(
         detail.some((line) => /SCAN (t|l|external_\w+)\b/.test(line)),
       ).toBe(false);

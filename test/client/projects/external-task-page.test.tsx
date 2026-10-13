@@ -68,6 +68,7 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   claim: null,
   last: null,
   entries: 0,
+  claimLimit: false,
   createdBy: { id: "u1", username: "stefan" },
   createdAt: NOW - 2 * HOUR,
   movedAt: NOW - 2 * HOUR,
@@ -171,7 +172,7 @@ describe("the crumb", () => {
 
 describe("the notice", () => {
   test("a todo task asks for an agent to claim it", () => {
-    const html = render(<TaskNotice state="todo" />);
+    const html = render(<TaskNotice state="todo" claimLimit={false} />);
     expect(html).toContain("Ask your agent to claim this task.");
     expect(html).toContain('<a class="btn btn-small" href="/connect">');
     for (const state of [
@@ -180,11 +181,19 @@ describe("the notice", () => {
       "done",
       "canceled",
     ] as const) {
-      expect(TaskNotice({ state })).toBeUndefined();
+      expect(TaskNotice({ state, claimLimit: false })).toBeUndefined();
     }
     expect(draw(page(), true)).toContain(
       '<div class="external-tasks-rest" hidden>',
     );
+  });
+
+  test("a todo task at the claim cap says to cancel and reopen it, with no Connect", () => {
+    const html = render(<TaskNotice state="todo" claimLimit />);
+    expect(html).toContain(
+      "Agents can't claim this task again. Cancel and reopen it to start over.",
+    );
+    expect(html).not.toContain("/connect");
   });
 });
 
@@ -257,6 +266,8 @@ describe("the answer box", () => {
     keyName: "laptop",
     claimId: "c1",
     claimEnd: null,
+    chatId: null,
+    chatTitle: null,
     at: NOW - HOUR,
   };
 
@@ -323,6 +334,8 @@ describe("a done task", () => {
       keyName: "laptop",
       claimId: "c1",
       claimEnd: "done",
+      chatId: null,
+      chatTitle: null,
       at: NOW - HOUR,
     };
     const html = draw(
@@ -330,7 +343,13 @@ describe("a done task", () => {
         row({ state: "done" }),
         {
           files: [
-            { fileId: "f1", name: "plan.md", revision: 1, deleted: false },
+            {
+              fileId: "f1",
+              name: "plan.md",
+              revision: 1,
+              changedAt: 1,
+              deleted: false,
+            },
           ],
         },
         [result],
@@ -353,8 +372,20 @@ describe("a done task", () => {
 
 describe("the files", () => {
   const files: ExternalTaskDetail["files"] = [
-    { fileId: "f1", name: "plan.md", revision: 3, deleted: false },
-    { fileId: "f2", name: "old.md", revision: null, deleted: true },
+    {
+      fileId: "f1",
+      name: "plan.md",
+      revision: 3,
+      changedAt: 1,
+      deleted: false,
+    },
+    {
+      fileId: "f2",
+      name: "old.md",
+      revision: null,
+      changedAt: null,
+      deleted: true,
+    },
   ];
 
   test("each opens in place, its pencil the way to its page", () => {
@@ -459,6 +490,7 @@ describe("the form", () => {
       fileId: `f${i}`,
       name: `f${i}.md`,
       revision: 1,
+      changedAt: 1,
       deleted: false,
     }));
     const full = form(page(row({ labels: ["build"] }), { files }).detail);

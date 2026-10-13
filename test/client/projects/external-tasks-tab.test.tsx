@@ -37,6 +37,7 @@ const row = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   claim: null,
   last: null,
   entries: 0,
+  claimLimit: false,
   createdBy: { id: "u1", username: "stefan" },
   createdAt: 1_000,
   movedAt: 1_000,

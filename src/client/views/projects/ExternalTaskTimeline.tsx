@@ -160,6 +160,30 @@ function Line({
   );
 }
 
+// the chat a move came through: its name a link when the reader may
+// open it, else a chat
+function InChat({
+  chatId,
+  chatTitle,
+}: {
+  chatId: string | null;
+  chatTitle: string | null;
+}) {
+  if (chatId === null) return null;
+  return (
+    <span class="external-tasks-line-place">
+      <span class="external-tasks-line-via">in</span>
+      {chatTitle === null ? (
+        <span>a chat</span>
+      ) : (
+        <a class="external-tasks-line-chat cut" href={chatHref(chatId)}>
+          {chatName(chatTitle)}
+        </a>
+      )}
+    </span>
+  );
+}
+
 // the first line: who opened the task, and in which chat when the
 // reader may open it
 function Opened({ page, now }: { page: TaskPage; now: number }) {
@@ -169,20 +193,7 @@ function Opened({ page, now }: { page: TaskPage; now: number }) {
       icon={<TaskStateIcon state="todo" size={14} />}
       verb="Opened"
       who={<Who username={task.createdBy?.username ?? null} keyName={null} />}
-      place={
-        chatId === null ? undefined : (
-          <span class="external-tasks-line-place">
-            <span class="external-tasks-line-via">in</span>
-            {chatTitle === null ? (
-              <span>a chat</span>
-            ) : (
-              <a class="external-tasks-line-chat cut" href={chatHref(chatId)}>
-                {chatName(chatTitle)}
-              </a>
-            )}
-          </span>
-        )
-      }
+      place={<InChat chatId={chatId} chatTitle={chatTitle} />}
       text=""
       at={task.createdAt}
       now={now}
@@ -245,6 +256,9 @@ export function Activity({
                     system={sweepReason(entry) !== null}
                   />
                 )
+              }
+              place={
+                <InChat chatId={entry.chatId} chatTitle={entry.chatTitle} />
               }
               text={line.line}
               at={entry.at}

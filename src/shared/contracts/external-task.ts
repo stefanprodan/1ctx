@@ -45,10 +45,10 @@ export type ExternalTaskRow = {
   revision: number;
   editRevision: number;
   claim: ExternalTaskClaim | null;
-  // the latest entry but a claim, its text cut to MAX_LAST_LINE; by is
-  // null when 1ctx wrote it or its user was deleted, keyName for a
-  // member; claimEnd as on the entry, idle or access_gone on 1ctx's
-  // releases
+  // the latest entry but a claim or an edit, its text cut to
+  // MAX_LAST_LINE; by is null when 1ctx wrote it or its user was deleted,
+  // keyName for a member; claimEnd as on the entry, idle, access_gone or
+  // limit on 1ctx's releases
   last: {
     kind: EntryKind;
     text: string;
@@ -58,6 +58,10 @@ export type ExternalTaskRow = {
     claimEnd: ClaimEnd | null;
   } | null;
   entries: number;
+  // a todo task at MAX_CLAIMS claims or CLOSING_ENTRIES agent entries
+  // since its last reopen: no agent may claim it until a member cancels
+  // and reopens it
+  claimLimit: boolean;
   createdBy: ExternalTaskUser | null;
   createdAt: number;
   // the last state change, a question asked again while awaiting input,
@@ -72,6 +76,9 @@ export type ExternalTaskFile = {
   name: string | null;
   // null when deleted
   revision: number | null;
+  // the file's last write, as the Knowledge tab's rows show it; null
+  // when deleted
+  changedAt: number | null;
   deleted: boolean;
 };
 
@@ -86,9 +93,13 @@ export type ExternalTaskEntry = {
   keyName: string | null;
   // the claim this entry belongs to or ends, including member/system ends
   claimId: string | null;
-  // set on the entry that ended a claim: idle or access_gone tells which
-  // of 1ctx's releases it was
+  // set on the entry that ended a claim: idle, access_gone or limit
+  // tells which of 1ctx's releases it was
   claimEnd: ClaimEnd | null;
+  // the chat an edit came through, null otherwise or once deleted
+  chatId: string | null;
+  // its title, only on the page's read and when the reader may open it
+  chatTitle: string | null;
   at: number;
 };
 
@@ -120,10 +131,11 @@ export const MAX_TASK_LABELS = 3;
 export const MAX_ENTRY_BYTES = 16 * 1024;
 export const MAX_ENTRY_LINKS = 5;
 export const MAX_LINK_BYTES = 2048;
-// every entry counts, claims too, so a task reopened again and again
-// stays bounded
+// an agent's entries since the last reopen, claims too, against one in
+// a loop; a member's and 1ctx's never count
 export const MAX_ENTRIES = 250;
-// from here a task takes only the moves that end a claim or close it
+// from here an agent may only finish or give the task back, and no
+// agent may claim it
 export const CLOSING_ENTRIES = 240;
 // claims since the last reopen, against an agent that loops
 export const MAX_CLAIMS = 20;

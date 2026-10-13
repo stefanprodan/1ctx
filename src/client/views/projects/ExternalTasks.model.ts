@@ -29,6 +29,8 @@ import { plainLine } from "../../lib/plain.ts";
 
 export const INTRO = "Work for an agent you run outside 1ctx.";
 export const UNCLAIMED = "Ask your agent to claim this task.";
+export const CLAIM_LIMIT =
+  "Agents can't claim this task again. Cancel and reopen it to start over.";
 
 export const GONE_USER = "a deleted user";
 
@@ -38,6 +40,7 @@ type Who = Pick<ExternalTaskEntry, "kind" | "by" | "keyName" | "claimEnd">;
 const SWEEP_REASONS: Partial<Record<ClaimEnd, string>> = {
   idle: "idle",
   access_gone: "access gone",
+  limit: "limit reached",
 };
 
 // the reason of an unclaim 1ctx made, null for any other entry
@@ -66,11 +69,16 @@ export const openerOf = (row: Pick<ExternalTaskRow, "createdBy">): string =>
   row.createdBy === null ? GONE_USER : `@${row.createdBy.username}`;
 
 // a row's second line, who moved it last: the question a task awaits,
-// who holds it, who opened, gave back or reopened it, who closed it
+// who holds it, who opened, gave back or reopened it, who closed it; a
+// todo task no agent may claim again says so instead
 export function rowLine(
-  row: Pick<ExternalTaskRow, "state" | "claim" | "last" | "createdBy">,
+  row: Pick<
+    ExternalTaskRow,
+    "state" | "claim" | "last" | "createdBy" | "claimLimit"
+  >,
 ): string {
   const last = row.last;
+  if (row.state === "todo" && row.claimLimit) return "Claim limit reached";
   switch (row.state) {
     case "awaiting_input":
       if (last?.kind === "question") return plainLine(last.text);

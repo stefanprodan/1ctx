@@ -35,6 +35,9 @@ import {
   checkUnfinished,
   closed,
   isState,
+  limitNote,
+  NEW_TASK,
+  roomFor,
 } from "./rules.ts";
 import type { KnowledgePort, TaskRead } from "./show.ts";
 import type { ExternalTaskStore, StoredBrief } from "./store.ts";
@@ -68,16 +71,15 @@ export function writeEntry(
   const { actor, kind, text, links, userId, at } = input;
   const state = checkMove(task.state, kind, actor);
   checkEntry(kind, text, links);
-  checkRoom(store.counted(task.id), kind);
   const end: ClaimEnd | null =
     kind === "result"
       ? "done"
       : kind === "cancel" && task.claim !== null
         ? "canceled"
         : kind === "unclaim"
-          ? actor === "idle" || actor === "access_gone"
-            ? actor
-            : "unclaimed"
+          ? actor === "agent" || actor === "member"
+            ? "unclaimed"
+            : actor
           : null;
   const claim = task.claim;
   if (claim !== null) {
@@ -153,7 +155,9 @@ export function taskActions(deps: ActionsDeps) {
       fileIds: brief.fileIds,
     };
   };
-  // the claim's own entry: a report, or the agent giving the task back
+  // the claim's own entry: a report, or the agent giving the task back.
+  // A report past the entry bounds ends the claim as limit and commits that
+  // before the refusal is thrown, so the page shows why it went back.
   const agentEntry = (
     key: TaskKey,
     taskId: string,
@@ -161,8 +165,8 @@ export function taskActions(deps: ActionsDeps) {
     kind: AgentEntryKind | "unclaim",
     text: string,
     links: string[],
-  ) =>
-    transact(db, () => {
+  ) => {
+    const written = transact(db, () => {
       const claim = store.claimById(claimId);
       if (claim === null) throw new NotFound("no such external task");
       if (
@@ -193,6 +197,20 @@ export function taskActions(deps: ActionsDeps) {
       if (claim.ended_at !== null || task.claim?.id !== claimId) {
         throw new Conflict(STALE_TASK);
       }
+      checkMove(task.state, kind, "agent");
+      checkEntry(kind, text, links);
+      const entries = store.counted(taskId);
+      if (!roomFor(entries, kind)) {
+        const released = writeEntry(store, task, {
+          actor: "limit",
+          kind: "unclaim",
+          text: limitNote(entries),
+          links: [],
+          userId: null,
+          at: deps.clock(),
+        });
+        return { result: null, events: [taskChanged(released.task)] };
+      }
       const result = writeEntry(store, task, {
         actor: "agent",
         kind,
@@ -203,6 +221,9 @@ export function taskActions(deps: ActionsDeps) {
       });
       return { result, events: [taskChanged(result.task)] };
     });
+    if (written === null) throw new Conflict(NEW_TASK);
+    return written;
+  };
   const member = (
     userId: string,
     id: string,
@@ -253,10 +274,14 @@ export function taskActions(deps: ActionsDeps) {
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
+    // an edit is an entry with no text, by the member or the chat's
+    // user, and never counts toward the bounds
     edit(
+      userId: string,
       id: string,
       body: PatchExternalTaskRequest,
       viewer: Principal | null = null,
+      chatId: string | null = null,
     ) {
       return transact(db, () => {
         const task = required(store, id);
@@ -280,7 +305,19 @@ export function taskActions(deps: ActionsDeps) {
         );
         if (JSON.stringify(brief) === JSON.stringify(old))
           return { result: detail(id, viewer) };
-        store.edit(id, brief, deps.clock());
+        const now = deps.clock();
+        store.edit(id, brief, now);
+        store.append(id, {
+          claimId: null,
+          kind: "edit",
+          text: "",
+          links: [],
+          userId,
+          keyName: null,
+          claimEnd: null,
+          chatId,
+          at: now,
+        });
         const result = detail(id, viewer);
         return { result, events: [taskChanged(result.task.task)] };
       });

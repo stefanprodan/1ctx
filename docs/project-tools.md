@@ -95,7 +95,8 @@ errors and cuts every tool shares are in `docs/tools.md`.
   name to ids only after the user is checked to still see the project,
   so one who lost it learns no file name. An edit's `labels` and
   `files` replace the task's, and a linked file's id from `show` keeps
-  it, a deleted one included.
+  it, a deleted one included. An edit writes an `edit` entry by the
+  chat's user that keeps the chat's id, as `create` links it.
 - **Every move names what the agent read.** `edit` names `editRevision`;
   `answer`, `unclaim`, `cancel` and `reopen` the state, `unclaim` also its
   `claimId`, which `answer` and `cancel` may name too and are then held

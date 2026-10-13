@@ -54,6 +54,8 @@ const entry = (
     keyName: agent ? "laptop-claude" : null,
     claimId: agent ? "c1" : null,
     claimEnd: null,
+    chatId: null,
+    chatTitle: null,
     at,
     ...changes,
   };
@@ -70,6 +72,7 @@ const task = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   claim: claim("c1"),
   last: null,
   entries: 0,
+  claimLimit: false,
   createdBy: stefan,
   createdAt: 0,
   movedAt: 0,
@@ -116,6 +119,7 @@ describe("the activity", () => {
       entry("reopen"),
       entry("cancel"),
       entry("unclaim", { by: null, claimEnd: "idle", claimId: "c1" }),
+      entry("edit", { text: "" }),
     ];
     expect(written.map((e) => e.kind).toSorted()).toEqual(
       [...ENTRY_KINDS].toSorted(),
@@ -207,6 +211,63 @@ describe("the activity", () => {
       '<span class="external-tasks-by-faint">a deleted user</span>',
     );
     expect(sweepReason({ kind: "unclaim", claimEnd: "unclaimed" })).toBeNull();
+  });
+
+  test("an agent stopped at the entry limit reads Unclaimed by 1ctx, limit reached", () => {
+    const [limit] = rows(
+      draw(
+        page(
+          [
+            entry("unclaim", {
+              by: null,
+              keyName: null,
+              claimEnd: "limit",
+              claimId: "c1",
+              text: "after 240 agent entries",
+            }),
+          ],
+          task({ state: "todo", claim: null }),
+        ),
+      ),
+    );
+    expect(limit).toContain(
+      '<span class="external-tasks-line-via">by</span><span class="external-tasks-by-faint">1ctx</span>',
+    );
+    expect(limit).toContain(
+      '<span class="external-tasks-line-text cut">limit reached</span>',
+    );
+  });
+
+  test("an edit is one line, Edited by @user, and in the chat it came through", () => {
+    const [plain, opens, hidden] = rows(
+      draw(
+        page([
+          entry("edit", { text: "" }),
+          entry("edit", {
+            text: "",
+            chatId: "s1",
+            chatTitle: "Plan the sweep",
+          }),
+          entry("edit", { text: "", chatId: "s2", chatTitle: null }),
+        ]),
+      ),
+    );
+    for (const line of [plain, opens, hidden]) {
+      expect(line).toContain(
+        '<span class="external-tasks-line-verb">Edited</span>',
+      );
+      expect(line).toContain("@stefan");
+      // no words, so nothing opens under it
+      expect(line).not.toContain("aria-expanded");
+    }
+    expect(plain).not.toContain("external-tasks-line-place");
+    expect(opens).toContain(
+      '<a class="external-tasks-line-chat cut" href="/chat/s1">Plan the sweep</a>',
+    );
+    expect(hidden).toContain(
+      '<span class="external-tasks-line-via">in</span><span>a chat</span>',
+    );
+    expect(hidden).not.toContain("href=");
   });
 
   test("a member since deleted is never 1ctx", () => {

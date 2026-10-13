@@ -186,42 +186,12 @@ test.serial(
 );
 
 for (const scope of ["keys", "user"] as const) {
-  test(`${scope} access endings cannot exhaust the entry budget of a live claim`, () => {
+  test(`${scope} access endings end a claim at the entry cap and never count`, () => {
     using f = fixture();
     expect(MAX_ENTRIES).toBe(250);
     expect(CLOSING_ENTRIES).toBe(240);
-    const task = f.create();
-    f.fillEntries(task.id, CLOSING_ENTRIES - 2);
-    const held = f.area.claim(f.key, task.id);
-    f.area.report(
-      f.key,
-      task.id,
-      held.claimId,
-      "question",
-      "Last question.",
-      [],
-    );
-    expect(f.area.store.counted(task.id)).toBe(CLOSING_ENTRIES);
-    refuses(
-      () =>
-        f.area.answer(f.owner.id, task.id, {
-          state: "awaiting_input",
-          text: "Another answer.",
-        }),
-      409,
-    );
-    refuses(
-      () =>
-        f.area.report(
-          f.key,
-          task.id,
-          held.claimId,
-          "progress",
-          "Another report.",
-          [],
-        ),
-      409,
-    );
+    const task = f.task("awaiting_input");
+    f.fillEntries(task.id, MAX_ENTRIES);
     transact(f.db, () => {
       const events =
         scope === "keys"
@@ -233,16 +203,15 @@ for (const scope of ["keys", "user"] as const) {
     expect(f.area.store.byId(task.id)).toMatchObject({
       state: "todo",
       claim: null,
-      entries: CLOSING_ENTRIES + 1,
     });
-    expect(f.area.store.counted(task.id)).toBe(CLOSING_ENTRIES + 1);
-    expect(f.area.store.claimById(held.claimId)!.end_reason).toBe(
+    expect(f.area.store.counted(task.id)).toBe(MAX_ENTRIES);
+    expect(f.area.store.claimById(task.claimId!)!.end_reason).toBe(
       "access_gone",
     );
     refuses(() => f.area.claim(f.key, task.id), 409);
     const cancelled = f.area.cancel(f.owner.id, task.id, { state: "todo" });
-    expect(cancelled.task.task.entries).toBe(CLOSING_ENTRIES + 2);
-    expect(f.area.store.counted(task.id)).toBeLessThan(MAX_ENTRIES);
+    expect(cancelled.task.task.state).toBe("canceled");
+    expect(f.area.store.counted(task.id)).toBe(MAX_ENTRIES);
   });
 
   test.serial(
@@ -336,17 +305,17 @@ test("a reopen between the closed scan and deletion wins the recheck", () => {
 });
 
 for (const kind of ["idle", "access_gone"] as const) {
-  test(`${kind} can end a claim in the reserved tail`, () => {
+  test(`${kind} ends a claim at the entry cap, uncounted`, () => {
     using f = fixture();
     const task = f.task(kind === "idle" ? "in_progress" : "awaiting_input");
-    f.fillEntries(task.id, 240);
+    f.fillEntries(task.id, MAX_ENTRIES);
     f.advance(DAY);
     expect(
       kind === "idle"
         ? f.area.unclaimIdle(f.now())
         : f.area.endClaims([f.key.keyId]),
     ).toBe(1);
-    expect(f.area.store.counted(task.id)).toBe(241);
+    expect(f.area.store.counted(task.id)).toBe(MAX_ENTRIES);
   });
 }
 

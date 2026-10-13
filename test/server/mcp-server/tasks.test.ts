@@ -669,6 +669,7 @@ describe("labels and unclaim on the tasks tool", () => {
           fileId: "file00000001",
           name: "notes/readme.md",
           revision: 7,
+          changedAt: "1970-01-01T00:00:00.250Z",
           deleted: false,
         },
       ]);

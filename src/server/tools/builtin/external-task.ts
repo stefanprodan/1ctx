@@ -71,10 +71,12 @@ export type ExternalTasksPort = {
     body: CreateExternalTaskRequest,
     chatId: string,
   ): ExternalTaskResponse;
+  // the edit's entry keeps the chat it came through
   edit(
     actor: Actor,
     id: string,
     body: PatchExternalTaskRequest,
+    chatId: string,
   ): ExternalTaskResponse;
   move(
     actor: Actor,
@@ -349,7 +351,9 @@ function run(
         body.fileIds = fileIds(port, actor.projectId, call.files, linked);
       }
       return editedText(
-        withLabels(port, actor, () => port.edit(actor, call.id, body)),
+        withLabels(port, actor, () =>
+          port.edit(actor, call.id, body, actor.sessionId),
+        ),
         call.body.editRevision,
       );
     }

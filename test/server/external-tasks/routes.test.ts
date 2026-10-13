@@ -31,7 +31,13 @@ for (const who of ["member", "admin"] as const) {
           entries: 0,
         },
         files: [
-          { fileId: f.briefId, name: "brief.md", revision: 1, deleted: false },
+          {
+            fileId: f.briefId,
+            name: "brief.md",
+            revision: 1,
+            changedAt: f.app.now.value,
+            deleted: false,
+          },
         ],
         briefAt: f.app.now.value,
         chatId: null,
@@ -70,7 +76,17 @@ for (const who of ["member", "admin"] as const) {
         before.task.task.editRevision + 1,
       );
       expect(edited.task.task.revision).toBe(before.task.task.revision + 1);
-      expect(edited.entries).toEqual(before.entries);
+      // the edit is the newest entry, by the editor, with no text
+      expect(edited.entries.slice(1)).toEqual(before.entries);
+      expect(edited.entries[0]).toMatchObject({
+        kind: "edit",
+        text: "",
+        html: "",
+        by: { username: who },
+        keyName: null,
+        chatId: null,
+        chatTitle: null,
+      });
     }
     const blocked = await f.show(id);
     const answer = await client.call("POST", `${base}/answer`, {
@@ -323,20 +339,36 @@ test("linked files stay live by id and retain their deleted name without crossin
   const id = made.task.task.id;
   const held = f.app.externalTasks.claim(await f.key(), id);
   expect(held.task.files).toEqual([
-    { fileId: file.id, name: "plan.md", revision: 1, deleted: false },
+    {
+      fileId: file.id,
+      name: "plan.md",
+      revision: 1,
+      changedAt: file.updatedAt,
+      deleted: false,
+    },
   ]);
+  f.app.now.value += 1_000;
   const changed = await f.creator.client.call(
     "PUT",
     `${path}/files/${file.id}`,
     { body: { revision: 1, text: "Second." } },
   );
   expect(changed.status).toBe(200);
-  expect((await f.show(id)).task.files[0]?.revision).toBe(2);
+  expect((await f.show(id)).task.files[0]).toMatchObject({
+    revision: 2,
+    changedAt: f.app.now.value,
+  });
   expect(
     (await f.creator.client.call("DELETE", `${path}/files/${file.id}`)).status,
   ).toBe(204);
   expect((await f.show(id)).task.files).toEqual([
-    { fileId: file.id, name: "plan.md", revision: null, deleted: true },
+    {
+      fileId: file.id,
+      name: "plan.md",
+      revision: null,
+      changedAt: null,
+      deleted: true,
+    },
   ]);
   expect(
     (
@@ -383,6 +415,7 @@ test("task reads and write answers read linked file columns without their text",
         fileId: file.id,
         name: file.name,
         revision: file.revision,
+        changedAt: file.updatedAt,
         deleted: false,
       },
     ]);

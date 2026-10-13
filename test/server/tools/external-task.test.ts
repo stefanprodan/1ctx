@@ -184,7 +184,13 @@ describe("a chat's external tasks", () => {
       const detail = chat.app.externalTasks.show(task!.id, null)!.task;
       expect(detail.chatId).toBe(sessionId);
       expect(detail.files).toEqual([
-        { fileId, name: "plans/port.md", revision: 1, deleted: false },
+        {
+          fileId,
+          name: "plans/port.md",
+          revision: 1,
+          changedAt: expect.any(Number),
+          deleted: false,
+        },
       ]);
       const key = await memberKey(chat);
       expect(await mcpTasks(chat, key.token, { action: "list" })).toContain(
@@ -285,7 +291,7 @@ describe("a chat's external tasks", () => {
         chat.projectId,
         { title: "Port it", labels: ["build"], fileIds: [first] },
       ).task.task;
-      const { script } = await startChat(chat);
+      const { script, sessionId } = await startChat(chat);
       const { answers, next } = await round(chat, script, [
         {
           action: "edit",
@@ -295,6 +301,16 @@ describe("a chat's external tasks", () => {
         },
       ]);
       expect(answers[0]).toContain("now edit revision 1");
+      // the edit is an entry by the chat's user, keeping the chat
+      expect(
+        chat.app.externalTasks.show(task.id, null)!.entries[0],
+      ).toMatchObject({
+        kind: "edit",
+        text: "",
+        by: { id: chat.memberId },
+        chatId: sessionId,
+        chatTitle: null,
+      });
       const after = chat.app.externalTasks.show(task.id, null)!.task;
       expect(after.files.map((file) => file.fileId)).toEqual([first, second]);
       const stale = await round(chat, next, [

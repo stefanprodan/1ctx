@@ -392,11 +392,16 @@ test("linked files read live names and revisions, then deleted names and a prune
   }).task.task;
   const held = f.area.claim(f.key, task.id);
   expect(held.task.files.map((v) => v.fileId)).toEqual(["file", "second"]);
-  f.files.set(`${f.projectId}/file`, { name: "renamed.md", revision: 2 });
+  f.files.set(`${f.projectId}/file`, {
+    name: "renamed.md",
+    revision: 2,
+    updatedAt: 5_000,
+  });
   expect(f.port.show(task.id, null)!.task.files[0]).toEqual({
     fileId: "file",
     name: "renamed.md",
     revision: 2,
+    changedAt: 5_000,
     deleted: false,
   });
   f.files.delete(`${f.projectId}/file`);
@@ -405,9 +410,10 @@ test("linked files read live names and revisions, then deleted names and a prune
     fileId: "file",
     name: "renamed.md",
     revision: null,
+    changedAt: null,
     deleted: true,
   });
-  f.area.edit(task.id, {
+  f.area.edit(f.owner.id, task.id, {
     editRevision: 0,
     title: "Still points at the deleted plan",
     fileIds: ["file", "second"],
@@ -419,18 +425,29 @@ test("linked files read live names and revisions, then deleted names and a prune
     fileId: "file",
     name: null,
     revision: null,
+    changedAt: null,
     deleted: true,
   });
-  f.area.edit(task.id, { editRevision: 1, fileIds: ["restored"] });
+  f.area.edit(f.owner.id, task.id, { editRevision: 1, fileIds: ["restored"] });
   expect(f.port.show(task.id, null)!.task.files).toEqual([
-    { fileId: "restored", name: "renamed.md", revision: 1, deleted: false },
+    {
+      fileId: "restored",
+      name: "renamed.md",
+      revision: 1,
+      changedAt: 0,
+      deleted: false,
+    },
   ]);
   f.files.set(`${f.otherProjectId}/foreign`, {
     name: "private.md",
     revision: 1,
   });
   refuses(
-    () => f.area.edit(task.id, { editRevision: 2, fileIds: ["foreign"] }),
+    () =>
+      f.area.edit(f.owner.id, task.id, {
+        editRevision: 2,
+        fileIds: ["foreign"],
+      }),
     400,
     "no such knowledge file",
   );

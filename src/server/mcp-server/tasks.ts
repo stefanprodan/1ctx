@@ -127,6 +127,7 @@ function detailChunk(detail: ExternalTaskDetail, keyId: string): string {
     files: detail.files.map((file) => ({
       ...file,
       name: file.name === null ? null : asSent(file.name),
+      changedAt: file.changedAt === null ? null : iso(file.changedAt),
     })),
     briefAt: iso(detail.briefAt),
     chatId: detail.chatId,
@@ -279,27 +280,38 @@ export function tasksTool(
     });
     return showResult(claimed, key.keyId, claimed.claimId);
   }
-  const reported = transact(deps.db, () => {
+  // A refusal is returned through the commit, never thrown through it:
+  // the action rolled back its own writes, and one past the entry bounds
+  // ended the claim before refusing, which must stay.
+  const reported = transact<
+    ReturnType<McpServerDeps["tasks"]["report"]> | HttpError
+  >(deps.db, () => {
     deps.access.checkKey(principal, projectId);
-    return {
-      result:
-        input.action === "unclaim"
-          ? deps.tasks.agentUnclaim(
-              key,
-              input.taskId,
-              input.claimId,
-              input.text,
-            )
-          : deps.tasks.report(
-              key,
-              input.taskId,
-              input.claimId,
-              input.kind,
-              input.text,
-              input.links,
-            ),
-    };
+    try {
+      return {
+        result:
+          input.action === "unclaim"
+            ? deps.tasks.agentUnclaim(
+                key,
+                input.taskId,
+                input.claimId,
+                input.text,
+              )
+            : deps.tasks.report(
+                key,
+                input.taskId,
+                input.claimId,
+                input.kind,
+                input.text,
+                input.links,
+              ),
+      };
+    } catch (error) {
+      if (error instanceof HttpError) return { result: error };
+      throw error;
+    }
   });
+  if (reported instanceof HttpError) throw reported;
   return textResult(
     `${dataLabel(input.action === "unclaim" ? "Task unclaim" : "Task report")}\n${jsonLine(
       {

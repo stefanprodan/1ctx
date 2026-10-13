@@ -38,7 +38,10 @@ export function fixture() {
   const key = { userId: owner.id, keyId: "key", keyName: "laptop" };
   const otherKey = { userId: member.id, keyId: "other-key", keyName: "other" };
   // every task links the brief file of its project unless told otherwise
-  const files = new Map<string, { name: string; revision: number }>([
+  const files = new Map<
+    string,
+    { name: string; revision: number; updatedAt?: number }
+  >([
     [`${projectId}/brief`, { name: "brief.md", revision: 1 }],
     [`${otherProjectId}/brief`, { name: "brief.md", revision: 1 }],
   ]);
@@ -58,7 +61,11 @@ export function fixture() {
     chatOpens: () => true,
     homeProjectIds: () => [projectId],
     knowledge: {
-      file: (projectId, fileId) => files.get(`${projectId}/${fileId}`) ?? null,
+      // a file set with no write time last changed at the start
+      file: (projectId, fileId) => {
+        const file = files.get(`${projectId}/${fileId}`);
+        return file === undefined ? null : { updatedAt: 0, ...file };
+      },
       deletedName: (projectId, fileId) =>
         deleted.get(`${projectId}/${fileId}`) ?? null,
     },
@@ -87,18 +94,18 @@ export function fixture() {
     if (state === "canceled") area.cancel(owner.id, row.id, { state: "todo" });
     return { ...area.store.byId(row.id)!, claimId };
   };
-  // fills to count entries of the 250 bound, claims included
+  // fills to count agent entries, the ones the 250 bound counts
   const fillEntries = (id: string, count: number) =>
     transact(db, () => {
       const have = area.store.counted(id);
       for (let i = have; i < count; i++) {
         area.store.append(id, {
           claimId: null,
-          kind: "answer",
+          kind: "progress",
           text: `entry ${i}`,
           links: [],
           userId: owner.id,
-          keyName: null,
+          keyName: key.keyName,
           claimEnd: null,
           at: now,
         });

@@ -44,7 +44,7 @@ test("a task stores its labels shaped, in order, and reads their names now", () 
 test("a label edit moves the edit revision, and a task whose labels went takes one at its next edit", () => {
   using f = fixture();
   const task = f.create();
-  const relabeled = f.area.edit(task.id, {
+  const relabeled = f.area.edit(f.owner.id, task.id, {
     editRevision: 0,
     labels: ["plan", "build"],
   }).task.task;
@@ -55,11 +55,14 @@ test("a label edit moves the edit revision, and a task whose labels went takes o
   });
   // the same labels again change nothing
   expect(
-    f.area.edit(task.id, { editRevision: 1, labels: ["plan", "build"] }).task
-      .task.editRevision,
+    f.area.edit(f.owner.id, task.id, {
+      editRevision: 1,
+      labels: ["plan", "build"],
+    }).task.task.editRevision,
   ).toBe(1);
   refuses(
-    () => f.area.edit(task.id, { editRevision: 0, labels: ["fix"] }),
+    () =>
+      f.area.edit(f.owner.id, task.id, { editRevision: 0, labels: ["fix"] }),
     409,
   );
   for (const name of ["plan", "build"]) {
@@ -69,12 +72,16 @@ test("a label edit moves the edit revision, and a task whose labels went takes o
   expect(bare.labels).toEqual([]);
   expect(bare.revision).toBe(relabeled.revision);
   refuses(
-    () => f.area.edit(task.id, { editRevision: 1, title: "Renamed" }),
+    () =>
+      f.area.edit(f.owner.id, task.id, { editRevision: 1, title: "Renamed" }),
     400,
   );
   expect(
-    f.area.edit(task.id, { editRevision: 1, title: "Renamed", labels: ["fix"] })
-      .task.task.labels,
+    f.area.edit(f.owner.id, task.id, {
+      editRevision: 1,
+      title: "Renamed",
+      labels: ["fix"],
+    }).task.task.labels,
   ).toEqual(["fix"]);
 });
 

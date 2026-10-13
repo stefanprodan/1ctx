@@ -69,6 +69,28 @@ test.serial(
   },
 );
 
+test("a live report retried after a member's edit answers the first", () => {
+  using f = fixture();
+  const task = f.task("in_progress");
+  const first = f.port.report(
+    f.key,
+    task.id,
+    task.claimId!,
+    "progress",
+    "Half.",
+    ["https://example.com/pr/1"],
+  );
+  f.area.edit(f.owner.id, task.id, { editRevision: 0, title: "Moved brief" });
+  const current = f.area.show(task.id, null);
+  f.advance();
+  expect(
+    f.port.report(f.key, task.id, task.claimId!, "progress", "Half.", [
+      "https://example.com/pr/1",
+    ]),
+  ).toEqual(first);
+  expect(f.area.show(task.id, null)).toEqual(current);
+});
+
 for (const kind of ["result", "unclaim"] as const) {
   test(`${kind} retry returns its original end even after another claim or brief edit`, () => {
     using f = fixture();
@@ -79,7 +101,10 @@ for (const kind of ["result", "unclaim"] as const) {
     ]);
     if (kind === "result")
       f.area.reopen(f.owner.id, task.id, { state: "done", text: "Try again." });
-    f.area.edit(task.id, { editRevision: 0, title: "Another attempt" });
+    f.area.edit(f.owner.id, task.id, {
+      editRevision: 0,
+      title: "Another attempt",
+    });
     const next = f.area.claim(f.otherKey, task.id);
     const current = f.area.show(task.id, null);
     f.advance();

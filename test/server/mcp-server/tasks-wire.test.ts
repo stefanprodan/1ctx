@@ -5,6 +5,7 @@
 // line from the real store, and an agent's unclaim with its retry.
 
 import { describe, expect, test } from "bun:test";
+import { CLOSING_ENTRIES } from "../../../src/shared/contracts/external-task.ts";
 import { createKey } from "../../helpers/access-keys.ts";
 import { type ChatApp, chatApp } from "../../helpers/chat.ts";
 import { briefFile } from "../external-tasks/http-fixture.ts";
@@ -148,6 +149,69 @@ describe("the tasks tool on the composed server", () => {
       });
       expect(again).toEqual(back);
       expect(area.store.byId(build)!.entries).toBe(entries);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a report past the entry bounds is refused and its claim's end commits", async () => {
+    const chat = await chatApp();
+    try {
+      chat.app.automationScheduler.stop();
+      const area = chat.app.externalTasks;
+      const id = area.create(chat.memberId, chat.projectId, {
+        title: "Loop on it",
+        labels: ["build"],
+        fileIds: [briefFile(chat.app, chat.projectId, chat.memberId)],
+      }).task.task.id;
+      const write = await createKey(chat.member, { name: "laptop" });
+      const claimed = await tasks(chat, write.token, {
+        action: "claim",
+        taskId: id,
+      });
+      const claimId = /^Claim (\w+) for task/.exec(claimed.text)![1]!;
+      // an agent's reports up to the reserved tail
+      for (let i = area.store.counted(id); i < CLOSING_ENTRIES; i++) {
+        area.store.append(id, {
+          claimId,
+          kind: "progress",
+          text: `step ${i}`,
+          links: [],
+          userId: chat.memberId,
+          keyName: "laptop",
+          claimEnd: null,
+          at: chat.app.now.value,
+        });
+      }
+      // a member's edit shows in show and never counts
+      const row = area.store.byId(id)!;
+      area.edit(chat.memberId, id, {
+        editRevision: row.editRevision,
+        title: "Loop on it, again",
+      });
+      const shown = await tasks(chat, write.token, {
+        action: "show",
+        taskId: id,
+      });
+      expect(shown.text).toContain('"kind":"edit","by":"a member"');
+      const refused = await tasks(chat, write.token, {
+        action: "report",
+        taskId: id,
+        claimId,
+        kind: "progress",
+        text: "Still looping.",
+      });
+      expect(refused).toEqual({
+        error: true,
+        text: "make a new external task",
+      });
+      expect(area.store.byId(id)).toMatchObject({
+        state: "todo",
+        claim: null,
+        last: { kind: "unclaim", by: null, claimEnd: "limit" },
+      });
+      expect(area.store.claimById(claimId)!.end_reason).toBe("limit");
+      expect(area.store.counted(id)).toBe(CLOSING_ENTRIES);
     } finally {
       await chat.app.shutdown();
     }

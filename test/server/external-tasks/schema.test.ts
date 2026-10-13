@@ -70,6 +70,8 @@ test("the schema checks the shared closed words and keeps history independent of
     "external_task_labels_label",
     "external_task_claims_open",
     "external_task_entries_task",
+    "external_task_entries_agent",
+    "external_task_entries_reopen",
   ])
     expect(indexes).toContain(name);
   expect(() =>
@@ -131,5 +133,21 @@ test("a missing originating chat leaves the stored task and is not a live link",
         "select chat_id from external_tasks where id = ?",
       )
       .get(made.task.task.id)!.chat_id,
+  ).toBe("gone-chat");
+  // an edit through it keeps the id, read as no chat
+  const edited = f.area.edit(
+    f.owner.id,
+    made.task.task.id,
+    { editRevision: 0, title: "Edited from chat" },
+    null,
+    "gone-chat",
+  );
+  expect(edited.entries[0]).toMatchObject({ kind: "edit", chatId: null });
+  expect(
+    f.db
+      .query<{ chat_id: string }, [string]>(
+        "select chat_id from external_task_entries where id = ?",
+      )
+      .get(edited.entries[0]!.id)!.chat_id,
   ).toBe("gone-chat");
 });

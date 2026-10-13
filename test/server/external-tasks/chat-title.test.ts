@@ -112,10 +112,45 @@ test("a task's chat title reaches only a reader who may open the chat", async ()
       expect((await edited.json()).task.chatTitle).toBe(title);
     }
 
+    // an edit through a chat names that chat to the same readers
+    const actor = { userId: chat.memberId, projectId: team.id };
+    for (const chatId of [teamChat, ownChat]) {
+      const revision = chat.app.externalTasks.store.byId(shared)!.editRevision;
+      chat.app.externalTasks.chat.edit(
+        actor,
+        shared,
+        { editRevision: revision, title: `Edited in ${chatId}` },
+        chatId,
+      );
+    }
+    const edits = async (client: typeof other) => {
+      const response = await client.call(
+        "GET",
+        `/api/external-tasks/${shared}`,
+      );
+      const body = (await response.json()) as ExternalTaskResponse;
+      return body.entries
+        .filter((entry) => entry.kind === "edit")
+        .map((entry) => [entry.chatId, entry.chatTitle]);
+    };
+    expect(await edits(other)).toEqual([
+      [ownChat, null],
+      [teamChat, "Plan the sweep"],
+    ]);
+    expect(await edits(chat.member)).toEqual([
+      [ownChat, "Private notes"],
+      [teamChat, "Plan the sweep"],
+    ]);
+
     // an agent's or a chat tool's read has no viewer and no title
     expect(
       chat.app.externalTasks.show(shared, null)!.task.chatTitle,
     ).toBeNull();
+    expect(
+      chat.app.externalTasks
+        .show(shared, null)!
+        .entries.every((entry) => entry.chatTitle === null),
+    ).toBe(true);
   } finally {
     await chat.app.shutdown();
   }

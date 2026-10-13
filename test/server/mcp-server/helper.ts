@@ -103,6 +103,7 @@ export const externalTaskRow = (
   claim: null,
   last: null,
   entries: 0,
+  claimLimit: false,
   createdBy: { id: "user00000001", username: "casey" },
   createdAt: 100,
   movedAt: 200,
@@ -120,6 +121,8 @@ export const externalTaskEntry = (
   keyName: "laptop",
   claimId: "claim0000001",
   claimEnd: null,
+  chatId: null,
+  chatTitle: null,
   at: 300,
   ...overrides,
 });
@@ -133,6 +136,7 @@ export const externalTaskDetail = (
       fileId: "file00000001",
       name: "notes/readme.md",
       revision: 7,
+      changedAt: 250,
       deleted: false,
     },
   ],
@@ -166,6 +170,8 @@ export const largestDetail = (): ExternalTaskDetail => ({
     fileId: `file${String(index).padStart(8, "0")}`,
     name: `${index}`.padEnd(MAX_KNOWLEDGE_NAME, "n"),
     revision: 1_000_000,
+    // the widest time an ISO string takes
+    changedAt: Date.UTC(275_000, 0),
     deleted: false,
   })),
   chatId: "session00001",

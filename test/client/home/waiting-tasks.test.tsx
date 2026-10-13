@@ -38,6 +38,7 @@ const row: ExternalTaskRow = {
     claimEnd: null,
   },
   entries: 2,
+  claimLimit: false,
   createdBy: null,
   createdAt: 1,
   movedAt: 5,

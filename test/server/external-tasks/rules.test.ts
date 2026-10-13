@@ -4,6 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   type Actor,
+  type AgentMove,
   type Brief,
   checkBrief,
   checkEntry,
@@ -51,10 +52,12 @@ const allowed = new Map<string, ExternalTaskState>([
   ["idle/in_progress/unclaim", "todo"],
   ["access_gone/in_progress/unclaim", "todo"],
   ["access_gone/awaiting_input/unclaim", "todo"],
+  ["limit/in_progress/unclaim", "todo"],
+  ["limit/awaiting_input/unclaim", "todo"],
 ]);
 
 describe("external task transitions", () => {
-  const actors: Actor[] = ["agent", "member", "idle", "access_gone"];
+  const actors: Actor[] = ["agent", "member", "idle", "access_gone", "limit"];
   const moves: Move[] = ["claim", ...ENTRY_KINDS];
   for (const actor of actors) {
     for (const state of EXTERNAL_TASK_STATES) {
@@ -78,7 +81,7 @@ describe("refused moves", () => {
       done: "this task is done",
       canceled: "this task is canceled",
     };
-    const actors: Actor[] = ["agent", "member", "idle", "access_gone"];
+    const actors: Actor[] = ["agent", "member", "idle", "access_gone", "limit"];
     for (const actor of actors) {
       for (const state of EXTERNAL_TASK_STATES) {
         for (const move of ENTRY_KINDS) {
@@ -150,14 +153,23 @@ describe("external task validation", () => {
     expect(() => checkEntry("cancel", "", [])).not.toThrow();
   });
 
-  test("only closing entries fit the reserved tail, and none passes the hard cap", () => {
-    for (const kind of ["claim", ...ENTRY_KINDS] satisfies Move[]) {
+  test("only an agent's closing moves fit the reserved tail, its unclaim passes the hard cap too", () => {
+    const moves: AgentMove[] = [
+      "claim",
+      "progress",
+      "question",
+      "result",
+      "unclaim",
+    ];
+    for (const kind of moves) {
       expect(() => checkRoom(CLOSING_ENTRIES - 1, kind)).not.toThrow();
-      if (["result", "unclaim", "cancel"].includes(kind)) {
+      if (["result", "unclaim"].includes(kind)) {
         expect(() => checkRoom(CLOSING_ENTRIES, kind)).not.toThrow();
         expect(() => checkRoom(MAX_ENTRIES - 1, kind)).not.toThrow();
       } else refuses(() => checkRoom(CLOSING_ENTRIES, kind), 409);
-      refuses(() => checkRoom(MAX_ENTRIES, kind), 409);
+      if (kind === "unclaim") {
+        expect(() => checkRoom(MAX_ENTRIES, kind)).not.toThrow();
+      } else refuses(() => checkRoom(MAX_ENTRIES, kind), 409);
     }
   });
 });

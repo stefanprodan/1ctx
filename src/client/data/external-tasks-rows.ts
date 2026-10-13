@@ -142,8 +142,8 @@ export type TaskLists = {
 };
 
 // a frame's row into the lists. The unfinished list is whole, so a row
-// it lacks was closed or is new; a new one has no entry yet, and a
-// reopen writes one. A closed row is placed only above the paging
+// it lacks was closed or is new; a reopen is its latest entry, where a
+// new one has none (an edit is never a row's last). A closed row is placed only above the paging
 // cursor, since one past it is read with its page, and only when the
 // filter the pages were read under takes it.
 export function applyTask(
@@ -158,7 +158,10 @@ export function applyTask(
   const tasks = upsertTask(lists.tasks, row);
   let closed = lists.closed;
   if (unfinished(row.state)) {
-    if (shut !== undefined || (open === undefined && row.entries > 0)) {
+    if (
+      shut !== undefined ||
+      (open === undefined && row.last?.kind === "reopen")
+    ) {
       closed = Math.max(0, closed - 1);
     }
   } else if (open !== undefined) {

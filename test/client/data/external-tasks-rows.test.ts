@@ -37,11 +37,22 @@ const taskRow = (changes: Partial<ExternalTaskRow> = {}): ExternalTaskRow => ({
   claim: null,
   last: null,
   entries: 0,
+  claimLimit: false,
   createdBy: { id: "u1", username: "casey" },
   createdAt: 1_000,
   movedAt: 1_000,
   ...changes,
 });
+
+// a reopen's latest entry, as a reopened row carries it
+const reopened: ExternalTaskRow["last"] = {
+  kind: "reopen",
+  text: "Again.",
+  at: 2_000,
+  by: { id: "u1", username: "casey" },
+  keyName: null,
+  claimEnd: null,
+};
 
 const entry = (id: string): ExternalTaskEntry => ({
   id,
@@ -52,6 +63,8 @@ const entry = (id: string): ExternalTaskEntry => ({
   keyName: null,
   claimId: null,
   claimEnd: null,
+  chatId: null,
+  chatTitle: null,
   at: 1_000,
 });
 
@@ -150,7 +163,13 @@ describe("a frame on a project's lists", () => {
     };
     const next = applyTask(
       lists({ pages }),
-      taskRow({ id: "z", state: "todo", revision: 5, entries: 3 }),
+      taskRow({
+        id: "z",
+        state: "todo",
+        revision: 5,
+        entries: 3,
+        last: reopened,
+      }),
     );
     expect(ids(next.tasks)).toEqual(["a", "z"]);
     expect(next.pages?.rows).toEqual([]);
@@ -160,13 +179,29 @@ describe("a frame on a project's lists", () => {
   test("a reopen of a task on no page read leaves the count too", () => {
     const next = applyTask(
       lists(),
-      taskRow({ id: "q", state: "todo", revision: 9, entries: 4 }),
+      taskRow({
+        id: "q",
+        state: "todo",
+        revision: 9,
+        entries: 4,
+        last: reopened,
+      }),
     );
     expect(next.closed).toBe(2);
   });
 
   test("a new task joins and leaves the closed count alone", () => {
     const next = applyTask(lists(), taskRow({ id: "n", entries: 0 }));
+    expect(ids(next.tasks)).toEqual(["a", "n"]);
+    expect(next.closed).toBe(3);
+  });
+
+  test("a new task edited before its first frame is no reopen", () => {
+    // an edit is an entry, but never the row's last
+    const next = applyTask(
+      lists(),
+      taskRow({ id: "n", revision: 1, entries: 1, last: null }),
+    );
     expect(ids(next.tasks)).toEqual(["a", "n"]);
     expect(next.closed).toBe(3);
   });

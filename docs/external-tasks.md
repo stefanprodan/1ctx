@@ -14,7 +14,8 @@ follow `docs/external-task-pages.md`.
   `rules.ts`: an agent's key claims a todo task, reports `progress`,
   `question` or `result`, and gives it back with its own unclaim; a
   member answers, unclaims, cancels and reopens; 1ctx unclaims as
-  `idle` (in progress only) or `access_gone` (both held states). A
+  `idle` (in progress only), `access_gone` or `limit` (both held
+  states). A
   `question` while awaiting input is accepted and keeps the state. A
   refused move answers 409 `this task is <state>` in the page's words.
 - Any agent report ends a wait. A result is done; there is no review.
@@ -49,7 +50,9 @@ follow `docs/external-task-pages.md`.
   `editRevision`; labels and files move the edit revision as a title
   does, and reports do not invalidate a brief edit. A task whose labels
   were all deleted keeps none until its next edit, which must give one.
-  Titles are stored trimmed.
+  Titles are stored trimmed. An edit that changes the brief writes an
+  `edit` entry in its transaction: the editor, no text, no claim, and
+  the chat's id when the chat tool made it.
   Answer, unclaim, cancel and reopen name the state the caller saw;
   unclaim also names its claim. Stale values answer 409 without a write.
 - Request parsers reject unknown fields and query parameters. Move body
@@ -62,8 +65,11 @@ follow `docs/external-task-pages.md`.
   area's own reads, which the `tasks` tool and the chat tool use, keep
   plain text. The detail's `chatTitle` is set only when the caller may
   open the chat by the chat route's own check (the `chatOpens` port); an
-  agent's or a chat tool's read has none. Delete answers 204 and
-  removes all of the task's dependent rows.
+  agent's or a chat tool's read has none; an entry's `chatTitle` is held
+  to the same check, asked once per chat in a read. A linked file
+  carries `changedAt`, the live file's `updatedAt` from the same row as
+  its name, null once deleted. Delete answers 204 and removes all of the
+  task's dependent rows.
 
 ## Claims and ordering
 
@@ -75,20 +81,36 @@ follow `docs/external-task-pages.md`.
   even after later entries.
 - A claim writes a `claim` entry in its own transaction: the key's user
   and name, its claim id, no text. No report writes one, a retried claim
-  adds none, and a row's `last` skips it. The 250 bound and the 240 tail
-  count every entry, claims included (`counted()`), so a task reopened
-  again and again stays at most 250. `MAX_CLAIMS` counts the claims
-  since the last reopen (`claimsSinceReopen()`), against an agent that
-  loops; a reopen starts it again.
+  adds none, and a row's `last` skips it and every `edit`; a retry's
+  check of the task's last entry skips an edit too.
+- The bounds stop agents in a loop, never members, and a reopen starts
+  them again. `counted()` counts an agent's entries since the task's
+  last reopen (`agentSince()`), those with a key name, sought by rowid on
+  the partial indexes `external_task_entries_agent` and
+  `external_task_entries_reopen`; members' and 1ctx's entries never
+  count. Only an agent's claim, report and unclaim are checked
+  (`roomFor()`): from 240 no claim, and its claim may only finish or
+  give the task back; from 250 only give it back. Its own unclaim always
+  lands, since it ends the loop. A member's answer, unclaim, cancel,
+  reopen and edit are never refused by a bound.
+- An agent's report past them ends its claim as `limit` in the same
+  transaction, writing 1ctx's unclaim (`limitNote()`) and putting the
+  task back to todo, then throws the 409 after that commit; a caller
+  inside its own transaction returns the refusal through its commit
+  (`docs/mcp-server.md`). A claim past them is only refused.
+- `MAX_CLAIMS` counts the claims since the last reopen
+  (`claimsSinceReopen()`, `claimsSince()`). A todo row at it or at 240
+  agent entries, where a claim is refused, carries `claimLimit`, read in
+  the row's select for todo rows only; Cancel and Reopen clear it.
 - A row's `last` carries its entry's user, key and claim end (`by`,
   `keyName`, `claimEnd`). `by` is null when 1ctx wrote it or the user
-  was deleted; only a `claimEnd` of `idle` or `access_gone` says 1ctx
-  wrote it.
+  was deleted; only a `claimEnd` of `idle`, `access_gone` or `limit`
+  says 1ctx wrote it.
 - Every agent entry and every entry ending a claim carries its claim
-  id, including member unclaims and cancels, and idle or access unclaims.
+  id, including member unclaims and cancels, and 1ctx's unclaims.
   Answers, reopens and cancels of open tasks have none. The entry stores
-  a key name only for claims and agent reports, never member or system
-  entries.
+  a key name only for claims, agent reports and an agent's unclaim,
+  never a member's or 1ctx's entry, so the bounds count by it.
 - `movedAt` is creation, the last state change or a question asked
   again while awaiting input, never another report or an answer. Every
   change still advances `revision`; a label rename or delete moves none.
@@ -112,7 +134,8 @@ follow `docs/external-task-pages.md`.
   still sees the project and the task is in it; a write checks both
   inside its transaction, then calls the same action a route does.
   Visibility comes from the access port's `visibleProjectIds(userId)`.
-- Create stores the chat id; nothing deletes the task with the chat.
+- Create stores the chat id, and an edit stores it on its entry;
+  nothing deletes the task or the entry with the chat.
   `task()` reads the row and the file ids without entries; `entry()`
   reads one entry by id, scoped to its task. `sees()` checks the user
   still sees the project, before the tool reads a file by name;

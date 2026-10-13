@@ -151,7 +151,9 @@ export function routes({
         const id = visible(principal, ctx.params.id);
         parseNoQuery(new URL(req.url));
         const body = parsePatchTask(await jsonBody(req));
-        return write(principal, id, () => tasks.edit(id, body, principal));
+        return write(principal, id, () =>
+          tasks.edit(principal.userId, id, body, principal),
+        );
       },
     },
     ...(["answer", "unclaim", "cancel", "reopen"] as const).map(
