@@ -19,10 +19,11 @@ import { at, type Problem } from "../../lib/save.ts";
 export const LABELS_TEXT = "How work here is sorted.";
 export const CAP_LINE = `At most ${MAX_LABELS_PER_PROJECT} labels.`;
 export const LAST_LINE = "A project keeps at least one label.";
-// the delete ask says how many tasks the label comes off, closed too
+// the delete ask says how many external tasks the label comes off,
+// closed too
 export function deleteAsk(tasks: number): string {
   if (tasks === 0) return "Delete this label?";
-  return `Delete this label? ${plural(tasks, "task")} ${tasks === 1 ? "uses" : "use"} it.`;
+  return `Delete this label? ${plural(tasks, "external task")} ${tasks === 1 ? "uses" : "use"} it.`;
 }
 
 export type OpenLabel = ProjectLabel | "new" | null;

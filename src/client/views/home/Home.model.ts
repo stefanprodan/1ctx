@@ -86,6 +86,6 @@ export function emptyLine(q: string, origin: FeedPick | null): string {
   if (q !== "") return "No sessions match";
   if (origin === "attention") return "Nothing flagged";
   if (origin === "chat") return "No chats yet";
-  if (origin === "automation") return "No task runs yet";
+  if (origin === "automation") return "No runs yet";
   return "No sessions found";
 }

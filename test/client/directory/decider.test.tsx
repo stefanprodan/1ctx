@@ -199,7 +199,7 @@ describe("the decider's page", () => {
   test.serial("lists each decision as the admin's list does, no link", () => {
     deciderPage.value = jev;
     const html = render(<Decider params={{ name: "jev" }} />);
-    expect(html).toContain(">Mark task runs that need attention<");
+    expect(html).toContain(">Mark runs that need attention<");
     expect(html).toContain(">Backs up the agent's own mark<");
     expect(html).not.toContain(">run-attention<");
     expect(html).not.toContain("/admin/config/decisions");

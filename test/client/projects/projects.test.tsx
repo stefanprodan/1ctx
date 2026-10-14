@@ -472,11 +472,11 @@ describe("the rail", () => {
     expect(projectHere("/chat/s1", null)).toBeNull();
     expect(projectHere("/chat/s9", chat)).toBeNull();
     expect(projectHere("/projects", null)).toBeNull();
-    const task = { id: "au1", projectId: "p3" };
-    expect(projectHere("/automations/au1", null, task)).toBe("p3");
-    expect(projectHere("/automations/au1/edit", null, task)).toBe("p3");
-    expect(projectHere("/automations/au1/memory", null, task)).toBe("p3");
-    expect(projectHere("/automations/au9", null, task)).toBeNull();
+    const automation = { id: "au1", projectId: "p3" };
+    expect(projectHere("/automations/au1", null, automation)).toBe("p3");
+    expect(projectHere("/automations/au1/edit", null, automation)).toBe("p3");
+    expect(projectHere("/automations/au1/memory", null, automation)).toBe("p3");
+    expect(projectHere("/automations/au9", null, automation)).toBeNull();
     const ext = { id: "t1", projectId: "p4" };
     expect(projectHere("/external-tasks/t1", null, null, ext)).toBe("p4");
     expect(projectHere("/external-tasks/t9", null, null, ext)).toBeNull();

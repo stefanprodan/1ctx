@@ -3,7 +3,7 @@
 //
 // The mark a run wears when its agent or the runner marked it or a
 // decider judged it to need a person: on the feed's line and on the
-// task's Runs list with its reason, at the threshold and above, and
+// automation's Runs list with its reason, at the threshold and above, and
 // nothing under it or when not marked. An automation's line with an
 // open alert says since when and how many runs, in All and in the
 // Flagged pick, and the Runs list filters the marked runs.
@@ -93,7 +93,7 @@ describe("needs attention", () => {
     }
   });
 
-  test("the task's Runs list says so after the agent, its icon bare", () => {
+  test("the automation's Runs list says so after the agent, its icon bare", () => {
     const html = render(
       <RunRow row={run(0.5)} deadlineMs={600_000} now={now} />,
     );

@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Task proposals as the session's detail carries them, and the rows of
+// Automation proposals as the session's detail carries them, and the rows of
 // a turn whose automation calls made them.
 
 import { AUTOMATION_DEFAULTS } from "../../../src/shared/automation-defaults.ts";
@@ -48,7 +48,7 @@ export function createDraft(
   } as AutomationDraft;
 }
 
-export function taskDraft(
+export function automationDraft(
   action: "update" | "suspend" | "resume" | "run",
   changes: Partial<AutomationDraft> = {},
 ): AutomationDraft {
@@ -135,7 +135,7 @@ export function proposalRows(
   ];
 }
 
-export function task(changes: Partial<AutomationSummary> = {}) {
+export function automation(changes: Partial<AutomationSummary> = {}) {
   return {
     id: "task-1",
     name: "nightly-check",

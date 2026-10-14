@@ -81,7 +81,7 @@ export function Transcript({
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
   // the messages that wait, under the last turn
   queue?: QueueProps;
-  // a chat's task proposals, drawn under the turn whose call made them
+  // a chat's automation proposals, drawn under the turn whose call made them
   proposals?: {
     drafts: AutomationDraft[];
     session: Pick<SessionSummary, "forkedFromId" | "createdAt">;

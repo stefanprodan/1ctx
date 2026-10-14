@@ -160,7 +160,7 @@ describe("storage words", () => {
       name: "A chat in a personal project",
       href: null,
     });
-    expect(largestLine("tasks", personal).href).toBeNull();
+    expect(largestLine("automations", personal).href).toBeNull();
   });
 
   test("team rows lead to their page and say what makes them big", () => {
@@ -192,14 +192,14 @@ describe("storage words", () => {
       sub: "#platform · 1,204 messages",
       href: "/chat/s1",
     });
-    const task = row({
+    const automation = row({
       id: "a1",
       name: "digest",
       project: "platform",
       runs: 90,
       retentionDays: 30,
     });
-    expect(largestLine("tasks", task)).toMatchObject({
+    expect(largestLine("automations", automation)).toMatchObject({
       sub: "#platform · 90 runs kept 30 days",
       href: "/automations/a1",
     });
@@ -207,7 +207,9 @@ describe("storage words", () => {
 
   test("a cleaned line names its setting when there is one", () => {
     expect(cleanedLine("scratch", 7).sub).toBe("idle 7 days");
-    expect(cleanedLine("runs", null).sub).toBe("by each task's retention");
+    expect(cleanedLine("runs", null).sub).toBe(
+      "by each automation's retention",
+    );
     expect(cleanedLine("history", 90).sub).toBe("after 90 days");
     expect(cleanedLine("externalTasks", 365)).toEqual({
       name: "Closed external tasks",

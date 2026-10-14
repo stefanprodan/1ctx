@@ -45,7 +45,7 @@ export type ProposalsPort = {
   }): string | Promise<string>;
 };
 
-// a chat's alone: a task's runs are never offered what they switch
+// a chat's alone: an automation's runs are never offered what they switch
 const CHAT_KEYS: ReadonlySet<string> = new Set([
   AUTOMATIONS,
   EXTERNAL_TASKS,
@@ -72,7 +72,7 @@ export async function propose(
         ? {
             ...AUTOMATION_DEFAULTS,
             tz: port.userZone(actor.userId),
-            // the default guidance is for own memory, so a task
+            // the default guidance is for own memory, so an automation
             // without one stores none
             ...(call.fields.ownMemory === false ? { memoryGuidance: "" } : {}),
             ...call.fields,

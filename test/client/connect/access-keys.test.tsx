@@ -112,7 +112,7 @@ describe("the new key's checks", () => {
   });
 
   test("the body trims the name and sends null for every project", () => {
-    // read and write first, since working a task writes
+    // read and write first, since working an external task writes
     expect(createBody({ ...NEW_KEY, name: " laptop " })).toEqual({
       name: "laptop",
       scope: "write",

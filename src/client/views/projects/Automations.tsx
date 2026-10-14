@@ -43,10 +43,10 @@ export function Automations({ params }: { params: Params }) {
     <Frame id={id} tab="automations">
       {(shown) => (
         <RowsCard
-          label="Scheduled tasks"
+          label="Automations"
           action={
             <RowsAdd
-              label="New scheduled task"
+              label="New automation"
               disabled={agents === null || agents.length === 0}
               onClick={() => navigate(`/projects/${shown.id}/automations/new`)}
             />
@@ -60,7 +60,7 @@ export function Automations({ params }: { params: Params }) {
             <RowsNote>
               {agents.length === 0
                 ? "No agents yet. An admin adds one first."
-                : "No scheduled tasks yet."}
+                : "No automations yet."}
             </RowsNote>
           ) : (
             list.map((automation) => {

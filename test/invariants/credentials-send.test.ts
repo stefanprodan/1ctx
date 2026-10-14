@@ -368,7 +368,7 @@ test("without network a send has no credentials, no clause and no curl", async (
   }
 });
 
-test("a personal project's send has none, and a run keeps its task's set", async () => {
+test("a personal project's send has none, and a run keeps its automation's set", async () => {
   const { chat, teamId, quotes, prices } = await setup();
   try {
     const personal = await send(chat, chat.projectId, null);

@@ -36,7 +36,7 @@ import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { takeChildren, takeWatched } from "./session-children.ts";
-import { draftsShown, forgetTask, onDraftSocket } from "./session-drafts.ts";
+import { draftsShown, markGone, onDraftSocket } from "./session-drafts.ts";
 import { session } from "./session-held.ts";
 import { ahead, flushLive, live, publish, stage } from "./session-live.ts";
 import { onQueueSocket, queueShown } from "./session-queue.ts";
@@ -442,7 +442,7 @@ export function onSocket(ev: SocketEvent): void {
       drop(ev.sessionId, ev.projectId);
       break;
     case "automationDeleted":
-      forgetTask(ev.automationId);
+      markGone(ev.automationId);
       if (ev.runs) leaveRuns(ev.automationId, ev.projectId);
       break;
     case "granted":

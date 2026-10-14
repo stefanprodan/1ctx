@@ -88,20 +88,21 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   at the bearer or Origin. Creation at the cap is a 409; all retained
   rows count, expired ones included. Lowering it deletes nothing; raising
   it from 0 lets retained unexpired keys work again.
-- **The task sweep shares the endpoint's key availability rule.**
-  Gone or expired keys and every key at cap 0 unclaim their tasks.
+- **The external task sweep shares the endpoint's key availability
+  rule.** Gone or expired keys and every key at cap 0 unclaim their
+  external tasks.
   A positive cap leaves every retained unexpired key available.
   This read deletes no key.
 - **A missing, malformed, unknown or expired bearer is a plain 401,**
   without `WWW-Authenticate`, so clients do not start OAuth. A disabled
   user cannot resolve; a must-change user's key gets 403. Last used
   is written at most once a minute and never extends expiry.
-- **Disable and every reset delete keys with logins in one transaction.**
-  This includes an admin's typed reset and a reset or invite link used.
-  The owner's password change keeps keys. A key created or revoked logs
-  its user, id and scope, never its token.
-  Revoke, disable and reset end those keys' task claims through a
-  closure port in the same transaction, with events after commit.
+- **Disable and every reset delete keys with logins in one
+  transaction.** This includes an admin's typed reset and a reset or
+  invite link used. The owner's password change keeps keys. A key
+  created or revoked logs its user, id and scope, never its token.
+  Revoke, disable and reset end those keys' external task claims through
+  a closure port in the same transaction, with events after commit.
 - **Writes call `checkKey()` inside their transaction.** It re-reads
   the key by id and the user: gone or expired is 401; disabled or
   must-change is 403; the project the write lands in no longer
@@ -248,14 +249,15 @@ from `emailOn` in `GET /api/me`.
   lets a member write a team project's. A key file's name (`keyName`)
   is in an admin's answer only.
 - **Removing a member drops their waiting messages in the same
-  transaction.** If they lose visibility, it also unclaims their tasks
-  there. An admin made a member unclaims tasks only in team
-  projects they have not joined; both use a closure port.
+  transaction.** If they lose visibility, it also unclaims their
+  external tasks there. An admin made a member unclaims external tasks
+  only in team projects they have not joined; both use a closure port.
 - **Anyone who may open a chat may archive it.** Rename and delete are
   in `docs/sessions.md`.
-- **Task draft Confirm and Dismiss use the chat's same visibility rule.**
-  Missing drafts and drafts in hidden chats answer the same "no such chat"
-  404 as opening that chat, an admin in another personal project included.
+- **Automation draft Confirm and Dismiss use the chat's same visibility
+  rule.** Missing drafts and drafts in hidden chats answer the same "no
+  such chat" 404 as opening that chat, an admin in another personal
+  project included.
 
 ## Secrets
 

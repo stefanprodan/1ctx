@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The Setup aside's lines for what a task keeps its runs from: nothing
+// The Setup aside's lines for what an automation keeps its runs from: nothing
 // while everything is on.
 
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";

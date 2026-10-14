@@ -272,7 +272,7 @@ fixture under `test/fixtures/structure/`.
   double quotes, semicolons, trailing commas, 80 columns.
 - **UI copy is short and plain.** No em-dashes anywhere. A send (one
   pass of the runner, `docs/sessions.md`) is a turn in a chat and a run
-  in an automation (a task on the page); the page never says send.
+  in an automation; the page never says send.
 - `perl -i -pe` for global replaces, `uv run` for ad hoc Python, never
   pip.
 - The brand SVGs and PNGs in `site/` are generated: change

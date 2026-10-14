@@ -4,12 +4,12 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { memoryChars } from "../../../src/shared/memory.ts";
-import { area, context, now, task } from "./memory.helpers.ts";
+import { area, context, now, ownNote } from "./memory.helpers.ts";
 
 describe("memory tool refusals", () => {
   test("refusals show current entry sizes, totals and the required cuts", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const handle = offered.memory!;
     const entries = [
       { topic: "First", text: "a".repeat(500) },
@@ -96,7 +96,7 @@ describe("memory tool refusals", () => {
 
   test("empty-note refusals give the right fix without asking for another set", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const cases = [
       {
         args: { action: "set", topic: "NVDA run notes", text: "x".repeat(913) },
@@ -139,7 +139,7 @@ describe("memory tool refusals", () => {
 
   test("an absent topic returns the working texts and the whole refusal stays under the result cut", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     offered.memory!.work!.entries = [
       { topic: "Sources", text: "Use the feed." },
     ];
@@ -162,7 +162,7 @@ describe("memory tool refusals", () => {
   });
 
   test.each([
-    ["an own-note phase", task],
+    ["an own-note phase", ownNote],
     [
       "a chat",
       {

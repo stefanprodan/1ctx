@@ -67,7 +67,7 @@ export function context(resultCut = DEFAULT_LIMITS.resultCut): ToolContext {
   };
 }
 
-export const task = {
+export const ownNote = {
   projectId: "p1",
   automation: { id: "a1", ownMemory: true },
   phase: "memory" as const,

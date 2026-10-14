@@ -192,7 +192,7 @@ function AreasPanels({ answer }: { answer: StorageResponse }) {
 const KINDS: { key: LargestKind; label: string; icon: IconName }[] = [
   { key: "projects", label: "Projects", icon: "hash" },
   { key: "chats", label: "Chats", icon: "chat" },
-  { key: "tasks", label: "Tasks", icon: "bolt" },
+  { key: "automations", label: "Automations", icon: "bolt" },
 ];
 
 function LargestPanel({ answer }: { answer: StorageResponse }) {

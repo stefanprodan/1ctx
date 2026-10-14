@@ -117,13 +117,13 @@ describe("the words", () => {
   test.serial("writes the member count and what a delete takes", () => {
     expect(countLine(detail)).toBe("1 member");
     expect(deleteLine(detail)).toBe(
-      "Deletes its 3 chats, scheduled tasks and memory. This cannot be undone.",
+      "Deletes its 3 chats, automations and memory. This cannot be undone.",
     );
     expect(deleteLine({ chats: 1, knowledge: { files: 2, tokens: 9 } })).toBe(
-      "Deletes its 1 chat, 2 knowledge files, scheduled tasks and memory. This cannot be undone.",
+      "Deletes its 1 chat, 2 knowledge files, automations and memory. This cannot be undone.",
     );
     expect(deleteLine({ chats: 0, knowledge: { files: 0, tokens: 0 } })).toBe(
-      "Deletes its scheduled tasks and memory. This cannot be undone.",
+      "Deletes its automations and memory. This cannot be undone.",
     );
   });
 

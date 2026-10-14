@@ -67,7 +67,7 @@ describe("who is offered delegate", () => {
   });
 });
 
-describe("a delegated task", () => {
+describe("delegated work", () => {
   test("runs in a hidden child on its own prompt and offer, and answers the parent", async () => {
     const chat = await subagentApp();
     try {

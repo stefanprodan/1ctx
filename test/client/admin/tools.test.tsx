@@ -806,7 +806,7 @@ describe("the Config board", () => {
     expect(html.match(/role="switch"/g)).toHaveLength(2);
     const forms = html.match(/<form\b[\s\S]*?<\/form>/g) ?? [];
     const card = forms.find((form) =>
-      form.includes("Agents manage scheduled tasks"),
+      form.includes("Agents manage automations"),
     )!;
     expect(card).toContain('role="switch"');
     expect(card).toContain('aria-checked="true"');
@@ -823,10 +823,10 @@ describe("the Config board", () => {
 
   test("the automation card's line says what its switch does", () => {
     expect(automationLine(true)).toBe(
-      "A chat's agent may read its project's scheduled tasks and propose changes a user confirms. Each chat can turn it off.",
+      "A chat's agent may read its project's automations and propose changes a user confirms. Each chat can turn it off.",
     );
     expect(automationLine(false)).toBe(
-      "No agent reads or changes scheduled tasks.",
+      "No agent reads or changes automations.",
     );
   });
 
@@ -841,7 +841,7 @@ describe("the Config board", () => {
     path.value = "/admin/config";
     const html = render(<ConfigBoard />);
     const card = (html.match(/<form\b[\s\S]*?<\/form>/g) ?? []).find((form) =>
-      form.includes("Agents manage scheduled tasks"),
+      form.includes("Agents manage automations"),
     )!;
     expect(card).toContain('aria-checked="false"');
     expect(card).toContain(automationLine(false));
@@ -864,7 +864,7 @@ describe("the Config board", () => {
     expect(card).toContain(externalTaskLine(false));
     expect(card).toContain('<span class="cut">external_task</span>');
     const automation = forms.find((form) =>
-      form.includes("Agents manage scheduled tasks"),
+      form.includes("Agents manage automations"),
     )!;
     expect(automation).toContain('aria-checked="true"');
     expect(externalTaskLine(true)).toBe(
@@ -887,7 +887,7 @@ describe("the Config board", () => {
     // the tool cards stay mounted, hidden, so their drafts are kept
     expect(html.match(/<form/g)).toHaveLength(11);
     expect(html).toMatch(
-      /config-board-cards config-board-away"><form[\s\S]*?Agents manage scheduled tasks/,
+      /config-board-cards config-board-away"><form[\s\S]*?Agents manage automations/,
     );
     expect(html).toContain(">Running<");
     expect(html).toContain("Per user");

@@ -4,7 +4,7 @@
 // The overview answer over a composed app: the parsers, the days of a
 // zone across a DST change, turns and runs apart, the totals and all
 // time, cost coverage, both breakdowns over a fixture with a team and
-// a personal project and their tasks, a send with several rounds
+// a personal project and their automations, a send with several rounds
 // counted once, the turn lengths without a running send or a run, the
 // cache per zone, and the load read at each request.
 
@@ -294,8 +294,8 @@ describe("the overview days", () => {
   test("count turns and runs apart and sum the 30 days", async () => {
     const chat = await fixture();
     const sessionId = await settledChat(chat);
-    const task = await createAutomation(chat);
-    const runId = await runOf(chat, task.id);
+    const automation = await createAutomation(chat);
+    const runId = await runOf(chat, automation.id);
     hide(chat);
     const tokens = (prompt: number, completion: number, at: number) => ({
       prompt,
@@ -437,15 +437,15 @@ describe("the overview turn lengths", () => {
   test("give each day's median and p95 of ended chat turns", async () => {
     const chat = await fixture();
     const sessionId = await settledChat(chat);
-    const task = await createAutomation(chat);
-    const runId = await runOf(chat, task.id);
+    const automation = await createAutomation(chat);
+    const runId = await runOf(chat, automation.id);
     hide(chat);
     const at = NOW - DAY;
     for (let n = 1; n <= 20; n++) {
       addSend(chat, sessionId, { at, finishedAt: at + n * 1000 });
     }
     addSend(chat, sessionId, { at: NOW, finishedAt: NOW + 400 });
-    // a running turn has no length yet, and a run's is its task's
+    // a running turn has no length yet, and a run's is its automation's
     addSend(chat, sessionId, { at: NOW, status: "running" });
     addSend(chat, runId, { at: NOW, finishedAt: NOW + 99_000 });
     const body = await overview(chat);
@@ -494,8 +494,8 @@ describe("the overview ranges", () => {
   test("take 30 days, 90 days or every day from the first", async () => {
     const chat = await fixture();
     const sessionId = await settledChat(chat);
-    const task = await createAutomation(chat);
-    const runId = await runOf(chat, task.id);
+    const automation = await createAutomation(chat);
+    const runId = await runOf(chat, automation.id);
     hide(chat);
     addSend(chat, sessionId, {
       at: NOW,
@@ -563,16 +563,18 @@ describe("the usage breakdowns", () => {
       .id;
     const personalChat = await settledChat(chat);
     const teamChat = await settledChat(chat, teamId);
-    const personalTask = await createAutomation(chat, { name: "secret-task" });
-    const personalRun = await runOf(chat, personalTask.id);
+    const personalAutomation = await createAutomation(chat, {
+      name: "secret-automation",
+    });
+    const personalRun = await runOf(chat, personalAutomation.id);
     const made = await chat.member.call(
       "POST",
       `/api/projects/${teamId}/automations`,
       { body: automationBody(chat, { name: "digest" }) },
     );
     expect(made.status).toBe(201);
-    const teamTask = (await made.json()).automation;
-    const teamRun = await runOf(chat, teamTask.id);
+    const teamAutomation = (await made.json()).automation;
+    const teamRun = await runOf(chat, teamAutomation.id);
     hide(chat);
     addSend(chat, personalChat, { at: NOW, usage: [{ prompt: 10 }] });
     addSend(chat, teamChat, {
@@ -634,8 +636,8 @@ describe("the usage breakdowns", () => {
       chat.projectId,
       personalChat,
       personalRun,
-      personalTask.id,
-      "secret-task",
+      personalAutomation.id,
+      "secret-automation",
       "hello there",
     ]) {
       expect(text).not.toContain(secret);

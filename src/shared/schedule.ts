@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A schedule in words, read by the task's page and the automation
+// A schedule in words, read by the automation's page and the automation
 // tool alike, and the cron fields they read it from. A shape the words
 // do not know is null, and the caller shows the expression.
 

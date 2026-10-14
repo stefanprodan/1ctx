@@ -10,8 +10,8 @@ export const BRAND = "1ctx";
 export type TitleParts = {
   // the route's word, the title until the page has read its row
   word: string;
-  // the object's name once its row is read: a chat's or a task's
-  // title, "Run of" its automation, an automation's name, a file's path
+  // the object's name once its row is read: a chat's or an external
+  // task's title, "Run of" its automation, an automation's name, a file's path
   name: string | null;
   // the project the page is in, from the rail's list
   project: string | null;

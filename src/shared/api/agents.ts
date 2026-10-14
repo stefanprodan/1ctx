@@ -58,7 +58,7 @@ export type SaveAgentRequest = {
   // leave out the hosts serving the model at 4 bits; absent is false.
   // Refused on another wire, and with a 4-bit upstream
   skip4Bit?: boolean;
-  // whether a turn may hand a task to a fresh copy of the agent; absent
+  // whether a turn may hand work to a fresh copy of the agent; absent
   // is false
   subagents?: boolean;
   // what the admin states for a model its catalog does not describe:

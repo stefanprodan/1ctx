@@ -64,7 +64,7 @@ describe("the chat's knowledge switch", () => {
       await chat.app.shutdown();
     }
   });
-  test("a task run gets the docs off and a fork of it keeps them off", async () => {
+  test("a run gets the docs off and a fork of it keeps them off", async () => {
     const chat = await chatApp();
     try {
       const automation = await createAutomation(chat, {

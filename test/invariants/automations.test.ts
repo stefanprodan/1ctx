@@ -406,7 +406,7 @@ describe("automations", () => {
 
 describe("automation rights", () => {
   // a team project with the member casey and another member, other, and
-  // a task casey made
+  // an automation casey made
   async function teamApp() {
     const chat = await chatApp();
     const other = chat.app.createUser({
@@ -681,7 +681,7 @@ describe("automation rights", () => {
     await chat.app.shutdown();
   });
 
-  test("keeps a task of a project the caller cannot see hidden", async () => {
+  test("keeps an automation of a project the caller cannot see hidden", async () => {
     const chat = await chatApp();
     const personal = await createAutomation(chat, { name: "private-run" });
     const path = `/api/automations/${personal.id}`;

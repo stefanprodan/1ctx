@@ -18,7 +18,7 @@ import { useLatest } from "./drafts.ts";
 const TITLE = "Subagents";
 
 const SUBAGENTS_LINE =
-  "Turns and runs may hand a task to a fresh copy of this agent.";
+  "Turns and runs may hand work to a fresh copy of this agent.";
 
 // the note the Skills and MCP tabs show, in sight on a phone too
 const NO_TOOLS = "This model takes no tools.";

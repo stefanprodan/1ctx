@@ -109,7 +109,7 @@ export type PromptPolicy = Pick<
   | "subagent"
 >;
 
-// a subagent's prompt keeps only what doing its task needs: no memory,
+// a subagent's prompt keeps only what doing its work needs: no memory,
 // automation, knowledge block, off lines, repository or MCP notes
 export function subagentPrompt(policy: PromptPolicy, now: number): string {
   const parts = [projectLine(policy)];

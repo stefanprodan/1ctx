@@ -2399,7 +2399,7 @@ describe("runs grouped in All", () => {
     },
   );
 
-  test.serial("Tasks lists every run on its own", async () => {
+  test.serial("Runs lists every run on its own", async () => {
     const urls: string[] = [];
     answer = (url) => {
       urls.push(url);

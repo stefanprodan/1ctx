@@ -86,7 +86,7 @@ export function ConfigBoard() {
             >
               <ChatToolCard
                 tool={state.automation}
-                title="Agents manage scheduled tasks"
+                title="Agents manage automations"
                 line={automationLine}
               />
               <ChatToolCard

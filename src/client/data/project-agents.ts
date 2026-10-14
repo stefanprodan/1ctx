@@ -58,7 +58,7 @@ effect(() => {
   homeProjectId.value = null;
 });
 
-// the agent a new chat or task starts on: the last pick while it is in
+// the agent a new chat or automation starts on: the last pick while it is in
 // the list, else the default, else the first
 export function startingAgent(list: AgentSummary[]): string | null {
   const start = startsOn.value;

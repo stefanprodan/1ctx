@@ -29,7 +29,7 @@ export function deleteLine(
       ? plural(project.knowledge.files, "knowledge file")
       : "",
   ].filter((part) => part !== "");
-  return `Deletes its ${[...counted, "scheduled tasks and memory"].join(
+  return `Deletes its ${[...counted, "automations and memory"].join(
     ", ",
   )}. This cannot be undone.`;
 }

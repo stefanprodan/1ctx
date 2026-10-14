@@ -205,7 +205,7 @@ describe("the feed's pages", () => {
     );
     expect(searched.map((page) => page.length)).toEqual([40]);
     expect(searched.flat()).toEqual(found);
-    const tasks = pages((before) =>
+    const runPages = pages((before) =>
       store.list({
         projectIds: ["p"],
         q: "",
@@ -213,8 +213,8 @@ describe("the feed's pages", () => {
         before: cursor(before),
       }),
     );
-    expect(tasks.map((page) => page.length)).toEqual([50, 5]);
-    expect(tasks.flat()).toEqual(runs);
+    expect(runPages.map((page) => page.length)).toEqual([50, 5]);
+    expect(runPages.flat()).toEqual(runs);
     const chats = pages((before) =>
       store.list({
         projectIds: ["p"],

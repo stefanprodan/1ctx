@@ -22,7 +22,7 @@ export type ProjectDetail = ProjectSummary & {
   // empty for none
   description: string;
   members: UserSummary[];
-  // by name, MAX_LABELS_PER_PROJECT at most, each with its task count
+  // by name, MAX_LABELS_PER_PROJECT at most, each with its external task count
   labels: ProjectLabelUse[];
   chats: number;
   // the knowledge base, for the aside and the tab's count

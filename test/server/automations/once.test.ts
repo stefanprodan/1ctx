@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A task that runs once: the fire that starts its run records the
+// An automation that runs once: the fire that starts its run records the
 // event and suspends it in one transaction; a skip, a wait and a plain
 // Run now spend nothing; resume arms it again; a cut run of it reruns
 // and stays suspended.
@@ -66,7 +66,7 @@ async function finishRun(chat: ChatApp, script: Script, sessionId: string) {
   await settleRun(chat, sessionId);
 }
 
-describe("a task that runs once", () => {
+describe("an automation that runs once", () => {
   test.serial(
     "its fire records the event, then suspends it, in one transaction",
     async () => {
@@ -310,7 +310,7 @@ describe("a task that runs once", () => {
     await chat.app.shutdown();
   });
 
-  test("a member's suspend of a task not fired yet is not a run once", async () => {
+  test("a member's suspend of an automation not fired yet is not a run once", async () => {
     const chat = await stopped();
     const automation = await createAutomation(chat, { once: true });
     const suspend = await chat.member.call(
@@ -383,7 +383,7 @@ describe("a run the row names, deleted", () => {
   );
 });
 
-describe("a once task cut by a restart", () => {
+describe("a once automation cut by a restart", () => {
   const restart = (chat: ChatApp) =>
     testApp({ db: chat.app.db, fetcher: chat.scripted.fetcher });
 
@@ -456,7 +456,7 @@ describe("a once task cut by a restart", () => {
     await fourth.shutdown();
   });
 
-  test("a Run now on a spent task is not rerun after a restart", async () => {
+  test("a Run now on a spent automation is not rerun after a restart", async () => {
     const chat = await stopped();
     const automation = await createAutomation(chat, {
       once: true,
@@ -484,7 +484,7 @@ describe("a once task cut by a restart", () => {
     await next.shutdown();
   });
 
-  test("turned off on a spent task, it still ran once and its cut run reruns", async () => {
+  test("turned off on a spent automation, it still ran once and its cut run reruns", async () => {
     const chat = await stopped();
     const automation = await createAutomation(chat, {
       once: true,
@@ -528,7 +528,7 @@ describe("a once task cut by a restart", () => {
     await next.shutdown();
   });
 
-  test("a spent task whose agent was deleted does not rerun", async () => {
+  test("a spent automation whose agent was deleted does not rerun", async () => {
     const chat = await stopped();
     const automation = await createAutomation(chat, {
       once: true,
@@ -541,7 +541,7 @@ describe("a once task cut by a restart", () => {
     await pending;
     const spent = chat.app.automations.byId(automation.id)!;
     await chat.app.shutdown();
-    // as an agent's delete leaves it: retired, the task still suspended
+    // as an agent's delete leaves it: retired, the automation still suspended
     chat.app.db
       .query(
         "update agents set deleted_at = ?, provider_id = null where id = ?",

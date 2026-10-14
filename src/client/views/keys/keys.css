@@ -12,7 +12,7 @@
     font-family: var(--mono);
     font-size: var(--text-input);
   }
-  /* as a task's label: a thin outline, no fill */
+  /* as an external task's label: a thin outline, no fill */
   .keys-tag {
     border-color: var(--line-strong);
     border-radius: var(--radius-card);

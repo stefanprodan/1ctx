@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
   agentMoved,
+  automationsItem,
   emailItem,
   externalTasksItem,
   onWords,
@@ -13,7 +14,6 @@ import {
   serversItem,
   skillsItem,
   switchItem,
-  tasksItem,
   webPaneItem,
 } from "../../../src/client/composer/Add.model.ts";
 import { AddPane } from "../../../src/client/composer/AddPane.tsx";
@@ -173,21 +173,23 @@ describe("the Email item", () => {
   });
 });
 
-describe("the Scheduled tasks item", () => {
+describe("the Automations item", () => {
   test("is on unless the chat turned it off, locked while the admin's row is off", () => {
     expect(
-      tasksItem({ tools: true, switchable: [AUTOMATIONS], off: false }),
+      automationsItem({ tools: true, switchable: [AUTOMATIONS], off: false }),
     ).toEqual({ live: true, on: true, reason: null });
     expect(
-      tasksItem({ tools: true, switchable: [AUTOMATIONS], off: true }),
+      automationsItem({ tools: true, switchable: [AUTOMATIONS], off: true }),
     ).toEqual({ live: true, on: false, reason: null });
-    expect(tasksItem({ tools: true, switchable: [WEB], off: false })).toEqual({
+    expect(
+      automationsItem({ tools: true, switchable: [WEB], off: false }),
+    ).toEqual({
       live: false,
       on: false,
       reason: "Turned off by an admin",
     });
     expect(
-      tasksItem({ tools: false, switchable: [AUTOMATIONS], off: false }),
+      automationsItem({ tools: false, switchable: [AUTOMATIONS], off: false }),
     ).toEqual({ live: false, on: false, reason: "Agent cannot use tools" });
   });
 });

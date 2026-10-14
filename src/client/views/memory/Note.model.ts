@@ -32,7 +32,7 @@ export type Writer =
         automationId: string | null;
         automationName: string | null;
       } | null;
-      // a deleted session was a run for a task's own note
+      // a deleted session was a run for an automation's own note
       run: boolean;
       when: string;
     };

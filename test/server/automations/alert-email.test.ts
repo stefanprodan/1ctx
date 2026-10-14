@@ -126,7 +126,7 @@ describe("an alert's email", () => {
     expect(message.from.name).toBe(SMTP.fromName);
     expect(message.subject).toBe("[1ctx] nightly needs attention");
     expect(message.text).toContain(
-      "The task nightly in your personal project needs attention.",
+      "The automation nightly in your personal project needs attention.",
     );
     expect(message.text).toContain("podinfo is not ready");
     expect(message.text).toContain(

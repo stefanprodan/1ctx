@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One tool grows by actions. Its proposals never change a task, so a
+// One tool grows by actions. Its proposals never change an automation, so a
 // person's confirmation is still needed after a call or a cut.
 
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
@@ -26,14 +26,14 @@ import {
 export type { LastRun, SwitchNames } from "./automation-text.ts";
 
 export type AutomationsPort = ProposalsPort & {
-  // the project's tasks, in name order
+  // the project's automations, in name order
   byProject(projectId: string): AutomationSummary[];
   byId(id: string): AutomationSummary | null;
-  // the run limit's deadline, for a task without its own
+  // the run limit's deadline, for an automation without its own
   runDeadlineMs(): number;
   // the run's last send and its answer; null once the session is gone
   lastRun(sessionId: string): LastRun | null;
-  // what the task's switches can name
+  // what the automation's switches can name
   switchNames(agentId: string, projectId: string): SwitchNames;
 };
 
@@ -293,7 +293,7 @@ function show(
   cut: number,
 ): ToolResult {
   const automation = port.byId(call.id);
-  // another project's task is not found, as on its page
+  // another project's automation is not found, as on its page
   if (automation === null || automation.projectId !== actor.projectId) {
     throw new Error("no scheduled task with that id in this project");
   }

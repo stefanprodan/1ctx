@@ -4,7 +4,7 @@
 // The automation tool through the composed server: offered in a chat
 // and its subagents, never a run or a run's subagents; off by the
 // admin's row and by the chat's key; each admin switch moves its own
-// row; and a chat reading a task its run answered, with the links.
+// row; and a chat reading an automation its run answered, with the links.
 
 import { describe, expect, test } from "bun:test";
 import { AUTOMATIONS_OFF_LINE } from "../../../src/shared/capabilities.ts";
@@ -152,7 +152,7 @@ describe("the offer", () => {
       const posted = await chat.member.call(
         "POST",
         `/api/sessions/${sessionId}/messages`,
-        { body: { message: "@checker which tasks watch the cluster" } },
+        { body: { message: "@checker which automations watch the cluster" } },
       );
       expect(posted.status).toBe(201);
       const summoned = await waitScript(chat.scripted, count + 1);
@@ -240,8 +240,8 @@ describe("the offer", () => {
   });
 });
 
-describe("a chat reading its project's tasks", () => {
-  test("lists and shows a task with its last run's answer and links", async () => {
+describe("a chat reading its project's automations", () => {
+  test("lists and shows an automation with its last run's answer and links", async () => {
     const chat = await app();
     try {
       const automation = await createAutomation(chat, {
@@ -289,7 +289,7 @@ describe("a chat reading its project's tasks", () => {
       );
       expect(answers.join("\n")).not.toContain("secret words");
 
-      // the reply's link opens the task in place
+      // the reply's link opens the automation in place
       await finish(
         chat,
         next,
@@ -324,7 +324,7 @@ describe("a chat reading its project's tasks", () => {
   });
 });
 
-describe("the switches a task shows", () => {
+describe("the switches an automation shows", () => {
   test("name only its own project's credentials and its agent's servers", async () => {
     const chat = await chatApp({
       secrets: {
@@ -385,7 +385,7 @@ describe("the switches a task shows", () => {
   });
 });
 
-describe("task text through the composed server", () => {
+describe("automation text through the composed server", () => {
   test("dropped characters between backticks never close the fence", async () => {
     const chat = await app();
     try {

@@ -31,7 +31,7 @@ function quiet(chat: ChatApp, parentId: string, count: number) {
   expect(chat.scripted.scripts.length).toBe(count);
 }
 
-// a scheduled run of a new task, its session id
+// a scheduled run of a new automation, its session id
 async function fired(chat: ChatApp, name: string): Promise<string> {
   const automation = await createAutomation(chat, { name });
   chat.app.db

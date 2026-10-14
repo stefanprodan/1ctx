@@ -117,17 +117,17 @@ describe("runs grouped in All", () => {
     expect(counts(rows)).toEqual([1, null, null]);
   });
 
-  test("leave Chats and Tasks as they were", () => {
+  test("leave Chats and Runs as they were", () => {
     const { store, chat, run } = seeded();
     const runs = [run("digest", 10), run("digest", 20), run("spend", 30)];
     const chats = [chat(5), chat(6)];
-    const tasks = store.list({
+    const listed = store.list({
       projectIds: ["p"],
       q: "",
       origin: "automation",
     }).rows;
-    expect(ids(tasks)).toEqual([...runs].reverse());
-    expect(counts(tasks)).toEqual([null, null, null]);
+    expect(ids(listed)).toEqual([...runs].reverse());
+    expect(counts(listed)).toEqual([null, null, null]);
     expect(
       ids(store.list({ projectIds: ["p"], q: "", origin: "chat" }).rows),
     ).toEqual([...chats].reverse());

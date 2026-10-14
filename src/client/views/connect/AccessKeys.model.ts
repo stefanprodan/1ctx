@@ -54,8 +54,8 @@ export const DAYS_OPTIONS: { value: AccessKeyDays; label: string }[] = [
 
 export const scopeHint = (scope: AccessKeyScope): string =>
   scope === "read"
-    ? "Reads knowledge, chats and tasks."
-    : "Reads, edits knowledge, works tasks.";
+    ? "Reads knowledge, chats and external tasks."
+    : "Reads, edits knowledge, works external tasks.";
 
 export const reachHint = (reach: KeyReach): string =>
   reach === "all" ? "All you see, now and later." : "Only these.";

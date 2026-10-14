@@ -111,14 +111,14 @@ export function failingLine(counts: { servers: number; skills: number }) {
 export function deleteLine(impact: AgentImpactResponse | null): string {
   if (impact === null) return "This cannot be undone.";
   const { chats, automations, running } = impact;
-  const tasks = plural(automations, "scheduled task");
+  const paused = plural(automations, "automation");
   const first =
     chats > 0 && automations > 0
-      ? `Archives its ${plural(chats, "chat")} and pauses ${tasks}.`
+      ? `Archives its ${plural(chats, "chat")} and pauses ${paused}.`
       : chats > 0
         ? `Archives its ${plural(chats, "chat")}.`
         : automations > 0
-          ? `Pauses ${tasks}.`
+          ? `Pauses ${paused}.`
           : "";
   const stops = running > 0 ? `Stops the ${running} running now.` : "";
   return [first, stops, "This cannot be undone."]

@@ -234,7 +234,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const row = find(ctx.params.id);
         if (deps.refreshing.has(row.id))
           throw new Conflict("the skill is refreshing");
-        // no agent has it, so its key in a chat or a task means nothing
+        // no agent has it, so its key in a chat or an automation means nothing
         transact(deps.db, () => {
           deps.store.delete(row.id);
           deps.capabilities.forget(skillKey(row.id));

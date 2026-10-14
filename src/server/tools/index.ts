@@ -229,7 +229,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const emailOn = () =>
     email !== undefined && store.row(EMAIL_TOOL).enabled && email.enabled();
   const automations = deps.automations ?? null;
-  // the admin's row, with the tasks wired to read
+  // the admin's row, with the automations wired to read
   const automationOn = () =>
     automations !== null && store.row(AUTOMATION_TOOL).enabled;
   const externalTaskOn = () =>

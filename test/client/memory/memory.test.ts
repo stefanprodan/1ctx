@@ -476,7 +476,7 @@ describe("the note card", () => {
       session: null,
       run: false,
     });
-    // a task's own note whose run is deleted
+    // an automation's own note whose run is deleted
     expect(
       writerOf(memory({ session: null, automationId: "au1" }), now),
     ).toMatchObject({ kind: "agent", session: null, run: true });
