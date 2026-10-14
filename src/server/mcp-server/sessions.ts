@@ -129,14 +129,20 @@ function sessionLines(
   );
 }
 
-export function sessionsTool(
+export async function sessionsTool(
   deps: McpServerDeps,
   principal: KeyPrincipal,
   input: SessionsInput,
-): McpResult {
+  signal?: AbortSignal,
+): Promise<McpResult> {
   if (input.action === "search") {
     const project = deps.access.project(principal, input.projectId);
-    const found = deps.sessions.search(project.id, input.q, input.after);
+    const found = await deps.sessions.search(project.id, input.q, input.after, {
+      from: "mcp",
+      signal,
+    });
+    // the key may have lost the project while the search waited
+    deps.access.project(principal, project.id);
     const continuation = (after: string) =>
       `Read on with sessions action=search, projectId=${project.id}, q=${JSON.stringify(input.q)}, after=${JSON.stringify(after)}.\n`;
     const label = dataLabel("Session search results");

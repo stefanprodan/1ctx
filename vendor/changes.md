@@ -107,6 +107,40 @@ asserts only that both paths match the same files.
 
 Before: its 4.8M evaluations passed 5 s once on a busy CI runner.
 
+### suite-platform: tests that depend on the machine are skipped there
+Files: `src/network/allow-list/dns-rebinding-integration.test.ts`,
+  `src/fs/read-write-fs/read-write-fs.mode-and-copy.test.ts`,
+  `src/fs/read-write-fs/read-write-fs.special-files.test.ts`,
+  `src/security/sandbox/information-disclosure.test.ts`,
+  `src/fs/overlay-fs/overlay-fs.security.test.ts`
+Upstream: not reported
+Tests: none, it makes `make vendor-test` answer the same on Linux and
+  macOS
+
+Now:
+
+- **Real DNS.** the real DNS suite is skipped everywhere.
+- **macOS realpath.** the write-only and mode-000 file tests and the
+  Unix socket test of `ReadWriteFs` are skipped on macOS.
+- **No USER.** the username test is skipped when `USER` is unset.
+- **Linux backslash.** the Windows-style `readdir` test of `OverlayFs`
+  is skipped on Linux.
+
+Before:
+
+- **Real DNS.** its answers depend on the machine's resolver and
+  network.
+- **macOS realpath.** Bun's `realpathSync` on macOS opens the path, so
+  it fails with `EACCES` on a file the user cannot read and
+  `EOPNOTSUPP` on a socket, and `ReadWriteFs` refuses the path as
+  outside the root. Node's does not open it, nor does Bun's on Linux.
+- **No USER.** the test asserts the output does not contain
+  `process.env.USER || ""`, which fails in a container with no `USER`.
+- **Linux backslash.** Bun's `realpathSync` on Linux reads `\` as a
+  separator, so `\..\..\etc` resolves above the root, `OverlayFs`
+  refuses it and `readdir` answers `[]` where the test expects a throw.
+  It fails closed; macOS reads `\` as a name and throws `ENOENT`.
+
 ## Interpreter
 
 ### command-not-found: a name that does not resolve is not found
@@ -234,6 +268,23 @@ Before: a pending call, such as the read of a large MCP result kept as
 a lazy file, held the command past the grace, so the execution scope
 was poisoned and the whole script ended, `bash: execution aborted`,
 exit 124. Upstream's #506 and #397 do not cover it.
+
+### deadline-abort: a command cut by its deadline ends the script
+Files: `src/interpreter/helpers/loop.ts`,
+  `src/interpreter/control-flow.ts`, `src/interpreter/subshell-group.ts`,
+  `src/interpreter/interpreter.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/deadline-abort.test.ts`
+
+Now: a command stopped by its execution deadline or an abort ends the
+script with 124 wherever it ran: a loop, if, case, subshell, group or
+function body, or a `[[ ]]` test passes its error up as a limit's,
+with the output before it.
+
+Before: those bodies caught it as any other error, so the command
+failed with `execution aborted`, exit 1, and the script went on. Only
+the script's next time check made it 124, and in the same millisecond
+that check passed, so a cut command's writes were kept.
 
 ### globstar: a trailing ** lists everything below, as bash
 Files: `src/shell/glob.ts`

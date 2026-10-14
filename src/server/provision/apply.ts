@@ -22,6 +22,7 @@ import type {
 } from "../../shared/api/skills.ts";
 import type { ToolsResponse } from "../../shared/api/tools.ts";
 import type { UsersResponse } from "../../shared/api/users.ts";
+import type { ProjectDetail } from "../../shared/contracts/project.ts";
 import type { SecretKind } from "../../shared/words.ts";
 import { messageOf } from "../lib/errors.ts";
 import { isToolName } from "../tools/index.ts";
@@ -33,7 +34,7 @@ import {
   required,
 } from "./client.ts";
 import { decider } from "./decider.ts";
-import { type Document, KINDS, type Of } from "./parse.ts";
+import { type Document, KINDS, type LabelSpec, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
 import { applySmtpServer } from "./smtp.ts";
 
@@ -90,6 +91,7 @@ async function project(
     : await api.call<ProjectResponse>("POST", "/api/projects", {
         name: doc.name,
         description: doc.spec.description ?? "",
+        ...(doc.spec.labels === undefined ? {} : { labels: doc.spec.labels }),
       });
   let action: Action = before ? "unchanged" : "created";
   if (
@@ -101,6 +103,9 @@ async function project(
       description: doc.spec.description,
     });
     action = "updated";
+  }
+  if (before && doc.spec.labels !== undefined) {
+    if (await labels(api, project, doc.spec.labels)) action = "updated";
   }
   if (doc.spec.members !== undefined) {
     const { users } = await api.call<UsersResponse>("GET", "/api/users");
@@ -125,6 +130,32 @@ async function project(
     }
   }
   return { action, id: project.id };
+}
+
+// A listed label is created or updated by name; one not listed is left,
+// since a delete would take it off what carries it.
+async function labels(
+  api: Client,
+  project: ProjectDetail,
+  listed: LabelSpec[],
+): Promise<boolean> {
+  let changed = false;
+  for (const label of listed) {
+    const held = project.labels.find((row) => row.name === label.name);
+    if (held === undefined) {
+      await api.call("POST", `/api/projects/${project.id}/labels`, label);
+      changed = true;
+    } else if (
+      label.description !== undefined &&
+      label.description !== held.description
+    ) {
+      await api.call("PATCH", `/api/projects/${project.id}/labels/${held.id}`, {
+        description: label.description,
+      });
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 // The folder wins over a live doc's text and a doc it does not name is

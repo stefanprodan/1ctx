@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What provisioning reads of the instance, from each area's rows when it
-// asks: every object by kind and name, and a team project's docs.
+// asks: every object by kind and name, and a team project's docs and
+// labels.
 
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { TOOL_NAMES } from "../tools/index.ts";
@@ -54,7 +55,9 @@ export function inventoryOf(sources: InventorySources): Inventory {
 }
 
 export function projectDocsOf(sources: {
-  projects: InventorySources["projects"];
+  projects: InventorySources["projects"] & {
+    labels(projectId: string): { name: string }[];
+  };
   limits: { current(): KnowledgeCaps };
   docs: { list(projectId: string): { name: string; bytes: number }[] };
 }): ProjectDocs {
@@ -65,6 +68,10 @@ export function projectDocsOf(sources: {
     return {
       caps: sources.limits.current(),
       live: id === undefined ? [] : sources.docs.list(id),
+      labels:
+        id === undefined
+          ? []
+          : sources.projects.labels(id).map((label) => label.name),
     };
   };
 }

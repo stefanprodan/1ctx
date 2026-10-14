@@ -25,6 +25,7 @@ import {
 } from "../../helpers/automations.ts";
 import { type ChatApp, chatApp, startChat } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
+import { briefFile } from "../external-tasks/http-fixture.ts";
 
 const mapped = () => Object.values(STORAGE_TABLES).flat();
 
@@ -85,15 +86,21 @@ describe("the storage scan", () => {
     const { externalTasks: tasks, db } = chat.app;
     const key = { userId: chat.memberId, keyId: "key", keyName: "terminal" };
     let closed = 0;
-    for (const state of ["open", "claimed", "blocked", "done", "dropped"]) {
+    const brief = briefFile(chat.app, chat.projectId, chat.memberId);
+    for (const state of [
+      "todo",
+      "in_progress",
+      "awaiting_input",
+      "done",
+      "canceled",
+    ]) {
       const made = tasks.create(chat.memberId, chat.projectId, {
         title: state,
-        text: "Brief \u00e9",
-        part: "Part",
-        fileIds: [],
+        labels: ["build"],
+        fileIds: [brief],
       });
       const id = made.task.task.id;
-      if (state === "open") continue;
+      if (state === "todo") continue;
       const { claimId } = tasks.claim(key, id);
       tasks.report(
         key,
@@ -101,20 +108,18 @@ describe("the storage scan", () => {
         claimId,
         state === "done"
           ? "result"
-          : state === "blocked"
+          : state === "awaiting_input"
             ? "question"
             : "progress",
         "Report \u00e9",
         ["https://example.test/result"],
       );
-      if (state === "dropped")
-        tasks.drop(chat.memberId, id, { state: "claimed" });
-      if (state !== "done" && state !== "dropped") continue;
+      if (state === "canceled")
+        tasks.cancel(chat.memberId, id, { state: "in_progress" });
+      if (state !== "done" && state !== "canceled") continue;
       const detail = tasks.show(id, null)!;
       closed += Buffer.byteLength(
         state +
-          detail.task.text +
-          "Part" +
           detail.entries
             .map((entry) => entry.text + JSON.stringify(entry.links))
             .join("") +
@@ -391,7 +396,7 @@ describe("the storage answer", () => {
     });
   });
 
-  test("sums a task's runs and splits chats from runs", async () => {
+  test("sums an automation's runs and splits chats from runs", async () => {
     const chat = await chatApp();
     const chatId = await settledChat(chat);
     const automation = await createAutomation(chat, { retentionDays: 14 });
@@ -407,7 +412,7 @@ describe("the storage answer", () => {
       0,
     );
     const body = await storage(chat);
-    expect(body.largest.tasks).toEqual([
+    expect(body.largest.automations).toEqual([
       {
         id: null,
         name: null,
@@ -506,7 +511,7 @@ describe("the storage answer", () => {
     expect(keptMcp?.bytes).toBe(700);
     const runs = body.retention.cleaned.find((row) => row.key === "runs")!;
     expect(runs.bytes).toBeGreaterThanOrEqual(messageBytes(chat, runId) + 300);
-    expect(body.largest.tasks[0]?.parts).toEqual([
+    expect(body.largest.automations[0]?.parts).toEqual([
       { part: "mcp", bytes: 300 },
       { part: "runs", bytes: messageBytes(chat, runId) },
     ]);
@@ -648,11 +653,11 @@ describe("the storage answer", () => {
     );
   });
 
-  test("never names a personal project, its chats or its tasks", async () => {
+  test("never names a personal project, its chats or its automations", async () => {
     const chat = await chatApp();
     const sessionId = await settledChat(chat);
     const automation = await createAutomation(chat, {
-      name: "secret-task",
+      name: "secret-automation",
     });
     const { sessionId: runId, main } = await startRun(chat, automation.id);
     main.reply("done");
@@ -664,7 +669,7 @@ describe("the storage answer", () => {
       runId,
       automation.id,
       "hello there",
-      "secret-task",
+      "secret-automation",
     ]) {
       expect(text).not.toContain(secret);
     }

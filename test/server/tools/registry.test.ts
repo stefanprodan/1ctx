@@ -8,7 +8,11 @@ import { describe, expect, test } from "bun:test";
 import { ToolError } from "../../../src/server/lib/errors.ts";
 import { errorFields } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import { Registry, resultCutLine } from "../../../src/server/tools/registry.ts";
+import {
+  type CallTimer,
+  Registry,
+  resultCutLine,
+} from "../../../src/server/tools/registry.ts";
 import type {
   Tool,
   ToolContext,
@@ -45,6 +49,33 @@ function context(): ToolContext {
     caps: DEFAULT_LIMITS,
   };
 }
+
+// a call timer the test moves: a timeout aborts once its time is
+// reached, unless the move leaves it to ring later
+function handTimer(): CallTimer & {
+  advance(ms: number, ring?: boolean): void;
+} {
+  let at = 0;
+  const armed: { due: number; controller: AbortController }[] = [];
+  return {
+    now: () => at,
+    timeout(ms) {
+      const controller = new AbortController();
+      armed.push({ due: at + ms, controller });
+      return controller.signal;
+    },
+    advance(ms, ring = true) {
+      at += ms;
+      if (!ring) return;
+      for (const { due, controller } of armed) {
+        if (due > at) continue;
+        controller.abort(new DOMException("timed out", "TimeoutError"));
+      }
+    },
+  };
+}
+
+const named = (name: string) => `tool "${name}" not found.`;
 
 function echo(text: string, fail = false): Registry {
   const tool: Tool = {
@@ -196,17 +227,22 @@ describe("the registry's result cleaning", () => {
   });
 
   test("names a timeout past the limit when the tool threw its own words first", async () => {
+    const timer = handTimer();
     const tool: Tool = {
       name: "echo",
       description: "",
       parameters: {},
       timeoutMs: 20,
+      // at the limit, before the call's own timeout aborts
       run: async () => {
-        await Bun.sleep(30);
+        timer.advance(20, false);
         throw new Error("MCP request timed out");
       },
     };
-    const result = await new Registry([tool]).run(call, context());
+    const result = await new Registry([tool], named, timer).run(
+      call,
+      context(),
+    );
     expect(result).toEqual({
       content: "Error: tool timed out after 0 seconds",
       error: true,
@@ -215,18 +251,23 @@ describe("the registry's result cleaning", () => {
   });
 
   test("gives a tool its grace past the timeout to answer", async () => {
+    const timer = handTimer();
     const tool: Tool = {
       name: "echo",
       description: "",
       parameters: {},
       timeoutMs: 20,
       graceMs: 1000,
-      run: async () => {
-        await Bun.sleep(60);
+      run: async (_args, ctx) => {
+        timer.advance(60);
+        ctx.signal.throwIfAborted();
         return "answered";
       },
     };
-    const result = await new Registry([tool]).run(call, context());
+    const result = await new Registry([tool], named, timer).run(
+      call,
+      context(),
+    );
     expect(result).toEqual({ content: "answered", error: false });
   });
 
@@ -253,18 +294,19 @@ describe("the registry's result cleaning", () => {
   test("leaves a failure of the tool's own, and a timeout, not interrupted", async () => {
     const own = await echo("the page is gone", true).run(call, context());
     expect(own.interrupted).toBeUndefined();
+    const timer = handTimer();
     const tool: Tool = {
       name: "echo",
       description: "",
       parameters: {},
       timeoutMs: 20,
       run: async (_args, ctx) => {
-        await Bun.sleep(30);
+        timer.advance(30);
         ctx.signal.throwIfAborted();
         return "late";
       },
     };
-    const late = await new Registry([tool]).run(call, context());
+    const late = await new Registry([tool], named, timer).run(call, context());
     expect(late.timedOut).toBeTrue();
     expect(late.interrupted).toBeUndefined();
   });

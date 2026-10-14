@@ -303,7 +303,7 @@ export async function memoryPhase(
         spend,
       );
       // A round whose edits all succeeded is the phase's work done; asking
-      // again only invites a model to go back to the run's task.
+      // again only invites a model to go back to the run's instructions.
       if (clean || controller.signal.aborted || offered.memory.stopped) {
         return;
       }

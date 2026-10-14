@@ -11,8 +11,8 @@ import type { Offered } from "../../src/server/tools/index.ts";
 import {
   type ChatApp,
   chatApp,
+  idle,
   startChat,
-  tick,
   waitScript,
 } from "../helpers/chat.ts";
 import { settle } from "../helpers/tool-loop.ts";
@@ -35,9 +35,7 @@ function codeJson(html: string): unknown {
 
 async function finish(chat: ChatApp, script: { reply(text: string): void }) {
   script.reply("done");
-  for (let i = 0; i < 100 && chat.app.runner.registry.size > 0; i++) {
-    await tick();
-  }
+  await idle(chat.app);
   expect(chat.app.runner.registry.size).toBe(0);
 }
 
@@ -63,12 +61,12 @@ describe("tools administration", () => {
     expect(codeJson(tool.parametersHtml)).toEqual(tool.parameters);
     expect(tool.tokens).toBeGreaterThan(0);
     expect(body.builtin.map((t: { name: string }) => t.name)).toEqual([
+      "attention",
       "bash",
       "datetime",
       "mcp_call",
       "mcp_describe",
       "memory_edit",
-      "needs_attention",
       "skill",
       "skill_file",
       "webfetch",
@@ -240,9 +238,9 @@ test("bash documents open and snapshots the Visuals row", async () => {
     (tool: { name: string }) => tool.name === "bash",
   );
   expect(bash.description).toContain(
-    "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out.",
+    "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. To point to one, write its /knowledge/ path.",
   );
-  expect(bash.tokens).toBe(449);
+  expect(bash.tokens).toBe(461);
 
   const first = await startChat(chat, "first");
   const active = chat.app.runner.registry.get(first.sessionId)!;
@@ -288,6 +286,8 @@ describe("tool usage through the composed app", () => {
         expect(rows.map((row) => [row.toolName, row.status])).toEqual([
           [tool, "failed"],
         ]);
+        // the window excludes its upper bound, a row stamped now included
+        chat.app.now.value += 1;
         const after = await chat.admin.call("GET", `/api/usage/${page}`);
         expect(after.status).toBe(200);
         expect(await after.json()).toMatchObject({ ...counts, failed: 1 });

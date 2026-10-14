@@ -11,7 +11,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { loadMe, me, meError } from "../data/me.ts";
-import { Icon, Mark } from "../lib/icons.tsx";
+import { Icon } from "../lib/icons.tsx";
 import { Login } from "../views/home/Login.tsx";
 import { Rail } from "./Rail.tsx";
 import { navigate, path, query } from "./router.ts";
@@ -23,16 +23,15 @@ import {
   openDrawer,
   railDrawer,
   railHidden,
-  showRail,
 } from "./shell.ts";
 import "./shell.css";
+import { Strip } from "./Strip.tsx";
 
-// wide: the rail is a column beside the view, or folded to a strip in
-// its colour with the button that brings it back and the mark. Narrow
-// or short: the rail is a full screen over the view, opened by the same
-// button floating at the top left of the view; while it is open the view
-// under it is inert, and when it closes the focus comes back to that
-// button.
+// wide: the rail is a column beside the view, or folded to the strip of
+// its entries as icons. Narrow or short: the rail is a full screen over
+// the view, opened by the same button floating at the top left of the
+// view; while it is open the view under it is inert, and when it closes
+// the focus comes back to that button.
 function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
   const phone = railDrawer.value;
   const railShown = phone ? drawerOpen.value : !railHidden.value;
@@ -77,21 +76,7 @@ function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
           onHide={phone ? closeDrawer : hideRail}
         />
       )}
-      {!railShown && !phone && (
-        <aside class="shell-strip">
-          <button
-            type="button"
-            class="btn-icon shell-show"
-            aria-label="Show the menu"
-            onClick={showRail}
-          >
-            <Icon name="sidebar" />
-          </button>
-          <a class="shell-strip-mark" href="/" aria-label="Home">
-            <Mark />
-          </a>
-        </aside>
-      )}
+      {!railShown && !phone && <Strip user={user} />}
       <main
         ref={main}
         class={`shell-main${railShown ? "" : " shell-main-bare"}`}
@@ -122,12 +107,6 @@ export function App() {
   useEffect(() => {
     void loadMe();
   }, []);
-
-  useEffect(() => {
-    const title =
-      user === null && needsUser ? "Sign in" : m ? m.route.title(m.params) : "";
-    document.title = title ? `1ctx · ${title}` : "1ctx";
-  }, [user, needsUser, m]);
 
   // one who must change the password they were handed lands on the
   // profile, where the server lets them go

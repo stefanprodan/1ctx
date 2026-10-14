@@ -42,7 +42,8 @@ export function Tabs({
   head?: boolean;
 }) {
   const row = useRef<HTMLElement>(null);
-  // a phone's row hides tabs past an edge: a fade says which side
+  // a row too long for its width hides tabs past an edge: a fade says
+  // which side
   const before = useSignal(false);
   const after = useSignal(false);
   useLayoutEffect(() => {

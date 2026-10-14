@@ -7,7 +7,7 @@
 
 import { week } from "../../data/usage.ts";
 import { count } from "../../lib/format.ts";
-import { AsideSection } from "../../ui/Split.tsx";
+import { AsideLine, AsideSection } from "../../ui/Split.tsx";
 
 export function WeekAside() {
   const spent = week.value;
@@ -17,20 +17,11 @@ export function WeekAside() {
         <p class="split-empty">Loading</p>
       ) : (
         <>
-          <div class="split-line">
-            <span class="split-value">{count(spent.sessions)}</span>
-            sessions
-          </div>
-          <div class="split-line">
-            <span class="split-value">{count(spent.sends)}</span>
-            {spent.sends === 1 ? "turn" : "turns"}
-          </div>
-          <div class="split-line">
-            <span class="split-value">
-              {count(spent.promptTokens + spent.completionTokens)}
-            </span>
-            tokens
-          </div>
+          <AsideLine label="Sessions">{count(spent.sessions)}</AsideLine>
+          <AsideLine label="Turns">{count(spent.sends)}</AsideLine>
+          <AsideLine label="Tokens">
+            {count(spent.promptTokens + spent.completionTokens)}
+          </AsideLine>
         </>
       )}
     </AsideSection>

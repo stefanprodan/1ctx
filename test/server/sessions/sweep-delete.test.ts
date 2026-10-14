@@ -84,7 +84,7 @@ describe("the chats sweep deletes", () => {
       ).toBe(204);
       idleAgo(chat, oldOrphan, KEPT + 1);
       idleAgo(chat, newOrphan, KEPT - 1);
-      // a live task's runs keep its own retention, whatever their age
+      // a live automation's runs keep its own retention, whatever their age
       const living = await createAutomation(chat, {
         name: "living",
         retentionDays: 365,

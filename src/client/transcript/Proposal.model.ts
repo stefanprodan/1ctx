@@ -30,9 +30,9 @@ const ACTIONS: readonly string[] = [
 
 export type ProposalCall = {
   action: ProposalAction;
-  // a create's name, and the task any other action names
+  // a create's name, and the automation any other action names
   name: string | null;
-  taskId: string | null;
+  automationId: string | null;
 };
 
 // what an automation call proposes; null for a read, another tool or
@@ -53,8 +53,8 @@ export function proposalCall(call: ToolCall): ProposalCall | null {
   const text = (value: unknown) =>
     typeof value === "string" && value !== "" ? value : null;
   return action === "create"
-    ? { action, name: text(args.name), taskId: null }
-    : { action, name: null, taskId: text(args.id) };
+    ? { action, name: text(args.name), automationId: null }
+    : { action, name: null, automationId: text(args.id) };
 }
 
 export const proposalAction = (call: ToolCall): ProposalAction | null =>
@@ -95,7 +95,7 @@ export function proposalLines(
 
 export const HEADS: Record<ProposalAction, { icon: IconName; title: string }> =
   {
-    create: { icon: "clock", title: "New task" },
+    create: { icon: "clock", title: "New automation" },
     update: { icon: "pencil", title: "Change" },
     suspend: { icon: "pause", title: "Suspend" },
     resume: { icon: "play", title: "Resume" },
@@ -111,9 +111,9 @@ const DONE: Record<ProposalAction, string> = {
 };
 
 export const INERT_WORDS = "Proposed in the original chat";
-// the name a line on a task gone, or not read, shows
-export const GONE_NAME = "a deleted task";
-export const UNREAD_NAME = "the task";
+// the name a line on an automation gone, or not read, shows
+export const GONE_NAME = "a deleted automation";
+export const UNREAD_NAME = "the automation";
 
 // how often "confirmed by @user, 40s ago" moves: every second while it
 // counts seconds, then at the coarseness ago() shows
@@ -158,33 +158,33 @@ export function lineHead(draft: AutomationDraft): {
         note: draft.decidedBy === null ? "dismissed" : null,
       };
     case "stale":
-      return { ...head, by: null, note: "not applied, the task changed" };
+      return { ...head, by: null, note: "not applied, the automation changed" };
     case "expired":
       return { ...head, by: null, note: "not applied, expired" };
   }
 }
 
-// where the name links: the task a confirm made, the run it started,
-// else the task named; null while there is none to link
+// where the name links: the automation a confirm made, the run it started,
+// else the automation named; null while there is none to link
 export function nameTarget(
   draft: AutomationDraft,
-  taskExists: boolean,
-): { kind: "task" | "run"; id: string } | null {
+  automationExists: boolean,
+): { kind: "automation" | "run"; id: string } | null {
   if (draft.state === "confirmed" && draft.action === "run") {
     if (draft.runSessionId !== null) {
       return { kind: "run", id: draft.runSessionId };
     }
   }
   if (draft.createdAutomationId !== null) {
-    return { kind: "task", id: draft.createdAutomationId };
+    return { kind: "automation", id: draft.createdAutomationId };
   }
-  if (draft.automationId !== null && taskExists) {
-    return { kind: "task", id: draft.automationId };
+  if (draft.automationId !== null && automationExists) {
+    return { kind: "automation", id: draft.automationId };
   }
   return null;
 }
 
-// the words the task page uses, else the expression as cron
+// the words the automation page uses, else the expression as cron
 export function when(schedule: string, once: boolean): string {
   if (once) return "once";
   return scheduleWords(schedule) === null
@@ -203,7 +203,7 @@ const FIELD_WORDS: [keyof ProposalFields, string][] = [
   ["attentionGuidance", "attention"],
 ];
 
-// what the line says after the name while it waits: when a new task
+// what the line says after the name while it waits: when a new automation
 // runs, which fields an update changes
 export function lineDetail(draft: AutomationDraft): string | null {
   if (draft.state !== "pending") return null;
@@ -229,7 +229,7 @@ export type FieldRow = { label: string; value: string; was: string | null };
 
 const yes = (on: boolean) => (on ? "yes" : "no");
 
-// an update's changed fields beside the task's values, struck when
+// an update's changed fields beside the automation's values, struck when
 // they differ
 export function changedFields(
   fields: Partial<ProposalFields>,
@@ -290,8 +290,8 @@ export type TextBlock = {
   // null for the instructions, which need none
   label: string | null;
   value: string;
-  // the task's text an update replaces; undefined for a create, or
-  // while the task is not read
+  // the automation's text an update replaces; undefined for a create, or
+  // while the automation is not read
   was?: string;
 };
 
@@ -312,7 +312,7 @@ export function createTexts(
   return texts;
 }
 
-// an update's changed texts beside the task's
+// an update's changed texts beside the automation's
 export function updateTexts(
   fields: Partial<ProposalFields>,
   before: Pick<

@@ -2,11 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
+import type { TaskKey } from "../../../src/server/external-tasks/index.ts";
 import { externalTasksArea } from "../../../src/server/external-tasks/index.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { STALE_TASK } from "../../../src/shared/contracts/external-task.ts";
+import type { AgentEntryKind } from "../../../src/shared/words.ts";
 import { fixture, HOUR, refuses } from "./fixture.ts";
+
+// the agent's own entry: a report, or its unclaim, which takes no links
+const agent =
+  (f: ReturnType<typeof fixture>) =>
+  (
+    key: TaskKey,
+    taskId: string,
+    claimId: string,
+    kind: AgentEntryKind | "unclaim",
+    text: string,
+    links: string[],
+  ) =>
+    kind === "unclaim"
+      ? f.area.agentUnclaim(key, taskId, claimId, text)
+      : f.port.report(key, taskId, claimId, kind, text, links);
 
 test.serial(
   "claim and identical last-entry retries write and publish nothing",
@@ -52,45 +69,65 @@ test.serial(
   },
 );
 
-for (const kind of ["result", "release"] as const) {
+test("a live report retried after a member's edit answers the first", () => {
+  using f = fixture();
+  const task = f.task("in_progress");
+  const first = f.port.report(
+    f.key,
+    task.id,
+    task.claimId!,
+    "progress",
+    "Half.",
+    ["https://example.com/pr/1"],
+  );
+  f.area.edit(f.owner.id, task.id, { editRevision: 0, title: "Moved brief" });
+  const current = f.area.show(task.id, null);
+  f.advance();
+  expect(
+    f.port.report(f.key, task.id, task.claimId!, "progress", "Half.", [
+      "https://example.com/pr/1",
+    ]),
+  ).toEqual(first);
+  expect(f.area.show(task.id, null)).toEqual(current);
+});
+
+for (const kind of ["result", "unclaim"] as const) {
   test(`${kind} retry returns its original end even after another claim or brief edit`, () => {
     using f = fixture();
-    const task = f.task("claimed");
-    const end = f.port.report(
-      f.key,
-      task.id,
-      task.claimId!,
-      kind,
-      "Original.",
-      ["https://example.com/1"],
-    );
+    const write = agent(f);
+    const task = f.task("in_progress");
+    const end = write(f.key, task.id, task.claimId!, kind, "Original.", [
+      "https://example.com/1",
+    ]);
     if (kind === "result")
       f.area.reopen(f.owner.id, task.id, { state: "done", text: "Try again." });
-    f.area.edit(task.id, { editRevision: 0, title: "Another attempt" });
+    f.area.edit(f.owner.id, task.id, {
+      editRevision: 0,
+      title: "Another attempt",
+    });
     const next = f.area.claim(f.otherKey, task.id);
     const current = f.area.show(task.id, null);
     f.advance();
     expect(
-      f.port.report(f.key, task.id, task.claimId!, kind, "Original.", [
+      write(f.key, task.id, task.claimId!, kind, "Original.", [
         "https://example.com/1",
       ]),
     ).toEqual(end);
     expect(
-      f.port.report(f.key, task.id, task.claimId!, kind, "Retry wording.", []),
+      write(f.key, task.id, task.claimId!, kind, "Retry wording.", []),
     ).toEqual(end);
     expect(f.area.show(task.id, null)).toEqual(current);
     expect(next.claimId).not.toBe(task.claimId);
     refuses(
       () =>
-        f.port.report(f.otherKey, task.id, task.claimId!, kind, "Original.", [
+        write(f.otherKey, task.id, task.claimId!, kind, "Original.", [
           "https://example.com/1",
         ]),
       409,
       STALE_TASK,
     );
     refuses(
-      () =>
-        f.port.report(f.key, task.id, task.claimId!, "progress", "Late.", []),
+      () => write(f.key, task.id, task.claimId!, "progress", "Late.", []),
       409,
       STALE_TASK,
     );
@@ -99,7 +136,7 @@ for (const kind of ["result", "release"] as const) {
 
 test("a repeated progress after a member answer is a new entry", () => {
   using f = fixture();
-  const task = f.task("claimed");
+  const task = f.task("in_progress");
   const first = f.port.report(
     f.key,
     task.id,
@@ -108,7 +145,10 @@ test("a repeated progress after a member answer is a new entry", () => {
     "Working.",
     [],
   );
-  f.area.answer(f.member.id, task.id, { state: "claimed", text: "A hint." });
+  f.area.answer(f.member.id, task.id, {
+    state: "in_progress",
+    text: "A hint.",
+  });
   const repeated = f.port.report(
     f.key,
     task.id,
@@ -118,7 +158,8 @@ test("a repeated progress after a member answer is a new entry", () => {
     [],
   );
   expect(repeated.entry.id).not.toBe(first.entry.id);
-  expect(repeated.task.entries).toBe(3);
+  // the claim, the first progress, the answer and the repeat
+  expect(repeated.task.entries).toBe(4);
   const links = f.port.report(
     f.key,
     task.id,
@@ -148,12 +189,12 @@ test("a repeated progress after a member answer is a new entry", () => {
   expect(again.entry.id).not.toBe(first.entry.id);
 });
 
-test("a question repeated after an answer blocks again instead of replaying the old row", () => {
+test("a question repeated after an answer waits again instead of replaying the old row", () => {
   using f = fixture();
-  const task = f.task("blocked");
+  const task = f.task("awaiting_input");
   const first = f.port.show(task.id, null)!.entries[0]!;
   const answered = f.area.answer(f.member.id, task.id, {
-    state: "blocked",
+    state: "awaiting_input",
     text: "Try the first path.",
   });
   f.advance();
@@ -167,26 +208,27 @@ test("a question repeated after an answer blocks again instead of replaying the 
   );
   expect(report.entry.id).not.toBe(first.id);
   expect(report.task).toMatchObject({
-    state: "blocked",
-    entries: 3,
+    state: "awaiting_input",
+    entries: 4,
     revision: answered.task.task.revision + 1,
-    attentionAt: f.now(),
+    movedAt: f.now(),
   });
   expect(f.area.store.byId(task.id)).toEqual(report.task);
   expect(f.area.store.claimById(task.claimId!)!.active_at).toBe(f.now());
 });
 
-for (const kind of ["progress", "result", "release"] as const) {
+for (const kind of ["progress", "result", "unclaim"] as const) {
   test(`${kind} refuses a claim from another task, including a retry`, () => {
     using f = fixture();
-    const task = f.task("claimed");
+    const write = agent(f);
+    const task = f.task("in_progress");
     const other = f.create("Other", f.otherProjectId);
     const report = () =>
-      f.port.report(f.key, other.id, task.claimId!, kind, "Report.", []);
+      write(f.key, other.id, task.claimId!, kind, "Report.", []);
     const before = f.area.show(task.id, null);
     refuses(report, 409, STALE_TASK);
     expect(f.area.show(task.id, null)).toEqual(before);
-    f.port.report(f.key, task.id, task.claimId!, kind, "Report.", []);
+    write(f.key, task.id, task.claimId!, kind, "Report.", []);
     const after = f.area.show(task.id, null);
     refuses(report, 409, STALE_TASK);
     expect(f.area.show(task.id, null)).toEqual(after);
@@ -194,56 +236,43 @@ for (const kind of ["progress", "result", "release"] as const) {
   });
 }
 
-test("a member's release of an unreported claim cannot be retried by the agent", () => {
+test("a member's unclaim of an unreported claim cannot be retried by the agent", () => {
   using f = fixture();
-  const task = f.task("claimed");
-  f.area.release(f.owner.id, task.id, {
-    state: "claimed",
+  const write = agent(f);
+  const task = f.task("in_progress");
+  f.area.unclaim(f.owner.id, task.id, {
+    state: "in_progress",
     claimId: task.claimId!,
     text: "Stop.",
   });
   refuses(
-    () => f.port.report(f.key, task.id, task.claimId!, "release", "Stop.", []),
+    () => write(f.key, task.id, task.claimId!, "unclaim", "Stop.", []),
     409,
     STALE_TASK,
   );
 });
 
-test("a member or system release does not authorize an ended progress retry", () => {
+test("a member or system unclaim does not authorize an ended progress retry", () => {
   using f = fixture();
+  const write = agent(f);
   for (const end of ["member", "access"] as const) {
-    const task = f.task("claimed");
-    f.port.report(f.key, task.id, task.claimId!, "progress", "Working.", []);
+    const task = f.task("in_progress");
+    write(f.key, task.id, task.claimId!, "progress", "Working.", []);
     if (end === "member")
-      f.area.release(f.owner.id, task.id, {
-        state: "claimed",
+      f.area.unclaim(f.owner.id, task.id, {
+        state: "in_progress",
         claimId: task.claimId!,
         text: "Take a break.",
       });
     else f.area.endClaims([f.key.keyId]);
     refuses(
-      () =>
-        f.port.report(
-          f.key,
-          task.id,
-          task.claimId!,
-          "progress",
-          "Working.",
-          [],
-        ),
+      () => write(f.key, task.id, task.claimId!, "progress", "Working.", []),
       409,
       STALE_TASK,
     );
     refuses(
       () =>
-        f.port.report(
-          f.key,
-          task.id,
-          task.claimId!,
-          "release",
-          "Take a break.",
-          [],
-        ),
+        write(f.key, task.id, task.claimId!, "unclaim", "Take a break.", []),
       409,
       STALE_TASK,
     );
@@ -252,7 +281,7 @@ test("a member or system release does not authorize an ended progress retry", ()
 
 test("a fresh area instance can retry a persisted result", () => {
   using f = fixture();
-  const task = f.task("claimed");
+  const task = f.task("in_progress");
   const ended = f.area.report(
     f.key,
     task.id,
@@ -272,10 +301,12 @@ test("a fresh area instance can retry a persisted result", () => {
     clock: f.now,
     externalTaskDays: () => f.limits.days,
     externalTaskIdleHours: () => f.limits.idle,
+    chatOpens: () => true,
+    homeProjectIds: () => [f.projectId],
     knowledge: { file: () => null, deletedName: () => null },
   });
   expect(
     restarted.report(f.key, task.id, task.claimId!, "result", "Finished.", []),
   ).toEqual(ended);
-  expect(restarted.show(task.id, null)!.task.task.state).toBe("open");
+  expect(restarted.show(task.id, null)!.task.task.state).toBe("todo");
 });

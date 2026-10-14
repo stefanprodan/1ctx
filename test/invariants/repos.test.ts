@@ -343,7 +343,7 @@ test("a team project's repository reads a key file, never through a credential",
   }
 });
 
-test("deleting a repository forgets its key in its project's chats and tasks", async () => {
+test("deleting a repository forgets its key in its project's chats and automations", async () => {
   const chat = await setup();
   try {
     const repo = await made(chat.member, "/api/profile/project/repos", {
@@ -373,12 +373,15 @@ test("deleting a repository forgets its key in its project's chats and tasks", a
       status: "done",
       disabledCapabilities: [key],
     });
-    const tasks = await Promise.all(
+    const automations = await Promise.all(
       sets.map((disabledCapabilities, i) =>
-        createAutomation(chat, { name: `task-${i}`, disabledCapabilities }),
+        createAutomation(chat, {
+          name: `automation-${i}`,
+          disabledCapabilities,
+        }),
       ),
     );
-    expect(tasks[0]!.disabledCapabilities).toEqual(sets[0]!);
+    expect(automations[0]!.disabledCapabilities).toEqual(sets[0]!);
     const gone = await chat.member.call(
       "DELETE",
       `/api/profile/project/repos/${repo.id}`,
@@ -391,7 +394,7 @@ test("deleting a repository forgets its key in its project's chats and tasks", a
         disabledCapabilities: without(row.disabledCapabilities),
       });
     }
-    for (const row of tasks) {
+    for (const row of automations) {
       expect(chat.app.automations.byId(row.id)).toEqual({
         ...row,
         disabledCapabilities: without(row.disabledCapabilities),

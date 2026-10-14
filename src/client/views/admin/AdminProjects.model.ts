@@ -29,7 +29,7 @@ export function deleteLine(
       ? plural(project.knowledge.files, "knowledge file")
       : "",
   ].filter((part) => part !== "");
-  return `Deletes its ${[...counted, "scheduled tasks and memory"].join(
+  return `Deletes its ${[...counted, "automations and memory"].join(
     ", ",
   )}. This cannot be undone.`;
 }
@@ -49,7 +49,12 @@ export function memberOptions(
     }));
 }
 
+// a new project's label is refused by its place: "labels.2.name must be"
+const LABEL_FIELD = /^labels\.\d+\.(name|description)\b/;
+
 export function projectFieldOf(message: string): string | undefined {
+  const label = LABEL_FIELD.exec(message);
+  if (label !== null) return label[0];
   if (message.startsWith("name")) return "name";
   if (message.startsWith("description")) return "description";
   return undefined;

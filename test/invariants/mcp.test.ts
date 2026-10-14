@@ -11,6 +11,7 @@ import { sha256 } from "../../src/server/lib/ids.ts";
 import type { LogFactory } from "../../src/server/lib/log.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
+import type { McpServerStore } from "../../src/server/mcp/index.ts";
 import { cutText } from "../../src/server/sessions/index.ts";
 import type { McpServerSummary } from "../../src/shared/contracts/mcp.ts";
 import { offeredServers, promptSnapshot } from "../../src/shared/mcp.ts";
@@ -22,7 +23,12 @@ import {
   testApp,
 } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
-import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
+import {
+  chatApp,
+  sessionSettled,
+  startChat,
+  waitScript,
+} from "../helpers/chat.ts";
 import { fixture, mcpFetch, type RecordedMcp } from "../server/mcp/fake.ts";
 
 // the MCP hosts go to the recorded servers, the rest to the provider
@@ -355,11 +361,7 @@ async function waitDone(
   app: Awaited<ReturnType<typeof chatApp>>["app"],
   id: string,
 ) {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    if (app.sessions.byId(id)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("chat did not finish");
+  await sessionSettled(app, id);
 }
 
 async function saveServers(
@@ -432,12 +434,20 @@ function systemOf(body: Record<string, unknown>): string {
   return (body.messages as { role: string; content: string }[])[0]!.content;
 }
 
-async function waitUntil(check: () => boolean, words: string) {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    if (check()) return;
-    await tick();
-  }
-  throw new Error(words);
+// once a discovery the store applies leaves check true
+function discovered(store: McpServerStore, check: () => boolean) {
+  return new Promise<void>((resolve) => {
+    if (check()) return resolve();
+    const apply = store.applyDiscovery.bind(store);
+    store.applyDiscovery = (...args) => {
+      const row = apply(...args);
+      if (check()) {
+        store.applyDiscovery = apply;
+        resolve();
+      }
+      return row;
+    };
+  });
 }
 
 function codeJson(html: string): unknown {
@@ -821,7 +831,7 @@ describe("MCP tools in a send", () => {
       },
     ]);
     started.script.end();
-    const answer = await waitScript(chat.scripted, 2, 400);
+    const answer = await waitScript(chat.scripted, 2);
     const rows = chat.app.sessions
       .messages(started.sessionId)
       .filter((message) => message.kind === "tool");
@@ -883,15 +893,8 @@ describe("MCP tools in a send", () => {
       `/api/sessions/${started.sessionId}/stop`,
     );
     expect(response.status).toBe(200);
-    await Promise.race([
-      waitDone(chat.app, started.sessionId),
-      new Promise<never>((_resolve, reject) =>
-        setTimeout(
-          () => reject(new Error("stop waited for the timeout")),
-          1000,
-        ),
-      ),
-    ]);
+    // a stop that waited for the call's timeout hangs to the test's own
+    await waitDone(chat.app, started.sessionId);
     expect(chat.app.sessions.byId(started.sessionId)?.status).toBe("stopped");
     // a stop is no timeout and no tool failure: the row says why it ended
     const row = chat.app.sessions
@@ -1116,12 +1119,12 @@ describe("MCP snapshots across sends", () => {
     ]);
     first.script.end();
     const answer = await waitScript(chat.scripted, 2);
-    await waitUntil(
+    await discovered(
+      chat.app.mcp,
       () =>
         chat.app.mcp
           .byId(server.id)
           ?.tools.some((tool) => tool.name === "get_flux_report") ?? false,
-      "the call-triggered refresh did not finish",
     );
     expect(answer.body.tools).toEqual(oldTools);
     expect(toolNames(answer.body)).toContain("mcp__flux__get_flux_instance");
@@ -1198,12 +1201,12 @@ describe("MCP snapshots across sends", () => {
     upgraded = true;
     chat.app.mcpStart();
     chat.app.now.value += 3_600_001;
-    await waitUntil(
+    await discovered(
+      chat.app.mcp,
       () =>
         chat.app.mcp
           .byId(server.id)
           ?.tools.some((tool) => tool.name === "get_hourly_report") ?? false,
-      "the hourly MCP pass did not finish",
     );
     expect(chat.app.mcp.byId(server.id)?.serverVersion).toBe(initialVersion);
     expect(chat.app.mcp.byId(server.id)?.instructions).toBe(
@@ -1295,7 +1298,7 @@ describe("MCP snapshots across sends", () => {
     ]);
     started.script.end();
     await reached;
-    const answer = await waitScript(chat.scripted, 2, 400);
+    const answer = await waitScript(chat.scripted, 2);
     const row = chat.app.sessions
       .messages(started.sessionId)
       .find((message) => message.toolCallId === "limited");

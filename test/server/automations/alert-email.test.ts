@@ -61,8 +61,8 @@ const flag = (reason: string) => (script: Script) => {
   script.toolRound([
     {
       id: "c1",
-      name: "needs_attention",
-      arguments: JSON.stringify({ reason }),
+      name: "attention",
+      arguments: JSON.stringify({ needed: true, reason }),
     },
   ]);
   script.end();
@@ -126,7 +126,7 @@ describe("an alert's email", () => {
     expect(message.from.name).toBe(SMTP.fromName);
     expect(message.subject).toBe("[1ctx] nightly needs attention");
     expect(message.text).toContain(
-      "The task nightly in your personal project needs attention.",
+      "The automation nightly in your personal project needs attention.",
     );
     expect(message.text).toContain("podinfo is not ready");
     expect(message.text).toContain(

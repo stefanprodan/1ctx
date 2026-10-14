@@ -4,7 +4,7 @@
 import { describe, expect, spyOn, test } from "bun:test";
 import { UsageStore } from "../../../src/server/usage/store.ts";
 import type { SendTotalsResponse } from "../../../src/shared/api/admin.ts";
-import { chatApp, startChat, tick } from "../../helpers/chat.ts";
+import { chatApp, idle, startChat } from "../../helpers/chat.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -24,13 +24,9 @@ test("a provider's usage sums its agents' last 30 days", async () => {
   expect(await read()).toMatchObject({ sends: 0, tokens: 0, cost: 0 });
   const started = await startChat(chat);
   started.script.reply("done");
-  let counted: SendTotalsResponse | null = null;
-  for (let i = 0; i < 50 && counted === null; i++) {
-    const body = await read();
-    if (body.sends === 1) counted = body;
-    else await tick();
-  }
-  if (counted === null) throw new Error("the turn never counted");
+  await idle(chat.app);
+  const counted = await read();
+  expect(counted.sends).toBe(1);
   expect(counted.tokens).toBeGreaterThan(0);
   expect(counted.cost).toBeNull();
   expect(counted.until - counted.since).toBe(30 * DAY);

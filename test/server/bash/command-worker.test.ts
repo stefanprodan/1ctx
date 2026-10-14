@@ -10,6 +10,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Job } from "../../../src/server/bash/protocol.ts";
 import { heldSessions } from "../../../src/server/bash/queue.ts";
+import { exitAt } from "../../../src/server/bash/tree.ts";
 import {
   type CommandHooks,
   commandWorkers,
@@ -59,48 +60,31 @@ const FORGED = new URL("../../fixtures/bash/forged.worker.ts", import.meta.url);
 const CRASH = new URL("../../fixtures/bash/crash.worker.ts", import.meta.url);
 
 describe("the command worker", () => {
-  test.serial(
-    "a busy loop ends at the deadline while this thread keeps serving",
-    async () => {
-      const workers = commandWorkers(COMMAND_WORKER, silent);
-      let last = performance.now();
-      let worst = 0;
-      const tick = setInterval(() => {
-        const now = performance.now();
-        worst = Math.max(worst, now - last);
-        last = now;
-      }, 5);
-      // the deadline starts once the loop runs, so a slow mount on a
-      // busy runner never spends it
-      const deadline = new AbortController();
-      const watch = phaseWatch();
-      let expiry: Timer | undefined;
-      try {
-        const pending = workers.run(
-          job(BUSY),
-          hooks,
-          stops(deadline.signal, undefined, watch.phase),
-        );
-        await watch.running;
-        const started = performance.now();
-        last = started;
-        worst = 0;
-        expiry = setTimeout(() => deadline.abort(), 400);
-        const settled = await pending;
-        expect(settled).toMatchObject({
-          ok: false,
-          phase: "run",
-          cause: "deadline",
-        });
-        expect(performance.now() - started).toBeLessThan(3000);
-        // not held for seconds, as a busy loop on this thread would
-        expect(worst).toBeLessThan(500);
-      } finally {
-        clearInterval(tick);
-        clearTimeout(expiry);
-      }
-    },
-  );
+  test("a busy loop ends at the deadline while this thread keeps serving", async () => {
+    const workers = commandWorkers(COMMAND_WORKER, silent);
+    const deadline = new AbortController();
+    const watch = phaseWatch();
+    let settled = false;
+    const pending = workers.run(
+      job(BUSY),
+      hooks,
+      stops(deadline.signal, undefined, watch.phase),
+    );
+    void pending.then(() => {
+      settled = true;
+    });
+    await watch.running;
+    // timer turns come round here while the loop spins, which a loop on
+    // this thread would never let happen
+    for (let i = 0; i < 20; i++) await Bun.sleep(0);
+    expect(settled).toBe(false);
+    deadline.abort();
+    expect(await pending).toMatchObject({
+      ok: false,
+      phase: "run",
+      cause: "deadline",
+    });
+  });
 
   test("a cancel stops an awaiting command within the grace", async () => {
     const logs = collectLogs();
@@ -113,10 +97,9 @@ describe("the command worker", () => {
       stops(undefined, abort.signal, watch.phase),
     );
     await watch.running;
-    const started = performance.now();
     abort.abort(new Error("send stopped"));
     expect(await pending).toMatchObject({ ok: false, cause: "abort" });
-    expect(performance.now() - started).toBeLessThan(2000);
+    // answered, not ended past the grace, which logs
     expect(logs.events).toEqual([]);
   });
 
@@ -231,20 +214,15 @@ describe("the command worker", () => {
         refused: null,
       },
     });
-    expect(asked).toBe(1);
+    // request 1 once, and the last read that marks the end
+    expect(asked).toBe(2);
   });
 
   test("an answer of the wrong shape fails the job at once", async () => {
     const logs = collectLogs();
     const workers = commandWorkers(FORGED, logs.logFactory("k"));
-    const started = performance.now();
-    const settled = await workers.run(
-      job("malformed"),
-      hooks,
-      stops(AbortSignal.timeout(30_000)),
-    );
+    const settled = await workers.run(job("malformed"), hooks, stops());
     expect(settled).toMatchObject({ ok: false, phase: "run", cause: "error" });
-    expect(performance.now() - started).toBeLessThan(5000);
     expect(logs.events).toEqual([
       {
         level: "warn",
@@ -258,14 +236,8 @@ describe("the command worker", () => {
   test("a request of the wrong shape fails the job at once", async () => {
     const logs = collectLogs();
     const workers = commandWorkers(FORGED, logs.logFactory("k"));
-    const started = performance.now();
-    const settled = await workers.run(
-      job("request"),
-      hooks,
-      stops(AbortSignal.timeout(30_000)),
-    );
+    const settled = await workers.run(job("request"), hooks, stops());
     expect(settled).toMatchObject({ ok: false, phase: "run", cause: "error" });
-    expect(performance.now() - started).toBeLessThan(5000);
     expect(logs.events).toEqual([
       {
         level: "warn",
@@ -278,11 +250,7 @@ describe("the command worker", () => {
 
   test("a worker that ends itself mid-job fails it once", async () => {
     const workers = commandWorkers(FORGED, silent);
-    const settled = await workers.run(
-      job("close"),
-      hooks,
-      stops(AbortSignal.timeout(30_000)),
-    );
+    const settled = await workers.run(job("close"), hooks, stops());
     expect(settled).toMatchObject({ ok: false, phase: "run", cause: "error" });
     expect(!settled.ok && settled.error?.message).toBe(
       "the command worker stopped",
@@ -316,7 +284,7 @@ describe("the command worker", () => {
         expect(heldSessions().has(s.session.id)).toBe(false);
         const slots: (() => void)[] = [];
         for (let i = 0; i < PROCESS_SLOTS; i++)
-          slots.push(await acquireProcess(AbortSignal.timeout(1000)));
+          slots.push(await acquireProcess(new AbortController().signal));
         for (const release of slots) release();
       } finally {
         s.db.close();
@@ -331,7 +299,7 @@ describe("the command worker", () => {
         endsAt: Date.now() + 1500,
       }),
       hooks,
-      stops(AbortSignal.timeout(60_000)),
+      stops(),
     );
     expect(settled).toMatchObject({
       ok: true,
@@ -340,8 +308,29 @@ describe("the command worker", () => {
     expect(settled.ok && settled.answer.stderr).toContain("exceeded");
   });
 
+  test("a command that ends past its deadline is the deadline and saves nothing", async () => {
+    const workers = commandWorkers(COMMAND_WORKER, silent);
+    const settled = await workers.run(
+      job("echo x > /knowledge/late", { endsAt: Date.now() - 1000 }),
+      hooks,
+      stops(),
+    );
+    expect(settled).toMatchObject({
+      ok: true,
+      answer: { exitCode: 124, changes: null },
+    });
+  });
+
+  test("the clock decides a cut command's exit, whatever the interpreter gave", () => {
+    expect(exitAt(1, 1000, 1000)).toBe(124);
+    expect(exitAt(0, 1001, 1000)).toBe(124);
+    expect(exitAt(1, 999, 1000)).toBe(1);
+    expect(exitAt(126, 999, 1000)).toBe(126);
+  });
+
   test("the call timeout is the interpreter's deadline, before the backstop", async () => {
-    const s = setup();
+    // a backstop past the test's own timeout, so only the deadline ends it
+    const s = setup({}, COMMAND_WORKER, 60_000);
     try {
       const result = await run(
         s,

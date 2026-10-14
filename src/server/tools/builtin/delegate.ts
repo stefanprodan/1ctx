@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// delegate hands a task to a subagent, a fresh copy of the agent in a
+// delegate hands work to a subagent, a fresh copy of the agent in a
 // child session (docs/subagents.md). The runner runs the child behind
 // the port compose passes, so the tools area never imports the runner.
 // It runs outside the registry: a child is bounded by the send's

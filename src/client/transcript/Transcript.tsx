@@ -81,7 +81,7 @@ export function Transcript({
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
   // the messages that wait, under the last turn
   queue?: QueueProps;
-  // a chat's task proposals, drawn under the turn whose call made them
+  // a chat's automation proposals, drawn under the turn whose call made them
   proposals?: {
     drafts: AutomationDraft[];
     session: Pick<SessionSummary, "forkedFromId" | "createdAt">;
@@ -102,7 +102,9 @@ export function Transcript({
 
   const toEnd = () => {
     const scroller = box.current;
-    if (!scroller) return;
+    // an observer can fire after the rows leave and before the cleanup,
+    // and the scroller is the next page's
+    if (!scroller || !rows.current?.isConnected) return;
     scroller.scrollTop = scroller.scrollHeight;
     last.current = boxOf(scroller);
   };

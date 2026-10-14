@@ -101,6 +101,9 @@ export type SessionsPort = {
   // the first call delta of a round: a streaming null-slot reply becomes
   // work, guarded so a second delta writes nothing
   markRoundWork(id: string): Message | null;
+  // a round asked again from its start: a streaming reply emptied and
+  // back in the slot it began in
+  restartReply(id: string, slot: "work" | null): Message | null;
   // place a null-slot reply's slot without ending it
   markSlot(id: string, slot: "work" | "answer"): Message | null;
   finishReply(id: string, fields: ReplyFinish): Message | null;

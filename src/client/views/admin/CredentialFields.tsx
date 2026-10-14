@@ -5,7 +5,9 @@ import {
   HTTP_METHODS,
   type HttpMethod,
 } from "../../../shared/contracts/credential.ts";
+import { MAX_NAME } from "../../../shared/words.ts";
 import { credentialKeys } from "../../data/credentials.ts";
+import { shapedInput } from "../../lib/names.ts";
 import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { RowsCheck } from "../../ui/Rows.tsx";
@@ -28,16 +30,22 @@ export function TextField({
   required,
   save,
   wide,
+  prose,
+  shaped,
   onInput,
 }: {
   label: string;
   name: string;
   value: string;
-  placeholder: string;
+  placeholder?: string;
   hint?: string;
   required?: boolean;
   save: Save;
   wide?: boolean;
+  // a sentence rather than a key or an address, in the body font
+  prose?: boolean;
+  // a name by the agent name rule, shaped as it is typed
+  shaped?: boolean;
   onInput: (value: string) => void;
 }) {
   const invalid = save.fieldError(name) !== null;
@@ -46,15 +54,22 @@ export function TextField({
       <span class={`label${required ? " label-required" : ""}`}>{label}</span>
       <input
         name={name}
-        class="credentials-mono"
+        class={prose ? undefined : "credentials-mono"}
         aria-required={required ? "true" : undefined}
         autocomplete="off"
-        spellcheck={false}
+        spellcheck={prose ? undefined : false}
         placeholder={placeholder}
+        maxLength={shaped ? MAX_NAME : undefined}
         aria-invalid={invalid || undefined}
         disabled={save.busy}
         value={value}
-        onInput={(e) => onInput((e.currentTarget as HTMLInputElement).value)}
+        onInput={(e) =>
+          onInput(
+            shaped
+              ? shapedInput(e)
+              : (e.currentTarget as HTMLInputElement).value,
+          )
+        }
       />
       {invalid ? (
         <FieldError save={save} field={name} />

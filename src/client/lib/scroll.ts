@@ -46,3 +46,39 @@ export function reveal(el: HTMLElement, clickedAt: number | null): void {
     bottom: frame.bottom - (Number.parseFloat(style.scrollMarginBottom) || 0),
   });
 }
+
+// Chrome reveals a typed caret inside a sticky head by scrolling the
+// page up towards where the head would sit unstuck. The head is always
+// in view, so an upward scroll right after typing goes back; a scroll
+// down (a stream the chat follows) and the reader's own wheel or touch
+// are kept.
+const TYPED_MS = 300;
+export function pinScroll(input: HTMLElement): () => void {
+  const box = scrollParent(input);
+  if (box === null) return () => {};
+  let top = box.scrollTop;
+  let typed = -Infinity;
+  const onInput = () => {
+    typed = performance.now();
+  };
+  const onReader = () => {
+    typed = -Infinity;
+  };
+  const onScroll = () => {
+    if (box.scrollTop < top && performance.now() - typed < TYPED_MS) {
+      box.scrollTop = top;
+    } else {
+      top = box.scrollTop;
+    }
+  };
+  input.addEventListener("input", onInput);
+  box.addEventListener("wheel", onReader, { passive: true });
+  box.addEventListener("touchstart", onReader, { passive: true });
+  box.addEventListener("scroll", onScroll);
+  return () => {
+    input.removeEventListener("input", onInput);
+    box.removeEventListener("wheel", onReader);
+    box.removeEventListener("touchstart", onReader);
+    box.removeEventListener("scroll", onScroll);
+  };
+}

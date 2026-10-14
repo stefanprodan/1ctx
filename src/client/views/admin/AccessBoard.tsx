@@ -194,6 +194,7 @@ function Inactive({
             picked.value = v;
           }}
           small
+          head
         />
       }
     >

@@ -8,8 +8,8 @@ import {
   reconcile as reconciled,
   replay,
   type Shown,
-  searched,
 } from "../../../src/client/data/sessions-rows.ts";
+import { searched } from "../../../src/client/lib/search.ts";
 import type { EnvelopeRow, FeedRow } from "../../../src/shared/api/sessions.ts";
 import type {
   SendSummary,
@@ -105,7 +105,7 @@ function env(
 
 const ALL: Shown = { origin: null, q: "" };
 const CHATS: Shown = { origin: "chat", q: "" };
-const TASKS: Shown = { origin: "automation", q: "" };
+const RUNS: Shown = { origin: "automation", q: "" };
 
 // the rows an envelope leaves, or "reload" when it asks one and leaves
 // the rows as they were
@@ -148,12 +148,12 @@ describe("a row not held", () => {
 
   test("a filter of the other origin leaves the rows", () => {
     const rows = held();
-    expect(reconcile(rows, null, TASKS, env(chat("n", 45)))).toBe(rows);
+    expect(reconcile(rows, null, RUNS, env(chat("n", 45)))).toBe(rows);
     expect(reconcile(rows, null, CHATS, env(run("r", 45)))).toBe(rows);
   });
 
-  test("a run is inserted in Tasks, on its own", () => {
-    const out = reconcile(held(), null, TASKS, env(run("r", 60)));
+  test("a run is inserted in Runs, on its own", () => {
+    const out = reconcile(held(), null, RUNS, env(run("r", 60)));
     expect(ids(out)).toEqual(["r", "b", "c"]);
     expect((out as FeedRow[])[0]!.runs).toBeNull();
     expect((out as FeedRow[])[0]!.automation?.name).toBe("digest");

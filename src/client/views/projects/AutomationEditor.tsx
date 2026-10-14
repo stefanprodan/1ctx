@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The automation editor, for a new automation and one that exists, in
-// steps: its name, the task (the composer's box with its agent chip),
+// steps: its name, the instructions (the composer's box with its agent chip),
 // memory, who marks a run, what it may use, a restart, when it runs and
 // its limits. Anyone in the project saves and deletes; a save names the
 // edit revision the form opened on, and when the row has moved on the
@@ -46,7 +46,7 @@ import { NumberBox } from "../../ui/NumberBox.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { Seg } from "../../ui/Seg.tsx";
-import { AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
 import { AccessSection } from "./AccessSection.tsx";
 import { AttentionSection } from "./AttentionSection.tsx";
 import { ownerNote, staleFailure, staleWords } from "./AutomationEdit.model.ts";
@@ -188,14 +188,14 @@ function Editor({
           onInput={(name) => set({ name })}
         />
       </Section>
-      <Section title="Task" text="The first message of every run">
+      <Section title="Instructions" text="The first message of every run">
         <div class="field">
           <div
-            class={`automations-task${invalid("instructions") || invalid("agent") ? " automations-task-invalid" : ""}`}
+            class={`automations-instructions${invalid("instructions") || invalid("agent") ? " automations-instructions-invalid" : ""}`}
           >
             <textarea
               name="instructions"
-              class="automations-task-text"
+              class="automations-instructions-text"
               aria-label="Instructions"
               aria-invalid={invalid("instructions") || undefined}
               placeholder="Instructions for the agent"
@@ -208,7 +208,7 @@ function Editor({
                 })
               }
             />
-            <div class="automations-task-bar">
+            <div class="automations-instructions-bar">
               <AgentPicker
                 agents={live}
                 agentId={d.agentId}
@@ -356,7 +356,7 @@ function Editor({
         <Foot
           save={save}
           dirty={dirtyOf(d, automation, limitMs) && gone === null}
-          label={automation === null ? "Create scheduled task" : "Save"}
+          label={automation === null ? "Create automation" : "Save"}
           above={
             <>
               {note !== null && !asking.value && (
@@ -402,7 +402,7 @@ function Editor({
 const RUN_FACTS = [
   "Each run starts a new session where the agent works on its own, without asking questions.",
   "A scheduled run is skipped if the previous one is still running.",
-  "When too many tasks are running, a scheduled run waits for one to finish, up to its next time.",
+  "When too many chats and runs are going, a scheduled run waits for a free place, up to its next time.",
   "A run that exceeds the deadline is stopped.",
   "Runs are deleted after the retention period.",
 ];
@@ -410,9 +410,7 @@ const RUN_FACTS = [
 const aside = (
   <AsideSection label="How it works">
     {RUN_FACTS.map((fact) => (
-      <p key={fact} class="automations-aside-text">
-        {fact}
-      </p>
+      <AsideNote key={fact}>{fact}</AsideNote>
     ))}
   </AsideSection>
 );
@@ -428,7 +426,7 @@ export function NewAutomation({ params }: { params: Params }) {
     <Page
       crumb={shown?.name ?? "Project"}
       crumbHref={`/projects/${id}/automations`}
-      title="New scheduled task"
+      title="New automation"
       loading={!ready && error === null}
       error={error}
       empty={

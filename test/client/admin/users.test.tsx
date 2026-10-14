@@ -542,7 +542,7 @@ describe("the pages", () => {
   );
 
   test.serial(
-    "a user's page lists their access keys with Revoke and never a New",
+    "a user's page lists their access keys with Revoke in More and never a New",
     async () => {
       users.value = [root, casey];
       projects.value = [];
@@ -567,9 +567,12 @@ describe("the pages", () => {
       await loadUserKeys("u2");
       const html = render(<UserPage params={{ username: "casey" }} />);
       expect(html).toContain(">laptop-claude<");
-      expect(html).toContain("Read and write · Never used");
-      expect(html).toContain("Expires ");
-      expect(html).toContain(">Revoke<");
+      expect(html).toContain('class="tag keys-tag">write<');
+      expect(html).toContain(
+        '<span class="cut">Every project</span><span class="keys-rest"> · never used · ',
+      );
+      expect(html).toContain("expires ");
+      expect(html).toContain('aria-label="More for laptop-claude"');
       expect(html).not.toContain("New access key");
       // the reset and the disable say they take the keys too
       expect(html).toContain(

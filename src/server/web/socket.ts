@@ -77,7 +77,7 @@ export type SocketDeps = {
   queue(sessionId: string): QueueFrame;
   // each running subagent's rows so far
   children(sessionId: string): ChildOf[];
-  // the chat's task proposals as the session read carries them
+  // the chat's automation proposals as the session read carries them
   drafts(sessionId: string): AutomationDraft[];
 };
 

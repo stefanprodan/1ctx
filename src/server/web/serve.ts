@@ -83,8 +83,10 @@ export function serve(options: ServeOptions) {
             options.trustProxy,
           ),
         ),
-      // the skills an outside agent fetches, by the path it is told
-      "/.well-known/skills/*": (req, server) =>
+      // the skills an outside agent fetches, by the path it is told; any
+      // other well-known path is the router's JSON 404, never the page,
+      // so an MCP client probing for OAuth metadata reads that there is none
+      "/.well-known/*": (req, server) =>
         options.handle(
           req,
           clientAddress(

@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A change to a scheduled task the agent proposed, one line under the
-// fold: what it does to which task, when it runs or what changes, and
-// Confirm or Dismiss while it waits. The task page has the rest.
+// A change to an automation the agent proposed, one line under the
+// fold: what it does to which automation, when it runs or what changes, and
+// Confirm or Dismiss while it waits. The automation page has the rest.
 
 import { useSignal } from "@preact/signals";
 import type { RefObject } from "preact";
@@ -14,10 +14,10 @@ import type {
   ProposalFields,
 } from "../../shared/contracts/automation-draft.ts";
 import {
+  automationFailing,
   decideDraft,
-  draftTask,
-  loadDraftTask,
-  taskFailing,
+  draftAutomation,
+  loadDraftAutomation,
 } from "../data/session-drafts.ts";
 import { ago } from "../lib/format.ts";
 import { automationHref, runHref, userHref } from "../lib/hrefs.ts";
@@ -62,7 +62,7 @@ function Text({ text }: { text: string }) {
   );
 }
 
-// a new task's instructions and guidance; an update's changed fields
+// a new automation's instructions and guidance; an update's changed fields
 // with their old values, then each text's changed lines, or the whole
 // text once nothing differs
 export function Details({
@@ -189,11 +189,12 @@ function UpdateDetails({
 
 function Inert({ line }: { line: Extract<ProposalLine, { kind: "inert" }> }) {
   const head = HEADS[line.action];
-  const taskId = line.taskId;
+  const automationId = line.automationId;
   useEffect(() => {
-    if (taskId !== null) void loadDraftTask(taskId);
+    if (automationId !== null) void loadDraftAutomation(automationId);
   });
-  const task = taskId === null ? null : draftTask(taskId);
+  const automation =
+    automationId === null ? null : draftAutomation(automationId);
   return (
     <div class="proposal">
       <div class="proposal-row">
@@ -207,14 +208,14 @@ function Inert({ line }: { line: Extract<ProposalLine, { kind: "inert" }> }) {
             {line.name !== null && (
               <span class="proposal-name">{line.name}</span>
             )}
-            {taskId !== null && task && (
-              <a class="proposal-name" href={automationHref(taskId)}>
-                {task.name}
+            {automationId !== null && automation && (
+              <a class="proposal-name" href={automationHref(automationId)}>
+                {automation.name}
               </a>
             )}
-            {taskId !== null && task === null && (
+            {automationId !== null && automation === null && (
               <span class="proposal-name">
-                {taskFailing(taskId) ? UNREAD_NAME : GONE_NAME}
+                {automationFailing(automationId) ? UNREAD_NAME : GONE_NAME}
               </span>
             )}
             <span class="proposal-state">{INERT_WORDS}</span>
@@ -238,12 +239,12 @@ function Draft({ draft }: { draft: AutomationDraft }) {
   );
   const open = useSignal(false);
   const press = useAction();
-  const taskId = draft.automationId;
+  const automationId = draft.automationId;
   // after every draw, so a read that failed is asked again later
   useEffect(() => {
-    if (taskId !== null) void loadDraftTask(taskId);
+    if (automationId !== null) void loadDraftAutomation(automationId);
   });
-  const before = taskId === null ? null : draftTask(taskId);
+  const before = automationId === null ? null : draftAutomation(automationId);
   if (before === undefined) return null;
   // a rename's new name shows in its details until it is confirmed
   const renamed =
@@ -255,13 +256,16 @@ function Draft({ draft }: { draft: AutomationDraft }) {
       ? draft.fields.name
       : (renamed ??
         before?.name ??
-        (taskId !== null && taskFailing(taskId) ? UNREAD_NAME : GONE_NAME));
+        (automationId !== null && automationFailing(automationId)
+          ? UNREAD_NAME
+          : GONE_NAME));
   const detail = lineDetail(draft);
   const target = nameTarget(draft, before !== null);
   const pending = draft.state === "pending";
-  // without the task's old values an update's details would hide what
+  // without the automation's old values an update's details would hide what
   // changes, so a failing read opens nothing until it answers
-  const shows = opens(draft) && !(taskId !== null && taskFailing(taskId));
+  const shows =
+    opens(draft) && !(automationId !== null && automationFailing(automationId));
   const decide = (action: "confirm" | "dismiss") =>
     void press.run(() => decideDraft(draft.id, action));
   return (

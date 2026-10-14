@@ -8,6 +8,7 @@ import { settleRun } from "../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
+  sessionSettled,
   setLimits,
   startChat,
   waitScript,
@@ -72,7 +73,7 @@ describe("socket fixtures for caps", () => {
     toolRound(script, many);
     const r2 = await chat.scripted.next();
     r2.reply("answered without the tools");
-    await settle(chat, 10);
+    await settle(chat);
     record("cap-calls", detail, conn);
     const toolRows = chat.app.sessions
       .messages(sessionId)
@@ -102,7 +103,7 @@ describe("socket fixtures for caps", () => {
     toolRound(r2, [call("c2")]);
     const r3 = await waitScript(chat.scripted, 3);
     r3.reply("out of time for tools");
-    await settle(chat, 12);
+    await settle(chat);
     record("cap-time", detail, conn);
     const replies = chat.app.sessions
       .messages(sessionId)
@@ -147,7 +148,7 @@ describe("socket fixtures for caps", () => {
     expect(asksAnswer(answer.body)).toBe(true);
     answer.reply("done after the cap");
     expect((await settleRun(chat, sessionId))?.status).toBe("done");
-    await settle(chat, 10);
+    await settle(chat);
     record("cap-result", detail, conn);
     const tools = chat.app.sessions
       .messages(sessionId)
@@ -187,9 +188,9 @@ describe("socket fixtures for caps", () => {
     const { detail, sessionId } = await startChat(chat, "keeps calling");
     watch(chat, conn, sessionId);
     let requests = 0;
+    const ended = sessionSettled(chat.app, sessionId).then(() => null);
+    let script = await waitScript(chat.scripted, 1);
     for (let round = 1; round <= DEFAULT_LIMITS.rounds; round++) {
-      if (chat.app.sessions.send(detail.send.id)!.status !== "running") break;
-      const script = await waitScript(chat.scripted, round);
       requests = round;
       toolRound(
         script,
@@ -199,10 +200,16 @@ describe("socket fixtures for caps", () => {
           }),
         ),
       );
-      await settle(chat, 8);
+      // the next round's request, or the send's end
+      const next = await Promise.race([
+        chat.scripted.reached(round + 1),
+        ended,
+      ]);
+      if (next === null) break;
+      script = next;
     }
     expect((await settleRun(chat, sessionId))?.status).toBe("done");
-    await settle(chat, 10);
+    await settle(chat);
     record("cap-result-calling", detail, conn);
     const rows = chat.app.sessions.messages(sessionId);
     const replies = rows.filter((r) => r.kind === "reply");
@@ -237,7 +244,7 @@ describe("socket fixtures for caps", () => {
     // recording carries an html frame between its deltas
     chat.app.now.value += HTML_EVERY_MS;
     answer.reply("answered after the loop\n\n");
-    await settle(chat, 10);
+    await settle(chat);
     expect(conn.frames.some((f) => f.type === "html")).toBe(true);
     record("loop-check", detail, conn);
     const replies = chat.app.sessions
@@ -263,7 +270,7 @@ describe("socket fixtures for caps", () => {
     toolRound(answer, [call("again")]);
     const bare = await chat.scripted.next();
     bare.reply("answered without tools");
-    await settle(chat, 12);
+    await settle(chat);
     record("calls-in-answer-round", detail, conn);
     const replies = chat.app.sessions
       .messages(sessionId)
@@ -286,7 +293,7 @@ describe("socket fixtures for caps", () => {
     script.finish("length");
     script.usage();
     script.end();
-    await settle(chat, 8);
+    await settle(chat);
     record("cut-round", detail, conn);
     const reply = chat.app.sessions
       .messages(sessionId)

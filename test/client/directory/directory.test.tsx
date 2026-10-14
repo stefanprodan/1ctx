@@ -544,6 +544,12 @@ describe("the pages", () => {
       // the provider, context and price under the model, what it can
       // do at the instructions' foot
       expect(html).toContain('class="who-line">router · 128K · $0.14 / $0.28<');
+      // the aside never says them again: only the settings
+      const aside = html.slice(html.indexOf('class="split-aside"'));
+      expect(aside).toContain('<span class="split-label">Thinking</span>');
+      expect(aside).not.toContain(">Provider<");
+      expect(aside).not.toContain(">Context<");
+      expect(aside).not.toContain(">Price<");
       expect(html).toMatch(
         /class="directory-foot"><svg.*<\/svg><span class="directory-foot-name">Capabilities<\/span>tools · reasoning</,
       );

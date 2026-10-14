@@ -7,6 +7,7 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 import { signal } from "@preact/signals";
+import type { VNode } from "preact";
 import { render } from "preact-render-to-string";
 import {
   accessKeys,
@@ -20,6 +21,7 @@ import { ApiError } from "../../../src/client/data/api.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
 import { Save } from "../../../src/client/lib/save.ts";
+import { TextField } from "../../../src/client/views/admin/CredentialFields.tsx";
 import {
   capLine,
   createBody,
@@ -37,13 +39,16 @@ import {
 } from "../../../src/client/views/connect/AccessKeys.tsx";
 import { KeyRow } from "../../../src/client/views/keys/KeyRow.tsx";
 import {
+  askFocus,
+  expiresSoon,
   expiryWords,
-  REVOKE_ASK,
   reachWords,
+  revokeAsk,
   usedWords,
 } from "../../../src/client/views/keys/Keys.model.ts";
 import type { CreateAccessKeyResponse } from "../../../src/shared/api/profile.ts";
 import type { AccessKey } from "../../../src/shared/contracts/access-key.ts";
+import { MAX_NAME } from "../../../src/shared/words.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
 
 const DAY = 86_400_000;
@@ -91,14 +96,13 @@ beforeEach(() => {
 describe("the new key's checks", () => {
   test("a name, unique among the user's keys, and a pick when picking", () => {
     expect(keyProblem({ ...NEW_KEY, name: "laptop" }, [])).toBeNull();
-    expect(keyProblem(NEW_KEY, [])).toEqual({
-      error: "Enter a name",
-      field: "name",
-    });
-    expect(keyProblem({ ...NEW_KEY, name: "a\nb" }, [])?.field).toBe("name");
-    expect(keyProblem({ ...NEW_KEY, name: "a".repeat(65) }, [])?.field).toBe(
-      "name",
-    );
+    // the agent form's check: the field shapes, the server holds the rule
+    for (const name of ["", "  "]) {
+      expect(keyProblem({ ...NEW_KEY, name }, [])).toEqual({
+        error: "Enter a name",
+        field: "name",
+      });
+    }
     expect(
       keyProblem({ ...NEW_KEY, name: " laptop-claude " }, [key()]),
     ).toEqual({ error: "Another access key has this name", field: "name" });
@@ -108,7 +112,7 @@ describe("the new key's checks", () => {
   });
 
   test("the body trims the name and sends null for every project", () => {
-    // read and write first, since working a task writes
+    // read and write first, since working an external task writes
     expect(createBody({ ...NEW_KEY, name: " laptop " })).toEqual({
       name: "laptop",
       scope: "write",
@@ -135,7 +139,7 @@ describe("the new key's checks", () => {
     // the words of access/parse.ts and access/key-routes.ts
     expect(
       keyFieldOf(
-        "name must be 1 to 64 characters on one line, no leading or trailing spaces",
+        "name must be 2 to 80 lowercase letters, digits, dashes and underscores",
       ),
     ).toBe("name");
     expect(keyFieldOf("access key name is taken")).toBe("name");
@@ -165,11 +169,25 @@ describe("a key's words", () => {
   });
 
   test("when it was used and when it ends", () => {
-    expect(usedWords(key(), NOW)).toBe("Used 2h ago");
-    expect(usedWords(key({ lastUsedAt: null }), NOW)).toBe("Never used");
-    expect(expiryWords(key(), NOW)).toStartWith("Expires ");
-    expect(expiryWords(key({ expiresAt: NOW - DAY }), NOW)).toStartWith(
-      "Expired ",
+    expect(usedWords(key(), NOW)).toBe("used 2h ago");
+    expect(usedWords(key({ lastUsedAt: null }), NOW)).toBe("never used");
+    const now = new Date(2026, 9, 13, 12).getTime();
+    expect(
+      expiryWords(key({ expiresAt: new Date(2026, 10, 12).getTime() }), now),
+    ).toBe("expires 12 Nov");
+    // the year once it is not this one
+    expect(
+      expiryWords(key({ expiresAt: new Date(2027, 9, 13).getTime() }), now),
+    ).toBe("expires 13 Oct 2027");
+    expect(
+      expiryWords(key({ expiresAt: new Date(2026, 9, 1).getTime() }), now),
+    ).toBe("expired 1 Oct");
+    // a week out it is worth a look, an ended key is not soon
+    expect(expiresSoon(key({ expiresAt: now + 7 * DAY }), now)).toBe(true);
+    expect(expiresSoon(key({ expiresAt: now + 8 * DAY }), now)).toBe(false);
+    expect(expiresSoon(key({ expiresAt: now - DAY }), now)).toBe(false);
+    expect(revokeAsk(key({ createdAt: new Date(2026, 9, 3).getTime() }))).toBe(
+      "Created 3 Oct 2026. Agents using it lose access.",
     );
     expect(capLine(5)).toBe(
       "At most 5 access keys, expired ones included. Revoke one to make another.",
@@ -195,11 +213,11 @@ describe("the card", () => {
     accessKeys.value = [key()];
     const kept = render(card());
     expect(kept).toContain("laptop-claude");
-    expect(kept).toContain(">Revoke<");
+    expect(kept).toContain('aria-label="More for laptop-claude"');
     expect(kept).not.toContain("New access key");
   });
 
-  test.serial("the list shows every column and a Revoke per key", () => {
+  test.serial("the list shows each key's two lines and a More per key", () => {
     accessKeys.value = [
       key(),
       key({
@@ -214,16 +232,26 @@ describe("the card", () => {
     accessKeysLimit.value = 5;
     const html = render(card());
     expect(html).toContain("New access key");
+    // the menus drop past the card's edge
+    expect(html).toContain("rows-card-menus");
     expect(html).toContain(">laptop-claude<");
-    expect(html).toContain("Read and write · Every project");
-    expect(html).toContain("Created ");
-    expect(html).toContain("Used 2h ago");
-    expect(html).toContain("Expires ");
+    expect(html).toContain('class="tag keys-tag">write<');
+    expect(html).toContain(
+      '<span class="cut">Every project</span><span class="keys-rest"> · used 2h ago · ',
+    );
+    expect(html).toContain(">expires ");
     expect(html).toContain(">ci-codex<");
-    expect(html).toContain("Read · research");
-    expect(html).toContain("Never used");
-    expect(html).toMatch(/rows-bad">Expired /);
-    expect(html.match(/>Revoke</g)).toHaveLength(2);
+    expect(html).toContain('class="tag keys-tag">read<');
+    expect(html).toContain(
+      '<span class="cut">research</span><span class="keys-rest"> · never used · ',
+    );
+    expect(html).toMatch(/rows-bad">expired /);
+    // made is in the Revoke ask, not the row
+    expect(html).not.toContain("Created ");
+    // each named, so a reader tells the menus apart
+    expect(html).toContain('aria-label="More for laptop-claude"');
+    expect(html).toContain('aria-label="More for ci-codex"');
+    expect(html).not.toContain(">Revoke<");
     // the token is never in a list
     expect(html).not.toContain("Bearer");
   });
@@ -276,7 +304,7 @@ describe("the card", () => {
     expect(html).toContain(">1ctx_made<");
     // one key at a time: New waits for Done
     expect(html).toMatch(
-      /<button[^>]*rows-add" disabled>(?:(?!<\/button>).)*New access key/s,
+      /<button[^>]*rows-add"[^>]* disabled>(?:(?!<\/button>).)*New access key/s,
     );
   });
 });
@@ -336,25 +364,99 @@ describe("the form and the row", () => {
     },
   );
 
-  test("a row asks before it revokes", () => {
+  test("the name field shapes what is typed and stops at the longest name", () => {
+    const fields = KeyFields({
+      draft: NEW_KEY,
+      save: new Save(async () => {}),
+      username: "casey",
+      set: () => {},
+    }) as VNode<{ children: VNode[] }>;
+    const field = fields.props.children.find(
+      (child) => child.type === TextField,
+    ) as VNode<Parameters<typeof TextField>[0]>;
+    expect(field.props.placeholder).toBe("claude-code");
+    const typed: string[] = [];
+    const label = TextField({
+      ...field.props,
+      onInput: (value) => typed.push(value),
+    }) as VNode<{ children: VNode[] }>;
+    const input = label.props.children.find(
+      (child) => child?.type === "input",
+    ) as VNode<{ maxLength?: number; onInput: (e: Event) => void }>;
+    expect(input.props.maxLength).toBe(MAX_NAME);
+    const box = { value: "Claude Code" };
+    input.props.onInput({ currentTarget: box } as unknown as Event);
+    expect(box.value).toBe("claude-code");
+    expect(typed).toEqual(["claude-code"]);
+  });
+
+  test("a row is a key, its name and scope, then its words", () => {
+    const now = new Date(2026, 9, 13, 12).getTime();
+    const row = (over: Partial<AccessKey>) =>
+      render(
+        <KeyRow
+          row={key({ lastUsedAt: now - 10 * 60_000, ...over })}
+          projects={[team("p1", "platform")]}
+          now={now}
+          onRevoke={async () => {}}
+        />,
+      );
+    const far = row({ expiresAt: new Date(2026, 10, 12).getTime() });
+    expect(far).toContain('class="keys-icon"');
+    expect(far).toContain('class="cut keys-name">laptop-claude<');
+    expect(far).toContain('class="tag keys-tag">write<');
+    expect(far).toContain("rows-sub-prose");
+    // the projects take the cut, the rest never shrinks
+    expect(far).toContain(
+      '<span class="keys-line"><span class="cut">Every project</span><span class="keys-rest"> · used 10m ago · <span>expires 12 Nov</span></span></span>',
+    );
+    expect(far).not.toContain("keys-soon");
+    const soon = row({
+      projectIds: ["p1"],
+      scope: "read",
+      expiresAt: now + 3 * DAY,
+    });
+    expect(soon).toContain('class="tag keys-tag">read<');
+    expect(soon).toContain(
+      '<span class="cut">platform</span><span class="keys-rest"> · used 10m ago · ',
+    );
+    expect(soon).toContain('class="keys-soon">expires 16 Oct<');
+    expect(row({ expiresAt: now - DAY })).toContain(
+      'class="rows-bad">expired 12 Oct<',
+    );
+  });
+
+  test("a row's Revoke is in its More menu and asks first", () => {
     const row = (asking: boolean) =>
       render(
         <KeyRow
           row={key()}
-          sub="Read and write · Every project"
-          lines={[{ text: "Expires 1 Jan 2027" }]}
+          projects={[]}
+          now={NOW}
           asking={asking}
           onRevoke={async () => {}}
         />,
       );
     const idle = row(false);
-    expect(idle).toContain(">Revoke<");
-    expect(idle).not.toContain(REVOKE_ASK);
-    expect(idle).not.toContain(">Keep<");
+    expect(idle).toContain('aria-label="More for laptop-claude"');
+    expect(idle).toContain('aria-haspopup="menu"');
+    // no boxed button until it asks
+    expect(idle).not.toContain(">Revoke<");
+    expect(idle).not.toContain("btn-small");
+    expect(idle).not.toContain(revokeAsk(key()));
     const asking = row(true);
-    expect(asking).toContain(`>${REVOKE_ASK}<`);
+    expect(asking).toContain(`>${revokeAsk(key())}<`);
     expect(asking).toMatch(/btn-small btn-danger"[^>]*>Revoke</);
     expect(asking).toMatch(/btn btn-small"[^>]*>Keep</);
+    expect(asking).not.toContain("aria-haspopup");
+  });
+
+  test("focus goes to the ask's Revoke and back to More", () => {
+    expect(askFocus(false, true)).toBe("ask");
+    expect(askFocus(true, false)).toBe("more");
+    // a row that opens or stays as it was takes no focus
+    expect(askFocus(false, false)).toBeNull();
+    expect(askFocus(true, true)).toBeNull();
   });
 });
 

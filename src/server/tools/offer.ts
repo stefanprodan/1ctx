@@ -80,9 +80,10 @@ type OfferDeps = {
   credentials?: CredentialsPort;
   // the admin's email_user row is on and email is set up
   emailOn?(): boolean;
-  // the admin's automation row is on and the tasks are wired to read
+  // the admin's automation row is on and the automations are wired to read
   automationOn?(): boolean;
-  // the admin's external_task row is on and the tasks are wired to act on
+  // the admin's external_task row is on and the external tasks are wired
+  // to act on
   externalTaskOn?(): boolean;
   toolsFor(
     search: SearchProvider | null,
@@ -180,7 +181,7 @@ function memoryFor(
 function attentionFor(scope: MemoryScope | undefined): AttentionHandle | null {
   const attention = scope?.automation?.attention ?? null;
   if (scope?.phase !== "attention" || attention === null) return null;
-  return { guidance: attention.guidance, reason: null };
+  return { guidance: attention.guidance, reason: null, answered: false };
 }
 
 const EMPTY: Omit<Offered, "tools" | "memory"> = {

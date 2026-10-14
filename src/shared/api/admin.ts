@@ -68,12 +68,12 @@ export type StoredPart =
   | "scratch"
   | "mcp";
 
-// A project, a chat or a task by its stored bytes. In a personal
+// A project, a chat or an automation by its stored bytes. In a personal
 // project id and name are null and owner names whose it is; in a team
 // project owner is null. project is the team project's name for a chat
-// or a task, null for a project row and in a personal project. parts
-// are the two largest, largest first. messages is a chat's, runs and
-// retentionDays a task's, null elsewhere
+// or an automation, null for a project row and in a personal project.
+// parts are the two largest, largest first. messages is a chat's, runs
+// and retentionDays an automation's, null elsewhere
 export type LargestRow = {
   id: string | null;
   name: string | null;
@@ -88,9 +88,9 @@ export type LargestRow = {
 
 // Stored bytes by how long they stay. days is what sweeps them when an
 // admin sets it (the scratch, history and archived chats limits, a
-// task's retention when every task has the same), null when it is
-// fixed or varies. Archived chats are the archived chats and the runs
-// whose task is gone, which the chats sweep deletes
+// automation's retention when every automation has the same), null
+// when it is fixed or varies. Archived chats are the archived chats and
+// the runs whose automation is gone, which the chats sweep deletes
 export type RetentionKept =
   | "chats"
   | "knowledge"
@@ -119,7 +119,11 @@ export type StorageResponse = {
   areas: StorageArea[];
   days: StorageDay[];
   before: number;
-  largest: { projects: LargestRow[]; chats: LargestRow[]; tasks: LargestRow[] };
+  largest: {
+    projects: LargestRow[];
+    chats: LargestRow[];
+    automations: LargestRow[];
+  };
   retention: {
     kept: { key: RetentionKept; bytes: number }[];
     cleaned: { key: RetentionCleaned; bytes: number; days: number | null }[];
@@ -129,7 +133,7 @@ export type StorageResponse = {
 // A day of the zone: the chat turns and the automation runs started in
 // it and how many of each failed, and the tokens and the cost of the
 // rounds in it. A turn is a send of a chat (a message, a regenerate, a
-// compact), a run a send of a task. cost is null when no round of the
+// compact), a run a send of an automation. cost is null when no round of the
 // day carried one. start is its local midnight
 export type OverviewDay = TurnLengths & {
   day: string;

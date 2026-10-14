@@ -21,9 +21,11 @@ import {
   applyHtml,
   liveOf,
   liveOfSnapshot,
+  restarted,
 } from "../transcript/stream.ts";
 import {
   applyVisual,
+  dropPreviews,
   type Previews,
   reconcileVisuals,
   snapshotVisuals,
@@ -34,7 +36,7 @@ import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { takeChildren, takeWatched } from "./session-children.ts";
-import { draftsShown, forgetTask, onDraftSocket } from "./session-drafts.ts";
+import { draftsShown, markGone, onDraftSocket } from "./session-drafts.ts";
 import { session } from "./session-held.ts";
 import { ahead, flushLive, live, publish, stage } from "./session-live.ts";
 import { onQueueSocket, queueShown } from "./session-queue.ts";
@@ -90,11 +92,8 @@ effect(() => {
   if (id === owner) return;
   owner = id;
   wanted = { id: "", turn: wanted.turn + 1 };
-  session.value = null;
+  clear();
   sessionError.value = null;
-  publish(new Map());
-  resetValues();
-  visualPreviews.value = new Map();
   chatsKept.clear();
   sending.value = false;
   pending = null;
@@ -111,10 +110,7 @@ function show(shown: SessionDetail): void {
   publish(liveFrom(detail));
   syncValues(detail);
   retrying.value = detail.live?.retry ?? null;
-  stream =
-    detail.live === null
-      ? null
-      : { sendId: detail.live.sendId, seq: detail.live.seq };
+  stream = detail.live && { sendId: detail.live.sendId, seq: detail.live.seq };
 }
 
 // a chat is held only settled: a running one would miss its frames
@@ -341,6 +337,11 @@ function applyFrame(frame: Frame): boolean {
     retrying.value = frame.retry;
     return true;
   }
+  if (frame.type === "restart") {
+    visualPreviews.value = dropPreviews(visualPreviews.value, frame.messageId);
+    if (ahead().has(frame.messageId)) stage(frame.messageId, restarted());
+    return true;
+  }
   if (frame.type === "visual") {
     const row = held.messages.find((row) => row.id === frame.messageId);
     if (!row || row.sendId !== frame.sendId) return false;
@@ -441,7 +442,7 @@ export function onSocket(ev: SocketEvent): void {
       drop(ev.sessionId, ev.projectId);
       break;
     case "automationDeleted":
-      forgetTask(ev.automationId);
+      markGone(ev.automationId);
       if (ev.runs) leaveRuns(ev.automationId, ev.projectId);
       break;
     case "granted":
@@ -480,6 +481,7 @@ export function onSocket(ev: SocketEvent): void {
     case "delta":
     case "html":
     case "visual":
+    case "restart":
     case "retry":
       if (pending !== null) {
         if (pending.buffer.length >= BUFFER_MAX) pending.overflow = true;

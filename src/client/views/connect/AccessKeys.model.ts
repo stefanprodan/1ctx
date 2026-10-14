@@ -12,8 +12,8 @@ import type {
   AccessKeyScope,
 } from "../../../shared/contracts/access-key.ts";
 import { plural } from "../../lib/format.ts";
+import { nameProblem } from "../../lib/names.ts";
 import { at, type Problem } from "../../lib/save.ts";
-import { fullNameProblem } from "../profile/Profile.model.ts";
 
 export type KeyReach = "all" | "picked";
 
@@ -54,8 +54,8 @@ export const DAYS_OPTIONS: { value: AccessKeyDays; label: string }[] = [
 
 export const scopeHint = (scope: AccessKeyScope): string =>
   scope === "read"
-    ? "Reads knowledge, chats and tasks."
-    : "Reads, edits knowledge, works tasks.";
+    ? "Reads knowledge, chats and external tasks."
+    : "Reads, edits knowledge, works external tasks.";
 
 export const reachHint = (reach: KeyReach): string =>
   reach === "all" ? "All you see, now and later." : "Only these.";
@@ -72,7 +72,7 @@ export function keyProblem(
   keys: readonly AccessKey[],
 ): Problem | null {
   const name = draft.name.trim();
-  const named = at("name", fullNameProblem(draft.name));
+  const named = at("name", nameProblem(draft.name));
   if (named !== null) return named;
   if (keys.some((k) => k.name === name)) {
     return { error: "Another access key has this name", field: "name" };

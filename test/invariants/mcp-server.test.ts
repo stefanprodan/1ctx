@@ -12,7 +12,13 @@ import { chatMarkdown } from "../../src/server/sessions/index.ts";
 import { sanitize } from "../../src/shared/memory.ts";
 import { createKey } from "../helpers/access-keys.ts";
 import { collectLogs, ORIGIN } from "../helpers/app.ts";
-import { type ChatApp, chatApp, setLimits, tick } from "../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  sessionSettled,
+  setLimits,
+  varied,
+} from "../helpers/chat.ts";
 import { createTeam } from "../helpers/projects.ts";
 
 const PAGE_BYTES = 32 * 1024;
@@ -150,11 +156,7 @@ async function createFile(
 }
 
 async function settle(chat: ChatApp, sessionId: string) {
-  for (let index = 0; index < 400; index++) {
-    if (chat.app.sessions.byId(sessionId)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("session did not settle");
+  await sessionSettled(chat.app, sessionId);
 }
 
 describe("the composed inbound MCP endpoint", () => {
@@ -256,6 +258,7 @@ describe("the composed inbound MCP endpoint", () => {
         "list",
         "show",
         "claim",
+        "unclaim",
         "report",
       ]);
       expect(writeKnowledge.inputSchema.properties.action.enum).toContain(
@@ -504,14 +507,26 @@ describe("the composed inbound MCP endpoint", () => {
         release = resolve;
       });
       const half = Math.floor(payload.length / 2);
-      const stream = new ReadableStream<Uint8Array>({
-        async start(controller) {
-          controller.enqueue(new TextEncoder().encode(payload.slice(0, half)));
-          await gate;
-          controller.enqueue(new TextEncoder().encode(payload.slice(half)));
-          controller.close();
+      // pulled only when read, so the first pull is the server reading
+      const reading = Promise.withResolvers<void>();
+      let pulls = 0;
+      const stream = new ReadableStream<Uint8Array>(
+        {
+          async pull(controller) {
+            if (pulls++ === 0) {
+              reading.resolve();
+              controller.enqueue(
+                new TextEncoder().encode(payload.slice(0, half)),
+              );
+              return;
+            }
+            await gate;
+            controller.enqueue(new TextEncoder().encode(payload.slice(half)));
+            controller.close();
+          },
         },
-      });
+        { highWaterMark: 0 },
+      );
       const request = new Request(`${ORIGIN}/mcp`, {
         method: "POST",
         headers: {
@@ -525,7 +540,7 @@ describe("the composed inbound MCP endpoint", () => {
         body: stream,
       });
       const pending = chat.app.handle(request, "127.0.0.1");
-      await tick();
+      await reading.promise;
       expect(
         (await chat.member.call("DELETE", `/api/profile/keys/${key.key.id}`))
           .status,
@@ -858,6 +873,92 @@ describe("the composed inbound MCP endpoint", () => {
     }
   });
 
+  test("ranks knowledge search as the page does, pages by cursor and skip", async () => {
+    const chat = await chatApp();
+    try {
+      for (let i = 0; i < 12; i++) {
+        const uses = (i % 4) + 1;
+        await createFile(
+          chat,
+          chat.projectId,
+          `notes/n${String(i).padStart(2, "0")}.md`,
+          `${Array.from({ length: uses }, () => "rollout").join(" ")}\n`,
+        );
+      }
+      await createFile(chat, chat.projectId, "a.md", "the rollouts\n");
+      await createFile(chat, chat.projectId, "b.md", "prerollout\n");
+      await createFile(chat, chat.projectId, "rollout.md", "none\n");
+      const key = await createKey(chat.member, {
+        name: "ranked",
+        scope: "read",
+      });
+      const client = mcp(chat, key.token);
+      const pageNames = async (after: string | null) => {
+        const query = new URLSearchParams({ q: "rollout" });
+        if (after !== null) query.set("after", after);
+        const response = await chat.member.call(
+          "GET",
+          `/api/projects/${chat.projectId}/knowledge/search?${query}`,
+        );
+        return (await response.json()) as {
+          files: { file: { name: string } }[];
+          next: string | null;
+        };
+      };
+      const rows = (text: string) =>
+        text
+          .split("\n")
+          .filter((line) => line.startsWith('{"match"'))
+          .map(
+            (line) =>
+              JSON.parse(line) as { match: string; file: { name: string } },
+          );
+      const first = resultText(
+        await client.tool("knowledge", {
+          action: "search",
+          projectId: chat.projectId,
+          q: "rollout",
+        }),
+      );
+      const page = await pageNames(null);
+      expect(rows(first)[0]).toMatchObject({
+        match: "name",
+        file: { name: "rollout.md" },
+      });
+      expect(
+        rows(first)
+          .filter((row) => row.match === "text")
+          .map((row) => row.file.name),
+      ).toEqual(page.files.map((hit) => hit.file.name));
+      const after = JSON.parse(first.match(/after=("[^"]+")\.\n$/)![1]!);
+      expect(after).toBe(page.next);
+      const second = resultText(
+        await client.tool("knowledge", {
+          action: "search",
+          projectId: chat.projectId,
+          q: "rollout",
+          after,
+        }),
+      );
+      const later = await pageNames(page.next);
+      expect(rows(second).map((row) => row.file.name)).toEqual(
+        later.files.map((hit) => hit.file.name),
+      );
+      expect(rows(second).at(-1)!.file.name).toBe("b.md");
+      const skipped = resultText(
+        await client.tool("knowledge", {
+          action: "search",
+          projectId: chat.projectId,
+          q: "rollout",
+          skip: 2,
+        }),
+      );
+      expect(rows(skipped)).toEqual(rows(first).slice(2));
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("pages knowledge byte-exactly and protects continuations and replace", async () => {
     const chat = await chatApp();
     try {
@@ -1023,7 +1124,7 @@ describe("the composed inbound MCP endpoint", () => {
         },
       });
       const sessionId = (await started.json()).session.id;
-      (await pending).reply("é".repeat(40_000) + "😀".repeat(20_000));
+      (await pending).reply(varied(40_000, "é") + varied(40_000, "😀"));
       await settle(chat, sessionId);
 
       const pages: McpResult[] = [];
@@ -1072,7 +1173,7 @@ describe("the composed inbound MCP endpoint", () => {
           )
         ).status,
       ).toBe(201);
-      (await regenerated).reply(`replacement ${"x".repeat(80_000)}`);
+      (await regenerated).reply(`replacement ${varied(80_000)}`);
       await settle(chat, sessionId);
       const changed = await client.tool("sessions", {
         action: "read",

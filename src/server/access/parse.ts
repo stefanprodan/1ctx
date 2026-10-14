@@ -42,7 +42,7 @@ import {
   NAME_CHARACTERS,
   passwordProblem,
 } from "../../shared/words.ts";
-import { fields } from "../lib/body.ts";
+import { fields, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 // a password as typed: anything up to the byte cap. The login parser
@@ -166,11 +166,8 @@ export function parsePasswordChange(body: unknown): ChangePasswordRequest {
 
 export function parseAccessKey(body: unknown): CreateAccessKeyRequest {
   const b = fields(body, ["name", "scope", "projectIds", "days"]);
-  if (!isFullName(b.name)) {
-    throw new BadRequest(
-      "name must be 1 to 64 characters on one line, no leading or trailing spaces",
-    );
-  }
+  // the agent name rule, so a key reads as a handle in `@user via <key>`
+  const name = parseName(b.name);
   const scope = ACCESS_KEY_SCOPES.find((value) => value === b.scope);
   if (scope === undefined) throw new BadRequest("scope must be read or write");
   const days = ACCESS_KEY_DAYS.find((value) => value === b.days);
@@ -188,7 +185,7 @@ export function parseAccessKey(body: unknown): CreateAccessKeyRequest {
   ) {
     throw new BadRequest("projectIds must be null or distinct project ids");
   }
-  return { name: b.name, scope, projectIds: ids, days };
+  return { name, scope, projectIds: ids, days };
 }
 
 export function parseNewUser(body: unknown): CreateUserRequest {

@@ -5,7 +5,7 @@
 // latest answer, the two entities that follow the signed-in user, the
 // Admin group in the rail, and the page rendered over the rows.
 
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, jest, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render } from "preact-render-to-string";
@@ -758,11 +758,16 @@ describe("CatalogSearch", () => {
         (q) => new Promise((open) => gates.push({ q, open })),
         0,
       );
-      s.type("de");
-      expect(s.busy.value).toBe(true);
-      await new Promise((r) => setTimeout(r, 1));
-      s.type("deep");
-      await new Promise((r) => setTimeout(r, 1));
+      jest.useFakeTimers();
+      try {
+        s.type("de");
+        expect(s.busy.value).toBe(true);
+        jest.advanceTimersByTime(0);
+        s.type("deep");
+        jest.advanceTimersByTime(0);
+      } finally {
+        jest.useRealTimers();
+      }
       expect(gates.map((g) => g.q)).toEqual(["de", "deep"]);
       gates[1].open([flash]);
       await Promise.resolve();
@@ -785,15 +790,22 @@ describe("CatalogSearch", () => {
         if (fail) throw new Error("the provider did not answer");
         return [flash];
       }, 0);
-      s.type("x");
-      await new Promise((r) => setTimeout(r, 2));
-      expect(s.error.value).toBe("The provider did not answer.");
-      expect(s.matches.value).toEqual([]);
-      fail = false;
-      s.type("y");
-      s.dispose();
-      await new Promise((r) => setTimeout(r, 2));
-      expect(s.matches.value).toEqual([]);
+      jest.useFakeTimers();
+      try {
+        s.type("x");
+        jest.advanceTimersByTime(0);
+        await Promise.resolve();
+        expect(s.error.value).toBe("The provider did not answer.");
+        expect(s.matches.value).toEqual([]);
+        fail = false;
+        s.type("y");
+        s.dispose();
+        jest.advanceTimersByTime(0);
+        await Promise.resolve();
+        expect(s.matches.value).toEqual([]);
+      } finally {
+        jest.useRealTimers();
+      }
     },
   );
 });
@@ -1002,9 +1014,11 @@ describe("the page", () => {
     keys.value = ["provider-spare", "provider-router"];
     const html = render(<Providers />);
     expect(html).toMatch(
-      /provider-router\.key<a\b[^>]*href="\/admin\/config\/providers\/router"[^>]*>router</,
+      /provider-router\.key<\/span><span class="split-item-sub cut"><a\b[^>]*href="\/admin\/config\/providers\/router"[^>]*>router</,
     );
-    expect(html).toMatch(/provider-spare\.key<span\b[^>]*>unused</);
+    expect(html).toMatch(
+      /provider-spare\.key<\/span><span class="split-item-sub cut">unused</,
+    );
     // by name, whatever order the server answered
     expect(html.indexOf("provider-router.key")).toBeLessThan(
       html.indexOf("provider-spare.key"),

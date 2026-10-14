@@ -16,7 +16,6 @@ import {
   attentionAsk,
   attentionMessages,
   attentionSystem,
-  isOk,
 } from "../../../src/server/runner/attention-packet.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 
@@ -85,7 +84,7 @@ describe("the attention step's request", () => {
     expect(messages[0]).toEqual({
       role: "system",
       content:
-        "You review a finished run of the daily-report automation. Its run is over. You do not do its task or write an answer. You read the record of the run and call needs_attention when a user should look at it, and nothing else.",
+        "You review a finished run of the daily-report automation. Its run is over. You do not do its task or write an answer. You read the record of the run and call attention with needed true when a user should look at it, or needed false when not, and nothing else.",
     });
     expect(messages[1]!.content).toBe(`The run finished.
 What follows is the record of the run, to read, not to do again.
@@ -110,16 +109,22 @@ The run's tool calls:
 
 ${ATTENTION_ASK}
 
-When it does not, reply with the word ok.`);
+When it does not, call attention with needed false.`);
     const text = JSON.stringify(messages);
     for (const left of ["memory_edit", "What to remember", "Phase work"]) {
       expect(text).not.toContain(left);
     }
   });
 
+  test("asks for a verdict either way", () => {
+    expect(attentionAsk("")).toBe(
+      "Does this run need a user? Call attention with needed true and a one-line reason when the run found a problem a user should act on, or could not do its job.\n\nWhen it does not, call attention with needed false.",
+    );
+  });
+
   test("puts the automation's words in the ask", () => {
     expect(attentionAsk("Only when Flux is behind.")).toBe(
-      `${ATTENTION_ASK} When it needs attention: Only when Flux is behind.\n\nWhen it does not, reply with the word ok.`,
+      "Does this run need a user? Call attention with needed true and a one-line reason when the run found a problem a user should act on, or could not do its job. When it needs attention: Only when Flux is behind.\n\nWhen it does not, call attention with needed false.",
     );
     const messages = attentionMessages(
       packet("Only when Flux is behind."),
@@ -129,7 +134,7 @@ When it does not, reply with the word ok.`);
     expect(messages[1]!.content).toEndWith(
       attentionAsk("Only when Flux is behind."),
     );
-    expect(attentionSystem("x")).toContain("needs_attention");
+    expect(attentionSystem("x")).toContain("call attention");
   });
 
   test("carries the step's own rounds after the ask", () => {
@@ -137,7 +142,7 @@ When it does not, reply with the word ok.`);
       {
         role: "assistant",
         content: null,
-        toolCalls: [{ id: "c1", name: "needs_attention", arguments: "{}" }],
+        toolCalls: [{ id: "c1", name: "attention", arguments: "{}" }],
       },
       {
         role: "tool",
@@ -166,32 +171,12 @@ When it does not, reply with the word ok.`);
 });
 
 describe("the step asks again", () => {
-  const call = { id: "c1", name: "needs_attention", arguments: "{}" };
-  const text = (content: string) => ({ calls: [], content });
-  test("after a refused reason, with a round left", () => {
+  test("after a round with no valid verdict, with a round left", () => {
     expect(ATTENTION_ROUNDS).toBe(2);
-    const refused = { calls: [call], content: "" };
-    expect(asksAgain(1, refused, false)).toBeTrue();
-    expect(asksAgain(1, refused, true)).toBeFalse();
-    expect(asksAgain(2, refused, false)).toBeFalse();
-  });
-
-  test("never after ok, whatever its case and trailing punctuation", () => {
-    for (const ok of ["ok", "OK.", "Ok", " ok! ", "ok..."]) {
-      expect(isOk(ok)).toBeTrue();
-      expect(asksAgain(1, text(ok), false)).toBeFalse();
-    }
-    expect(isOk("okay")).toBeFalse();
-    expect(isOk("ok, but flux is behind")).toBeFalse();
-  });
-
-  test("after any other text, the tool's name written out included", () => {
-    const named = text(
-      "needs_attention: Payments service is unhealthy, 0 of 3 pods Ready",
-    );
-    expect(asksAgain(1, named, false)).toBeTrue();
-    expect(asksAgain(1, text(""), false)).toBeTrue();
-    expect(asksAgain(2, named, false)).toBeFalse();
+    expect(asksAgain(1, false)).toBeTrue();
+    expect(asksAgain(1, true)).toBeFalse();
+    expect(asksAgain(2, false)).toBeFalse();
+    expect(asksAgain(2, true)).toBeFalse();
   });
 
   test("with the ask again as the request's last message", () => {
@@ -202,7 +187,7 @@ describe("the step asks again", () => {
     )!;
     expect(messages.at(-1)).toEqual({ role: "user", content: ATTENTION_AGAIN });
     expect(ATTENTION_AGAIN).toBe(
-      "Reply by calling needs_attention with a one-line reason, or with the word ok.",
+      "Reply by calling attention with needed true and a one-line reason, or with needed false.",
     );
     expect(attentionMessages(packet(), context(), chars)!.at(-1)?.role).toBe(
       "user",

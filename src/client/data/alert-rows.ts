@@ -14,12 +14,8 @@ import type {
   AutomationAlert,
   AutomationSummary,
 } from "../../shared/contracts/automation.ts";
-import {
-  type Change,
-  type Reconciled,
-  type RowEnvelope,
-  searched,
-} from "./sessions-rows.ts";
+import { searched } from "../lib/search.ts";
+import type { Change, Reconciled, RowEnvelope } from "./sessions-rows.ts";
 
 // two words on an alert alike, by value, as frames and rows carry copies
 export const sameAlert = (

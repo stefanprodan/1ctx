@@ -14,7 +14,7 @@ for (const who of ["member", "admin"] as const) {
     await using f = await httpFixture();
     const client = who === "admin" ? f.admin : f.member.client;
     const key = await f.key();
-    const made = await f.create({ part: "First" });
+    const made = await f.create({ labels: [" Build", "fix"] });
     const id = made.task.task.id;
     const base = `/api/external-tasks/${id}`;
     expect(made).toMatchObject({
@@ -22,17 +22,23 @@ for (const who of ["member", "admin"] as const) {
         task: {
           projectId: f.projectId,
           title: "Check the work",
-          part: "First",
-          state: "open",
+          labels: ["build", "fix"],
+          state: "todo",
           revision: 0,
           editRevision: 0,
           claim: null,
           last: null,
           entries: 0,
-          attentionAt: null,
         },
-        text: "Read the brief.",
-        files: [],
+        files: [
+          {
+            fileId: f.briefId,
+            name: "brief.md",
+            revision: 1,
+            changedAt: f.app.now.value,
+            deleted: false,
+          },
+        ],
         briefAt: f.app.now.value,
         chatId: null,
       },
@@ -41,9 +47,9 @@ for (const who of ["member", "admin"] as const) {
       idleHours: 24,
     });
     expect(await f.show(id, client)).toEqual(made);
-    for (const state of ["open", "claimed", "blocked"] as const) {
-      if (state === "claimed") f.app.externalTasks.claim(key, id);
-      if (state === "blocked") {
+    for (const state of ["todo", "in_progress", "awaiting_input"] as const) {
+      if (state === "in_progress") f.app.externalTasks.claim(key, id);
+      if (state === "awaiting_input") {
         const claimId = f.app.externalTasks.store.byId(id)!.claim!.id;
         f.app.externalTasks.report(
           key,
@@ -58,8 +64,8 @@ for (const who of ["member", "admin"] as const) {
       const response = await client.call("PATCH", base, {
         body: {
           editRevision: before.task.task.editRevision,
-          text: `Brief while ${state}`,
-          part: null,
+          title: `Brief while ${state}`,
+          labels: state === "todo" ? ["plan"] : ["plan", "fix"],
         },
       });
       expect(response.status).toBe(200);
@@ -70,44 +76,79 @@ for (const who of ["member", "admin"] as const) {
         before.task.task.editRevision + 1,
       );
       expect(edited.task.task.revision).toBe(before.task.task.revision + 1);
-      expect(edited.entries).toEqual(before.entries);
+      // the edit is the newest entry, by the editor, with no text
+      expect(edited.entries.slice(1)).toEqual(before.entries);
+      expect(edited.entries[0]).toMatchObject({
+        kind: "edit",
+        text: "",
+        html: "",
+        by: { username: who },
+        keyName: null,
+        chatId: null,
+        chatTitle: null,
+      });
     }
     const blocked = await f.show(id);
     const answer = await client.call("POST", `${base}/answer`, {
-      body: { state: "blocked", text: "Take the first path." },
+      body: {
+        state: "awaiting_input",
+        text: "Take the **first** path, see https://example.com/pr/1.",
+      },
     });
     expect(answer.status).toBe(200);
     const answered: ExternalTaskResponse = await answer.json();
-    expect(answered.task.task.state).toBe("claimed");
+    expect(answered.task.task.state).toBe("in_progress");
     expect(answered.task.task.editRevision).toBe(
       blocked.task.task.editRevision,
     );
     expect(answered.entries[0]).toMatchObject({
       kind: "answer",
-      text: "Take the first path.",
+      text: "Take the **first** path, see https://example.com/pr/1.",
       keyName: null,
     });
+    // the page reads each entry as Markdown, a bare URL linked
+    expect(answered.entries[0]!.html).toBe(
+      '<p class="md-p">Take the <strong class="md-strong">first</strong> path, see <a class="md-link" href="https://example.com/pr/1" target="_blank" rel="noopener">https://example.com/pr/1</a>.</p>',
+    );
+    expect(
+      answered.entries.every((entry) => typeof entry.html === "string"),
+    ).toBe(true);
     const late = await client.call("POST", `${base}/answer`, {
-      body: { state: "claimed", text: "One more note." },
+      body: { state: "in_progress", text: "One more note." },
     });
     expect(late.status).toBe(200);
     expect((await late.json()).task.task.revision).toBe(
       answered.task.task.revision + 1,
     );
+    // the old name has no alias
     const released = await client.call("POST", `${base}/release`, {
       body: {
-        state: "claimed",
+        state: "in_progress",
         claimId: answered.task.task.claim!.id,
         text: "Try later.",
       },
     });
-    expect(released.status).toBe(200);
-    expect((await released.json()).task.task).toMatchObject({
-      state: "open",
+    expect(released.status).toBe(404);
+    const unclaimed = await client.call("POST", `${base}/unclaim`, {
+      body: {
+        state: "in_progress",
+        claimId: answered.task.task.claim!.id,
+        text: "Try later.",
+      },
+    });
+    expect(unclaimed.status).toBe(200);
+    expect((await unclaimed.json()).task.task).toMatchObject({
+      state: "todo",
       claim: null,
     });
+    // the old name has no alias
     expect(
-      (await client.call("POST", `${base}/drop`, { body: { state: "open" } }))
+      (await client.call("POST", `${base}/drop`, { body: { state: "todo" } }))
+        .status,
+    ).toBe(404);
+    expect(f.app.externalTasks.store.byId(id)!.state).toBe("todo");
+    expect(
+      (await client.call("POST", `${base}/cancel`, { body: { state: "todo" } }))
         .status,
     ).toBe(200);
     expect(
@@ -120,7 +161,7 @@ for (const who of ["member", "admin"] as const) {
     expect(
       (
         await client.call("POST", `${base}/reopen`, {
-          body: { state: "dropped", text: "Try again." },
+          body: { state: "canceled", text: "Try again." },
         })
       ).status,
     ).toBe(200);
@@ -163,14 +204,7 @@ test("stale state, claim and edit revision are conflicts that change nothing", a
   const first = f.app.externalTasks.claim(key, id);
   const base = `/api/external-tasks/${id}`;
   const client = f.member.client;
-  f.app.externalTasks.report(
-    key,
-    first.task.task.id,
-    first.claimId,
-    "release",
-    "Restart.",
-    [],
-  );
+  f.app.externalTasks.agentUnclaim(key, id, first.claimId, "Restart.");
   const second = f.app.externalTasks.claim(key, id);
   f.app.externalTasks.report(
     key,
@@ -187,13 +221,13 @@ test("stale state, claim and edit revision are conflicts that change nothing", a
   const before = await f.show(id);
   const requests = [
     ["PATCH", base, { editRevision: 0, title: "Stale" }],
-    ["POST", `${base}/answer`, { state: "claimed", text: "Stale" }],
+    ["POST", `${base}/answer`, { state: "in_progress", text: "Stale" }],
     [
       "POST",
-      `${base}/release`,
-      { state: "blocked", claimId: first.claimId, text: "Stale" },
+      `${base}/unclaim`,
+      { state: "awaiting_input", claimId: first.claimId, text: "Stale" },
     ],
-    ["POST", `${base}/drop`, { state: "open" }],
+    ["POST", `${base}/cancel`, { state: "todo" }],
     ["POST", `${base}/reopen`, { state: "done", text: "Stale" }],
   ] as const;
   for (const [method, path, body] of requests) {
@@ -212,7 +246,11 @@ test("an unseen team or personal project and each of its task routes answer 404"
     [personal, f.admin],
     [personal, f.member.client],
   ] as const) {
-    const id = (await f.create({}, f.creator.client, projectId)).task.task.id;
+    const fileIds = [
+      projectId === f.projectId ? f.briefId : await f.file("own.md", projectId),
+    ];
+    const id = (await f.create({ fileIds }, f.creator.client, projectId)).task
+      .task.id;
     const base = `/api/external-tasks/${id}`;
     const project = `/api/projects/${projectId}/external-tasks`;
     for (const [method, path] of [
@@ -222,7 +260,7 @@ test("an unseen team or personal project and each of its task routes answer 404"
       ["GET", base],
       ["PATCH", base],
       ["DELETE", base],
-      ...["answer", "release", "drop", "reopen", "seen"].map((move) => [
+      ...["answer", "unclaim", "cancel", "reopen"].map((move) => [
         "POST",
         `${base}/${move}`,
       ]),
@@ -242,7 +280,11 @@ test("an unseen team or personal project and each of its task routes answer 404"
     }
   }
   const own = f.app.projects.personal(f.outsider.user.id)!.id;
-  const made = await f.create({}, f.outsider.client, own);
+  const made = await f.create(
+    { fileIds: [await f.file("own.md", own, f.outsider.client)] },
+    f.outsider.client,
+    own,
+  );
   expect(await f.show(made.task.task.id, f.outsider.client)).toEqual(made);
 });
 
@@ -288,7 +330,7 @@ test("linked files stay live by id and retain their deleted name without crossin
   await using f = await httpFixture();
   const path = `/api/projects/${f.projectId}/knowledge`;
   const created = await f.creator.client.call("POST", path, {
-    body: { name: "brief.md", text: "First." },
+    body: { name: "plan.md", text: "First." },
   });
 
   expect(created.status).toBe(201);
@@ -297,20 +339,36 @@ test("linked files stay live by id and retain their deleted name without crossin
   const id = made.task.task.id;
   const held = f.app.externalTasks.claim(await f.key(), id);
   expect(held.task.files).toEqual([
-    { fileId: file.id, name: "brief.md", revision: 1, deleted: false },
+    {
+      fileId: file.id,
+      name: "plan.md",
+      revision: 1,
+      changedAt: file.updatedAt,
+      deleted: false,
+    },
   ]);
+  f.app.now.value += 1_000;
   const changed = await f.creator.client.call(
     "PUT",
     `${path}/files/${file.id}`,
     { body: { revision: 1, text: "Second." } },
   );
   expect(changed.status).toBe(200);
-  expect((await f.show(id)).task.files[0]?.revision).toBe(2);
+  expect((await f.show(id)).task.files[0]).toMatchObject({
+    revision: 2,
+    changedAt: f.app.now.value,
+  });
   expect(
     (await f.creator.client.call("DELETE", `${path}/files/${file.id}`)).status,
   ).toBe(204);
   expect((await f.show(id)).task.files).toEqual([
-    { fileId: file.id, name: "brief.md", revision: null, deleted: true },
+    {
+      fileId: file.id,
+      name: "plan.md",
+      revision: null,
+      changedAt: null,
+      deleted: true,
+    },
   ]);
   expect(
     (
@@ -332,7 +390,7 @@ test("task reads and write answers read linked file columns without their text",
   const created = await f.creator.client.call(
     "POST",
     `/api/projects/${f.projectId}/knowledge`,
-    { body: { name: "brief.md", text: "Large brief.\n".repeat(10_000) } },
+    { body: { name: "plan.md", text: "Large brief.\n".repeat(10_000) } },
   );
   expect(created.status).toBe(201);
   const file = (await created.json()).file;
@@ -357,6 +415,7 @@ test("task reads and write answers read linked file columns without their text",
         fileId: file.id,
         name: file.name,
         revision: file.revision,
+        changedAt: file.updatedAt,
         deleted: false,
       },
     ]);

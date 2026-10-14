@@ -295,7 +295,8 @@ export function parseKnowledge(value: unknown): KnowledgeInput {
     const url = new URL("http://mcp/knowledge");
     url.searchParams.set("q", q);
     if (head.after !== undefined && head.after !== null) {
-      url.searchParams.set("after", parseName(head.after));
+      const after = optionalString(head.after, "after");
+      if (after !== null) url.searchParams.set("after", after);
     }
     const parsed = parseSearch(url);
     return {

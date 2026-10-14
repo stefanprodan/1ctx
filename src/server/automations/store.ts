@@ -333,7 +333,7 @@ export class AutomationStore {
     return this.byId(id);
   }
 
-  // a once task's fire spends it, after its event in the same
+  // a once automation's fire spends it, after its event in the same
   // transaction: suspended by nobody, at the time it fired, naming the
   // run it started
   spendOnce(
@@ -382,7 +382,7 @@ export class AutomationStore {
     forgetCapabilityIn(this.db, "automations", key, projectId);
   }
 
-  // armed again: a task that ran once runs once more
+  // armed again: an automation that ran once runs once more
   resume(id: string, nextAt: number, now: number): AutomationSummary | null {
     this.db
       .query(

@@ -193,7 +193,7 @@ function steps(deps: SweepDeps): Step[] {
       },
     },
     {
-      // a live task's runs keep its retention; a deleted task leaves its
+      // a live automation's runs keep its retention; a deleted one leaves its
       // runs with no automation, which that retention never reaches
       field: "runs_deleted",
       candidates: (now, caps, limit) =>

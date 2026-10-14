@@ -35,13 +35,13 @@ test.serial(
       "A question",
       [],
     );
-    const marked = await f.show(id);
+    const asked = await f.show(id);
     for (const conn of conns) expect(taskFrames(conn)).toHaveLength(3);
-    const seen = await f.member.client.call("POST", `${base}/seen`, {
-      body: { attentionAt: marked.task.task.attentionAt },
+    const reply = await f.member.client.call("POST", `${base}/answer`, {
+      body: { state: "awaiting_input", text: "Take the first." },
     });
-    expect(seen.status).toBe(200);
-    const cleared = await seen.json();
+    expect(reply.status).toBe(200);
+    const replied = await reply.json();
     for (const conn of conns) {
       expect(taskFrames(conn)[0]).toEqual({
         type: "externalTask",
@@ -51,9 +51,9 @@ test.serial(
       expect(taskFrames(conn).at(-1)).toEqual({
         type: "externalTask",
         projectId: f.projectId,
-        task: cleared.task.task,
+        task: replied.task.task,
       });
-      expect(cleared.task.task.revision).toBe(marked.task.task.revision + 1);
+      expect(replied.task.task.revision).toBe(asked.task.task.revision + 1);
     }
     f.app.externalTasks.report(
       key,
@@ -64,7 +64,7 @@ test.serial(
       [],
     );
     const answered = await f.member.client.call("POST", `${base}/answer`, {
-      body: { state: "claimed", text: "Another note." },
+      body: { state: "in_progress", text: "Another note." },
     });
     expect(answered.status).toBe(200);
     const row = (await answered.json()).task.task;
@@ -88,11 +88,11 @@ test.serial(
   },
 );
 
-test("the hourly sweep reads live idle limits and spares blocked and recently active claims", async () => {
+test("the hourly sweep reads live idle limits and spares claims awaiting input and recently active ones", async () => {
   await using f = await httpFixture();
   const key = await f.key();
   const tasks = [];
-  for (const title of ["idle", "blocked", "active"]) {
+  for (const title of ["idle", "awaiting_input", "active"]) {
     const id = (await f.create({ title })).task.task.id;
     tasks.push(f.app.externalTasks.claim(key, id));
   }
@@ -108,7 +108,9 @@ test("the hourly sweep reads live idle limits and spares blocked and recently ac
   f.app.now.value += 25 * HOUR_MS;
   await f.limits({ externalTaskIdleHours: 30 });
   f.app.sweep();
-  expect((await f.show(idle!.task.task.id)).task.task.state).toBe("claimed");
+  expect((await f.show(idle!.task.task.id)).task.task.state).toBe(
+    "in_progress",
+  );
   f.app.externalTasks.report(
     key,
     active!.task.task.id,
@@ -119,23 +121,28 @@ test("the hourly sweep reads live idle limits and spares blocked and recently ac
   );
   await f.limits({ externalTaskIdleHours: 24 });
   f.app.sweep();
-  const released = await f.show(idle!.task.task.id);
-  expect(released.task.task).toMatchObject({
-    state: "open",
+  const unclaimed = await f.show(idle!.task.task.id);
+  expect(unclaimed.task.task).toMatchObject({
+    state: "todo",
     claim: null,
-    attentionAt: f.app.now.value,
+    movedAt: f.app.now.value,
+    last: { kind: "unclaim", by: null, keyName: null, claimEnd: "idle" },
   });
-  expect(released.entries[0]).toMatchObject({
-    kind: "release",
+  expect(unclaimed.entries[0]).toMatchObject({
+    kind: "unclaim",
     by: null,
     claimEnd: "idle",
-    text: "released after 24 hours without a report",
+    text: "after 24 hours without a report",
   });
   expect(f.app.externalTasks.store.claimById(idle!.claimId)?.end_reason).toBe(
     "idle",
   );
-  expect((await f.show(blocked!.task.task.id)).task.task.state).toBe("blocked");
-  expect((await f.show(active!.task.task.id)).task.task.state).toBe("claimed");
+  expect((await f.show(blocked!.task.task.id)).task.task.state).toBe(
+    "awaiting_input",
+  );
+  expect((await f.show(active!.task.task.id)).task.task.state).toBe(
+    "in_progress",
+  );
   expect(() =>
     f.app.externalTasks.report(
       key,
@@ -149,7 +156,9 @@ test("the hourly sweep reads live idle limits and spares blocked and recently ac
   const reclaimed = f.app.externalTasks.claim(key, idle!.task.task.id);
   expect(reclaimed.claimId).not.toBe(idle!.claimId);
   f.app.sweep();
-  expect((await f.show(idle!.task.task.id)).task.task.state).toBe("claimed");
+  expect((await f.show(idle!.task.task.id)).task.task.state).toBe(
+    "in_progress",
+  );
   const logged = f.logs.events.filter((event) => event.area === "sweep");
   expect(logged.some((event) => event.fields.external_idle === 1)).toBe(true);
   for (const event of logged) {
@@ -189,12 +198,12 @@ test("the sweep ends expired and missing keys but keeps every key under a positi
   for (const task of [expired!, missing!]) {
     const detail = await f.show(task.id);
     expect(detail.task.task).toMatchObject({
-      state: "open",
+      state: "todo",
       claim: null,
-      attentionAt: f.app.now.value,
+      movedAt: f.app.now.value,
     });
     expect(detail.entries[0]).toMatchObject({
-      kind: "release",
+      kind: "unclaim",
       by: null,
       claimEnd: "access_gone",
     });
@@ -203,7 +212,7 @@ test("the sweep ends expired and missing keys but keeps every key under a positi
     );
   }
   for (const task of [older!, newer!])
-    expect((await f.show(task.id)).task.task.state).toBe("blocked");
+    expect((await f.show(task.id)).task.task.state).toBe("awaiting_input");
   expect(f.app.db.query("select id from access_keys").all()).toHaveLength(3);
   expect(
     f.logs.events.find((event) => event.area === "sweep")?.fields,
@@ -211,7 +220,7 @@ test("the sweep ends expired and missing keys but keeps every key under a positi
   await f.limits({ accessKeysPerUser: 0 });
   f.app.sweep();
   for (const task of [older!, newer!]) {
-    expect((await f.show(task.id)).task.task.state).toBe("open");
+    expect((await f.show(task.id)).task.task.state).toBe("todo");
     expect(f.app.externalTasks.store.claimById(task.claimId)?.end_reason).toBe(
       "access_gone",
     );
@@ -225,16 +234,16 @@ test.serial(
     await using f = await httpFixture();
     const key = await f.key();
     const rows = [];
-    for (const title of ["done", "dropped", "reopened"]) {
+    for (const title of ["done", "canceled", "reopened"]) {
       const id = (await f.create({ title })).task.task.id;
       const claim = f.app.externalTasks.claim(key, id);
-      if (title === "dropped") {
+      if (title === "canceled") {
         expect(
           (
             await f.member.client.call(
               "POST",
-              `/api/external-tasks/${id}/drop`,
-              { body: { state: "claimed" } },
+              `/api/external-tasks/${id}/cancel`,
+              { body: { state: "in_progress" } },
             )
           ).status,
         ).toBe(200);
@@ -262,7 +271,7 @@ test.serial(
     const table = "external_task_files";
     f.app.db
       .query(
-        `insert into ${table} (task_id, file_id, position) values (?, 'deleted-file', 0)`,
+        `insert into ${table} (task_id, file_id, position) values (?, 'deleted-file', 1)`,
       )
       .run(rows[0]!.id);
     f.app.now.value += 31 * DAY_MS;
@@ -282,7 +291,7 @@ test.serial(
         ).toEqual([]);
       }
     }
-    expect((await f.show(reopened)).task.task.state).toBe("open");
+    expect((await f.show(reopened)).task.task.state).toBe("todo");
     expect(
       conn.frames
         .filter((frame) => frame.type === "externalTaskDeleted")
@@ -318,7 +327,7 @@ test.serial(
     );
     f.app.db
       .query(
-        "insert into external_task_files (task_id, file_id, position) values (?, 'gone', 0)",
+        "insert into external_task_files (task_id, file_id, position) values (?, 'gone', 1)",
       )
       .run(id);
     const conn = await f.connect(f.member.client);
@@ -328,6 +337,7 @@ test.serial(
     for (const table of [
       "external_tasks",
       "external_task_files",
+      "external_task_labels",
       "external_task_claims",
       "external_task_entries",
     ]) {
@@ -341,15 +351,17 @@ test.serial(
 
 test("storage assigns every task table to external and cleans only closed task bytes at the live retention", async () => {
   await using f = await httpFixture();
-  const open = (await f.create({ title: "Open", text: "Still working." })).task
-    .task.id;
-  const closed = (await f.create({ title: "Closed", text: "Finished." })).task
-    .task.id;
+  const open = (await f.create({ title: "Open" })).task.task.id;
+  const closed = (await f.create({ title: "Closed" })).task.task.id;
   expect(
     (
-      await f.member.client.call("POST", `/api/external-tasks/${closed}/drop`, {
-        body: { state: "open", text: "No longer needed." },
-      })
+      await f.member.client.call(
+        "POST",
+        `/api/external-tasks/${closed}/cancel`,
+        {
+          body: { state: "todo", text: "No longer needed." },
+        },
+      )
     ).status,
   ).toBe(200);
   await f.limits({ externalTaskDays: 90 });
@@ -361,17 +373,89 @@ test("storage assigns every task table to external and cleans only closed task b
     "external_task_claims",
     "external_task_entries",
     "external_task_files",
+    "external_task_labels",
     "external_tasks",
   ]);
-  expect(area.rows).toBe(3);
+  // two tasks, their file and label links, and the cancel
+  expect(area.rows).toBe(7);
   expect(area.bytes).toBeGreaterThan(0);
   expect(area.indexes.count).toBeGreaterThan(0);
   expect(
     storage.retention.cleaned.find((row) => row.key === "externalTasks"),
   ).toEqual({
     key: "externalTasks",
-    bytes: Buffer.byteLength("ClosedFinished.No longer needed.[]"),
+    bytes: Buffer.byteLength("ClosedNo longer needed.[]"),
     days: 90,
   });
-  expect(f.app.externalTasks.store.byId(open)?.state).toBe("open");
+  expect(f.app.externalTasks.store.byId(open)?.state).toBe("todo");
 });
+
+test.serial(
+  "a label rename or delete sends projectLabels to the project's users, and the detail counts each label's tasks",
+  async () => {
+    await using f = await httpFixture();
+    const conns = [await f.connect(f.creator.client), await f.connect(f.admin)];
+    const outsider = await f.connect(f.outsider.client);
+    const done = (await f.create({ labels: ["build", "fix"] })).task.task.id;
+    await f.create({ labels: ["fix"] });
+    const key = await f.key();
+    const claim = f.app.externalTasks.claim(key, done);
+    f.app.externalTasks.report(key, done, claim.claimId, "result", "Done.", []);
+    const detail = async () => {
+      const response = await f.member.client.call(
+        "GET",
+        `/api/projects/${f.projectId}`,
+      );
+      expect(response.status).toBe(200);
+      return (await response.json()).project.labels as {
+        id: string;
+        name: string;
+        tasks: number;
+      }[];
+    };
+    const labels = await detail();
+    expect(
+      Object.fromEntries(labels.map((label) => [label.name, label.tasks])),
+    ).toEqual({ build: 1, fix: 2, plan: 0, research: 0 });
+    const fix = labels.find((label) => label.name === "fix")!;
+    const labelFrames = (conn: typeof outsider) =>
+      conn.frames.filter((frame) => frame.type === "projectLabels");
+    const path = `/api/projects/${f.projectId}/labels`;
+    // a new label or a new description changes no task
+    expect(
+      (await f.member.client.call("POST", path, { body: { name: "docs" } }))
+        .status,
+    ).toBe(201);
+    expect(
+      (
+        await f.member.client.call("PATCH", `${path}/${fix.id}`, {
+          body: { description: "Broken things" },
+        })
+      ).status,
+    ).toBe(200);
+    for (const conn of conns) expect(labelFrames(conn)).toEqual([]);
+    expect(
+      (
+        await f.member.client.call("PATCH", `${path}/${fix.id}`, {
+          body: { name: "bug" },
+        })
+      ).status,
+    ).toBe(200);
+    for (const conn of conns) {
+      expect(labelFrames(conn)).toEqual([
+        { type: "projectLabels", projectId: f.projectId },
+      ]);
+    }
+    // a rename shows on the task without moving it
+    const renamed = await f.show(done);
+    expect(renamed.task.task.labels).toEqual(["build", "bug"]);
+    expect(renamed.task.task.revision).toBe(claim.task.task.revision + 1);
+    expect(
+      (await f.member.client.call("DELETE", `${path}/${fix.id}`)).status,
+    ).toBe(200);
+    for (const conn of conns) expect(labelFrames(conn)).toHaveLength(2);
+    expect(labelFrames(outsider)).toEqual([]);
+    expect((await f.show(done)).task.task.labels).toEqual(["build"]);
+    expect((await detail()).map((label) => label.name)).not.toContain("bug");
+  },
+);

@@ -64,6 +64,13 @@ describe("the summary fold", () => {
       summaryLabel(summary(), true, 14_500, { attempt: 1, max: 3 }).text,
     ).toBe("Summarizing 4 s · retrying 1/3");
     expect(
+      summaryLabel(summary(), true, 14_500, {
+        attempt: 1,
+        max: 1,
+        cause: "output_loop",
+      }).text,
+    ).toBe("Summarizing 4 s · output loop · retrying 1/1");
+    expect(
       summaryLabel(summary(), false, 14_500, { attempt: 1, max: 3 }).text,
     ).toBe("Summarized 41K tokens");
     expect(summaryLabel(summary(), false).text).toBe("Summarized 41K tokens");

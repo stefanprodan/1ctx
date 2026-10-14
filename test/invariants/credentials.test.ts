@@ -360,7 +360,7 @@ test("deleting a project takes its links, the credential stays", async () => {
   }
 });
 
-test("deleting a credential forgets its key in chats and tasks", async () => {
+test("deleting a credential forgets its key in chats and automations", async () => {
   const chat = await chatApp({ secrets: { "http-quotes": KEY } });
   chat.app.automationScheduler.stop();
   try {
@@ -382,12 +382,15 @@ test("deleting a credential forgets its key in chats and tasks", async () => {
         disabledCapabilities,
       }),
     );
-    const tasks = await Promise.all(
+    const automations = await Promise.all(
       sets.map((disabledCapabilities, i) =>
-        createAutomation(chat, { name: `task-${i}`, disabledCapabilities }),
+        createAutomation(chat, {
+          name: `automation-${i}`,
+          disabledCapabilities,
+        }),
       ),
     );
-    expect(tasks[0]!.disabledCapabilities).toEqual(sets[0]!);
+    expect(automations[0]!.disabledCapabilities).toEqual(sets[0]!);
     const gone = await chat.admin.call(
       "DELETE",
       `/api/credentials/${credential.id}`,
@@ -400,7 +403,7 @@ test("deleting a credential forgets its key in chats and tasks", async () => {
         disabledCapabilities: without(row.disabledCapabilities),
       });
     }
-    for (const row of tasks) {
+    for (const row of automations) {
       expect(chat.app.automations.byId(row.id)).toEqual({
         ...row,
         disabledCapabilities: without(row.disabledCapabilities),

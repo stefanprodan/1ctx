@@ -1,21 +1,25 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// needs_attention, a run's own mark: the run's agent, asked alone in a
-// step after the run, says the run needs a user, with a reason. It is
-// held on the step's handle and written when the run ends, so a later
-// call replaces the reason. The answer never says anyone was told, since
-// nothing is sent.
+// attention, a run's own verdict: the run's agent, asked alone in a step
+// after the run, says whether the run needs a user, with a reason when
+// it does. No is a call too: offered alone with only a text way to say
+// no, a fast model called it on every clean run. The verdict is held on
+// the step's handle and written when the run ends, so a later call
+// replaces it. The answer never says anyone was told, since nothing is
+// sent.
 
 import { sanitize } from "../../../shared/memory.ts";
 import { cutCodePoints } from "../../../shared/text.ts";
 import { hasLineBreak, MAX_ATTENTION_REASON } from "../../../shared/words.ts";
 import type { AttentionHandle, Tool } from "../types.ts";
 
-export const ATTENTION_TOOL = "needs_attention";
+export const ATTENTION_TOOL = "attention";
 
-export const ATTENTION_DESCRIPTION = `Mark this run as needing attention, with a one-line reason a user reads, at most ${MAX_ATTENTION_REASON} characters. Call it when the run found something a user should act on, or could not do its job. The task may say when. A later call replaces the reason.`;
+export const ATTENTION_DESCRIPTION = `Give your verdict on this run. needed true, with a one-line reason a user reads, at most ${MAX_ATTENTION_REASON} characters, when the run found something a user should act on, or could not do its job; needed false, with no reason, when it did not. The task may say when. A later call replaces the verdict.`;
 
+const NEEDED_REFUSED = "needed must be true or false.";
+const MISSING = "needed true takes a one-line reason.";
 const REFUSED = "reason must be one line.";
 const FILLER_REFUSED =
   "reason must say what a user should act on, not a placeholder.";
@@ -68,19 +72,37 @@ export function checkReason(value: unknown): string {
   return reason;
 }
 
+// no reason at all, as against one that breaks the rules
+function absent(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "string" && value.trim() === "")
+  );
+}
+
 export function makeAttentionTool(handle: AttentionHandle): Tool {
   return {
     name: ATTENTION_TOOL,
     description: attentionDescription(handle.guidance),
     parameters: {
       type: "object",
-      properties: { reason: { type: "string" } },
-      required: ["reason"],
+      properties: {
+        needed: { type: "boolean" },
+        reason: { type: "string" },
+      },
+      required: ["needed"],
       additionalProperties: false,
     },
+    // a refused call leaves the verdict before it; a false one drops its
+    // reason, never stored or shown
     async run(args) {
-      handle.reason = checkReason(args.reason);
-      return "Marked.";
+      if (typeof args.needed !== "boolean") throw new Error(NEEDED_REFUSED);
+      if (args.needed && absent(args.reason)) throw new Error(MISSING);
+      const reason = args.needed ? checkReason(args.reason) : null;
+      handle.reason = reason;
+      handle.answered = true;
+      return reason === null ? "Checked." : "Marked.";
     },
   };
 }

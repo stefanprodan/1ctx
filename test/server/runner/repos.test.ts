@@ -25,6 +25,7 @@ import {
   type ChatApp,
   chatApp,
   type Script,
+  sessionSettled,
   startChat,
   tick,
   waitScript,
@@ -116,11 +117,7 @@ async function repoChat(answer?: HostAnswer, repo = true): Promise<Counted> {
 }
 
 async function settled(chat: ChatApp, id: string) {
-  for (let i = 0; i < 400; i++) {
-    if (chat.app.sessions.byId(id)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("send did not settle");
+  await sessionSettled(chat.app, id);
 }
 
 const bashOf = (script: Script) =>

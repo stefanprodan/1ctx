@@ -8,6 +8,8 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { ReposStore } from "../../src/server/repos/index.ts";
+import type { RepoState } from "../../src/shared/contracts/repo.ts";
 
 export const COMMIT = "3e0ff8ae123b710bc91de1315cba0f996a8896c2";
 export const NEXT_COMMIT = "8d01e44a7b2f3c9d0e1f2a3b4c5d6e7f8a9b0c1d";
@@ -178,4 +180,45 @@ export const redirect = (location: string, status = 302) =>
 
 export function cacheDir(): string {
   return mkdtempSync(join(tmpdir(), "1ctx-repos-"));
+}
+
+// a fetch's row write: its state, and whether the row still matched
+export type RowWrite = { id: string; state: RepoState; written: boolean };
+
+// the fetch's row writes as events, so a test awaits one instead of
+// polling the row on a timer
+export function rowWrites(
+  store: ReposStore,
+): (until: (write: RowWrite) => boolean) => Promise<RowWrite> {
+  const waiting = new Set<{
+    until: (write: RowWrite) => boolean;
+    resolve: (write: RowWrite) => void;
+  }>();
+  const write = store.setFetched.bind(store);
+  store.setFetched = (id, fetched, of) => {
+    const written = write(id, fetched, of);
+    const event = { id, state: fetched.state, written };
+    for (const waiter of waiting) {
+      if (!waiter.until(event)) continue;
+      waiting.delete(waiter);
+      waiter.resolve(event);
+    }
+    return written;
+  };
+  return (until) => new Promise((resolve) => waiting.add({ until, resolve }));
+}
+
+// a row's state once its fetch has ended, ready or failed
+export function settledState(
+  store: ReposStore,
+  writes: ReturnType<typeof rowWrites>,
+  id: string,
+): Promise<RepoState> {
+  const ended = (state: RepoState | undefined) =>
+    state === "ready" || state === "failed";
+  const now = store.byId(id)?.state;
+  if (ended(now)) return Promise.resolve(now!);
+  return writes((w) => w.id === id && w.written && ended(w.state)).then(
+    (w) => w.state,
+  );
 }

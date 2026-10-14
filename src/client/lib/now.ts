@@ -25,7 +25,7 @@ export type DayClock = {
   after(ms: number, fire: () => void): () => void;
 };
 
-const browserClock: DayClock = {
+export const browserClock: DayClock = {
   now: () => Date.now(),
   after(ms, fire) {
     const timer = setTimeout(fire, ms);

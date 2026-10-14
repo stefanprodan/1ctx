@@ -85,8 +85,9 @@ src/client/   the Preact app from client/index.html: app/ (routes,
 test/         invariants/ (cross-cutting suites), server/, client/,
               shared/, vendor/just-bash/, structure.ts (the layout
               rules), helpers/, fixtures/.
-scripts/      preview, staging, smoke, image, release and vendor-test
-              scripts; brand.py; record/, the fixture recorders, run by
+scripts/      preview, staging, smoke, image, release, vendor-test and
+              cloud-setup (a Claude Code cloud environment) scripts;
+              brand.py; record/, the fixture recorders, run by
               hand; load/, the load harness (docs/load-testing.md).
 skills/       installable agent skills, added by URL, never seeded;
               the binary embeds and serves external-tasks/.
@@ -120,7 +121,10 @@ with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`,
 `ANTHROPIC_URL`) and fails every other, and a fake email sender that
-keeps every message. `smtp.ts` is a fake SMTP server on loopback.
+keeps every message; `sleeping`, `slept` and `commandPhase` await the
+fake clock and a command's phase. In `chat.ts`, `until`, `idle`,
+`freed`, `sessionSettled` and `ringing` await bus events, sends
+letting go and the fake clock's due sleeps. `smtp.ts` is a fake SMTP server on loopback.
 `chat.ts` drives a chat with a scripted provider stream. `auth-cases.ts`
 is the authorization matrix.
 
@@ -132,13 +136,16 @@ change it in the same commit as the code that changes a rule.
 
 | Doc | Governs |
 |---|---|
-| `docs/ui.md` | `src/client/`: data layer, primitives, forms, shell, themes, helpers |
+| `docs/ui.md` | `src/client/`: data layer, primitives, forms, themes, helpers |
+| `docs/shell.md` | the shell, the rail and its Recent list, the drawer, the installed app, app links and `/knowledge/` paths in replies |
 | `docs/views.md` | what a page draws: `views/`, the composer, the session list (feed) |
+| `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
-| `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, queue |
+| `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, stream bounds |
+| `docs/queue.md` | messages to a busy chat: the queue, its dispatcher |
 | `docs/subagents.md` | the `delegate` tool, child sessions, the child loop and the child rows |
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
@@ -192,6 +199,8 @@ fixture under `test/fixtures/structure/`.
   inside its own selector, and never selects by element, attribute, id
   or `*` at any depth, inside `:is()`, `:has()`, `:where()` and `:not()`
   too.
+- Only `client/ui/Split.tsx` writes the aside's line classes
+  (`split-line`, `split-item`, `split-note` and their parts).
 - Colour, font family, font size, the `font` shorthand and radius come
   only from `tokens.css`: never a literal anywhere else, CSS or TSX, a
   `var()` fallback included (`LITERAL_EXEMPTIONS` lists the exceptions).
@@ -255,12 +264,15 @@ fixture under `test/fixtures/structure/`.
   Linux CI runs the files in parallel, each in a fresh global, so a
   test sets what it reads itself. Local runs take the files one by one.
   A test's clock counts its neighbours' work, so the default timeout
-  is 20 s.
+  is 20 s. No test asserts elapsed time or lets a real sleep, timer or
+  poll budget decide it: a fake clock, an awaited event or counted
+  work. A promise that may never settle takes a plain `await`, never
+  `expect(p).rejects` or `.resolves`, where Bun's timeout never fires.
 - **Comments explain why, never what.** Style is Biome's: 2 spaces,
   double quotes, semicolons, trailing commas, 80 columns.
 - **UI copy is short and plain.** No em-dashes anywhere. A send (one
   pass of the runner, `docs/sessions.md`) is a turn in a chat and a run
-  in an automation (a task on the page); the page never says send.
+  in an automation; the page never says send.
 - `perl -i -pe` for global replaces, `uv run` for ad hoc Python, never
   pip.
 - The brand SVGs and PNGs in `site/` are generated: change

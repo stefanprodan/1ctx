@@ -17,7 +17,7 @@ import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgentCount } from "../../data/sessions.ts";
 import { longDate } from "../../lib/format.ts";
 import { Page, PageLoading } from "../../ui/Page.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideLine, AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { knowledgeWords } from "../knowledge/Knowledge.model.ts";
 import { ActivityAside } from "./ActivityAside.tsx";
@@ -81,7 +81,7 @@ export function Frame({
             shown !== null && (
               <>
                 <AsideSection label="About">
-                  {about !== null && <div class="split-line">{about}</div>}
+                  {about !== null && <AsideNote links>{about}</AsideNote>}
                   {knowledge.files > 0 && (
                     <AsideLine label="Knowledge">
                       {knowledgeWords(knowledge)}

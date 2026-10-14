@@ -250,12 +250,12 @@ export function cardFieldOf(
 export function keyReader(
   list: readonly Pick<CredentialSummary, "name" | "keyName">[],
   keys: readonly CredentialKey[],
-): (file: string) => { label: string; href?: string; quiet?: boolean } {
+): (file: string) => { label: string; href?: string } {
   return (file) => {
     const users = list.filter((c) => c.keyName === file);
     const repos = keys.find((key) => key.name === file)?.repos ?? [];
     if (users.length + repos.length === 0) {
-      return { label: "unused", quiet: true };
+      return { label: "unused" };
     }
     if (users.length === 1 && repos.length === 0) {
       const name = users[0]!.name;

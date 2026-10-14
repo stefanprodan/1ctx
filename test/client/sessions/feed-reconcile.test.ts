@@ -169,7 +169,7 @@ describe("an envelope for a row not held", () => {
     expect(urls).toHaveLength(1);
   });
 
-  test.serial("inserts a run in Tasks and in Chats leaves it", async () => {
+  test.serial("inserts a run in Runs and in Chats leaves it", async () => {
     await loaded({ ...HOME, origin: "automation" }, [rowOf(run("r1", 30))]);
     applyEnvelope(envelope(run("r2", 60)));
     expect(ids()).toEqual(["r2", "r1"]);

@@ -9,7 +9,7 @@
 
 import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
 import { k } from "../lib/format.ts";
-import { clock } from "./stream.ts";
+import { clock, retrying } from "./stream.ts";
 
 export type SummaryLabel = {
   live: boolean;
@@ -32,8 +32,7 @@ export function summaryLabel(
 ): SummaryLabel {
   if (running) {
     const ms = Math.max(0, now - message.createdAt);
-    const wait =
-      retry === null ? "" : ` · retrying ${retry.attempt}/${retry.max}`;
+    const wait = retrying(retry);
     return { live: true, text: `Summarizing ${clock(ms)}${wait}`, err: false };
   }
   if (message.status === "done") {

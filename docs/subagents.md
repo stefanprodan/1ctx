@@ -7,7 +7,7 @@ what reads or writes a child elsewhere. A send, the writer and the
 caps are in `docs/sessions.md`; archive, packing and the sweep in
 `docs/archive.md`; what the Monitor counts in `docs/monitor.md`.
 
-A turn may hand a task to a fresh copy of its agent when an admin
+A turn may hand work to a fresh copy of its agent when an admin
 turned the agent's Subagents switch on (`agents.subagents`, off by
 default). The copy runs in a child session; the session it belongs to
 is its root.
@@ -19,8 +19,8 @@ is its root.
   one child to a row (a unique index), and either delete takes the
   child with every row but its usage. It
   has the root's project, owner, agent and origin, never an
-  automation (`store.create()` refuses one), so a run's picks and a
-  task's retention meet roots alone. Its links never change.
+  automation (`store.create()` refuses one), so a run's picks and an
+  automation's retention meet roots alone. Its links never change.
 - **A child's send carries `sends.child = 1`, and only a child's.**
   `insertSend()` takes `child: true` and refuses a mark that does not
   match its session, so every reader of turns tests the row it already
@@ -108,7 +108,7 @@ is its root.
   message is `task`, written by the parent's user.
 - **Its offer is `childOffered()`** (`tools/offer.ts`), taken with the
   parent's as `policy.childOffered`: the main offer less `delegate`,
-  `memory_edit`, `email_user`, `visualize`, `needs_attention`,
+  `memory_edit`, `email_user`, `visualize`, `attention`,
   `automation` and `external_task` when the parent is a run (the
   scope's `origin`), the write actions of both otherwise, its MCP
   links read alone so `offeredServers()` drops the write side, a bash
@@ -189,7 +189,7 @@ is its root.
   chats show none. With none of the child's rows held, the status is
   the root's row's (done, stopped, else failed) and no tokens show
   until the group is opened or a watch brings them. Open, it shows the
-  task, the child's rounds drawn by the fold's own `Rounds` and
+  `task` input, the child's rounds drawn by the fold's own `Rounds` and
   `Tool`, the child's answer once it is done, then only the files part
   of the parent's result
   (`filesPart()` in `shared/subagents.ts`, whose headings the server

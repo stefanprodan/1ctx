@@ -103,6 +103,8 @@ type MountDeps = {
   current(): KnowledgeCaps;
   // each phase a command's worker reports, by chat
   onPhase?(sessionId: string, phase: "run" | "diff"): void;
+  // BACKSTOP_MS unless a test needs the deadline alone to decide
+  backstopMs?: number;
 };
 
 const seconds = (ms: number) => Math.round(ms / 1000);
@@ -291,7 +293,7 @@ export async function run(
   const deadline = new AbortController();
   const timer = setTimeout(
     () => deadline.abort(new Error("command timed out")),
-    caps.callTimeoutMs + BACKSTOP_MS,
+    caps.callTimeoutMs + (deps.backstopMs ?? BACKSTOP_MS),
   );
   const combined = AbortSignal.any([signal, deadline.signal]);
   let release: (() => void) | undefined;

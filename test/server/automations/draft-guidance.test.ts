@@ -19,7 +19,7 @@ import { startChat } from "../../helpers/chat.ts";
 import { settled } from "../../helpers/subagents.ts";
 
 describe("memory and attention in a proposal", () => {
-  test("a create with all three confirms into a task holding them", async () => {
+  test("a create with all three confirms into an automation holding them", async () => {
     const chat = await draftApp();
     try {
       const { drafts } = await proposals(chat, [
@@ -36,25 +36,25 @@ describe("memory and attention in a proposal", () => {
         },
         createProposal("defaults"),
       ]);
-      const tasks = [];
+      const automations = [];
       for (const draft of drafts) {
         expect((await press(chat, draft.id)).status).toBe(200);
         const id = chat.app.automationDrafts.byId(draft.id)!
           .createdAutomationId!;
-        tasks.push(chat.app.automations.byId(id)!);
+        automations.push(chat.app.automations.byId(id)!);
       }
-      expect(tasks[0]).toMatchObject({
+      expect(automations[0]).toMatchObject({
         ownMemory: true,
         memoryGuidance: "Keep sources that fail.",
         attentionGuidance: "A price moved past its limit.",
       });
       // the default guidance is own memory's, so none is stored without it
-      expect(tasks[1]).toMatchObject({
+      expect(automations[1]).toMatchObject({
         ownMemory: false,
         memoryGuidance: "",
         attentionGuidance: "A script failed.",
       });
-      expect(tasks[2]).toMatchObject({
+      expect(automations[2]).toMatchObject({
         ownMemory: true,
         memoryGuidance: OWN_MEMORY_GUIDANCE,
         attentionMode: "agent",
@@ -65,10 +65,10 @@ describe("memory and attention in a proposal", () => {
     }
   });
 
-  test("an update of each alone confirms into the task", async () => {
+  test("an update of each alone confirms into the automation", async () => {
     const chat = await draftApp();
     try {
-      let task = await createAutomation(chat, {
+      let automation = await createAutomation(chat, {
         ownMemory: true,
         memoryGuidance: "Keep everything.",
         attentionMode: "agent",
@@ -79,14 +79,14 @@ describe("memory and attention in a proposal", () => {
         { ownMemory: false },
       ]) {
         const { drafts } = await proposals(chat, [
-          { action: "update", id: task.id, ...patch },
+          { action: "update", id: automation.id, ...patch },
         ]);
         expect(drafts[0]!.fields).toEqual(patch);
         expect((await press(chat, drafts[0]!.id)).status).toBe(200);
-        task = chat.app.automations.byId(task.id)!;
-        expect(task).toMatchObject(patch);
+        automation = chat.app.automations.byId(automation.id)!;
+        expect(automation).toMatchObject(patch);
       }
-      expect(task).toMatchObject({
+      expect(automation).toMatchObject({
         ownMemory: false,
         memoryGuidance: "Keep sources that fail.",
         attentionGuidance: "A script failed.",
@@ -99,9 +99,9 @@ describe("memory and attention in a proposal", () => {
   test("turning own memory on fills a blank guidance, as the page does", async () => {
     const chat = await draftApp();
     try {
-      const task = await createAutomation(chat, { ownMemory: false });
+      const automation = await createAutomation(chat, { ownMemory: false });
       const { drafts } = await proposals(chat, [
-        { action: "update", id: task.id, ownMemory: true },
+        { action: "update", id: automation.id, ownMemory: true },
       ]);
       expect(drafts[0]!.fields).toEqual({
         ownMemory: true,
@@ -163,30 +163,30 @@ describe("memory and attention in a proposal", () => {
     }
   });
 
-  test("own memory off on a task already without it changes nothing", async () => {
+  test("own memory off on an automation already without it changes nothing", async () => {
     const chat = await draftApp();
     try {
-      const task = await createAutomation(chat, {
+      const automation = await createAutomation(chat, {
         ownMemory: false,
         memoryGuidance: OWN_MEMORY_GUIDANCE,
       });
       const { drafts } = await proposals(chat, [
-        { action: "update", id: task.id, ownMemory: false },
+        { action: "update", id: automation.id, ownMemory: false },
       ]);
       expect(drafts[0]!.fields).toEqual({ ownMemory: false });
       expect((await press(chat, drafts[0]!.id)).status).toBe(200);
-      expect(chat.app.automations.byId(task.id)).toEqual(task);
+      expect(chat.app.automations.byId(automation.id)).toEqual(automation);
     } finally {
       await chat.app.shutdown();
     }
   });
 
-  test("clearing the attention guidance of a task with attention off is allowed", async () => {
+  test("clearing the attention guidance of an automation with attention off is allowed", async () => {
     const chat = await draftApp();
     try {
-      const task = await createAutomation(chat, { attentionMode: "off" });
+      const automation = await createAutomation(chat, { attentionMode: "off" });
       const { drafts } = await proposals(chat, [
-        { action: "update", id: task.id, attentionGuidance: "" },
+        { action: "update", id: automation.id, attentionGuidance: "" },
       ]);
       expect(drafts[0]!.fields).toEqual({ attentionGuidance: "" });
       expect((await press(chat, drafts[0]!.id)).status).toBe(200);
@@ -198,10 +198,10 @@ describe("memory and attention in a proposal", () => {
   test("a proposed name is shaped as the page shapes it", async () => {
     const chat = await draftApp();
     try {
-      const task = await createAutomation(chat);
+      const automation = await createAutomation(chat);
       const { drafts } = await proposals(chat, [
         { ...createProposal(), name: "Weekly Bun and Preact CVE watch  " },
-        { action: "update", id: task.id, name: "Ședință Zilnică v2.1" },
+        { action: "update", id: automation.id, name: "Ședință Zilnică v2.1" },
       ]);
       expect(drafts.map((draft) => draft.fields.name)).toEqual([
         "weekly-bun-and-preact-cve-watch",
@@ -210,13 +210,13 @@ describe("memory and attention in a proposal", () => {
       for (const draft of drafts) {
         expect((await press(chat, draft.id)).status).toBe(200);
       }
-      expect(chat.app.automations.byId(task.id)!.name).toBe(
+      expect(chat.app.automations.byId(automation.id)!.name).toBe(
         "sedinta-zilnica-v2-1",
       );
       const { sessionId, script } = await startChat(chat);
       const answer = await proposalRound(chat, script, [
         { ...createProposal(), name: "!!! ???" },
-        { action: "update", id: task.id, name: "---" },
+        { action: "update", id: automation.id, name: "---" },
       ]);
       const messages = answer.body.messages as {
         role: string;
@@ -279,7 +279,7 @@ describe("memory and attention in a proposal", () => {
         .map((m) => m.content);
       expect(tools.slice(0, 3)).toEqual(
         Array(3).fill(
-          "Error: memoryGuidance needs ownMemory. Leave it out when the task keeps no memory.",
+          "Error: memoryGuidance needs ownMemory. Leave it out when the automation keeps no memory.",
         ),
       );
       expect(tools[3]).toContain(

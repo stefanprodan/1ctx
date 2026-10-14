@@ -1,3 +1,4 @@
+(errors) 15
 (fail) (unnamed)
 (fail) AGENTS.npm.md Bash examples > should execute bash examples without errors
 (fail) AGENTS.npm.md Bash examples > should have bash code blocks
@@ -6,10 +7,6 @@
 (fail) Additional Syntax Features - Prototype Pollution > AWK Output Redirection > should reject pipe output via variable (sandboxed)
 (fail) Code execution exploit regressions > blocks python worker escape vectors (js bridge, ctypes, subprocess)
 (fail) Code execution exploit regressions > blocks sqlite3 extension loading attempts
-(fail) DNS rebinding SSRF protection > guarded-fetch error mapping > rejects a redirect to a private IP literal
-(fail) DNS rebinding integration (real DNS) > ENOTFOUND domain fails closed before fetch
-(fail) DNS rebinding integration (real DNS) > allows public domain through real DNS check (if DNS available)
-(fail) DNS rebinding integration (real DNS) > denyPrivateRanges + allow-list works with real DNS
 (fail) Documentation TypeScript examples > should have TypeScript code blocks in AGENTS.npm.md
 (fail) Documentation TypeScript examples > should have valid TypeScript syntax in all examples
 (fail) InMemoryFs Security - Symlink Handling > symlink + write operations > should overwrite symlink with file on appendFile
@@ -18,11 +15,13 @@
 (fail) Python/SQLite Information Disclosure > python3 sys.path should not expose host or Node internal paths
 (fail) README validation > command list completeness > should list all registered commands
 (fail) ReadWriteFs > rm > should not throw with force option for non-existent files
-(fail) ReadWriteFs replacement mode and copy behavior > appends to a private write-only regular file
-(fail) ReadWriteFs replacement mode and copy behavior > changes metadata on a private mode-000 regular file
-(fail) ReadWriteFs special-file metadata operations > preserves a Unix socket during chmod and utimes
-(fail) allow-list e2e via BashEnv > dangerouslyAllowFullInternetAccess > still blocks private IPs when denyPrivateRanges is enabled
-(fail) allow-list e2e via Sandbox > dangerouslyAllowFullInternetAccess > still blocks private IPs when denyPrivateRanges is enabled
+(fail) ReadWriteFs hard-link containment through shell operations > contains append redirection
+(fail) ReadWriteFs hard-link containment through shell operations > contains chmod metadata mutation
+(fail) ReadWriteFs hard-link containment through shell operations > contains file-descriptor redirection
+(fail) ReadWriteFs hard-link containment through shell operations > contains sed in-place
+(fail) ReadWriteFs hard-link containment through shell operations > contains tee overwrite
+(fail) ReadWriteFs hard-link containment through shell operations > contains touch metadata mutation
+(fail) ReadWriteFs hard-link containment through shell operations > creates new files while defense-in-depth is active
 (fail) awk built-in variables > FILENAME > should be empty for stdin
 (fail) awk command > error handling > should error on missing file
 (fail) awk command > printf formats > should format scientific with %e
@@ -155,6 +154,9 @@
 (fail) query date builtin validation > rejects unsupported strptime formats instead of fallback parsing
 (fail) runtime error-forwarding leak probes > python3 script-open directory error does not expose host/internal markers
 (fail) runtime error-forwarding leak probes > sqlite3 open-directory error does not expose host/internal markers
+(fail) split > destructive-write preflight > does not truncate a real-backed input through a additional suffix hard-link alias
+(fail) split > destructive-write preflight > does not truncate a real-backed input through a alphabetic hard-link alias
+(fail) split > destructive-write preflight > does not truncate a real-backed input through a numeric hard-link alias
 (fail) tar > auto-compress (-a) > should auto-detect xz from .tar.xz extension
 (fail) tar > auto-compress (-a) > should auto-detect zstd from .tar.zst extension
 (fail) tar > xz compression (-J) > should preserve xz compression by default
@@ -186,6 +188,8 @@
 (fail) yq format strings > edge cases > @csv on non-array returns null
 (fail) yq format strings > edge cases > @csv with null values
 (fail) yq format strings > edge cases > @sh on non-string returns null
+TypeError: describe.runIf is not a function. (In 'describe.runIf(typeof nodeModule.registerHooks === "function")', 'describe.runIf' is undefined)
+TypeError: it.runIf is not a function. (In 'it.runIf(typeof nodeModule.registerHooks === "function")', 'it.runIf' is undefined)
 error: Cannot find package 'esbuild' from 'src/worker-lifecycle.browser-build.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-coverage.test.ts'
 error: Cannot find package 'fast-check' from 'src/security/fuzzing/__tests__/fuzz-dos.test.ts'
@@ -197,4 +201,3 @@ error: Cannot find package 'tsx' from 'src/security/defense-in-depth-trusted-set
 error: Cannot find package 'tsx' from 'src/security/defense-runtime-capability.test.ts'
 error: Cannot find package 'tsx' from 'src/security/module-accessor-descriptors.test.ts'
 error: Cannot find package 'tsx' from 'src/security/module-accessor-redefinition.test.ts'
-error: expect(received).toBe(expected)

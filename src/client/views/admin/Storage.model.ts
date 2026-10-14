@@ -161,7 +161,7 @@ export function factsLine(file: StorageFile): string {
   return parts.join(" · ");
 }
 
-export type LargestKind = "projects" | "chats" | "tasks";
+export type LargestKind = "projects" | "chats" | "automations";
 
 const PART_WORDS: Record<StoredPart, string> = {
   chats: "chats",
@@ -220,7 +220,7 @@ export function largestLine(kind: LargestKind, row: LargestRow) {
       ? pluralCommas(runs, "run", "runs")
       : `${pluralCommas(runs, "run", "runs")} kept ${pluralCommas(row.retentionDays, "day", "days")}`;
   return {
-    name: personal ? "A task in a personal project" : (row.name ?? ""),
+    name: personal ? "An automation in a personal project" : (row.name ?? ""),
     mono: !personal,
     sub: [where(row), kept].filter(Boolean).join(" · "),
     href: personal ? null : automationHref(row.id ?? ""),
@@ -257,7 +257,7 @@ export function cleanedLine(key: RetentionCleaned, days: number | null) {
     case "runs":
       return {
         name: "Runs",
-        sub: d ? `after ${d}` : "by each task's retention",
+        sub: d ? `after ${d}` : "by each automation's retention",
       };
     case "scratch":
       return { name: "Scratch", sub: d ? `idle ${d}` : "when idle" };

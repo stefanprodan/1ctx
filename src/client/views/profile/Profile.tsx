@@ -159,8 +159,8 @@ function EmailForm({ user }: { user: ProfileRow }) {
           </RowsLine>
         </RowsList>
         <span class="hint">
-          Agents may email you about chats and tasks you can open, and your
-          tasks when they need attention.
+          Agents may email you about chats and runs you can open, and your
+          automations when they need attention.
         </span>
       </div>
       <Foot

@@ -6,17 +6,16 @@
 [![license](https://img.shields.io/github/license/stefanprodan/1ctx)](LICENSE)
 [![SLSA 2](https://slsa.dev/images/gh-badge-level2.svg)](https://github.com/stefanprodan/1ctx/attestations)
 
-A self-hosted AI factory with continuous context.
-
 1ctx brings people and AI agents together in shared projects. Give each
-agent a model, instructions and tools. Work with them in team chats, or
-schedule tasks for them to carry out autonomously.
+agent a model, instructions and tools. Work with them in team chats, run
+them on schedules, or hand work to the coding agents you already run,
+such as Claude Code, Codex or OpenCode.
 
 Context stays with the project. Working memory keeps compact project
-notes in context across chats and scheduled tasks. The shared knowledge
+notes in context across chats and automations. The shared knowledge
 base provides long-term memory that agents consult and update as needed.
 Long conversations continue through summaries. Optional deciders use
-models such as [Jev](https://typesafe.ai/) to flag task results that need
+models such as [Jev](https://typesafe.ai/) to flag run results that need
 human attention.
 
 Agents run commands in a sandbox. You control their tools and network
@@ -26,17 +25,23 @@ data kept on your server.
 ## Highlights
 
 - **Memory with provenance.** Every knowledge revision records who wrote
-  it and in which chat or task. See its changes, roll back, or undo a
-  project note. Scheduled tasks pick up where the last run left off.
-- **Scheduled tasks.** Run an agent on a cron schedule in your time zone,
-  or start a task by hand. Set deadlines and let agents flag results that
+  it and in which chat or run. See its changes, roll back, or undo a
+  project note. Automations pick up where the last run left off.
+- **Automations.** Run an agent on a cron schedule in your time zone,
+  or start a run by hand. Set deadlines and let agents flag results that
   need your attention.
+- **Delegate to your coding agents.** Hand an external task to an agent
+  you run outside 1ctx. It connects over MCP with a personal access
+  key, claims the task, reads the linked knowledge, asks when it is
+  stuck and reports back on the task's timeline. The same endpoint lets
+  it search the project's knowledge and chats and update the knowledge
+  base.
 - **Conversations that continue.** Long chats are summarized with recent
   turns kept in context. Fork a chat or bring another agent into a turn
   with `@name`.
 - **MCP and skills.** Connect [MCP](https://modelcontextprotocol.io/)
   servers and install [Agent Skills](https://agentskills.io/). Choose
-  which capabilities a chat or scheduled task can use.
+  which capabilities a chat or automation can use.
 - **Sandboxed commands.** Agents use a sandboxed shell with built-in
   commands and a virtual filesystem to work with project files. They can
   call HTTP APIs with managed credentials.

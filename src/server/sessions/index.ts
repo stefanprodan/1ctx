@@ -17,6 +17,7 @@ import type { Clock } from "../lib/clock.ts";
 import { HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
+import type { SearchAsk, SearchQueue } from "../lib/search-queue.ts";
 import type { ChatCaps } from "../limits/index.ts";
 import {
   agentActivity,
@@ -48,9 +49,11 @@ import {
 import type { SessionRow, UsagePort } from "./rows.ts";
 import {
   listSessionsOf,
+  SESSION_SCAN_BYTES,
   type SessionListPage,
   type SessionSearchPage,
   searchSessions,
+  sessionQuery,
 } from "./search.ts";
 import { SessionStore } from "./store.ts";
 import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
@@ -147,6 +150,8 @@ export type SessionsDeps = {
   uploads: UploadsPort;
   scratch: SweepScratch;
   limits: { current(): { archivedDeleteDays: number } };
+  // the server's one search queue, shared with knowledge search
+  searches: Pick<SearchQueue, "run">;
   // the queue's dispatcher, built later in the runner
   wakeQueue(): void;
   // a marked run's delete, with when it ended, or one its automation
@@ -167,8 +172,14 @@ export type Sessions = {
   envelopeRow(sessionId: string): EnvelopeRow | null;
   // a project's sessions, children and archived ones included, newest
   // activity first, whose transcript text holds every word of q; after
-  // is a page's next. The caller checks the project
-  search(projectId: string, q: string, after: string | null): SessionSearchPage;
+  // is a page's next; queued behind the server's other searches. The
+  // caller checks the project before and after
+  search(
+    projectId: string,
+    q: string,
+    after: string | null,
+    ask: SearchAsk,
+  ): Promise<SessionSearchPage>;
   // a project's sessions as search reads them, those active at or after
   // since (epoch ms) when given
   list(
@@ -251,8 +262,13 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       }
     },
     envelopeRow: (sessionId) => envelopeRow(deps.db, sessionId),
-    search: (projectId, q, after) =>
-      searchSessions(deps.db, projectId, q, after),
+    search(projectId, q, after, ask) {
+      // a bad query is a 400 at once, never after a wait
+      sessionQuery(q, after);
+      return deps.searches.run(ask, (step) =>
+        searchSessions(deps.db, projectId, q, after, SESSION_SCAN_BYTES, step),
+      );
+    },
     list: (projectId, since, after) =>
       listSessionsOf(deps.db, projectId, since, after),
     runningChildren: (sessionId) =>

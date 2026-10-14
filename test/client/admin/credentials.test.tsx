@@ -393,7 +393,7 @@ describe("a card of the page", () => {
     // a repository reads a key without a credential: it is used
     expect(reader("http-repo")).toEqual({ label: "platform/widgets" });
     expect(reader("http-repos")).toEqual({ label: "2 repositories" });
-    expect(reader("http-none")).toEqual({ label: "unused", quiet: true });
+    expect(reader("http-none")).toEqual({ label: "unused" });
   });
 });
 
@@ -527,7 +527,9 @@ describe("the pages", () => {
     expect(html).toContain('href="/admin/config/web/credentials"');
     expect(html).toContain("page-pill");
     // the aside
-    expect(html).toMatch(/Key file<span class="split-strong cut">/);
+    expect(html).toMatch(
+      /Key file<\/span><span class="split-strong cut" title="/,
+    );
     expect(html).toContain("1 project");
   });
 

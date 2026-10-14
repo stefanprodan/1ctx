@@ -22,6 +22,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { copyText } from "../../lib/clipboard.ts";
 import { says } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { pinScroll } from "../../lib/scroll.ts";
 import {
   CLOSED,
   type MenuAction,
@@ -98,6 +99,11 @@ export function Menu({
       trigger.current?.focus({ preventScroll: true });
     }
   }, [editing]);
+  // and typing in it would scroll the chat the same way
+  useEffect(
+    () => (editing && box.current ? pinScroll(box.current) : undefined),
+    [editing],
+  );
   const edit = () => {
     draft.value = title;
     step("edit");

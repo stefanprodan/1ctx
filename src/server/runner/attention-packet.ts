@@ -5,7 +5,7 @@
 // on 5 of 48 runs that needed it; asked alone after the run, on 32 of 32.
 
 import type { Message } from "../../shared/contracts/session.ts";
-import type { ChatMessageIn, ToolCall } from "../providers/index.ts";
+import type { ChatMessageIn } from "../providers/index.ts";
 import {
   fitRecord,
   type RecordContext,
@@ -14,16 +14,18 @@ import {
   recordSections,
 } from "./run-record.ts";
 
-// a refused reason is written again once; never more
+// a round with no valid verdict is asked again once; never more
 export const ATTENTION_ROUNDS = 2;
 
-// asked after a text reply that is not "ok": a model may write the call
-// out as text, which never marks the run
+// asked after a text reply: a model may write the call out as text,
+// which is never read for a verdict
 export const ATTENTION_AGAIN =
-  "Reply by calling needs_attention with a one-line reason, or with the word ok.";
+  "Reply by calling attention with needed true and a one-line reason, or with needed false.";
 
 export const ATTENTION_ASK =
-  "Does this run need a user? Call needs_attention with a one-line reason when the run found a problem a user should act on, or could not do its job.";
+  "Does this run need a user? Call attention with needed true and a one-line reason when the run found a problem a user should act on, or could not do its job.";
+
+const ATTENTION_NO = "When it does not, call attention with needed false.";
 
 export type AttentionPacket = {
   // the automation the run belongs to, named in the system prompt
@@ -37,17 +39,17 @@ export type AttentionPacket = {
 };
 
 export function attentionSystem(automation: string): string {
-  return `You review a finished run of the ${automation} automation. Its run is over. You do not do its task or write an answer. You read the record of the run and call needs_attention when a user should look at it, and nothing else.`;
+  return `You review a finished run of the ${automation} automation. Its run is over. You do not do its task or write an answer. You read the record of the run and call attention with needed true when a user should look at it, or needed false when not, and nothing else.`;
 }
 
 export function attentionAsk(guidance: string): string {
   const when = guidance === "" ? "" : ` When it needs attention: ${guidance}`;
-  return `${ATTENTION_ASK}${when}\n\nWhen it does not, reply with the word ok.`;
+  return `${ATTENTION_ASK}${when}\n\n${ATTENTION_NO}`;
 }
 
 // the request's messages: the system prompt, the record and the ask,
-// then the step's own rounds so far and, after a text reply that was not
-// ok, the ask again as a request-local message; null when nothing fits
+// then the step's own rounds so far and, after a text reply, the ask
+// again as a request-local message; null when nothing fits
 export function attentionMessages(
   packet: AttentionPacket,
   context: RecordContext & { step: ChatMessageIn[]; again?: boolean },
@@ -76,19 +78,9 @@ export function attentionMessages(
   return fitRecord(parts, build, context, count);
 }
 
-// "ok", whatever its case, with trailing punctuation
-export function isOk(text: string): boolean {
-  return /^ok[.!]*$/i.test(text.trim());
-}
-
 // whether the step asks again after a round, while a round is left:
-// after calls that marked nothing, or after text that is not "ok". The
-// text is never read for a mark: only the tool call marks.
-export function asksAgain(
-  round: number,
-  reply: { calls: readonly ToolCall[]; content: string },
-  marked: boolean,
-): boolean {
-  if (round >= ATTENTION_ROUNDS) return false;
-  return reply.calls.length > 0 ? !marked : !isOk(reply.content);
+// after text or calls that all failed. The text is never read: only a
+// valid verdict, yes or no, answers the step.
+export function asksAgain(round: number, answered: boolean): boolean {
+  return round < ATTENTION_ROUNDS && !answered;
 }

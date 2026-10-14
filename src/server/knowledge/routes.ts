@@ -6,6 +6,7 @@ import type {
   KnowledgeFileDetailResponse,
   KnowledgeFileResponse,
   KnowledgeListResponse,
+  KnowledgePathResponse,
   KnowledgeSearchResponse,
   KnowledgeUploadResult,
   KnowledgeVersionDetailResponse,
@@ -16,12 +17,14 @@ import type {
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
 import { jsonBody, MAX_BODY } from "../lib/body.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
+import type { SearchAsk } from "../lib/search-queue.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { KnowledgeEdit } from "./edit.ts";
 import { MAX_KNOWLEDGE_BODY } from "./limits.ts";
 import {
   parseCreate,
   parseId,
+  parsePath,
   parseRename,
   parseReplace,
   parseSearch,
@@ -46,6 +49,8 @@ export type KnowledgePort = {
   ): Promise<KnowledgeUploadResult>;
   list(projectId: string): KnowledgeListResponse;
   read(projectId: string, fileId: string): KnowledgeFileDetailResponse["file"];
+  // the live file of that name; a deleted or renamed one is not found
+  fileIdByName(projectId: string, name: string): string;
   versions(
     projectId: string,
     fileId: string,
@@ -74,12 +79,14 @@ export type KnowledgePort = {
     name: string,
     revision: number,
   ): KnowledgeFileResponse["file"];
+  // queued behind the server's other searches; the caller checks the
+  // project before and after
   search(
     projectId: string,
-    userId: string,
     q: string,
     after: string | null,
-  ): KnowledgeSearchResponse;
+    ask: SearchAsk,
+  ): Promise<KnowledgeSearchResponse>;
   // a revision refuses a delete of a file written since it was read;
   // the page names none
   remove(
@@ -214,6 +221,21 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       },
     },
     {
+      method: "GET",
+      path: "/api/projects/:id/knowledge/path",
+      policy: "authenticated",
+      handle(req, ctx) {
+        const project = deps.access.project(ctx.principal!, ctx.params.id);
+        const body: KnowledgePathResponse = {
+          fileId: deps.knowledge.fileIdByName(
+            project.id,
+            parsePath(new URL(req.url)),
+          ),
+        };
+        return json(body);
+      },
+    },
+    {
       method: "PUT",
       path: "/api/projects/:id/knowledge/files/:fileId",
       policy: "authenticated",
@@ -257,15 +279,17 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       method: "GET",
       path: "/api/projects/:id/knowledge/search",
       policy: "authenticated",
-      handle(req, ctx) {
+      async handle(req, ctx) {
         const project = deps.access.project(ctx.principal!, ctx.params.id);
         const query = parseSearch(new URL(req.url));
-        const body: KnowledgeSearchResponse = deps.knowledge.search(
+        const body: KnowledgeSearchResponse = await deps.knowledge.search(
           project.id,
-          ctx.principal!.userId,
           query.q,
           query.after,
+          { from: "page", signal: req.signal },
         );
+        // the member may have left while the search waited
+        deps.access.project(ctx.principal!, project.id);
         return json(body);
       },
     },

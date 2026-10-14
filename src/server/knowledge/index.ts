@@ -8,6 +8,7 @@ import type {
   KnowledgeCounts,
   KnowledgeFile,
 } from "../../shared/contracts/knowledge.ts";
+import { FILE_EXISTS } from "../../shared/knowledge.ts";
 import {
   MAX_UPLOADS_PER_MESSAGE,
   type MessageUpload,
@@ -17,6 +18,7 @@ import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
+import type { SearchQueue } from "../lib/search-queue.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { upload } from "./archive.ts";
 import { checkFile, checkNames, checkTotals } from "./check.ts";
@@ -26,7 +28,7 @@ import { MAX_ARCHIVE_UPLOAD, MAX_STAGED_ITEMS } from "./limits.ts";
 import { parseText } from "./parse.ts";
 import { RenderCache, rendered } from "./render.ts";
 import { type AccessPort, type KnowledgePort, routes } from "./routes.ts";
-import { oneAtATime, search } from "./search.ts";
+import { prepareSearch, search } from "./search.ts";
 import { stage } from "./stage.ts";
 import {
   type KnowledgeRow,
@@ -48,9 +50,10 @@ export type KnowledgeDeps = {
   clock: Clock;
   limits: LimitsPort;
   access: AccessPort;
+  // the server's one search queue, shared with session search
+  searches: Pick<SearchQueue, "run">;
 };
 export type KnowledgeCapability = KnowledgePort & {
-  oneAtATime<T>(userId: string, scan: () => T): T;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   claimUploads(
     projectId: string,
@@ -92,7 +95,6 @@ export type KnowledgeArea = KnowledgeCapability & {
 export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
   const store = new KnowledgeStore(deps.db);
   const uploads = new UploadStore(deps.db);
-  const searching = new Set<string>();
   const views = new RenderCache();
   const required = (projectId: string, fileId: string) => {
     const row = store.byId(projectId, fileId);
@@ -140,11 +142,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
       deleted: false,
     };
   };
-  function guardedSearch<T>(userId: string, scan: () => T): T {
-    return oneAtATime(searching, userId, scan);
-  }
   const capability: KnowledgeCapability = {
-    oneAtATime: guardedSearch,
     checkUploads: (userId, projectId, ids) =>
       uploads.check(userId, projectId, ids, deps.clock()),
     claimUploads: (projectId, sessionId, claims) =>
@@ -231,6 +229,11 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         ),
       };
     },
+    fileIdByName(projectId, name) {
+      const row = store.byName(projectId, name);
+      if (row === null) throw new NotFound();
+      return row.id;
+    },
     versions(projectId, fileId) {
       const versions = store.versions(projectId, fileId);
       if (!versions.length && store.byId(projectId, fileId) === null) {
@@ -251,7 +254,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     create(projectId, author, name, text) {
       return write(projectId, (caps) => {
         if (store.byName(projectId, name) !== null) {
-          throw new Conflict(`a file named ${name} exists`);
+          throw new Conflict(FILE_EXISTS);
         }
         checkNames([...store.list(projectId).map((file) => file.name), name]);
         const bytes = Buffer.byteLength(text);
@@ -282,7 +285,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
           throw new BadRequest(`the file is named ${name} already`);
         }
         if (store.byName(projectId, name) !== null) {
-          throw new Conflict(`a file named ${name} exists`);
+          throw new Conflict(FILE_EXISTS);
         }
         // the size is unchanged, so only the tree's shape is checked
         checkNames([
@@ -298,18 +301,19 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         };
       });
     },
-    search: (projectId, userId, q, after) =>
-      guardedSearch(userId, () =>
+    search(projectId, q, after, ask) {
+      const query = prepareSearch(q, after);
+      return deps.searches.run(ask, (step) =>
         search(
           {
-            files: (from) => store.after(projectId, from),
-            named: (from, terms) => store.named(projectId, from, terms),
-            text: (fileId) => store.text(projectId, fileId),
+            ids: () => store.fileIds(projectId),
+            row: (fileId) => store.withText(projectId, fileId),
           },
-          q,
-          after,
+          query,
+          step,
         ),
-      ),
+      );
+    },
     remove: (projectId, author, fileId, revision) =>
       write(projectId, () => {
         const current =

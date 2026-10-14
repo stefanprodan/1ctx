@@ -1,7 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { LiveSend, Message } from "../../shared/contracts/session.ts";
+import type {
+  LiveRetry,
+  LiveSend,
+  Message,
+} from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 
 export type Live = {
@@ -33,6 +37,24 @@ function thinking(message: Message, reasoning: string, content: string) {
     thinkMs: message.thinkingMs,
   };
 }
+
+// the live line's words for a round waiting to ask its provider again:
+// the cause when it was cut for one, then which of its retries
+export const retrying = (retry: LiveRetry | null): string =>
+  retry === null
+    ? ""
+    : `${retry.cause === "output_loop" ? " · output loop" : ""} · retrying ${retry.attempt}/${retry.max}`;
+
+// a round that starts over begins its live text again
+export const restarted = (): Live => ({
+  content: "",
+  reasoning: "",
+  html: "",
+  htmlAt: 0,
+  thinkStart: null,
+  thinkEnd: null,
+  thinkMs: null,
+});
 
 // a streaming row's checkpoint holds no html, so its text is all tail
 // until a render frame covers it

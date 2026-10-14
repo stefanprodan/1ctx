@@ -13,9 +13,9 @@ import {
   type ChatApp,
   chatApp,
   FLASH,
+  idle,
   type Script,
   startChat,
-  tick,
 } from "../helpers/chat.ts";
 import { createTeam } from "../helpers/projects.ts";
 
@@ -85,11 +85,10 @@ async function addMember(chat: ChatApp, projectId: string, userId: string) {
 }
 async function finish(chat: ChatApp, script: Script) {
   script.reply("done");
-  for (let i = 0; i < 200; i++) {
-    if (chat.app.runner.registry.size === 0) return;
-    await tick();
+  await idle(chat.app);
+  if (chat.app.runner.registry.size > 0) {
+    throw new Error("the send did not finish");
   }
-  throw new Error("the send did not finish");
 }
 function count(
   chat: ChatApp,
@@ -290,9 +289,13 @@ describe("team project administration", () => {
       body: {},
     });
     expect(empty.status).toBe(400);
-    const own = await chat.member.call("PATCH", "/api/profile/project", {
-      body: { description: "" },
-    });
+    const own = await chat.member.call(
+      "PATCH",
+      `/api/projects/${chat.projectId}/about`,
+      {
+        body: { description: "" },
+      },
+    );
     expect(own.status).toBe(200);
     chat.app.socket.dispose();
   });
@@ -616,9 +619,13 @@ describe("team project chat lifecycle", () => {
 describe("the personal project's settings", () => {
   test("its owner describes it and cannot name it", async () => {
     const chat = await chatApp();
-    const described = await chat.member.call("PATCH", "/api/profile/project", {
-      body: { description: "My scratch work" },
-    });
+    const described = await chat.member.call(
+      "PATCH",
+      `/api/projects/${chat.projectId}/about`,
+      {
+        body: { description: "My scratch work" },
+      },
+    );
     expect(described.status).toBe(200);
     expect((await described.json()).project).toMatchObject({
       id: chat.projectId,
@@ -628,9 +635,13 @@ describe("the personal project's settings", () => {
     });
     // the admin's personal project is untouched
     expect(chat.app.projects.personal(chat.adminId)!.description).toBe("");
-    const cleared = await chat.member.call("PATCH", "/api/profile/project", {
-      body: { description: "" },
-    });
+    const cleared = await chat.member.call(
+      "PATCH",
+      `/api/projects/${chat.projectId}/about`,
+      {
+        body: { description: "" },
+      },
+    );
     expect(cleared.status).toBe(200);
     for (const body of [
       { name: "notes" },
@@ -639,8 +650,13 @@ describe("the personal project's settings", () => {
       { description: "two\nlines" },
     ]) {
       expect(
-        (await chat.member.call("PATCH", "/api/profile/project", { body }))
-          .status,
+        (
+          await chat.member.call(
+            "PATCH",
+            `/api/projects/${chat.projectId}/about`,
+            { body },
+          )
+        ).status,
       ).toBe(400);
     }
     chat.app.socket.dispose();
@@ -693,7 +709,7 @@ describe("the personal project's settings", () => {
       `You are coder, an agent in @${username}'s personal project.\n`,
     );
     await finish(chat, first.script);
-    await chat.member.call("PATCH", "/api/profile/project", {
+    await chat.member.call("PATCH", `/api/projects/${chat.projectId}/about`, {
       body: { description: "My scratch work" },
     });
     const second = await startChat(chat, "again");

@@ -189,7 +189,7 @@ export type ToolsArea = Tools & {
 // the memory phase is offered memory_edit and nothing else; a call to
 // anything the run had gets the reason rather than a bare not found
 const PHASE_ONLY = "only memory_edit is offered in the memory phase.";
-// the attention step likewise offers needs_attention alone
+// the attention step likewise offers attention alone
 const ATTENTION_ONLY = `only ${ATTENTION_TOOL} is offered in this step.`;
 // an MCP call's own timer runs this far past the registry's, so two
 // timers never race and the timeout words are the registry's
@@ -229,7 +229,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const emailOn = () =>
     email !== undefined && store.row(EMAIL_TOOL).enabled && email.enabled();
   const automations = deps.automations ?? null;
-  // the admin's row, with the tasks wired to read
+  // the admin's row, with the automations wired to read
   const automationOn = () =>
     automations !== null && store.row(AUTOMATION_TOOL).enabled;
   const externalTaskOn = () =>

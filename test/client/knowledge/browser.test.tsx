@@ -119,8 +119,8 @@ describe("the search results", () => {
     const html = draw(
       search({ names: [file("n1", "ops/Deploy.md")], namesTotal: 1 }),
     );
-    expect(html).toContain('<span class="knowledge-dir cut">ops/</span>');
-    expect(html).toContain('<mark class="knowledge-mark">Deploy</mark>');
+    expect(html).toContain('<span class="pathname-dir cut">ops/</span>');
+    expect(html).toContain('<mark class="pathname-mark">Deploy</mark>');
     expect(html).not.toContain("Show more");
   });
 
@@ -130,10 +130,10 @@ describe("the search results", () => {
     expect(html).toContain("5 lines");
     expect(html).toContain('href="/projects/p1/knowledge/files/f1?line=3"');
     expect(html).toContain('href="/projects/p1/knowledge/files/f1?line=40"');
-    expect(html).toContain('<mark class="knowledge-mark">Deploy</mark> the');
+    expect(html).toContain('<mark class="pathname-mark">Deploy</mark> the');
     expect(html).toContain(
-      '…then <mark class="knowledge-mark">deploy</mark> it again and ' +
-        '<mark class="knowledge-mark">DEPLOY</mark>…',
+      '…then <mark class="pathname-mark">deploy</mark> it again and ' +
+        '<mark class="pathname-mark">DEPLOY</mark>…',
     );
   });
 
@@ -200,7 +200,7 @@ describe("the Deleted list", () => {
       />,
     );
     expect(html).toContain(
-      '<span class="knowledge-dir cut">old/</span><span class="cut">notes.md</span>',
+      '<span class="pathname-dir cut">old/</span><span class="cut">notes.md</span>',
     );
     expect(html).toContain("deleted by ");
     expect(html.replace(/<[^>]*>/g, "")).toContain("@sre in a chat");
@@ -213,7 +213,7 @@ describe("the Deleted list", () => {
   test("a refused Restore is said at its row's end, nowhere else", () => {
     const held = bin(false, "f9");
     held.save.status.value = {
-      error: "a file named old/notes.md exists",
+      error: "a file with this name exists",
       action: "restore",
     };
     const html = render(
@@ -225,7 +225,7 @@ describe("the Deleted list", () => {
         bin={held}
       />,
     );
-    const said = "Could not restore. A file named old/notes.md exists.";
+    const said = "Could not restore. A file with this name exists.";
     expect(html.split(said).length - 1).toBe(1);
     expect(html.indexOf(said)).toBeLessThan(html.indexOf("other.md"));
     expect(html).toContain("rows-end-error");

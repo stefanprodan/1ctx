@@ -41,7 +41,12 @@ import {
   type StartFields,
   startSend as startSendRows,
 } from "./start.ts";
-import { streamDelta, streamRetry, streamVisual } from "./stream.ts";
+import {
+  streamDelta,
+  streamRestart,
+  streamRetry,
+  streamVisual,
+} from "./stream.ts";
 import {
   type AfterAnswer,
   type CompactFields,
@@ -65,7 +70,8 @@ export type WriterDeps = {
   // a chat's snapshot of the project's note, started with its first send
   // and dropped by a summary, inside the caller's transaction
   views: StartDeps["views"] & { end(sessionId: string): void };
-  render: (markdown: string) => string;
+  // a reply links knowledge paths to its session's project
+  render: (markdown: string, options: { project: string }) => string;
   // the stream frames, straight to the watchers
   stream: (sessionId: string, frame: SocketEvent) => void;
   alerts: AlertsPort;
@@ -177,6 +183,28 @@ export class Writer {
     });
   }
 
+  // a round asked again from its start, its state already fresh: the
+  // page drops the live text first, then the row is emptied and goes
+  // back to the slot it began in
+  restartRound(send: ActiveSend): void {
+    const round = send.round;
+    if (round === null) return;
+    streamRestart(this.streams(send), send);
+    const now = this.deps.clock();
+    transact(this.deps.db, () => {
+      const reply = this.deps.sessions.restartReply(
+        round.messageId,
+        round.slotMarked ? "work" : null,
+      );
+      if (reply === null) return { result: undefined, events: [] };
+      const session = this.session(send.sessionId, now);
+      return {
+        result: undefined,
+        events: this.out(send, [reply], () => envelope(session, [reply], null)),
+      };
+    });
+  }
+
   finishRound(
     send: ActiveSend,
     toolNames: string[] = send.round?.calls.map((call) => call.name) ?? [],
@@ -188,6 +216,7 @@ export class Writer {
     const result = transact(this.deps.db, () => {
       const reply = finishReplyRow(
         this.deps,
+        send,
         round,
         "done",
         null,

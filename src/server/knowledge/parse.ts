@@ -16,7 +16,7 @@ import {
 } from "../../shared/words.ts";
 import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
-import { queryTerms } from "./search.ts";
+import { queryTerms, readCursor } from "./search.ts";
 
 export function parseId(value: unknown, name: string): string {
   if (typeof value !== "string" || !/^[0-9a-z]{12}$/.test(value)) {
@@ -71,6 +71,12 @@ export function parseRename(body: unknown): RenameKnowledgeFileRequest {
   };
 }
 
+export function parsePath(url: URL): string {
+  const name = queryParams(url, ["name"])("name");
+  if (name === null) throw new BadRequest("name must appear once");
+  return parseName(name);
+}
+
 export type SearchQuery = { q: string; after: string | null };
 
 export function parseSearch(url: URL): SearchQuery {
@@ -88,8 +94,8 @@ export function parseSearch(url: URL): SearchQuery {
   queryTerms(q);
   const after = get("after");
   if (after === null) return { q, after: null };
-  if (!isKnowledgeName(after)) {
-    throw new BadRequest("after must be a file name");
+  if (readCursor(after) === null) {
+    throw new BadRequest("after must be a search cursor");
   }
   return { q, after };
 }

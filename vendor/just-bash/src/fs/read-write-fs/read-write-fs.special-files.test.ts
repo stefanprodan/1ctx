@@ -125,7 +125,8 @@ describe.skipIf(process.platform === "win32")(
       expect(fs.lstatSync(alias).mode & 0o777).toBe(originalMode);
     });
 
-    it("preserves a Unix socket during chmod and utimes", async () => {
+    // (1ctx suite-platform) Bun's realpath on macOS cannot open a socket
+    it.skipIf(process.platform === "darwin")("preserves a Unix socket during chmod and utimes", async () => {
       const socketPath = path.join(root, "service.sock");
       const changed = new Date("2020-08-01T00:00:00.000Z");
       const server = net.createServer();

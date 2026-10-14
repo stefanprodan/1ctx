@@ -46,20 +46,23 @@ export type KnowledgeFileResponse = { file: KnowledgeFile };
 
 export type KnowledgeFileDetailResponse = { file: KnowledgeFileView };
 
+// the file a /knowledge/ path names now, for a link in a reply
+export type KnowledgePathResponse = { fileId: string };
+
 export type ReplaceKnowledgeFileRequest = { text: string; revision: number };
 
 export type RenameKnowledgeFileRequest = { name: string; revision: number };
 
 // q is 2 to 100 characters, its words matched as plain text in any
-// case (shared/search.ts). The files whose text holds every word come in
-// name order, SEARCH_PAGE a page, after the name given as after; names
+// case (shared/search.ts). The files whose text holds every word come
+// best first, SEARCH_PAGE a page, after the cursor given as after; names
 // are the files whose name alone holds every word, on the first page
 // only (none with after), at most SEARCH_NAMES of namesTotal
 export type KnowledgeSearchResponse = {
   names: KnowledgeFile[];
   namesTotal: number;
   files: KnowledgeSearchHit[];
-  // the name to pass as after for the next page, null on the last
+  // an opaque cursor to pass as after for the next page, null on the last
   next: string | null;
 };
 

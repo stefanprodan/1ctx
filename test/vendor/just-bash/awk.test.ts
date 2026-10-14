@@ -6,6 +6,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { Bash, defineCommand, InMemoryFs } from "just-bash";
+import { countWork, expectLinear } from "./work.ts";
 
 const LIMIT_EXIT = 126;
 
@@ -354,68 +355,71 @@ describe("awk output files and speed", () => {
     expect(await out.read("/w/out")).toBe(`${" ".repeat(94)}x`);
   });
 
-  // Runners differ in speed and tests here run side by side, so these
-  // compare the fastest of three runs with the fastest of three an eighth
-  // the size, serially: linear work grows about 8 to 11 times (twice that
-  // on a slow runner), the quadratic bugs grew 64.
-  const fastest = async (make: () => Bash, command: string) => {
-    let bash = make();
-    let result = await bash.exec(command);
-    let best = Number.POSITIVE_INFINITY;
-    for (let i = 0; i < 3; i++) {
-      bash = make();
-      const started = performance.now();
-      result = await bash.exec(command);
-      best = Math.min(best, performance.now() - started);
+  // The quadratic bugs grew with the square of the lines: a print that
+  // re-wrote its whole file, a printf that read the whole output, a flush
+  // that walked every open file. So the work is counted, not timed.
+  class CountingFs extends InMemoryFs {
+    written = 0;
+    override async writeFile(
+      ...args: Parameters<InMemoryFs["writeFile"]>
+    ): Promise<void> {
+      this.written += args[1].length;
+      return super.writeFile(...args);
     }
-    return { best, bash, result };
-  };
+    override async appendFile(
+      ...args: Parameters<InMemoryFs["appendFile"]>
+    ): Promise<void> {
+      this.written += args[1].length;
+      return super.appendFile(...args);
+    }
+  }
 
-  test.serial(
-    "10k files open in linear time",
-    async () => {
-      const shell = () => new Bash({ cwd: "/w" });
-      const files = (n: number) =>
-        `seq 1 ${n} | awk '{ print > ($1 ".txt"); print "again" > ($1 ".txt") }'`;
-      const eighth = await fastest(shell, files(1_250));
-      const full = await fastest(shell, files(10_000));
-      // a flush that walked every open file grew with their square
-      expect(full.best / eighth.best).toBeLessThan(32);
-      const r = full.result;
-      expect([r.stdout, r.stderr, r.exitCode]).toEqual(["", "", 0]);
-      expect(await full.bash.readFile("/w/9999.txt")).toBe("9999\nagain\n");
-    },
-    30_000,
-  );
+  // patches globals, so only from a test.serial
+  async function counted(command: string) {
+    const fs = new CountingFs();
+    const bash = new Bash({
+      fs,
+      cwd: "/w",
+      executionLimits: { maxOutputSize: 10_000_000 },
+    });
+    fs.written = 0;
+    const { result, work } = await countWork(() => bash.exec(command));
+    return { work: { ...work, written: fs.written }, bash, result };
+  }
 
-  test.serial(
-    "printf and print > f at 20k lines stay linear",
-    async () => {
-      const shell = () =>
-        new Bash({ cwd: "/w", executionLimits: { maxOutputSize: 10_000_000 } });
-      const lines = (n: number) =>
-        `seq 1 ${n} | awk '{ printf "pod-%d ns-%d\\n", $1, $1 % 23 }'; ` +
-        `seq 1 ${n} | awk '{ print "pod-" $1 > "out" }'`;
-      const eighth = await fastest(shell, lines(2_500));
-      const full = await fastest(shell, lines(20_000));
-      // quadratic, the time grew with the square of the lines
-      expect(full.best / eighth.best).toBeLessThan(32);
-      const expected = Array.from(
-        { length: 20_000 },
-        (_, i) => `pod-${i + 1} ns-${(i + 1) % 23}\n`,
-      );
-      const r = full.result;
-      expect([r.stdout, r.stderr, r.exitCode]).toEqual([
-        expected.join(""),
-        "",
-        0,
-      ]);
-      expect((await full.bash.readFile("/w/out")).split("\n")).toHaveLength(
-        20_001,
-      );
-    },
-    30_000,
-  );
+  test.serial("10k files open in linear time", async () => {
+    const files = (n: number) =>
+      `seq 1 ${n} | awk '{ print > ($1 ".txt"); print "again" > ($1 ".txt") }'`;
+    const eighth = await counted(files(1_250));
+    const full = await counted(files(10_000));
+    expectLinear(eighth.work, full.work);
+    const r = full.result;
+    expect([r.stdout, r.stderr, r.exitCode]).toEqual(["", "", 0]);
+    expect(await full.bash.readFile("/w/9999.txt")).toBe("9999\nagain\n");
+  });
+
+  test.serial("printf and print > f at 20k lines stay linear", async () => {
+    const lines = (n: number) =>
+      `seq 1 ${n} | awk '{ printf "pod-%d ns-%d\\n", $1, $1 % 23 }'; ` +
+      `seq 1 ${n} | awk '{ print "pod-" $1 > "out" }'`;
+    const eighth = await counted(lines(2_500));
+    const full = await counted(lines(20_000));
+    expectLinear(eighth.work, full.work);
+    const expected = Array.from(
+      { length: 20_000 },
+      (_, i) => `pod-${i + 1} ns-${(i + 1) % 23}\n`,
+    );
+    const r = full.result;
+    expect([r.stdout, r.stderr, r.exitCode]).toEqual([
+      expected.join(""),
+      "",
+      0,
+    ]);
+    const out = await full.bash.readFile("/w/out");
+    expect(out.split("\n")).toHaveLength(20_001);
+    // each line written once
+    expect(full.work.written).toBe(out.length);
+  });
 });
 
 describe("gawk features we do not have", () => {

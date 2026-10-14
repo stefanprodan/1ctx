@@ -9,6 +9,9 @@ import type { OpenClaim } from "./rows.ts";
 import { closed } from "./rules.ts";
 import type { ExternalTaskStore } from "./store.ts";
 
+const hoursText = (hours: number) =>
+  hours === 1 ? "1 hour" : `${hours} hours`;
+
 type SweepDeps = {
   db: Db;
   store: ExternalTaskStore;
@@ -25,12 +28,11 @@ export function taskSweeps(deps: SweepDeps) {
     for (const claim of claims) {
       const task = store.byId(claim.task_id);
       if (task === null || task.claim?.id !== claim.id) continue;
-      // A live claim has at most 240 entries; release fits the 250-entry cap.
       const result = writeEntry(store, task, {
         actor: "access_gone",
-        kind: "release",
+        kind: "unclaim",
         userId: null,
-        text: "released because access ended",
+        text: "access ended",
         links: [],
         at: now,
       });
@@ -47,7 +49,7 @@ export function taskSweeps(deps: SweepDeps) {
         ? []
         : end(store.claimsForUser(userId, projectIds));
     },
-    releaseIdle(now: number): number {
+    unclaimIdle(now: number): number {
       const hours = deps.externalTaskIdleHours();
       const cutoff = now - hours * 3_600_000;
       let count = 0;
@@ -64,16 +66,16 @@ export function taskSweeps(deps: SweepDeps) {
           const task = store.byId(claim.task_id);
           if (
             task === null ||
-            task.state !== "claimed" ||
+            task.state !== "in_progress" ||
             task.claim?.id !== claim.id
           ) {
             return { result: 0 };
           }
           const result = writeEntry(store, task, {
             actor: "idle",
-            kind: "release",
+            kind: "unclaim",
             userId: null,
-            text: `released after ${hours} hours without a report`,
+            text: `after ${hoursText(hours)} without a report`,
             links: [],
             at: now,
           });

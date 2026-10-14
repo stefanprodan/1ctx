@@ -110,6 +110,12 @@ const SERVER_ROOT_FILES = new Set(["main.ts", "compose.ts"]);
 // the extensions an import may name; a bare specifier is refused
 const IMPORT_EXTENSIONS = /\.(?:ts|tsx|css|html|json|svg|woff2|png|md)$/;
 
+// the aside's line shapes, drawn only by ui/Split.tsx, so every aside
+// lays its lines on the section's two columns the same way
+const SPLIT = join("client", "ui", "Split.tsx");
+const ASIDE_SHAPES =
+  /\bsplit-(?:line|pair|label|strong|word|item|note|handle|quiet)\b/;
+
 // the two stylesheets with global reach, and where they live
 const TOKENS = join("client", "style", "tokens.css");
 const BASE = join("client", "style", "base.css");
@@ -266,6 +272,17 @@ export function check(root: string): Violation[] {
           file: rel,
           rule: "tokens",
           detail: `colour literal on line ${line}; use a token`,
+        });
+      }
+    }
+    if (area === "client" && rel !== SPLIT) {
+      const bare = withoutComments(code);
+      const found = bare.match(ASIDE_SHAPES);
+      if (found) {
+        out.push({
+          file: rel,
+          rule: "aside",
+          detail: `${found[0]} on line ${lineAt(bare, found.index ?? 0)}; use the shapes in ui/Split.tsx`,
         });
       }
     }

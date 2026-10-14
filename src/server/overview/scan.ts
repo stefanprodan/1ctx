@@ -369,13 +369,12 @@ function externalTasks(db: Db): ScanResult["externalTasks"] {
   return {
     closed: total(
       db,
-      `select sum(octet_length(t.title) + octet_length(t.text)
-        + coalesce(octet_length(t.part), 0)
+      `select sum(octet_length(t.title)
         + coalesce((select sum(octet_length(text) + octet_length(links))
             from external_task_entries where task_id = t.id), 0)
         + coalesce((select sum(octet_length(last_task))
             from external_task_claims where task_id = t.id), 0)) as bytes
-      from external_tasks t where t.state in ('done', 'dropped')`,
+      from external_tasks t where t.state in ('done', 'canceled')`,
     ),
   };
 }

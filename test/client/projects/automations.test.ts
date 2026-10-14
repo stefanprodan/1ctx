@@ -300,7 +300,7 @@ describe("the row's words", () => {
     ).toBe("");
   });
 
-  test("a task its own run suspended says it ran once, and when", () => {
+  test("an automation its own run suspended says it ran once, and when", () => {
     const tz = "Europe/Bucharest";
     // Monday 14 September 2026, 12:00 in Bucharest
     const clock = Date.UTC(2026, 8, 14, 9);
@@ -318,7 +318,7 @@ describe("the row's words", () => {
     expect(suspendedText(spent, clock + 48 * HOUR)).toBe(
       "Ran once on Mon Sep 14 2026 09:00",
     );
-    // a member's suspend of a task not fired yet reads as any other
+    // a member's suspend of an automation not fired yet reads as any other
     const held = {
       ...spent,
       onceFiredAt: null,
@@ -340,7 +340,7 @@ describe("the row's words", () => {
     ).toBe(false);
   });
 
-  test("a task that runs once names its one fire with its year", () => {
+  test("an automation that runs once names its one fire with its year", () => {
     const tz = "Europe/Bucharest";
     const clock = Date.UTC(2026, 9, 10, 9);
     // 0 9 11 10 *: 11 October at 9:00, tomorrow
@@ -362,11 +362,11 @@ describe("the row's words", () => {
     );
   });
 
-  test("a once task's next run is its one fire, or the fire it waits on", () => {
+  test("a once automation's next run is its one fire, or the fire it waits on", () => {
     const tz = "UTC";
     const nine = Date.UTC(2026, 9, 10, 9);
     const fires = [nine + HOUR, nine + 2 * HOUR];
-    // a recurring task lists every fire ahead
+    // a recurring automation lists every fire ahead
     expect(nextRunsOf(automation({ tz }), fires, nine + 10 * 60_000)).toEqual({
       waiting: null,
       fires,
@@ -470,7 +470,7 @@ describe("the row's words", () => {
     );
   });
 
-  test("the save row says a save takes over a task someone else owns", () => {
+  test("the save row says a save takes over an automation someone else owns", () => {
     const row = automation();
     expect(ownerNote(row, "u2")).toBe(
       "Saving makes you the owner. Scheduled runs will act as you.",
@@ -624,7 +624,7 @@ describe("the form", () => {
     ).toBe("attention");
   });
 
-  test("starting again after a restart is off for a new task and saved as drafted", () => {
+  test("starting again after a restart is off for a new automation and saved as drafted", () => {
     const on = requestOf(filled({ rerunOnRestart: true }), LIMIT);
     expect("body" in on && on.body.rerunOnRestart).toBe(true);
     const row = automation({ rerunOnRestart: true });
@@ -634,7 +634,7 @@ describe("the form", () => {
     expect(dirtyOf({ ...shown, rerunOnRestart: false }, row, LIMIT)).toBe(true);
   });
 
-  test("run once is off for a new task and saved as drafted", () => {
+  test("run once is off for a new automation and saved as drafted", () => {
     const on = requestOf(filled({ once: true }), LIMIT);
     expect("body" in on && on.body.once).toBe(true);
     const row = automation({ once: true });
@@ -685,7 +685,7 @@ describe("the form", () => {
     expect(dirtyOf(shown, none, LIMIT)).toBe(false);
   });
 
-  test("web access is on for a new task, follows the row, and saves as the set", () => {
+  test("web access is on for a new automation, follows the row, and saves as the set", () => {
     expect(draftOf(null, "a1", "UTC", LIMIT).web).toBe(true);
     const off = automation({ disabledCapabilities: ["web"] });
     const shown = draftOf(off, "ignored", "ignored", LIMIT);
@@ -700,7 +700,7 @@ describe("the form", () => {
     expect(body(true)).toEqual([]);
   });
 
-  test("visuals are on for a new task, follow the row, and save as the key", () => {
+  test("visuals are on for a new automation, follow the row, and save as the key", () => {
     expect(draftOf(null, "a1", "UTC", LIMIT).visuals).toBe(true);
     const off = automation({ disabledCapabilities: ["visualize"] });
     const shown = draftOf(off, "ignored", "ignored", LIMIT);
@@ -714,7 +714,7 @@ describe("the form", () => {
     ).toEqual(["visualize", "web"]);
   });
 
-  test("knowledge is on for a new task, follows the row, and saves as the key", () => {
+  test("knowledge is on for a new automation, follows the row, and saves as the key", () => {
     expect(draftOf(null, "a1", "UTC", LIMIT).knowledge).toBe(true);
     const off = automation({ disabledCapabilities: ["knowledge"] });
     const shown = draftOf(off, "ignored", "ignored", LIMIT);
@@ -775,7 +775,7 @@ describe("the form", () => {
     ]);
   });
 
-  test("the saved set drops the chat's own keys a task cannot switch", () => {
+  test("the saved set drops the chat's own keys an automation cannot switch", () => {
     const row = automation({
       disabledCapabilities: ["automations", "memory", "web"],
     });
@@ -915,7 +915,7 @@ describe("the form", () => {
     expect(accessOf(row, { repos }).reposOff).toEqual(["flux2"]);
   });
 
-  test("memory is none or the task's own note", () => {
+  test("memory is none or the automation's own note", () => {
     const mode = (ownMemory: boolean) =>
       draftOf(automation({ ownMemory }), "a1", "UTC", LIMIT).memory;
     expect(mode(false)).toBe("none");

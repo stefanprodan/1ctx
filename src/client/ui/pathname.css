@@ -1,0 +1,22 @@
+/* A file's path, its folder faint before its name, and a search's
+   marks on a text. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  .pathname {
+    display: flex;
+    min-width: 0;
+  }
+  /* the folder gives way long before the name does */
+  .pathname-dir {
+    flex-shrink: 1000;
+    min-width: 2ch;
+    color: var(--faint);
+  }
+  .pathname-mark {
+    border-radius: var(--radius-cell);
+    background: var(--hover);
+    color: var(--mark);
+  }
+}

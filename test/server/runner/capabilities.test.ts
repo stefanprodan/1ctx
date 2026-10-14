@@ -15,18 +15,14 @@ import {
   type ChatApp,
   chatApp,
   NO_TOOLS,
+  sessionSettled,
   setLimits,
   startChat,
-  tick,
   waitScript,
 } from "../../helpers/chat.ts";
 
 async function settled(chat: ChatApp, id: string) {
-  for (let i = 0; i < 200; i++) {
-    if (chat.app.sessions.byId(id)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("send did not settle");
+  await sessionSettled(chat.app, id);
 }
 
 async function create(

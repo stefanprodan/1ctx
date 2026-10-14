@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
+import { MAX_LABELS_PER_PROJECT } from "../../shared/contracts/label.ts";
 import { sourceKind } from "../../shared/skills.ts";
 import { isWebAccessMode, type WebAccessMode } from "../../shared/web.ts";
 import {
@@ -52,6 +53,7 @@ import {
   parseTimeout,
   parseUrl,
 } from "../mcp/index.ts";
+import { parseLabelDescription, parseLabelName } from "../projects/index.ts";
 import {
   azureBaseUrlProblem,
   parseBaseUrl,
@@ -90,9 +92,44 @@ export type UserSpec = {
 export type ProjectSpec = {
   description?: string;
   members?: string[];
+  // created or updated by name; a label not listed is left
+  labels?: LabelSpec[];
   // a folder relative to the file that holds the document
   knowledge?: string;
 };
+
+export type LabelSpec = { name: string; description?: string };
+
+// the API's rules, a name trimmed and lowercased first, each name once
+function labels(value: unknown): LabelSpec[] {
+  if (!Array.isArray(value) || value.length > MAX_LABELS_PER_PROJECT) {
+    throw new BadRequest(
+      `must be a list of at most ${MAX_LABELS_PER_PROJECT} labels`,
+    );
+  }
+  const seen = new Set<string>();
+  return value.map((item, i) => {
+    const b = object(item, ["name", "description"], `spec.labels.${i}`);
+    const name = at(`spec.labels.${i}.name`, () =>
+      parseLabelName(b.name, "label"),
+    );
+    if (seen.has(name)) {
+      // the position, never the name: the error reaches the startup log
+      throw new Error(`spec.labels.${i}.name must not repeat`);
+    }
+    seen.add(name);
+    return {
+      name,
+      ...(b.description === undefined
+        ? {}
+        : {
+            description: at(`spec.labels.${i}.description`, () =>
+              parseLabelDescription(b.description, "description"),
+            ),
+          }),
+    };
+  });
+}
 
 const MAX_FOLDER_PATH = 1024;
 
@@ -172,7 +209,7 @@ export type AgentSpec = {
   // leave out OpenRouter's 4-bit hosts, as the agents API takes it; an
   // upstream changed to a 4-bit host while it stays on is refused
   skip4Bit?: boolean;
-  // whether a turn may hand a task to a fresh copy of the agent; a new
+  // whether a turn may hand work to a fresh copy of the agent; a new
   // agent left without it is off
   subagents?: boolean;
   // only true: the agent a new chat starts on for anyone who has not
@@ -242,6 +279,7 @@ export function project(value: unknown): ProjectSpec {
       `must be one trimmed line of at most ${MAX_DESCRIPTION} characters`,
     ),
     members: (v) => names(v, isUsername),
+    labels,
     knowledge: folderPath,
   });
 }

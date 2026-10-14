@@ -31,8 +31,8 @@ export function RowsCard({
   hint,
   live,
   count,
-  wrap,
   hintBelow,
+  menus,
   class: extra,
   children,
 }: {
@@ -43,10 +43,11 @@ export function RowsCard({
   hint?: string;
   live?: boolean;
   count?: string;
-  wrap?: boolean;
   // on a phone the hint takes its own line under the label, held even
   // while empty, so a hint that follows the pointer never moves the card
   hintBelow?: boolean;
+  // its rows open menus, which drop past the card's edge
+  menus?: boolean;
   class?: string;
   children?: ComponentChildren;
 }) {
@@ -54,23 +55,21 @@ export function RowsCard({
   const slot = search ?? tabs;
   return (
     <section
-      class={`card rows-card${extra ? ` ${extra}` : ""}`}
+      class={`card rows-card${menus ? " rows-card-menus" : ""}${
+        extra ? ` ${extra}` : ""
+      }`}
       aria-label={slot ? label : undefined}
       aria-labelledby={slot ? undefined : id}
     >
       <div
         class={`rows-head${search ? " rows-head-search" : ""}${
           tabs ? " rows-head-tabs" : ""
-        }${wrap ? " rows-head-wrap" : ""}${hintBelow ? " rows-head-below" : ""}`}
+        }${hintBelow ? " rows-head-below" : ""}`}
       >
-        {wrap && slot ? (
-          <div class="rows-head-slot">{slot}</div>
-        ) : (
-          (slot ?? (
-            <span class="label" id={id}>
-              {label}
-            </span>
-          ))
+        {slot ?? (
+          <span class="label" id={id}>
+            {label}
+          </span>
         )}
         {(hint || hintBelow) && (
           <span class="rows-hint cut" aria-live={live ? "polite" : undefined}>
@@ -102,11 +101,12 @@ export function RowsAdd({
     <button
       type="button"
       class="btn btn-small rows-add"
+      aria-label={label}
       disabled={disabled}
       onClick={onClick}
     >
       <Icon name="plus" size={14} />
-      {label}
+      <span class="rows-add-words">{label}</span>
     </button>
   );
 }
@@ -176,6 +176,7 @@ export function RowsGo({
   under,
   off,
   side,
+  compact,
   children,
 }: {
   href: string;
@@ -185,6 +186,8 @@ export function RowsGo({
   // on a phone the meta stays beside the title, as the feed's time
   // does, and the arrow waits for the width where the row fits
   side?: boolean;
+  // as tall as its lines, for a long list of one or two short lines
+  compact?: boolean;
   children: ComponentChildren;
 }) {
   // a row with a button at its end leaves the arrow out, or it would
@@ -193,7 +196,7 @@ export function RowsGo({
     <a
       class={`${line ? "rows-line rows-go" : "rows-go rows-go-part"}${
         side ? " rows-go-side" : ""
-      }`}
+      }${compact ? " rows-go-compact" : ""}`}
       href={href}
     >
       {children}
@@ -218,10 +221,13 @@ export function RowsGo({
 export function RowsButton({
   onClick,
   disabled,
+  edit,
   children,
 }: {
   onClick: () => void;
   disabled?: boolean;
+  // a pencil at the end, so a row that opens its form says so on a phone
+  edit?: boolean;
   children: ComponentChildren;
 }) {
   return (
@@ -232,6 +238,24 @@ export function RowsButton({
         disabled={disabled}
         onClick={onClick}
       >
+        {children}
+        {edit && <Icon name="pencil" size={14} class="rows-button-edit" />}
+      </button>
+    </div>
+  );
+}
+
+// the end of a list that holds more: a small centred word, not a row
+export function RowsMore({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: ComponentChildren;
+}) {
+  return (
+    <div class="rows-item rows-more">
+      <button type="button" class="btn-text" onClick={onClick}>
         {children}
       </button>
     </div>
@@ -380,6 +404,7 @@ export function RowsTitle({
   subWide,
   lines,
   wrap,
+  prose,
 }: {
   name: ComponentChildren;
   sub?: ComponentChildren;
@@ -391,6 +416,8 @@ export function RowsTitle({
   // the sub lines wrap whole rather than ellipsize, for details that
   // mean nothing cut
   wrap?: boolean;
+  // a sub of words someone wrote, in the body font
+  prose?: boolean;
 }) {
   const subClass = `rows-sub${wrap ? " rows-sub-wrap" : ""}`;
   return (
@@ -402,7 +429,7 @@ export function RowsTitle({
       </span>
       {sub !== undefined && (
         <span
-          class={`${subClass}${bad ? " rows-bad" : ""}${subWide ? " rows-sub-wide" : ""}`}
+          class={`${subClass}${bad ? " rows-bad" : ""}${subWide ? " rows-sub-wide" : ""}${prose ? " rows-sub-prose" : ""}`}
         >
           {sub}
         </span>

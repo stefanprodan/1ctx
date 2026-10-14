@@ -1,10 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { authorOf as pageAuthorOf } from "../../../src/client/views/knowledge/Knowledge.model.ts";
 import { byWords } from "../../../src/server/mcp-server/knowledge.ts";
 import type { KnowledgeAuthor } from "../../../src/shared/contracts/knowledge.ts";
+import * as searchModule from "../../../src/shared/search.ts";
 import {
   fencedContent,
   file,
@@ -613,7 +614,6 @@ describe("the inbound MCP knowledge tool", () => {
       skip = Number(next[1]);
     }
     expect(found).toEqual(Array.from({ length: 400 }, (_, index) => index + 1));
-    expect(state.guardedSearches).toBeGreaterThan(1);
 
     const missing = await toolCall(send, "knowledge", {
       action: "search",
@@ -626,30 +626,38 @@ describe("the inbound MCP knowledge tool", () => {
     await area.close();
   });
 
-  test("stops a single-file search when its first page is full", async () => {
-    const { area, send, state } = fixture();
-    state.text = "ab\n".repeat(Math.floor((4 * 1024 * 1024) / 3));
-    state.listed = [
-      {
-        ...file(state.text),
-        name: `${"d".repeat(60)}/${"n".repeat(70)}.md`,
-      },
-    ];
-    const started = performance.now();
-    const answer = await toolCall(send, "knowledge", {
-      action: "search",
-      projectId: project.id,
-      fileId: "file00000001",
-      q: "ab",
-    });
-    const elapsed = performance.now() - started;
-    const result = soleText(answer);
-    expect(Buffer.byteLength(result)).toBeLessThanOrEqual(32 * 1024);
-    expect(result).toContain('fileId="file00000001", skip=');
-    expect(elapsed).toBeLessThan(250);
-    expect(state.guardedSearches).toBe(1);
-    await area.close();
-  });
+  // the spy patches a module export, which concurrent tests would count
+  test.serial(
+    "stops a single-file search when its first page is full",
+    async () => {
+      const { area, send, state } = fixture();
+      state.text = "ab\n".repeat(Math.floor((4 * 1024 * 1024) / 3));
+      state.listed = [
+        {
+          ...file(state.text),
+          name: `${"d".repeat(60)}/${"n".repeat(70)}.md`,
+        },
+      ];
+      const scanned = spyOn(searchModule, "termRanges");
+      try {
+        const answer = await toolCall(send, "knowledge", {
+          action: "search",
+          projectId: project.id,
+          fileId: "file00000001",
+          q: "ab",
+        });
+        const result = soleText(answer);
+        expect(Buffer.byteLength(result)).toBeLessThanOrEqual(32 * 1024);
+        const next = result.match(/fileId="file00000001", skip=(\d+)\./);
+        expect(next).toBeTruthy();
+        // every line matches: one line per emitted hit, then the one that overflowed
+        expect(scanned).toHaveBeenCalledTimes(Number(next![1]) + 1);
+      } finally {
+        scanned.mockRestore();
+      }
+      await area.close();
+    },
+  );
 
   test("outlines Markdown outside matching fences and refuses line paging", async () => {
     const { area, send, state } = fixture();

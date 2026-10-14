@@ -116,13 +116,15 @@ of that shell that shows a file on the chat page.
 
 `/knowledge` and `/tmp` are the trees a command may change.
 
-- **A command's trees commit once or not at all.** An abort, exit 124
-  or 126, or a throw discards both writable trees. A command the
-  caller's abort or a shutdown ended (cause `abort`) returns
-  `interrupted` and `discarded`: only then may its cut text say the
-  file changes were discarded. Any other exit,
-  nonzero included, commits in one transaction (`bash/commit.ts`): docs
-  through `commitDocs`, then scratch. An overflow rolls both back.
+- **A command's trees commit once or not at all.** An abort, exit 124 or
+  126, or a throw discards both writable trees. A command that ends at
+  or past its deadline is exit 124 whatever the interpreter answered
+  (`exitAt()`), so a cut that reads as a failure never commits. A
+  command the caller's abort or a shutdown ended (cause `abort`) returns
+  `interrupted` and `discarded`: only then may its cut text say the file
+  changes were discarded. Any other exit, nonzero included, commits in
+  one transaction (`bash/commit.ts`): docs through `commitDocs`, then
+  scratch. An overflow rolls both back.
 - **A process slot per core holds a mount.** `PROCESS_SLOTS` is the
   cores read at start (a container's CPU limit, floored), at least 4
   (a command waiting on the network holds one idle) and at most 16,
@@ -240,7 +242,9 @@ of that shell that shows a file on the chat page.
 - **`open` copies a mounted text file onto the chat page.** HTML and SVG
   become a visual when the admin's Visuals switch was on at send start
   and the text fits `VISUAL_FRAME_BYTES`, Markdown is rendered, the rest
-  is code.
+  is code. Its line in the description tells the agent to write a
+  file's `/knowledge/` path to point the user to it, which the reply
+  links (`docs/shell.md`), and to open it only to show it.
 - **A refused `open` stops nothing.** Outside the trees, a symlink, a
   directory, past `knowledgeFileBytes`, non-text, or past
   `MAX_OPENS_PER_COMMAND`. The copies are `opened_files` rows written in

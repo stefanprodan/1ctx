@@ -6,6 +6,7 @@ import {
   type KeyState,
   MAX_CREDENTIALS_PER_PROJECT,
 } from "../../shared/contracts/credential.ts";
+import { MAX_LABELS_PER_PROJECT } from "../../shared/contracts/label.ts";
 import type { WebAccess } from "../../shared/web.ts";
 import {
   isName,
@@ -50,11 +51,12 @@ export const KINDS = [
 export type Kind = (typeof KINDS)[number];
 export type Source = { path: string; text: string };
 export type Inventory = Record<Kind, string[]>;
-// a team project's live docs and the limits they are held to, empty for
-// a project not made yet
+// a team project's live docs and the limits they are held to, and its
+// labels' names, empty for a project not made yet
 export type ProjectDocs = (project: string) => {
   caps: KnowledgeCaps;
   live: { name: string; bytes: number }[];
+  labels: string[];
 };
 // the credentials the database holds, and what a key file's value is
 // now, for the checks that span objects
@@ -82,6 +84,7 @@ export type {
   AgentSpec,
   CredentialSpec,
   DeciderSpec,
+  LabelSpec,
   McpServerSpec,
   ProjectSpec,
   ProviderSpec,
@@ -325,6 +328,21 @@ export function preflight(
       case "Project":
         for (const name of doc.spec.members ?? [])
           reference("members", "User", name);
+        // a new project gets the listed labels alone; a held one keeps
+        // those not listed
+        if (doc.spec.labels !== undefined) {
+          if (!exists && doc.spec.labels.length === 0) {
+            fail("labels", "must list at least one label for a new project");
+          }
+          const held = new Set(exists ? projectDocs(doc.name).labels : []);
+          for (const label of doc.spec.labels) held.add(label.name);
+          if (held.size > MAX_LABELS_PER_PROJECT) {
+            fail(
+              "labels",
+              `would leave more than ${MAX_LABELS_PER_PROJECT} labels on the project`,
+            );
+          }
+        }
         if (doc.docs !== undefined) {
           const { caps, live } = projectDocs(doc.name);
           const named = new Set(doc.docs.map((file) => file.name));

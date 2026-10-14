@@ -153,7 +153,7 @@ function Aside({ providers: all }: { providers: ProviderSummary[] }) {
           const user = all.find((p) => p.keyName === file);
           return user
             ? { label: user.name, href: configProviderHref(user.name) }
-            : { label: "unused", quiet: true };
+            : { label: "unused" };
         }}
       />
     </>

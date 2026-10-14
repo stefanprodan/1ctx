@@ -10,7 +10,8 @@
 // in.
 
 import type { Db } from "../../src/server/db/index.ts";
-import type { LogFactory } from "../../src/server/lib/log.ts";
+import { subscribe } from "../../src/server/lib/bus.ts";
+import { type LogFactory, silent } from "../../src/server/lib/log.ts";
 import { tokens } from "../../src/server/lib/tokens.ts";
 import { DEFAULT_LIMITS, type Limits } from "../../src/server/limits/index.ts";
 import type { JobRunner } from "../../src/server/repos/index.ts";
@@ -92,6 +93,8 @@ export type Scripted = {
   requests: { inputTokens: number; maxTokens: number; accepted: boolean }[];
   // the next script once a chat request arrives
   next(): Promise<Script>;
+  // the count-th script, once that many chat requests arrived
+  reached(count: number): Promise<Script>;
   // answer every chat request with an HTTP error, or only the next
   // `times`, with the headers given
   refuse(
@@ -104,6 +107,8 @@ export type Scripted = {
   drop(count: number): void;
   // the chat requests made, the dropped ones included
   chats(): number;
+  // once that many chat requests were made, the dropped ones included
+  asked(count: number): Promise<void>;
 };
 
 // the Messages frames for the script's calls: a block opened on its first
@@ -199,6 +204,8 @@ export function scriptedFetch(
   const scripts: Script[] = [];
   const requests: Scripted["requests"] = [];
   const waiting: ((s: Script) => void)[] = [];
+  const counting = new Set<{ count: number; resolve: (s: Script) => void }>();
+  const asking = new Set<{ count: number; resolve: () => void }>();
   let refusal: {
     status: number;
     body: string;
@@ -228,6 +235,11 @@ export function scriptedFetch(
       throw new TypeError("unable to connect");
     }
     chats++;
+    for (const wait of asking) {
+      if (chats < wait.count) continue;
+      asking.delete(wait);
+      wait.resolve();
+    }
     if (dropping > 0) {
       dropping--;
       throw new TypeError("the connection was reset");
@@ -384,6 +396,11 @@ export function scriptedFetch(
     });
     scripts.push(script);
     waiting.shift()?.(script);
+    for (const wait of counting) {
+      if (scripts.length < wait.count) continue;
+      counting.delete(wait);
+      wait.resolve(scripts[wait.count - 1]!);
+    }
     return new Response(stream, {
       headers: { "content-type": "text/event-stream" },
     });
@@ -396,6 +413,12 @@ export function scriptedFetch(
       new Promise<Script>((resolve) => {
         waiting.push(resolve);
       }),
+    reached: (count) =>
+      count <= scripts.length
+        ? Promise.resolve(scripts[count - 1]!)
+        : new Promise<Script>((resolve) => {
+            counting.add({ count, resolve });
+          }),
     refuse(status, body = "", options = {}) {
       refusal = {
         status,
@@ -408,28 +431,118 @@ export function scriptedFetch(
       dropping = count;
     },
     chats: () => chats,
+    asked: (count) =>
+      count <= chats
+        ? Promise.resolve()
+        : new Promise<void>((resolve) => {
+            asking.add({ count, resolve });
+          }),
   };
 }
 
-export const tick = () => new Promise((r) => setTimeout(r, 5));
-
-// wait until the scripted provider has received at least `count`
-// requests and return the last one; a round the runner starts arrives
-// as a new script, so a test that drives several rounds waits for each
-// by count rather than racing next(). Up to 4 s, under a test's 5 s:
-// each bash command starts a worker, slower on a CI runner
-export async function waitScript(
-  scripted: Scripted,
-  count: number,
-  tries = 800,
-): Promise<Script> {
-  for (let i = 0; i < tries; i++) {
-    if (scripted.scripts.length >= count) return scripted.scripts[count - 1]!;
-    await tick();
+// filler of length UTF-16 units in which no 60 characters repeat, so
+// the repetition watch never takes it for a loop: piece and a counter,
+// again and again. A pair cut at the end is dropped
+export function varied(length: number, piece = "x"): string {
+  const parts: string[] = [];
+  let size = 0;
+  for (let i = 0; size < length; i++) {
+    const part = `${piece}${i.toString(36)} `;
+    parts.push(part);
+    size += part.length;
   }
-  throw new Error(
-    `only ${scripted.scripts.length} chat requests after ${tries} ticks, wanted ${count}`,
-  );
+  const text = parts.join("").slice(0, length);
+  const last = text.charCodeAt(text.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? text.slice(0, -1) : text;
+}
+
+// one turn of the event loop: what the in-memory fakes already queued
+// runs, never a wait for work that takes time
+export const tick = () => new Promise((r) => setTimeout(r, 0));
+
+// the count-th request to the scripted provider; a round the runner
+// starts arrives as a new script, so a test that drives several rounds
+// waits for each by count rather than racing next(). No budget of its
+// own: the test's timeout bounds a hang
+export function waitScript(scripted: Scripted, count: number): Promise<Script> {
+  return scripted.reached(count);
+}
+
+// the session's row once a commit leaves it no longer running and its
+// send let go of its place
+export function sessionSettled(app: TestApp, sessionId: string) {
+  return new Promise<ReturnType<TestApp["sessions"]["byId"]>>((resolve) => {
+    const check = () => {
+      const session = app.sessions.byId(sessionId);
+      if (session?.status === "running") return;
+      stop();
+      const held = app.runner.registry.get(sessionId);
+      // the runner frees the place right after it lets go
+      if (held === null) resolve(session);
+      else void held.drained.then(() => resolve(session));
+    };
+    const stop = subscribe((event) => {
+      if (event.type === "session.changed") check();
+    }, silent);
+    check();
+  });
+}
+
+// once check holds, checked now and after each bus event
+export function until(check: () => boolean): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (check()) return resolve();
+    const stop = subscribe(() => {
+      if (!check()) return;
+      stop();
+      resolve();
+    }, silent);
+  });
+}
+
+// once the session's send let go of its place, or at once with none
+export async function freed(app: TestApp, sessionId: string): Promise<void> {
+  const held = app.runner.registry.get(sessionId);
+  // the runner frees the place in the same turn it lets go
+  if (held !== null) await held.drained;
+}
+
+// once every send let go of its place; one still held after it let go
+// was never finalized, which the caller sees in the registry
+export async function idle(app: TestApp): Promise<void> {
+  for (;;) {
+    const held = app.runner.registry.values();
+    if (held.length === 0) return;
+    await Promise.all(held.map((send) => send.drained));
+    const kept = (send: (typeof held)[number]) =>
+      app.runner.registry.get(send.sessionId) === send;
+    if (held.every(kept)) return;
+  }
+}
+
+// done's value, ringing each fake clock sleep due within the horizon,
+// as a retry's backoff or a finalize's pause; a horizon short of the
+// app's minute timers, so it never walks the clock to a deadline
+export async function ringing<T>(
+  app: TestApp,
+  done: Promise<T>,
+  horizonMs: number,
+): Promise<T> {
+  let ended = false;
+  const result = done.finally(() => {
+    ended = true;
+  });
+  for (;;) {
+    if (ended) return result;
+    const due = app.sleeping().filter((at) => at <= app.now.value + horizonMs);
+    if (due.length > 0) {
+      app.now.value = Math.max(app.now.value, Math.min(...due));
+      // the rung sleep's continuation runs before the next look
+      await Promise.resolve();
+      continue;
+    }
+    await Promise.race([result, app.slept()]);
+  }
 }
 
 export type ChatApp = {

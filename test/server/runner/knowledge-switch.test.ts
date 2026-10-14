@@ -8,14 +8,10 @@ import {
 } from "../../../src/shared/capabilities.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 import { createAutomation, startRun } from "../../helpers/automations.ts";
-import { chatApp, tick, waitScript } from "../../helpers/chat.ts";
+import { chatApp, sessionSettled, waitScript } from "../../helpers/chat.ts";
 
 async function settled(chat: Awaited<ReturnType<typeof chatApp>>, id: string) {
-  for (let i = 0; i < 200; i++) {
-    if (chat.app.sessions.byId(id)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("send did not settle");
+  await sessionSettled(chat.app, id);
 }
 
 describe("the chat's knowledge switch", () => {
@@ -68,7 +64,7 @@ describe("the chat's knowledge switch", () => {
       await chat.app.shutdown();
     }
   });
-  test("a task run gets the docs off and a fork of it keeps them off", async () => {
+  test("a run gets the docs off and a fork of it keeps them off", async () => {
     const chat = await chatApp();
     try {
       const automation = await createAutomation(chat, {

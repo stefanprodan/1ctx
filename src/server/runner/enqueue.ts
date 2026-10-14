@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One message to a busy chat's queue (docs/sessions.md, The queue).
+// One message to a busy chat's queue (docs/queue.md, The queue).
 
 import type {
   QueuedResponse,

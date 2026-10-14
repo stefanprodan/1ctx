@@ -282,9 +282,12 @@ test.serial(
           disabledCapabilities,
         }),
       );
-      const tasks = await Promise.all(
+      const automations = await Promise.all(
         sets.map((disabledCapabilities, i) =>
-          createAutomation(chat, { name: `task-${i}`, disabledCapabilities }),
+          createAutomation(chat, {
+            name: `automation-${i}`,
+            disabledCapabilities,
+          }),
         ),
       );
       unsubscribe = subscribe((event) => events.push(event), silent);
@@ -319,7 +322,7 @@ test.serial(
       expect(chat.app.skills.byId(gitops.id)).not.toBeNull();
       for (const row of chats)
         expect(chat.app.sessions.byId(row.id)).toEqual(row);
-      for (const row of tasks)
+      for (const row of automations)
         expect(chat.app.automations.byId(row.id)).toEqual(row);
       expect(events).toEqual([]);
       expect((await chat.admin.call("DELETE", path)).status).toBe(200);
@@ -332,7 +335,7 @@ test.serial(
           ),
         });
       }
-      for (const row of tasks) {
+      for (const row of automations) {
         expect(chat.app.automations.byId(row.id)).toEqual({
           ...row,
           disabledCapabilities: row.disabledCapabilities.filter(

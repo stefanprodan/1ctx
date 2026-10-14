@@ -7,6 +7,7 @@
 // draws too (who, sizes, counts) are the tab's, in Knowledge.model.ts.
 
 import type { KnowledgeVersion } from "../../../../shared/contracts/knowledge.ts";
+import { FILE_EXISTS } from "../../../../shared/knowledge.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
 import type { PageStep } from "../../../ui/Page.tsx";
 import { listHref, newFileHref } from "../Knowledge.model.ts";
@@ -140,8 +141,8 @@ export function revisionSteps(
 // a refusal the path field owns: the name's rule, a taken name, a
 // folder that is a file, the same name
 export function pathFieldOf(message: string): string | undefined {
-  const path =
-    /^name must|^a file named|conflicts with file|is named .* already/i;
+  if (message === FILE_EXISTS) return "path";
+  const path = /^name must|conflicts with file|is named .* already/i;
   return path.test(message) ? "path" : undefined;
 }
 

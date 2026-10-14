@@ -374,7 +374,7 @@ describe("the kept files job at its edges", () => {
     try {
       const now = s.now.value;
       const cut = now - KEPT * DAY_MS;
-      const task = automation(s, 30);
+      const automationId = automation(s, 30);
       const taskCut = now - 30 * DAY_MS;
       const at = (
         fields: Parameters<typeof session>[1],
@@ -390,7 +390,7 @@ describe("the kept files job at its edges", () => {
       };
       const chat = { archivedDays: 0 };
       const orphan = { origin: "automation" as const };
-      const run = { origin: "automation" as const, automationId: task };
+      const run = { origin: "automation" as const, automationId };
       const onCut = [
         at(chat, "archived_at", cut),
         at(orphan, "last_activity_at", cut),
@@ -462,7 +462,8 @@ describe("the kept files job at its edges", () => {
         expect(
           every.mock.calls.filter(([, ms]) => ms === KEPT_PASS_MS),
         ).toHaveLength(1);
-        await Bun.sleep(5);
+        // shares a pass start began, so none is still to land
+        await job.pass();
         expect(packedOf(s, late)).toEqual([0]);
       } finally {
         every.mockRestore();

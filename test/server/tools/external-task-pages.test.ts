@@ -92,34 +92,47 @@ describe("the arguments", () => {
       parseExternalTaskArgs({ action: "list", id: "x" }, true),
     ).toThrow("id is not a field of list");
     expect(() =>
-      parseExternalTaskArgs({ action: "create", title: "T", text: "B" }),
+      parseExternalTaskArgs({ action: "create", title: "T", labels: ["b"] }),
     ).toThrow("action must be list, show");
     expect(() =>
       parseExternalTaskArgs(
-        { action: "release", id: "t", state: "claimed", text: "Why." },
+        { action: "unclaim", id: "t", state: "in_progress", text: "Why." },
         true,
       ),
-    ).toThrow("release needs the claimId show gave");
+    ).toThrow("unclaim needs the claimId show gave");
     expect(() =>
       parseExternalTaskArgs({ action: "edit", id: "t", editRevision: 0 }, true),
-    ).toThrow("edit needs a title, text, part or files to change");
+    ).toThrow("edit needs a title, labels or files to change");
     expect(() =>
       parseExternalTaskArgs({ action: "list", states: ["closed"] }, true),
     ).toThrow("states must be a list of");
     expect(
-      parseExternalTaskArgs({ action: "drop", id: "t", state: "open" }, true),
+      parseExternalTaskArgs({ action: "cancel", id: "t", state: "todo" }, true),
     ).toEqual({
-      action: "drop",
+      action: "cancel",
       id: "t",
-      body: { state: "open", text: "" },
+      body: { state: "todo", text: "" },
     });
+    for (const field of ["text", "scope"]) {
+      expect(() =>
+        parseExternalTaskArgs(
+          { action: "create", title: "T", labels: ["b"], [field]: "B" },
+          true,
+        ),
+      ).toThrow(`${field} is not a field of create`);
+    }
   });
 
   test("a subagent's forged write is refused with nothing written", async () => {
     using f = fixture();
     const result = await call(
       f,
-      { action: "create", title: "T", text: "B" },
+      {
+        action: "create",
+        title: "T",
+        labels: ["build"],
+        files: ["/knowledge/brief.md"],
+      },
       DEFAULT_LIMITS.resultCut,
       true,
     );
@@ -131,31 +144,23 @@ describe("the arguments", () => {
 });
 
 describe("pages", () => {
-  test("a brief past the cut reads on by offset, and a moved ref starts again", async () => {
+  test("a task has no brief text to read on: the agent reads its files", async () => {
     using f = fixture();
-    const brief = Array.from({ length: 120 }, (_, i) => `Step ${i}.`).join(
-      "\n",
-    );
-    const id = f.area.create(f.owner.id, f.projectId, {
-      title: "Long",
-      text: brief,
-      fileIds: [],
-    }).task.task.id;
-    const first = await ok(f, { action: "show", id }, 1000);
-    let read = quotedAfter(first, "Its brief");
-    let offset = number(first, /offset (\d+), ref 0\./);
-    while (!Number.isNaN(offset)) {
-      const page = await ok(f, { action: "show", id, offset, ref: 0 }, 1000);
-      read += quotedAfter(page, "Its brief");
-      offset = number(page, /ref 0, offset (\d+)\./);
+    const id = f.create("Long").id;
+    for (const [args, error] of [
+      [{ offset: 0, ref: 0 }, "Error: ref is not a field of show"],
+      [{ offset: 0 }, "Error: entry and offset go together, from the note"],
+      [
+        { before: "newest" },
+        "Error: before must be an entry id from this task's show",
+      ],
+    ] as const) {
+      const result = await call(f, { action: "show", id, ...args });
+      expect(result.content).toBe(error);
     }
-    expect(read).toBe(brief);
-    f.area.edit(id, { editRevision: 0, title: "Longer" });
-    const moved = await ok(f, { action: "show", id, offset: 50, ref: 0 }, 1000);
-    expect(moved).toStartWith(
-      "The brief changed since ref 0, so this starts again at 0.",
-    );
-    expect(moved).toContain("Characters 0 to ");
+    const shown = await ok(f, { action: "show", id });
+    expect(shown).not.toContain("Its brief");
+    expect(shown).toContain("Linked files, the brief, which its agent reads");
   });
 
   test("entries page newest first by before, never skipping or repeating", async () => {
@@ -194,14 +199,10 @@ describe("pages", () => {
 
   test("an entry longer than a page is cut and read on by its id", async () => {
     using f = fixture();
-    const held = f.task("claimed");
+    const held = f.task("in_progress");
     const long = "word ".repeat(600).trim();
     f.area.report(f.key, held.id, held.claimId!, "progress", long, []);
-    const first = await ok(
-      f,
-      { action: "show", id: held.id, before: "newest" },
-      1200,
-    );
+    const first = await ok(f, { action: "show", id: held.id }, 1200);
     expect(first).not.toContain("Its brief");
     const entry = /^Entry (\w+): progress/m.exec(first)![1]!;
     let read = quotedAfter(first, "Its text");
@@ -225,6 +226,25 @@ describe("pages", () => {
     expect(result.content).toBe("Error: no entry with that id on this task");
   });
 
+  test("a first list page ends with the project's labels, a later one does not", async () => {
+    using f = fixture();
+    expect(await ok(f, { action: "list" })).toBe(
+      "This project has no external tasks that are todo, in_progress, awaiting_input.\n\nLabels in this project: build (0 open), fix (0 open), plan (0 open), research (0 open).",
+    );
+    f.create("One");
+    f.advance();
+    f.create("Two");
+    const first = await ok(f, { action: "list" }, 550);
+    const lines = first.split("\n");
+    expect(lines.at(-2)).toBe(
+      "Labels in this project: build (2 open), fix (0 open), plan (0 open), research (0 open).",
+    );
+    const after = /after ([\w.]+)\.$/m.exec(first)![1]!;
+    const later = await ok(f, { action: "list", after }, 550);
+    expect(later).not.toContain("Labels in");
+    expect(later).toEndWith("The end of the list.");
+  });
+
   test("list pages by cursor under the cut", async () => {
     using f = fixture();
     const ids = new Set<string>();
@@ -236,7 +256,7 @@ describe("pages", () => {
     let args: Record<string, unknown> = { action: "list" };
     for (let pages = 0; pages < 12; pages++) {
       const page = await ok(f, args, 1000);
-      seen.push(...[...page.matchAll(/" id (\w+), open/g)].map((m) => m[1]!));
+      seen.push(...[...page.matchAll(/" id (\w+), labels/g)].map((m) => m[1]!));
       const after = /after ([\w.]+)\.$/m.exec(page)?.[1];
       if (after === undefined) {
         expect(page).toEndWith("The end of the list.");
@@ -250,44 +270,93 @@ describe("pages", () => {
 });
 
 describe("show and moves", () => {
+  test("a list keeps the last report after a claim, and a deleted user's key is named", async () => {
+    using f = fixture();
+    const held = f.task("in_progress");
+    f.area.report(f.key, held.id, held.claimId!, "progress", "Halfway.", []);
+    f.area.agentUnclaim(f.key, held.id, held.claimId!, "Later.");
+    f.area.claim(f.key, held.id);
+    const list = await ok(f, { action: "list" });
+    expect(list).toContain('last unclaim 1970-01-02 00:00: "Later."');
+    expect(list).not.toContain("last claim");
+    f.db.exec("update external_task_entries set user_id = null");
+    const shown = await ok(f, { action: "show", id: held.id });
+    expect(shown).toMatch(
+      /^Entry \w+: claim by a deleted user via laptop at /m,
+    );
+    expect(shown).not.toContain("by 1ctx");
+  });
+
   test("a page ending on a cut entry points on only while older ones remain", async () => {
     using f = fixture();
-    const held = f.task("claimed");
+    const held = f.task("in_progress");
     const long = "word ".repeat(600).trim();
-    f.area.report(f.key, held.id, held.claimId!, "progress", long, []);
-    // the oldest of the two is the long one, cut on its own page
+    const longId = f.area.report(
+      f.key,
+      held.id,
+      held.claimId!,
+      "progress",
+      long,
+      [],
+    ).entry.id;
+    // the long one is cut on its own page, the claim's entry older still
+    const cut = await ok(f, { action: "show", id: held.id }, 1200);
+    expect(cut).toContain("cut: characters 0 to");
+    expect(cut).toContain(`before ${longId}.`);
     const last = await ok(
       f,
-      { action: "show", id: held.id, before: "newest" },
+      { action: "show", id: held.id, before: longId },
       1200,
     );
-    expect(last).toContain("cut: characters 0 to");
+    expect(last).toMatch(
+      new RegExp(
+        `^Entry \\w+: claim by @owner via laptop at .+, claim ${held.claimId}$`,
+        "m",
+      ),
+    );
     expect(last).not.toContain("More entries");
     // a different text, since a repeat of the last entry adds none
     f.area.report(f.key, held.id, held.claimId!, "progress", `${long}.`, []);
-    const newer = await ok(
-      f,
-      { action: "show", id: held.id, before: "newest" },
-      1200,
-    );
+    const newer = await ok(f, { action: "show", id: held.id }, 1200);
     const shownId = /^Entry (\w+): progress/m.exec(newer)![1]!;
     expect(newer).toContain(`before ${shownId}.`);
   });
 
-  test("only a claimed task says when it is released", async () => {
+  test("entries read as their plain text, never the page's HTML", async () => {
     using f = fixture();
-    const idle = "A claimed task is released after 24 hours without a report.";
-    for (const state of ["open", "blocked", "done", "dropped"] as const) {
+    const held = f.task("in_progress");
+    const text = "**Half** done, see https://example.test/pull/1";
+    f.area.report(f.key, held.id, held.claimId!, "progress", text, []);
+    for (const args of [{ action: "list" }, { action: "show", id: held.id }]) {
+      const content = await ok(f, args);
+      expect(content).toContain("Half");
+      expect(content).not.toMatch(/<strong>|<a |"html"/);
+    }
+    expect(await ok(f, { action: "show", id: held.id })).toContain(
+      "**Half** done",
+    );
+  });
+
+  test("only a task in progress says when it is unclaimed", async () => {
+    using f = fixture();
+    const idle =
+      "A task in progress is unclaimed after 24 hours without a report.";
+    for (const state of [
+      "todo",
+      "awaiting_input",
+      "done",
+      "canceled",
+    ] as const) {
       const task = f.task(state);
       expect(await ok(f, { action: "show", id: task.id })).not.toContain(idle);
     }
-    const claimed = f.task("claimed");
+    const claimed = f.task("in_progress");
     expect(await ok(f, { action: "show", id: claimed.id })).toContain(idle);
   });
 
-  test("answer and drop may name the claim they saw and are held to it", async () => {
+  test("answer and cancel may name the claim they saw and are held to it", async () => {
     using f = fixture();
-    const blocked = f.task("blocked");
+    const blocked = f.task("awaiting_input");
     const stale =
       "Error: the task changed since you read it: nothing was written. Show it again and check with the user";
     const entries = () => f.area.store.byId(blocked.id)!.entries;
@@ -295,11 +364,11 @@ describe("show and moves", () => {
     for (const args of [
       {
         action: "answer",
-        state: "blocked",
+        state: "awaiting_input",
         claimId: "gone00000000",
         text: "A.",
       },
-      { action: "drop", state: "blocked", claimId: "gone00000000" },
+      { action: "cancel", state: "awaiting_input", claimId: "gone00000000" },
     ]) {
       const result = await call(f, { ...args, id: blocked.id });
       expect(result.content).toBe(stale);
@@ -309,24 +378,24 @@ describe("show and moves", () => {
       await ok(f, {
         action: "answer",
         id: blocked.id,
-        state: "blocked",
+        state: "awaiting_input",
         claimId: blocked.claimId,
         text: "Take path A.",
       }),
-    ).toContain("now claimed");
+    ).toContain("now in_progress");
     expect(
       await ok(f, {
-        action: "drop",
+        action: "cancel",
         id: blocked.id,
-        state: "claimed",
+        state: "in_progress",
         claimId: blocked.claimId,
       }),
-    ).toContain("now dropped");
-    const open = f.task("open");
+    ).toContain("now canceled");
+    const open = f.task("todo");
     const named = await call(f, {
-      action: "drop",
+      action: "cancel",
       id: open.id,
-      state: "open",
+      state: "todo",
       claimId: blocked.claimId,
     });
     expect(named.content).toBe(stale);
@@ -335,39 +404,39 @@ describe("show and moves", () => {
         await call(f, {
           action: "answer",
           id: open.id,
-          state: "open",
+          state: "todo",
           claimId: "",
         })
       ).content,
     ).toBe("Error: answer needs the text of the answer");
     expect(
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: " c1 " },
+        { action: "cancel", id: "t", state: "todo", claimId: " c1 " },
         true,
       ),
     ).toEqual({
-      action: "drop",
+      action: "cancel",
       id: "t",
-      body: { state: "open", text: "", claimId: "c1" },
+      body: { state: "todo", text: "", claimId: "c1" },
     });
     expect(() =>
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: "" },
+        { action: "cancel", id: "t", state: "todo", claimId: "" },
         true,
       ),
-    ).toThrow("drop needs the claimId show gave");
+    ).toThrow("cancel needs the claimId show gave");
     expect(
       parseExternalTaskArgs(
-        { action: "drop", id: "t", state: "open", claimId: null },
+        { action: "cancel", id: "t", state: "todo", claimId: null },
         true,
       ),
-    ).toEqual({ action: "drop", id: "t", body: { state: "open", text: "" } });
+    ).toEqual({ action: "cancel", id: "t", body: { state: "todo", text: "" } });
     expect(
       parseExternalTaskArgs(
         {
           action: "answer",
           id: "t",
-          state: "blocked",
+          state: "awaiting_input",
           text: "A",
           claimId: null,
         },
@@ -376,19 +445,19 @@ describe("show and moves", () => {
     ).toEqual({
       action: "answer",
       id: "t",
-      body: { state: "blocked", text: "A" },
+      body: { state: "awaiting_input", text: "A" },
     });
     expect(() =>
       parseExternalTaskArgs(
         {
-          action: "release",
+          action: "unclaim",
           id: "t",
-          state: "claimed",
+          state: "in_progress",
           text: "R",
           claimId: null,
         },
         true,
       ),
-    ).toThrow("release needs the claimId show gave");
+    ).toThrow("unclaim needs the claimId show gave");
   });
 });

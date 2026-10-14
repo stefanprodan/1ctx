@@ -34,6 +34,7 @@ import {
   deleteLine,
   descriptionProblem,
   memberOptions,
+  projectFieldOf,
 } from "../../../src/client/views/admin/AdminProjects.model.ts";
 import { AdminProjects } from "../../../src/client/views/admin/AdminProjects.tsx";
 import { ProjectPage } from "../../../src/client/views/admin/ProjectPage.tsx";
@@ -81,6 +82,7 @@ const detail: ProjectDetail = {
   ...team,
   description: "",
   members: [casey],
+  labels: [{ id: "l1", name: "build", description: "New work", tasks: 0 }],
   chats: 3,
   knowledge: { files: 0, tokens: 0 },
   latestFiles: [],
@@ -115,14 +117,25 @@ describe("the words", () => {
   test.serial("writes the member count and what a delete takes", () => {
     expect(countLine(detail)).toBe("1 member");
     expect(deleteLine(detail)).toBe(
-      "Deletes its 3 chats, scheduled tasks and memory. This cannot be undone.",
+      "Deletes its 3 chats, automations and memory. This cannot be undone.",
     );
     expect(deleteLine({ chats: 1, knowledge: { files: 2, tokens: 9 } })).toBe(
-      "Deletes its 1 chat, 2 knowledge files, scheduled tasks and memory. This cannot be undone.",
+      "Deletes its 1 chat, 2 knowledge files, automations and memory. This cannot be undone.",
     );
     expect(deleteLine({ chats: 0, knowledge: { files: 0, tokens: 0 } })).toBe(
-      "Deletes its scheduled tasks and memory. This cannot be undone.",
+      "Deletes its automations and memory. This cannot be undone.",
     );
+  });
+
+  test.serial("a new project's label refusal names its input", () => {
+    expect(projectFieldOf("labels.2.name must be 1 to 24 lowercase")).toBe(
+      "labels.2.name",
+    );
+    expect(projectFieldOf("labels.0.description must be one line")).toBe(
+      "labels.0.description",
+    );
+    expect(projectFieldOf("labels must not repeat a name")).toBeUndefined();
+    expect(projectFieldOf("name is taken")).toBe("name");
   });
 
   test.serial("New project asks for a description", () => {
@@ -520,6 +533,13 @@ describe("the page", () => {
     expect(html).toContain('name="name"');
     expect(html).toContain('name="description"');
     expect(html).toContain('aria-required="true" rows="3"');
+    // the four labels, filled in and editable
+    for (const [i, name] of ["research", "plan", "build", "fix"].entries()) {
+      expect(html).toContain(`name="labels.${i}.name"`);
+      expect(html).toContain(`value="${name}"`);
+    }
+    expect(html).toContain('value="A defect or failure to correct"');
+    expect(html).toContain("Add label");
   });
 
   test.serial("a project's page has its cards and its aside", async () => {
@@ -538,6 +558,10 @@ describe("the page", () => {
     expect(html).toContain(">Delete platform<");
     expect(html).toContain("Deletes its 3 chats");
     expect(html).toContain(">not priced<");
+    // the labels are read here and written on the project's Settings tab
+    expect(html).toContain(">build<");
+    expect(html).toContain(">New work<");
+    expect(html).toContain('href="/projects/p2/settings">Manage<');
   });
 
   test.serial("a detail that failed shows while the list still loads", () => {

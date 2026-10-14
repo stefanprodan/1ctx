@@ -14,8 +14,10 @@ import {
   type ChatApp,
   chatApp,
   FLASH,
+  freed,
   startChat,
   tick,
+  waitScript,
 } from "../helpers/chat.ts";
 
 const BOUND = 10_000;
@@ -29,10 +31,7 @@ const message = (chat: ChatApp, sessionId: string, text: string) =>
 async function idleChat(chat: ChatApp, text = "first") {
   const started = await startChat(chat, text);
   started.script.reply("done");
-  for (let i = 0; i < 100; i++) {
-    if (chat.app.runner.registry.get(started.sessionId) === null) break;
-    await tick();
-  }
+  await freed(chat.app, started.sessionId);
   return started.sessionId;
 }
 
@@ -179,9 +178,7 @@ describe("a drain", () => {
       db: chat.app.db,
       fetcher: chat.scripted.fetcher,
     });
-    for (let i = 0; i < 100 && chat.scripted.scripts.length < 4; i++) {
-      await tick();
-    }
+    await waitScript(chat.scripted, 4);
     expect(chat.scripted.scripts).toHaveLength(4);
     const sent = chat.scripted.scripts
       .slice(2)

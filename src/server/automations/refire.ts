@@ -30,10 +30,10 @@ export function cutRuns(
 }
 
 // a suspend, the flag turned off, or a later run whatever its end,
-// leaves the cut one alone. The run of a task its own fire suspended
-// reruns and the task stays suspended, since suspend cannot tell a rerun
-// to stop; only that run, never a later Run now, nor once its agent is
-// deleted
+// leaves the cut one alone. The run of an automation its own fire
+// suspended reruns and the automation stays suspended, since suspend
+// cannot tell a rerun to stop; only that run, never a later Run now, nor
+// once its agent is deleted
 export function stillCut(
   row: AutomationSummary,
   listed: Cut | undefined,

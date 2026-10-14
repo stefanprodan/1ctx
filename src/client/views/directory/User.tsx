@@ -87,37 +87,15 @@ function UserActivity({
   );
 }
 
-// the text they wrote, then the time where they are, so a reader can
-// tell whether they are likely at work now
-function AboutTab({
-  about,
-  tz,
-  now,
-}: {
-  about: string;
-  tz: string;
-  now: number;
-}) {
-  const time = localTime(tz, now);
-  return (
-    <>
-      {about === "" ? (
-        <RowsNote>Nothing written yet.</RowsNote>
-      ) : (
-        <RowsBlock>
-          <p class="directory-about">{about}</p>
-        </RowsBlock>
-      )}
-      {time !== "" && (
-        <RowsBlock>
-          <p class="directory-foot">
-            <Icon name="clock" size={14} />
-            <span class="directory-foot-name">Local time</span>
-            {time}
-          </p>
-        </RowsBlock>
-      )}
-    </>
+// the text they wrote; the time where they are is in the aside, and in
+// the head where the aside hides
+function AboutTab({ about }: { about: string }) {
+  return about === "" ? (
+    <RowsNote>Nothing written yet.</RowsNote>
+  ) : (
+    <RowsBlock>
+      <p class="directory-about">{about}</p>
+    </RowsBlock>
   );
 }
 
@@ -156,6 +134,8 @@ export function User({ params }: { params: Params }) {
     answer !== null && answer.user.username === username ? answer : null;
   // the local time moves on the minute
   const now = useNow(60_000);
+  // empty for a zone the browser does not know, then only the zone shows
+  const time = shown === null ? "" : localTime(shown.user.tz, now);
   const self = me.value?.id === shown?.user.id;
   const tab = userTab(path.value, username);
   const tabs = shown === null ? [] : userTabs(username, shown);
@@ -210,9 +190,7 @@ export function User({ params }: { params: Params }) {
                 {shown.user.email}
               </AsideLine>
               <AsideLine label="Role">{roleWords(shown.user.role)}</AsideLine>
-              <AsideLine label="Local time">
-                {localTime(shown.user.tz, now)}
-              </AsideLine>
+              {time !== "" && <AsideLine label="Local time">{time}</AsideLine>}
               <AsideLine label="Zone" cut>
                 {shown.user.tz}
               </AsideLine>
@@ -232,7 +210,7 @@ export function User({ params }: { params: Params }) {
               {/* the aside holds these, and it is hidden this narrow */}
               <WhoLine narrow>{shown.user.email}</WhoLine>
               <WhoLine narrow>
-                {localTime(shown.user.tz, now)} in {shown.user.tz}
+                {time === "" ? shown.user.tz : `${time} in ${shown.user.tz}`}
               </WhoLine>
             </Who>
             <UserActivity username={username} userId={shown.user.id} />
@@ -247,13 +225,7 @@ export function User({ params }: { params: Params }) {
                 }
                 tabs={<Tabs tabs={tabs} active={tabs[tab].href} head />}
               >
-                {tab === 0 && (
-                  <AboutTab
-                    about={shown.user.about}
-                    tz={shown.user.tz}
-                    now={now}
-                  />
-                )}
+                {tab === 0 && <AboutTab about={shown.user.about} />}
                 {tab === 1 && <ProjectsTab shown={shown} self={self} />}
               </RowsCard>
             </Rows>

@@ -12,7 +12,13 @@ import {
   STREAM_IDLE_MS,
 } from "../../src/server/runner/round.ts";
 import { collectLogs } from "../helpers/app.ts";
-import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
+import {
+  chatApp,
+  startChat,
+  tick,
+  varied,
+  waitScript,
+} from "../helpers/chat.ts";
 import { answerNodes } from "../helpers/tool-loop.ts";
 
 describe("the terminal transition", () => {
@@ -211,8 +217,8 @@ describe("the terminal transition", () => {
     const chat = await chatApp();
     const { detail, script } = await startChat(chat);
     const half = Math.floor(MAX_REPLY_BYTES / 2);
-    script.reasoning("x".repeat(half));
-    script.content("y".repeat(MAX_REPLY_BYTES - half + 1));
+    script.reasoning(varied(half));
+    script.content(varied(MAX_REPLY_BYTES - half + 1, "y"));
     await tick();
     await tick();
     expect(chat.app.sessions.send(detail.send.id)).toMatchObject({

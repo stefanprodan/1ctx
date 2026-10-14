@@ -40,7 +40,7 @@ const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   ...existing,
 });
 const web = { mode: "all" as const, domains: [] };
-const noDocs = () => ({ caps: DEFAULT_LIMITS, live: [] });
+const noDocs = () => ({ caps: DEFAULT_LIMITS, live: [], labels: [] });
 // every key usable and nothing bound yet
 const creds: CredentialsView = { key: () => "ok", list: () => [] };
 const secret = (kind: SecretKind, name: string) =>
@@ -91,6 +91,37 @@ describe("provision documents", () => {
       expect(() => parse([input])).toThrow(field!);
     },
   );
+
+  test("a project's labels are shaped and held to the cap with the live ones", () => {
+    const docs = parse([
+      source("Project", "nebula", {
+        labels: [{ name: " Ops ", description: "Pages" }, { name: "build" }],
+      }),
+    ]);
+    expect(docs[0]?.spec).toEqual({
+      labels: [{ name: "ops", description: "Pages" }, { name: "build" }],
+    });
+    check(docs);
+    const live = Array.from({ length: 19 }, (_, i) => `l${i}`);
+    const held = () => ({ caps: DEFAULT_LIMITS, live: [], labels: live });
+    const run = (labels: unknown, existing = ["nebula"]) =>
+      preflight(
+        parse([source("Project", "nebula", { labels })]),
+        inventory({ Project: existing }),
+        secret,
+        web,
+        held,
+        creds,
+      );
+    // a listed label the project holds counts once
+    run([{ name: "l0" }, { name: "ops" }]);
+    expect(() => run([{ name: "ops" }, { name: "infra" }])).toThrow(
+      "Project/nebula: spec.labels would leave more than 20 labels",
+    );
+    // a new project gets the listed ones alone, and at least one
+    run([{ name: "ops" }, { name: "infra" }], []);
+    expect(() => run([], [])).toThrow("spec.labels must list at least one");
+  });
 
   test("a name may appear once per kind, but not twice across files", () => {
     const a = source("Project", "nebula", {}, "a.yaml");
@@ -252,6 +283,26 @@ describe("provision documents", () => {
     ],
     ["Project", "nebula", { description: "two\nlines" }, "description"],
     ["Project", "nebula", { members: ["zed-user", "zed-user"] }, "members"],
+    ["Project", "nebula", { labels: [{ name: "back end" }] }, "labels.0.name"],
+    [
+      "Project",
+      "nebula",
+      { labels: [{ name: "ops" }, { name: "OPS" }] },
+      "labels.1.name",
+    ],
+    [
+      "Project",
+      "nebula",
+      { labels: [{ name: "ops", description: "x".repeat(101) }] },
+      "labels.0.description",
+    ],
+    [
+      "Project",
+      "nebula",
+      { labels: [{ name: "ops", colour: "red" }] },
+      "labels.0.colour",
+    ],
+    ["Project", "nebula", { labels: "ops" }, "labels"],
     [
       "Provider",
       "mock-provider",
@@ -310,6 +361,21 @@ describe("provision documents", () => {
       expect(() => parse([source(kind, name, spec)])).toThrow(`spec.${field}`);
     },
   );
+
+  test("a repeated label is named by its position, never its name", () => {
+    let message = "";
+    try {
+      parse([
+        source("Project", "nebula", {
+          labels: [{ name: "secret-word" }, { name: "SECRET-WORD" }],
+        }),
+      ]);
+    } catch (err) {
+      message = (err as Error).message;
+    }
+    expect(message).toContain("spec.labels.1.name must not repeat");
+    expect(message).not.toContain("secret-word");
+  });
 
   test("accepts any string effort without checking a live provider", () => {
     for (const effort of [null, "", "future-level"]) {

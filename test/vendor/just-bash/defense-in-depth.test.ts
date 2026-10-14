@@ -145,7 +145,8 @@ describe("the defense-in-depth box on bun", () => {
     });
     handle.deactivate();
     ${settle};
-    await new Promise((done) => setTimeout(done, 50));
+    // a rejection nothing handles is reported before the next macrotask
+    await new Promise((done) => setTimeout(done, 0));
     console.log(JSON.stringify({ outcome, unhandled }));
   `;
 
@@ -178,7 +179,7 @@ describe("the defense-in-depth box on bun", () => {
       );
       const fs = new InMemoryFs();
       fs.writeFileLazy("/late.md", async () => {
-        await new Promise((done) => setTimeout(done, 5));
+        await new Promise((done) => setTimeout(done, 0));
         return "LATE\\n";
       });
       const bash = new Bash({ defenseInDepth: true, fs, customCommands: [probe] });

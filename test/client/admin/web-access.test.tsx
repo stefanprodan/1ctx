@@ -324,9 +324,9 @@ describe("the Web access page", () => {
         })) as unknown as typeof fetch;
       await loadWebUsage();
       const html = render(<WebAccess />);
-      expect(html).toMatch(/Fetches<span class="split-strong">9</);
-      expect(html).toMatch(/Searches<span class="split-strong">4</);
-      expect(html).toMatch(/Failed<span class="split-strong">2</);
+      expect(html).toMatch(/Fetches<\/span><span class="split-strong">9</);
+      expect(html).toMatch(/Searches<\/span><span class="split-strong">4</);
+      expect(html).toMatch(/Failed<\/span><span class="split-strong">2</);
       expect(html).toContain('href="/admin/monitor/usage"');
       globalThis.fetch = (async () =>
         Response.json(

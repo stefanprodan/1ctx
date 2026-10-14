@@ -1,18 +1,20 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ExternalTaskResponse } from "../../shared/api/external-tasks.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import { type KnowledgePort, taskActions } from "./actions.ts";
+import type { Principal } from "../lib/http.ts";
+import { taskActions } from "./actions.ts";
 import { chatTasks } from "./chat.ts";
+import type { ClosedFilter } from "./lists.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import type { ListInput } from "./rows.ts";
+import { type KnowledgePort, taskShow } from "./show.ts";
 import { ExternalTaskStore } from "./store.ts";
 import { taskSweeps } from "./sweeps.ts";
 
-export type { KnowledgePort } from "./actions.ts";
 export type { TaskKey } from "./rows.ts";
+export type { KnowledgePort, TaskRead } from "./show.ts";
 export type { ExternalTaskStore } from "./store.ts";
 
 export type ExternalTasksDeps = {
@@ -22,32 +24,18 @@ export type ExternalTasksDeps = {
   externalTaskDays(): number;
   knowledge: KnowledgePort;
   access: AccessPort;
+  // whether the principal may open the chat, as the chat's own route
+  // decides
+  chatOpens(principal: Principal, chatId: string): boolean;
+  // the projects Home lists waiting tasks from: those the principal
+  // reaches and belongs to or owns, so an admin is not handed every
+  // team's tasks
+  homeProjectIds(principal: Principal): string[];
 };
 
 export function externalTasksArea(deps: ExternalTasksDeps) {
   const store = new ExternalTaskStore(deps.db);
-  const show = (
-    id: string,
-    before: string | null,
-  ): ExternalTaskResponse | null => {
-    const task = store.byId(id);
-    if (task === null) return null;
-    const brief = store.brief(id)!;
-    const files = store.fileIds(id).map((fileId) => {
-      const live = deps.knowledge.file(task.projectId, fileId);
-      return {
-        fileId,
-        name: live?.name ?? deps.knowledge.deletedName(task.projectId, fileId),
-        revision: live?.revision ?? null,
-        deleted: live === null,
-      };
-    });
-    return {
-      task: { task, files, ...brief },
-      ...store.entries(id, before),
-      idleHours: deps.externalTaskIdleHours(),
-    };
-  };
+  const show = taskShow({ ...deps, store });
   const tasks = {
     store,
     projectOf: (id: string) => store.projectOf(id),
@@ -57,9 +45,17 @@ export function externalTasksArea(deps: ExternalTasksDeps) {
       ...store.byProject(projectId),
       idleHours: deps.externalTaskIdleHours(),
     }),
-    closed: (projectId: string, after: string | null, limit?: number) =>
-      store.closed(projectId, after, limit),
-    attention: (projectIds: string[]) => store.attention(projectIds),
+    closed: (
+      projectId: string,
+      after: string | null,
+      filter?: ClosedFilter,
+      limit?: number,
+    ) => store.closed(projectId, after, limit, filter),
+    waiting: (projectIds: string[]) => store.waiting(projectIds),
+    // the line an agent's first list page of a project ends with
+    openLabelCounts: (projectId: string) => store.openLabelCounts(projectId),
+    // the label task counts the project's detail carries
+    labelTasks: (projectId: string) => store.labelTasks(projectId),
     ...taskActions({ ...deps, store, show }),
     ...taskSweeps({ ...deps, store }),
   };
@@ -72,7 +68,12 @@ export function externalTasksArea(deps: ExternalTasksDeps) {
       show,
       actions: tasks,
     }),
-    routes: routes({ db: deps.db, access: deps.access, tasks }),
+    routes: routes({
+      db: deps.db,
+      access: deps.access,
+      homeProjectIds: deps.homeProjectIds,
+      tasks,
+    }),
   };
 }
 

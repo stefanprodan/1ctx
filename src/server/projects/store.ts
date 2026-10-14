@@ -1,6 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import {
+  DEFAULT_LABELS,
+  type LabelInput,
+  type ProjectLabel,
+} from "../../shared/contracts/label.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import { PERSONAL_PROJECT_NAME, type ProjectKind } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
@@ -43,6 +48,13 @@ export const summary = (
   createdAt: project.createdAt,
   memberCount,
 });
+
+// a write that lost a race to a unique index
+export const uniqueViolation = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === "SQLITE_CONSTRAINT_UNIQUE";
 
 export class ProjectStore {
   constructor(private readonly db: Db) {}
@@ -127,10 +139,13 @@ export class ProjectStore {
     return found > 0;
   }
 
+  // in the caller's transaction, so a project never exists without labels
   createTeam(fields: {
     ownerId: string;
     name: string;
     description: string;
+    // DEFAULT_LABELS when left out
+    labels?: readonly LabelInput[];
     now: number;
   }): ProjectRow {
     const id = newId();
@@ -139,6 +154,9 @@ export class ProjectStore {
         "insert into projects (id, kind, name, description, owner_id, created_at) values (?, 'team', ?, ?, ?, ?)",
       )
       .run(id, fields.name, fields.description, fields.ownerId, fields.now);
+    for (const label of fields.labels ?? DEFAULT_LABELS) {
+      this.addLabel(id, label, fields.now);
+    }
     return this.byId(id)!;
   }
 
@@ -178,13 +196,77 @@ export class ProjectStore {
     );
   }
 
-  describePersonal(userId: string, description: string): ProjectRow | null {
+  describe(id: string, description: string): ProjectRow | null {
+    this.db
+      .query("update projects set description = ? where id = ?")
+      .run(description, id);
+    return this.byId(id);
+  }
+
+  labels(projectId: string): ProjectLabel[] {
+    return this.db
+      .query<ProjectLabel, [string]>(
+        "select id, name, description from project_labels where project_id = ? order by name",
+      )
+      .all(projectId);
+  }
+
+  label(projectId: string, id: string): ProjectLabel | null {
+    return this.db
+      .query<ProjectLabel, [string, string]>(
+        "select id, name, description from project_labels where project_id = ? and id = ?",
+      )
+      .get(projectId, id);
+  }
+
+  labelCount(projectId: string): number {
+    return this.db
+      .query<{ n: number }, [string]>(
+        "select count(*) as n from project_labels where project_id = ?",
+      )
+      .get(projectId)!.n;
+  }
+
+  labelTaken(projectId: string, name: string, exceptId?: string): boolean {
+    return (
+      this.db
+        .query<{ n: number }, [string, string, string | null]>(
+          "select count(*) as n from project_labels where project_id = ? and name = ? and id != coalesce(?, '')",
+        )
+        .get(projectId, name, exceptId ?? null)!.n > 0
+    );
+  }
+
+  addLabel(projectId: string, label: LabelInput, now: number): string {
+    const id = newId();
     this.db
       .query(
-        "update projects set description = ? where owner_id = ? and kind = 'personal'",
+        "insert into project_labels (id, project_id, name, description, created_at) values (?, ?, ?, ?, ?)",
       )
-      .run(description, userId);
-    return this.personal(userId);
+      .run(id, projectId, label.name, label.description ?? "", now);
+    return id;
+  }
+
+  updateLabel(
+    projectId: string,
+    id: string,
+    fields: { name: string; description: string },
+  ): boolean {
+    return (
+      this.db
+        .query(
+          "update project_labels set name = ?, description = ? where project_id = ? and id = ?",
+        )
+        .run(fields.name, fields.description, projectId, id).changes > 0
+    );
+  }
+
+  removeLabel(projectId: string, id: string): boolean {
+    return (
+      this.db
+        .query("delete from project_labels where project_id = ? and id = ?")
+        .run(projectId, id).changes > 0
+    );
   }
 
   // the user and their project must either both exist or neither does
@@ -196,6 +278,7 @@ export class ProjectStore {
       )
       .run(id, PERSONAL_PROJECT_NAME, fields.userId, fields.now);
     this.addMember(id, fields.userId, fields.now);
+    for (const label of DEFAULT_LABELS) this.addLabel(id, label, fields.now);
     return this.byId(id)!;
   }
 }

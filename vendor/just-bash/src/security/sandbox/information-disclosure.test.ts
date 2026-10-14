@@ -70,7 +70,8 @@ describe("Information Disclosure Prevention", () => {
       expect(typeof result.exitCode).toBe("number");
     });
 
-    it("should not expose real username", async () => {
+    // (1ctx suite-platform) with no USER every output contains ""
+    it.skipIf(!process.env.USER)("should not expose real username", async () => {
       const result = await bash.exec(`
         whoami 2>&1 || echo "whoami handled"
       `);

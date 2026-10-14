@@ -9,14 +9,15 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
 
 - **An archived chat is read-only for good.** There is no unarchive;
   Fork is the way on. A run is never archived.
-- **Archiving expires pending task drafts in the same transaction.**
-  Packing changes no draft. Regenerate deletes pending drafts from the
-  sends it removes in its transaction, keeping decided records; fork
-  copies no drafts. A chat's deletion cascades to every draft.
-  Archive expiry, sweep expiry and regenerate removal return one
+- **Archiving expires pending automation drafts in the same
+  transaction.** Packing changes no draft. Regenerate deletes pending
+  drafts from the sends it removes in its transaction, keeping decided
+  records; fork copies no drafts. A chat's deletion cascades to every
+  draft. Archive expiry, sweep expiry and regenerate removal return one
   `draft.changed` per draft through nested `transact()`, so no watcher
   hears a state or removal that rolled back. Expiry carries the whole
-  draft as session detail reads it; removal carries its id and `removed: true`.
+  draft as session detail reads it; removal carries its id and
+  `removed: true`.
 - **Where archive is refused.** A send and regenerate in `startSend`'s
   transaction, compact in `startCompact`'s, never in `startSummary`,
   so a send an agent delete stops ends as a stop. `runner.send`,
@@ -46,11 +47,10 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
 - **The sweep is an ordered list of steps** (`sessions/sweep.ts`), run
   hourly and at startup. Each step takes at most `CHATS_PER_STEP`
   sessions, one transaction each that rechecks the row. First expire
-  pending task drafts at their 24-hour expiry, over the partial expiry
-  index, at most `CHATS_PER_STEP` drafts with one transaction each.
-  Then archive
-  idle chats, pack archived chats and free their scratch, pack ended
-  runs, delete old archived chats and orphaned runs.
+  pending automation drafts at their 24-hour expiry, over the partial
+  expiry index, at most `CHATS_PER_STEP` drafts with one transaction
+  each. Then archive idle chats, pack archived chats and free their
+  scratch, pack ended runs, delete old archived chats and orphaned runs.
 - **Scratch is skipped while a command holds it,** since a chat
   archived mid-send writes scratch until the stop lands. Scratch is the
   bash area's (`docs/bash.md`), reached through its port; the step
@@ -69,7 +69,7 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   is no age order. A walked session is checked by key (`KEPT_STILL`):
   archived chats and ended runs, none running, skipping those due for
   deletion (a chat archived past `archivedDeleteDays`, an orphaned run
-  past the same cut, a run past its task's retention). Each `>=`
+  past the same cut, a run past its automation's retention). Each `>=`
   mirrors its deleter's `<`.
 - **A batch reads, compresses, then writes.** It copies files' bytes up
   to `KEPT_BATCH_BYTES`, or one larger file, at most one walk step;

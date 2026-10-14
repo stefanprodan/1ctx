@@ -40,11 +40,15 @@ import {
   loadUserPage,
 } from "../data/directory.ts";
 import { loadExternalTask } from "../data/external-task.ts";
-import { loadExternalTasks } from "../data/external-tasks.ts";
+import {
+  loadExternalTasks,
+  rememberTasksView,
+  showClosed,
+} from "../data/external-tasks.ts";
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
+import { loadKnowledgePath } from "../data/knowledge-path.ts";
 import { loadLink } from "../data/links.ts";
-import { loadMarkedTasks } from "../data/marked-tasks.ts";
 import {
   loadAllUsage,
   loadMcp,
@@ -92,6 +96,8 @@ import { loadTools, loadVisualsUsage, loadWebUsage } from "../data/tools.ts";
 import { loadUploads } from "../data/uploads.ts";
 import { loadDays, loadRecentDays, loadWeek } from "../data/usage.ts";
 import { loadUsers, loadUserUsage, users } from "../data/users.ts";
+import { loadWaitingTasks } from "../data/waiting-tasks.ts";
+import type { TasksShow } from "../lib/hrefs.ts";
 import type { IconName } from "../lib/icons.tsx";
 import { DECISION_WORDS } from "../views/admin/Decisions.model.ts";
 import {
@@ -100,6 +106,7 @@ import {
   pickOf,
 } from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
+import { tasksAddressOf } from "../views/projects/ExternalTasks.model.ts";
 import { type Lazy, lazy } from "./lazy.ts";
 import type { Params } from "./params.ts";
 
@@ -117,8 +124,21 @@ export type Route = {
   // matches, with the query for a view filtered by it; a view never
   // fetches
   load?: (params: Params, query: URLSearchParams) => Promise<void>;
+  // run in place of load when only the query moved on the same path,
+  // for a view whose filter needs less than a whole reload; arriving
+  // and reload() still run load
+  loadQuery?: (params: Params, query: URLSearchParams) => Promise<void>;
   nav?: { label: string; icon: IconName; order: number };
 };
+
+// the feed's list under the address's search and pick, on Home (no
+// project) and a project's Feed tab
+const feedList = (project: string | null, query: URLSearchParams) =>
+  loadList({
+    project,
+    q: query.get("q")?.trim() ?? "",
+    ...listPick(pickOf(`?${query.toString()}`)),
+  });
 
 // a project page's head, tabs and aside
 const frame = (id: string) => [
@@ -131,6 +151,16 @@ const frame = (id: string) => [
 const framed = async (params: Params) => {
   await Promise.all(frame(params.id));
 };
+
+// the External tasks tab's view and search, kept for the pages that
+// lead back to it
+const tasksView = (params: Params, query: URLSearchParams) => {
+  const view = tasksAddressOf(`?${query.toString()}`);
+  rememberTasksView(params.id, view);
+  return view;
+};
+const closedOf = (projectId: string, show: TasksShow | null, q: string) =>
+  show === null ? Promise.resolve() : showClosed(projectId, { q, state: show });
 
 // the automation's two tabs share one view, so a tab change keeps the
 // page mounted instead of drawing it again
@@ -250,12 +280,10 @@ export const ROUTES: Route[] = [
     // the picked one or the personal; it comes from the rail's list,
     // waited for only when none is held
     load: async (_params, query) => {
-      const q = query.get("q")?.trim() ?? "";
-      const pick = listPick(pickOf(`?${query.toString()}`));
-      const rows = loadList({ project: null, q, ...pick });
+      const rows = feedList(null, query);
       const spent = loadWeek();
       const unsent = loadNotSent();
-      const marked = loadMarkedTasks();
+      const marked = loadWaitingTasks();
       const listed = loadProjects();
       if (projects.value === null) await listed;
       const target = composeProjectOf(projects.value, homeProjectId.value);
@@ -271,6 +299,9 @@ export const ROUTES: Route[] = [
         target === null ? Promise.resolve() : loadUploads(target.id),
       ]);
     },
+    // a search or a pick reads only the feed: nothing else on the page
+    // reads the query
+    loadQuery: (_params, query) => feedList(null, query),
     nav: { label: "Home", icon: "home", order: 1 },
   },
   {
@@ -295,7 +326,7 @@ export const ROUTES: Route[] = [
         personal === null ? Promise.resolve() : loadProjectAgents(personal.id),
       ]);
     },
-    nav: { label: "Projects", icon: "projects", order: 2 },
+    nav: { label: "Projects", icon: "projects", order: 3 },
   },
   // every list loads on each tab, so each tab's count shows
   ...tabRoutes(
@@ -319,7 +350,7 @@ export const ROUTES: Route[] = [
   ).map(
     (route, i): Route =>
       i === 0
-        ? { ...route, nav: { label: "Directory", icon: "users", order: 3 } }
+        ? { ...route, nav: { label: "Directory", icon: "users", order: 2 } }
         : route,
   ),
   {
@@ -327,19 +358,17 @@ export const ROUTES: Route[] = [
     view: lazy(() =>
       import("../views/projects/Project.tsx").then((m) => m.Project),
     ),
-    title: () => "Project",
+    title: () => "Feed",
     role: "authenticated",
     load: async (params, query) => {
       await Promise.all([
         ...frame(params.id),
-        loadList({
-          project: params.id,
-          q: query.get("q")?.trim() ?? "",
-          ...listPick(pickOf(`?${query.toString()}`)),
-        }),
+        feedList(params.id, query),
         loadUploads(params.id),
       ]);
     },
+    // as Home's: a search or a pick reads only the feed
+    loadQuery: (params, query) => feedList(params.id, query),
   },
   {
     path: "/projects/:id/automations",
@@ -359,7 +388,18 @@ export const ROUTES: Route[] = [
     ),
     title: () => "External tasks",
     role: "authenticated",
-    load: framed,
+    // ?show=done or ?show=canceled reads that closed page under ?q=;
+    // Open searches the list on the page. The frame comes first, so
+    // the closed read is for this project
+    load: async (params, query) => {
+      const { show, q } = tasksView(params, query);
+      await Promise.all([...frame(params.id), closedOf(params.id, show, q)]);
+    },
+    // a pick or a search reads only the closed page it names
+    loadQuery: async (params, query) => {
+      const { show, q } = tasksView(params, query);
+      await closedOf(params.id, show, q);
+    },
   },
   {
     path: "/projects/:id/memory",
@@ -405,6 +445,22 @@ export const ROUTES: Route[] = [
     },
   },
   {
+    // ?name= is the file's name, from a /knowledge/ path in a reply;
+    // the view moves to the file's page once the name is read
+    path: "/projects/:id/knowledge/path",
+    view: lazy(() =>
+      import("../views/knowledge/file/DocPage.tsx").then((m) => m.PathDoc),
+    ),
+    title: () => "Knowledge",
+    role: "authenticated",
+    load: async (params, query) => {
+      await Promise.all([
+        loadProject(params.id),
+        loadKnowledgePath(params.id, query.get("name") ?? ""),
+      ]);
+    },
+  },
+  {
     // ?folder= is where the path starts
     path: "/projects/:id/knowledge/new",
     view: lazy(() =>
@@ -423,7 +479,7 @@ export const ROUTES: Route[] = [
         (m) => m.NewAutomation,
       ),
     ),
-    title: () => "New scheduled task",
+    title: () => "New automation",
     role: "authenticated",
     // the list for the deadline limit and the tab's count
     load: async (params) => {

@@ -51,6 +51,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
   external: [
     "external_tasks",
     "external_task_files",
+    "external_task_labels",
     "external_task_claims",
     "external_task_entries",
   ],
@@ -62,6 +63,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "visits",
     "projects",
     "memberships",
+    "project_labels",
     "providers",
     "agents",
     "deciders",
@@ -283,7 +285,7 @@ function largest(result: ScanResult): StorageResponse["largest"] {
     add(parts, "knowledge", row.files + row.liveVersions);
     add(parts, "history", row.deletedVersions);
   }
-  const tasks = result.automations.map((automation: AutomationRow) => {
+  const automations = result.automations.map((automation: AutomationRow) => {
     const entry = runs.get(automation.id) ?? { parts: {}, count: 0 };
     return {
       ...naming(projects.get(automation.projectId), automation, true),
@@ -305,16 +307,21 @@ function largest(result: ScanResult): StorageResponse["largest"] {
       retentionDays: null,
     };
   });
-  return { projects: top(projectRows), chats: top(chats), tasks: top(tasks) };
+  return {
+    projects: top(projectRows),
+    chats: top(chats),
+    automations: top(automations),
+  };
 }
 
-// Kept is what only a delete removes, cleaned what a sweep or a task's
-// retention takes. A chat not archived is kept: the idle sweep archives
-// it and only a delete removes it. An archived chat and a run whose
-// task is gone go with the chats sweep, a run of a living task with its
-// task's retention, each with its uploads and kept MCP files. Usage
-// outlives every delete, so all of it is kept. Rows without a byte
-// count (usage, logins, the rest) are their table's pages on disk.
+// Kept is what only a delete removes, cleaned what a sweep or an
+// automation's retention takes. A chat not archived is kept: the idle
+// sweep archives it and only a delete removes it. An archived chat and a
+// run whose automation is gone go with the chats sweep, a run of a
+// living automation with its retention, each with its uploads and kept
+// MCP files. Usage outlives every delete, so all of it is kept. Rows
+// without a byte count (usage, logins, the rest) are their table's pages
+// on disk.
 function retention(
   result: ScanResult,
   limits: StorageLimits,

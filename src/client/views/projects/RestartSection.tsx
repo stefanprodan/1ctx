@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The task editor's After a restart step: one switch, drawn as the
+// The automation editor's After a restart step: one switch, drawn as the
 // Access step's rows, to start again a run a deploy stopped.
 
 import { Icon } from "../../lib/icons.tsx";

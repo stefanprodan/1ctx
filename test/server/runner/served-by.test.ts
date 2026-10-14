@@ -7,7 +7,13 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Wire } from "../../../src/shared/words.ts";
-import { type ChatApp, chatApp, startChat, tick } from "../../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  freed,
+  startChat,
+  tick,
+} from "../../helpers/chat.ts";
 
 const fixture = (name: string) =>
   Bun.file(
@@ -20,9 +26,7 @@ async function replay(wire: Wire, name: string) {
   const { script, sessionId } = await startChat(chat);
   script.sse(await fixture(name));
   script.end();
-  for (let i = 0; i < 100 && chat.app.runner.live(sessionId); i++) {
-    await tick();
-  }
+  await freed(chat.app, sessionId);
   const answer = chat.app.sessions
     .messages(sessionId)
     .find((row) => row.kind === "reply")!;
@@ -115,9 +119,7 @@ describe("who served a round", () => {
         `/api/sessions/${sessionId}/stop`,
       );
       expect(stop.status).toBeLessThan(300);
-      for (let i = 0; i < 100 && chat.app.runner.live(sessionId); i++) {
-        await tick();
-      }
+      await freed(chat.app, sessionId);
       const answer = chat.app.sessions
         .messages(sessionId)
         .find((row) => row.kind === "reply")!;
@@ -159,9 +161,7 @@ describe("who served a round", () => {
         }),
       );
       script.end();
-      for (let i = 0; i < 100 && chat.app.runner.live(sessionId); i++) {
-        await tick();
-      }
+      await freed(chat.app, sessionId);
       const answer = chat.app.sessions
         .messages(sessionId)
         .find((row) => row.kind === "reply")!;

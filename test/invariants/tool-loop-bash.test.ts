@@ -39,7 +39,7 @@ describe("bash in the tool loop", () => {
           "datetime",
           "webfetch",
           "visualize",
-          // a run never reads the project's tasks
+          // a run never reads the project's automations
           ...(origin === "chat" ? ["automation", "external_task"] : []),
           "bash",
           // a run never saves to the project's memory, nor marks itself
@@ -198,7 +198,7 @@ describe("a bash command that saves nothing", () => {
       ]);
       script.end();
       // the loop runs to its cap first: wait as long as the test may
-      const answer = await waitScript(chat.scripted, 2, 3_600);
+      const answer = await waitScript(chat.scripted, 2);
       const failed = logs.events.filter((event) => event.msg === "tool failed");
       expect(failed).toHaveLength(2);
       // a nonzero exit commits, so only the limit names a phase

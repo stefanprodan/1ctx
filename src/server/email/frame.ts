@@ -105,7 +105,7 @@ export function alertEmail(input: AlertEmail): Framed {
   // a name with a direction character would fail the subject check and
   // lose the email
   const name = stripBidi(input.automation);
-  const head = `The task ${name} in ${placeOf(input.project)} needs attention.`;
+  const head = `The automation ${name} in ${placeOf(input.project)} needs attention.`;
   const why =
     input.reason === null
       ? "A decider marked its run."

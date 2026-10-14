@@ -3,7 +3,12 @@
 
 import { describe, expect, test } from "bun:test";
 import { createAutomation } from "../../helpers/automations.ts";
-import { type ChatApp, chatApp, startChat, tick } from "../../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  sessionSettled,
+  startChat,
+} from "../../helpers/chat.ts";
 
 // a manual run of the automation, answered and settled
 async function ran(chat: ChatApp, automationId: string): Promise<string> {
@@ -14,11 +19,8 @@ async function ran(chat: ChatApp, automationId: string): Promise<string> {
   );
   const id = (await started.json()).session.id as string;
   (await pending).reply("done");
-  for (let i = 0; i < 100; i++) {
-    if (chat.app.sessions.byId(id)?.status !== "running") return id;
-    await tick();
-  }
-  throw new Error("run did not settle");
+  await sessionSettled(chat.app, id);
+  return id;
 }
 
 const usageRows = (chat: ChatApp, sessionId: string) =>
@@ -38,10 +40,7 @@ describe("deleting an automation with its runs", () => {
     ];
     const { sessionId: chatId, script } = await startChat(chat);
     script.reply("hi");
-    for (let i = 0; i < 100; i++) {
-      if (chat.app.sessions.byId(chatId)?.status !== "running") break;
-      await tick();
-    }
+    await sessionSettled(chat.app, chatId);
     expect(usageRows(chat, runs[0]!)).toBeGreaterThan(0);
 
     for (const query of ["runs=keep", "runs=delete&runs=delete", "other=1"]) {
@@ -95,10 +94,7 @@ describe("deleting an automation with its runs", () => {
     ).toBe(409);
     expect(chat.app.sessions.byId(running)).not.toBeNull();
     script.reply("done");
-    for (let i = 0; i < 100; i++) {
-      if (chat.app.sessions.byId(running)?.status !== "running") break;
-      await tick();
-    }
+    await sessionSettled(chat.app, running);
     await chat.app.shutdown();
   });
 });

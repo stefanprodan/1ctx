@@ -4,26 +4,24 @@
 import type {
   CreateExternalTaskRequest,
   ExternalTaskMoveRequest,
-  ExternalTaskSeenRequest,
   PatchExternalTaskRequest,
 } from "../../shared/api/external-tasks.ts";
 import type { MemberMove } from "../../shared/contracts/external-task.ts";
-import { isExternalTaskState } from "../../shared/words.ts";
+import { isExternalTaskState, MAX_SEARCH } from "../../shared/words.ts";
 import { fields, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { ID_SHAPE } from "../lib/ids.ts";
+import type { ClosedFilter } from "./lists.ts";
 import {
   checkBrief,
   checkEntry,
-  MAX_BRIEF_BYTES,
   MAX_ENTRY_BYTES,
   parseCursor,
 } from "./rules.ts";
 
 // JSON can escape each byte of text as six characters.
-export const MAX_TASK_BODY = 6 * MAX_BRIEF_BYTES + 4096;
 export const MAX_MOVE_BODY = 6 * MAX_ENTRY_BYTES + 1024;
-const BRIEF_KEYS = ["title", "text", "part", "fileIds"];
+const BRIEF_KEYS = ["title", "labels", "fileIds"];
 const ENTRY_ID = new RegExp(`^${ID_SHAPE}$`);
 
 function text(value: unknown, name: string): string {
@@ -34,28 +32,24 @@ function text(value: unknown, name: string): string {
 function briefValues(body: Record<string, unknown>) {
   const out: Partial<CreateExternalTaskRequest> = {};
   if (Object.hasOwn(body, "title")) out.title = text(body.title, "title");
-  if (Object.hasOwn(body, "text")) out.text = text(body.text, "text");
-  if (Object.hasOwn(body, "part")) {
-    out.part = body.part === null ? null : text(body.part, "part");
+  for (const key of ["labels", "fileIds"] as const) {
+    if (!Object.hasOwn(body, key)) continue;
+    const list = body[key];
+    if (!Array.isArray(list)) throw new BadRequest(`${key} must be a list`);
+    out[key] = list.map((item) => text(item, key));
   }
-  if (Object.hasOwn(body, "fileIds")) {
-    if (!Array.isArray(body.fileIds)) {
-      throw new BadRequest("fileIds must be a list");
-    }
-    out.fileIds = body.fileIds.map((id) => text(id, "fileId"));
-  }
+  // what a patch leaves out stands in as valid, checked on the task
   checkBrief({
     title: out.title ?? "Task",
-    text: out.text ?? "",
-    part: out.part ?? null,
-    fileIds: out.fileIds ?? [],
+    labels: out.labels ?? ["kept"],
+    fileIds: out.fileIds ?? ["kept"],
   });
   return out;
 }
 
 export function parseCreateTask(body: unknown): CreateExternalTaskRequest {
   const parsed = fields(body, BRIEF_KEYS);
-  for (const key of ["title", "text", "fileIds"]) {
+  for (const key of BRIEF_KEYS) {
     if (!Object.hasOwn(parsed, key)) {
       throw new BadRequest(`missing field ${key}`);
     }
@@ -63,8 +57,7 @@ export function parseCreateTask(body: unknown): CreateExternalTaskRequest {
   const values = briefValues(parsed);
   return {
     title: values.title!,
-    text: values.text!,
-    part: values.part ?? null,
+    labels: values.labels!,
     fileIds: values.fileIds!,
   };
 }
@@ -87,38 +80,61 @@ export function parsePatchTask(body: unknown): PatchExternalTaskRequest {
 
 export function parseMoveTask(
   body: unknown,
-  move: Exclude<MemberMove, "seen">,
+  move: MemberMove,
 ): ExternalTaskMoveRequest {
   const parsed = fields(
     body,
-    move === "release" ? ["state", "text", "claimId"] : ["state", "text"],
+    move === "unclaim" ? ["state", "text", "claimId"] : ["state", "text"],
   );
   if (!isExternalTaskState(parsed.state)) {
     throw new BadRequest("invalid task state");
   }
   const entry =
-    move === "drop" && !Object.hasOwn(parsed, "text")
+    move === "cancel" && !Object.hasOwn(parsed, "text")
       ? ""
       : text(parsed.text, "text");
   checkEntry(move, entry, []);
-  if (move !== "release") return { state: parsed.state, text: entry };
+  if (move !== "unclaim") return { state: parsed.state, text: entry };
   const claimId = text(parsed.claimId, "claimId");
   if (claimId === "") throw new BadRequest("claimId must not be empty");
   return { state: parsed.state, text: entry, claimId };
 }
 
-export function parseProjectTasks(url: URL) {
-  const get = queryParams(url, ["closed", "after"]);
+// ?closed=1&q=&state=&after=: the closed pages, narrowed by a search
+// and done or canceled
+export function parseProjectTasks(url: URL): {
+  closed: boolean;
+  after: string | null;
+  filter: ClosedFilter;
+} {
+  const get = queryParams(url, ["closed", "after", "q", "state"]);
   const closed = get("closed");
   const after = get("after");
+  const q = get("q");
+  const state = get("state");
   if (closed !== null && closed !== "1") {
     throw new BadRequest("closed must be 1");
   }
-  if (after !== null) {
-    if (closed === null) throw new BadRequest("after requires closed");
-    parseCursor(after);
+  for (const [name, value] of [
+    ["after", after],
+    ["q", q],
+    ["state", state],
+  ] as const) {
+    if (value !== null && closed === null) {
+      throw new BadRequest(`${name} requires closed`);
+    }
   }
-  return { closed: closed !== null, after };
+  if (after !== null) parseCursor(after);
+  if (q !== null && q.length > MAX_SEARCH)
+    throw new BadRequest("q is too long");
+  if (state !== null && state !== "done" && state !== "canceled") {
+    throw new BadRequest("state must be done or canceled");
+  }
+  return {
+    closed: closed !== null,
+    after,
+    filter: { q: (q ?? "").trim(), state },
+  };
 }
 
 export function parseTaskDetail(url: URL): string | null {
@@ -129,20 +145,8 @@ export function parseTaskDetail(url: URL): string | null {
   return before;
 }
 
-export function parseTaskAttention(url: URL): void {
-  if (queryParams(url, ["attention"])("attention") !== "1") {
-    throw new BadRequest("attention must be 1");
+export function parseTaskWaiting(url: URL): void {
+  if (queryParams(url, ["waiting"])("waiting") !== "1") {
+    throw new BadRequest("waiting must be 1");
   }
-}
-
-export function parseSeenTask(body: unknown): ExternalTaskSeenRequest {
-  const { attentionAt } = fields(body, ["attentionAt"]);
-  if (
-    typeof attentionAt !== "number" ||
-    !Number.isSafeInteger(attentionAt) ||
-    attentionAt < 0
-  ) {
-    throw new BadRequest("attentionAt must be a non-negative integer");
-  }
-  return { attentionAt };
 }

@@ -161,6 +161,11 @@ describe("the decider's page", () => {
     expect(html).toContain("typesafe/jev-1.13");
     expect(html).toContain("router · 32K · $0.05 input · default");
     expect(html).toContain("1 September 2026");
+    // the head holds the model's facts; the aside never repeats them
+    const aside = html.slice(html.indexOf('class="split-aside"'));
+    expect(aside).toContain('<span class="split-label">Added</span>');
+    expect(aside).not.toContain(">Provider<");
+    expect(aside).not.toContain(">Price<");
     expect(html).not.toContain("Manage");
     expect(html).not.toContain("cost");
   });
@@ -194,7 +199,7 @@ describe("the decider's page", () => {
   test.serial("lists each decision as the admin's list does, no link", () => {
     deciderPage.value = jev;
     const html = render(<Decider params={{ name: "jev" }} />);
-    expect(html).toContain(">Mark task runs that need attention<");
+    expect(html).toContain(">Mark runs that need attention<");
     expect(html).toContain(">Backs up the agent's own mark<");
     expect(html).not.toContain(">run-attention<");
     expect(html).not.toContain("/admin/config/decisions");

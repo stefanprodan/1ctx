@@ -4,8 +4,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import {
-  loadDraftTask,
-  taskFailing,
+  automationFailing,
+  loadDraftAutomation,
 } from "../../../src/client/data/session-drafts.ts";
 import { onSocket } from "../../../src/client/data/sessions.ts";
 import {
@@ -36,10 +36,10 @@ import {
 } from "../../../src/client/transcript/rows.ts";
 import type { AutomationDraft } from "../../../src/shared/contracts/automation-draft.ts";
 import {
+  automation,
+  automationDraft,
   createDraft,
   proposalRows,
-  task,
-  taskDraft,
 } from "../../fixtures/sessions/drafts.ts";
 
 // a text as tag characters, the way ASCII is smuggled
@@ -82,7 +82,7 @@ describe("which calls draw a line", () => {
       ]),
     );
     const first = createDraft({ id: "d1", messageId: "tool-a" });
-    const third = taskDraft("suspend", { id: "d3", messageId: "tool-c" });
+    const third = automationDraft("suspend", { id: "d3", messageId: "tool-c" });
     const lines = proposalLines(node, [third, first], chat);
     expect(lines.map((l) => l.kind === "draft" && l.draft.id)).toEqual([
       "d1",
@@ -110,7 +110,7 @@ describe("which calls draw a line", () => {
         kind: "inert",
         action: "resume",
         name: null,
-        taskId: "t",
+        automationId: "t",
       },
     ]);
     const created = turn(
@@ -125,7 +125,7 @@ describe("which calls draw a line", () => {
         kind: "inert",
         action: "create",
         name: "cert-expiry-check",
-        taskId: null,
+        automationId: null,
       },
     ]);
     const refused = turn(
@@ -148,14 +148,14 @@ describe("the line's words", () => {
     const by = { decidedBy: { id: "u2", username: "robin" }, ...at };
     expect(lineHead(createDraft())).toEqual({
       icon: "clock",
-      title: "New task",
+      title: "New automation",
       by: null,
       note: null,
     });
-    expect(lineHead(taskDraft("update")).title).toBe("Change");
-    expect(lineHead(taskDraft("suspend")).icon).toBe("pause");
-    expect(lineHead(taskDraft("resume")).icon).toBe("play");
-    expect(lineHead(taskDraft("run")).title).toBe("Run now");
+    expect(lineHead(automationDraft("update")).title).toBe("Change");
+    expect(lineHead(automationDraft("suspend")).icon).toBe("pause");
+    expect(lineHead(automationDraft("resume")).icon).toBe("play");
+    expect(lineHead(automationDraft("run")).title).toBe("Run now");
     const confirmed = (d: AutomationDraft) =>
       lineHead({ ...d, state: "confirmed", ...by });
     expect(confirmed(createDraft())).toEqual({
@@ -164,12 +164,12 @@ describe("the line's words", () => {
       by: { verb: "confirmed", username: "robin", at: 2_000 },
       note: null,
     });
-    expect(confirmed(taskDraft("update")).title).toBe("Changed");
-    expect(confirmed(taskDraft("suspend")).title).toBe("Suspended");
-    expect(confirmed(taskDraft("resume")).title).toBe("Resumed");
-    expect(confirmed(taskDraft("run")).title).toBe("Ran");
+    expect(confirmed(automationDraft("update")).title).toBe("Changed");
+    expect(confirmed(automationDraft("suspend")).title).toBe("Suspended");
+    expect(confirmed(automationDraft("resume")).title).toBe("Resumed");
+    expect(confirmed(automationDraft("run")).title).toBe("Ran");
     expect(
-      lineHead({ ...taskDraft("run"), state: "dismissed", ...by }),
+      lineHead({ ...automationDraft("run"), state: "dismissed", ...by }),
     ).toEqual({
       icon: "bolt",
       title: "Run now",
@@ -177,7 +177,7 @@ describe("the line's words", () => {
       note: null,
     });
     expect(lineHead({ ...createDraft(), state: "stale" }).note).toBe(
-      "not applied, the task changed",
+      "not applied, the automation changed",
     );
     expect(lineHead({ ...createDraft(), state: "expired" }).note).toBe(
       "not applied, expired",
@@ -194,14 +194,14 @@ describe("the line's words", () => {
     expect(lineDetail(once)).toBe("once");
     expect(
       lineDetail(
-        taskDraft("update", {
+        automationDraft("update", {
           fields: { instructions: "x", schedule: "0 1 * * *" },
         } as Partial<AutomationDraft>),
       ),
     ).toBe("schedule, instructions");
     expect(
       lineDetail(
-        taskDraft("update", {
+        automationDraft("update", {
           fields: {
             name: "x",
             ownMemory: true,
@@ -213,31 +213,35 @@ describe("the line's words", () => {
     ).toBe("name, memory, attention");
     expect(
       lineDetail(
-        taskDraft("update", {
+        automationDraft("update", {
           fields: { attentionGuidance: "" },
         } as Partial<AutomationDraft>),
       ),
     ).toBe("attention");
-    expect(lineDetail(taskDraft("run"))).toBeNull();
+    expect(lineDetail(automationDraft("run"))).toBeNull();
     expect(lineDetail({ ...createDraft(), state: "confirmed" })).toBeNull();
   });
 
-  test("the name links the task, the created task or the run", () => {
+  test("the name links the automation, the created automation or the run", () => {
     expect(nameTarget(createDraft(), false)).toBeNull();
     expect(
       nameTarget(
         { ...createDraft(), state: "confirmed", createdAutomationId: "new" },
         false,
       ),
-    ).toEqual({ kind: "task", id: "new" });
-    expect(nameTarget(taskDraft("suspend"), true)).toEqual({
-      kind: "task",
+    ).toEqual({ kind: "automation", id: "new" });
+    expect(nameTarget(automationDraft("suspend"), true)).toEqual({
+      kind: "automation",
       id: "task-1",
     });
-    expect(nameTarget(taskDraft("suspend"), false)).toBeNull();
+    expect(nameTarget(automationDraft("suspend"), false)).toBeNull();
     expect(
       nameTarget(
-        { ...taskDraft("run"), state: "confirmed", runSessionId: "run-1" },
+        {
+          ...automationDraft("run"),
+          state: "confirmed",
+          runSessionId: "run-1",
+        },
         true,
       ),
     ).toEqual({ kind: "run", id: "run-1" });
@@ -246,19 +250,19 @@ describe("the line's words", () => {
   test("only a create or an update opens", () => {
     expect(opens(createDraft())).toBe(true);
     const update = (fields: object) =>
-      taskDraft("update", { fields } as Partial<AutomationDraft>);
+      automationDraft("update", { fields } as Partial<AutomationDraft>);
     expect(opens(update({ name: "x" }))).toBe(true);
     expect(opens(update({ once: true }))).toBe(true);
     for (const action of ["suspend", "resume", "run"] as const) {
-      expect(opens(taskDraft(action))).toBe(false);
+      expect(opens(automationDraft(action))).toBe(false);
     }
   });
 
-  test("changed fields strike the task's value where it differs", () => {
+  test("changed fields strike the automation's value where it differs", () => {
     expect(
       changedFields(
         { name: "next", schedule: "0 9 * * *", tz: "UTC" },
-        task({ name: "old", schedule: "*/5 * * * *", tz: "UTC" }),
+        automation({ name: "old", schedule: "*/5 * * * *", tz: "UTC" }),
       ),
     ).toEqual([
       { label: "Name", value: "next", was: "old" },
@@ -272,11 +276,11 @@ describe("the line's words", () => {
     expect(changedFields({ name: "next" }, null)).toEqual([
       { label: "Name", value: "next", was: null },
     ]);
-    expect(changedFields({ once: true }, task({ once: false }))).toEqual([
+    expect(changedFields({ once: true }, automation({ once: false }))).toEqual([
       { label: "Run once", value: "yes", was: "no" },
     ]);
     expect(
-      changedFields({ ownMemory: false }, task({ ownMemory: true })),
+      changedFields({ ownMemory: false }, automation({ ownMemory: true })),
     ).toEqual([{ label: "Own memory", value: "no", was: "yes" }]);
     expect(changedFields({ ownMemory: false }, null)).toEqual([
       { label: "Own memory", value: "no", was: null },
@@ -303,7 +307,7 @@ describe("the line's words", () => {
     expect(
       updateTexts(
         { attentionGuidance: "Alert.", memoryGuidance: "Keep it." },
-        task({ memoryGuidance: "", attentionGuidance: "Old." }),
+        automation({ memoryGuidance: "", attentionGuidance: "Old." }),
       ),
     ).toEqual([
       { label: "Memory", value: "Keep it.", was: "" },
@@ -359,14 +363,15 @@ describe("the instructions as drawn", () => {
     ]);
   });
 
+  // past DIFF_CELLS no table is built: the middle is all removed, then all added
   test("a long text changed at both ends stays bounded", () => {
     const lines = Array.from({ length: 16_000 }, (_, i) => `step ${i}`);
     const after = [...lines];
     after[0] = "new first";
     after[lines.length - 1] = "new last";
-    const start = performance.now();
     const diff = lineDiff(lines.join("\n"), after.join("\n"));
-    expect(performance.now() - start).toBeLessThan(1000);
+    expect(diff.some((line) => line.kind === "same")).toBe(false);
+    expect(diff.filter((line) => line.kind === "removed")).toHaveLength(16_000);
     expect(diff.filter((line) => line.kind === "added")).toHaveLength(16_000);
     expect(diff[0]).toEqual({ kind: "removed", text: "step 0" });
     expect(diff.at(-1)).toEqual({ kind: "added", text: "new last" });
@@ -472,7 +477,7 @@ describe("the line", () => {
     const html = render(
       <Proposal line={{ key: "k", kind: "draft", draft: createDraft() }} />,
     );
-    expect(html).toContain("New task");
+    expect(html).toContain("New automation");
     expect(html).toContain("daily-digest");
     expect(html).toContain("every day at 09:00");
     expect(html).toContain('aria-label="Show details"');
@@ -501,7 +506,7 @@ describe("the line", () => {
     const dismissed = draw({ ...createDraft(), state: "dismissed", ...by });
     expect(dismissed).toContain("dismissed by");
     expect(draw({ ...createDraft(), state: "stale" })).toContain(
-      "not applied, the task changed",
+      "not applied, the automation changed",
     );
     expect(draw({ ...createDraft(), state: "expired" })).toContain(
       "not applied, expired",
@@ -516,11 +521,11 @@ describe("the line", () => {
           kind: "inert",
           action: "create",
           name: "cert-expiry-check",
-          taskId: null,
+          automationId: null,
         }}
       />,
     );
-    expect(html).toContain("New task");
+    expect(html).toContain("New automation");
     expect(html).toContain(
       '<span class="proposal-name">cert-expiry-check</span>',
     );
@@ -529,17 +534,17 @@ describe("the line", () => {
   });
 
   test.serial(
-    "a fork's line on a task names it, or a deleted task once it is gone",
+    "a fork's line on an automation names it, or a deleted automation once it is gone",
     async () => {
       globalThis.fetch = (async (url: string) =>
         String(url).endsWith("/gone-task")
           ? Response.json({ error: "no" }, { status: 404 })
           : Response.json({
-              automation: task({ id: "fork-task" }),
+              automation: automation({ id: "fork-task" }),
             })) as unknown as typeof fetch;
-      await loadDraftTask("fork-task");
-      await loadDraftTask("gone-task");
-      const draw = (taskId: string) =>
+      await loadDraftAutomation("fork-task");
+      await loadDraftAutomation("gone-task");
+      const draw = (automationId: string) =>
         render(
           <Proposal
             line={{
@@ -547,7 +552,7 @@ describe("the line", () => {
               kind: "inert",
               action: "suspend",
               name: null,
-              taskId,
+              automationId,
             }}
           />,
         );
@@ -556,23 +561,23 @@ describe("the line", () => {
       );
       const gone = draw("gone-task");
       expect(gone).toContain(
-        '<span class="proposal-name">a deleted task</span>',
+        '<span class="proposal-name">a deleted automation</span>',
       );
       expect(gone).toContain(INERT_WORDS);
     },
   );
 
   test.serial(
-    "a line on a task waits for it, then only an update has a chevron",
+    "a line on an automation waits for it, then only an update has a chevron",
     async () => {
       globalThis.fetch = (async () =>
-        Response.json({ automation: task() })) as unknown as typeof fetch;
-      loadDraftTask("task-1");
+        Response.json({ automation: automation() })) as unknown as typeof fetch;
+      loadDraftAutomation("task-1");
       await settle();
       const draw = (draft: AutomationDraft) =>
         render(<Proposal line={{ key: "k", kind: "draft", draft }} />);
       const update = draw(
-        taskDraft("update", {
+        automationDraft("update", {
           fields: { schedule: "0 9 * * *" },
         } as Partial<AutomationDraft>),
       );
@@ -581,13 +586,13 @@ describe("the line", () => {
       expect(update).toContain("schedule");
       expect(update).toContain('aria-label="Show details"');
       for (const action of ["suspend", "resume", "run"] as const) {
-        const html = draw(taskDraft(action));
+        const html = draw(automationDraft(action));
         expect(html).toContain("nightly-check");
         expect(html).not.toContain("Show details");
         expect(rowOf(html)).toContain(">Confirm</button>");
       }
       const ran = draw({
-        ...taskDraft("run"),
+        ...automationDraft("run"),
         state: "confirmed",
         runSessionId: "run-1",
         decidedBy: { id: "u2", username: "robin" },
@@ -595,7 +600,7 @@ describe("the line", () => {
       });
       expect(ran).toContain("Ran");
       expect(ran).toContain('href="/run/run-1"');
-      const rename = taskDraft("update", {
+      const rename = automationDraft("update", {
         fields: { name: "renamed" },
       } as Partial<AutomationDraft>);
       const pending = draw(rename);
@@ -614,24 +619,26 @@ describe("the line", () => {
   );
 });
 
-describe("a line whose task read fails", () => {
+describe("a line whose automation read fails", () => {
   test.serial(
-    "names the task, keeps both buttons and opens nothing, then a delete names it gone",
+    "names the automation, keeps both buttons and opens nothing, then a delete names it gone",
     async () => {
       globalThis.fetch = (async () =>
         Response.json(
           { error: "down" },
           { status: 502 },
         )) as unknown as typeof fetch;
-      await loadDraftTask("t-fail");
-      const update = taskDraft("update", {
+      await loadDraftAutomation("t-fail");
+      const update = automationDraft("update", {
         automationId: "t-fail",
         fields: { instructions: "new" },
       } as Partial<AutomationDraft>);
       const drawn = render(
         <Proposal line={{ key: "k", kind: "draft", draft: update }} />,
       );
-      expect(drawn).toContain('<span class="proposal-name">the task</span>');
+      expect(drawn).toContain(
+        '<span class="proposal-name">the automation</span>',
+      );
       expect(rowOf(drawn)).toContain(">Dismiss</button>");
       expect(rowOf(drawn)).toContain(">Confirm</button>");
       expect(drawn).not.toContain("Show details");
@@ -642,12 +649,12 @@ describe("a line whose task read fails", () => {
             kind: "inert",
             action: "suspend",
             name: null,
-            taskId: "t-fail",
+            automationId: "t-fail",
           }}
         />
       );
       expect(render(inert)).toContain(
-        '<span class="proposal-name">the task</span>',
+        '<span class="proposal-name">the automation</span>',
       );
       onSocket({
         type: "automationDeleted",
@@ -655,13 +662,13 @@ describe("a line whose task read fails", () => {
         projectId: "p1",
         runs: false,
       });
-      expect(taskFailing("t-fail")).toBe(false);
+      expect(automationFailing("t-fail")).toBe(false);
       expect(render(inert)).toContain(
-        '<span class="proposal-name">a deleted task</span>',
+        '<span class="proposal-name">a deleted automation</span>',
       );
       expect(
         render(<Proposal line={{ key: "k", kind: "draft", draft: update }} />),
-      ).toContain('<span class="proposal-name">a deleted task</span>');
+      ).toContain('<span class="proposal-name">a deleted automation</span>');
     },
   );
 });
@@ -678,13 +685,13 @@ describe("an opened line", () => {
   });
 
   test("an update strikes old values and shows only changed lines", () => {
-    const draft = taskDraft("update", {
+    const draft = automationDraft("update", {
       fields: {
         name: "renamed",
         instructions: "Check the queue.\nReport every failure.",
       },
     } as Partial<AutomationDraft>);
-    const html = render(<Details draft={draft} before={task()} />);
+    const html = render(<Details draft={draft} before={automation()} />);
     expect(html).toContain('<span class="proposal-was">nightly-check</span>');
     expect(html).toContain('<span class="proposal-value">renamed</span>');
     expect(html).toContain("proposal-removed");
@@ -760,8 +767,8 @@ describe("an opened line", () => {
     expect(diff).not.toContain("Show all");
   });
 
-  test("a guidance cleared on an unread task says None, not an empty box", () => {
-    const draft = taskDraft("update", {
+  test("a guidance cleared on an unread automation says None, not an empty box", () => {
+    const draft = automationDraft("update", {
       fields: { attentionGuidance: "" },
     } as Partial<AutomationDraft>);
     const html = render(<Details draft={draft} before={null} />);
@@ -771,7 +778,7 @@ describe("an opened line", () => {
   });
 
   test("an update draws each changed guidance as it draws instructions", () => {
-    const draft = taskDraft("update", {
+    const draft = automationDraft("update", {
       fields: {
         ownMemory: true,
         memoryGuidance: "Keep failing sources.",
@@ -781,7 +788,7 @@ describe("an opened line", () => {
     const html = render(
       <Details
         draft={draft}
-        before={task({
+        before={automation({
           ownMemory: false,
           memoryGuidance: "Keep everything.",
           attentionGuidance: "Only outages.\nAny error.",

@@ -3,8 +3,8 @@
 
 import { expect, test } from "bun:test";
 import type {
-  AttentionTasksResponse,
   ClosedTasksResponse,
+  WaitingTasksResponse,
 } from "../../../src/shared/api/external-tasks.ts";
 import {
   ATTENTION_ROWS,
@@ -34,9 +34,13 @@ test("closed pages sort latest first and continue without duplicating rows", asy
     } else {
       expect(
         (
-          await f.member.client.call("POST", `/api/external-tasks/${id}/drop`, {
-            body: { state: "open" },
-          })
+          await f.member.client.call(
+            "POST",
+            `/api/external-tasks/${id}/cancel`,
+            {
+              body: { state: "todo" },
+            },
+          )
         ).status,
       ).toBe(200);
     }
@@ -63,12 +67,74 @@ test("closed pages sort latest first and continue without duplicating rows", asy
   });
 });
 
+test("closed pages search the title, the labels and the creator, and filter done or canceled", async () => {
+  await using f = await httpFixture();
+  const key = await f.key();
+  const done = async (fields: object, client = f.creator.client) => {
+    const id = (await f.create(fields, client)).task.task.id;
+    const claim = f.app.externalTasks.claim(key, id);
+    f.app.externalTasks.report(key, id, claim.claimId, "result", "Done.", []);
+    f.app.now.value++;
+    return id;
+  };
+  const cancelled = async (fields: object, client = f.creator.client) => {
+    const id = (await f.create(fields, client)).task.task.id;
+    const response = await f.member.client.call(
+      "POST",
+      `/api/external-tasks/${id}/cancel`,
+      { body: { state: "todo" } },
+    );
+    expect(response.status).toBe(200);
+    f.app.now.value++;
+    return id;
+  };
+  const percent = await done({
+    title: "Ship 100% of the API",
+    labels: ["plan"],
+  });
+  const sweep = await cancelled({ title: "Sweep" }, f.member.client);
+  const under = await done(
+    { title: "Other web_ui", labels: ["fix"] },
+    f.member.client,
+  );
+  const plain = await cancelled({ title: "Webxui 100 points" });
+  await f.create({ title: "Still open API", labels: ["fix"] });
+  const ids = async (query: string) => {
+    const response = await f.member.client.call(
+      "GET",
+      `${f.base}?closed=1${query}`,
+    );
+    expect(response.status).toBe(200);
+    const page: ClosedTasksResponse = await response.json();
+    return page.tasks.map((row) => row.id);
+  };
+  expect(await ids("")).toEqual([plain, under, sweep, percent]);
+  expect(await ids("&state=done")).toEqual([under, percent]);
+  expect(await ids("&state=canceled")).toEqual([plain, sweep]);
+  expect(await ids("&q=api")).toEqual([percent]);
+  expect(await ids("&q=%20%20API%20")).toEqual([percent]);
+  expect(await ids("&q=member")).toEqual([under, sweep]);
+  expect(await ids("&q=member&state=canceled")).toEqual([sweep]);
+  // a label matches by its name now
+  expect(await ids("&q=fix")).toEqual([under]);
+  expect(await ids("&q=PLA")).toEqual([percent]);
+  expect(await ids("&q=build&state=canceled")).toEqual([plain, sweep]);
+  // the wildcards match as written
+  expect(await ids("&q=100%25")).toEqual([percent]);
+  expect(await ids("&q=b_u")).toEqual([under]);
+  expect(await ids("&q=nothing")).toEqual([]);
+  expect(await ids("&q=")).toEqual([plain, under, sweep, percent]);
+});
+
 test("detail entries continue by entry id through timestamp ties and new reports", async () => {
   await using f = await httpFixture();
   const id = (await f.create()).task.task.id;
   const key = await f.key();
   const claim = f.app.externalTasks.claim(key, id);
-  const ids: string[] = [];
+  // the claim's own entry is the oldest, paged like any other
+  const claimed = (await f.show(id)).entries;
+  expect(claimed.map((entry) => entry.kind)).toEqual(["claim"]);
+  const ids = [claimed[0]!.id];
   for (let i = 0; i < ENTRIES_PAGE + 3; i++) {
     ids.unshift(
       f.app.externalTasks.report(
@@ -110,131 +176,123 @@ test("detail entries continue by entry id through timestamp ties and new reports
   ).toBe(400);
 });
 
-test("attention is capped with a visible count and seen clears its mark", async () => {
+test("Home's waiting list is capped with a full count and holds only tasks awaiting input", async () => {
   await using f = await httpFixture();
   const key = await f.key();
   const ids: string[] = [];
   const personal = f.app.projects.personal(f.member.user.id)!.id;
+  const own = await f.file("own.md", personal, f.member.client);
   for (let i = 0; i < ATTENTION_ROWS + 3; i++) {
     const made =
       i === 0
-        ? await f.create({}, f.member.client, personal)
+        ? await f.create({ fileIds: [own] }, f.member.client, personal)
         : await f.create();
     const id = made.task.task.id;
     const claim = f.app.externalTasks.claim(key, id);
     f.app.now.value++;
-    f.app.externalTasks.report(
-      key,
-      claim.task.task.id,
-      claim.claimId,
-      "result",
-      "Finished.",
-      [],
-    );
-    ids.unshift(id);
+    f.app.externalTasks.report(key, id, claim.claimId, "question", "Q?", []);
+    ids.push(id);
+  }
+  // a result, a claim and a todo task never reach Home
+  for (const end of ["result", "progress", null] as const) {
+    const id = (await f.create()).task.task.id;
+    if (end === null) continue;
+    const claim = f.app.externalTasks.claim(key, id);
+    f.app.externalTasks.report(key, id, claim.claimId, end, "Here.", []);
   }
   const hiddenProject = f.app.projects.personal(f.creator.user.id)!.id;
-  const hidden = (await f.create({}, f.creator.client, hiddenProject)).task.task
-    .id;
+  const hidden = (
+    await f.create(
+      { fileIds: [await f.file("own.md", hiddenProject)] },
+      f.creator.client,
+      hiddenProject,
+    )
+  ).task.task.id;
   const hiddenClaim = f.app.externalTasks.claim(key, hidden);
   f.app.externalTasks.report(
     key,
-    hiddenClaim.task.task.id,
+    hidden,
     hiddenClaim.claimId,
     "question",
     "Private?",
     [],
   );
-  const attention = async (
+  const waiting = async (
     client = f.member.client,
-  ): Promise<AttentionTasksResponse> => {
-    const response = await client.call(
-      "GET",
-      "/api/external-tasks?attention=1",
-    );
+  ): Promise<WaitingTasksResponse> => {
+    const response = await client.call("GET", "/api/external-tasks?waiting=1");
     expect(response.status).toBe(200);
     return response.json();
   };
-  expect(await attention()).toMatchObject({ count: ids.length });
-  expect((await attention()).tasks.map((row) => row.id)).toEqual(
+  expect(await waiting()).toMatchObject({ count: ids.length });
+  expect((await waiting()).tasks.map((row) => row.id)).toEqual(
     ids.slice(0, ATTENTION_ROWS),
   );
-  expect(await attention(f.outsider.client)).toEqual({ tasks: [], count: 0 });
-  const id = ids[0]!;
-  const before = f.app.externalTasks.store.byId(id)!;
-  expect((await f.show(id)).task.task).toEqual(before);
-  expect((await attention()).count).toBe(ids.length);
-  const seen = await f.member.client.call(
-    "POST",
-    `/api/external-tasks/${id}/seen`,
-    { body: { attentionAt: before.attentionAt } },
-  );
-  expect(seen.status).toBe(200);
-  const result = await seen.json();
-  expect(result.task.task).toMatchObject({
-    attentionAt: null,
-    revision: before.revision + 1,
-    editRevision: before.editRevision,
-    movedAt: before.movedAt,
+  expect(await waiting(f.outsider.client)).toMatchObject({
+    tasks: [],
+    count: 0,
   });
-  expect((await attention()).count).toBe(ids.length - 1);
-  expect((await attention()).tasks).toHaveLength(ATTENTION_ROWS);
+  // a read leaves it, an answer takes it off
+  const id = ids[0]!;
+  await f.show(id);
+  expect((await waiting()).count).toBe(ids.length);
+  const answered = await f.member.client.call(
+    "POST",
+    `/api/external-tasks/${id}/answer`,
+    { body: { state: "awaiting_input", text: "Go." } },
+  );
+  expect(answered.status).toBe(200);
+  expect((await waiting()).count).toBe(ids.length - 1);
+  expect((await waiting()).tasks[0]!.id).toBe(ids[1]!);
+  // the old query and the old move are gone
+  expect(
+    (await f.member.client.call("GET", "/api/external-tasks?attention=1"))
+      .status,
+  ).toBe(400);
   expect(
     (
       await f.member.client.call("POST", `/api/external-tasks/${id}/seen`, {
-        body: { attentionAt: before.attentionAt },
+        body: { attentionAt: 1 },
       })
     ).status,
-  ).toBe(200);
-  expect((await f.show(id)).task.task.revision).toBe(before.revision + 1);
+  ).toBe(404);
 });
 
-test.serial(
-  "seen clears only the mark read before a later report",
-  async () => {
-    await using f = await httpFixture();
-    const id = (await f.create()).task.task.id;
-    const key = await f.key();
-    const claim = f.app.externalTasks.claim(key, id);
-    f.app.externalTasks.report(
-      key,
-      id,
-      claim.claimId,
-      "question",
-      "Which?",
-      [],
-    );
-    const question = await f.show(id);
-    f.app.now.value++;
-    f.app.externalTasks.report(key, id, claim.claimId, "result", "Done.", []);
-    const result = await f.show(id);
-    const conn = await f.connect(f.member.client);
-    const frames = () =>
-      conn.frames.filter((frame) => frame.type === "externalTask");
-    const seen = (attentionAt: number) =>
-      f.member.client.call("POST", `/api/external-tasks/${id}/seen`, {
-        body: { attentionAt },
-      });
-    expect(result.task.task.attentionAt).not.toBe(
-      question.task.task.attentionAt,
-    );
-    const stale = await seen(question.task.task.attentionAt!);
-    expect(stale.status).toBe(200);
-    expect(await stale.json()).toEqual(result);
-    expect(await f.show(id)).toEqual(result);
-    expect(frames()).toEqual([]);
-    const current = await seen(result.task.task.attentionAt!);
-    expect(current.status).toBe(200);
-    const cleared = await current.json();
-    expect(cleared.task.task).toEqual({
-      ...result.task.task,
-      attentionAt: null,
-      revision: result.task.task.revision + 1,
-    });
-    expect(frames()).toHaveLength(1);
-    const retry = await seen(result.task.task.attentionAt!);
-    expect(retry.status).toBe(200);
-    expect(await retry.json()).toEqual(cleared);
-    expect(frames()).toHaveLength(1);
-  },
-);
+test("Home lists waiting tasks only from the projects a user belongs to, an admin too", async () => {
+  await using f = await httpFixture();
+  const key = await f.key();
+  const id = (await f.create({ title: "Needs the team" })).task.task.id;
+  const claim = f.app.externalTasks.claim(key, id);
+  f.app.externalTasks.report(key, id, claim.claimId, "question", "Which?", []);
+  const attention = async (client: typeof f.admin) => {
+    const response = await client.call("GET", "/api/external-tasks?waiting=1");
+    expect(response.status).toBe(200);
+    return (await response.json()) as WaitingTasksResponse;
+  };
+  expect((await attention(f.member.client)).tasks.map((row) => row.id)).toEqual(
+    [id],
+  );
+  // the admin sees the team's tab, but its questions are the team's
+  const outside = await attention(f.admin);
+  expect(outside).toMatchObject({ tasks: [], count: 0 });
+  // the client drops frames from projects the read did not cover
+  expect(outside.projectIds).not.toContain(f.projectId);
+  const me = (await (await f.admin.call("GET", "/api/me")).json()).user;
+  const personal = f.app.projects.personal(me.id)!.id;
+  expect(outside.projectIds).toContain(personal);
+  const tab = await f.admin.call("GET", f.base);
+  expect(tab.status).toBe(200);
+  expect((await tab.json()).tasks.map((row: { id: string }) => row.id)).toEqual(
+    [id],
+  );
+  // once a member, the admin's Home has the team's questions
+  const joined = await f.admin.call(
+    "POST",
+    `/api/projects/${f.projectId}/members`,
+    { body: { userId: me.id } },
+  );
+  expect(joined.status).toBeLessThan(300);
+  const inside = await attention(f.admin);
+  expect(inside.tasks.map((row) => row.id)).toEqual([id]);
+  expect(inside.projectIds).toContain(f.projectId);
+});

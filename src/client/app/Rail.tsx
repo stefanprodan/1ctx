@@ -1,16 +1,16 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useSignal } from "@preact/signals";
 import { Fragment } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { automationProject } from "../data/automations.ts";
-import { logout } from "../data/me.ts";
+import { taskPage } from "../data/external-task.ts";
 import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
-import { initials, says } from "../lib/format.ts";
+import { initials } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
+import { PathName } from "../ui/PathName.tsx";
 import {
   adminFace,
   navLit,
@@ -18,12 +18,33 @@ import {
   projectHere,
   zoneLit,
 } from "./Rail.model.ts";
-import { navigate, path } from "./router.ts";
+import {
+  type RecentRow,
+  recentHref,
+  recentKey,
+  recentLook,
+  recentText,
+  statusKey,
+} from "./Recent.model.ts";
+import { pickRecent, recent, recentStatus } from "./Recent.state.ts";
+import { path } from "./router.ts";
 import { navEntries } from "./routes.ts";
 import { lastAdmin, lastWork } from "./shell.ts";
-import { theme, toggleTheme } from "./theme.ts";
+import { toggleUserMenu, UserMenu, userMenuOpen } from "./UserMenu.tsx";
 import { ZONES } from "./zones.ts";
 import "./rail.css";
+
+// the project of the page on screen, which a chat, a run, an
+// automation and an external task name only once their row is read
+export function projectOnScreen(here: string): string | null {
+  const task = taskPage.value;
+  return projectHere(
+    here,
+    session.value,
+    automationProject.value,
+    task && { id: task.id, projectId: task.detail.task.projectId },
+  );
+}
 
 function Sub({
   href,
@@ -57,6 +78,47 @@ function Sub({
         children
       )}
     </a>
+  );
+}
+
+// the pages opened last, under the entries' icons; a title is a
+// sentence, cut to the rail with the whole of it on hover. The icon
+// takes the row's live status, coloured as its own list draws it
+function Recent({ here, follow }: { here: string; follow?: () => void }) {
+  const rows = recent.value;
+  const statuses = recentStatus.value;
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <span class="rail-label">Recent</span>
+      {rows.map((row: RecentRow) => {
+        const href = recentHref(row);
+        const text = recentText(row);
+        const look = recentLook(row, statuses[statusKey(row)]);
+        return (
+          <a
+            key={recentKey(row)}
+            href={href}
+            class={`rail-sub rail-sub-icon rail-recent${onPage(here, href) ? " rail-sub-on" : ""}`}
+            aria-current={here === href ? "page" : undefined}
+            title={text}
+            onClick={(e) => {
+              pickRecent(row, e);
+              follow?.();
+            }}
+          >
+            <Icon
+              name={look.icon}
+              size={14}
+              class={`rail-sub-glyph${look.tone ? ` status-${look.tone}` : ""}`}
+            />
+            <span class="rail-sub-name">
+              {row.kind === "file" ? <PathName name={text} /> : text}
+            </span>
+          </a>
+        );
+      })}
+    </>
   );
 }
 
@@ -103,11 +165,9 @@ export function Rail({
   narrow: boolean;
   onHide: () => void;
 }) {
-  const open = useSignal(false);
-  const failure = useSignal<string | null>(null);
   const here = path.value;
   const admin = adminFace(here);
-  const inProject = projectHere(here, session.value, automationProject.value);
+  const inProject = projectOnScreen(here);
   const hide = useRef<HTMLButtonElement>(null);
   const nav = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -117,7 +177,7 @@ export function Rail({
   // view when it sits below the fold, after a reload or a link elsewhere
   useEffect(() => {
     nav.current
-      ?.querySelector(".rail-sub-on")
+      ?.querySelector(".rail-sub-on:not(.rail-recent)")
       ?.scrollIntoView({ block: "nearest" });
   }, [here, inProject, projects.value]);
   // a link to the page on screen is no navigation, so the link closes
@@ -145,8 +205,13 @@ export function Rail({
           {admin ? (
             <Zones here={here} follow={follow} />
           ) : (
+            // Projects comes last in the table, so Recent sits above its
+            // long list
             navEntries().map((route) => (
               <Fragment key={route.path}>
+                {route.path === "/projects" && (
+                  <Recent here={here} follow={follow} />
+                )}
                 <a
                   href={route.path}
                   class={`rail-item${navLit(here, route.path) ? " rail-item-on" : ""}`}
@@ -185,82 +250,18 @@ export function Rail({
           <Icon name="open" size={14} class="rail-band-open" />
         </a>
       )}
-      <div class="rail-user">
-        {open.value && (
-          <div class="menu rail-menu">
-            <a
-              class="menu-item"
-              href="/profile"
-              onClick={() => {
-                open.value = false;
-                follow?.();
-              }}
-            >
-              <Icon name="user" size={14} />
-              <span>Profile</span>
-            </a>
-            <a
-              class="menu-item"
-              href="/connect"
-              onClick={() => {
-                open.value = false;
-                follow?.();
-              }}
-            >
-              <Icon name="plug" size={14} />
-              <span>Connect agents</span>
-            </a>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={theme.value === "dark"}
-              class="menu-item"
-              onClick={toggleTheme}
-            >
-              <Icon name="moon" size={14} />
-              <span>Dark theme</span>
-              <span
-                class={`rail-menu-switch switch${theme.value === "dark" ? " switch-on" : ""}`}
-              >
-                <span class="switch-knob" />
-              </span>
-            </button>
-            <button
-              type="button"
-              class="menu-item"
-              onClick={async () => {
-                failure.value = null;
-                try {
-                  await logout();
-                } catch (err) {
-                  failure.value = says(err);
-                  return;
-                }
-                open.value = false;
-                navigate("/login", true);
-              }}
-            >
-              <Icon name="sign-out" size={14} />
-              <span>Sign out</span>
-            </button>
-            {failure.value && (
-              <p class="rail-menu-error error">{failure.value}</p>
-            )}
-          </div>
-        )}
+      <UserMenu wrap="rail-user" place="rail-menu" follow={follow}>
         <button
           type="button"
           class="rail-user-row"
-          aria-expanded={open.value}
-          onClick={() => {
-            open.value = !open.value;
-          }}
+          aria-expanded={userMenuOpen.value}
+          onClick={toggleUserMenu}
         >
           <span class="avatar">{initials(user.fullName)}</span>
           <span class="rail-user-name cut">{user.fullName}</span>
           <Icon name="chevron" size={14} class="rail-user-chevron" />
         </button>
-      </div>
+      </UserMenu>
     </aside>
   );
 }

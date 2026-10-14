@@ -24,6 +24,7 @@ import { searches } from "../../../src/client/data/knowledge-search.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { project } from "../../../src/client/data/projects.ts";
 import { treeOf } from "../../../src/client/lib/tree.ts";
+import { marked, pathParts } from "../../../src/client/ui/PathName.model.ts";
 import type { RowsTreeNode } from "../../../src/client/ui/Rows.tsx";
 import {
   Author,
@@ -42,10 +43,8 @@ import {
   knowledgeWords,
   listHref,
   listOf,
-  marked,
   namesWords,
   noMatchWords,
-  pathParts,
   restoredHref,
   revisionHref,
   treeNodes,
@@ -159,6 +158,7 @@ const shown = {
   memberCount: 1,
   description: "",
   members: [],
+  labels: [],
   chats: 2,
   knowledge: { files: 1, tokens: 620 },
   latestFiles: [],
@@ -517,7 +517,7 @@ describe("the page", () => {
     try {
       const html = render(<Knowledge params={{ id: "p1" }} />);
       expect(html.indexOf("values.yaml")).toBeLessThan(html.indexOf("runbook"));
-      expect(html).toContain('<span class="knowledge-dir cut">docs/</span>');
+      expect(html).toContain('<span class="pathname-dir cut">docs/</span>');
       expect(html).toContain("Revision 3 · ");
       expect(html.replace(/<[^>]*>/g, "")).toContain("@sre in a run");
       expect(html).toContain('href="/projects/p1/knowledge/files/f2"');
@@ -583,8 +583,8 @@ describe("the page", () => {
       expect(html).toContain("In files");
       expect(html).toContain("4 lines");
       expect(html).toContain('href="/projects/p1/knowledge/files/f1?line=12"');
-      expect(html).toContain('<mark class="knowledge-mark">Run</mark>');
-      expect(html).toContain('<mark class="knowledge-mark">run</mark>');
+      expect(html).toContain('<mark class="pathname-mark">Run</mark>');
+      expect(html).toContain('<mark class="pathname-mark">run</mark>');
       expect(html).toContain("…");
       expect(html).toContain("Show more");
     } finally {

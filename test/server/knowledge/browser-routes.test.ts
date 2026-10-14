@@ -148,7 +148,7 @@ describe("knowledge browser routes", () => {
         body: { name: "b.md", revision: 1 },
       });
       expect(taken.status).toBe(409);
-      expect((await taken.json()).error).toBe("a file named b.md exists");
+      expect((await taken.json()).error).toBe("a file with this name exists");
       const stale = await s.client.call("PATCH", path, {
         body: { name: "c.md", revision: 3 },
       });

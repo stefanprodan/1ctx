@@ -215,12 +215,12 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     text: "Keys one user may make for /mcp. 0 turns it off.",
   },
   externalTaskDays: {
-    label: "Delete closed tasks",
-    text: "Days a done or dropped external task is kept.",
+    label: "Delete closed external tasks",
+    text: "Days a done or cancelled external task is kept.",
   },
   externalTaskIdleHours: {
-    label: "Release idle claims",
-    text: "Hours without a report before a claimed task opens again.",
+    label: "Unclaim idle external tasks",
+    text: "Hours without a report before a claimed external task opens again.",
   },
 };
 

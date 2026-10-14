@@ -8,8 +8,7 @@
 import type { KnowledgeFile } from "../../../shared/contracts/knowledge.ts";
 import { ago } from "../../lib/format.ts";
 import { useNow } from "../../lib/now.ts";
-import { RowsHandle } from "../../ui/Rows.tsx";
-import { AsideSection } from "../../ui/Split.tsx";
+import { AsideHandle, AsideItem, AsideSection } from "../../ui/Split.tsx";
 import { authorOf, fileHref } from "../knowledge/Knowledge.model.ts";
 
 export function LatestAside({
@@ -26,24 +25,19 @@ export function LatestAside({
       {files.map((file) => {
         const by = authorOf(file.author);
         return (
-          <div key={file.id} class="split-line">
-            <span class="split-stack">
-              <a
-                class="split-name split-name-link cut"
-                href={fileHref(projectId, file.id)}
-                title={file.name}
-              >
-                {file.name.slice(file.name.lastIndexOf("/") + 1)}
-              </a>
-              <span class="split-faint cut">
-                <a class="split-link" href={by.href}>
-                  <RowsHandle name={by.name} />
-                </a>
+          <AsideItem
+            key={file.id}
+            name={file.name.slice(file.name.lastIndexOf("/") + 1)}
+            title={file.name}
+            href={fileHref(projectId, file.id)}
+            sub={
+              <>
+                <AsideHandle name={by.name} href={by.href} />
                 {by.via !== null && ` via ${by.via}`} ·{" "}
                 {ago(file.updatedAt, now)}
-              </span>
-            </span>
-          </div>
+              </>
+            }
+          />
         );
       })}
     </AsideSection>

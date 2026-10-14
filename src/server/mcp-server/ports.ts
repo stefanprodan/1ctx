@@ -17,6 +17,7 @@ import type { Db } from "../db/index.ts";
 import type { KnowledgeEdit } from "../knowledge/index.ts";
 import type { Principal, Via } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
+import type { SearchAsk } from "../lib/search-queue.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type {
   ExportRow,
@@ -36,7 +37,6 @@ export type AccessPort = {
 };
 
 export type KnowledgePort = {
-  oneAtATime<T>(userId: string, scan: () => T): T;
   list(projectId: string): KnowledgeListResponse;
   projectOf(kind: "file" | "version", id: string): string | null;
   rawFile(
@@ -90,12 +90,13 @@ export type KnowledgePort = {
     fileId: string,
     revision?: number,
   ): { id: string; name: string; revision: number };
+  // queued behind the server's other searches
   search(
     projectId: string,
-    userId: string,
     q: string,
     after: string | null,
-  ): KnowledgeSearchResponse;
+    ask: SearchAsk,
+  ): Promise<KnowledgeSearchResponse>;
 };
 
 export type ProjectsPort = { byId(id: string): ProjectRow | null };
@@ -103,8 +104,14 @@ export type ProjectsPort = { byId(id: string): ProjectRow | null };
 export type SessionsPort = {
   byId(id: string): SessionRow | null;
   exportRows(sessionId: string): ExportRow[];
-  // access is the caller's: the project is checked before either
-  search(projectId: string, q: string, after: string | null): SessionSearchPage;
+  // access is the caller's: the project is checked before either, and
+  // again after a search, which is queued behind the server's others
+  search(
+    projectId: string,
+    q: string,
+    after: string | null,
+    ask: SearchAsk,
+  ): Promise<SessionSearchPage>;
   list(
     projectId: string,
     since: number | null,
@@ -133,27 +140,32 @@ export type TaskShow = {
 };
 
 // access is the caller's: the tool checks the key reaches the task's
-// project (projectOf) before show, claim or report, and passes only
-// reachable projects to list. A refusal throws HttpError with the
+// project (projectOf) before show, claim, unclaim or report, and passes
+// only reachable projects to list. A refusal throws HttpError with the
 // state's words; a stale or ended claim answers 409, a missing task 404
 export type TasksPort = {
   projectOf(taskId: string): string | null;
   // projectIds already narrowed to the key's; held keeps only the
-  // key's open claims and ignores states. Rows carry no brief text;
-  // after is the cursor of the row before, latest move first
+  // key's open claims and ignores states and labels; after is the
+  // cursor of the row before, latest move first
   list(input: {
     projectIds: string[];
     states: ExternalTaskState[];
+    // label names, any of them; empty for every task
+    labels: string[];
     held: TaskKey | null;
     after: string | null;
     limit: number;
   }): { rows: TaskListRow[]; next: string | null };
+  // every label of the project in name order, with its unfinished tasks
+  openLabelCounts(projectId: string): { name: string; open: number }[];
   show(taskId: string, before: string | null): TaskShow | null;
-  // open to claimed; the same key holding it answers that claim again
+  // todo to in progress; the same key holding it answers that claim again
   claim(key: TaskKey, taskId: string): TaskShow & { claimId: string };
   // the claim must belong to taskId; a live retry must repeat both the
-  // claim's and task's last entry. A result or release retry answers
-  // the original end even after later task entries
+  // claim's and task's last entry. A result retry answers the original
+  // end even after later task entries. Past the entry bounds it ends the
+  // claim, then throws the refusal; a caller's transaction keeps that end
   report(
     key: TaskKey,
     taskId: string,
@@ -161,6 +173,14 @@ export type TasksPort = {
     kind: AgentEntryKind,
     text: string,
     links: string[],
+  ): { entry: ExternalTaskEntry; task: ExternalTaskRow };
+  // the claim's key gives the task back with a note; a retry answers
+  // the first unclaim, as a repeated result does
+  agentUnclaim(
+    key: TaskKey,
+    taskId: string,
+    claimId: string,
+    text: string,
   ): { entry: ExternalTaskEntry; task: ExternalTaskRow };
 };
 

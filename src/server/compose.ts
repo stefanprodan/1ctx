@@ -18,7 +18,7 @@ import {
 import { type Access, accessArea } from "./access/index.ts";
 import { type AgentStore, type Agents, agentsArea } from "./agents/index.ts";
 import { type Automations, automationsArea } from "./automations/index.ts";
-import { type BashArea, bashArea } from "./bash/index.ts";
+import { type BashArea, type BashDeps, bashArea } from "./bash/index.ts";
 import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
@@ -41,6 +41,7 @@ import type { Clock } from "./lib/clock.ts";
 import { userAgent, withUserAgent } from "./lib/fetcher.ts";
 import type { RouteDescriptor } from "./lib/http.ts";
 import { errorFields, type LogFactory, scrubErrors } from "./lib/log.ts";
+import { type SearchQueue, searchQueue } from "./lib/search-queue.ts";
 import { limitsArea } from "./limits/index.ts";
 import { type Mcp, type McpServerStore, mcpArea } from "./mcp/index.ts";
 import { mcpServerArea } from "./mcp-server/index.ts";
@@ -116,6 +117,8 @@ export type ComposeOptions = {
   tools?: Tools;
   // a test's command worker entry; the real one by default
   commandWorker?: URL;
+  // each phase a command's worker reports; a test waits on it
+  onCommandPhase?: BashDeps["onCommandPhase"];
   // the repositories' cache directory; none fetches nothing
   cacheDir?: string | null;
   // a test's repository fetches; the fetch worker by default
@@ -140,6 +143,8 @@ export type App = {
   deciders: Deciders;
   memory: MemoryStore;
   knowledge: KnowledgeArea;
+  // the one search queue, which a test may hold
+  searches: SearchQueue;
   repos: Repos;
   // the cache directory as startup found it
   repoCache: { dir: string; trees: number; bytes: number } | null;
@@ -276,7 +281,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     usage,
   });
-  // a deleted object leaves no key behind in a chat or a task; a
+  // a deleted object leaves no key behind in a chat or an automation; a
   // repository was its project's, so only that project's rows are read
   const capabilities = {
     forget(key: string, projectId?: string) {
@@ -327,6 +332,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     taskClaims: {
       endForUser: (userId, projectIds) =>
         externalTasks.endForUser(userId, projectIds),
+    },
+    taskLabels: {
+      labelTasks: (projectId) => externalTasks.labelTasks(projectId),
     },
     sessions: {
       count: (projectId) => sessions.store.count(projectId),
@@ -410,7 +418,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     users,
     sessions: { sessionInfo: (sessionId) => sessions.sessionInfo(sessionId) },
   });
-  const knowledge = knowledgeArea({ db, clock, limits, access });
+  // one scan at a time across knowledge and session search
+  const searches = searchQueue();
+  const knowledge = knowledgeArea({ db, clock, limits, access, searches });
   repos = reposArea({
     db,
     clock,
@@ -438,6 +448,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     worker:
       options.commandWorker ??
       new URL("./bash/command.worker.ts", import.meta.url),
+    ...(options.onCommandPhase
+      ? { onCommandPhase: options.onCommandPhase }
+      : {}),
     knowledge: {
       mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
       mountedUploads: (sessionId) => knowledge.mountedUploads(sessionId),
@@ -455,6 +468,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     limits,
     uploads: knowledge,
+    searches,
     scratch: bash.scratch,
     wakeQueue: () => runner.queue.wake(),
     pruned: (run) => automations.runDeleted(run),
@@ -474,6 +488,15 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     externalTaskIdleHours: () => limits.current().externalTaskIdleHours,
     externalTaskDays: () => limits.current().externalTaskDays,
+    chatOpens: (principal, id) =>
+      sessions.sessionProject(principal, id) !== null,
+    // a personal project holds its owner's membership too
+    homeProjectIds: (principal) => {
+      const member = new Set(projects.store.memberProjectIds(principal.userId));
+      return access
+        .reachableProjectIds(principal)
+        .filter((id) => member.has(id));
+    },
     knowledge: {
       file: (projectId, fileId) => knowledge.store.file(projectId, fileId),
       deletedName: (projectId, fileId) =>
@@ -547,7 +570,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
           judged: session !== null && session.attention !== null,
         };
       },
-      // the names the task's page shows: its agent's switchable servers
+      // the names the automation's page shows: its agent's switchable servers
       // and skills, its project's credentials and repositories
       switchNames(agentId, projectId) {
         const agent = agents.byId(agentId);
@@ -717,7 +740,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: {
       byId: (id) => sessions.store.byId(id),
       exportRows: (id) => sessions.store.exportRows(id),
-      search: (projectId, q, after) => sessions.search(projectId, q, after),
+      search: (projectId, q, after, ask) =>
+        sessions.search(projectId, q, after, ask),
       list: (projectId, since, after) => sessions.list(projectId, since, after),
     },
     tasks: externalTasks,
@@ -808,6 +832,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     deciders,
     memory: memory.store,
     knowledge,
+    searches,
     repos,
     repoCache,
     bash,
@@ -848,7 +873,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
             externalTasks.store.openClaims().map((claim) => claim.key_id),
           ),
         );
-        const externalIdle = externalTasks.releaseIdle(now);
+        const externalIdle = externalTasks.unclaimIdle(now);
         const externalDeleted = externalTasks.deleteClosed(now);
         const removed =
           logins +

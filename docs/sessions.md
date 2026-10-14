@@ -7,9 +7,9 @@ A session (`SESSION_ORIGINS`) is a chat users write in or an automation's
 run. Both share the writer, caps and sweep. A send (`SEND_KINDS`:
 `chat`, `compact`, `run`) is one turn, compaction or run. Its rounds each
 ask the model and run its calls. Rules for runs alone are in
-`docs/automations.md`; the tool loop in `docs/tools.md`; memory in
-`docs/memory.md`; archive, packing and the sweep in `docs/archive.md`;
-compaction in `docs/compaction.md`.
+`docs/automations.md`; the queue in `docs/queue.md`; the tool loop in
+`docs/tools.md`; memory in `docs/memory.md`; archive, packing and the
+sweep in `docs/archive.md`; compaction in `docs/compaction.md`.
 
 An envelope is the `session` socket frame (`shared/socket.ts`) a
 session transaction publishes: the summary with its revision, the rows
@@ -17,13 +17,13 @@ written, the ids removed, the send row and the session's row in the
 session list. A summon is a chat message whose first word is `@name`:
 that agent answers the one turn (Summons below).
 
-Detail carries the chat's task proposals as `automationDrafts`, whole
-drafts with their state, who asked and decided, and the task or run a
-confirm made. Their lifecycle is in `docs/archive.md` and their `draft`
-frames in `docs/access.md`; a frame moves neither activity nor
+Detail carries the chat's automation proposals as `automationDrafts`,
+whole drafts with their state, who asked and decided, and the automation
+or run a confirm made. Their lifecycle is in `docs/archive.md` and their
+`draft` frames in `docs/access.md`; a frame moves neither activity nor
 revision. A reconnect reads detail again, and the `watched` answer
-carries the drafts, so one written between the read and the watch
-still arrives.
+carries the drafts, so one written between the read and the watch still
+arrives.
 
 ## Sends and caps
 
@@ -104,75 +104,6 @@ still arrives.
   envelope with the reply alone and `messagesCut`; a tab reads the
   session's detail (`GET /api/sessions/:id`).
 
-## The queue
-
-- **A message to a busy chat is queued, never sent.** `POST
-  /api/sessions/:id/messages` on a held lock (running or stopping), or
-  on any chat once a drain closed the dispatcher, writes a
-  `queued_messages` row and answers 202. On a free chat it first starts
-  the chat's own queue, then sends. Regenerate, compact, Run now and a
-  new chat never queue.
-- **A queued row holds no place in any cap.** A user holds at most
-  `queuedPerUser` rows (queued and not sent together), a chat
-  `MAX_QUEUED_PER_CHAT` queued ones; past either is a 429. A staged
-  upload id may sit in one queued row of a chat only.
-- **A queue change bumps the revision alone.** It publishes no
-  project-wide envelope (`queueChanged()`), since nothing a list shows
-  moved. It publishes `queue.changed`, which the socket sends to the
-  chat's watchers only, with texts cut to `QUEUED_PREVIEW`.
-- **A start publishes the queue left right before its envelope.** The
-  client holds it until the envelope brings the user messages the rows
-  became.
-- **A not-sent row is its author's alone.** A change to one publishes
-  `queue.mine` to that user's connections, before the watchers' frame
-  of the same commit, so the author never sees a turning row vanish.
-- **Queue writes name the revision they saw.** PATCH and DELETE of a
-  queued row are the author's only (an admin too gets 403). A row that
-  started or changed is a 409. A write answers the caller's whole queue
-  with its revision (`QueueState`), which the client takes only when
-  newer.
-- **Queue order is `queued_at`, then `rowid`.** An edit never moves a
-  row.
-- **The hourly sweep deletes not-sent rows after `NOT_SENT_KEPT_MS`.**
-
-## The queue dispatcher
-
-- **It starts a chat's queue as one turn.** `runner/queue.ts` is
-  started in `compose.ts` after `sessions.repair()` and before the
-  scheduler. It closes at the first signal and runs no pass after; its
-  rows wait for the next start.
-- **A wake is level-triggered.** A wake during a pass runs one more. A
-  pass inside a transaction, and anything past four passes of one wake,
-  goes to a timer: a macrotask, never a microtask, so the process moves
-  on.
-- **A pass reads in keyset pages.** It walks chats with queued rows and
-  a free lock, oldest first, over `queued_waiting`: one indexed read
-  when none waits. It skips a chat whose authors or project are full
-  and ends only at a full process.
-- **Rows that can never start turn not sent.** An archived chat, a
-  retired (deleted) agent, summons included, a row past `queuedMinutes`,
-  a gone, disabled or must-change-password author, or an upload that no
-  longer checks. An author who lost the chat loses the row outright.
-- **The rest start in order up to the first summon,** which starts
-  alone once they end. The turn counts against the oldest author with
-  room under `sendsPerUser`; with none, the rows wait.
-- **The start carries a claim.** `startSend` deletes the rows by id and
-  revision. A row edited or removed meanwhile throws `ClaimLost`: the
-  start writes nothing and its freed lock wakes again.
-- **Only some refusals keep the rows queued.** `CapFull`,
-  `RunCapacity`, `LockHeld`, `Restarting` and `ClaimLost`, matched by
-  class. Any other refusal is found row by row: each is tried in a
-  start rolled back with its transaction, never admitted, and the ones
-  that fail turn not sent (`failed`). A trial writes only SQLite rows
-  and launches nothing.
-- **A chat never loops.** When the real start fails after its trial
-  passed, its rows turn not sent too, and a failed start never asks for
-  another pass of its chat.
-- **One timer expires rows in an idle process.** It is set on the clock
-  port to the oldest row's expiry and reset when the limit moves. An
-  archive, an archiving hourly sweep and an agent delete wake the
-  dispatcher, so those rows turn not sent at once.
-
 ## Ending a send
 
 - **A send ends for one cause.** Finish, stop, failure, shutdown or
@@ -188,6 +119,21 @@ still arrives.
   `thinking` both the check and the silence limit are lifted until
   thinking ends. `reasoningRefused` starts nothing either, since the
   request it announces starts afresh.
+- **A round that loops is cut** (`runner/repetition.ts`, a port of
+  Hermes Agent's exact-repetition check, and `runner/round-loop.ts`).
+  `runRound()` watches the answer text, the reasoning and each call's
+  arguments apart, never a tool's result. A watch checks first at
+  16,000 characters, then at doubling gaps over at most the latest
+  64,000, and holds no more. A fire closes the stream, logs `round loop
+  cut` (channel, characters) and counts the request and the streamed
+  text as an estimate against the send's tokens. The first fire with
+  time left before the deadline asks the round again with the same
+  request: the round's state is fresh, the row emptied and back in the
+  slot it began in (`restartReply`), and a `restart` frame drops the
+  page's live text and previews. A second fails the round with "the
+  model was stopped due to output loop" and finish reason
+  `output_loop`; its row keeps no text, reasoning or calls, so no later
+  turn replays them.
 - **A chat send past `sendDeadlineMs` ends with cause `deadline`,**
   status `stopped`. A run has its own deadline.
 - **A cut keeps every completion.** Every phase's calls keep their end
@@ -246,7 +192,8 @@ still arrives.
   `summonedLine()`, the user's or automation line, the skills catalog,
   the MCP catalog, `<mcp_instructions>`, project memory, automation
   memory, knowledge, the date, the off lines (web, visualize, knowledge,
-  memory, email, tasks, MCP, skills, repositories), the moved
+  memory, email, automations, external tasks, MCP, skills,
+  repositories), the moved
   branches (`docs/repos.md`), and last the MCP change note
   (`docs/mcp.md`). What is fixed per agent and project leads; the user's
   line follows, as a team chat's author changes it. A subagent's
@@ -326,7 +273,8 @@ still arrives.
   gets 403. A rename is allowed while the chat runs, since a send never
   writes the title. A delete waits for the end.
 - **Every delete goes through `removeSession()`**
-  (`sessions/delete.ts`): the route, a task's retention and the sweep.
+  (`sessions/delete.ts`): the route, an automation's retention and the
+  sweep.
   The foreign keys take the dependents.
 - **Usage outlives every delete** (`docs/monitor.md`). `latest()`
   counts only rows of sends still there.

@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { MAX_OPENS_PER_COMMAND } from "../../../src/server/bash/commands.ts";
 import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
-import { afterMountRead, callCaps, run, setup } from "./helpers.ts";
+import { afterMountRead, callCaps, run, setup, untilPhase } from "./helpers.ts";
 
 const receipt = (path: string, kind: string, lines?: number) =>
   `opened ${path} for the user as ${kind}${lines === undefined ? "" : `, ${lines} lines`}. They see it now, so do not repeat its content.`;
@@ -268,11 +268,11 @@ describe("open command", () => {
       const controller = new AbortController();
       const pending = run(
         s,
-        "echo x > /tmp/f; open /tmp/f; sleep 1",
+        "echo x > /tmp/f; open /tmp/f; sleep 30",
         callCaps,
         controller.signal,
       );
-      await Bun.sleep(30);
+      await untilPhase(s);
       controller.abort(new Error("stopped"));
       expect((await pending).opened).toBeUndefined();
     } finally {

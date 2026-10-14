@@ -33,13 +33,13 @@ import {
 } from "../data/capabilities.ts";
 import {
   agentMoved,
+  automationsItem,
   emailItem,
   externalTasksItem,
   reposItem,
   serversItem,
   skillsItem,
   switchItem,
-  tasksItem,
   webPaneItem,
 } from "./Add.model.ts";
 
@@ -92,7 +92,7 @@ export function useSwitches({
     knowledge: item(KNOWLEDGE),
     memory: item(MEMORY),
     email: emailItem(input(EMAIL)),
-    tasks: tasksItem(input(AUTOMATIONS)),
+    automations: automationsItem(input(AUTOMATIONS)),
     externalTasks: externalTasksItem(input(EXTERNAL_TASKS)),
     servers: serversItem({
       tools: readable,

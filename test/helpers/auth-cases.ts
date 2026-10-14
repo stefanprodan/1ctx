@@ -24,6 +24,7 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
+    // Home's ?waiting=1; without it the query is refused, after the login
     method: "GET",
     path: "/api/external-tasks",
     expect: { anonymous: 401, member: 400, admin: 400 },
@@ -36,7 +37,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/projects/:id/external-tasks",
-    body: { title: "Check the work", text: "", fileIds: [] },
+    body: { title: "Check the work", labels: ["build"], fileIds: ["file"] },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
@@ -48,30 +49,25 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/external-tasks/:id/answer",
-    body: { state: "blocked", text: "Go ahead." },
+    body: { state: "awaiting_input", text: "Go ahead." },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     method: "POST",
-    path: "/api/external-tasks/:id/release",
-    body: { state: "claimed", claimId: "none", text: "Try later." },
+    path: "/api/external-tasks/:id/unclaim",
+    body: { state: "in_progress", claimId: "none", text: "Try later." },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     method: "POST",
-    path: "/api/external-tasks/:id/drop",
-    body: { state: "open" },
+    path: "/api/external-tasks/:id/cancel",
+    body: { state: "todo" },
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     method: "POST",
     path: "/api/external-tasks/:id/reopen",
     body: { state: "done", text: "Try again." },
-    expect: { anonymous: 401, member: 404, admin: 404 },
-  },
-  {
-    method: "POST",
-    path: "/api/external-tasks/:id/seen",
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
@@ -195,12 +191,6 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 400, admin: 400 },
   },
   {
-    method: "PATCH",
-    path: "/api/profile/project",
-    body: { description: "" },
-    expect: { anonymous: 401, member: 200, admin: 200 },
-  },
-  {
     method: "POST",
     path: "/api/profile/password",
     // authenticated: the handler then checks the current password,
@@ -318,6 +308,31 @@ export const AUTH_CASES: AuthCase[] = [
     method: "DELETE",
     path: "/api/projects/:id/members/:userId",
     expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    // a project's metadata: any user who sees the project, through the
+    // project access check, so a project the caller may not see is 404
+    method: "PATCH",
+    path: "/api/projects/:id/about",
+    body: { description: "Incidents and pages" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/labels",
+    body: { name: "ops" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/projects/:id/labels/:labelId",
+    body: { name: "ops" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id/labels/:labelId",
+    expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {
     // through the project access check: a project the caller may not
@@ -666,6 +681,11 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "GET",
     path: "/api/projects/:id/knowledge/search",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/projects/:id/knowledge/path",
     expect: { anonymous: 401, member: 404, admin: 404 },
   },
   {

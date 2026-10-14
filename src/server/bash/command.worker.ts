@@ -33,6 +33,7 @@ import {
 import {
   diff,
   executionLimits,
+  exitAt,
   notices,
   savedCwd,
   sharedChanged,
@@ -241,6 +242,7 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
     executionLimits: executionLimits(job, fs, job.endsAt - Date.now()),
   });
   const result = await bash.exec(job.command, { rawScript: true, signal });
+  const exitCode = exitAt(result.exitCode, Date.now(), job.endsAt);
   const stdout = decodeBytesToUtf8(stdoutAsBytes(result));
   signal.throwIfAborted();
   notice = (await notices(fs, job)) + notice;
@@ -249,11 +251,11 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
   const printed = {
     stdout,
     stderr: result.stderr,
-    exitCode: result.exitCode,
+    exitCode,
     notice,
     opened,
   };
-  if (result.exitCode === 124 || result.exitCode === 126)
+  if (exitCode === 124 || exitCode === 126)
     return { ...printed, changes: null, refused: null };
   let changes: Awaited<ReturnType<typeof diff>>;
   try {

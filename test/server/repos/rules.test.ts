@@ -8,6 +8,7 @@ import {
   ignored,
   ignoreKey,
   parseIgnore,
+  wildmatchProbe,
 } from "../../../src/server/repos/rules.ts";
 import { DEFAULT_REPO_IGNORE } from "../../../src/shared/contracts/repo.ts";
 import fixture from "../../fixtures/repos/ignore-cases.json";
@@ -164,13 +165,28 @@ test("a folder answered once keeps its answer", () => {
   expect(ignored(r, "src/a/c.go", false)).toBe(true);
 });
 
-test("many stars on a long name stay fast", () => {
-  // each name holds the patterns' literals, so only the full match refuses it
-  const r = rules(`${"*a".repeat(60)}*ab*b\n${"**/a/".repeat(7)}b/**/b\n`);
-  const name = `${"a".repeat(4000)}b`;
-  const deep = `${Array(200).fill("a").join("/")}/b`;
-  const start = performance.now();
-  expect(ignored(r, name, false)).toBe(false);
-  expect(ignored(r, deep, false)).toBe(false);
-  expect(performance.now() - start).toBeLessThan(500);
-});
+// the probe is module state, which concurrent tests would count
+test.serial(
+  "many stars on a long name backtrack a bounded number of times",
+  () => {
+    // each name holds the patterns' literals, so only the full match refuses it
+    const r = rules(`${"*a".repeat(60)}*ab*b\n${"**/a/".repeat(7)}b/**/b\n`);
+    const name = `${"a".repeat(4000)}b`;
+    const deep = `${Array(200).fill("a").join("/")}/b`;
+    const step = wildmatchProbe.step;
+    let calls = 0;
+    // git's aborts keep it near linear; without them it is exponential
+    wildmatchProbe.step = () => {
+      if (++calls > 20_000) throw new Error("wildmatch backtracked too far");
+    };
+    try {
+      expect(ignored(r, name, false)).toBe(false);
+      expect(calls).toBeGreaterThan(0);
+      calls = 0;
+      expect(ignored(r, deep, false)).toBe(false);
+      expect(calls).toBeGreaterThan(0);
+    } finally {
+      wildmatchProbe.step = step;
+    }
+  },
+);

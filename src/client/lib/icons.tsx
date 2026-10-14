@@ -116,6 +116,9 @@ const PATHS = {
   // one path splitting into two: a decision between its options
   decision: "M8 14V8M8 8 3.5 3.5M8 8l4.5-4.5M3.5 6.5v-3h3M9.5 3.5h3v3",
   clock: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8 4.5V8l2.5 1.5",
+  // a ring with a dot, as GitHub draws an issue: an external task as a
+  // kind, whatever its state, which the task list's rings draw
+  task: "M8 14.25a6.25 6.25 0 1 0 0-12.5 6.25 6.25 0 0 0 0 12.5zM8 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
   // automation as a whole, whatever starts a run
   bolt: "M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z",
   play: "M5 3.5v9l7-4.5z",
@@ -158,6 +161,14 @@ const PATHS = {
   eye: "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
   "eye-off":
     "M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM2.5 2.5l11 11",
+  // a line rising: a report of progress on an external task
+  progress: "M2.5 11.5 6 8l2.5 2.5 5-5M10 5.5h3.5V9",
+  // bare, as a row already rings its icon
+  question:
+    "M5.25 5.75a2.75 2.75 0 1 1 4.1 2.4c-.8.45-1.35 1.1-1.35 2v.6M8 13h.01",
+  // the canceled task's ring and cross, as its state icon draws it
+  cancelled:
+    "M14.25 8a6.25 6.25 0 1 1-12.5 0 6.25 6.25 0 1 1 12.5 0zM6 6l4 4m0-4-4 4",
   // a bookmark: what the project's memory keeps
   memory: "M4.5 2.5h7v11L8 11l-3.5 2.5z",
   // the database file: the admin's Storage page

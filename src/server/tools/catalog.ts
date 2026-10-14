@@ -58,6 +58,7 @@ export function parametersHtml(
 }
 
 const WHEN: Record<BuiltinToolSummary["name"], ToolWhen> = {
+  attention: "runs",
   bash: "knowledge",
   datetime: "always",
   skill: "skills",
@@ -65,7 +66,6 @@ const WHEN: Record<BuiltinToolSummary["name"], ToolWhen> = {
   mcp_describe: "mcpCatalog",
   mcp_call: "mcpCatalog",
   memory_edit: "memory",
-  needs_attention: "runs",
   webfetch: "web",
   websearch: "webSearch",
 };
@@ -120,7 +120,7 @@ export function builtinCatalog(
       }),
       ...makeMcpCatalogTools([server]),
       ...chatMemoryTools(),
-      makeAttentionTool({ guidance: "", reason: null }),
+      makeAttentionTool({ guidance: "", reason: null, answered: false }),
     ].map(schema),
     now,
   );

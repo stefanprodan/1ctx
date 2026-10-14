@@ -8,6 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Db } from "../../../src/server/db/index.ts";
 import { BadRequest } from "../../../src/server/lib/errors.ts";
+import { searchQueue } from "../../../src/server/lib/search-queue.ts";
 import {
   chatMarkdownParts,
   SessionStore,
@@ -16,6 +17,7 @@ import {
 import {
   listSessionsOf,
   searchSessions,
+  sessionQuery,
 } from "../../../src/server/sessions/search.ts";
 import { SEARCH_PAGE } from "../../../src/shared/api/knowledge.ts";
 import { memoryDb } from "../../helpers/db.ts";
@@ -118,11 +120,15 @@ function seeded() {
 }
 
 // every page of a search, following next until it is null
-function allPages(db: Db, q: string, budget?: number): string[][] {
+async function allPages(
+  db: Db,
+  q: string,
+  budget?: number,
+): Promise<string[][]> {
   const out: string[][] = [];
   let after: string | null = null;
   for (let i = 0; i < 100; i++) {
-    const page = searchSessions(db, "p", q, after, budget);
+    const page = await searchSessions(db, "p", q, after, budget);
     out.push(page.hits.map((hit) => hit.id));
     if (page.next === null) return out;
     after = page.next;
@@ -131,7 +137,7 @@ function allPages(db: Db, q: string, budget?: number): string[][] {
 }
 
 describe("session search", () => {
-  test("a session matches when its messages together hold every word", () => {
+  test("a session matches when its messages together hold every word", async () => {
     const { db, add } = seeded();
     const both = add({
       at: 2,
@@ -142,7 +148,7 @@ describe("session search", () => {
       ],
     });
     add({ at: 3, texts: [["user", "the plan, external work"]] });
-    const page = searchSessions(db, "p", "plan external TASKS", null);
+    const page = await searchSessions(db, "p", "plan external TASKS", null);
     expect(page).toEqual({
       hits: [
         {
@@ -172,10 +178,12 @@ describe("session search", () => {
       ],
       next: null,
     });
-    expect(searchSessions(db, "p", '"plan external"', null).hits).toEqual([]);
+    expect(
+      (await searchSessions(db, "p", '"plan external"', null)).hits,
+    ).toEqual([]);
   });
 
-  test("reads only what a transcript shows, so every hit can be read", () => {
+  test("reads only what a transcript shows, so every hit can be read", async () => {
     const { db, store, add } = seeded();
     add({
       at: 1,
@@ -203,7 +211,7 @@ describe("session search", () => {
         ["reply", "the quokkaplan holds"],
       ],
     });
-    const hits = searchSessions(db, "p", "quokkaplan", null).hits;
+    const hits = (await searchSessions(db, "p", "quokkaplan", null)).hits;
     expect(hits.map((hit) => hit.id)).toEqual([shown.id]);
     expect(hits[0]!.lines.map((line) => line.messageId)).toEqual([
       shown.messages[0]!,
@@ -219,7 +227,7 @@ describe("session search", () => {
     }
   });
 
-  test("tool rows and summaries are never read", () => {
+  test("tool rows and summaries are never read", async () => {
     const { db, add } = seeded();
     add({
       texts: [
@@ -228,10 +236,10 @@ describe("session search", () => {
         ["summary", "needle in a summary"],
       ],
     });
-    expect(searchSessions(db, "p", "needle", null).hits).toEqual([]);
+    expect((await searchSessions(db, "p", "needle", null)).hits).toEqual([]);
   });
 
-  test("children carry their parent, archived sessions and runs are found", () => {
+  test("children carry their parent, archived sessions and runs are found", async () => {
     const { db, add } = seeded();
     const root = add({ at: 1, texts: [["user", "start the needle hunt"]] });
     const child = add({
@@ -243,7 +251,7 @@ describe("session search", () => {
     db.query(
       "update sessions set archived_at = 5, archived_reason = 'idle' where id = ?",
     ).run(root.id);
-    const hits = searchSessions(db, "p", "needle", null).hits;
+    const hits = (await searchSessions(db, "p", "needle", null)).hits;
     expect(hits.map((hit) => [hit.id, hit.kind, hit.parentSessionId])).toEqual([
       [run.id, "run", null],
       [child.id, "chat", root.id],
@@ -251,19 +259,19 @@ describe("session search", () => {
     ]);
   });
 
-  test("another project's sessions never appear", () => {
+  test("another project's sessions never appear", async () => {
     const { db, add } = seeded();
     add({ project: "q", texts: [["user", "needle"]] });
     const mine = add({ texts: [["user", "needle"]] });
     expect(
-      searchSessions(db, "p", "needle", null).hits.map((hit) => hit.id),
+      (await searchSessions(db, "p", "needle", null)).hits.map((hit) => hit.id),
     ).toEqual([mine.id]);
     expect(
       listSessionsOf(db, "p", null, null).sessions.map((row) => row.id),
     ).toEqual([mine.id]);
   });
 
-  test("pages by page size, newest first, with no skip or repeat", () => {
+  test("pages by page size, newest first, with no skip or repeat", async () => {
     const { db, add } = seeded();
     const ids: string[] = [];
     for (let i = 0; i < 2 * SEARCH_PAGE + 5; i++) {
@@ -274,7 +282,7 @@ describe("session search", () => {
     const order = listSessionsOf(db, "p", null, null, 1000).sessions.map(
       (row) => row.id,
     );
-    const pages = allPages(db, "needle");
+    const pages = await allPages(db, "needle");
     expect(pages.map((page) => page.length)).toEqual([
       SEARCH_PAGE,
       SEARCH_PAGE,
@@ -283,7 +291,7 @@ describe("session search", () => {
     expect(pages.flat()).toEqual(order.filter((id) => ids.includes(id)));
   });
 
-  test("a spent budget ends the page early, one session a page at least", () => {
+  test("a spent budget ends the page early, one session a page at least", async () => {
     const { db, add } = seeded();
     const ids: string[] = [];
     // 16 bytes each
@@ -298,20 +306,89 @@ describe("session search", () => {
         }).id,
       );
     }
-    const pages = allPages(db, "hit", 40);
+    const pages = await allPages(db, "hit", 40);
     expect(pages).toEqual([ids.slice(0, 2), ids.slice(2, 4), ids.slice(4)]);
-    const tiny = allPages(db, "hit", 0);
+    const tiny = await allPages(db, "hit", 0);
     expect(tiny).toEqual(ids.map((id) => [id]));
   });
 
-  test("refuses a query with no word and a bad cursor", () => {
+  test("refuses a query with no word and a bad cursor", async () => {
     const { db } = seeded();
-    expect(() => searchSessions(db, "p", '""', null)).toThrow(
+    expect(() => sessionQuery('""', null)).toThrow(
       new BadRequest("q must hold a word"),
     );
-    expect(() => searchSessions(db, "p", "x", "nope")).toThrow(
+    expect(() => sessionQuery("x", "nope")).toThrow(
       new BadRequest("invalid cursor"),
     );
+    await expect(searchSessions(db, "p", '""', null)).rejects.toThrow(
+      new BadRequest("q must hold a word"),
+    );
+  });
+});
+
+describe("session search while it yields", () => {
+  test("steps once a session, keeps its order and never sums one it does not reach", async () => {
+    const { db, add } = seeded();
+    for (let i = 0; i < 2 * SEARCH_PAGE + 5; i++) {
+      add({ at: i, texts: [["user", `needle ${i}`]] });
+    }
+    const order = listSessionsOf(db, "p", null, null, 1000).sessions.map(
+      (row) => row.id,
+    );
+    // every per-session sum the search asks for, by session
+    const summed: string[] = [];
+    const counted = new Proxy(db, {
+      get(target, key) {
+        if (key === "query") {
+          return (sql: string) => {
+            const statement = target.query(sql);
+            if (!sql.includes("octet_length")) return statement;
+            return {
+              get: (id: string) => {
+                summed.push(id);
+                return statement.get(id);
+              },
+            };
+          };
+        }
+        const value = Reflect.get(target, key);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }) as Db;
+    let steps = 0;
+    const page = await searchSessions(
+      counted,
+      "p",
+      "needle",
+      null,
+      undefined,
+      async () => {
+        steps++;
+      },
+    );
+    expect(page.hits.map((hit) => hit.id)).toEqual(order.slice(0, SEARCH_PAGE));
+    // the page's hits and the one more that sets next
+    expect(summed).toEqual(order.slice(0, SEARCH_PAGE + 1));
+    expect(steps).toBe(SEARCH_PAGE + 1);
+  });
+
+  test("work queued before the scan runs between its sessions", async () => {
+    const { db, add } = seeded();
+    for (let i = 0; i < 5; i++) add({ at: i, texts: [["user", "needle"]] });
+    const queue = searchQueue({ sliceMs: 0 });
+    let fired = false;
+    const seen: boolean[] = [];
+    setImmediate(() => {
+      fired = true;
+    });
+    const page = await queue.run({ from: "mcp" }, (step) =>
+      searchSessions(db, "p", "needle", null, undefined, async () => {
+        await step();
+        seen.push(fired);
+      }),
+    );
+    expect(page.hits).toHaveLength(5);
+    expect(seen).toEqual([true, true, true, true, true]);
   });
 });
 

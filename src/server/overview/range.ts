@@ -25,7 +25,7 @@ export type RangeInput = {
   until: number;
 };
 
-// a turn is a send of a chat, a run a send of a task
+// a turn is a send of a chat, a run a send of an automation
 export type SendSlot = {
   slot: number;
   turns: number;
@@ -128,7 +128,7 @@ function instance(db: Db): RangeResult["instance"] {
   };
 }
 
-// a run's length is its task's; a clock stepped back reads as zero long
+// a run's length is its automation's; a clock stepped back reads as zero long
 function ended(db: Db, bounds: Bounds): Ended {
   const rows = db
     .query<{ at: number; ms: number }, Bounds>(

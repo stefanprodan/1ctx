@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The task editor's Access section, one list with the project's
+// The automation editor's Access section, one list with the project's
 // credentials after Web access and its repositories last, and the Setup
 // aside naming those off.
 

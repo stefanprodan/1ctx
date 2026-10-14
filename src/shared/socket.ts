@@ -128,6 +128,9 @@ export type SocketEvent =
   // an external task's row after any change, by the revision rule
   | { type: "externalTask"; projectId: string; task: ExternalTaskRow }
   | { type: "externalTaskDeleted"; projectId: string; taskId: string }
+  // a label of the project was renamed or deleted: what shows its
+  // external tasks reads them again
+  | { type: "projectLabels"; projectId: string }
   // the project's deleted files and their history are gone
   | { type: "knowledgeEmptied"; projectId: string }
   // the connection may now see the project
@@ -142,7 +145,7 @@ export type SocketEvent =
   | ({ type: "child"; sessionId: string } & ChildOf)
   // the answer to a watch: the send in flight as far as it got, the
   // queue as the queue frame carries it, each running subagent's rows
-  // so far, and the chat's task proposals, any written since its read
+  // so far, and the chat's automation proposals, any written since its read
   | {
       type: "watched";
       sessionId: string;
@@ -173,6 +176,14 @@ export type SocketEvent =
       html: string;
       // how much content the html renders
       htmlAt: number;
+    }
+  // a round starts over: the reply's live text and previews are empty
+  | {
+      type: "restart";
+      sessionId: string;
+      sendId: string;
+      messageId: string;
+      seq: number;
     }
   // a round started or ended a wait to ask its provider again
   | {

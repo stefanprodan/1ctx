@@ -1,47 +1,28 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type {
-  ExternalTaskEntry,
-  ExternalTaskRow,
-} from "../../shared/contracts/external-task.ts";
-import type {
-  ClaimEnd,
-  EntryKind,
-  ExternalTaskState,
-} from "../../shared/words.ts";
-import type { Db } from "../db/index.ts";
-import { BadRequest } from "../lib/errors.ts";
+import type { ExternalTaskRow } from "../../shared/contracts/external-task.ts";
+import type { ClaimEnd, ExternalTaskState } from "../../shared/words.ts";
 import { newId } from "../lib/ids.ts";
+import { ExternalTaskEntries } from "./entries.ts";
+import { CLOSED, UNFINISHED } from "./lists.ts";
 import {
   type Claim,
-  entryRow,
-  type ListInput,
   type OpenClaim,
-  type RawEntry,
   type RawTask,
   TASK_SELECT,
   type TaskKey,
   taskRow,
 } from "./rows.ts";
-import {
-  ATTENTION_ROWS,
-  type Brief,
-  CLOSED_PAGE,
-  closed,
-  ENTRIES_PAGE,
-  parseCursor,
-} from "./rules.ts";
 
-const ENTRY = `select e.*, u.username
-  from external_task_entries e
-  left join users u on u.id = e.user_id`;
-const UNFINISHED = "t.state in ('open', 'claimed', 'blocked')";
-const CLOSED = "t.state in ('done', 'dropped')";
+// a brief as stored: the shaped title, label ids and file ids, in order
+export type StoredBrief = {
+  title: string;
+  labelIds: string[];
+  fileIds: string[];
+};
 
-export class ExternalTaskStore {
-  constructor(private readonly db: Db) {}
-
+export class ExternalTaskStore extends ExternalTaskEntries {
   byId(id: string): ExternalTaskRow | null {
     const raw = this.db
       .query<RawTask, [string]>(`${TASK_SELECT} where t.id = ?`)
@@ -59,28 +40,47 @@ export class ExternalTaskStore {
     );
   }
 
-  brief(id: string) {
+  // the chat's title is for a reader who may open it: show() decides
+  made(id: string) {
     const raw = this.db
       .query<
-        {
-          text: string;
-          brief_at: number;
-          chat_id: string | null;
-        },
+        { brief_at: number; chat_id: string | null; chat_title: string | null },
         [string]
       >(
-        `select text, brief_at,
-        case when exists (select 1 from sessions where id = t.chat_id)
-          then chat_id end as chat_id from external_tasks t where id = ?`,
+        `select t.brief_at, s.id as chat_id, s.title as chat_title
+        from external_tasks t left join sessions s on s.id = t.chat_id
+        where t.id = ?`,
       )
       .get(id);
     return raw === null
       ? null
       : {
-          text: raw.text,
           briefAt: raw.brief_at,
           chatId: raw.chat_id,
+          chatTitle: raw.chat_title,
         };
+  }
+
+  labelIds(id: string): string[] {
+    return this.db
+      .query<{ label_id: string }, [string]>(
+        "select label_id from external_task_labels where task_id = ? order by position",
+      )
+      .all(id)
+      .map((row) => row.label_id);
+  }
+
+  // the project's labels by name, for the names given that it holds
+  projectLabels(projectId: string, names: readonly string[]) {
+    return new Map(
+      this.db
+        .query<{ id: string; name: string }, [string, string]>(
+          `select id, name from project_labels where project_id = ?
+          and name in (select value from json_each(?))`,
+        )
+        .all(projectId, JSON.stringify(names))
+        .map((row) => [row.name, row.id]),
+    );
   }
 
   fileIds(id: string): string[] {
@@ -100,204 +100,10 @@ export class ExternalTaskStore {
       .get(projectId)!.n;
   }
 
-  byProject(projectId: string) {
-    const tasks = this.db
-      .query<RawTask, [string]>(
-        `${TASK_SELECT} where t.project_id = ? and ${UNFINISHED}
-        order by case t.state when 'blocked' then 0 when 'claimed' then 1 else 2 end,
-          t.moved_at desc, t.id`,
-      )
-      .all(projectId)
-      .map(taskRow);
-    const count = this.db
-      .query<{ n: number }, [string]>(
-        `select count(*) as n from external_tasks t where t.project_id = ? and ${CLOSED}`,
-      )
-      .get(projectId)!.n;
-    return { tasks, closed: count };
-  }
-
-  private page(
-    filters: { from?: string; where: string; args: (string | number)[] }[],
-    after: string | null,
-    limit: number,
-  ) {
-    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
-      throw new BadRequest("invalid page size");
-    }
-    const cursor = after === null ? null : parseCursor(after);
-    const past =
-      cursor === null
-        ? ""
-        : "and (t.moved_at < ? or (t.moved_at = ? and t.id > ?))";
-    const values = [
-      ...(cursor === null ? [] : [cursor.at, cursor.at, cursor.id]),
-      limit + 1,
-    ];
-    const rows = filters.flatMap(({ from = "external_tasks t", where, args }) =>
-      this.db
-        .query<Pick<RawTask, "moved_at" | "id">, (string | number)[]>(
-          `select t.moved_at, t.id from ${from}
-          where ${where} ${past} order by t.moved_at desc, t.id limit ?`,
-        )
-        .all(...args, ...values),
-    );
-    rows.sort(
-      (a, b) =>
-        b.moved_at - a.moved_at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-    );
-    const page = rows.slice(0, limit);
-    const last = page.at(-1);
-    const hydrated =
-      page.length === 0
-        ? []
-        : this.db
-            .query<RawTask, [string]>(
-              `${TASK_SELECT} where t.id in (select value from json_each(?))
-              order by t.moved_at desc, t.id`,
-            )
-            .all(JSON.stringify(page.map((row) => row.id)));
-    return {
-      rows: hydrated.map((raw) => ({
-        ...taskRow(raw),
-        answered: raw.answered === 1,
-        cursor: `${raw.moved_at}.${raw.id}`,
-      })),
-      next: rows.length > limit && last ? `${last.moved_at}.${last.id}` : null,
-    };
-  }
-
-  closed(projectId: string, after: string | null, limit = CLOSED_PAGE) {
-    const page = this.page(
-      [{ where: `t.project_id = ? and ${CLOSED}`, args: [projectId] }],
-      after,
-      limit,
-    );
-    return {
-      tasks: page.rows.map(({ answered: _, cursor: __, ...row }) => row),
-      next: page.next,
-    };
-  }
-
-  list(input: ListInput) {
-    if (input.held !== null) {
-      return this.page(
-        [
-          {
-            from: `external_task_claims c cross join external_tasks t
-              on t.id = c.task_id and t.claim_id = c.id`,
-            where: `c.key_id = ? and c.user_id = ? and c.ended_at is null
-              and t.project_id in (select value from json_each(?))`,
-            args: [
-              input.held.keyId,
-              input.held.userId,
-              JSON.stringify(input.projectIds),
-            ],
-          },
-        ],
-        input.after,
-        input.limit,
-      );
-    }
-    const states: ExternalTaskState[] = input.states.length
-      ? input.states
-      : ["open"];
-    const filters = [...new Set(input.projectIds)].flatMap((projectId) =>
-      [...new Set(states)].map((state) => ({
-        where: `t.project_id = ? and t.state = ? and ${closed(state) ? CLOSED : UNFINISHED}`,
-        args: [projectId, state],
-      })),
-    );
-    const page = this.page(filters, input.after, input.limit);
-    for (const row of page.rows) row.answered = false;
-    return page;
-  }
-
-  attention(projectIds: string[]) {
-    const where =
-      "t.project_id in (select value from json_each(?)) and t.attention_at is not null";
-    const ids = JSON.stringify(projectIds);
-    const tasks = this.db
-      .query<RawTask, [string, number]>(
-        `${TASK_SELECT} where t.id in (
-          select t.id from external_tasks t indexed by external_tasks_project_attention
-          where ${where} order by t.attention_at desc, t.id limit ?
-        ) order by t.attention_at desc, t.id`,
-      )
-      .all(ids, ATTENTION_ROWS)
-      .map(taskRow);
-    const count = this.db
-      .query<{ n: number }, [string]>(
-        `select count(*) as n from external_tasks t where ${where}`,
-      )
-      .get(ids)!.n;
-    return { tasks, count };
-  }
-
-  entries(taskId: string, before: string | null) {
-    const cursor =
-      before === null
-        ? null
-        : this.db
-            .query<{ at: number; rowid: number }, [string, string]>(
-              "select at, rowid from external_task_entries where task_id = ? and id = ?",
-            )
-            .get(taskId, before);
-    if (before !== null && cursor === null)
-      throw new BadRequest("invalid entry cursor");
-    const past =
-      cursor === null ? "" : "and (e.at < ? or (e.at = ? and e.rowid < ?))";
-    const args = [
-      taskId,
-      ...(cursor === null ? [] : [cursor.at, cursor.at, cursor.rowid]),
-      ENTRIES_PAGE + 1,
-    ];
-    const rows = this.db
-      .query<RawEntry, (string | number)[]>(
-        `${ENTRY} where e.task_id = ? ${past} order by e.at desc, e.rowid desc limit ?`,
-      )
-      .all(...args);
-    const page = rows.slice(0, ENTRIES_PAGE).map(entryRow);
-    return {
-      entries: page,
-      next: rows.length > ENTRIES_PAGE ? page.at(-1)!.id : null,
-    };
-  }
-
-  entry(taskId: string, id: string): ExternalTaskEntry | null {
-    const raw = this.db
-      .query<RawEntry, [string, string]>(
-        `${ENTRY} where e.id = ? and e.task_id = ?`,
-      )
-      .get(id, taskId);
-    return raw === null ? null : entryRow(raw);
-  }
-
-  lastEntry(claimId: string, taskLast: boolean): ExternalTaskEntry | null {
-    const latest = taskLast
-      ? `and e.rowid = (select rowid from external_task_entries
-          where task_id = e.task_id order by at desc, rowid desc limit 1)`
-      : "";
-    const raw = this.db
-      .query<RawEntry, [string]>(
-        `${ENTRY} where e.claim_id = ? ${latest} order by e.at desc, e.rowid desc limit 1`,
-      )
-      .get(claimId);
-    return raw ? entryRow(raw) : null;
-  }
-
   claimById(id: string): Claim | null {
     return this.db
       .query<Claim, [string]>("select * from external_task_claims where id = ?")
       .get(id);
-  }
-
-  claimsCount(taskId: string): number {
-    return this.db
-      .query<{ n: number }, [string]>(
-        "select count(*) as n from external_task_claims where task_id = ?",
-      )
-      .get(taskId)!.n;
   }
 
   openClaims(cutoff?: number): OpenClaim[] {
@@ -306,7 +112,7 @@ export class ExternalTaskStore {
         ? ""
         : `and c.active_at <= ?
       and exists (select 1 from external_tasks t
-        where t.id = c.task_id and t.state = 'claimed' and t.claim_id = c.id)`;
+        where t.id = c.task_id and t.state = 'in_progress' and t.claim_id = c.id)`;
     return this.db
       .query<OpenClaim, number[]>(
         `select c.id, c.task_id, c.key_id from external_task_claims c
@@ -347,7 +153,7 @@ export class ExternalTaskStore {
   create(
     projectId: string,
     userId: string,
-    brief: Brief,
+    brief: StoredBrief,
     now: number,
     chatId: string | null,
   ): string {
@@ -355,43 +161,37 @@ export class ExternalTaskStore {
     this.db
       .query(
         `insert into external_tasks
-        (id, project_id, title, text, part, created_by, chat_id, created_at, brief_at, moved_at)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, project_id, title, created_by, chat_id, created_at, brief_at, moved_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(
-        id,
-        projectId,
-        brief.title,
-        brief.text,
-        brief.part,
-        userId,
-        chatId,
-        now,
-        now,
-        now,
-      );
-    this.setFiles(id, brief.fileIds);
+      .run(id, projectId, brief.title, userId, chatId, now, now, now);
+    this.setLinks(id, brief);
     return id;
   }
 
-  private setFiles(id: string, fileIds: string[]): void {
-    this.db.query("delete from external_task_files where task_id = ?").run(id);
-    const insert = this.db.query(
-      "insert into external_task_files (task_id, file_id, position) values (?, ?, ?)",
-    );
-    fileIds.forEach((fileId, position) => {
-      insert.run(id, fileId, position);
-    });
+  private setLinks(id: string, brief: StoredBrief): void {
+    for (const [table, column, ids] of [
+      ["external_task_files", "file_id", brief.fileIds],
+      ["external_task_labels", "label_id", brief.labelIds],
+    ] as const) {
+      this.db.query(`delete from ${table} where task_id = ?`).run(id);
+      const insert = this.db.query(
+        `insert into ${table} (task_id, ${column}, position) values (?, ?, ?)`,
+      );
+      ids.forEach((linked, position) => {
+        insert.run(id, linked, position);
+      });
+    }
   }
 
-  edit(id: string, brief: Brief, now: number): void {
+  edit(id: string, brief: StoredBrief, now: number): void {
     this.db
       .query(
-        `update external_tasks set title = ?, text = ?, part = ?, brief_at = ?,
+        `update external_tasks set title = ?, brief_at = ?,
         revision = revision + 1, edit_revision = edit_revision + 1 where id = ?`,
       )
-      .run(brief.title, brief.text, brief.part, now, id);
-    this.setFiles(id, brief.fileIds);
+      .run(brief.title, now, id);
+    this.setLinks(id, brief);
   }
 
   startClaim(taskId: string, key: TaskKey, now: number): string {
@@ -430,66 +230,22 @@ export class ExternalTaskStore {
       .run(JSON.stringify(row), claimId);
   }
 
-  append(
-    taskId: string,
-    fields: {
-      claimId: string | null;
-      kind: EntryKind;
-      text: string;
-      links: string[];
-      userId: string | null;
-      keyName: string | null;
-      claimEnd: ClaimEnd | null;
-      at: number;
-    },
-  ): string {
-    const id = newId();
-    this.db
-      .query(
-        `insert into external_task_entries
-        (id, task_id, claim_id, kind, text, links, user_id, key_name, claim_end, at)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        id,
-        taskId,
-        fields.claimId,
-        fields.kind,
-        fields.text,
-        JSON.stringify(fields.links),
-        fields.userId,
-        fields.keyName,
-        fields.claimEnd,
-        fields.at,
-      );
-    return id;
-  }
-
+  // moved says the entry moves the task's time even in the same state,
+  // as a question asked again while awaiting input does
   move(
     id: string,
     state: ExternalTaskState,
     claimId: string | null,
-    attentionAt: number | null,
     now: number,
+    moved = false,
   ): void {
     this.db
       .query(
-        `update external_tasks set state = ?, claim_id = ?, attention_at = ?,
-        moved_at = case when state <> ? then ? else moved_at end,
+        `update external_tasks set state = ?, claim_id = ?,
+        moved_at = case when state <> ? or ? then ? else moved_at end,
         revision = revision + 1 where id = ?`,
       )
-      .run(state, claimId, attentionAt, state, now, id);
-  }
-
-  seen(id: string, attentionAt: number): boolean {
-    return (
-      this.db
-        .query(
-          `update external_tasks set attention_at = null, revision = revision + 1
-          where id = ? and attention_at = ?`,
-        )
-        .run(id, attentionAt).changes > 0
-    );
+      .run(state, claimId, state, moved ? 1 : 0, now, id);
   }
 
   delete(id: string): void {

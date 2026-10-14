@@ -25,8 +25,8 @@ import {
   NO_TOOLS,
   type Script,
   scriptedFetch,
+  sessionSettled,
   startChat,
-  tick,
   waitScript,
 } from "../helpers/chat.ts";
 import { fileDb } from "../helpers/db.ts";
@@ -36,11 +36,7 @@ const BLOCK = "Project memory, notes this project's chats saved.";
 type Edit = Record<string, unknown>;
 
 async function settled(chat: Pick<ChatApp, "app">, id: string) {
-  for (let i = 0; i < 400; i++) {
-    if (chat.app.sessions.byId(id)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("send did not settle");
+  await sessionSettled(chat.app, id);
 }
 
 const note = (chat: Pick<ChatApp, "app" | "projectId">) =>

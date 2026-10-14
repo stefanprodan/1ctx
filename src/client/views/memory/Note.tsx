@@ -296,6 +296,7 @@ export function Note({
             <Seg
               label="Show"
               small
+              head
               class="note-switch"
               options={[
                 { value: "current", label: "Current" },

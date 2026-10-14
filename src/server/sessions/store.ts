@@ -54,6 +54,7 @@ import {
   readMessage,
   readMessages,
   readMountedRepos,
+  restartReply,
   setMountedRepos,
   type ToolFinish,
   writeReply,
@@ -137,7 +138,7 @@ export class SessionStore {
   }
 
   // a child belongs to its root's automation through the root alone, so
-  // a run's picks and its task's retention only ever meet roots
+  // a run's picks and its automation's retention only ever meet roots
   create(fields: CreateSession): SessionRow {
     if (fields.parent && fields.automationId) {
       throw new Error("a child session has no automation");
@@ -400,6 +401,11 @@ export class SessionStore {
   // guarded by the null slot, so a second call delta writes nothing
   markRoundWork(id: string): Message | null {
     return markRoundWork(this.db, id) ? this.message(id) : null;
+  }
+
+  // a round asked again from its start
+  restartReply(id: string, slot: "work" | null): Message | null {
+    return restartReply(this.db, id, slot) ? this.message(id) : null;
   }
 
   // the repair places a reply before it ends it

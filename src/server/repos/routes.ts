@@ -34,7 +34,7 @@ export type ProjectsPort = {
 };
 
 // in the caller's transaction: a deleted repository's key leaves every
-// disabled set of its project's chats and tasks
+// disabled set of its project's chats and automations
 export type CapabilitiesPort = {
   forget(key: string, projectId: string): void;
 };

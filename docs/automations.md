@@ -5,14 +5,13 @@ scheduler), runs in `src/server/runner/` and the attention mark
 (`runner/marks.ts`, `runner/attention-step.ts`, `runner/attention.ts`,
 `tools/builtin/attention.ts`, see Attention).
 
-An automation (a scheduled task on the page) is a project's saved
-instructions that one agent carries out on a cron schedule or by Run
-now. Each time it starts, a run is made: a session the agent works
-through alone. A fire is one due occurrence of the schedule, recorded as
-an event whose outcome is `run`, `skipped` or `deferred`
-(`EVENT_OUTCOMES`). A run is a session, so what it shares with chats
-(the caps, the scheduled share, the writer, the sweep) is in
-`docs/sessions.md`.
+An automation is a project's saved instructions that one agent carries
+out on a cron schedule or by Run now. Each time it starts, a run is
+made: a session the agent works through alone. A fire is one due
+occurrence of the schedule, recorded as an event whose outcome is `run`,
+`skipped` or `deferred` (`EVENT_OUTCOMES`). A run is a session, so what
+it shares with chats (the caps, the scheduled share, the writer, the
+sweep) is in `docs/sessions.md`.
 
 ## Automations
 
@@ -28,7 +27,8 @@ an event whose outcome is `run`, `skipped` or `deferred`
 - **Anyone who sees the project runs, suspends, resumes, edits and
   deletes,** lowering retention included: a team project's members and
   every admin, a personal project's owner alone. A hidden project's
-  task is a 404. At most `MAX_AUTOMATIONS_PER_PROJECT` per project.
+  automation is a 404. At most `MAX_AUTOMATIONS_PER_PROJECT` per
+  project.
 - **A save that changes a field makes its editor the owner,** in the
   same transaction, so no run acts on someone else's words. A PATCH
   that changes nothing writes nothing and keeps the owner. Suspend,
@@ -41,17 +41,17 @@ an event whose outcome is `run`, `skipped` or `deferred`
   it. A PATCH that changes the schedule or zone recomputes it from
   now, which ends a cap wait; other fields leave it. Resume computes
   it from now.
-- **A `once` task runs once.** The schedule stays cron. The fire that
-  starts its run (source `schedule`, a `restart` that takes a due fire,
-  or a Run now that takes a waiting one, since each moves `next_at`)
-  records the event, then `spendOnce()` suspends it with
+- **A `once` automation runs once.** The schedule stays cron. The fire
+  that starts its run (source `schedule`, a `restart` that takes a due
+  fire, or a Run now that takes a waiting one, since each moves
+  `next_at`) records the event, then `spendOnce()` suspends it with
   `suspended_by` null, `once_fired_at` equal to `suspended_at` and
   `once_run_session_id` naming the run, in that order in the fire's
   transaction. A plain Run now, a skip, a wait and a deferral spend
   nothing. Resume arms it for one more run and clears both; suspend on
-  it is a no-op, as on any suspended task.
+  it is a no-op, as on any suspended automation.
 - **`ranOnce()` in `shared/contracts/automation.ts` is the one test**
-  of a task its own fire suspended: `suspended_at` equal to
+  of an automation its own fire suspended: `suspended_at` equal to
   `once_fired_at` and a once run kept, whether `once` is still set.
   The page and `stillCut()` both read it.
 - **A retired agent blocks its automations.** Deleting an agent retires
@@ -64,49 +64,51 @@ an event whose outcome is `run`, `skipped` or `deferred`
   is one `automation.deleted` with `runs`, never a `session.deleted`
   per run.
 
-## Task proposals
+## Automation proposals
 
-- **A chat's main rounds propose create, update, suspend, resume and
-  run through the `automation` tool.** Each writes one pending draft,
-  never a task or a run. The answering agent is fixed by the turn;
-  updates keep the task's agent. The parsers and schedule checks are
-  the form's, after a name is shaped as the page shapes it. A taken
-  name links its task. An update on a retired agent or with a deadline
-  above the current limit sends the user to the task page.
+- **A chat's main rounds propose create, update, suspend, resume and run
+  through the `automation` tool.** Each writes one pending draft, never
+  an automation or a run. The answering agent is fixed by the turn;
+  updates keep the automation's agent. The parsers and schedule checks
+  are the form's, after a name is shaped as the page shapes it. A taken
+  name links its automation. An update on a retired agent or with a
+  deadline above the current limit sends the user to the automation
+  page.
 - **The form and tool read `shared/automation-defaults.ts`.** A create
   follows the deadline limit, keeps 30 days, uses own memory with
   `OWN_MEMORY_GUIDANCE`, attention by the agent with no guidance, no
   rerun on restart and `once` off. A proposal takes the send's disabled
   set without `automations`, `external_tasks` and `memory`; an update
-  keeps the task's set.
+  keeps the automation's set.
 - **A proposal never stores a guidance nothing reads.** `memoryGuidance`
-  without own memory, on the create or the task after the update, is
-  refused; a create with `ownMemory` false stores none. As on the page,
-  an update turning own memory on with the guidance omitted fills the
-  task's blank one, and turning it off drops an unchanged default; a
-  given guidance, `""` included, is kept as given. An attention
-  guidance on a task whose attention is off sends the user to the task
-  page. The attention mode is the page's alone.
-- **`AutomationDraftStore` belongs to automations.** Its session
-  foreign key cascades; send, message, task and created run ids have no
+  without own memory, on the create or the automation after the update,
+  is refused; a create with `ownMemory` false stores none. As on the
+  page, an update turning own memory on with the guidance omitted fills
+  the automation's blank one, and turning it off drops an unchanged
+  default; a given guidance, `""` included, is kept as given. An
+  attention guidance on an automation whose attention is off sends the
+  user to the automation page. The attention mode is the page's alone.
+- **`AutomationDraftStore` belongs to automations.** Its session foreign
+  key cascades; send, message, automation and created run ids have no
   foreign keys, so decided records survive regenerate and retention.
-  Session lifecycle operations reach it through closures in `compose.ts`,
-  inside their own transactions. Lifecycle and expiry are in
-  `docs/archive.md`; session detail carries its wire shape.
+  Session lifecycle operations reach it through closures in
+  `compose.ts`, inside their own transactions. Lifecycle and expiry are
+  in `docs/archive.md`; session detail carries its wire shape.
 - **Confirm and Dismiss are authenticated writes on a draft id.** Anyone
   who may open its chat may press either. Confirm calls the same exported
   `actions` as the page, taking the presser's `Principal` and parsed
   request; an unchanged update keeps the owner. The draft's fields pass
   the form parsers again, using its stored edit revision for a PATCH.
-- **A decision and its task write commit together.** `decide()` guards
-  pending state; a second press answers 409 with the state. A create
-  records its task id, a run its session id. Run uses `prepareNow()` over
-  the scheduler's fire path; it launches only after the outer commit and
-  abandons its reservation on a throw.
-- **Stale refusals are kept before answering 409.** A moved edit revision,
-  a task gone or a name taken turns the draft stale; its expiry turns it
-  expired. A full run cap or a run still going answers 409 and leaves it
-  pending. A fire moves revision alone and leaves the draft valid.
+- **A decision and its automation write commit together.** `decide()`
+  guards pending state; a second press answers 409 with the state. A
+  create records its automation id, a run its session id. Run uses
+  `prepareNow()` over the scheduler's fire path; it launches only after
+  the outer commit and abandons its reservation on a throw.
+- **Stale refusals are kept before answering 409.** A moved edit
+  revision, an automation gone or a name taken turns the draft stale;
+  its expiry turns it expired. A full run cap or a run still going
+  answers 409 and leaves it pending. A fire moves revision alone and
+  leaves the draft valid.
 - **Every state change publishes `draft.changed` after commit,** carrying
   the whole `AutomationDraft`, a new pending proposal included.
   `draft-read.ts` supplies both frames and session detail, so fields and
@@ -168,7 +170,7 @@ an event whose outcome is `run`, `skipped` or `deferred`
   rows with source `restart`, through the scheduled fire's checks and
   cap waits. A suspend, the flag turned off, or a later run drops a
   row (`stillCut()`); the list is memory only, so a second restart
-  lists the cut run again. A suspended task reruns only when
+  lists the cut run again. A suspended automation reruns only when
   `ranOnce()` holds, its agent is not retired and the cut run is its
   once run, never a later Run now. It stays suspended, and the rerun
   becomes the once run (`carryOnceRun()`), so a second restart reruns
@@ -216,14 +218,15 @@ optional words on when, `attention_guidance` (`MAX_ATTENTION_GUIDANCE`).
   tools, `ownMemory` or not. One request on the run's agent and model:
   its own system prompt and the run's record (`runner/run-record.ts`,
   no note), the ask and the automation's words
-  (`runner/attention-packet.ts`), `needs_attention` alone
+  (`runner/attention-packet.ts`), the `attention` verdict alone
   (`docs/tools.md`), with thinking off, or the least effort for a model
   that must think, as compaction asks (`leastThinking()`): thinking, a
-  model wrote the call out as text. Only the call marks; text is never
-  read for one.
-  At most `ATTENTION_ROUNDS` (2): "ok" ends the step, while a refused
-  call or any other text is asked again once (`asksAgain()`, the text
-  with `ATTENTION_AGAIN` as a request-local message).
+  model wrote the call out as text. Only a `needed: true` call marks;
+  `needed: false` answers no, and text is never read for either.
+  At most `ATTENTION_ROUNDS` (2): a valid verdict ends the step, while
+  text or a round with no valid verdict is asked again once
+  (`asksAgain()`, the text with `ATTENTION_AGAIN` as a request-local
+  message). Two rounds with no valid verdict mark nothing.
 - **The step is part of the run.** Its rows are work from
   `attentionRound`, which is also `memoryRound`, the first round after
   the answer, up to `memoryFrom`, the memory phase's own start; its
@@ -245,7 +248,8 @@ optional words on when, `attention_guidance` (`MAX_ATTENTION_GUIDANCE`).
   `runner/attention.ts` asks the `run-attention` decision
   (`docs/providers.md`) from `endSend()` after `finalizeSend` committed,
   only for a run that ended `finish` with no mark of the step or the
-  runner (`asksDecider()`), never a chat. It reads the last done
+  runner (`asksDecider()`), after a `needed: false` too, never a
+  chat. It reads the last done
   `answer` (`sessions.runAnswer()`) when the ask starts; none means no
   ask. The
   automation's words, when set, replace the needs-attention option's
@@ -311,9 +315,9 @@ none; `by` names who marked the latest.
   queued in the opening transaction itself (`docs/email.md`), at most
   `ALERT_EMAILS_PER_DAY` (3) per automation a day, counted on the outbox
   rows that name it, which deleting runs keeps; over the cap the opening
-  emails nobody and logs `alert email capped`. The task's Email switch
-  is the `email_user` tool's alone (its meta says so) and never stops an
-  alert's email; the owner's profile opt-in does.
+  emails nobody and logs `alert email capped`. The automation's Email
+  switch is the `email_user` tool's alone (its meta says so) and never
+  stops an alert's email; the owner's profile opt-in does.
 - **The summary carries `alert`**: `since`, the count of its runs and
   the latest one's reason (`alertColumns()` in `sessions/alerts.ts`),
   read with the row, each feed row and each envelope. The feed's pick

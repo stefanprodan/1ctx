@@ -69,6 +69,17 @@ export function failedCall(error: unknown, ctx: ToolContext): ToolResult {
   );
 }
 
+// the call timeout's clock, a port so a test can move it
+export type CallTimer = {
+  now(): number;
+  timeout(ms: number): AbortSignal;
+};
+
+const realTimer: CallTimer = {
+  now: () => performance.now(),
+  timeout: (ms) => AbortSignal.timeout(ms),
+};
+
 export class Registry {
   private readonly byName = new Map<string, Tool<string | ToolResult>>();
 
@@ -77,6 +88,7 @@ export class Registry {
   constructor(
     tools: Tool<string | ToolResult>[],
     private readonly unknown = (name: string) => `tool "${name}" not found.`,
+    private readonly timer: CallTimer = realTimer,
   ) {
     for (const tool of tools) this.byName.set(tool.name, tool);
   }
@@ -95,8 +107,8 @@ export class Registry {
       timeoutMs =
         (tool.timeoutMs ?? ctx.caps.callTimeoutMs) + (tool.graceMs ?? 0);
       const args = parsedArgs(call);
-      started = performance.now();
-      timeoutSignal = AbortSignal.timeout(timeoutMs);
+      started = this.timer.now();
+      timeoutSignal = this.timer.timeout(timeoutMs);
       const signal = AbortSignal.any([ctx.signal, timeoutSignal]);
       const result = await tool.run(args, {
         ...ctx,
@@ -136,7 +148,7 @@ export class Registry {
       // past the limit it is this timeout
       const late =
         timeoutSignal !== null &&
-        (timeoutSignal.aborted || performance.now() - started >= timeoutMs);
+        (timeoutSignal.aborted || this.timer.now() - started >= timeoutMs);
       const timedOut = late && !ctx.signal.aborted;
       const failure = timedOut
         ? new DOMException("the tool call timed out", "TimeoutError")

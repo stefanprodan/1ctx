@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { FADE, scrollTo } from "../../../src/client/ui/Tabs.tsx";
 
-describe("a phone's tab row scrolls the open tab into view", () => {
+describe("a tab row too long scrolls the open tab into view", () => {
   test("a tab past the end comes clear of the fade at the right", () => {
     expect(scrollTo(0, 358, { left: 370, width: 52 })).toBe(
       370 + 52 + FADE - 358,

@@ -49,7 +49,7 @@ const send = (
       attentionOffered: {
         attention:
           fields.reason === undefined || fields.reason === null
-            ? { guidance: "", reason: null }
+            ? { guidance: "", reason: null, answered: false }
             : { guidance: "", reason: fields.reason },
       },
     },

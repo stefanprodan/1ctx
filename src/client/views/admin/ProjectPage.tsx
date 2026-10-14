@@ -18,7 +18,11 @@ import {
 } from "../../data/admin-projects.ts";
 import { users, usersError } from "../../data/users.ts";
 import { count, dayMonthYear, initials, plural } from "../../lib/format.ts";
-import { adminProjectHref, PROJECTS_HREF } from "../../lib/hrefs.ts";
+import {
+  adminProjectHref,
+  PROJECTS_HREF,
+  projectSettingsHref,
+} from "../../lib/hrefs.ts";
 import { sameIds, toggledId } from "../../lib/ids.ts";
 import { nameProblem, nameTaken } from "../../lib/names.ts";
 import { at } from "../../lib/save.ts";
@@ -29,6 +33,7 @@ import {
   RowsAvatar,
   RowsEnd,
   RowsLine,
+  RowsLink,
   RowsNote,
   RowsRemove,
   RowsTitle,
@@ -124,6 +129,7 @@ function Body({ project }: { project: ProjectDetail }) {
     <SettingStack>
       <AboutCard project={project} saving={saving} />
       <MembersCard project={project} saving={saving} />
+      <LabelsCard project={project} />
       <Repos projectId={project.id} personal={false} />
       <SettingDelete
         title={`Delete ${project.name}`}
@@ -274,6 +280,33 @@ function MembersCard({ project, saving }: CardProps) {
         )}
       </Setting>
     </SettingForm>
+  );
+}
+
+// read-only here: every user who sees the project writes them on its
+// Settings tab
+function LabelsCard({ project }: { project: ProjectDetail }) {
+  return (
+    <Setting
+      title="Labels"
+      count={countOf(project.labels.length, project.labels.length)}
+      list
+      action={
+        <RowsLink label="Manage" href={projectSettingsHref(project.id)} />
+      }
+    >
+      {project.labels.map((label) => (
+        <RowsLine key={label.id} flush>
+          <RowsTitle
+            name={label.name}
+            mono
+            sub={label.description === "" ? undefined : label.description}
+            prose
+            wrap
+          />
+        </RowsLine>
+      ))}
+    </Setting>
   );
 }
 

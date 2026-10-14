@@ -21,12 +21,16 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   throws a 400 on anything unexpected. A body is read through
   `readBody()` or `readBytes()` with the route's own cap, never
   `req.json()`. The listener's ceiling is `MAX_REQUEST_BYTES` (32 MiB).
+- **A `TooManyRequests` with a `retryAfter`** answers its 429 with a
+  `Retry-After` header in whole seconds.
 - **The access matrix is checked against the composed route list,**
   health and ready included.
-- **Only `/api/*`, `/mcp`, `/mcp/*` and `/.well-known/skills/*` go through
+- **Only `/api/*`, `/mcp`, `/mcp/*` and `/.well-known/*` go through
   the router.** `/mcp` is the access-key endpoint in `docs/mcp-server.md`;
-  its subpaths reach the router and do not match a route. The skills path
-  serves the `public` external tasks skill and nothing else. The page, its bundle and
+  its subpaths reach the router and do not match a route. Under
+  `/.well-known/` only the skills path matches, serving the `public`
+  external tasks skill; any other path, the OAuth metadata an MCP client
+  probes for included, is a JSON 404, never the page. The page, its bundle and
   the files `serve()` takes by a fixed path (the manifest's icons) are
   public static files outside it, with no row in the matrix.
 
@@ -71,9 +75,10 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   create response shows the token once; lists and logs never do.
   The secrets rules below govern files, not these login-like credentials.
 - **Only the owner mints a key.** `GET/POST /api/profile/keys` list and
-  create; `DELETE /api/profile/keys/:id` revokes. A name is 1..64
-  characters on one line with no edge spaces, unique per user (409
-  when taken). Scope is `read` or `write`, lifetime 30, 90 or 365 days.
+  create; `DELETE /api/profile/keys/:id` revokes. A name follows the
+  agent name rule (`isName`, 2 to 80 lowercase letters, digits, dashes
+  and underscores), unique per user (409 when taken). Scope is `read`
+  or `write`, lifetime 30, 90 or 365 days.
   `projectIds` is null for all visible projects, or a non-empty distinct
   list the owner sees now. Admins list and revoke through
   `GET /api/users/:id/keys` and `DELETE /api/users/:id/keys/:keyId`,
@@ -83,20 +88,21 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
   at the bearer or Origin. Creation at the cap is a 409; all retained
   rows count, expired ones included. Lowering it deletes nothing; raising
   it from 0 lets retained unexpired keys work again.
-- **The task sweep shares the endpoint's key availability rule.**
-  Gone or expired keys and every key at cap 0 release their claims.
+- **The external task sweep shares the endpoint's key availability
+  rule.** Gone or expired keys and every key at cap 0 unclaim their
+  external tasks.
   A positive cap leaves every retained unexpired key available.
   This read deletes no key.
 - **A missing, malformed, unknown or expired bearer is a plain 401,**
   without `WWW-Authenticate`, so clients do not start OAuth. A disabled
   user cannot resolve; a must-change user's key gets 403. Last used
   is written at most once a minute and never extends expiry.
-- **Disable and every reset delete keys with logins in one transaction.**
-  This includes an admin's typed reset and a reset or invite link used.
-  The owner's password change keeps keys. A key created or revoked logs
-  its user, id and scope, never its token.
-  Revoke, disable and reset end those keys' task claims through a
-  closure port in the same transaction, with events after commit.
+- **Disable and every reset delete keys with logins in one
+  transaction.** This includes an admin's typed reset and a reset or
+  invite link used. The owner's password change keeps keys. A key
+  created or revoked logs its user, id and scope, never its token.
+  Revoke, disable and reset end those keys' external task claims through
+  a closure port in the same transaction, with events after commit.
 - **Writes call `checkKey()` inside their transaction.** It re-reads
   the key by id and the user: gone or expired is 401; disabled or
   must-change is 403; the project the write lands in no longer
@@ -212,8 +218,26 @@ from `emailOn` in `GET /api/me`.
   a decider's and a user's page count across every project as one
   series. An admin sees a user's usage as their personal project's
   totals alone.
-- **Only admins manage team projects.** An owner only describes their
-  personal project, through `PATCH /api/profile/project`.
+- **Only admins manage team projects:** their name, members and
+  deletion, and the description through `PATCH /api/projects/:id`.
+- **Any user who sees a project writes its metadata,** its description
+  and its labels: a team project's members and every admin, a personal
+  project's owner alone. `PATCH /api/projects/:id/about` takes the
+  description (a team's required), and `POST /api/projects/:id/labels`,
+  `PATCH` and `DELETE` on `.../labels/:labelId` the labels, each
+  through `access.project()` inside its transaction and answering the
+  detail. No chat or `/mcp` tool writes either.
+- **A label is a project's row** (`project_labels`), linked by id so a
+  rename keeps its links. A name is 1 to 24 of `a-z`, `0-9` and `-`,
+  starting with a letter or digit, trimmed and lowercased first; a
+  description one line of at most 100 characters. At most 20 a
+  project; a duplicate name, the 21st and the last label's delete are
+  a 409. Every new project, team or personal, gets `DEFAULT_LABELS` in
+  the transaction that makes it, unless an admin's create names its
+  own `labels`. A delete takes the label off its external tasks by the
+  cascade, in its transaction; the detail counts each label's tasks
+  (`tasks`), and a rename or delete publishes `project.labels`
+  (`docs/external-tasks.md`).
 - **Deleting a team project is refused while a chat runs.** It takes
   the chats and keeps their usage.
 - **Repositories follow the same split** (`docs/repos.md`). Anyone who
@@ -225,14 +249,15 @@ from `emailOn` in `GET /api/me`.
   lets a member write a team project's. A key file's name (`keyName`)
   is in an admin's answer only.
 - **Removing a member drops their waiting messages in the same
-  transaction.** If they lose visibility, it also releases their task
-  claims there. An admin made a member releases claims only in team
-  projects they have not joined; both use a closure port.
+  transaction.** If they lose visibility, it also unclaims their
+  external tasks there. An admin made a member unclaims external tasks
+  only in team projects they have not joined; both use a closure port.
 - **Anyone who may open a chat may archive it.** Rename and delete are
   in `docs/sessions.md`.
-- **Task draft Confirm and Dismiss use the chat's same visibility rule.**
-  Missing drafts and drafts in hidden chats answer the same "no such chat"
-  404 as opening that chat, an admin in another personal project included.
+- **Automation draft Confirm and Dismiss use the chat's same visibility
+  rule.** Missing drafts and drafts in hidden chats answer the same "no
+  such chat" 404 as opening that chat, an admin in another personal
+  project included.
 
 ## Secrets
 

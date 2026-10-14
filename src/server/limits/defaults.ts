@@ -111,7 +111,7 @@ export type ExternalCaps = {
   accessKeysPerUser: number;
   // a closed external task is deleted this long after its close
   externalTaskDays: number;
-  // a claim with no entry or answer this long is released as idle
+  // a claimed task with no entry or answer this long is unclaimed as idle
   externalTaskIdleHours: number;
 };
 

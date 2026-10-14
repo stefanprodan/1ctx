@@ -14,6 +14,7 @@ import type { Tools } from "../../../src/server/tools/index.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
 import type { Tool, ToolResult } from "../../../src/server/tools/types.ts";
 import { collectLogs } from "../../helpers/app.ts";
+import { settle } from "../../helpers/async.ts";
 import {
   createAutomation,
   settleRun,
@@ -23,7 +24,7 @@ import {
   type ChatApp,
   chatApp,
   startChat,
-  tick,
+  until,
   waitScript,
 } from "../../helpers/chat.ts";
 
@@ -125,11 +126,7 @@ async function waitRows(
   sessionId: string,
   check: (statuses: string[]) => boolean,
 ) {
-  for (let i = 0; i < 400; i++) {
-    if (check(toolRows(chat, sessionId).map((row) => row.status))) return;
-    await tick();
-  }
-  throw new Error("the tool rows never reached the state");
+  await until(() => check(toolRows(chat, sessionId).map((row) => row.status)));
 }
 
 async function stop(chat: ChatApp, sessionId: string) {
@@ -142,14 +139,14 @@ async function stop(chat: ChatApp, sessionId: string) {
 
 describe("a cut send's tool rows", () => {
   test("a completion in a buffered round keeps its whole end, the hanging sibling the stop text, and the next send reads both", async () => {
-    let finished = false;
+    const finished = Promise.withResolvers<void>();
     const chat = await chatApp({
       window: 20_000,
       tools: fakeTools(
         ["bash", "visualize"],
         async (_offered, toolCall, ctx) => {
           if (toolCall.name === "bash") {
-            finished = true;
+            finished.resolve();
             return completion(ctx.caps.resultCut);
           }
           return hang(ctx.signal);
@@ -165,8 +162,8 @@ describe("a cut send's tool rows", () => {
         BUFFERED,
       );
       script.end();
-      for (let i = 0; i < 200 && !finished; i++) await tick();
-      await tick();
+      await finished.promise;
+      await settle();
       // held for the fit, so nothing is written yet
       expect(toolRows(chat, sessionId).map((row) => row.status)).toEqual([
         "streaming",
@@ -231,13 +228,13 @@ describe("a cut send's tool rows", () => {
         },
       },
     ];
-    let failed = false;
+    const failed = Promise.withResolvers<void>();
     const chat = await chatApp({
       window: 20_000,
       logFactory: logs.logFactory,
       tools: fakeTools(["webfetch", "websearch"], async (_o, toolCall, ctx) => {
         const result = await new Registry(tools).run(toolCall, ctx);
-        if (toolCall.name === "webfetch") failed = true;
+        if (toolCall.name === "webfetch") failed.resolve();
         return result;
       }),
     });
@@ -248,7 +245,7 @@ describe("a cut send's tool rows", () => {
         BUFFERED,
       );
       script.end();
-      for (let i = 0; i < 200 && !failed; i++) await tick();
+      await failed.promise;
       await stop(chat, sessionId);
       await settleRun(chat, sessionId);
 
@@ -312,14 +309,14 @@ describe("a cut send's tool rows", () => {
   );
 
   test("a finalization that fails once writes the completions on its retry, once", async () => {
-    let finished = false;
+    const finished = Promise.withResolvers<void>();
     const chat = await chatApp({
       window: 20_000,
       tools: fakeTools(
         ["bash", "visualize"],
         async (_offered, toolCall, ctx) => {
           if (toolCall.name === "bash") {
-            finished = true;
+            finished.resolve();
             return completion(ctx.caps.resultCut);
           }
           return hang(ctx.signal);
@@ -333,17 +330,21 @@ describe("a cut send's tool rows", () => {
         BUFFERED,
       );
       script.end();
-      for (let i = 0; i < 200 && !finished; i++) await tick();
+      await finished.promise;
       const store = chat.app.sessions;
       const original = store.finishSend.bind(store);
       let attempts = 0;
+      const first = Promise.withResolvers<void>();
       store.finishSend = (id, fields) => {
         attempts++;
-        if (attempts === 1) throw new Error("first finalize failed");
+        if (attempts === 1) {
+          first.resolve();
+          throw new Error("first finalize failed");
+        }
         return original(id, fields);
       };
       await stop(chat, sessionId);
-      for (let i = 0; i < 50 && attempts === 0; i++) await tick();
+      await first.promise;
       // the first attempt rolled the completion back with the rest
       expect(toolRows(chat, sessionId)[0]!.status).toBe("streaming");
       chat.app.now.value += FINALIZE_RETRY_MS;
@@ -372,7 +373,7 @@ describe("a cut send's tool rows", () => {
 describe("a completion the cut cannot write", () => {
   test("logs the failed write and leaves the row the cut text", async () => {
     const logs = collectLogs();
-    let finished = false;
+    const finished = Promise.withResolvers<void>();
     const chat = await chatApp({
       window: 20_000,
       logFactory: logs.logFactory,
@@ -380,7 +381,7 @@ describe("a completion the cut cannot write", () => {
         ["bash", "visualize"],
         async (_offered, toolCall, ctx) => {
           if (toolCall.name === "bash") {
-            finished = true;
+            finished.resolve();
             return completion(ctx.caps.resultCut);
           }
           return hang(ctx.signal);
@@ -394,7 +395,7 @@ describe("a completion the cut cannot write", () => {
         BUFFERED,
       );
       script.end();
-      for (let i = 0; i < 200 && !finished; i++) await tick();
+      await finished.promise;
       const store = chat.app.sessions;
       const original = store.finishTool.bind(store);
       store.finishTool = (id, fields) => {
@@ -453,7 +454,7 @@ describe("a run cut by its deadline before its memory phase", () => {
       run.main.end();
       await waitRows(chat, run.sessionId, (s) => s.length === 2);
       // the command is running before the deadline rings
-      for (let i = 0; i < 100; i++) await tick();
+      await chat.app.commandPhase(run.sessionId, "run");
       chat.app.now.value += DEFAULT_LIMITS.runDeadlineMs;
       const phase = await waitScript(chat.scripted, 2);
       const [time, slow] = toolRows(chat, run.sessionId);
@@ -476,7 +477,7 @@ describe("a run cut by its deadline before its memory phase", () => {
   });
 });
 
-// a fake tools port whose attention step offers needs_attention alone
+// a fake tools port whose attention step offers attention alone
 function attentionTools(run: Tools["run"]): Tools {
   const base = fakeTools(["datetime"], run);
   return {
@@ -488,12 +489,12 @@ function attentionTools(run: Tools["run"]): Tools {
         ...offered,
         tools: [
           {
-            name: "needs_attention",
+            name: "attention",
             description: "mark",
             parameters: { type: "object" },
           },
         ],
-        attention: { guidance: "when it fails", reason: null },
+        attention: { guidance: "when it fails", reason: null, answered: false },
       };
     },
   } as Tools;
@@ -501,16 +502,16 @@ function attentionTools(run: Tools["run"]): Tools {
 
 const MARK = {
   id: "mark",
-  name: "needs_attention",
-  arguments: '{"reason":"podinfo is not ready"}',
+  name: "attention",
+  arguments: '{"needed":true,"reason":"podinfo is not ready"}',
 };
 
 describe("the work after a run's answer", () => {
   test("an attention call a Stop cuts reads the stop, not a failure", async () => {
-    let reached = false;
+    const reached = Promise.withResolvers<void>();
     const chat = await chatApp({
       tools: attentionTools(async (_offered, _call, ctx) => {
-        reached = true;
+        reached.resolve();
         return hang(ctx.signal);
       }),
     });
@@ -523,13 +524,13 @@ describe("the work after a run's answer", () => {
       const step = await waitScript(chat.scripted, 2);
       step.toolRound([MARK]);
       step.end();
-      for (let i = 0; i < 200 && !reached; i++) await tick();
+      await reached.promise;
       await stop(chat, run.sessionId);
       await settleRun(chat, run.sessionId);
       const [row] = toolRows(chat, run.sessionId);
       expect(row).toMatchObject({
         status: "stopped",
-        toolName: "needs_attention",
+        toolName: "attention",
         content: cutText("stop", "write", false),
       });
       // the run's own end stays its answer's

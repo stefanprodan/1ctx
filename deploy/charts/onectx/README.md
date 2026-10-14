@@ -5,7 +5,7 @@ A self-hosted AI factory with continuous context.
 ## Introduction
 
 [1ctx](https://1ctx.dev) lets teams collaborate with sandboxed AI agents
-and schedule autonomous tasks, using shared project memory and knowledge.
+and run them on schedules, using shared project memory and knowledge.
 
 This chart deploys 1ctx on Kubernetes. See the
 [project README](https://github.com/stefanprodan/1ctx#highlights) for the
@@ -140,7 +140,7 @@ the Gateway.
 ### Graceful shutdown
 
 On termination, 1ctx waits up to `drain` seconds for active chats and
-scheduled tasks to finish. The pod termination grace period is `drain`
+runs to finish. The pod termination grace period is `drain`
 plus 15 seconds.
 During the drain, readiness fails and liveness stays up.
 
@@ -189,7 +189,7 @@ can evict the pod. Leave enough headroom for active agent work.
 
 | Name | Description | Value |
 |---|---|---|
-| `drain` | Seconds to wait for active chats and scheduled tasks during shutdown. Valid range is 0 to 3600 | `10` |
+| `drain` | Seconds to wait for active chats and runs during shutdown. Valid range is 0 to 3600 | `10` |
 | `trustProxy` | Read the client address and scheme from `X-Forwarded-*` headers | `true` |
 | `secureCookie` | Mark the login cookie as `Secure`. Disable only when serving plain HTTP | `true` |
 | `secrets.existingSecret` | Existing Secret mounted at `/secrets` | `onectx` |

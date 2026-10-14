@@ -509,8 +509,25 @@ describe("the agents", () => {
       clock: () => app.now.value,
       secret: () => null,
     });
+    // each request awaits the catalog; a test awaits the count-th ask,
+    // so the next request moves the world only once this one waits
+    let asks = 0;
+    const waiters: { count: number; resolve: () => void }[] = [];
+    const asked = (count: number) =>
+      new Promise<void>((resolve) => {
+        if (asks >= count) resolve();
+        else waiters.push({ count, resolve });
+      });
     Object.assign(app.catalogs, {
-      models: (p: ProviderRow) => catalogs.models(p),
+      models: (p: ProviderRow) => {
+        const models = catalogs.models(p);
+        asks++;
+        for (const waiter of waiters.filter((w) => w.count <= asks)) {
+          waiters.splice(waiters.indexOf(waiter), 1);
+          waiter.resolve();
+        }
+        return models;
+      },
     });
     const body = {
       ...defaults,
@@ -519,9 +536,9 @@ describe("the agents", () => {
       model: flash.id,
     };
     const a = client.call("POST", "/api/agents", { body });
-    await new Promise((r) => setTimeout(r, 5));
+    await asked(1);
     const twin = client.call("POST", "/api/agents", { body });
-    await new Promise((r) => setTimeout(r, 5));
+    await asked(2);
     for (const g of gates) g();
     const [first, second] = await Promise.all([a, twin]);
     expect([first.status, second.status].sort()).toEqual([201, 409]);
@@ -558,7 +575,7 @@ describe("the agents", () => {
         servers: [{ serverId: server.id, read: true, write: false }],
       },
     });
-    await new Promise((r) => setTimeout(r, 5));
+    await asked(3);
     expect(app.mcp.deleteUnreferenced(server.id)).toBe("deleted");
     for (const g of gates) g();
     const vanishedResponse = await vanished;
@@ -572,7 +589,7 @@ describe("the agents", () => {
     const patch = client.call("PATCH", `/api/agents/${agent.id}`, {
       body: { ...body, name: "other" },
     });
-    await new Promise((r) => setTimeout(r, 5));
+    await asked(4);
     expect(
       (await client.call("DELETE", `/api/agents/${agent.id}`)).status,
     ).toBe(200);
@@ -581,7 +598,7 @@ describe("the agents", () => {
     // a POST whose provider goes while the catalog is asked
     catalogs.forget(provider.id);
     const late = client.call("POST", "/api/agents", { body });
-    await new Promise((r) => setTimeout(r, 5));
+    await asked(5);
     expect(
       (await client.call("DELETE", `/api/providers/${provider.id}`)).status,
     ).toBe(200);

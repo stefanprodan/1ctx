@@ -12,17 +12,17 @@ import type { FeedRow } from "../../shared/api/sessions.ts";
 import type { Failure } from "../lib/format.ts";
 import type { IconName } from "../lib/icons.tsx";
 import {
-  RowsButton,
   RowsCard,
   RowsFailed,
   RowsFilters,
+  RowsMore,
   RowsNote,
 } from "../ui/Rows.tsx";
 import { Search } from "../ui/Search.tsx";
 import { Row } from "./Row.tsx";
 import "./feed.css";
 
-// chats, task runs, or the automations that need attention; null lists
+// chats, runs, or the automations that need attention; null lists
 // chats and runs
 export type FeedPick = "chat" | "automation" | "attention";
 
@@ -33,7 +33,7 @@ const FILTERS: {
 }[] = [
   { value: null, label: "All", icon: null },
   { value: "chat", label: "Chats", icon: "chat" },
-  { value: "automation", label: "Tasks", icon: "bolt" },
+  { value: "automation", label: "Runs", icon: "bolt" },
   { value: "attention", label: "Flagged", icon: "alert" },
 ];
 
@@ -60,7 +60,7 @@ export function FeedCard({
   projectName: (projectId: string) => string | null;
   // the query as the address has it, and where a new one goes
   search: { value: string; onChange: (q: string) => void };
-  // All, Chats, Tasks or Flagged beside the search
+  // All, Chats, Runs or Flagged beside the search
   filter: {
     value: FeedPick | null;
     onPick: (pick: FeedPick | null) => void;
@@ -129,7 +129,7 @@ export function ShowMore({
   if (more.loading) return <Ghosts count={3} />;
   return (
     <>
-      <RowsButton onClick={onMore}>Show more</RowsButton>
+      <RowsMore onClick={onMore}>Show more</RowsMore>
       {more.error !== null && <RowsFailed failure={more.error} />}
     </>
   );

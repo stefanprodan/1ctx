@@ -1,9 +1,9 @@
 # Admin pages
 
 Governs what the admin pages draw: `src/client/views/admin/` and the
-`data/` entities behind them. The other pages are in `docs/views.md`;
-the primitives, forms and the data layer's general rules are in
-`docs/ui.md`.
+`data/` entities behind them. The other pages are in `docs/views.md`
+and `docs/external-task-pages.md`; the primitives, forms and the data
+layer's general rules are in `docs/ui.md`.
 
 Every admin page is a list, an object page or a New page. Copy the
 nearest sibling of the same shape and compare the two before
@@ -17,6 +17,9 @@ reporting.
   `views/admin/AdminAside.tsx`. An aside over the Monitor's numbers
   reads `overviewTotals()`, which answers only for 30d, so the
   Monitor's range never reaches a list.
+- **Key files are items, file first** (`KeyFilesSection`): the file is
+  the name, what reads it the faint line under it, linked to its page,
+  or "unused". A name never sits in a label's place.
 - **A page whose object can be renamed or deleted uses
   `useShownRow()`.** It holds the last row by id until the address
   follows, so the page never flashes "No ... by that name." The body is
@@ -53,10 +56,19 @@ reporting.
   first (`deleteAsk()`). The Running card checks the caps' order in
   `collect()` before the server refuses it, and `limitRefusal()` maps a
   server refusal to labels.
+- **A team project's labels are read-only on its admin page,** with
+  Manage linking to the project's Settings tab, where every user who
+  sees it writes them. New project starts with `DEFAULT_LABELS` filled
+  in and editable (`LabelDrafts`), each input named as the server names
+  its refusal (`labels.2.name`).
 - **A provider is never edited, only made and deleted.** Delete is off
   while an agent or a decider runs on it, since the server refuses.
 - **The admin's own user page has no Reset password nor Disable.**
   `roleLock()` fixes their role and the last admin's.
+- **A user page lists the user's access keys from `userKeys`,** read
+  again after a revoke (whatever its answer), a reset and a disable,
+  which delete them. No admin page makes a key. The row is
+  `views/keys/` (`docs/views.md`).
 - **The MCP tab's prompt preview is `promptPreview()`** over
   `offeredServers()` and `promptSnapshot()` from `shared/mcp.ts`, the
   bytes a send would carry. Never compute it apart.

@@ -261,7 +261,7 @@ describe("the pages", () => {
     expect(html).toContain('aria-label="Decisions"');
     expect(html).toContain('placeholder="Search decisions"');
     expect(html).toContain('href="/admin/config/decisions/run-attention"');
-    expect(html).toContain("Mark task runs that need attention");
+    expect(html).toContain("Mark runs that need attention");
     expect(html).toContain(DECISION_WORDS["run-attention"].sub);
     expect(html).toContain(">on · small · custom");
     expect(html).toContain('<span class="rows-meta-short">on · small</span>');
@@ -276,7 +276,7 @@ describe("the pages", () => {
     const html = render(<DecisionList />);
     // an off decision's name goes faint
     expect(html).toContain('class="rows-item rows-item-off"');
-    expect(html).toContain("Mark task runs that need attention");
+    expect(html).toContain("Mark runs that need attention");
     expect(html).toContain(">off until a decider is added");
   });
 

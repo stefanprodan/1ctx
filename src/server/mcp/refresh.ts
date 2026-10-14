@@ -109,12 +109,15 @@ export class RefreshCoordinator {
     return taken.promise;
   }
 
-  refreshSoon(id: string, observed: string): void {
+  // resolves once a refresh it started is done, at once when none
+  refreshSoon(id: string, observed: string): Promise<void> {
     try {
       const row = this.deps.store.byId(id);
-      if (row !== null) this.startAutomatic(row, observed);
+      const running = row === null ? null : this.startAutomatic(row, observed);
+      return running ?? Promise.resolve();
     } catch (error) {
       this.deps.log.error("server refresh start failed", errorFields(error));
+      return Promise.resolve();
     }
   }
 

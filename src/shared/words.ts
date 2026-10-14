@@ -365,50 +365,51 @@ export const MAX_ATTENTION_GUIDANCE = 1000;
 // the agent's reason, one line
 export const MAX_ATTENTION_REASON = 300;
 
-// an external task waits open for a claim, is claimed while an agent
-// outside 1ctx works it, blocked while its question waits on a member,
-// and closes done or dropped
+// an external task's states: todo waits for a claim, awaiting input on a
+// member; done and canceled are closed
 export const EXTERNAL_TASK_STATES = [
-  "open",
-  "claimed",
-  "blocked",
+  "todo",
+  "in_progress",
+  "awaiting_input",
   "done",
-  "dropped",
+  "canceled",
 ] as const;
 export type ExternalTaskState = (typeof EXTERNAL_TASK_STATES)[number];
-export function isExternalTaskState(
+export const isExternalTaskState = (
   value: unknown,
-): value is ExternalTaskState {
-  return EXTERNAL_TASK_STATES.includes(value as ExternalTaskState);
-}
-// what the agent holding a claim reports
-export const AGENT_ENTRY_KINDS = [
-  "progress",
-  "question",
-  "result",
-  "release",
-] as const;
+): value is ExternalTaskState =>
+  EXTERNAL_TASK_STATES.includes(value as ExternalTaskState);
+export const EXTERNAL_TASK_STATE_WORDS: Record<ExternalTaskState, string> = {
+  todo: "Todo",
+  in_progress: "In progress",
+  awaiting_input: "Awaiting input",
+  done: "Done",
+  canceled: "Canceled",
+};
+// what the agent holding a claim reports; its unclaim is no report
+export const AGENT_ENTRY_KINDS = ["progress", "question", "result"] as const;
 export type AgentEntryKind = (typeof AGENT_ENTRY_KINDS)[number];
-export function isAgentEntryKind(value: unknown): value is AgentEntryKind {
-  return AGENT_ENTRY_KINDS.includes(value as AgentEntryKind);
-}
-// every entry on a task's timeline: the agent's, then a member's; a
-// release is also a member's and 1ctx's
+export const isAgentEntryKind = (value: unknown): value is AgentEntryKind =>
+  AGENT_ENTRY_KINDS.includes(value as AgentEntryKind);
+// every timeline entry; an unclaim is an agent's, a member's or 1ctx's
 export const ENTRY_KINDS = [
+  "claim",
   ...AGENT_ENTRY_KINDS,
+  "unclaim",
   "answer",
-  "drop",
+  "cancel",
   "reopen",
+  "edit",
 ] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
-// how a claim ended: access_gone when its key or its user's sight of
-// the project went, idle after externalTaskIdleHours with no entry
+// how a claim ended: access_gone when access went, limit past the bounds
 export const CLAIM_ENDS = [
-  "released",
+  "unclaimed",
   "done",
-  "dropped",
+  "canceled",
   "access_gone",
   "idle",
+  "limit",
 ] as const;
 export type ClaimEnd = (typeof CLAIM_ENDS)[number];
 
@@ -442,19 +443,19 @@ export type WebTool = (typeof WEB_TOOLS)[number];
 // the tool an agent emails users with, off until an admin turns it on
 export const EMAIL_TOOL = "email_user";
 
-// the tool a chat's agent reads its project's scheduled tasks and
+// the tool a chat's agent reads its project's automations and
 // proposes changes to them with, on until an admin turns it off
 export const AUTOMATION_TOOL = "automation";
 
 // the tools the server writes itself, besides the web ones, by name;
 // none has a switch, each follows what its send has
 export const BUILTIN_TOOLS = [
+  "attention",
   "bash",
   "datetime",
   "mcp_call",
   "mcp_describe",
   "memory_edit",
-  "needs_attention",
   "skill",
   "skill_file",
 ] as const;

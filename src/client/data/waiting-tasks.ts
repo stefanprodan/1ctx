@@ -1,28 +1,36 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Home's External tasks card: the marked tasks across the user's
-// projects, read by their own query on Home's load, then kept by the
-// external task frames by the revision rule. Frames that land while a
-// read is out are applied over its answer. A project the user stops or
-// starts seeing, and rows cleared under the ones the read answered,
-// read them again, one flight folding a burst.
+// Home's External tasks card: the tasks awaiting input across the
+// user's projects, read by their own query on Home's load, then kept by
+// the external task frames by the revision rule. Frames that land while
+// a read is out are applied over its answer. A project the user stops or
+// starts seeing, a label of a Home project renamed or deleted, and rows
+// leaving under the ones the read answered, read them again, one flight
+// folding a burst. An admin sees every team
+// project, so joining or leaving one sends no such frame: Home's next
+// load picks it up.
 
 import { effect, signal } from "@preact/signals";
-import type { AttentionTasksResponse } from "../../shared/api/external-tasks.ts";
+import type { WaitingTasksResponse } from "../../shared/api/external-tasks.ts";
 import {
   ATTENTION_ROWS,
   type ExternalTaskRow,
 } from "../../shared/contracts/external-task.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { api } from "./api.ts";
-import { applyMarked, dropMarked, type Marked } from "./external-tasks-rows.ts";
+import {
+  applyWaiting,
+  awaiting,
+  dropWaiting,
+  type Waiting,
+} from "./external-tasks-rows.ts";
 import { Flight } from "./flight.ts";
 import { me } from "./me.ts";
 import { onSocketEvent } from "./socket.ts";
 
 // null until read
-export const markedTasks = signal<Marked | null>(null);
+export const waitingTasks = signal<Waiting | null>(null);
 
 let owner: string | null = null;
 let turn = 0;
@@ -30,6 +38,8 @@ let turn = 0;
 let during: Map<string, ExternalTaskRow> | null = null;
 // deleted tasks: a row read before its delete never joins again
 const gone = new Set<string>();
+// the projects the last read covered; a frame from any other is not Home's
+let home: Set<string> | null = null;
 // read is hoisted, so the flight exists before the user effect runs
 const flight = new Flight(read);
 
@@ -41,25 +51,26 @@ effect(() => {
   during = null;
   flight.stop();
   gone.clear();
-  markedTasks.value = null;
+  home = null;
+  waitingTasks.value = null;
 });
 
-// fewer rows held than the answer had, while more are marked: the card
-// would thin out or hide with tasks still to show
-const thin = (marked: Marked) =>
-  marked.tasks.length < Math.min(marked.count, ATTENTION_ROWS);
+// fewer rows held than the answer had, while more wait: the card would
+// thin out or hide with tasks still to show
+const thin = (waiting: Waiting) =>
+  waiting.tasks.length < Math.min(waiting.count, ATTENTION_ROWS);
 
 // a row onto the rows held, and whether the count must be read again:
-// the card thinned under what is marked, or a marked row not held may
-// be one past the rows read, already counted
+// the card thinned under what waits, or a waiting row not held may be
+// one past the rows read, already counted
 function step(
-  held: Marked,
+  held: Waiting,
   row: ExternalTaskRow,
-): { next: Marked; ask: boolean } {
-  const next = applyMarked(held, row);
+): { next: Waiting; ask: boolean } {
+  const next = applyWaiting(held, row);
   if (next === held) return { next, ask: false };
   const past =
-    row.attentionAt !== null &&
+    awaiting(row) &&
     held.count > held.tasks.length &&
     !held.tasks.some((t) => t.id === row.id);
   return { next, ask: thin(next) || past };
@@ -70,24 +81,26 @@ async function read(): Promise<void> {
   const mine = ++turn;
   during = new Map();
   try {
-    const body = await api<AttentionTasksResponse>(
-      "/api/external-tasks?attention=1",
+    const body = await api<WaitingTasksResponse>(
+      "/api/external-tasks?waiting=1",
     );
     if (owner !== forUser || mine !== turn) return;
     const seen = during;
     during = null;
-    const answered: Marked = {
+    home = new Set(body.projectIds);
+    const answered: Waiting = {
       tasks: body.tasks.filter((t) => !gone.has(t.id)),
       count: body.count,
     };
-    let marked = answered;
+    let waiting = answered;
     let ask = false;
     for (const row of seen.values()) {
-      const done = step(marked, row);
-      marked = done.next;
+      if (!home.has(row.projectId)) continue;
+      const done = step(waiting, row);
+      waiting = done.next;
       ask ||= done.ask;
     }
-    markedTasks.value = marked;
+    waitingTasks.value = waiting;
     if (ask) flight.ask();
   } catch {
     // Home draws no card rather than a failure for it
@@ -95,23 +108,26 @@ async function read(): Promise<void> {
   }
 }
 
-export const loadMarkedTasks = (): Promise<void> => flight.run(read);
+export const loadWaitingTasks = (): Promise<void> => flight.run(read);
 
 function take(row: ExternalTaskRow): void {
   if (gone.has(row.id)) return;
+  // a read out may cover a project the last one did not; its answer
+  // filters what it saw
   const was = during?.get(row.id);
   if (during !== null && (was === undefined || was.revision < row.revision)) {
     during.set(row.id, row);
   }
-  const held = markedTasks.value;
+  if (home !== null && !home.has(row.projectId)) return;
+  const held = waitingTasks.value;
   if (held === null) return;
   const { next, ask } = step(held, row);
   if (next === held) return;
-  markedTasks.value = next;
+  waitingTasks.value = next;
   if (ask) flight.ask();
 }
 
-export function onMarkedSocket(ev: SocketEvent): void {
+export function onWaitingSocket(ev: SocketEvent): void {
   switch (ev.type) {
     case "externalTask":
       take(ev.task);
@@ -119,21 +135,31 @@ export function onMarkedSocket(ev: SocketEvent): void {
     case "externalTaskDeleted": {
       gone.add(ev.taskId);
       during?.delete(ev.taskId);
-      const held = markedTasks.value;
+      const held = waitingTasks.value;
       if (held === null) break;
-      const next = dropMarked(held, ev.taskId);
-      markedTasks.value = next;
+      const next = dropWaiting(held, ev.taskId);
+      waitingTasks.value = next;
       // a deleted row past the ones held still counts until read again
       if (thin(next) || next.count > next.tasks.length) flight.ask();
       break;
     }
     case "revoked":
     case "granted":
-      if (markedTasks.value !== null) flight.ask();
+      if (waitingTasks.value !== null) flight.ask();
+      break;
+    // no row moved, so only a read shows the labels as they are now
+    // and while a read is out, whose projects are not known yet
+    case "projectLabels":
+      if (
+        during !== null ||
+        (waitingTasks.value !== null && home?.has(ev.projectId))
+      ) {
+        flight.ask();
+      }
       break;
     default:
       break;
   }
 }
 
-onSocketEvent(onMarkedSocket);
+onSocketEvent(onWaitingSocket);

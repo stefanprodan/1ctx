@@ -26,6 +26,12 @@
     text-align: left;
     cursor: pointer;
   }
+  /* a card head's filter: the segments' outline, no fill */
+  .select-trigger-quiet {
+    height: 30px;
+    background: transparent;
+    font-size: var(--text-small);
+  }
   .select-trigger:disabled {
     color: var(--dim);
     cursor: default;

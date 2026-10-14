@@ -43,7 +43,11 @@ export class NotFound extends HttpError {
 }
 
 export class TooManyRequests extends HttpError {
-  constructor(message = "too many requests") {
+  constructor(
+    message = "too many requests",
+    // whole seconds, sent as Retry-After when set
+    readonly retryAfter: number | null = null,
+  ) {
     super(429, message);
   }
 }

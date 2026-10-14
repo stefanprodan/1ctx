@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The queue dispatcher (docs/sessions.md, The queue dispatcher).
+// The queue dispatcher (docs/queue.md, The queue dispatcher).
 
 import type {
   QueuedResponse,

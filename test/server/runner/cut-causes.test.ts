@@ -21,7 +21,7 @@ import {
   settleRun,
   startRun,
 } from "../../helpers/automations.ts";
-import { type ChatApp, chatApp, tick, waitScript } from "../../helpers/chat.ts";
+import { type ChatApp, chatApp, waitScript } from "../../helpers/chat.ts";
 
 const tool = (name: string) => ({
   name,
@@ -59,7 +59,7 @@ function memoryHandle(): MemoryHandle {
   };
 }
 
-// a fake tools port: datetime in the main rounds, needs_attention in
+// a fake tools port: datetime in the main rounds, attention in
 // the attention step, memory_edit in the memory phase, each run by run
 function phaseTools(run: Tools["run"]): Tools {
   return {
@@ -75,8 +75,12 @@ function phaseTools(run: Tools["run"]): Tools {
     ) => {
       if (scope?.phase === "attention") {
         return {
-          ...base(["needs_attention"]),
-          attention: { guidance: "when it fails", reason: null },
+          ...base(["attention"]),
+          attention: {
+            guidance: "when it fails",
+            reason: null,
+            answered: false,
+          },
         };
       }
       if (scope?.phase === "memory") {
@@ -109,10 +113,10 @@ async function stop(chat: ChatApp, sessionId: string) {
 
 describe("the cause a cut row names", () => {
   test("a Stop in the memory phase after the attention step ran out of time reads the stop", async () => {
-    let reached = false;
+    const reached = Promise.withResolvers<void>();
     const chat = await chatApp({
       tools: phaseTools(async (_offered, call, ctx) => {
-        if (call.name === "memory_edit") reached = true;
+        if (call.name === "memory_edit") reached.resolve();
         return hang(ctx.signal);
       }),
     });
@@ -135,8 +139,7 @@ describe("the cause a cut row names", () => {
         },
       ]);
       phase.end();
-      for (let i = 0; i < 200 && !reached; i++) await tick();
-      expect(reached).toBe(true);
+      await reached.promise;
       await stop(chat, run.sessionId);
       await settleRun(chat, run.sessionId);
       expect(toolRows(chat, run.sessionId)).toMatchObject([
@@ -152,11 +155,11 @@ describe("the cause a cut row names", () => {
   });
 
   test("a Stop while a run waits on a tool its deadline cut keeps the deadline", async () => {
-    let reached = false;
+    const reached = Promise.withResolvers<void>();
     let release: (() => void) | null = null;
     const chat = await chatApp({
       tools: phaseTools(async () => {
-        reached = true;
+        reached.resolve();
         // ignores the abort until the test lets it end, then throws
         await new Promise<void>((resolve) => {
           release = resolve;
@@ -171,14 +174,16 @@ describe("the cause a cut row names", () => {
         { id: "t1", name: "datetime", arguments: '{"timezone":"UTC"}' },
       ]);
       run.main.end();
-      for (let i = 0; i < 200 && !reached; i++) await tick();
-      expect(reached).toBe(true);
+      await reached.promise;
+      const send = chat.app.runner.registry.get(run.sessionId)!;
+      const cut = new Promise((resolve) =>
+        send.controller.signal.addEventListener("abort", resolve, {
+          once: true,
+        }),
+      );
       chat.app.now.value += DEFAULT_LIMITS.runDeadlineMs;
-      for (let i = 0; i < 50; i++) {
-        if (chat.app.runner.registry.get(run.sessionId)?.cause === "deadline")
-          break;
-        await tick();
-      }
+      await cut;
+      expect(send.cause).toBe("deadline");
       await stop(chat, run.sessionId);
       release!();
       await settleRun(chat, run.sessionId);

@@ -16,11 +16,12 @@ import { recentFiles } from "../../data/knowledge-rows.ts";
 import { ago } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, type Save, useSave } from "../../lib/save.ts";
+import { PathName } from "../../ui/PathName.tsx";
 import {
-  RowsButton,
   RowsEnd,
   RowsGo,
   RowsMeta,
+  RowsMore,
   RowsNote,
   RowsTitle,
 } from "../../ui/Rows.tsx";
@@ -32,7 +33,6 @@ import {
   fileHref,
   keptWords,
 } from "./Knowledge.model.ts";
-import { PathName } from "./PathName.tsx";
 import "./knowledge.css";
 
 export function RecentList({
@@ -64,13 +64,13 @@ export function RecentList({
         </RowsGo>
       ))}
       {more && (
-        <RowsButton
+        <RowsMore
           onClick={() => {
             pages.value++;
           }}
         >
           Show more
-        </RowsButton>
+        </RowsMore>
       )}
     </>
   );

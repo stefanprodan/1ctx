@@ -52,7 +52,7 @@ describe("socket fixtures", () => {
       },
     ]);
     memory.end();
-    await settle(chat, 10);
+    await settle(chat);
     record("memory-phase", detail, conn);
     expect(chat.scripted.scripts).toHaveLength(2);
     expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
@@ -94,7 +94,7 @@ describe("socket fixtures", () => {
     memory.end();
     const open = await waitScript(chat.scripted, 3);
     await chat.member.call("POST", `/api/sessions/${detail.session.id}/stop`);
-    await settle(chat, 10);
+    await settle(chat);
     record("stop-during-memory", detail, conn);
     expect(open.aborted).toBe(true);
     expect(chat.app.sessions.send(detail.send.id)).toMatchObject({
@@ -151,7 +151,7 @@ describe("socket fixtures", () => {
     summary.finish();
     summary.usage({ prompt: 41_000, completion: 100 });
     summary.end();
-    await settle(chat, 10);
+    await settle(chat);
     record("compact-after-answer", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.rounds).toBe(2);
     chat.app.socket.dispose();
@@ -170,7 +170,7 @@ describe("socket fixtures", () => {
     summary.content("partial summary");
     await tick();
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
-    await settle(chat, 10);
+    await settle(chat);
     record("stop-during-summary", detail, conn);
     expect(chat.app.sessions.send(detail.send.id)!.status).toBe("stopped");
     chat.app.socket.dispose();
@@ -180,7 +180,7 @@ describe("socket fixtures", () => {
     const chat = await chatApp();
     const started = await startChat(chat, "compact this");
     started.script.reply("the answer");
-    await settle(chat, 8);
+    await settle(chat);
     const conn = await watcher(chat);
     watch(chat, conn, started.sessionId);
     conn.frames = [];
@@ -197,7 +197,7 @@ describe("socket fixtures", () => {
     summary.finish();
     summary.usage({ prompt: 20, completion: 10 });
     summary.end();
-    await settle(chat, 8);
+    await settle(chat);
     record("compact-send", detail, conn);
     expect(detail.send.kind).toBe("compact");
     chat.app.socket.dispose();

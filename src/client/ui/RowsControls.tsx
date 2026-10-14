@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ComponentChildren } from "preact";
+import { navigate } from "../app/router.ts";
 import { Icon, type IconName } from "../lib/icons.tsx";
+import { Select } from "./Select.tsx";
 import "./rows.css";
 
 type RowsFilter = {
@@ -13,6 +15,8 @@ type RowsFilter = {
   onPick?: () => void;
 };
 
+// a phone's head has room for the one filter that is on, so there the
+// segments become a dropdown of the same choices
 export function RowsFilters({
   label,
   filters,
@@ -20,40 +24,60 @@ export function RowsFilters({
   label: string;
   filters: RowsFilter[];
 }) {
+  // with none on (a search over the lists), the dropdown names the set,
+  // so picking any filter is a change
+  const on = filters.find((f) => f.on);
   return (
-    <nav class="seg seg-small rows-filters" aria-label={label}>
-      {filters.map((f) => {
-        const cls = `seg-option${f.on ? " seg-on" : ""}`;
-        const inner = (
-          <>
-            {f.icon && (
-              <Icon name={f.icon} size={12} class="rows-filter-icon" />
-            )}
-            {f.label}
-          </>
-        );
-        return f.href !== undefined ? (
-          <a
-            key={f.label}
-            class={cls}
-            href={f.href}
-            aria-current={f.on ? "page" : undefined}
-          >
-            {inner}
-          </a>
-        ) : (
-          <button
-            key={f.label}
-            type="button"
-            class={cls}
-            aria-pressed={f.on}
-            onClick={f.onPick}
-          >
-            {inner}
-          </button>
-        );
-      })}
-    </nav>
+    <>
+      <span class="rows-filters-pick">
+        <Select
+          label={label}
+          quiet
+          value={on?.label ?? ""}
+          placeholder={label}
+          options={filters.map((f) => ({ value: f.label, label: f.label }))}
+          onChange={(value) => {
+            const f = filters.find((choice) => choice.label === value);
+            if (f === undefined) return;
+            if (f.href !== undefined) navigate(f.href);
+            else f.onPick?.();
+          }}
+        />
+      </span>
+      <nav class="seg seg-small rows-filters" aria-label={label}>
+        {filters.map((f) => {
+          const cls = `seg-option${f.on ? " seg-on" : ""}`;
+          const inner = (
+            <>
+              {f.icon && (
+                <Icon name={f.icon} size={12} class="rows-filter-icon" />
+              )}
+              {f.label}
+            </>
+          );
+          return f.href !== undefined ? (
+            <a
+              key={f.label}
+              class={cls}
+              href={f.href}
+              aria-current={f.on ? "page" : undefined}
+            >
+              {inner}
+            </a>
+          ) : (
+            <button
+              key={f.label}
+              type="button"
+              class={cls}
+              aria-pressed={f.on}
+              onClick={f.onPick}
+            >
+              {inner}
+            </button>
+          );
+        })}
+      </nav>
+    </>
   );
 }
 

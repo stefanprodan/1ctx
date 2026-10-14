@@ -5,7 +5,6 @@ import { expect, spyOn, test } from "bun:test";
 import type { Db } from "../../../src/server/db/index.ts";
 import {
   ATTENTION_ROWS,
-  MAX_BRIEF_BYTES,
   MAX_ENTRY_BYTES,
 } from "../../../src/shared/contracts/external-task.ts";
 import { EXTERNAL_TASK_STATES } from "../../../src/shared/words.ts";
@@ -52,12 +51,17 @@ test("agent pages seek each project's state indexes without scans or temp sorts"
   using f = fixture();
   for (const state of EXTERNAL_TASK_STATES) f.task(state);
   for (const projectIds of [[f.projectId], [f.projectId, f.otherProjectId]]) {
-    for (const states of [[], ["open"], [...EXTERNAL_TASK_STATES]] as const) {
-      for (const after of [null, `${f.now()}.000000000000`]) {
+    for (const states of [[], ["todo"], [...EXTERNAL_TASK_STATES]] as const) {
+      for (const [after, labels] of [
+        [null, []],
+        [`${f.now()}.000000000000`, []],
+        [null, ["build", "fix"]],
+      ] as const) {
         const sqls = queries(f.db, () =>
           f.port.list({
             projectIds,
             states: [...states],
+            labels: [...labels],
             held: null,
             after,
             limit: 2,
@@ -91,16 +95,48 @@ test("agent pages seek each project's state indexes without scans or temp sorts"
   }
 });
 
+test("closed pages seek the project's closed index under a search and a state", () => {
+  using f = fixture();
+  f.task("done");
+  f.task("canceled");
+  for (const filter of [
+    { q: "", state: null },
+    { q: "work", state: null },
+    { q: "", state: "done" },
+    { q: "work", state: "canceled" },
+  ] as const) {
+    for (const after of [null, `${f.now()}.000000000000`]) {
+      const sqls = queries(f.db, () =>
+        f.area.closed(f.projectId, after, filter, 2),
+      );
+      const candidates = sqls.filter((sql) => !sql.includes("last_text"));
+      expect(candidates).toHaveLength(1);
+      const detail = plan(f.db, candidates[0]!);
+      expect(
+        detail.some((line) =>
+          line.startsWith(
+            "SEARCH t USING INDEX external_tasks_closed (project_id=?",
+          ),
+        ),
+      ).toBe(true);
+      expect(detail.some((line) => /SCAN \w+|TEMP B-TREE/.test(line))).toBe(
+        false,
+      );
+    }
+  }
+});
+
 test("held pages seek the key's open claims once and hydrate only the page", () => {
   using f = fixture();
-  const held = f.task("claimed");
-  f.task("blocked");
+  const held = f.task("in_progress");
+  f.task("awaiting_input");
   f.task("done");
   for (const after of [null, `${f.now()}.000000000000`]) {
     const sqls = queries(f.db, () =>
       f.port.list({
         projectIds: [f.projectId, f.otherProjectId],
         states: [...EXTERNAL_TASK_STATES],
+        labels: [],
         held: f.key,
         after,
         limit: 1,
@@ -124,6 +160,7 @@ test("held pages seek the key's open claims once and hydrate only the page", () 
     f.port.list({
       projectIds: [f.projectId],
       states: [],
+      labels: [],
       held: { ...f.key, userId: f.member.id },
       after: null,
       limit: 1,
@@ -134,7 +171,7 @@ test("held pages seek the key's open claims once and hydrate only the page", () 
 
 test("access endings seek the supplied key ids instead of scanning open claims", () => {
   using f = fixture();
-  f.task("claimed");
+  f.task("in_progress");
   const sqls = queries(f.db, () => f.area.endClaims(["unrelated"]));
   const claims = sqls.filter((sql) =>
     sql.includes("from external_task_claims"),
@@ -163,11 +200,11 @@ test("user claim endings seek the supplied projects instead of scanning tasks", 
   expect(detail.some((line) => /SCAN [tc]\b/.test(line))).toBe(false);
 });
 
-test("attention rows and counts seek visible projects instead of the global mark index", () => {
+test("waiting rows and counts seek each Home project's unfinished index by state", () => {
   using f = fixture();
-  f.task("blocked");
+  f.task("awaiting_input");
   const sqls = queries(f.db, () =>
-    f.area.attention([f.projectId, f.otherProjectId]),
+    f.area.waiting([f.projectId, f.otherProjectId]),
   );
   expect(sqls).toHaveLength(2);
   const rows = sqls.find((sql) => sql.includes("last_text"))!;
@@ -182,7 +219,7 @@ test("attention rows and counts seek visible projects instead of the global mark
     const detail = plan(f.db, sql, args);
     expect(
       detail.some((line) =>
-        /SEARCH t USING COVERING INDEX external_tasks_project_attention \(project_id=\?/.test(
+        /SEARCH t USING (COVERING )?INDEX external_tasks_unfinished \(project_id=\? AND state=\?\)/.test(
           line,
         ),
       ),
@@ -191,13 +228,47 @@ test("attention rows and counts seek visible projects instead of the global mark
   }
 });
 
-test("list queries project no brief and bound the entry preview inside SQLite", () => {
+test("label counts and a task's bounds seek their indexes", () => {
   using f = fixture();
-  const task = f.area.create(f.owner.id, f.projectId, {
-    title: "Large task",
-    text: "b".repeat(MAX_BRIEF_BYTES),
-    fileIds: [],
-  }).task.task;
+  const task = f.task("in_progress");
+  f.task("done");
+  // an agent's entries since the last reopen: sought by rowid past it
+  const since = [
+    /SEARCH external_task_entries USING INDEX external_task_entries_agent \(task_id=\? AND rowid>\?\)/,
+    /SEARCH external_task_entries USING COVERING INDEX external_task_entries_reopen \(task_id=\?\)/,
+  ];
+  const reads: [() => unknown, RegExp[]][] = [
+    [
+      () => f.area.openLabelCounts(f.projectId),
+      [
+        /SEARCH t USING (COVERING )?INDEX external_tasks_unfinished \(project_id=\?/,
+      ],
+    ],
+    [
+      () => f.area.labelTasks(f.projectId),
+      [
+        /SEARCH l USING COVERING INDEX external_task_labels_label \(label_id=\?\)/,
+      ],
+    ],
+    [() => f.area.store.claimsSinceReopen(task.id), since],
+    [() => f.area.store.counted(task.id), since],
+  ];
+  for (const [read, indexes] of reads) {
+    for (const sql of queries(f.db, read)) {
+      const detail = plan(f.db, sql);
+      if (!sql.includes("external_task")) continue;
+      for (const index of indexes)
+        expect(detail.some((line) => index.test(line))).toBe(true);
+      expect(
+        detail.some((line) => /SCAN (t|l|external_\w+)\b/.test(line)),
+      ).toBe(false);
+    }
+  }
+});
+
+test("list queries bound the entry preview inside SQLite", () => {
+  using f = fixture();
+  const task = f.create("Large task");
   const claim = f.area.claim(f.key, task.id);
   const text = "q".repeat(MAX_ENTRY_BYTES);
   f.area.report(f.key, task.id, claim.claimId, "question", text, []);
@@ -206,12 +277,13 @@ test("list queries project no brief and bound the entry preview inside SQLite", 
     () =>
       f.port.list({
         projectIds: [f.projectId],
-        states: ["blocked"],
+        states: ["awaiting_input"],
+        labels: [],
         held: null,
         after: null,
         limit: 50,
       }),
-    () => f.area.attention([f.projectId]),
+    () => f.area.waiting([f.projectId]),
   ]) {
     const sqls = queries(f.db, read).filter((sql) => sql.includes("last_text"));
     expect(sqls).toHaveLength(1);
@@ -226,6 +298,5 @@ test("list queries project no brief and bound the entry preview inside SQLite", 
     .query<{ last_text: string }, [string]>(sql)
     .get(f.projectId)!;
   expect(raw.last_text).toBe(text.slice(0, 600));
-  expect(f.port.show(task.id, null)!.task.text.length).toBe(MAX_BRIEF_BYTES);
   expect(f.port.show(task.id, null)!.entries[0]!.text).toBe(text);
 });

@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What a task's switches turned off, in words, named only from what its
+// What an automation's switches turned off, in words, named only from what its
 // agent and project hold.
 
 import {
@@ -20,7 +20,7 @@ import {
 
 export type Named = { id: string; name: string };
 
-// what a task's switches can name: its agent's servers and skills, its
+// what an automation's switches can name: its agent's servers and skills, its
 // project's credentials and repositories
 export type SwitchNames = {
   servers: Named[];
@@ -43,7 +43,7 @@ const CHAT_ONLY: ReadonlySet<string> = new Set([
   EXTERNAL_TASKS,
 ]);
 
-// the names of what a task's runs go without, read only from what its
+// the names of what an automation's runs go without, read only from what its
 // agent and project hold, as the page names them; with the web off a
 // credential goes with it and is not named
 export function switchedOff(

@@ -12,17 +12,13 @@ import {
 } from "../../src/shared/contracts/automation.ts";
 import { hashPassword } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
-import { chatApp, tick } from "../helpers/chat.ts";
+import { chatApp, sessionSettled, tick } from "../helpers/chat.ts";
 
 async function settle(
   chat: Awaited<ReturnType<typeof chatApp>>,
   sessionId: string,
 ) {
-  for (let i = 0; i < 100; i++) {
-    if (chat.app.sessions.byId(sessionId)?.status !== "running") return;
-    await tick();
-  }
-  throw new Error("run did not settle");
+  await sessionSettled(chat.app, sessionId);
 }
 
 describe("automations", () => {
@@ -410,7 +406,7 @@ describe("automations", () => {
 
 describe("automation rights", () => {
   // a team project with the member casey and another member, other, and
-  // a task casey made
+  // an automation casey made
   async function teamApp() {
     const chat = await chatApp();
     const other = chat.app.createUser({
@@ -685,7 +681,7 @@ describe("automation rights", () => {
     await chat.app.shutdown();
   });
 
-  test("keeps a task of a project the caller cannot see hidden", async () => {
+  test("keeps an automation of a project the caller cannot see hidden", async () => {
     const chat = await chatApp();
     const personal = await createAutomation(chat, { name: "private-run" });
     const path = `/api/automations/${personal.id}`;

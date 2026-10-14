@@ -192,7 +192,7 @@ describe("the Memory fold's line", () => {
 });
 
 describe("the fold after a run's answer", () => {
-  // the step in round 2, needs_attention done or text only; the memory
+  // the step in round 2, attention done or text only; the memory
   // phase in round 3, its edit done
   const step = (marked: boolean) =>
     marked
@@ -205,8 +205,8 @@ describe("the fold after a run's answer", () => {
             toolCalls: [
               {
                 id: "a1",
-                name: "needs_attention",
-                arguments: '{"reason":"flux is not ready"}',
+                name: "attention",
+                arguments: '{"needed":true,"reason":"flux is not ready"}',
               },
             ],
             createdAt: 10_000,
@@ -219,7 +219,7 @@ describe("the fold after a run's answer", () => {
             slot: null,
             round: 2,
             toolCallId: "a1",
-            toolName: "needs_attention",
+            toolName: "attention",
             content: "Marked.",
             createdAt: 11_000,
             finishedAt: 12_000,
@@ -394,7 +394,7 @@ describe("the fold after a run's answer", () => {
         round.calls.map((call) => [call.call.name, call.result?.id]),
       ),
     ).toEqual([
-      ["needs_attention", "flag"],
+      ["attention", "flag"],
       ["memory_edit", "edit"],
     ]);
   });
@@ -476,7 +476,7 @@ describe("the note card", () => {
       session: null,
       run: false,
     });
-    // a task's own note whose run is deleted
+    // an automation's own note whose run is deleted
     expect(
       writerOf(memory({ session: null, automationId: "au1" }), now),
     ).toMatchObject({ kind: "agent", session: null, run: true });

@@ -66,7 +66,7 @@ describe("the shell on a wide window", () => {
   test.serial("shows the rail and no strip", () => {
     const html = render(<App />);
     expect(html).toContain('class="rail"');
-    expect(html).not.toContain("shell-strip");
+    expect(html).not.toContain('class="strip"');
     expect(html).not.toContain("shell-show");
     expect(html).toContain('aria-label="Hide the menu"');
   });
@@ -79,8 +79,8 @@ describe("the shell on a wide window", () => {
       expect(store.get("rail")).toBe("hidden");
       const html = render(<App />);
       expect(html).not.toContain('class="rail"');
-      expect(html).toContain("shell-strip");
-      expect(html).toContain("shell-show");
+      expect(html).toContain('class="strip"');
+      expect(html).toContain('aria-label="Show the menu"');
       expect(html).not.toContain("shell-show-float");
       showRail();
       expect(store.has("rail")).toBe(false);
@@ -101,7 +101,7 @@ describe("the shell on a phone", () => {
   test.serial("shows the floating button and no rail until it opens", () => {
     const closed = render(<App />);
     expect(closed).toContain("shell-show-float");
-    expect(closed).not.toContain("shell-strip");
+    expect(closed).not.toContain('class="strip"');
     expect(closed).not.toContain('class="rail');
     openDrawer();
     const opened = render(<App />);

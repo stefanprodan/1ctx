@@ -125,7 +125,7 @@ function Aside({ list }: { list: McpServerSummary[] }) {
           const user = list.find((s) => s.keyName === file);
           return user
             ? { label: user.name, href: configMcpHref(user.name) }
-            : { label: "unused", quiet: true };
+            : { label: "unused" };
         }}
       />
     </>

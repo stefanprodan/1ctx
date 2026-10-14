@@ -96,17 +96,17 @@ const timeCall = {
   arguments: '{"timezone":"UTC"}',
 };
 
-function addTeam(chat: ChatApp, id: string) {
-  chat.app.db
-    .query(
-      "insert into projects (id, kind, name, owner_id, created_at) values (?, 'team', ?, ?, ?)",
-    )
-    .run(id, id, chat.memberId, chat.app.now.value);
-  chat.app.db
-    .query(
-      "insert into memberships (project_id, user_id, created_at) values (?, ?, ?)",
-    )
-    .run(id, chat.memberId, chat.app.now.value);
+// through the store, so the project holds its default labels as any does
+function addTeam(chat: ChatApp, name: string): string {
+  const now = chat.app.now.value;
+  const { id } = chat.app.projects.createTeam({
+    ownerId: chat.memberId,
+    name,
+    description: "",
+    now,
+  });
+  chat.app.projects.addMember(id, chat.memberId, now);
+  return id;
 }
 
 describe("GET /api/sessions", () => {
@@ -142,15 +142,10 @@ describe("GET /api/sessions", () => {
 
   test("filters titles case-insensitively and narrows to a project", async () => {
     const chat = await chatApp();
-    addTeam(chat, "sessions-team");
+    const sessionsTeam = addTeam(chat, "sessions-team");
     const personal = await startChat(chat, "Alpha Release");
     await finish(personal.script);
-    const team = await startChat(
-      chat,
-      "Team Notes",
-      chat.member,
-      "sessions-team",
-    );
+    const team = await startChat(chat, "Team Notes", chat.member, sessionsTeam);
     await finish(team.script);
 
     const searched = await (
@@ -160,7 +155,7 @@ describe("GET /api/sessions", () => {
       personal.sessionId,
     ]);
     const narrowed = await (
-      await chat.member.call("GET", "/api/sessions?project=sessions-team")
+      await chat.member.call("GET", `/api/sessions?project=${sessionsTeam}`)
     ).json();
     expect(narrowed.rows.map((row: FeedRow) => row.session.id)).toEqual([
       team.sessionId,

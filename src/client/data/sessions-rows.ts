@@ -15,6 +15,7 @@ import type {
   SessionSummary,
 } from "../../shared/contracts/session.ts";
 import type { SessionOrigin } from "../../shared/words.ts";
+import { searched } from "../lib/search.ts";
 import { type Live, liveOf, liveOfSnapshot } from "../transcript/stream.ts";
 
 // what the order reads of a row, and all a cursor names
@@ -180,13 +181,6 @@ export function cursorPlace(cursor: string): Place | null {
     id,
   };
 }
-
-// the server's search: the query trimmed, then a title holding it, ASCII
-// letters in any case and every other character as it is, as SQLite's
-// LIKE folds with % and _ escaped
-const ascii = (text: string) => text.replace(/[A-Z]/g, (c) => c.toLowerCase());
-export const searched = (title: string, q: string) =>
-  ascii(title).includes(ascii(q.trim()));
 
 // what a session envelope tells the feed: the summary, what the
 // transaction wrote, and the row as it stood after the commit, null

@@ -30,6 +30,7 @@ import {
   type ChatApp,
   chatApp,
   type Script,
+  sessionSettled,
   startChat,
   tick,
 } from "../helpers/chat.ts";
@@ -85,17 +86,17 @@ async function finish(script: Script) {
   await tick();
 }
 
-function addTeam(chat: ChatApp, id: string) {
-  chat.app.db
-    .query(
-      "insert into projects (id, kind, name, owner_id, created_at) values (?, 'team', ?, ?, ?)",
-    )
-    .run(id, id, chat.memberId, chat.app.now.value);
-  chat.app.db
-    .query(
-      "insert into memberships (project_id, user_id, created_at) values (?, ?, ?)",
-    )
-    .run(id, chat.memberId, chat.app.now.value);
+// through the store, so the project holds its default labels as any does
+function addTeam(chat: ChatApp, name: string): string {
+  const now = chat.app.now.value;
+  const { id } = chat.app.projects.createTeam({
+    ownerId: chat.memberId,
+    name,
+    description: "",
+    now,
+  });
+  chat.app.projects.addMember(id, chat.memberId, now);
+  return id;
 }
 
 describe("the socket", () => {
@@ -170,7 +171,7 @@ describe("the socket", () => {
 
   test("the row reaches the same audience as the envelope", async () => {
     const chat = await chatApp();
-    addTeam(chat, "row-team");
+    const rowTeam = addTeam(chat, "row-team");
     chat.app.createUser({
       username: "drew",
       fullName: "Drew Doe",
@@ -193,7 +194,7 @@ describe("the socket", () => {
       .query(
         "insert into memberships (project_id, user_id, created_at) values (?, ?, ?)",
       )
-      .run("row-team", locked.id, chat.app.now.value);
+      .run(rowTeam, locked.id, chat.app.now.value);
     const drew = chat.app.client();
     await drew.login("drew", "pw");
     const erin = chat.app.client();
@@ -205,8 +206,8 @@ describe("the socket", () => {
       locked: await connection(chat, erin),
     };
     for (const conn of Object.values(conns)) chat.app.socket.open(conn);
-    expect(conns.locked.data.projects.has("row-team")).toBe(true);
-    const team = await startChat(chat, "team chat", chat.member, "row-team");
+    expect(conns.locked.data.projects.has(rowTeam)).toBe(true);
+    const team = await startChat(chat, "team chat", chat.member, rowTeam);
     await finish(team.script);
     const personal = await startChat(chat, "own chat");
     await finish(personal.script);
@@ -597,20 +598,20 @@ describe("the socket", () => {
 
   test("access revocation removes delivery and the active watch", async () => {
     const chat = await chatApp();
-    addTeam(chat, "socket-team");
+    const socketTeam = addTeam(chat, "socket-team");
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
     const { script, sessionId } = await startChat(
       chat,
       "team chat",
       chat.member,
-      "socket-team",
+      socketTeam,
     );
     chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));
     conn.frames = [];
     chat.app.db
       .query("delete from memberships where project_id = ? and user_id = ?")
-      .run("socket-team", chat.memberId);
+      .run(socketTeam, chat.memberId);
     transact(chat.app.db, () => ({
       result: 0,
       events: [
@@ -620,10 +621,8 @@ describe("the socket", () => {
         },
       ],
     }));
-    expect(conn.frames).toEqual([
-      { type: "revoked", projectId: "socket-team" },
-    ]);
-    expect(conn.data.projects.has("socket-team")).toBe(false);
+    expect(conn.frames).toEqual([{ type: "revoked", projectId: socketTeam }]);
+    expect(conn.data.projects.has(socketTeam)).toBe(false);
     expect(conn.data.watching).toBeNull();
     transact(chat.app.db, () => ({
       result: undefined,
@@ -631,7 +630,7 @@ describe("the socket", () => {
         {
           type: "memory.changed" as const,
           data: {
-            projectId: "socket-team",
+            projectId: socketTeam,
             automationId: null,
             revision: 1,
           },
@@ -795,10 +794,7 @@ describe("automation socket events", () => {
     );
     const sessionId = (await started.json()).session.id;
     (await pending).reply("done");
-    for (let i = 0; i < 100; i++) {
-      if (chat.app.sessions.byId(sessionId)?.status !== "running") break;
-      await tick();
-    }
+    await sessionSettled(chat.app, sessionId);
     const conn = await connection(chat, chat.member);
     chat.app.socket.open(conn);
     chat.app.socket.message(conn, JSON.stringify({ type: "watch", sessionId }));

@@ -7,6 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { Bash, InMemoryFs } from "just-bash";
 import { CASES } from "./jq-paths.cases.ts";
+import { countWork, expectLinear } from "./work.ts";
 
 describe("jq path expressions", () => {
   for (const [input, filter, outputs] of CASES) {
@@ -26,16 +27,21 @@ describe("jq path expressions", () => {
     });
   }
 
-  test("an update over a large array stays linear", async () => {
-    const fs = new InMemoryFs();
-    const items = Array.from({ length: 20_000 }, (_, i) => ({ i }));
-    await fs.writeFile("/in.json", JSON.stringify(items));
-    const started = performance.now();
-    const result = await new Bash({ fs }).exec(
-      "jq '.[] |= (.i += 1) | length' /in.json",
-    );
-    expect(result.stdout).toBe("20000\n");
-    expect(performance.now() - started).toBeLessThan(2_000);
+  // a writer that copied the array for each element was quadratic
+  test.serial("an update over a large array stays linear", async () => {
+    const update = async (length: number) => {
+      const fs = new InMemoryFs();
+      const items = Array.from({ length }, (_, i) => ({ i }));
+      await fs.writeFile("/in.json", JSON.stringify(items));
+      const bash = new Bash({ fs });
+      return countWork(() =>
+        bash.exec("jq '.[] |= (.i += 1) | length' /in.json"),
+      );
+    };
+    const eighth = await update(2_500);
+    const full = await update(20_000);
+    expect(full.result.stdout).toBe("20000\n");
+    expectLinear(eighth.work, full.work);
   });
 
   test("an update keeps a value it placed twice apart", async () => {

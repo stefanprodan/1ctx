@@ -5,13 +5,13 @@ import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import { effect } from "@preact/signals";
 import { me } from "../../../src/client/data/me.ts";
 import {
+  AUTOMATION_RETRY_MS,
   applyDraftFrame,
+  automationFailing,
   decideDraft,
+  draftAutomation,
   draftsShown,
-  draftTask,
-  loadDraftTask,
-  TASK_RETRY_MS,
-  taskFailing,
+  loadDraftAutomation,
 } from "../../../src/client/data/session-drafts.ts";
 import {
   leaveSession,
@@ -23,11 +23,11 @@ import type { AutomationDraft } from "../../../src/shared/contracts/automation-d
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 import { hasWatchedDrafts } from "../../../src/shared/socket.ts";
 import {
+  automation,
+  automationDraft,
   createDraft,
   detail,
   proposalRows,
-  task,
-  taskDraft,
 } from "../../fixtures/sessions/drafts.ts";
 
 const realFetch = globalThis.fetch;
@@ -66,7 +66,7 @@ describe("the draft frame", () => {
       applyDraftFrame({
         type: "draft",
         sessionId: "chat-1",
-        draft: taskDraft("run"),
+        draft: automationDraft("run"),
       });
       expect(states()).toEqual([
         ["draft-1", "pending"],
@@ -137,7 +137,7 @@ describe("a press", () => {
   });
 
   test.serial("a refusal that leaves it pending throws its words", async () => {
-    session.value = detail([taskDraft("run")]);
+    session.value = detail([automationDraft("run")]);
     answer(409, { state: "pending", error: "too many runs at once" });
     await expect(decideDraft("draft-run", "confirm")).rejects.toThrow(
       "too many runs at once",
@@ -191,7 +191,7 @@ describe("a watch's answer", () => {
       type: "watched",
       sessionId: "chat-1",
       live: null,
-      drafts: [taskDraft("run")],
+      drafts: [automationDraft("run")],
     });
     expect(states()).toEqual([["draft-run", "pending"]]);
   });
@@ -209,7 +209,7 @@ describe("a watch's answer", () => {
         type: "watched",
         sessionId: "chat-1",
         live: null,
-        drafts: [{ ...createDraft(), fields: older }, taskDraft("run")],
+        drafts: [{ ...createDraft(), fields: older }, automationDraft("run")],
       }),
     );
     expect(hasWatchedDrafts(event)).toBe(true);
@@ -246,7 +246,7 @@ describe("a 409 for a draft decided elsewhere", () => {
   });
 });
 
-describe("the task a line names", () => {
+describe("the automation a line names", () => {
   const settle = () => new Promise((r) => setTimeout(r, 0));
 
   test.serial("only a 404 means gone; another failure asks again", async () => {
@@ -255,9 +255,9 @@ describe("the task a line names", () => {
         { error: "no" },
         { status: 404 },
       )) as unknown as typeof fetch;
-    await loadDraftTask("gone-1");
-    expect(draftTask("gone-1")).toBeNull();
-    expect(taskFailing("gone-1")).toBe(false);
+    await loadDraftAutomation("gone-1");
+    expect(draftAutomation("gone-1")).toBeNull();
+    expect(automationFailing("gone-1")).toBe(false);
 
     globalThis.fetch = (async () =>
       Response.json(
@@ -266,43 +266,43 @@ describe("the task a line names", () => {
       )) as unknown as typeof fetch;
     jest.useFakeTimers();
     try {
-      await loadDraftTask("flaky-1");
+      await loadDraftAutomation("flaky-1");
       // drawn while failing, so its buttons stay reachable, never as gone
-      expect(draftTask("flaky-1")).toBeNull();
-      expect(taskFailing("flaky-1")).toBe(true);
+      expect(draftAutomation("flaky-1")).toBeNull();
+      expect(automationFailing("flaky-1")).toBe(true);
       let draws = 0;
       const stop = effect(() => {
-        draftTask("flaky-1");
+        draftAutomation("flaky-1");
         draws++;
       });
       let reads = 0;
       globalThis.fetch = (async () => {
         reads++;
-        return Response.json({ automation: task({ id: "flaky-1" }) });
+        return Response.json({ automation: automation({ id: "flaky-1" }) });
       }) as unknown as typeof fetch;
       // within the pause nothing is asked
-      await loadDraftTask("flaky-1");
+      await loadDraftAutomation("flaky-1");
       expect(reads).toBe(0);
-      jest.advanceTimersByTime(TASK_RETRY_MS);
+      jest.advanceTimersByTime(AUTOMATION_RETRY_MS);
       // the timer alone draws the line again, whose effect reads once more
       expect(draws).toBe(2);
       stop();
-      await loadDraftTask("flaky-1");
+      await loadDraftAutomation("flaky-1");
       expect(reads).toBe(1);
-      expect(draftTask("flaky-1")?.name).toBe("nightly-check");
-      expect(taskFailing("flaky-1")).toBe(false);
+      expect(draftAutomation("flaky-1")?.name).toBe("nightly-check");
+      expect(automationFailing("flaky-1")).toBe(false);
     } finally {
       jest.useRealTimers();
     }
   });
 
-  test.serial("a deleted task reads as gone without a read", async () => {
+  test.serial("a deleted automation reads as gone without a read", async () => {
     globalThis.fetch = (async () =>
       Response.json({
-        automation: task({ id: "task-9" }),
+        automation: automation({ id: "task-9" }),
       })) as unknown as typeof fetch;
-    await loadDraftTask("task-9");
-    expect(draftTask("task-9")?.id).toBe("task-9");
+    await loadDraftAutomation("task-9");
+    expect(draftAutomation("task-9")?.id).toBe("task-9");
     onSocket({
       type: "automationDeleted",
       automationId: "task-9",
@@ -310,6 +310,6 @@ describe("the task a line names", () => {
       runs: false,
     });
     await settle();
-    expect(draftTask("task-9")).toBeNull();
+    expect(draftAutomation("task-9")).toBeNull();
   });
 });

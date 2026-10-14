@@ -10,26 +10,27 @@ import type {
   KnowledgeFile,
   KnowledgeSearchHit,
 } from "../../shared/contracts/knowledge.ts";
-import { holdsAll, matchText, searchTerms } from "../../shared/search.ts";
-import { BadRequest, TooManyRequests } from "../lib/errors.ts";
+import {
+  bestLines,
+  creditedCount,
+  holdsAll,
+  searchTerms,
+} from "../../shared/search.ts";
+import { isKnowledgeName } from "../../shared/words.ts";
+import { BadRequest } from "../lib/errors.ts";
+import { noStep, type SearchStep } from "../lib/search-queue.ts";
 
-// the text read a request at most; past it the page ends early with
-// next set, so a large base is searched a page at a time
-export const SEARCH_SCAN_BYTES = 8 * 1024 * 1024;
+// BM25 with Lucene's IDF
+const K1 = 1.2;
+const B = 0.75;
+const NAME_ALL = 1.5;
+const NAME_SOME = 1.2;
 
-// Rows come without text and a text is read only once it fits what is
-// left of the budget, so a request never loads past it but for the one
-// file every page reads.
 export type SearchSource = {
-  // the live files past the name, in name order
-  files(after: string | null): Iterable<KnowledgeFile>;
-  // those whose name holds every one of the lowercased terms
-  named(
-    after: string | null,
-    terms: readonly string[],
-  ): Iterable<KnowledgeFile>;
-  // empty for a file gone since its row was read
-  text(fileId: string): string;
+  // every live file's id, in name order, taken at the start
+  ids(): string[];
+  // the file's metadata and text from one read, null for a file gone
+  row(fileId: string): { file: KnowledgeFile; text: string } | null;
 };
 
 // the query's words, refused when it holds none
@@ -39,73 +40,118 @@ export function queryTerms(q: string): string[] {
   return terms;
 }
 
-// The cursor is a name, so a rename between two pages may move a file
-// across it: it can then show twice or not at all.
-export function search(
-  source: SearchSource,
-  q: string,
-  after: string | null,
-  budget = SEARCH_SCAN_BYTES,
-): KnowledgeSearchResponse {
-  const terms = queryTerms(q);
-  const first = after === null;
-  const files: KnowledgeSearchHit[] = [];
-  const names: KnowledgeFile[] = [];
-  let namesTotal = 0;
-  const name = (file: KnowledgeFile) => {
-    namesTotal++;
-    if (names.length < SEARCH_NAMES) names.push(file);
-  };
-  let read = 0;
-  let last: string | null = null;
-  let next: string | null = null;
-  for (const file of source.files(after)) {
-    if (last !== null && read + file.bytes > budget) {
-      next = last;
-      break;
-    }
-    read += file.bytes;
-    last = file.name;
-    const hit = matchText(source.text(file.id), terms);
-    if (hit === null) {
-      if (first && holdsAll(file.name, terms)) name(file);
-      continue;
-    }
-    if (files.length === SEARCH_PAGE) {
-      next = files[SEARCH_PAGE - 1]!.file.name;
-      break;
-    }
-    files.push({ file, ...hit });
+export type SearchCursor = { score: number; name: string };
+
+// the last row's score and name; the score's shortest form reads back
+// to the same number
+export const cursorOf = (cursor: SearchCursor): string =>
+  `${cursor.score}:${cursor.name}`;
+
+// null when it is not one cursorOf wrote
+export function readCursor(value: string): SearchCursor | null {
+  const at = value.indexOf(":");
+  if (at < 0) return null;
+  const head = value.slice(0, at);
+  const name = value.slice(at + 1);
+  if (!/^\d+(\.\d+)?(e[-+]\d+)?$/.test(head) || !isKnowledgeName(name)) {
+    return null;
   }
-  if (!first || next === null) return { names, namesTotal, files, next };
-  // the names past where the page stopped, their text read while the
-  // budget lasts and, past it, listed on the name alone
-  let spent = false;
-  for (const file of source.named(last, terms)) {
-    if (!spent && read + file.bytes > budget) spent = true;
-    if (spent) {
-      name(file);
-      continue;
-    }
-    read += file.bytes;
-    if (!holdsAll(source.text(file.id), terms)) name(file);
-  }
-  return { names, namesTotal, files, next };
+  const score = Number(head);
+  return Number.isFinite(score) ? { score, name } : null;
 }
 
-// one scan per user at a time, should the scan ever yield
-export function oneAtATime<T>(
-  running: Set<string>,
-  userId: string,
-  scan: () => T,
-): T {
-  if (running.has(userId)) {
-    throw new TooManyRequests("a search is already running");
+export type SearchQuery = { terms: string[]; cursor: SearchCursor | null };
+
+// the query and cursor checked, before a search takes its turn
+export function prepareSearch(q: string, after: string | null): SearchQuery {
+  const terms = queryTerms(q);
+  const cursor = after === null ? null : readCursor(after);
+  if (after !== null && cursor === null) {
+    throw new BadRequest("after must be a search cursor");
   }
-  running.add(userId);
-  try {
-    return scan();
-  } finally {
-    running.delete(userId);
+  return { terms, cursor };
+}
+
+type Found = { file: KnowledgeFile; counts: number[] };
+type Ranked = { file: KnowledgeFile; score: number };
+
+// Every file is read on every page: the IDF needs the whole project, and
+// the project's cap bounds the scan. A write between two pages changes
+// the scores, so a row may then repeat or be skipped.
+export async function search(
+  source: SearchSource,
+  query: SearchQuery,
+  step: SearchStep = noStep,
+): Promise<KnowledgeSearchResponse> {
+  const { terms, cursor } = query;
+  const found: Found[] = [];
+  const names: KnowledgeFile[] = [];
+  let namesTotal = 0;
+  const df = terms.map(() => 0);
+  let scanned = 0;
+  let bytes = 0;
+  for (const id of source.ids()) {
+    await step();
+    // a file gone since the snapshot is neither row
+    const row = source.row(id);
+    if (row === null) continue;
+    const { file, text } = row;
+    scanned++;
+    bytes += file.bytes;
+    const lower = text.toLowerCase();
+    const counts = terms.map((term) => creditedCount(lower, term));
+    counts.forEach((count, i) => {
+      if (count > 0) df[i]!++;
+    });
+    if (terms.every((term) => lower.includes(term)) && holdsAll(text, terms)) {
+      found.push({ file, counts });
+    } else if (cursor === null && holdsAll(file.name, terms)) {
+      namesTotal++;
+      if (names.length < SEARCH_NAMES) names.push(file);
+    }
   }
+  const avg = Math.max(1, bytes / Math.max(1, scanned));
+  const idf = df.map((n) => Math.log(1 + (scanned - n + 0.5) / (n + 0.5)));
+  const ranked: Ranked[] = found.map(({ file, counts }) => {
+    const norm = K1 * (1 - B + (B * file.bytes) / avg);
+    let score = 0;
+    counts.forEach((tf, i) => {
+      score += (idf[i]! * tf * (K1 + 1)) / (tf + norm);
+    });
+    const name = file.name.toLowerCase();
+    const named = terms.filter((term) => name.includes(term)).length;
+    if (named === terms.length) score *= NAME_ALL;
+    else if (named > 0) score *= NAME_SOME;
+    return { file, score };
+  });
+  ranked.sort(
+    (a, b) =>
+      b.score - a.score ||
+      (a.file.name < b.file.name ? -1 : a.file.name > b.file.name ? 1 : 0),
+  );
+  let start = 0;
+  if (cursor !== null) {
+    start = ranked.findIndex(
+      (row) =>
+        row.score < cursor.score ||
+        (row.score === cursor.score && row.file.name > cursor.name),
+    );
+    if (start < 0) start = ranked.length;
+  }
+  const page = ranked.slice(start, start + SEARCH_PAGE);
+  const last = page.at(-1);
+  const next =
+    last !== undefined && start + SEARCH_PAGE < ranked.length
+      ? cursorOf({ score: last.score, name: last.file.name })
+      : null;
+  // rows are read again for the page alone, so a scan holds one text at
+  // a time; a row gone or changed since is left out, the cursor unmoved
+  const files: KnowledgeSearchHit[] = [];
+  for (const { file } of page) {
+    await step();
+    const row = source.row(file.id);
+    if (row === null || !holdsAll(row.text, terms)) continue;
+    files.push({ file: row.file, ...bestLines(row.text, terms) });
+  }
+  return { names, namesTotal, files, next };
 }

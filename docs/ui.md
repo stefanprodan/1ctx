@@ -1,8 +1,10 @@
 # UI
 
 Governs `src/client/`: the data layer, the `ui/` primitives, forms,
-the shell, the stylesheets and the `lib/` helpers. What each page
-draws is in `docs/views.md`, the admin pages in `docs/admin-pages.md`.
+the stylesheets and the `lib/` helpers. The shell and the rail are in
+`docs/shell.md`. What each page draws is in `docs/views.md`, the
+admin pages in `docs/admin-pages.md`, the external task pages in
+`docs/external-task-pages.md`.
 
 ## Data
 
@@ -10,7 +12,12 @@ draws is in `docs/views.md`, the admin pages in `docs/admin-pages.md`.
   view reads signals. A route names its `load` in `app/routes.ts`,
   and `app/loading.ts` starts it when the path, the query or the
   signed-in user changes, before the view renders. A public route's
-  loads for anyone, once per address. `reload()` runs it again.
+  loads for anyone, once per address. `reload()` runs it again. A route
+  whose filter or search needs less than its whole load names a
+  `loadQuery`, run in its place when only the query moved on the same
+  path; arriving, a new user and `reload()` run `load`. The feed's
+  search and pick on Home and a project's Feed tab read only the
+  session list, since nothing else on those pages reads the query.
 - **Every route is one `lazy()` entry in `app/routes.ts`.** The rail
   is computed from that table.
 - **Only the latest answer lands.** A later load or a write
@@ -62,25 +69,55 @@ open row's body or a meta. The shared shapes are below.
   The head, end and controls (`RowsTitle`, `RowsMeta`, `RowsEnd`,
   `RowsSwitch`, `RowsCheck`, `RowsRadio`, `RowsRemove`, `RowsNote`,
   `RowsFailed`, ...) are exported from `Rows.tsx`. The session list's
-  row (`feed/Row.tsx`) is the one row outside Rows.
+  row (`feed/Row.tsx`) is the one row outside Rows. A `RowsCard` whose
+  rows open a More menu takes `menus`, or its edge clips the menu.
 - **A row's meta wraps under its title on a phone,** unless `RowsGo`
   has `side`: then it stays beside the title, as the feed's time does,
   and the arrow shows only from 720 wide.
 - **Details that mean nothing cut wrap.** `RowsTitle`'s `wrap` stacks
   the sub and its `lines` whole, one fact each (a repository's URL,
-  ref and state), and on a phone puts the row's end under them.
+  ref and state). Its `prose` draws a sub someone wrote (a label's
+  description) in the body font; a sub is mono otherwise.
 - **A folder tree is `RowsTree`,** over `treeOf()` in `lib/tree.ts`.
   An outcome log is `RowsLog` with its group, line and more parts.
 - **A paged list ends in `ShowMore`** from `feed/FeedCard.tsx` while
-  `next` is set. No infinite scroll.
+  `next` is set, drawn by `RowsMore`: a small centred word, never a
+  whole row. A list that only reveals more of what it holds uses
+  `RowsMore` too. No infinite scroll.
 - **A growing list has a search:** `ui/Search.tsx` as `RowsCard`'s
   `search`, over `useListSearch()` in `lib/search.ts`
   (`searchList()` outside a component).
-- **A card head's filters are `RowsFilters`,** short words; under 720
-  their icons are hidden, so a search beside them keeps room.
+- **A card head is one line on a phone.** Its filters are
+  `RowsFilters`, short words, and a small `Seg` in a head takes `head`;
+  under 720 either is a compact outlined dropdown of the same choices
+  (`Select`'s `quiet`), naming the set while no filter is on, so any
+  pick is a change. A head's `RowsAdd` shows only its plus there,
+  keeping its name for readers. The search takes what is left and its
+  icon keeps its size; no head wraps.
 - **A page with an aside is `ui/Split.tsx`.** Aside content is
-  `AsideSection`, `AsideLine` and `AsideRead`; `Page` alone has no
-  aside. The aside holds only real numbers, and is hidden under 1100.
+  `AsideSection`, `AsideRead` and three line shapes: `AsideLine` (a
+  label and its value), `AsideItem` (one thing in a list) and
+  `AsideNote` (a sentence). No view writes their classes by hand (the
+  structure test). `Page` alone has no aside. The aside holds only real
+  numbers, and is hidden under 1100. An aside never repeats its page:
+  what the head says (an agent's model) stays out of it, and a page's
+  line of what the aside holds (a user's local time, an external task's
+  state) shows only under 1100. A note's web addresses link with
+  `links`, opening a new tab.
+- **A list in an aside is `AsideItem`:** the name in the aside's own
+  text, never mono whatever the rows use, linked when it has a page,
+  a count or word at the right, an optional faint line under it.
+- **A handle in an aside is quiet:** `AsideLine` with `href`, or
+  `AsideHandle` inside a value or a faint line, in the value's colour
+  and yellow only on hover or focus, never the rows' `RowsHandle`.
+- **An aside section is two columns.** Its labels never wrap and its
+  longest sets the first column, so every value starts at one line. A
+  value of words wraps in its column; `cut` is only for a one-token
+  value (an email, a zone), and `AsideLine` gives it its whole text as
+  the title. A list of names in a value is `AsideNames`.
+- **A tab row scrolls whenever it does not fit,** at any width, with a
+  fade at the hidden side, so it never runs under the aside. Under 720
+  it drops the counts.
 - **A user's settings page stacks `ui/Section.tsx`.** An object or
   admin settings page stacks `ui/Setting.tsx` cards in a
   `SettingStack`, each card saving apart through its own
@@ -157,58 +194,6 @@ open row's body or a meta. The shared shapes are below.
   `ui/CodeTag.tsx` after the words, and left out when the server did
   not answer.
 
-## Shell
-
-- **One shell, no header or top bar.** `app/shell.ts` holds its state.
-  The rail (the side navigation) is a column the user can hide, kept
-  in `localStorage`. Below 720 wide, or 500 tall on touch (`DRAWER`, a
-  phone on its side), it covers the screen and is never kept. `NARROW`
-  and `DRAWER` in `shell.ts` are the same queries as in the sheets
-  (`shell.css`, `page.css`); change both.
-- **The shell is the visible height.** While a phone's keyboard is
-  up, `watchViewport()` sizes and moves it to the visual viewport
-  (`frameOf()` in `lib/viewport.ts`), so its top stays. Under
-  `MIN_SHELL` tall the browser scrolls the field into view instead.
-- **The app installs to a phone's Home Screen.** `manifest.webmanifest`
-  and its icons sit beside `index.html`, copies of the brand's files in
-  `site/`, made as `site/README.md` says. The bundler hashes what the
-  page links but not the URLs inside the manifest, so the manifest
-  names its icons by fixed paths that `main.ts` embeds and serves
-  beside the page.
-- **An edge element clears the safe area.** With `viewport-fit=cover`
-  the page runs under the notch and the home indicator, so whatever
-  touches the screen's edge pads by `env(safe-area-inset-*)`, 0 off a
-  phone. In the shell that is `--shell-inset-top`,
-  `--shell-inset-bottom`, `--shell-left` and `--shell-right`
-  (`shell.css`); the bottom one drops while the keyboard is up.
-- **A link to another origin opens a new tab,** which an installed app
-  hands to Safari. The markdown renderer gives every `http(s):` and
-  `mailto:` link `target="_blank" rel="noopener"`, and keeps no other
-  relative link but `/automations/<id>`, `/automations/<id>/memory`,
-  `/run/<id>`, `/chat/<id>` and `/external-tasks/<id>` (`APP_HREF` in
-  `render/markdown.ts`), without a target, so the router takes them in
-  place; in an installed app (`display-mode: standalone`) the router's
-  `inApp()` still opens a page of the app in place, so it never leaves
-  the app.
-- **The address picks what the rail shows.** Under an admin address it
-  shows the admin panel's zones (Monitor, Access, Config) from
-  `app/zones.ts`; an admin page lives under its zone's address and
-  nowhere else.
-- **On touch nothing takes a focus the user did not give,** and every
-  field is `--text-touch` (16px), since iOS zooms into a smaller one
-  and stays zoomed. Touch is `pointer: coarse`, read in `lib/touch.ts`.
-  On it menu items, `Seg` and `Select` options, rail rows, the reply's
-  actions and the transcript's fold heads take 44px of tap area, set in
-  the sheet that owns them, never changing the desktop's density. The
-  composer's command list and in-field agent list keep 36 and 32.
-- **A page head is `ui/Page.tsx`.** Its actions take no height, so a
-  crumb sits in the same place on every page. An object's switcher is
-  `PageSwitcher`, a list's New button `PageNew`. A failed load is
-  `Page`'s `error`.
-- **A `Page` with `actions` or `notice` over a `Split` passes
-  `split`,** or its buttons sit over the aside.
-  `test/client/ui/page-split.test.ts` enforces it.
-
 ## Style
 
 The stylesheet rules the structure test enforces are in AGENTS.md.
@@ -250,6 +235,11 @@ One helper per job, never a copy in a view.
   constant or builder there, never a literal in a view.
 - **A name is a link to its page** wherever it is drawn, except inside
   a row that is itself a link.
+- **A one-line summary of Markdown is `plainLine()`** in
+  `lib/plain.ts`: the first line with words as a reader sees it, link
+  words, code without backticks, no emphasis, heading, quote or list
+  marks. A line left empty (a bare `#`, an image with no alt, a code
+  fence) gives way to the next.
 - **Other single homes:** a menu is `useMenu()` in `lib/menu.ts`; the
   browser's zone `browserZone()` in `lib/zone.ts`; picked ids
   `sameIds()` and `toggledId()` in `lib/ids.ts`; a skipped pick's

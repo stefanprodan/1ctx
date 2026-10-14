@@ -12,9 +12,11 @@
 
 import { effect, signal } from "@preact/signals";
 import type {
+  CreateLabelRequest,
   ProjectResponse,
   ProjectsResponse,
-  UpdatePersonalProjectRequest,
+  UpdateAboutRequest,
+  UpdateLabelRequest,
 } from "../../shared/api/projects.ts";
 import type {
   ProjectDetail,
@@ -22,7 +24,8 @@ import type {
 } from "../../shared/contracts/project.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { api } from "./api.ts";
+import { ApiError, api } from "./api.ts";
+import { Flight } from "./flight.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
 import { onSocketEvent } from "./socket.ts";
@@ -40,6 +43,11 @@ let listTurn = 0;
 let listShown = 0;
 let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 const kept = new Held<ProjectDetail>();
+// per project, the last metadata write sent and the newest one whose
+// answer landed: an older answer landing late would put back what a
+// newer one changed, and a newer write that fails leaves the older one
+const sent = new Map<string, number>();
+const landed = new Map<string, number>();
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -53,6 +61,8 @@ effect(() => {
   project.value = null;
   projectError.value = null;
   kept.clear();
+  sent.clear();
+  landed.clear();
 });
 
 export async function loadProjects(): Promise<void> {
@@ -72,11 +82,22 @@ export async function loadProjects(): Promise<void> {
   }
 }
 
-export async function loadProject(id: string): Promise<void> {
-  const turn = wanted.turn + 1;
-  wanted = { id, turn };
+export function loadProject(id: string): Promise<void> {
   projectError.value = null;
   if (project.value?.id !== id) project.value = kept.get(id) ?? null;
+  return readProject(id, false);
+}
+
+// the project shown read again in the background: a failure keeps it,
+// so a page drawn on it, a draft included, stays, unless it is gone
+export const refreshProject = (id: string) => readProject(id, true);
+
+const gone = (err: unknown) =>
+  err instanceof ApiError && (err.status === 403 || err.status === 404);
+
+async function readProject(id: string, quiet: boolean): Promise<void> {
+  const turn = wanted.turn + 1;
+  wanted = { id, turn };
   try {
     const body = await api<ProjectResponse>(
       `/api/projects/${encodeURIComponent(id)}`,
@@ -85,7 +106,7 @@ export async function loadProject(id: string): Promise<void> {
     kept.set(id, body.project);
     project.value = body.project;
   } catch (err) {
-    if (wanted.turn !== turn) return;
+    if (wanted.turn !== turn || (quiet && !gone(err))) return;
     // a held copy of a project no longer seen goes with it
     kept.delete(id);
     if (project.value?.id === id) project.value = null;
@@ -93,21 +114,58 @@ export async function loadProject(id: string): Promise<void> {
   }
 }
 
-// the caller's personal project; the page keeps the answer when it
-// still shows that project, and the rail follows the name
-export async function savePersonalProject(
-  body: UpdatePersonalProjectRequest,
+// admin-projects.ts hears a metadata write without this module
+// importing it, so the admin page shows the same row
+type SavedListener = (saved: ProjectDetail) => void;
+const savedListeners: SavedListener[] = [];
+export function onProjectSaved(fn: SavedListener): void {
+  savedListeners.push(fn);
+}
+
+const projectPath = (id: string) => `/api/projects/${encodeURIComponent(id)}`;
+
+// a metadata write from the Settings tab, by any user who sees the
+// project; its answer is the detail, kept as an admin write's is
+async function writeMetadata(
+  id: string,
+  path: string,
+  method: "POST" | "PATCH" | "DELETE",
+  body?: unknown,
 ): Promise<void> {
   const forUser = owner;
-  const { project: saved } = await api<ProjectResponse>(
-    "/api/profile/project",
+  const mine = (sent.get(id) ?? 0) + 1;
+  sent.set(id, mine);
+  const { project: saved } = await api<ProjectResponse>(path, method, body);
+  if (owner !== forUser || (landed.get(id) ?? 0) > mine) return;
+  landed.set(id, mine);
+  keepProject(saved);
+  for (const fn of savedListeners) fn(saved);
+}
+
+export const saveAbout = (id: string, body: UpdateAboutRequest) =>
+  writeMetadata(id, `${projectPath(id)}/about`, "PATCH", body);
+
+export const addLabel = (id: string, body: CreateLabelRequest) =>
+  writeMetadata(id, `${projectPath(id)}/labels`, "POST", body);
+
+export const changeLabel = (
+  id: string,
+  labelId: string,
+  body: UpdateLabelRequest,
+) =>
+  writeMetadata(
+    id,
+    `${projectPath(id)}/labels/${encodeURIComponent(labelId)}`,
     "PATCH",
     body,
   );
-  if (owner !== forUser) return;
-  keepProject(saved);
-  await loadProjects();
-}
+
+export const deleteLabel = (id: string, labelId: string) =>
+  writeMetadata(
+    id,
+    `${projectPath(id)}/labels/${encodeURIComponent(labelId)}`,
+    "DELETE",
+  );
 
 // a write's answer, the admin's on a team project included, lands over
 // any load out, so the project's tabs and the admin page show one row
@@ -120,11 +178,24 @@ export function keepProject(saved: ProjectDetail): void {
   }
 }
 
-function onAccessChanged(event: SocketEvent): void {
+// the project shown read again, a burst of label frames costing one
+// read out and one trailing
+const labelsFlight = new Flight(async () => {
+  const id = project.value?.id;
+  if (id !== undefined) await refreshProject(id);
+});
+
+export function onProjectsSocket(event: SocketEvent): void {
   if (event.type === "revoked") kept.delete(event.projectId);
   if (event.type === "granted" || event.type === "revoked") {
     void loadProjects();
   }
+  // a label renamed or deleted elsewhere: the forms pick from the
+  // project's labels, so the one shown reads them again
+  if (event.type === "projectLabels") {
+    if (project.value?.id === event.projectId) labelsFlight.ask();
+    else kept.delete(event.projectId);
+  }
 }
 
-onSocketEvent(onAccessChanged);
+onSocketEvent(onProjectsSocket);

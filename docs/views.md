@@ -2,14 +2,14 @@
 
 Governs what pages draw: `src/client/views/`, `feed/`, `composer/`,
 `transcript/` and the `data/` entities behind them. The admin pages are
-in `docs/admin-pages.md`; the primitives, forms and the data layer's
-general rules are in `docs/ui.md`.
+in `docs/admin-pages.md`, the external task pages in
+`docs/external-task-pages.md`; the primitives, forms and the data
+layer's general rules are in `docs/ui.md`.
 
 ## The feed
 
 The feed is the session list on Home and on a project's Feed tab: chats
-and runs, one row each, under the filters All, Chats, Tasks (runs) and
-Flagged.
+and runs, one row each, under the filters All, Chats, Runs and Flagged.
 
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the feed lands on both.
@@ -63,27 +63,28 @@ Flagged.
   from the parent's watch and read from the child route when opened
   later; its rules are in `docs/subagents.md`.
 
-- **A task proposal is one line under its turn's fold**
+- **An automation proposal is one line under its turn's fold**
   (`transcript/Proposal.tsx`), drawn where visuals are. A call's draft
   is the one whose `messageId` is the call's tool row. A fork copies
   rows under new ids and no drafts, so a copied done row of a proposing
   call, older than the fork, is an inert line; a refused call draws
-  none. `data/session-drafts.ts` upserts the `draft` frame and a
-  press's answer into the detail's drafts; a decided draft never goes
-  back to pending, and a detail read before a frame keeps the frame's
-  draft while its tool row is there. Only a 200 names the presser as
-  decider. A 409 that leaves it pending shows its words under the
-  line. A task's name and an update's old values come from
+  none. `data/session-drafts.ts` upserts the `draft` frame and a press's
+  answer into the detail's drafts; a decided draft never goes back to
+  pending, and a detail read before a frame keeps the frame's draft
+  while its tool row is there. Only a 200 names the presser as decider.
+  A 409 that leaves it pending shows its words under the line. An
+  automation's name and an update's old values come from
   `GET /api/automations/:id`, read once per id: a 404 or 403, or an
-  `automationDeleted` frame, makes it a deleted task; another failure
-  draws the line naming "the task", with no details to open, and a
-  timer asks again after `TASK_RETRY_MS`. Above `DIFF_CELLS` the
-  changed middle of the instructions is drawn as all removed, then all
-  added. A pending rename shows the task's name; the new one is in the
-  details. A create opens to its memory and attention guidance under
-  the instructions when set, or "No memory"; an update diffs each
-  changed guidance as it does the instructions. Tag characters are
-  marked everywhere but in the England, Scotland and Wales flags.
+  `automationDeleted` frame, makes it a deleted automation; another
+  failure draws the line naming "the automation", with no details to
+  open, and a timer asks again after `AUTOMATION_RETRY_MS`. Above
+  `DIFF_CELLS` the changed middle of the instructions is drawn as all
+  removed, then all added. A pending rename shows the automation's name;
+  the new one is in the details. A create opens to its memory and
+  attention guidance under the instructions when set, or "No memory"; an
+  update diffs each changed guidance as it does the instructions. Tag
+  characters are marked everywhere but in the England, Scotland and
+  Wales flags.
 
 - **A chat is `/chat/:id` and a run `/run/:id`.** Each shows the other
   origin as not found, so every link picks its page by origin.
@@ -197,12 +198,20 @@ Flagged.
   one view, so a tab change keeps the head and its Activity card
   mounted. The Directory loads every list on each tab, so every tab
   carries a count.
-- **Every project has a Settings tab,** a team's after Members. An
-  admin writes a team project's description and repositories there
-  through the admin page's routes and entities, and a member reads
-  them; the name is the admin page's alone. The answer to an admin's
-  project write goes through `keepProject()`, so both pages show one
-  row.
+- **Every project has a Settings tab,** a team's after Members. Every
+  user who sees the project writes its description and its labels
+  there (`views/projects/Labels.tsx`). An admin writes a team project's
+  repositories through the admin page's routes and entities, and a
+  member reads them; the name is the admin page's alone. Every project
+  write's answer goes through `keepProject()`, and a metadata write's
+  through `onProjectSaved()` too, so both pages show one row.
+- **A label row is its button** (`RowsButton`): a click opens its
+  form, with no buttons on the row, and every row waits while a form
+  is open.
+- **The last label has no Delete,** and Add label goes at the cap; the
+  server refuses both anyway. The delete ask says how many external
+  tasks carry the label, closed ones too (`deleteAsk()` over the
+  detail's `tasks`).
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted in its provider's wire shape; the client never
   counts tokens.
@@ -215,6 +224,11 @@ Flagged.
   leaves out the key and the kind. A team's member gets `edit` off: the
   rows with their state, no control. The Key select lists the `http-`
   files from `credentialKeys`, after None.
+- **An editor's row is its button,** opening its form, as a label's
+  does. Refresh sits in the form's foot beside Delete, and its refusal
+  is the form's notice.
+- **A ready row that kept no file is drawn as a fault,** since its ignore
+  rules most often exclude a parent of what they meant to keep.
 - **A row's state is read again while it waits or fetches.** No frame
   says a fetch ended, so `watchRepos()` reads the list every
   `REPO_POLL_MS` while a row is pending or fetching and the tab is
@@ -225,25 +239,24 @@ Flagged.
 - **A failed read keeps the rows** with `RowsFailed` above them and
   polls on until a read succeeds; a 403 or 404 drops them.
 - **A change sends only what changed** (`patchBody()`) against the row
-  as Change opened it: a rename alone never fetches the tree again, and
+  as its form opened it: a rename alone never fetches the tree again, and
   a field another admin changed since is never sent back. A row gone
   from the list closes its form.
 
 ## Access keys
 
 - **Keys live on Connect agents (`views/connect/`),** one view for its
-  agent tabs and `?new` (a `NewCard` page).
+  agent tabs and `?new` (a `NewCard` page, its name shaped as an
+  agent's).
 - **A key's token lives in that view alone;** `data/access-keys.ts`
   keeps only the key. The shown-once box goes on Done or on leaving.
 - **No setup line carries a token.** Each reads `ONECTX_ACCESS_KEY`.
 - **At a cap of 0 the keys card says keys are off** with no New; kept
   keys list with Revoke, and Setup shows only while one is kept.
-- **An admin's user page lists a user's keys from `userKeys`,** read
-  again after a revoke (whatever its answer), a reset and a disable,
-  which delete them. No admin page makes a key. A Connect agents revoke that
-  answers 404 drops the row.
-- **A key's row is `views/keys/`,** shared by both pages, so neither
-  view imports the other.
+- **A Connect agents revoke that answers 404 drops the row.**
+- **A key's row is `views/keys/`,** shared with the admin's user page,
+  so neither view imports the other: the feed's two lines, with Revoke
+  in its More menu.
 
 ## Knowledge
 
@@ -279,7 +292,8 @@ Flagged.
 ## Automations
 
 - **Create defaults come from `shared/automation-defaults.ts`,** shared
-  with the chat's task proposals; `draftOf()` only maps them to fields.
+  with the chat's automation proposals; `draftOf()` only maps them to
+  fields.
 
 - **An open alert sits over the summary** (`OpenAttention.tsx`): the
   feed line's words, the latest reason and Dismiss. The Runs list's
@@ -297,7 +311,7 @@ Flagged.
   cold and keeps only the tally; a tally refresh is warm.
 - **The editor saves the whole `disabledCapabilities`.** `disabledOf()`
   in `Access.model.ts` keeps only keys the picked agent and the project
-  have, so a stale key is dropped on save. Memory, Scheduled tasks and
+  have, so a stale key is dropped on save. Memory, Automations and
   External tasks, a chat's alone, have no switch there and are dropped
   too.
 - **An automation on a deleted agent cannot be saved as is.** Run now
@@ -305,15 +319,16 @@ Flagged.
   (`retiredPick()`).
 - **Delete asks in place** with Keep, Delete and Delete with runs, and
   hides every other button while it asks.
-- **A task that runs once says so.** The editor's Run once box sits
-  under the schedule; with it on, the reading and the page's next runs
-  show the one fire with its year (`nextRunWords()`), or "Waiting
-  since" while that fire waits for a slot (`nextRunsOf()`). A task its own
-  fire suspended (`ranOnce()`) reads "Ran once" and the time, linked to
-  its once run; another reads "Suspended by". The list's schedule
-  column adds "once" (`scheduleColumn()` in `Schedule.model.ts`).
-- **Edit and Delete show for every member.** On a task someone else
-  owns the save row says a save makes the user the owner
+- **An automation that runs once says so.** The editor's Run once box
+  sits under the schedule; with it on, the reading and the page's next
+  runs show the one fire with its year (`nextRunWords()`), or "Waiting
+  since" while that fire waits for a slot (`nextRunsOf()`). An
+  automation its own fire suspended (`ranOnce()`) reads "Ran once" and
+  the time, linked to its once run; another reads "Suspended by". The
+  list's schedule column adds "once" (`scheduleColumn()` in
+  `Schedule.model.ts`).
+- **Edit and Delete show for every member.** On an automation someone
+  else owns the save row says a save makes the user the owner
   (`ownerNote()`).
 - **A save sends the edit revision the form opened on,** never the
   live row's. Its 409 (`staleEdit()`) keeps the draft, and Reload
@@ -323,19 +338,3 @@ Flagged.
   Decider while the list's `deciderOn` is false, with a hint saying
   why. A saved pick stays shown. The words on when are kept
   while the mode is off, so turning it on again brings them back.
-
-## External tasks
-
-- **The words are external task, brief, claim, report and answer,**
-  never ticket, issue, job or reply.
-- **The list loads whole, then frames keep it** by revision
-  (`data/external-tasks.ts`): blocked, claimed, open, latest move first.
-  The highest revision seen per task keeps an older list read from
-  bringing a closed one back. Done and dropped page on unfold. Home's
-  card reads `?attention=1`, drawn as Not sent while a task is marked.
-- **The task's page clears its mark with `seen`** once its read lands
-  marked. A frame adding an entry or editing the brief reads it again,
-  keeping older entries.
-- **A move names what the page showed:** a box keeps the state and the
-  claim from when it opened. An edit sends what changed and the edit
-  revision the form opened on.
