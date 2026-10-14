@@ -116,9 +116,9 @@ const PATHS = {
   // one path splitting into two: a decision between its options
   decision: "M8 14V8M8 8 3.5 3.5M8 8l4.5-4.5M3.5 6.5v-3h3M9.5 3.5h3v3",
   clock: "M8 14a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8 4.5V8l2.5 1.5",
-  // a dashed ring: an external task waiting for an agent to claim it
-  "task-open":
-    "M7.06 2.07A6 6 0 0 1 8.94 2.07M11.53 3.15A6 6 0 0 1 12.85 4.47M13.93 7.06A6 6 0 0 1 13.93 8.94M12.85 11.53A6 6 0 0 1 11.53 12.85M8.94 13.93A6 6 0 0 1 7.06 13.93M4.47 12.85A6 6 0 0 1 3.15 11.53M2.07 8.94A6 6 0 0 1 2.07 7.06M3.15 4.47A6 6 0 0 1 4.47 3.15",
+  // a ring with a dot, as GitHub draws an issue: an external task as a
+  // kind, whatever its state, which the task list's rings draw
+  task: "M8 14.25a6.25 6.25 0 1 0 0-12.5 6.25 6.25 0 0 0 0 12.5zM8 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2z",
   // automation as a whole, whatever starts a run
   bolt: "M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z",
   play: "M5 3.5v9l7-4.5z",

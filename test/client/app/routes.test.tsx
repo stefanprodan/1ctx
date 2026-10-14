@@ -55,11 +55,12 @@ describe("the route table", () => {
     }
   });
 
-  test("the working face lists Home, Projects and Directory", () => {
+  // the project list is long, so Projects and its list come last
+  test("the working face lists Home, Directory and Projects", () => {
     expect(navEntries().map((r) => r.path)).toEqual([
       "/",
-      "/projects",
       "/directory",
+      "/projects",
     ]);
   });
 

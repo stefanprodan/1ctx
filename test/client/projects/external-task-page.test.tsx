@@ -414,7 +414,7 @@ describe("the files", () => {
     expect(html).toContain(icon("file-text"));
     expect(html).toContain(icon("code"));
     expect(html).toContain(
-      '<span class="external-tasks-file-name"><span class="knowledge-path"><span class="knowledge-dir cut">plans/</span><span class="cut">plan.md</span></span></span>',
+      '<span class="external-tasks-file-name"><span class="pathname"><span class="pathname-dir cut">plans/</span><span class="cut">plan.md</span></span></span>',
     );
     // a deleted file keeps its row, drawn as a live one so the two line
     // up, with no way to open it
@@ -422,7 +422,7 @@ describe("the files", () => {
       '<div class="external-tasks-file-row external-tasks-file-row-off"><span class="external-tasks-file-go external-tasks-file-gone" title="deleted: src/old.ts">',
     );
     expect(html).toContain(
-      '<span class="external-tasks-file-word">deleted:</span><span class="external-tasks-file-name"><span class="knowledge-path"><span class="knowledge-dir cut">src/</span><span class="cut">old.ts</span></span></span>',
+      '<span class="external-tasks-file-word">deleted:</span><span class="external-tasks-file-name"><span class="pathname"><span class="pathname-dir cut">src/</span><span class="cut">old.ts</span></span></span>',
     );
     expect(html).toContain(
       '<span class="external-tasks-file-name cut">a deleted file</span>',

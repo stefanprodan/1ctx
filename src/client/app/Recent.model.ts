@@ -1,0 +1,235 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// The pages the user opened last, as the rail lists them: which pages
+// are recorded, the row each one makes, where it goes in the list and
+// how a stored list is read back. Pure, so every rule runs on fixtures.
+
+import {
+  automationHref,
+  chatHref,
+  externalTaskHref,
+  knowledgeFileHref,
+  runHref,
+} from "../lib/hrefs.ts";
+import type { IconName } from "../lib/icons.tsx";
+
+export const RECENT_MAX = 5;
+
+export const RECENT_KINDS = [
+  "chat",
+  "run",
+  "automation",
+  "task",
+  "file",
+] as const;
+export type RecentKind = (typeof RECENT_KINDS)[number];
+
+// what is stored: the kind, the object's id and its project, never a
+// link, so a stored value can only ever lead to a page of the app
+export type RecentRow = {
+  kind: RecentKind;
+  // a session, an automation, an external task or a knowledge file
+  id: string;
+  projectId: string;
+  // a run's automation, whose runs share one row; null for any other
+  // kind, and for a run whose automation was deleted
+  automationId: string | null;
+  // a chat's or a task's title, an automation's or a run's
+  // automation's name, a file's path
+  title: string;
+};
+
+const ICONS: Record<RecentKind, IconName> = {
+  chat: "chat",
+  run: "bolt",
+  automation: "clock",
+  task: "task",
+  file: "file-text",
+};
+
+export const recentIcon = (row: RecentRow): IconName => ICONS[row.kind];
+
+// a run's title is its automation's name, so the words say it is a run
+export const recentText = (row: RecentRow): string =>
+  row.kind === "run" ? `Run of ${row.title}` : row.title;
+
+export function recentHref(row: RecentRow): string {
+  switch (row.kind) {
+    case "chat":
+      return chatHref(row.id);
+    case "run":
+      return runHref(row.id);
+    case "automation":
+      return automationHref(row.id);
+    case "task":
+      return externalTaskHref(row.id);
+    case "file":
+      return knowledgeFileHref(row.projectId, row.id);
+  }
+}
+
+// one row per key: every run of an automation shares its automation's
+export const recentKey = (row: RecentRow): string =>
+  row.kind === "run" && row.automationId !== null
+    ? `runs:${row.automationId}`
+    : `${row.kind}:${row.id}`;
+
+// the object a page shows, before its row is read. A chat and a run
+// are one session until the row says which; an automation's edit page
+// is part of its visit but never recorded
+export type RecentPage = {
+  kind: "session" | "automation" | "task" | "file";
+  id: string;
+  record: boolean;
+};
+
+const PAGES: [RegExp, RecentPage["kind"], boolean][] = [
+  [/^\/(?:chat|run)\/([^/]+)$/, "session", true],
+  [/^\/automations\/([^/]+)(?:\/memory)?$/, "automation", true],
+  [/^\/automations\/([^/]+)\/edit$/, "automation", false],
+  [/^\/external-tasks\/([^/]+)$/, "task", true],
+  [/^\/projects\/[^/]+\/knowledge\/files\/([^/]+)$/, "file", true],
+];
+
+export function recentPage(pathname: string): RecentPage | null {
+  for (const [re, kind, record] of PAGES) {
+    const hit = re.exec(pathname);
+    if (hit === null) continue;
+    try {
+      return { kind, id: decodeURIComponent(hit[1]), record };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+// a visit is one object on screen, whichever of its tabs
+export const visitKey = (page: RecentPage): string => `${page.kind}:${page.id}`;
+
+// the rows the pages read, as Recent holds them
+export const sessionRecent = (s: {
+  id: string;
+  projectId: string;
+  origin: "chat" | "automation";
+  automationId: string | null;
+  title: string;
+}): RecentRow =>
+  s.origin === "automation"
+    ? {
+        kind: "run",
+        id: s.id,
+        projectId: s.projectId,
+        automationId: s.automationId,
+        title: s.title,
+      }
+    : {
+        kind: "chat",
+        id: s.id,
+        projectId: s.projectId,
+        automationId: null,
+        title: s.title,
+      };
+
+type Named = { id: string; projectId: string };
+
+export const automationRecent = (a: Named & { name: string }): RecentRow => ({
+  kind: "automation",
+  id: a.id,
+  projectId: a.projectId,
+  automationId: null,
+  title: a.name,
+});
+
+export const taskRecent = (t: Named & { title: string }): RecentRow => ({
+  kind: "task",
+  id: t.id,
+  projectId: t.projectId,
+  automationId: null,
+  title: t.title,
+});
+
+export const fileRecent = (f: Named & { name: string }): RecentRow => ({
+  kind: "file",
+  id: f.id,
+  projectId: f.projectId,
+  automationId: null,
+  title: f.name,
+});
+
+export const sameRow = (a: RecentRow, b: RecentRow): boolean =>
+  a.kind === b.kind &&
+  a.id === b.id &&
+  a.projectId === b.projectId &&
+  a.automationId === b.automationId &&
+  a.title === b.title;
+
+// the page just opened goes first, once, under its latest title
+export function pushRecent(list: RecentRow[], row: RecentRow): RecentRow[] {
+  const key = recentKey(row);
+  return [row, ...list.filter((r) => recentKey(r) !== key)].slice(
+    0,
+    RECENT_MAX,
+  );
+}
+
+// a page opened from Recent, or read again in the same visit: its row
+// takes the latest title and link in its place, so the list never
+// moves under the pointer
+export function keepRecent(list: RecentRow[], row: RecentRow): RecentRow[] {
+  const key = recentKey(row);
+  const at = list.findIndex((r) => recentKey(r) === key);
+  if (at === -1) return pushRecent(list, row);
+  return list.map((r, i) => (i === at ? row : r));
+}
+
+const isKind = (value: unknown): value is RecentKind =>
+  (RECENT_KINDS as readonly unknown[]).includes(value);
+
+const nonEmpty = (value: unknown): value is string =>
+  typeof value === "string" && value !== "";
+
+function isRow(value: unknown): value is RecentRow {
+  if (typeof value !== "object" || value === null) return false;
+  const r = value as Record<string, unknown>;
+  return (
+    isKind(r.kind) &&
+    nonEmpty(r.id) &&
+    nonEmpty(r.projectId) &&
+    (r.automationId === null ||
+      (r.kind === "run" && nonEmpty(r.automationId))) &&
+    typeof r.title === "string"
+  );
+}
+
+// a stored list read back without trusting it: a row of the wrong
+// shape or kind is dropped, and so is a second row of one key
+export function readRecent(raw: string | null): RecentRow[] {
+  if (raw === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const out: RecentRow[] = [];
+  const keys = new Set<string>();
+  for (const value of parsed) {
+    if (!isRow(value)) continue;
+    const row: RecentRow = {
+      kind: value.kind,
+      id: value.id,
+      projectId: value.projectId,
+      automationId: value.automationId,
+      title: value.title,
+    };
+    const key = recentKey(row);
+    if (keys.has(key)) continue;
+    keys.add(key);
+    out.push(row);
+    if (out.length === RECENT_MAX) break;
+  }
+  return out;
+}

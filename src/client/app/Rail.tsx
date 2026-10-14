@@ -11,6 +11,7 @@ import { projects } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials, says } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
+import { PathName } from "../ui/PathName.tsx";
 import {
   adminFace,
   navLit,
@@ -18,6 +19,14 @@ import {
   projectHere,
   zoneLit,
 } from "./Rail.model.ts";
+import {
+  type RecentRow,
+  recentHref,
+  recentIcon,
+  recentKey,
+  recentText,
+} from "./Recent.model.ts";
+import { pickRecent, recent } from "./Recent.state.ts";
 import { navigate, path } from "./router.ts";
 import { navEntries } from "./routes.ts";
 import { lastAdmin, lastWork } from "./shell.ts";
@@ -57,6 +66,40 @@ function Sub({
         children
       )}
     </a>
+  );
+}
+
+// the pages opened last, under the entries' icons; a title is a
+// sentence, cut to the rail with the whole of it on hover
+function Recent({ here, follow }: { here: string; follow?: () => void }) {
+  const rows = recent.value;
+  if (rows.length === 0) return null;
+  return (
+    <>
+      <span class="rail-label">Recent</span>
+      {rows.map((row: RecentRow) => {
+        const href = recentHref(row);
+        const text = recentText(row);
+        return (
+          <a
+            key={recentKey(row)}
+            href={href}
+            class={`rail-sub rail-sub-icon rail-recent${onPage(here, href) ? " rail-sub-on" : ""}`}
+            aria-current={here === href ? "page" : undefined}
+            title={text}
+            onClick={(e) => {
+              pickRecent(row, e);
+              follow?.();
+            }}
+          >
+            <Icon name={recentIcon(row)} size={14} class="rail-sub-glyph" />
+            <span class="rail-sub-name">
+              {row.kind === "file" ? <PathName name={text} /> : text}
+            </span>
+          </a>
+        );
+      })}
+    </>
   );
 }
 
@@ -117,7 +160,7 @@ export function Rail({
   // view when it sits below the fold, after a reload or a link elsewhere
   useEffect(() => {
     nav.current
-      ?.querySelector(".rail-sub-on")
+      ?.querySelector(".rail-sub-on:not(.rail-recent)")
       ?.scrollIntoView({ block: "nearest" });
   }, [here, inProject, projects.value]);
   // a link to the page on screen is no navigation, so the link closes
@@ -145,8 +188,13 @@ export function Rail({
           {admin ? (
             <Zones here={here} follow={follow} />
           ) : (
+            // Projects comes last in the table, so Recent sits above its
+            // long list
             navEntries().map((route) => (
               <Fragment key={route.path}>
+                {route.path === "/projects" && (
+                  <Recent here={here} follow={follow} />
+                )}
                 <a
                   href={route.path}
                   class={`rail-item${navLit(here, route.path) ? " rail-item-on" : ""}`}

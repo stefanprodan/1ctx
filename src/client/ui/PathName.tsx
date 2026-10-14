@@ -3,15 +3,15 @@
 //
 // A file's name as the lists draw it, and a search's marks on a text.
 
-import { marked, pathParts } from "./Knowledge.model.ts";
-import "./knowledge.css";
+import { marked, pathParts } from "./PathName.model.ts";
+import "./pathname.css";
 
 export function Marks({ text, q }: { text: string; q: string }) {
   return (
     <>
       {marked(text, q).map((part, i) =>
         part.mark ? (
-          <mark key={i} class="knowledge-mark">
+          <mark key={i} class="pathname-mark">
             {part.text}
           </mark>
         ) : (
@@ -28,9 +28,9 @@ export function Marks({ text, q }: { text: string; q: string }) {
 export function PathName({ name, q = "" }: { name: string; q?: string }) {
   const { dir, base } = pathParts(name);
   return (
-    <span class="knowledge-path">
+    <span class="pathname">
       {dir !== "" && (
-        <span class="knowledge-dir cut">
+        <span class="pathname-dir cut">
           <Marks text={dir} q={q} />
         </span>
       )}

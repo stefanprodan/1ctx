@@ -326,7 +326,7 @@ export const ROUTES: Route[] = [
         personal === null ? Promise.resolve() : loadProjectAgents(personal.id),
       ]);
     },
-    nav: { label: "Projects", icon: "projects", order: 2 },
+    nav: { label: "Projects", icon: "projects", order: 3 },
   },
   // every list loads on each tab, so each tab's count shows
   ...tabRoutes(
@@ -350,7 +350,7 @@ export const ROUTES: Route[] = [
   ).map(
     (route, i): Route =>
       i === 0
-        ? { ...route, nav: { label: "Directory", icon: "users", order: 3 } }
+        ? { ...route, nav: { label: "Directory", icon: "users", order: 2 } }
         : route,
   ),
   {

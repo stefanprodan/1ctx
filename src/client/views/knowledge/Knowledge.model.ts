@@ -13,9 +13,15 @@ import type {
   KnowledgeFile,
   KnowledgeTotals,
 } from "../../../shared/contracts/knowledge.ts";
-import { searchTerms, termRanges } from "../../../shared/search.ts";
+import { searchTerms } from "../../../shared/search.ts";
 import { ago, count, plural } from "../../lib/format.ts";
-import { agentHref, chatHref, runHref, userHref } from "../../lib/hrefs.ts";
+import {
+  agentHref,
+  chatHref,
+  knowledgeFileHref,
+  runHref,
+  userHref,
+} from "../../lib/hrefs.ts";
 import type { IconName } from "../../lib/icons.tsx";
 import { FOLDER_ROWS, type TreeFolder } from "../../lib/tree.ts";
 import type { RowsTreeNode } from "../../ui/Rows.tsx";
@@ -35,7 +41,7 @@ export function fileHref(
   line?: number,
 ): string {
   const at = line === undefined ? "" : `?line=${line}`;
-  return `${project(projectId)}/files/${encodeURIComponent(fileId)}${at}`;
+  return `${knowledgeFileHref(projectId, fileId)}${at}`;
 }
 
 // a revision's page, what it changed from the one before; the latest
@@ -262,30 +268,6 @@ export function treeNodes(
     });
   }
   return nodes;
-}
-
-// a name split where its folder ends, the folder drawn faint
-export function pathParts(name: string): { dir: string; base: string } {
-  const at = name.lastIndexOf("/") + 1;
-  return { dir: name.slice(0, at), base: name.slice(at) };
-}
-
-// a text in runs, every place it holds a word of q marked, not
-// case-sensitive
-type Marked = { text: string; mark: boolean }[];
-
-export function marked(text: string, q: string): Marked {
-  const out: Marked = [];
-  let from = 0;
-  for (const range of termRanges(text, searchTerms(q))) {
-    if (range.from > from) {
-      out.push({ text: text.slice(from, range.from), mark: false });
-    }
-    out.push({ text: text.slice(range.from, range.to), mark: true });
-    from = range.to;
-  }
-  if (from < text.length) out.push({ text: text.slice(from), mark: false });
-  return out;
 }
 
 // what the search box says when nothing matched

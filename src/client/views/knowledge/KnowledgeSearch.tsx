@@ -11,6 +11,7 @@ import type { KnowledgeSearchLine } from "../../../shared/contracts/knowledge.ts
 import { loadMoreSearch, searchOf } from "../../data/knowledge-search.ts";
 import { ShowMore } from "../../feed/FeedCard.tsx";
 import { ago, plural } from "../../lib/format.ts";
+import { Marks, PathName } from "../../ui/PathName.tsx";
 import {
   RowsFailed,
   RowsGo,
@@ -25,7 +26,6 @@ import {
   namesWords,
   noMatchWords,
 } from "./Knowledge.model.ts";
-import { Marks, PathName } from "./PathName.tsx";
 import "./knowledge.css";
 
 function HitLine({

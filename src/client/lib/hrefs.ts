@@ -107,6 +107,9 @@ export function externalTaskHref(id: string): string {
   return `/external-tasks/${encodeURIComponent(id)}`;
 }
 
+export const knowledgeFileHref = (projectId: string, fileId: string): string =>
+  `/projects/${encodeURIComponent(projectId)}/knowledge/files/${encodeURIComponent(fileId)}`;
+
 // a project's Settings tab, where its users write its metadata
 export const projectSettingsHref = (projectId: string): string =>
   `/projects/${encodeURIComponent(projectId)}/settings`;
