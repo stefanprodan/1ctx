@@ -8,12 +8,15 @@
 import { describe, expect, test } from "bun:test";
 import {
   automationRecent,
+  dropRecent,
   fileRecent,
   keepRecent,
+  notFound,
   pushRecent,
   RECENT_MAX,
   type RecentRow,
   readRecent,
+  recentFrame,
   recentHref,
   recentIcon,
   recentKey,
@@ -22,6 +25,7 @@ import {
   sessionRecent,
   taskRecent,
 } from "../../../src/client/app/Recent.model.ts";
+import type { SocketEvent } from "../../../src/shared/socket.ts";
 
 const chat = (id: string, title = `chat ${id}`): RecentRow =>
   sessionRecent({
@@ -254,5 +258,166 @@ describe("reading a stored list", () => {
   test("a stored id never leads off the app", () => {
     const [row] = readRecent(stored([chat("//elsewhere.test")]));
     expect(recentHref(row)).toBe("/chat/%2F%2Felsewhere.test");
+  });
+});
+
+describe("following the socket", () => {
+  const task = (id: string, projectId = "p1") =>
+    taskRecent({ id, projectId, title: `task ${id}` });
+  const file = (id: string) =>
+    fileRecent({ id, projectId: "p1", name: `notes/${id}.md` });
+  const held = (): RecentRow[] => [
+    chat("c1"),
+    run("r1", "a1"),
+    automationRecent({ id: "a1", projectId: "p1", name: "Digest" }),
+    task("t1", "p2"),
+    file("f1"),
+  ];
+  const frame = (ev: unknown) => recentFrame(held(), ev as SocketEvent);
+  const titles = (list: RecentRow[]) => list.map((r) => r.title);
+  const keys = (list: RecentRow[]) => list.map(recentKey);
+
+  test("a chat's frame renames its row in place", () => {
+    const next = frame({
+      type: "session",
+      session: { id: "c1", origin: "chat", title: "Renamed" },
+    });
+    expect(keys(next)).toEqual(keys(held()));
+    expect(titles(next)).toEqual([
+      "Renamed",
+      "Digest",
+      "Digest",
+      "task t1",
+      "notes/f1.md",
+    ]);
+  });
+
+  test("a run's own frame changes nothing", () => {
+    const list = held();
+    const ev = {
+      type: "session",
+      session: { id: "r1", origin: "automation", title: "Other" },
+    } as unknown as SocketEvent;
+    expect(recentFrame(list, ev)).toBe(list);
+  });
+
+  test("an automation's rename reaches its runs' row", () => {
+    const next = frame({
+      type: "automation",
+      automation: { id: "a1", name: "Weekly" },
+    });
+    expect(keys(next)).toEqual(keys(held()));
+    expect(next.map(recentText)).toEqual([
+      "chat c1",
+      "Run of Weekly",
+      "Weekly",
+      "task t1",
+      "notes/f1.md",
+    ]);
+  });
+
+  test("a task's and a file's frames rename their rows", () => {
+    expect(
+      titles(frame({ type: "externalTask", task: { id: "t1", title: "New" } })),
+    ).toEqual(["chat c1", "Digest", "Digest", "New", "notes/f1.md"]);
+    expect(
+      titles(
+        frame({
+          type: "knowledge",
+          file: { id: "f1", name: "plans/f1.md" },
+          deleted: false,
+        }),
+      ),
+    ).toEqual(["chat c1", "Digest", "Digest", "task t1", "plans/f1.md"]);
+  });
+
+  test("each delete drops only its own row", () => {
+    const cases: [unknown, string[]][] = [
+      [{ type: "deleted", sessionId: "c1" }, ["c1"]],
+      [{ type: "deleted", sessionId: "r1" }, ["r1"]],
+      [{ type: "automationDeleted", automationId: "a1", runs: false }, ["a1"]],
+      [
+        { type: "automationDeleted", automationId: "a1", runs: true },
+        ["r1", "a1"],
+      ],
+      [{ type: "externalTaskDeleted", taskId: "t1" }, ["t1"]],
+      [
+        { type: "knowledge", file: { id: "f1", name: "x" }, deleted: true },
+        ["f1"],
+      ],
+    ];
+    for (const [ev, gone] of cases) {
+      expect(ids(frame(ev))).toEqual(
+        ids(held()).filter((id) => !gone.includes(id)),
+      );
+    }
+  });
+
+  test("revoked drops every row of that project", () => {
+    expect(ids(frame({ type: "revoked", projectId: "p1" }))).toEqual(["t1"]);
+    expect(ids(frame({ type: "revoked", projectId: "p2" }))).toEqual([
+      "c1",
+      "r1",
+      "a1",
+      "f1",
+    ]);
+  });
+
+  test("a frame for an object not held changes nothing", () => {
+    const list = held();
+    for (const ev of [
+      { type: "session", session: { id: "c9", origin: "chat", title: "x" } },
+      { type: "automation", automation: { id: "a9", name: "x" } },
+      { type: "externalTask", task: { id: "t9", title: "x" } },
+      { type: "knowledge", file: { id: "f9", name: "x" }, deleted: true },
+      { type: "deleted", sessionId: "c9" },
+      { type: "automationDeleted", automationId: "a9", runs: true },
+      { type: "externalTaskDeleted", taskId: "t9" },
+      { type: "revoked", projectId: "p9" },
+      { type: "granted", projectId: "p1" },
+      // the same title again
+      {
+        type: "session",
+        session: { id: "c1", origin: "chat", title: "chat c1" },
+      },
+    ]) {
+      expect(recentFrame(list, ev as unknown as SocketEvent)).toBe(list);
+    }
+  });
+});
+
+describe("a page not found", () => {
+  const list = (): RecentRow[] => [
+    chat("c1"),
+    run("r1", "a1"),
+    automationRecent({ id: "a1", projectId: "p1", name: "Digest" }),
+    fileRecent({ id: "f1", projectId: "p1", name: "x.md" }),
+  ];
+
+  test("drops only the row of the page", () => {
+    expect(
+      ids(dropRecent(list(), { kind: "session", id: "r1", record: true })),
+    ).toEqual(["c1", "a1", "f1"]);
+    expect(
+      ids(dropRecent(list(), { kind: "automation", id: "a1", record: true })),
+    ).toEqual(["c1", "r1", "f1"]);
+    expect(
+      ids(dropRecent(list(), { kind: "file", id: "f1", record: true })),
+    ).toEqual(["c1", "r1", "a1"]);
+  });
+
+  test("a run of the automation other than the row's keeps it", () => {
+    const held = list();
+    expect(dropRecent(held, { kind: "session", id: "r2", record: true })).toBe(
+      held,
+    );
+  });
+
+  test("is a 404 or the words of a closed page", () => {
+    expect(notFound({ status: 404 })).toBe(true);
+    expect(notFound("This external task was deleted.")).toBe(true);
+    expect(notFound({ status: 500 })).toBe(false);
+    expect(notFound({ status: null })).toBe(false);
+    expect(notFound(null)).toBe(false);
   });
 });

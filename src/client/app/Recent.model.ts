@@ -5,6 +5,7 @@
 // are recorded, the row each one makes, where it goes in the list and
 // how a stored list is read back. Pure, so every rule runs on fixtures.
 
+import type { SocketEvent } from "../../shared/socket.ts";
 import {
   automationHref,
   chatHref,
@@ -233,3 +234,94 @@ export function readRecent(raw: string | null): RecentRow[] {
   }
   return out;
 }
+
+// a held row follows its object: renamed or dropped where it stands,
+// never moved or added. The same list comes back when nothing changed
+function change(
+  list: RecentRow[],
+  hit: (row: RecentRow) => boolean,
+  title: string | null,
+): RecentRow[] {
+  if (!list.some((r) => hit(r) && (title === null || r.title !== title))) {
+    return list;
+  }
+  return title === null
+    ? list.filter((r) => !hit(r))
+    : list.map((r) => (hit(r) ? { ...r, title } : r));
+}
+
+const isSession = (row: RecentRow, id: string) =>
+  (row.kind === "chat" || row.kind === "run") && row.id === id;
+
+// a frame of a project the user sees, whatever page is open. A run's
+// own session frame changes nothing: its title is its automation's
+// name, which the automation frame carries
+export function recentFrame(list: RecentRow[], ev: SocketEvent): RecentRow[] {
+  switch (ev.type) {
+    case "session": {
+      const s = ev.session;
+      if (s.origin !== "chat") return list;
+      return change(list, (r) => r.kind === "chat" && r.id === s.id, s.title);
+    }
+    case "automation": {
+      const a = ev.automation;
+      return change(
+        list,
+        (r) =>
+          (r.kind === "automation" && r.id === a.id) ||
+          (r.kind === "run" && r.automationId === a.id),
+        a.name,
+      );
+    }
+    case "externalTask":
+      return change(
+        list,
+        (r) => r.kind === "task" && r.id === ev.task.id,
+        ev.task.title,
+      );
+    case "knowledge":
+      return change(
+        list,
+        (r) => r.kind === "file" && r.id === ev.file.id,
+        ev.deleted ? null : ev.file.name,
+      );
+    case "deleted":
+      return change(list, (r) => isSession(r, ev.sessionId), null);
+    case "automationDeleted":
+      return change(
+        list,
+        (r) =>
+          (r.kind === "automation" && r.id === ev.automationId) ||
+          (ev.runs && r.kind === "run" && r.automationId === ev.automationId),
+        null,
+      );
+    case "externalTaskDeleted":
+      return change(list, (r) => r.kind === "task" && r.id === ev.taskId, null);
+    case "revoked":
+      return change(list, (r) => r.projectId === ev.projectId, null);
+    default:
+      return list;
+  }
+}
+
+// a page that answered not found takes its row out: a delete or a lost
+// project the tab missed while closed. A run's row goes only when it
+// links to the run that is gone
+export function dropRecent(list: RecentRow[], page: RecentPage): RecentRow[] {
+  const kind = page.kind;
+  return change(
+    list,
+    (r) =>
+      kind === "session"
+        ? isSession(r, page.id)
+        : r.kind === kind && r.id === page.id,
+    null,
+  );
+}
+
+// what a page shows for its failure: a 404 is not found, a hidden
+// project included; words are the page closed by a delete or a revoke
+export const notFound = (
+  failure: { status: number | null } | string | null,
+): boolean =>
+  typeof failure === "string" || (failure !== null && failure.status === 404);

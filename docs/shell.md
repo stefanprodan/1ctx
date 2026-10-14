@@ -91,3 +91,24 @@ layer, the primitives and the styles are in `docs/ui.md`.
   title, never a link: the link is built from the id, and a stored row
   of the wrong shape or kind is dropped on read. No route or table
   backs it.
+- **A row follows its object and never moves for it.** The socket's
+  frames reach every tab for each project its user sees, and
+  `recentFrame()` changes a held row in place: `session` renames a
+  chat (a run's own frame changes nothing), `automation` renames the
+  automation and its runs' row, `externalTask` and `knowledge` rename
+  theirs; `deleted`, `automationDeleted` (its runs' row too, with
+  `runs`), `externalTaskDeleted` and `knowledge` with `deleted` drop
+  the row, and `revoked` drops every row of the project. A frame never
+  adds a row. A page that answers not found (a 404, a task page closed
+  by a delete, a file missing or deleted) drops its row; a chat's,
+  automation's and task's failure is one signal for any page, so one
+  left by the page before counts only once it changed in the visit.
+- **Every tab of the user holds one list.** A tab takes the list
+  another wrote from the `storage` event on its user's key, dropping a
+  bad value as on read, and never writes back for it, so two tabs
+  never answer each other. A frame changes the stored list, not the
+  held one, since another tab may have written since. Only a visit's
+  first read adds a row, so one dropped or pushed off, here or by
+  another tab, never comes back on top. A run's row takes its
+  automation's name from the list, since a run keeps the name it ran
+  under.

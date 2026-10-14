@@ -6,22 +6,34 @@
 // list is this browser's, one per user in localStorage, so it stays
 // when another user signs in here. Storage can be absent or full, so
 // every access is guarded; a failed write keeps the list for the tab.
+// Its rows follow the socket's frames and the page's not found, and
+// every tab of the user takes the list another one wrote.
 
-import { effect, signal } from "@preact/signals";
-import { automationProject, automations } from "../data/automations.ts";
-import { taskPage } from "../data/external-task.ts";
+import { effect, signal, untracked } from "@preact/signals";
+import type { SocketEvent } from "../../shared/socket.ts";
+import {
+  automationError,
+  automationProject,
+  automations,
+} from "../data/automations.ts";
+import { taskError, taskPage } from "../data/external-task.ts";
 import { docFileOf } from "../data/knowledge-file.ts";
 import { me } from "../data/me.ts";
-import { session } from "../data/sessions.ts";
+import { session, sessionError } from "../data/sessions.ts";
+import { onSocketEvent } from "../data/socket.ts";
 import {
   automationRecent,
+  dropRecent,
   fileRecent,
   keepRecent,
+  notFound,
   pushRecent,
   type RecentPage,
   type RecentRow,
   readRecent,
+  recentFrame,
   recentHref,
+  recentKey,
   recentPage,
   sameRow,
   sessionRecent,
@@ -65,10 +77,17 @@ export function pickRecent(
 }
 
 function load(userId: string): RecentRow[] {
+  return stored(userId) ?? [];
+}
+
+// the list as the user's tabs last wrote it; null when nothing was
+// written or there is no storage, so the tab's own list stands
+function stored(userId: string): RecentRow[] | null {
   try {
-    return readRecent(localStorage.getItem(recentStoreKey(userId)));
+    const raw = localStorage.getItem(recentStoreKey(userId));
+    return raw === null ? null : readRecent(raw);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -87,7 +106,14 @@ function readRow(page: RecentPage): RecentRow | null {
   switch (page.kind) {
     case "session": {
       const s = session.value?.session;
-      return s?.id === page.id ? sessionRecent(s) : null;
+      if (s?.id !== page.id) return null;
+      // a run's title is its automation's name when it ran; the row
+      // takes the name now, which a rename frame may have brought
+      const name =
+        s.origin === "automation" && s.automationId !== null
+          ? automations.value?.find((a) => a.id === s.automationId)?.name
+          : undefined;
+      return sessionRecent(name === undefined ? s : { ...s, title: name });
     }
     case "automation": {
       // the page's own read names the project, then the list holds it
@@ -108,6 +134,38 @@ function readRow(page: RecentPage): RecentRow | null {
   }
 }
 
+const sameList = (a: RecentRow[], b: RecentRow[]) =>
+  a.length === b.length && a.every((r, i) => sameRow(r, b[i]));
+
+// the failure the page on screen shows. A chat's, an automation's and
+// a task's are one signal for whichever page is open, so the watcher
+// counts one only once it changed in the visit; a file's is its own
+function failureOf(page: RecentPage): unknown {
+  switch (page.kind) {
+    case "session":
+      return sessionError.value;
+    case "automation":
+      return automationError.value;
+    case "task":
+      return taskError.value;
+    case "file":
+      return docFileOf(page.id);
+  }
+}
+
+function isGone(page: RecentPage, failure: unknown): boolean {
+  if (page.kind !== "file") {
+    return notFound(failure as Parameters<typeof notFound>[0]);
+  }
+  const doc = failure as ReturnType<typeof docFileOf>;
+  return (
+    doc.state === "missing" || (doc.state === "done" && doc.deleted !== null)
+  );
+}
+
+// a value a failure never holds, for a visit whose first one changed
+const CHANGED = Symbol("changed");
+
 export function watchRecent(): () => void {
   let owner: string | null = null;
   // the address last seen, the object on screen, whether its row was
@@ -118,7 +176,30 @@ export function watchRecent(): () => void {
   let visit: string | null = null;
   let placed = false;
   let fromRecent = false;
-  return effect(() => {
+  // the failure on screen when the visit began, left by the page before
+  let stale: unknown = CHANGED;
+  // a frame of a project the user sees, whatever page is open
+  const offSocket = onSocketEvent((ev: SocketEvent) => {
+    if (owner === null) return;
+    // the stored list, not the held one: another tab may have written
+    // since, and its storage event may not have arrived yet
+    const list = stored(owner) ?? recent.peek();
+    const next = recentFrame(list, ev);
+    if (next === list) return;
+    recent.value = next;
+    save(owner, next);
+  });
+  // another tab wrote the list: taken, never written back, so two tabs
+  // never answer each other. A cleared storage has no key
+  const onStorage = (ev: Event) => {
+    const { key, newValue } = ev as StorageEvent;
+    if (owner === null) return;
+    if (key !== null && key !== recentStoreKey(owner)) return;
+    const next = readRecent(key === null ? null : newValue);
+    if (!sameList(next, recent.peek())) recent.value = next;
+  };
+  globalThis.addEventListener?.("storage", onStorage);
+  const dispose = effect(() => {
     const user = me.value;
     if (owner !== (user?.id ?? null)) {
       owner = user?.id ?? null;
@@ -139,26 +220,45 @@ export function watchRecent(): () => void {
         visit = at;
         placed = false;
         fromRecent = at !== null && pick === at;
+        stale = page === null ? CHANGED : untracked(() => failureOf(page));
       } else if (at !== null && pick === at) {
         // from a tab of the visit that records nothing, its edit page
         fromRecent = true;
       }
     }
     if (page === null || !page.record) return;
+    const failure = failureOf(page);
+    if (page.kind === "file" || failure !== stale) {
+      stale = CHANGED;
+      if (isGone(page, failure)) {
+        const list = recent.peek();
+        const next = dropRecent(list, page);
+        if (next !== list) {
+          recent.value = next;
+          save(user.id, next);
+        }
+        return;
+      }
+    }
     const row = readRow(page);
     if (row === null) return;
     const inPlace = placed || fromRecent;
+    const first = !placed;
     placed = true;
     // peeked, so the write below never runs this again
     const list = recent.peek();
+    // only a visit's first read adds a row: one gone since was dropped
+    // or pushed off, here or by another tab, and never comes back on top
+    const key = recentKey(row);
+    if (!first && !list.some((r) => recentKey(r) === key)) return;
     const next = inPlace ? keepRecent(list, row) : pushRecent(list, row);
-    if (
-      next.length === list.length &&
-      next.every((r, i) => sameRow(r, list[i]))
-    ) {
-      return;
-    }
+    if (sameList(next, list)) return;
     recent.value = next;
     save(user.id, next);
   });
+  return () => {
+    dispose();
+    offSocket();
+    globalThis.removeEventListener?.("storage", onStorage);
+  };
 }

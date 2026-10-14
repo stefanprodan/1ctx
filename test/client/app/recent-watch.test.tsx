@@ -22,15 +22,22 @@ import {
 } from "../../../src/client/app/Recent.state.ts";
 import { path } from "../../../src/client/app/router.ts";
 import {
+  automationError,
   automationProject,
   automations,
 } from "../../../src/client/data/automations.ts";
-import { taskPage } from "../../../src/client/data/external-task.ts";
+import {
+  TASK_DELETED,
+  taskError,
+  taskPage,
+} from "../../../src/client/data/external-task.ts";
 import { docFiles } from "../../../src/client/data/knowledge-file.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { projects } from "../../../src/client/data/projects.ts";
-import { session } from "../../../src/client/data/sessions.ts";
+import { session, sessionError } from "../../../src/client/data/sessions.ts";
+import { startSocket } from "../../../src/client/data/socket.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
+import { FakeWire } from "../../helpers/client-socket.ts";
 
 const store = new Map<string, string>();
 let full = false;
@@ -110,6 +117,9 @@ beforeEach(() => {
   docFiles.value = new Map();
   automations.value = null;
   automationProject.value = null;
+  sessionError.value = null;
+  automationError.value = null;
+  taskError.value = null;
   stop = watchRecent();
 });
 
@@ -382,6 +392,230 @@ describe("one list per user", () => {
     me.value = casey;
     expect(recent.value).toEqual([]);
     visit("s1");
+    expect(ids()).toEqual(["s1"]);
+  });
+});
+
+describe("a gone row leaves", () => {
+  const notFound = { words: "Not found", status: 404 };
+
+  test.serial("a chat that answers not found drops its row", () => {
+    visit("s1");
+    visit("s2");
+    path.value = "/";
+    path.value = "/chat/s1";
+    session.value = null;
+    sessionError.value = { ...notFound };
+    expect(ids()).toEqual(["s2"]);
+    expect(stored().map((r: RecentRow) => r.id)).toEqual(["s2"]);
+  });
+
+  test.serial("another failure keeps the row", () => {
+    visit("s1");
+    path.value = "/";
+    path.value = "/chat/s1";
+    sessionError.value = { words: "Server error", status: 500 };
+    expect(ids()).toEqual(["s1"]);
+  });
+
+  test.serial("the page before's not found never drops the next", () => {
+    visit("s1");
+    path.value = "/chat/gone";
+    sessionError.value = { ...notFound };
+    // the next chat opened while the old failure still shows
+    path.value = "/chat/s1";
+    expect(ids()).toEqual(["s1"]);
+    // its own load clears it, then answers not found
+    sessionError.value = null;
+    sessionError.value = { ...notFound };
+    expect(ids()).toEqual([]);
+  });
+
+  test.serial("an automation and a task drop on not found", () => {
+    automations.value = [
+      { id: "a1", projectId: "p1", name: "Digest" },
+    ] as never;
+    automationProject.value = { id: "a1", projectId: "p1" };
+    path.value = "/automations/a1";
+    path.value = "/external-tasks/t1";
+    taskPage.value = {
+      id: "t1",
+      detail: { task: { id: "t1", projectId: "p1", title: "Fix it" } },
+    } as never;
+    expect(ids()).toEqual(["t1", "a1"]);
+    taskPage.value = null;
+    taskError.value = TASK_DELETED;
+    expect(ids()).toEqual(["a1"]);
+    automationProject.value = null;
+    path.value = "/automations/a1";
+    automationError.value = { ...notFound };
+    expect(ids()).toEqual([]);
+  });
+
+  test.serial("a file missing or deleted drops its row", () => {
+    const done = (deleted: unknown) =>
+      ({
+        state: "done",
+        file: { id: "f1", projectId: "p1", name: "x.md" },
+        newer: null,
+        deleted,
+        failure: null,
+      }) as never;
+    path.value = "/projects/p1/knowledge/files/f1";
+    docFiles.value = new Map([["f1", done(null)]]);
+    expect(ids()).toEqual(["f1"]);
+    docFiles.value = new Map([["f1", done({ at: 1 })]]);
+    expect(ids()).toEqual([]);
+    // a read later in the visit never adds it back
+    docFiles.value = new Map([["f1", done(null)]]);
+    expect(ids()).toEqual([]);
+    path.value = "/";
+    path.value = "/projects/p1/knowledge/files/f1";
+    expect(ids()).toEqual(["f1"]);
+    docFiles.value = new Map([["f1", { state: "missing" }]]);
+    expect(ids()).toEqual([]);
+  });
+
+  test.serial("a delete frame drops the row and stores the list", () => {
+    const wire = new FakeWire();
+    const stopSocket = startSocket({ connect: () => wire });
+    try {
+      visit("s1");
+      visit("s2");
+      path.value = "/";
+      wire.message(
+        JSON.stringify({ type: "deleted", projectId: "p1", sessionId: "s1" }),
+      );
+      expect(ids()).toEqual(["s2"]);
+      expect(stored().map((r: RecentRow) => r.id)).toEqual(["s2"]);
+    } finally {
+      stopSocket();
+    }
+  });
+
+  test.serial("a run read after its automation's rename keeps the name", () => {
+    const wire = new FakeWire();
+    const stopSocket = startSocket({ connect: () => wire });
+    try {
+      automations.value = [
+        { id: "a1", projectId: "p1", name: "Digest" },
+      ] as never;
+      path.value = "/run/r1";
+      openRun("r1", "a1", "Digest");
+      path.value = "/";
+      wire.message(
+        JSON.stringify({
+          type: "automation",
+          projectId: "p1",
+          automation: { id: "a1", projectId: "p1", name: "Weekly" },
+        }),
+      );
+      expect(recent.value.map((r) => r.title)).toEqual(["Weekly"]);
+      // the run page's list has the new name; the run keeps the old one
+      automations.value = [
+        { id: "a1", projectId: "p1", name: "Weekly" },
+      ] as never;
+      path.value = "/run/r1";
+      session.value = null;
+      openRun("r1", "a1", "Digest");
+      expect(recent.value.map((r) => r.title)).toEqual(["Weekly"]);
+      expect(stored().map((r: RecentRow) => r.title)).toEqual(["Weekly"]);
+    } finally {
+      stopSocket();
+    }
+  });
+
+  test.serial("a frame applies to what another tab stored last", () => {
+    const wire = new FakeWire();
+    const stopSocket = startSocket({ connect: () => wire });
+    try {
+      visit("s1");
+      visit("s2");
+      path.value = "/";
+      // another tab moved s3 to the top; its storage event is not here yet
+      store.set(
+        recentStoreKey("u1"),
+        JSON.stringify([chatRow("s3"), chatRow("s2"), chatRow("s1")]),
+      );
+      wire.message(
+        JSON.stringify({ type: "deleted", projectId: "p1", sessionId: "s1" }),
+      );
+      expect(ids()).toEqual(["s3", "s2"]);
+      expect(stored().map((r: RecentRow) => r.id)).toEqual(["s3", "s2"]);
+    } finally {
+      stopSocket();
+    }
+  });
+});
+
+describe("tabs keep one list", () => {
+  const from = (key: string | null, newValue: string | null) => {
+    globalThis.dispatchEvent(
+      Object.assign(new Event("storage"), { key, newValue }),
+    );
+  };
+
+  test.serial("another tab's list replaces the held one", () => {
+    visit("s1");
+    const writes: string[] = [];
+    const setItem = fakeStorage.setItem;
+    fakeStorage.setItem = (k, v) => {
+      writes.push(k);
+      setItem(k, v);
+    };
+    try {
+      from(
+        recentStoreKey("u1"),
+        JSON.stringify([chatRow("s7"), chatRow("s1")]),
+      );
+      expect(ids()).toEqual(["s7", "s1"]);
+      // taken, never written back
+      expect(writes).toEqual([]);
+    } finally {
+      fakeStorage.setItem = setItem;
+    }
+  });
+
+  test.serial("a bad value is dropped as on read", () => {
+    visit("s1");
+    from(recentStoreKey("u1"), "{not json");
+    expect(ids()).toEqual([]);
+    from(
+      recentStoreKey("u1"),
+      JSON.stringify([{ kind: "nope", id: "x" }, chatRow("s3")]),
+    );
+    expect(ids()).toEqual(["s3"]);
+  });
+
+  test.serial("another user's key changes nothing", () => {
+    visit("s1");
+    from(recentStoreKey("u2"), JSON.stringify([chatRow("s7")]));
+    from("theme", "dark");
+    expect(ids()).toEqual(["s1"]);
+  });
+
+  test.serial("a cleared storage empties the list", () => {
+    visit("s1");
+    from(null, null);
+    expect(ids()).toEqual([]);
+  });
+
+  test.serial("a row another tab pushed off never comes back", () => {
+    visit("s1");
+    // another tab pushed s1 off while it stays open here
+    const others = ["s2", "s3", "s4", "s5", "s6"].map((id) => chatRow(id));
+    from(recentStoreKey("u1"), JSON.stringify(others));
+    openChat("s1", "renamed");
+    expect(ids()).toEqual(["s2", "s3", "s4", "s5", "s6"]);
+    // the next visit adds it again
+    visit("s1");
+    expect(ids()).toEqual(["s1", "s2", "s3", "s4", "s5"]);
+  });
+
+  test.serial("a stopped watcher listens to nothing", () => {
+    visit("s1");
+    stop();
+    from(recentStoreKey("u1"), JSON.stringify([chatRow("s7")]));
     expect(ids()).toEqual(["s1"]);
   });
 });
