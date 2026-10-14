@@ -3,7 +3,8 @@
 Governs the summary round and what a chat's history is after one:
 `src/shared/compaction.ts`, `src/server/runner/tail.ts`,
 `runner/compact.ts` and the summary request in `runner/context.ts`.
-Sends, the writer and the queue are in `docs/sessions.md`.
+Sends and the writer are in `docs/sessions.md`, the queue in
+`docs/queue.md`.
 
 ## The summary and its tail
 

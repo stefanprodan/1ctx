@@ -142,7 +142,10 @@ Completions shape, about one token a tool under the azure one.
   1 s, jitter and `Retry-After` (past 30 s fails the round). A headers
   timeout is retried once, since each costs two minutes. A `served`
   event does not count as started. No wait passes the turn's deadline
-  (the memory phase's own window in that phase).
+  (the memory phase's own window in that phase). The one exception is
+  a round cut for an output loop, asked again once after it streamed
+  (`docs/sessions.md`, stream bounds); its new attempt retries as any
+  other.
 - **Only a send's rounds retry.** Deciders, catalogs and MCP calls are
   never retried here. The exceptions are the refusals the azure and
   anthropic wires adapt, inside the wire, never a 429 or 5xx.

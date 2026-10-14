@@ -9,7 +9,13 @@ import {
   settleRun,
   startRun,
 } from "../../helpers/automations.ts";
-import { chatApp, startChat, tick, waitScript } from "../../helpers/chat.ts";
+import {
+  chatApp,
+  startChat,
+  tick,
+  varied,
+  waitScript,
+} from "../../helpers/chat.ts";
 import { frames, watch, watcher } from "../../helpers/socket.ts";
 import { asksAnswer } from "../../helpers/tool-loop.ts";
 
@@ -145,8 +151,8 @@ describe("visual draft gates", () => {
         script.content("12345");
         script.reasoning("12345");
         const half = MAX_REPLY_BYTES / 2;
-        script.toolCall({ name, arguments: "x".repeat(half) });
-        script.toolCall({ arguments: "x".repeat(half - 10) });
+        script.toolCall({ name, arguments: varied(half) });
+        script.toolCall({ arguments: varied(half - 10) });
         await tick();
         await tick();
         expect(chat.app.sessions.send(detail.send.id)?.status).toBe("running");

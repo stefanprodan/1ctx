@@ -143,7 +143,8 @@ change it in the same commit as the code that changes a rule.
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
-| `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, queue |
+| `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, stream bounds |
+| `docs/queue.md` | messages to a busy chat: the queue, its dispatcher |
 | `docs/subagents.md` | the `delegate` tool, child sessions, the child loop and the child rows |
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |

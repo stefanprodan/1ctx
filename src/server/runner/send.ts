@@ -251,8 +251,11 @@ export function newRound(messageId: string, now: number): RoundState {
   };
 }
 
-// the round number bumps with the reply startRound or a phase opened; a
-// round after the run's answer is work from its start
+// a round after the run's answer is work from its start
+const startsWork = (phase: SendPhase) =>
+  phase === "memory" || phase === "attention";
+
+// the round number bumps with the reply startRound or a phase opened
 export function nextRound(
   send: ActiveSend,
   reply: Pick<Message, "id" | "createdAt">,
@@ -261,7 +264,16 @@ export function nextRound(
   send.roundNo += 1;
   send.phase = phase;
   send.round = newRound(reply.id, reply.createdAt);
-  send.round.slotMarked = phase === "memory" || phase === "attention";
+  send.round.slotMarked = startsWork(phase);
+}
+
+// the round asked again from its start: the same reply and start,
+// nothing the cut attempt streamed
+export function restartRound(send: ActiveSend, round: RoundState): RoundState {
+  const fresh = newRound(round.messageId, round.startedAt);
+  fresh.slotMarked = startsWork(send.phase);
+  send.round = fresh;
+  return fresh;
 }
 
 export function newSend(fields: {

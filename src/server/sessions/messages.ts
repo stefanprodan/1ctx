@@ -262,6 +262,14 @@ export function markRoundWork(db: Db, id: string): boolean {
   return db.query(sql).run(id).changes > 0;
 }
 
+// a round asked again from its start: the streaming reply holds nothing
+// and goes back to the slot it began in
+export function restartReply(db: Db, id: string, slot: "work" | null): boolean {
+  const sql =
+    "update messages set content = '', reasoning = '', reasoning_details = null, html = '', slot = ? where id = ? and kind in ('reply', 'summary') and status = 'streaming'";
+  return db.query(sql).run(slot, id).changes > 0;
+}
+
 // the repair places a reply before it ends it
 export function markSlot(db: Db, id: string, slot: "work" | "answer"): boolean {
   return (

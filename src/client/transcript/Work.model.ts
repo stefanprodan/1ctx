@@ -11,13 +11,9 @@ import type {
   SessionSummary,
 } from "../../shared/contracts/session.ts";
 import type { WorkNode } from "./rows.ts";
-import { clock, secs } from "./stream.ts";
+import { clock, retrying, secs } from "./stream.ts";
 
 const count = (value: number) => `${value} tool${value === 1 ? "" : "s"}`;
-
-// a round waiting to ask its provider again: which of its retries
-const retrying = (retry: LiveRetry | null) =>
-  retry === null ? "" : ` · retrying ${retry.attempt}/${retry.max}`;
 
 export type WorkSummary = {
   live: boolean;
@@ -43,6 +39,7 @@ export function capWord(rows: Message[]): string | null {
     if (row.finishReason === "token_limit") return "token limit";
     if (row.finishReason === "context_limit") return "context full";
     if (row.finishReason === "tool_loop") return "tool loop";
+    if (row.finishReason === "output_loop") return "output loop";
     if (row.finishReason === "tool_repeat") repeat = true;
   }
   // a refused repeat the loop went on from, unless a cap ended it

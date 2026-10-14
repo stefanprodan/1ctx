@@ -259,8 +259,13 @@ export type VisualDraft = {
   html: string;
 };
 
-// a round waiting to ask its provider again: this attempt of max
-export type LiveRetry = { attempt: number; max: number };
+// a round waiting to ask its provider again: this attempt of max, and
+// the cause when the round was cut for one, as a loop in its output
+export type LiveRetry = {
+  attempt: number;
+  max: number;
+  cause?: "output_loop";
+};
 
 export type LiveSend = {
   // the previews at seq, absent when no call is streaming a visual

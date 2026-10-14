@@ -19,8 +19,9 @@ import { history, request, summaryRequest, withExhausted } from "./context.ts";
 import { offers } from "./policy.ts";
 import type { ContextLookups } from "./render.ts";
 import { MAX_RETRIES, type RetryState, retryWait } from "./retry.ts";
+import { cutLoop, loopFailure, RoundWatches } from "./round-loop.ts";
 import { RoundVisuals } from "./round-visuals.ts";
-import type { ActiveSend, RoundState } from "./send.ts";
+import { type ActiveSend, type RoundState, restartRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
 
 // a cached read costs about a tenth of a fresh one on the wires that
@@ -175,10 +176,12 @@ export async function runRound(
 async function streamRound(
   deps: RoundDeps,
   send: ActiveSend,
-  round: RoundState,
+  first: RoundState,
   rows: Message[],
   options: RoundOptions,
 ): Promise<void> {
+  // a loop starts the round over once with a fresh state
+  let round = first;
   const signal = options.signal ?? send.controller.signal;
   const deadline =
     options.deadline !== undefined
@@ -192,14 +195,18 @@ async function streamRound(
     deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
   let iterator = open();
   const retry: RetryState = { retries: 0, timeouts: 0 };
-  const visuals =
+  const paints =
     send.phase === "provider" &&
     send.kind !== "compact" &&
     !send.summarizing &&
     !send.answering &&
-    offers(send.policy.offered, "visualize")
-      ? new RoundVisuals(send, round, deps.writer, signal)
-      : null;
+    offers(send.policy.offered, "visualize");
+  let visuals = paints
+    ? new RoundVisuals(send, round, deps.writer, signal)
+    : null;
+  let watches = new RoundWatches();
+  // the round was cut for a loop once and asked again
+  let looped = false;
   let replyBytes =
     Buffer.byteLength(round.content) + Buffer.byteLength(round.reasoning);
   const grow = (text: string) => {
@@ -278,6 +285,31 @@ async function streamRound(
     // running starts over, and thinking lifts it
     if (event.kind === "alive") {
       thinking = event.thinking;
+      continue;
+    }
+    const loop = watches.feed(event);
+    if (loop !== null) {
+      cutLoop(deps.log, send, round, req, watches, loop);
+      void iterator.return?.()?.catch(() => {});
+      const left = deadline === null || deadline > deps.clock();
+      if (looped || !left) throw loopFailure(round);
+      // the first loop asks again with the same request: nothing of the
+      // cut attempt stays on the round, the row or the page
+      looped = true;
+      round = restartRound(send, round);
+      deps.writer.restartRound(send);
+      deps.writer.retrying(send, { attempt: 1, max: 1, cause: "output_loop" });
+      visuals = paints
+        ? new RoundVisuals(send, round, deps.writer, signal)
+        : null;
+      watches = new RoundWatches();
+      replyBytes = 0;
+      retry.retries = 0;
+      retry.timeouts = 0;
+      heard = false;
+      thinking = false;
+      started = false;
+      iterator = open();
       continue;
     }
     heard = true;

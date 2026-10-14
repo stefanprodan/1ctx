@@ -177,6 +177,14 @@ export type SocketEvent =
       // how much content the html renders
       htmlAt: number;
     }
+  // a round starts over: the reply's live text and previews are empty
+  | {
+      type: "restart";
+      sessionId: string;
+      sendId: string;
+      messageId: string;
+      seq: number;
+    }
   // a round started or ended a wait to ask its provider again
   | {
       type: "retry";

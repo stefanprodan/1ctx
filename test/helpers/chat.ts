@@ -440,6 +440,22 @@ export function scriptedFetch(
   };
 }
 
+// filler of length UTF-16 units in which no 60 characters repeat, so
+// the repetition watch never takes it for a loop: piece and a counter,
+// again and again. A pair cut at the end is dropped
+export function varied(length: number, piece = "x"): string {
+  const parts: string[] = [];
+  let size = 0;
+  for (let i = 0; size < length; i++) {
+    const part = `${piece}${i.toString(36)} `;
+    parts.push(part);
+    size += part.length;
+  }
+  const text = parts.join("").slice(0, length);
+  const last = text.charCodeAt(text.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? text.slice(0, -1) : text;
+}
+
 // one turn of the event loop: what the in-memory fakes already queued
 // runs, never a wait for work that takes time
 export const tick = () => new Promise((r) => setTimeout(r, 0));

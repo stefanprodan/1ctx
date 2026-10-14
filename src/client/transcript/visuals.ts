@@ -27,6 +27,13 @@ export type VisualPreview = VisualDraft & {
 };
 export type Previews = ReadonlyMap<string, VisualPreview>;
 
+// a round that starts over drops the previews its calls streamed
+export function dropPreviews(previews: Previews, messageId: string): Previews {
+  return new Map(
+    [...previews].filter(([, preview]) => preview.messageId !== messageId),
+  );
+}
+
 export function applyVisual(
   previews: Previews,
   frame: VisualFrame,
