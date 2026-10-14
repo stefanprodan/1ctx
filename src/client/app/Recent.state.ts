@@ -7,7 +7,10 @@
 // when another user signs in here. Storage can be absent or full, so
 // every access is guarded; a failed write keeps the list for the tab.
 // Its rows follow the socket's frames and the page's not found, and
-// every tab of the user takes the list another one wrote.
+// every tab of the user takes the list another one wrote. A row's
+// live status is never stored: a reload draws every row plain until a
+// visit or a frame gives it, so a run never shows running after it
+// finished while the tab was closed.
 
 import { effect, signal, untracked } from "@preact/signals";
 import type { SocketEvent } from "../../shared/socket.ts";
@@ -23,26 +26,38 @@ import { session, sessionError } from "../data/sessions.ts";
 import { onSocketEvent } from "../data/socket.ts";
 import {
   automationRecent,
+  automationStatus,
   dropRecent,
   fileRecent,
   keepRecent,
   notFound,
+  pruneStatus,
   pushRecent,
   type RecentPage,
   type RecentRow,
+  type RecentStatus,
+  type RecentStatuses,
   readRecent,
   recentFrame,
   recentHref,
   recentKey,
   recentPage,
+  reopenStatus,
   sameRow,
   sessionRecent,
+  sessionStatus,
+  statusFrame,
   taskRecent,
+  taskStatus,
   visitKey,
+  withStatus,
 } from "./Recent.model.ts";
 import { path } from "./router.ts";
 
 export const recent = signal<RecentRow[]>([]);
+
+// each held row's live status, in memory only
+export const recentStatus = signal<RecentStatuses>({});
 
 export const recentStoreKey = (userId: string) => `recent:${userId}`;
 
@@ -99,10 +114,12 @@ function save(userId: string, list: RecentRow[]): void {
   }
 }
 
-// the row of the object on screen once its page has read it, null
-// before; only the signals of that page are read, so no other page's
-// loads run the watcher
-function readRow(page: RecentPage): RecentRow | null {
+type Read = { row: RecentRow; status: RecentStatus | null };
+
+// the row of the object on screen once its page has read it, and its
+// status from the same read, null before; only the signals of that
+// page are read, so no other page's loads run the watcher
+function readRow(page: RecentPage): Read | null {
   switch (page.kind) {
     case "session": {
       const s = session.value?.session;
@@ -113,25 +130,36 @@ function readRow(page: RecentPage): RecentRow | null {
         s.origin === "automation" && s.automationId !== null
           ? automations.value?.find((a) => a.id === s.automationId)?.name
           : undefined;
-      return sessionRecent(name === undefined ? s : { ...s, title: name });
+      return {
+        row: sessionRecent(name === undefined ? s : { ...s, title: name }),
+        status: sessionStatus(s),
+      };
     }
     case "automation": {
       // the page's own read names the project, then the list holds it
       if (automationProject.value?.id !== page.id) return null;
-      const row = automations.value?.find((a) => a.id === page.id);
-      return row === undefined ? null : automationRecent(row);
+      const held = automations.value?.find((a) => a.id === page.id);
+      return held === undefined
+        ? null
+        : { row: automationRecent(held), status: automationStatus(held) };
     }
     case "task": {
       const t = taskPage.value;
-      return t?.id === page.id ? taskRecent(t.detail.task) : null;
+      return t?.id === page.id
+        ? { row: taskRecent(t.detail.task), status: taskStatus(t.detail.task) }
+        : null;
     }
     case "file": {
       const doc = docFileOf(page.id);
       return doc.state === "done" && doc.deleted === null
-        ? fileRecent(doc.file)
+        ? { row: fileRecent(doc.file), status: null }
         : null;
     }
   }
+}
+
+function setStatuses(next: RecentStatuses): void {
+  if (next !== recentStatus.peek()) recentStatus.value = next;
 }
 
 const sameList = (a: RecentRow[], b: RecentRow[]) =>
@@ -181,13 +209,20 @@ export function watchRecent(): () => void {
   // a frame of a project the user sees, whatever page is open
   const offSocket = onSocketEvent((ev: SocketEvent) => {
     if (owner === null) return;
+    // every open of the socket says hello
+    if (ev.type === "hello") {
+      setStatuses(reopenStatus(recentStatus.peek(), recentPage(path.peek())));
+      return;
+    }
     // the stored list, not the held one: another tab may have written
     // since, and its storage event may not have arrived yet
     const list = stored(owner) ?? recent.peek();
     const next = recentFrame(list, ev);
-    if (next === list) return;
-    recent.value = next;
-    save(owner, next);
+    if (next !== list) {
+      recent.value = next;
+      save(owner, next);
+    }
+    setStatuses(statusFrame(recentStatus.peek(), recent.peek(), ev));
   });
   // another tab wrote the list: taken, never written back, so two tabs
   // never answer each other. A cleared storage has no key
@@ -199,6 +234,11 @@ export function watchRecent(): () => void {
     if (!sameList(next, recent.peek())) recent.value = next;
   };
   globalThis.addEventListener?.("storage", onStorage);
+  // a status leaves with its row, however the row went
+  const disposePrune = effect(() => {
+    const list = recent.value;
+    setStatuses(pruneStatus(recentStatus.peek(), list));
+  });
   const dispose = effect(() => {
     const user = me.value;
     if (owner !== (user?.id ?? null)) {
@@ -206,6 +246,7 @@ export function watchRecent(): () => void {
       seen = null;
       visit = null;
       picked = null;
+      recentStatus.value = {};
       recent.value = owner === null ? [] : load(owner);
     }
     if (user === null || user === undefined) return;
@@ -240,8 +281,9 @@ export function watchRecent(): () => void {
         return;
       }
     }
-    const row = readRow(page);
-    if (row === null) return;
+    const read = readRow(page);
+    if (read === null) return;
+    const { row, status } = read;
     const inPlace = placed || fromRecent;
     const first = !placed;
     placed = true;
@@ -252,12 +294,17 @@ export function watchRecent(): () => void {
     const key = recentKey(row);
     if (!first && !list.some((r) => recentKey(r) === key)) return;
     const next = inPlace ? keepRecent(list, row) : pushRecent(list, row);
-    if (sameList(next, list)) return;
-    recent.value = next;
-    save(user.id, next);
+    if (!sameList(next, list)) {
+      recent.value = next;
+      save(user.id, next);
+    }
+    if (status !== null) {
+      setStatuses(withStatus(recentStatus.peek(), row, status));
+    }
   });
   return () => {
     dispose();
+    disposePrune();
     offSocket();
     globalThis.removeEventListener?.("storage", onStorage);
   };

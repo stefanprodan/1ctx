@@ -4,7 +4,8 @@
 // The Recent watcher records a page once the row it shows is read,
 // places it once per visit, keeps the order for a page opened from the
 // list, keeps one list per user in localStorage; the rail draws it
-// between Directory and Projects on the working face only.
+// between Directory and Projects on the working face only, each row's
+// icon in its live status, which is never stored.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -17,6 +18,7 @@ import {
 import {
   pickRecent,
   recent,
+  recentStatus,
   recentStoreKey,
   watchRecent,
 } from "../../../src/client/app/Recent.state.ts";
@@ -37,6 +39,7 @@ import { projects } from "../../../src/client/data/projects.ts";
 import { session, sessionError } from "../../../src/client/data/sessions.ts";
 import { startSocket } from "../../../src/client/data/socket.ts";
 import type { Me } from "../../../src/shared/contracts/user.ts";
+import { PROTOCOL } from "../../../src/shared/socket.ts";
 import { FakeWire } from "../../helpers/client-socket.ts";
 
 const store = new Map<string, string>();
@@ -682,5 +685,238 @@ describe("the rail's Recent", () => {
     );
     expect(html).not.toContain("Recent");
     expect(html).not.toContain('href="/chat/s1"');
+  });
+});
+
+describe("a row's live status", () => {
+  const rail = () =>
+    render(<Rail user={casey} narrow={false} onHide={() => {}} />);
+  const PAUSE = 'd="M5.5 3.5v9M10.5 3.5v9"';
+  const glyph = (tone?: string) =>
+    `class="rail-sub-glyph${tone === undefined ? "" : ` status-${tone}`}"`;
+  // a revision past every one before, as the server's frames carry
+  let revision = 0;
+  const summary = (id: string, status: string, origin: string) => ({
+    id,
+    projectId: "p1",
+    origin,
+    automationId: origin === "chat" ? null : "a1",
+    title: origin === "chat" ? `chat ${id}` : "Digest",
+    status,
+    attention: null,
+    archived: null,
+    revision: ++revision,
+  });
+  // the page's read, in the shape the sessions layer applies frames to
+  const openSession = (
+    id: string,
+    status: string,
+    origin: "chat" | "automation" = "chat",
+  ) => {
+    session.value = {
+      session: summary(id, status, origin),
+      messages: [],
+      send: null,
+      live: null,
+    } as never;
+  };
+  const sessionFrame = (id: string, status: string, origin = "chat") =>
+    JSON.stringify({
+      type: "session",
+      projectId: "p1",
+      session: summary(id, status, origin),
+      messages: [],
+    });
+
+  test.serial("the page read gives a row its status", () => {
+    path.value = "/chat/s1";
+    openSession("s1", "running");
+    path.value = "/";
+    expect(rail()).toContain(glyph("running"));
+    // the page's own reads change it while it is open
+    path.value = "/chat/s1";
+    openSession("s1", "done");
+    expect(rail()).toContain(glyph());
+    expect(rail()).not.toContain("status-");
+  });
+
+  test.serial("a frame turns a row running, then plain when done", () => {
+    const wire = new FakeWire();
+    const stopSocket = startSocket({ connect: () => wire });
+    try {
+      path.value = "/chat/s1";
+      openSession("s1", "done");
+      // the chat's own page takes the frame too
+      wire.message(sessionFrame("s1", "running"));
+      expect(session.value?.session.status).toBe("running");
+      expect(rail()).toContain(glyph("running"));
+      // and so does its row while another page is open
+      path.value = "/";
+      wire.message(sessionFrame("s1", "done"));
+      expect(rail()).not.toContain("status-");
+      wire.message(sessionFrame("s1", "failed"));
+      expect(rail()).toContain(glyph("failed"));
+      // a frame for a session not held sets nothing
+      const held = recentStatus.value;
+      wire.message(sessionFrame("s9", "running"));
+      expect(recentStatus.value).toBe(held);
+    } finally {
+      stopSocket();
+    }
+  });
+
+  test.serial("a run row follows only the run it links to", () => {
+    const wire = new FakeWire();
+    const stopSocket = startSocket({ connect: () => wire });
+    try {
+      path.value = "/run/r1";
+      openSession("r1", "failed", "automation");
+      path.value = "/";
+      expect(rail()).toContain(glyph("failed"));
+      // a newer run of the automation, running elsewhere
+      wire.message(sessionFrame("r2", "running", "automation"));
+      expect(rail()).toContain(glyph("failed"));
+      // opened, it takes the row and its own status; the old one goes
+      path.value = "/run/r2";
+      openSession("r2", "done", "automation");
+      expect(recent.value.map((r) => r.id)).toEqual(["r2"]);
+      expect(rail()).not.toContain("status-");
+      expect(Object.keys(recentStatus.value)).toEqual(["run:r2"]);
+    } finally {
+      stopSocket();
+    }
+  });
+
+  test.serial("an automation draws its pause and its last run", () => {
+    const wire = new FakeWire();
+    const stopSocket = startSocket({ connect: () => wire });
+    try {
+      const row = {
+        id: "a1",
+        projectId: "p1",
+        name: "Digest",
+        suspendedAt: 5,
+        lastRunStatus: null,
+      };
+      automations.value = [row] as never;
+      automationProject.value = { id: "a1", projectId: "p1" };
+      path.value = "/automations/a1";
+      path.value = "/";
+      expect(rail()).toContain(PAUSE);
+      wire.message(
+        JSON.stringify({
+          type: "automation",
+          projectId: "p1",
+          automation: { ...row, suspendedAt: null, lastRunStatus: "running" },
+        }),
+      );
+      const html = rail();
+      expect(html).not.toContain(PAUSE);
+      expect(html).toContain(glyph("running"));
+    } finally {
+      stopSocket();
+    }
+  });
+
+  test.serial("a task awaiting input takes the attention colour", () => {
+    path.value = "/external-tasks/t1";
+    const task = { id: "t1", projectId: "p1", title: "Fix it" };
+    taskPage.value = {
+      id: "t1",
+      detail: { task: { ...task, state: "awaiting_input" } },
+    } as never;
+    expect(rail()).toContain(glyph("attention"));
+    taskPage.value = {
+      id: "t1",
+      detail: { task: { ...task, state: "in_progress" } },
+    } as never;
+    expect(rail()).not.toContain("status-");
+  });
+
+  test.serial("a status leaves with its row", () => {
+    const wire = new FakeWire();
+    const stopSocket = startSocket({ connect: () => wire });
+    try {
+      path.value = "/chat/s1";
+      openSession("s1", "done");
+      // another chat is open when s1 runs and is deleted
+      path.value = "/chat/s2";
+      openSession("s2", "done");
+      wire.message(sessionFrame("s1", "running"));
+      expect(Object.keys(recentStatus.value).sort()).toEqual([
+        "chat:s1",
+        "chat:s2",
+      ]);
+      wire.message(
+        JSON.stringify({ type: "deleted", projectId: "p1", sessionId: "s1" }),
+      );
+      expect(Object.keys(recentStatus.value)).toEqual(["chat:s2"]);
+    } finally {
+      stopSocket();
+    }
+  });
+
+  test.serial("status is never stored, and a reload draws plain", () => {
+    path.value = "/chat/s1";
+    openSession("s1", "running");
+    path.value = "/";
+    expect(rail()).toContain(glyph("running"));
+    expect(stored()).toEqual([chatRow("s1")]);
+    expect(store.get(recentStoreKey("u1"))).not.toContain("running");
+    // a reload: a fresh tab reads the stored list and nothing else
+    stop();
+    session.value = null;
+    stop = watchRecent();
+    expect(ids()).toEqual(["s1"]);
+    expect(rail()).not.toContain("status-");
+  });
+
+  test.serial("a reopened socket drops what it may have missed", () => {
+    let wire = new FakeWire();
+    const timers: (() => void)[] = [];
+    const stopSocket = startSocket({
+      connect: () => wire,
+      setTimer: (fn) => timers.push(fn),
+      clearTimer: () => {},
+    });
+    try {
+      wire.message(
+        JSON.stringify({ type: "hello", protocol: PROTOCOL, version: "v1" }),
+      );
+      path.value = "/chat/s1";
+      openSession("s1", "done");
+      path.value = "/chat/s2";
+      openSession("s2", "done");
+      wire.message(sessionFrame("s1", "running"));
+      wire.message(sessionFrame("s2", "running"));
+      expect(Object.keys(recentStatus.value).sort()).toEqual([
+        "chat:s1",
+        "chat:s2",
+      ]);
+      // the laptop sleeps through s1's done frame
+      const first = wire;
+      wire = new FakeWire();
+      first.fireClose(1006);
+      expect(timers.length).toBe(1);
+      timers[0]();
+      wire.message(
+        JSON.stringify({ type: "hello", protocol: PROTOCOL, version: "v1" }),
+      );
+      // the page on screen keeps its own, which its load refills
+      expect(Object.keys(recentStatus.value)).toEqual(["chat:s2"]);
+      path.value = "/";
+      const html = rail();
+      expect(html).toContain(glyph("running"));
+      expect(html.match(/status-running/g)?.length).toBe(1);
+    } finally {
+      stopSocket();
+    }
+  });
+
+  test.serial("another user signing in starts with no status", () => {
+    path.value = "/chat/s1";
+    openSession("s1", "running");
+    me.value = robin;
+    expect(recentStatus.value).toEqual({});
   });
 });

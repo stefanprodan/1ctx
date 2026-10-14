@@ -112,3 +112,17 @@ layer, the primitives and the styles are in `docs/ui.md`.
   another tab, never comes back on top. A run's row takes its
   automation's name from the list, since a run keeps the name it ran
   under.
+- **A row's icon shows only the status that asks for action,** as its
+  own list draws it, through the `status-*` classes: a chat and a run
+  the colour of `iconStatus()` (running, failed, attention), matched by
+  the session id, so a run's row follows only the run it links to; an
+  automation the pause icon while suspended, coloured while its last
+  run is running or failed; an external task the attention colour
+  while awaiting input. Done and stopped stay plain, and a file has no
+  status. Status lives in `recentStatus`, in memory only, set by the
+  page's read and the `session`, `automation` and `externalTask`
+  frames for a held row, and dropped with its row. It is never stored
+  or asked of the server, so after a reload every row draws plain
+  until a visit or a frame gives its status. A socket that reopens
+  may have missed frames, so on its `hello` every status but the page
+  on screen's, whose load runs again, is dropped.

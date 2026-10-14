@@ -5,7 +5,11 @@
 // are recorded, the row each one makes, where it goes in the list and
 // how a stored list is read back. Pure, so every rule runs on fixtures.
 
+import type { AutomationSummary } from "../../shared/contracts/automation.ts";
+import type { ExternalTaskRow } from "../../shared/contracts/external-task.ts";
+import type { SessionSummary } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
+import { iconStatus } from "../feed/Row.model.ts";
 import {
   automationHref,
   chatHref,
@@ -325,3 +329,127 @@ export const notFound = (
   failure: { status: number | null } | string | null,
 ): boolean =>
   typeof failure === "string" || (failure !== null && failure.status === 404);
+
+// a row's live status: only what asks for action is coloured, since
+// the rail is quieter than the feed; done and stopped stay plain
+export type RecentTone = "running" | "failed" | "attention";
+export type RecentStatus = { tone: RecentTone | null; paused: boolean };
+export const PLAIN: RecentStatus = { tone: null, paused: false };
+
+// held in memory only, keyed by the object a row links to, so a run's
+// row follows only its own run, never another of its automation
+export type RecentStatuses = Readonly<Record<string, RecentStatus>>;
+export const statusKey = (row: RecentRow): string => `${row.kind}:${row.id}`;
+
+const tone = (status: string): RecentTone | null =>
+  status === "running" || status === "failed" || status === "attention"
+    ? status
+    : null;
+
+// a chat and a run: the feed's icon colour
+export const sessionStatus = (
+  s: Pick<SessionSummary, "attention" | "status">,
+): RecentStatus => ({ tone: tone(iconStatus(s)), paused: false });
+
+// an automation: as on the Automations list, coloured only while its
+// last run is running or failed, paused while suspended
+export const automationStatus = (
+  a: Pick<AutomationSummary, "suspendedAt" | "lastRunStatus">,
+): RecentStatus => ({
+  tone:
+    a.lastRunStatus === "running" || a.lastRunStatus === "failed"
+      ? a.lastRunStatus
+      : null,
+  paused: a.suspendedAt !== null,
+});
+
+// an external task: awaiting input is the one state that asks for
+// action; the ring of its other states is the task page's
+export const taskStatus = (
+  t: Pick<ExternalTaskRow, "state">,
+): RecentStatus => ({
+  tone: t.state === "awaiting_input" ? "attention" : null,
+  paused: false,
+});
+
+const sameStatus = (a: RecentStatus, b: RecentStatus) =>
+  a.tone === b.tone && a.paused === b.paused;
+
+// the same map comes back when nothing changed
+export function withStatus(
+  statuses: RecentStatuses,
+  row: RecentRow,
+  status: RecentStatus,
+): RecentStatuses {
+  const key = statusKey(row);
+  const held = statuses[key];
+  if (held !== undefined && sameStatus(held, status)) return statuses;
+  return { ...statuses, [key]: status };
+}
+
+// a status leaves with its row
+export function pruneStatus(
+  statuses: RecentStatuses,
+  list: RecentRow[],
+): RecentStatuses {
+  const keys = new Set(list.map(statusKey));
+  const kept = Object.keys(statuses).filter((k) => keys.has(k));
+  if (kept.length === Object.keys(statuses).length) return statuses;
+  return Object.fromEntries(kept.map((k) => [k, statuses[k]]));
+}
+
+// a socket that was down missed frames, so a status held from before
+// may be stale: only the page on screen keeps its own, since its load
+// runs again on every open
+export function reopenStatus(
+  statuses: RecentStatuses,
+  page: RecentPage | null,
+): RecentStatuses {
+  const keep = (key: string) =>
+    page?.record === true &&
+    (page.kind === "session"
+      ? key === `chat:${page.id}` || key === `run:${page.id}`
+      : key === `${page.kind}:${page.id}`);
+  const kept = Object.keys(statuses).filter(keep);
+  if (kept.length === Object.keys(statuses).length) return statuses;
+  return Object.fromEntries(kept.map((k) => [k, statuses[k]]));
+}
+
+// a frame's status for a held row; a frame never adds a row
+export function statusFrame(
+  statuses: RecentStatuses,
+  list: RecentRow[],
+  ev: SocketEvent,
+): RecentStatuses {
+  let row: RecentRow | undefined;
+  let status: RecentStatus;
+  switch (ev.type) {
+    case "session":
+      row = list.find((r) => isSession(r, ev.session.id));
+      status = sessionStatus(ev.session);
+      break;
+    case "automation":
+      row = list.find(
+        (r) => r.kind === "automation" && r.id === ev.automation.id,
+      );
+      status = automationStatus(ev.automation);
+      break;
+    case "externalTask":
+      row = list.find((r) => r.kind === "task" && r.id === ev.task.id);
+      status = taskStatus(ev.task);
+      break;
+    default:
+      return statuses;
+  }
+  return row === undefined ? statuses : withStatus(statuses, row, status);
+}
+
+// what a row draws: an automation's pause while suspended, else its
+// kind's icon; a row with no status read yet draws plain
+export const recentLook = (
+  row: RecentRow,
+  status: RecentStatus = PLAIN,
+): { icon: IconName; tone: RecentTone | null } => ({
+  icon: row.kind === "automation" && status.paused ? "pause" : recentIcon(row),
+  tone: status.tone,
+});

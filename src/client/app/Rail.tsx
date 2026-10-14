@@ -22,11 +22,12 @@ import {
 import {
   type RecentRow,
   recentHref,
-  recentIcon,
   recentKey,
+  recentLook,
   recentText,
+  statusKey,
 } from "./Recent.model.ts";
-import { pickRecent, recent } from "./Recent.state.ts";
+import { pickRecent, recent, recentStatus } from "./Recent.state.ts";
 import { navigate, path } from "./router.ts";
 import { navEntries } from "./routes.ts";
 import { lastAdmin, lastWork } from "./shell.ts";
@@ -70,9 +71,11 @@ function Sub({
 }
 
 // the pages opened last, under the entries' icons; a title is a
-// sentence, cut to the rail with the whole of it on hover
+// sentence, cut to the rail with the whole of it on hover. The icon
+// takes the row's live status, coloured as its own list draws it
 function Recent({ here, follow }: { here: string; follow?: () => void }) {
   const rows = recent.value;
+  const statuses = recentStatus.value;
   if (rows.length === 0) return null;
   return (
     <>
@@ -80,6 +83,7 @@ function Recent({ here, follow }: { here: string; follow?: () => void }) {
       {rows.map((row: RecentRow) => {
         const href = recentHref(row);
         const text = recentText(row);
+        const look = recentLook(row, statuses[statusKey(row)]);
         return (
           <a
             key={recentKey(row)}
@@ -92,7 +96,11 @@ function Recent({ here, follow }: { here: string; follow?: () => void }) {
               follow?.();
             }}
           >
-            <Icon name={recentIcon(row)} size={14} class="rail-sub-glyph" />
+            <Icon
+              name={look.icon}
+              size={14}
+              class={`rail-sub-glyph${look.tone ? ` status-${look.tone}` : ""}`}
+            />
             <span class="rail-sub-name">
               {row.kind === "file" ? <PathName name={text} /> : text}
             </span>
