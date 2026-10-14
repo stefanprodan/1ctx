@@ -4,12 +4,15 @@
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import { ZONES } from "./zones.ts";
 
+type Held = { id: string; projectId: string } | null;
+
 // the project a page is in: its own pages, the chat's, or the
-// automation's, which only its row names
+// automation's or external task's, which only its row names
 export function projectHere(
   pathname: string,
   chat: SessionDetail | null,
-  automation: { id: string; projectId: string } | null = null,
+  automation: Held = null,
+  task: Held = null,
 ): string | null {
   const page = /^\/projects\/([^/]+)(\/|$)/.exec(pathname);
   if (page !== null) return decodeURIComponent(page[1]);
@@ -17,9 +20,13 @@ export function projectHere(
   if (open !== null && chat?.session.id === decodeURIComponent(open[1])) {
     return chat.session.projectId;
   }
-  const task = /^\/automations\/([^/]+)(\/edit|\/memory)?$/.exec(pathname);
-  if (task !== null && automation?.id === decodeURIComponent(task[1])) {
+  const auto = /^\/automations\/([^/]+)(\/edit|\/memory)?$/.exec(pathname);
+  if (auto !== null && automation?.id === decodeURIComponent(auto[1])) {
     return automation.projectId;
+  }
+  const ext = /^\/external-tasks\/([^/]+)$/.exec(pathname);
+  if (ext !== null && task?.id === decodeURIComponent(ext[1])) {
+    return task.projectId;
   }
   return null;
 }

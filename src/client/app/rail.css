@@ -102,6 +102,10 @@
   .rail-sub + .rail-zone {
     margin-top: var(--space-2);
   }
+  /* Projects after Recent's last row, so it never reads as a sixth */
+  .rail-recent + .rail-item {
+    margin-top: var(--space-2);
+  }
 
   /* a block, not a flex row: text-overflow cuts only a block's own text,
      and a name may be 80 characters */
@@ -140,6 +144,25 @@
   .rail-sub-on {
     background: var(--card);
     color: var(--fg);
+  }
+  /* a page's title is a sentence: the icon under the entries' icons,
+     the words in the page's font */
+  .rail-recent {
+    gap: 11px;
+    padding-left: 11px;
+    font-family: var(--sans);
+  }
+  /* Recent's head: a row high on the rail's gap, quiet since it is no
+     link, and no taller on touch since it is no tap target */
+  .rail-label {
+    display: block;
+    flex-shrink: 0;
+    height: 30px;
+    padding: 0 10px;
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    line-height: 30px;
   }
   /* a finger's 44px; the nav scrolls, so the rows may grow */
   @media (pointer: coarse) {
@@ -208,14 +231,5 @@
     left: var(--space-2);
     right: var(--space-2);
     bottom: 56px;
-  }
-
-  /* the theme's switch at the end of its row */
-  .rail-menu-switch {
-    margin-left: auto;
-  }
-
-  .rail-menu-error {
-    margin: var(--space-1) var(--space-2);
   }
 }

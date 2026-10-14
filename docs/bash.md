@@ -244,7 +244,7 @@ of that shell that shows a file on the chat page.
   and the text fits `VISUAL_FRAME_BYTES`, Markdown is rendered, the rest
   is code. Its line in the description tells the agent to write a
   file's `/knowledge/` path to point the user to it, which the reply
-  links (`docs/ui.md`), and to open it only to show it.
+  links (`docs/shell.md`), and to open it only to show it.
 - **A refused `open` stops nothing.** Outside the trees, a symlink, a
   directory, past `knowledgeFileBytes`, non-text, or past
   `MAX_OPENS_PER_COMMAND`. The copies are `opened_files` rows written in

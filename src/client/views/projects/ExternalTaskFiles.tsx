@@ -21,9 +21,9 @@ import {
 } from "../../data/external-task-files.ts";
 import { ago } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { PathName } from "../../ui/PathName.tsx";
 import { RowsCard, RowsFailed } from "../../ui/Rows.tsx";
 import { fileHref, fileIcon } from "../knowledge/Knowledge.model.ts";
-import { PathName } from "../knowledge/PathName.tsx";
 import { fileLabel } from "./ExternalTasks.model.ts";
 import "../../transcript/md.css";
 

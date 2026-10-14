@@ -477,6 +477,10 @@ describe("the rail", () => {
     expect(projectHere("/automations/au1/edit", null, task)).toBe("p3");
     expect(projectHere("/automations/au1/memory", null, task)).toBe("p3");
     expect(projectHere("/automations/au9", null, task)).toBeNull();
+    const ext = { id: "t1", projectId: "p4" };
+    expect(projectHere("/external-tasks/t1", null, null, ext)).toBe("p4");
+    expect(projectHere("/external-tasks/t9", null, null, ext)).toBeNull();
+    expect(projectHere("/external-tasks/t1", null)).toBeNull();
     expect(projectHere("/", chat)).toBeNull();
   });
 });

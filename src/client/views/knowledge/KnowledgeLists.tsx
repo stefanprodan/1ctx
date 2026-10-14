@@ -16,6 +16,7 @@ import { recentFiles } from "../../data/knowledge-rows.ts";
 import { ago } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, type Save, useSave } from "../../lib/save.ts";
+import { PathName } from "../../ui/PathName.tsx";
 import {
   RowsEnd,
   RowsGo,
@@ -32,7 +33,6 @@ import {
   fileHref,
   keptWords,
 } from "./Knowledge.model.ts";
-import { PathName } from "./PathName.tsx";
 import "./knowledge.css";
 
 export function RecentList({

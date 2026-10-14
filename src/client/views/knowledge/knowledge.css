@@ -1,4 +1,4 @@
-/* Knowledge: the card's head, the search's marks and lines, the empty
+/* Knowledge: the card's head, the search's lines, the empty
    base, and the uploader's drop target and progress. */
 
 @layer tokens, base, owners;
@@ -41,23 +41,6 @@
   .knowledge-label {
     padding: var(--space-3) var(--space-4) var(--space-1);
   }
-  /* a path's folder, faint before its name */
-  .knowledge-path {
-    display: flex;
-    min-width: 0;
-  }
-  /* the folder gives way long before the name does */
-  .knowledge-dir {
-    flex-shrink: 1000;
-    min-width: 2ch;
-    color: var(--faint);
-  }
-  .knowledge-mark {
-    border-radius: var(--radius-cell);
-    background: var(--hover);
-    color: var(--mark);
-  }
-
   /* the lines sit under the row's words, inside its rule */
   .knowledge-hits {
     display: flex;
