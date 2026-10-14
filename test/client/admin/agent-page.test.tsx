@@ -231,13 +231,13 @@ test("what is failing counts the agent's own servers and skills", () => {
 
 test("the Delete line says only the parts that apply", () => {
   expect(deleteLine({ chats: 18, automations: 1, running: 0 })).toBe(
-    "Archives its 18 chats and pauses 1 scheduled task. This cannot be undone.",
+    "Archives its 18 chats and pauses 1 automation. This cannot be undone.",
   );
   expect(deleteLine({ chats: 1, automations: 0, running: 2 })).toBe(
     "Archives its 1 chat. Stops the 2 running now. This cannot be undone.",
   );
   expect(deleteLine({ chats: 0, automations: 2, running: 0 })).toBe(
-    "Pauses 2 scheduled tasks. This cannot be undone.",
+    "Pauses 2 automations. This cannot be undone.",
   );
   expect(deleteLine({ chats: 0, automations: 0, running: 0 })).toBe(
     "This cannot be undone.",

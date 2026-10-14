@@ -163,8 +163,8 @@ export function switchEvery(b: Builder, every: Every): Builder {
 
 // a fire as a list reads it, in the zone: "Today 21:15", "Tomorrow
 // 09:00", "Wed Sep 16 09:00"; lowercase inside a sentence. With year,
-// a later day names it, "Sun Oct 11 2026 09:00", since a task's one
-// fire may be a year off
+// a later day names it, "Sun Oct 11 2026 09:00", since an automation's
+// one fire may be a year off
 export function fireLabel(
   fire: number,
   now: number,
@@ -220,7 +220,7 @@ export function scheduleTitle(schedule: string): string {
 }
 
 // the list's schedule column: the words, or the expression, and
-// "once" for a task that runs once
+// "once" for an automation that runs once
 export function scheduleColumn(
   a: Pick<AutomationSummary, "schedule" | "once">,
 ): string {

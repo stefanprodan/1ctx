@@ -70,8 +70,8 @@ export type BusEvents = {
   };
   "externalTask.changed": { projectId: string; task: ExternalTaskRow };
   "externalTask.deleted": { projectId: string; taskId: string };
-  // a label of the project was renamed or deleted: what shows its tasks
-  // reads them again
+  // a label of the project was renamed or deleted: what shows its
+  // external tasks reads them again
   "project.labels": { projectId: string };
   // an automation's alert opened: once per open alert, at the run that
   // opened it, never for a run that joins it. The one place a

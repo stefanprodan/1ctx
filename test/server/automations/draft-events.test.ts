@@ -35,7 +35,7 @@ describe("draft state frames", () => {
         committed.push(!chat.app.db.inTransaction);
       }, silent);
       try {
-        const task = await createAutomation(chat);
+        const automation = await createAutomation(chat);
         const { sessionId, script } = await startChat(chat);
         const conn = await watcher(chat);
         const unwatched = await watcher(chat);
@@ -48,10 +48,10 @@ describe("draft state frames", () => {
         watch(chat, conn, sessionId);
         const answer = await proposalRound(chat, script, [
           createProposal(),
-          { action: "update", id: task.id, once: true },
-          { action: "suspend", id: task.id },
-          { action: "resume", id: task.id },
-          { action: "run", id: task.id },
+          { action: "update", id: automation.id, once: true },
+          { action: "suspend", id: automation.id },
+          { action: "resume", id: automation.id },
+          { action: "run", id: automation.id },
         ]);
         const sent = frames(conn, "draft");
         const rows = chat.app.automationDrafts.bySession(sessionId);
@@ -127,13 +127,13 @@ describe("draft state frames", () => {
         ).toEqual(draft);
       }, silent);
       try {
-        const task = await createAutomation(chat);
+        const automation = await createAutomation(chat);
         const { sessionId, drafts } = await proposals(chat, [
           createProposal(),
           createProposal("dismiss"),
-          { action: "update", id: task.id, instructions: "draft" },
+          { action: "update", id: automation.id, instructions: "draft" },
           createProposal("expires"),
-          { action: "run", id: task.id },
+          { action: "run", id: automation.id },
         ]);
         expect(seen).toHaveLength(5);
         seen.length = 0;
@@ -149,8 +149,8 @@ describe("draft state frames", () => {
           .runSessionId!;
         (await next).reply("Done.");
         await settleRun(chat, runId);
-        await chat.member.call("PATCH", `/api/automations/${task.id}`, {
-          body: { instructions: "page", editRevision: task.editRevision },
+        await chat.member.call("PATCH", `/api/automations/${automation.id}`, {
+          body: { instructions: "page", editRevision: automation.editRevision },
         });
         expect((await press(chat, drafts[2]!.id)).status).toBe(409);
         chat.app.now.value = drafts[3]!.expiresAt;
@@ -431,9 +431,9 @@ describe("draft state frames", () => {
       const seen: BusEvent[] = [];
       const stop = subscribe((event) => seen.push(event), silent);
       try {
-        const task = await createAutomation(chat);
+        const automation = await createAutomation(chat);
         const { drafts, sessionId } = await proposals(chat, [
-          { action: "run", id: task.id },
+          { action: "run", id: automation.id },
         ]);
         const conn = await watcher(chat);
         watch(chat, conn, sessionId);
@@ -447,7 +447,7 @@ describe("draft state frames", () => {
           runSessionId: null,
           decidedAt: null,
         });
-        expect(chat.app.automations.byId(task.id)).toEqual(task);
+        expect(chat.app.automations.byId(automation.id)).toEqual(automation);
         expect(chat.app.sessions.count(chat.projectId)).toBe(count);
         expect(chat.app.runner.registry.values()).toHaveLength(0);
         expect(chat.scripted.chats()).toBe(chats);

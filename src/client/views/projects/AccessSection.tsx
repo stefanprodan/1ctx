@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The task editor's Access step: one list of switches, the web with
+// The automation editor's Access step: one list of switches, the web with
 // the project's credentials after it, visuals, the project docs, email
 // while the instance offers it, then
 // the picked agent's MCP servers and skills, and the project's

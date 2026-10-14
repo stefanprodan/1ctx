@@ -209,7 +209,7 @@ export type AgentSpec = {
   // leave out OpenRouter's 4-bit hosts, as the agents API takes it; an
   // upstream changed to a 4-bit host while it stays on is refused
   skip4Bit?: boolean;
-  // whether a turn may hand a task to a fresh copy of the agent; a new
+  // whether a turn may hand work to a fresh copy of the agent; a new
   // agent left without it is off
   subagents?: boolean;
   // only true: the agent a new chat starts on for anyone who has not

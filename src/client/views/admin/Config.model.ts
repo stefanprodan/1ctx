@@ -223,6 +223,6 @@ export function externalTaskLine(on: boolean): string {
 // the automation card's line, by its switch
 export function automationLine(on: boolean): string {
   return on
-    ? "A chat's agent may read its project's scheduled tasks and propose changes a user confirms. Each chat can turn it off."
-    : "No agent reads or changes scheduled tasks.";
+    ? "A chat's agent may read its project's automations and propose changes a user confirms. Each chat can turn it off."
+    : "No agent reads or changes automations.";
 }

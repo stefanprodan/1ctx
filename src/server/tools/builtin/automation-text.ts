@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What the automation tool answers, without I/O: a task's line, its
+// What the automation tool answers, without I/O: an automation's line, its
 // settings, its text quoted as data, the cuts and the links. Long text
 // is cut by bytes of UTF-8, so a page of Chinese costs about what a page
 // of English does in tokens.
@@ -83,7 +83,7 @@ export function short(text: string, bytes = SHORT_BYTES): string {
     : `${pageOf(line, 0, bytes - 3).text.trimEnd()}…`;
 }
 
-// task text as the result carries it: the registry's sanitizer drops
+// automation text as the result carries it: the registry's sanitizer drops
 // what it would drop later, so a fence is sized, and offsets counted, on
 // the text as sent. Run once on a whole field, never on a page, since it
 // trims
@@ -98,9 +98,9 @@ export function fenceFor(text: string): string {
   return "`".repeat(Math.max(3, longest + 1));
 }
 
-// a task's text as data, already asSent(): fenced, and labelled as the
-// task's, never the reader's instructions. A page of a field takes the
-// whole field's fence
+// an automation's text as data, already asSent(): fenced, and labelled
+// as the automation's, never the reader's instructions. A page of a
+// field takes the whole field's fence
 export function quoted(
   label: string,
   text: string,
@@ -115,7 +115,7 @@ export const taskPath = (id: string) => `/automations/${id}`;
 export const runPath = (id: string) => `/run/${id}`;
 export const memoryPath = (id: string) => `/automations/${id}/memory`;
 
-export const taskLink = (a: Pick<AutomationSummary, "id" | "name">) =>
+export const automationLink = (a: Pick<AutomationSummary, "id" | "name">) =>
   `[${label(a.name)}](${taskPath(a.id)})`;
 
 const plural = (n: number, word: string) =>
@@ -167,7 +167,7 @@ function lastEventText(a: AutomationSummary): string {
 // one line of list: never the instructions
 export function listLine(a: AutomationSummary, now: number): string {
   const parts = [
-    `${taskLink(a)} id ${a.id}`,
+    `${automationLink(a)} id ${a.id}`,
     `owner @${a.ownerName}`,
     `agent ${a.agentName}${a.agentRetired ? " (retired)" : ""}`,
     `${scheduleText(a.schedule)} in ${a.tz}`,
@@ -286,7 +286,7 @@ export type ShowInput = {
   cut: number;
 };
 
-// show: every setting the task's page shows, then its instructions,
+// show: every setting the automation's page shows, then its instructions,
 // its open alert and its last run's result; the notes and links are the
 // tail, which a later cut keeps
 export function showText(input: ShowInput): { body: string; tail: string } {
@@ -294,9 +294,9 @@ export function showText(input: ShowInput): { body: string; tail: string } {
   const time = at(a);
   const off = switchedOff(a.disabledCapabilities, input.names);
   const lines = [
-    `Scheduled task ${taskLink(a)}, id ${a.id}`,
+    `Automation ${automationLink(a)}, id ${a.id}`,
     `Owner: @${a.ownerName}`,
-    `Agent: ${a.agentName}${a.agentRetired ? " (retired, the task stays suspended until another agent is picked)" : ""}`,
+    `Agent: ${a.agentName}${a.agentRetired ? " (retired, the automation stays suspended until another agent is picked)" : ""}`,
     `Schedule: ${scheduleText(a.schedule)} (${a.schedule}), zone ${a.tz}`,
     `Runs once: ${a.once ? "yes, the fire that starts its run suspends it" : "no"}`,
     `Suspended: ${suspendedText(a)}`,
@@ -383,7 +383,7 @@ export function showText(input: ShowInput): { body: string; tail: string } {
 
 function tailOf(a: AutomationSummary, notes: string[]): string {
   const links = [
-    taskLink(a),
+    automationLink(a),
     ...(a.lastRunSessionId === null
       ? []
       : [`[last run](${runPath(a.lastRunSessionId)})`]),
@@ -418,7 +418,7 @@ export function partText(input: PartInput): { body: string; tail: string } {
         : runText(a, input.run).answer;
   if (text === null || current === null) {
     return {
-      body: `Scheduled task ${taskLink(a)}: its last run has no answer to read.`,
+      body: `Automation ${automationLink(a)}: its last run has no answer to read.`,
       tail: tailOf(a, []),
     };
   }
@@ -436,7 +436,7 @@ export function partText(input: PartInput): { body: string; tail: string } {
     ? `The ${part === "instructions" ? "instructions" : "last run"} changed since ref ${input.ref}, so this starts again at 0.\n`
     : "";
   const body = (shown: string) =>
-    `${head}Scheduled task ${taskLink(a)}\n${quoted(name, shown, fence)}`;
+    `${head}Automation ${automationLink(a)}\n${quoted(name, shown, fence)}`;
   const note = (page: Page, worst = false) =>
     worst || page.to < page.total
       ? `Characters ${page.from} to ${page.to} of ${page.total}. Read on with offset ${page.to}, ref ${current}.`
@@ -449,32 +449,32 @@ export function partText(input: PartInput): { body: string; tail: string } {
 }
 
 // list: a page of lines from offset that fits the cut, and a note
-// saying which tasks it holds and where the next page starts
+// saying which automations it holds and where the next page starts
 export function listText(
-  tasks: AutomationSummary[],
+  automations: AutomationSummary[],
   offset: number,
   now: number,
   cut: number,
 ): { body: string; tail: string } {
-  const total = tasks.length;
+  const total = automations.length;
   if (total === 0) {
-    return { body: "This project has no scheduled tasks.", tail: "" };
+    return { body: "This project has no automations.", tail: "" };
   }
   if (offset >= total) {
     throw new Error(
-      `offset is past the end: the project has ${plural(total, "scheduled task")}`,
+      `offset is past the end: the project has ${plural(total, "automation")}`,
     );
   }
-  const head = `This project has ${plural(total, "scheduled task")}. Read one with show and its id.`;
+  const head = `This project has ${plural(total, "automation")}. Read one with show and its id.`;
   const note = (to: number, worst = false) =>
     worst || to < total
-      ? `Tasks ${offset + 1} to ${to} of ${total}. Read on with list, offset ${to}.`
-      : `Tasks ${offset + 1} to ${to} of ${total}, the end.`;
+      ? `Automations ${offset + 1} to ${to} of ${total}. Read on with list, offset ${to}.`
+      : `Automations ${offset + 1} to ${to} of ${total}, the end.`;
   const room = cut - head.length - 2 - note(total, true).length;
   const lines: string[] = [];
   let used = 0;
   for (let i = offset; i < total; i++) {
-    const line = listLine(tasks[i]!, now);
+    const line = listLine(automations[i]!, now);
     // one line at least, so paging always moves on
     if (lines.length > 0 && used + 1 + line.length > room) break;
     lines.push(line);

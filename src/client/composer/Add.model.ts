@@ -7,7 +7,7 @@
 // leads to a pane instead: Web access first, then a switch per
 // credential, which goes with it. Memory and Knowledge are live
 // whenever the agent takes tools, since no admin switch governs them.
-// Scheduled tasks is the automation tool's and External tasks the
+// Automations is the automation tool's and External tasks the
 // external_task tool's, each live while the admin's row is on.
 // MCP servers is there when the picked agent is offered any, and leads
 // to a switch per server; Skills is the same for the skills it carries,
@@ -77,13 +77,13 @@ export function offeredItem(
 export const emailItem = (input: Parameters<typeof switchItem>[1]) =>
   offeredItem(EMAIL, input);
 
-// Scheduled tasks, the automation tool's: locked with the admin's row
+// Automations, the automation tool's: locked with the admin's row
 // off, as Visuals is
-export const tasksItem = (input: Parameters<typeof switchItem>[1]) =>
+export const automationsItem = (input: Parameters<typeof switchItem>[1]) =>
   switchItem(AUTOMATIONS, input);
 
 // External tasks, the external_task tool's: locked with the admin's row
-// off, as Scheduled tasks is
+// off, as Automations is
 export const externalTasksItem = (input: Parameters<typeof switchItem>[1]) =>
   switchItem(EXTERNAL_TASKS, input);
 

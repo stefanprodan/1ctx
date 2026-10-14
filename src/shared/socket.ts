@@ -145,7 +145,7 @@ export type SocketEvent =
   | ({ type: "child"; sessionId: string } & ChildOf)
   // the answer to a watch: the send in flight as far as it got, the
   // queue as the queue frame carries it, each running subagent's rows
-  // so far, and the chat's task proposals, any written since its read
+  // so far, and the chat's automation proposals, any written since its read
   | {
       type: "watched";
       sessionId: string;

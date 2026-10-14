@@ -129,7 +129,7 @@ describe("the page", () => {
     path.value = "/connect/codex";
     const html = render(<Connect />);
     expect(html).toContain(">Access keys<");
-    expect(html).toContain("pick up tasks to work on");
+    expect(html).toContain("pick up external tasks to work on");
     expect(html).toMatch(/aria-current="page"[^>]*>Codex</);
     expect(html).toContain("[mcp_servers.1ctx]");
     expect(html).toContain("~/.agents/skills/external-tasks/SKILL.md");

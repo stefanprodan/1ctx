@@ -119,9 +119,9 @@ describe("swapRun", () => {
     const other = line("x1", 90, 0, { automationId: "other" }).session;
     expect(swapRun(held(), { session: other, send: null })).toBeUndefined();
     // a run row outside All is no line
-    const tasks = [{ ...line("r1", 40, 0), runs: null }];
+    const rows = [{ ...line("r1", 40, 0), runs: null }];
     const next = line("r2", 60, 0).session;
-    expect(swapRun(tasks, { session: next, send: null })).toBeUndefined();
+    expect(swapRun(rows, { session: next, send: null })).toBeUndefined();
   });
 });
 

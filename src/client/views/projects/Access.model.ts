@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What a task keeps its runs from: the set its editor saves, from the
+// What an automation keeps its runs from: the set its editor saves, from the
 // switches it shows, and the names its page's aside says. The lists are
 // the picked agent's servers and skills and the project's credentials
 // and repositories; one left out is none.

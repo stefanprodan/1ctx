@@ -141,7 +141,8 @@ const turnOf = (send: ActiveSend) => (send.kind === "run" ? "run" : "turn");
 
 type Baseline = ReturnType<ChildDeps["bash"]["copyScratch"]>;
 
-// the child's session, send, task and first reply in one transaction
+// the child's session, send, first message and first reply in one
+// transaction
 function startChild(
   deps: ChildDeps,
   link: ChildLink,

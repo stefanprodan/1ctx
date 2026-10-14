@@ -163,7 +163,7 @@ function Aside({ agent }: { agent: AgentSummary }) {
         {(impact) => (
           <>
             <AsideLine label="Chats">{count(impact.chats)}</AsideLine>
-            <AsideLine label="Scheduled tasks">
+            <AsideLine label="Automations">
               {count(impact.automations)}
             </AsideLine>
           </>

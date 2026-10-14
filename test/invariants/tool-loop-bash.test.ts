@@ -39,7 +39,7 @@ describe("bash in the tool loop", () => {
           "datetime",
           "webfetch",
           "visualize",
-          // a run never reads the project's tasks
+          // a run never reads the project's automations
           ...(origin === "chat" ? ["automation", "external_task"] : []),
           "bash",
           // a run never saves to the project's memory, nor marks itself

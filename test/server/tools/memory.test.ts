@@ -3,16 +3,16 @@
 
 import { describe, expect, test } from "bun:test";
 import parallelEdits from "../../fixtures/memory/parallel-edits.json";
-import { area, context, now, task } from "./memory.helpers.ts";
+import { area, context, now, ownNote } from "./memory.helpers.ts";
 
 describe("memory offered sets", () => {
   test("offers only memory_edit, and only in an own-memory phase", () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     expect(offered.tools.map((tool) => tool.name)).toEqual(["memory_edit"]);
     expect(offered.memory).not.toBeNull();
     const main = tools.offered(now, "agent", [], "auto", {
-      ...task,
+      ...ownNote,
       phase: "main",
     });
     expect(main.memory).toBeNull();
@@ -28,7 +28,7 @@ describe("memory offered sets", () => {
 
   test("the edit tool names its note and what a topic means", () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const text = offered.tools.find(
       (tool) => tool.name === "memory_edit",
     )!.description;
@@ -48,7 +48,7 @@ describe("memory offered sets", () => {
 
   test("the edit schema offers only set, remove and none by topic", () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const edit = offered.tools.find((tool) => tool.name === "memory_edit")!;
     expect(edit.parameters).toMatchObject({
       type: "object",
@@ -71,7 +71,7 @@ describe("memory offered sets", () => {
     "a %s call in the phase says what it offers",
     async (name) => {
       const tools = area();
-      const phase = tools.offered(now, "agent", [], "auto", task);
+      const phase = tools.offered(now, "agent", [], "auto", ownNote);
       const result = await tools.run(
         phase,
         { id: "c1", name, arguments: '{"command":"ls"}' },
@@ -88,7 +88,7 @@ describe("memory offered sets", () => {
 describe("memory tool handles", () => {
   test("five parallel edits with two failures allow later valid corrections", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     offered.memory!.work!.entries = [...parallelEdits.entries];
     const errors: boolean[][] = [];
     for (const calls of parallelEdits.rounds) {
@@ -129,7 +129,7 @@ describe("memory tool handles", () => {
 
   test("applies parallel edit calls in call order", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const first = tools.run(
       offered,
       {
@@ -163,7 +163,7 @@ describe("memory tool handles", () => {
 
   test("captures prior text and sanitized topic spelling for each operation", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const handle = offered.memory!;
     handle.work!.entries = [{ topic: "Run status", text: "first" }];
     const call = (args: object) =>
@@ -224,7 +224,7 @@ describe("memory tool handles", () => {
 
   test("counts failed rounds and resets on any success", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const handle = offered.memory!;
     const edit = (args: string) =>
       tools.run(
@@ -271,7 +271,7 @@ describe("memory tool handles", () => {
 
   test("two failed rounds stop every memory call", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const handle = offered.memory!;
     const call = (name: string, args: string) =>
       tools.run(
@@ -306,7 +306,7 @@ describe("memory tool handles", () => {
 
   test("none changes nothing and resets a failed round", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", task);
+    const offered = tools.offered(now, "agent", [], "auto", ownNote);
     const handle = offered.memory!;
     const call = (name: string, args: string) =>
       tools.run(

@@ -479,7 +479,7 @@ export const ROUTES: Route[] = [
         (m) => m.NewAutomation,
       ),
     ),
-    title: () => "New scheduled task",
+    title: () => "New automation",
     role: "authenticated",
     // the list for the deadline limit and the tab's count
     load: async (params) => {

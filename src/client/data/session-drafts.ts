@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The task proposals of the chat on screen: the detail's drafts, moved
-// by the draft frame and by a press's answer, and the tasks they name,
+// The automation proposals of the chat on screen: the detail's drafts, moved
+// by the draft frame and by a press's answer, and the automations they name,
 // read once per id for the line's name and an update's old values. A
 // draft never goes back to pending once decided, whichever of a frame,
 // an answer or a detail lands last.
@@ -161,10 +161,12 @@ export async function decideDraft(
 }
 
 // a failed read other than a 404 or 403 is no answer: the line draws
-// as for a gone task, and the read is asked again after a pause
-export const TASK_RETRY_MS = 30_000;
+// as for a gone automation, and the read is asked again after a pause
+export const AUTOMATION_RETRY_MS = 30_000;
 
-const tasks = signal<ReadonlyMap<string, AutomationSummary | null>>(new Map());
+const automations = signal<ReadonlyMap<string, AutomationSummary | null>>(
+  new Map(),
+);
 // the ids whose last read failed, drawn as gone until a read answers;
 // due once the pause is over, so the next draw asks again
 const failing = signal<ReadonlySet<string>>(new Set());
@@ -182,11 +184,11 @@ effect(() => {
   retries.clear();
   due.clear();
   failing.value = new Set();
-  tasks.value = new Map();
+  automations.value = new Map();
 });
 
-const keep = (id: string, task: AutomationSummary | null) => {
-  tasks.value = new Map(tasks.value).set(id, task);
+const keep = (id: string, automation: AutomationSummary | null) => {
+  automations.value = new Map(automations.value).set(id, automation);
 };
 
 function failed(id: string): void {
@@ -199,7 +201,7 @@ function failed(id: string): void {
       due.add(id);
       // a new set draws the lines again, and their effect reads once more
       failing.value = new Set(failing.value);
-    }, TASK_RETRY_MS),
+    }, AUTOMATION_RETRY_MS),
   );
 }
 
@@ -211,20 +213,22 @@ function settledRead(id: string): void {
   failing.value = next;
 }
 
-// a failed read is not a gone task: the line names neither
-export const taskFailing = (id: string): boolean => failing.value.has(id);
+// a failed read is not a gone automation: the line names neither
+export const automationFailing = (id: string): boolean => failing.value.has(id);
 
-// undefined until read, null for a task gone, not seen or failing
-export const draftTask = (id: string): AutomationSummary | null | undefined =>
-  tasks.value.has(id)
-    ? tasks.value.get(id)
+// undefined until read, null for an automation gone, not seen or failing
+export const draftAutomation = (
+  id: string,
+): AutomationSummary | null | undefined =>
+  automations.value.has(id)
+    ? automations.value.get(id)
     : failing.value.has(id)
       ? null
       : undefined;
 
-export async function loadDraftTask(id: string): Promise<void> {
+export async function loadDraftAutomation(id: string): Promise<void> {
   const forUser = owner;
-  if (asked.has(id) || tasks.value.has(id)) return;
+  if (asked.has(id) || automations.value.has(id)) return;
   if (failing.value.has(id) && !due.has(id)) return;
   asked.add(id);
   try {
@@ -234,7 +238,7 @@ export async function loadDraftTask(id: string): Promise<void> {
     // a delete frame that came first wins over the read
     if (owner !== forUser) return;
     settledRead(id);
-    if (tasks.value.get(id) === null) return;
+    if (automations.value.get(id) === null) return;
     keep(id, automation);
   } catch (err) {
     if (owner !== forUser) return;
@@ -249,8 +253,8 @@ export async function loadDraftTask(id: string): Promise<void> {
   }
 }
 
-// a deleted task's lines say so without a read
-export function forgetTask(id: string): void {
+// a deleted automation's lines say so without a read
+export function markGone(id: string): void {
   const retry = retries.get(id);
   if (retry !== undefined) clearTimeout(retry);
   retries.delete(id);

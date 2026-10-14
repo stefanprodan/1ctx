@@ -72,18 +72,20 @@ async function finish(chat: ChatApp, script: Script, id: string) {
 const drafts = (chat: ChatApp, id: string) =>
   chat.app.automationDrafts.bySession(id);
 
-describe("task proposals", () => {
-  test("each action writes one pending draft and no task or run", async () => {
+describe("automation proposals", () => {
+  test("each action writes one pending draft and no automation or run", async () => {
     const chat = await app();
     try {
-      const task = await createAutomation(chat, { tz: "Europe/Bucharest" });
+      const automation = await createAutomation(chat, {
+        tz: "Europe/Bucharest",
+      });
       const { script, sessionId } = await startChat(chat);
       const result = await round(chat, script, [
         create(),
-        { action: "update", id: task.id, name: "changed", once: true },
-        { action: "suspend", id: task.id },
-        { action: "resume", id: task.id },
-        { action: "run", id: task.id },
+        { action: "update", id: automation.id, name: "changed", once: true },
+        { action: "suspend", id: automation.id },
+        { action: "resume", id: automation.id },
+        { action: "run", id: automation.id },
       ]);
       expect(
         result.answers.every((text) => text.includes("waits for a person")),
@@ -98,8 +100,8 @@ describe("task proposals", () => {
           sessionId,
           userId: chat.memberId,
           agentId: chat.agentId,
-          automationId: action === "create" ? null : task.id,
-          editRevision: action === "create" ? null : task.editRevision,
+          automationId: action === "create" ? null : automation.id,
+          editRevision: action === "create" ? null : automation.editRevision,
           state: "pending",
           decidedBy: null,
           decidedAt: null,
@@ -116,9 +118,9 @@ describe("task proposals", () => {
         name: "changed",
         once: true,
       });
-      expect(chat.app.automations.byId(task.id)).toEqual(task);
+      expect(chat.app.automations.byId(automation.id)).toEqual(automation);
       expect(chat.app.automations.count(chat.projectId)).toBe(1);
-      expect(chat.app.sessions.runningAutomation(task.id)).toBe(false);
+      expect(chat.app.sessions.runningAutomation(automation.id)).toBe(false);
       const response = await chat.member.call(
         "GET",
         `/api/sessions/${sessionId}`,
@@ -183,7 +185,7 @@ describe("task proposals", () => {
       const response = await chat.member.call(
         "POST",
         `/api/sessions/${sessionId}/messages`,
-        { body: { message: "@checker propose a task" } },
+        { body: { message: "@checker propose an automation" } },
       );
       expect(response.status).toBe(201);
       const result = await round(chat, await next, [create()]);
@@ -200,16 +202,16 @@ describe("task proposals", () => {
   test("refused fields, parser bounds and schedules write no draft and return their places", async () => {
     const chat = await app();
     try {
-      const task = await createAutomation(chat);
+      const automation = await createAutomation(chat);
       const { script, sessionId } = await startChat(chat);
       let current = script;
       const refused = [
-        { ...create(), id: task.id },
+        { ...create(), id: automation.id },
         { ...create(), agentId: chat.agentId },
-        { action: "update", id: task.id },
-        { action: "suspend", id: task.id, once: true },
-        { action: "resume", id: task.id, tz: "UTC" },
-        { action: "run", id: task.id, schedule: "0 9 * * *" },
+        { action: "update", id: automation.id },
+        { action: "suspend", id: automation.id, once: true },
+        { action: "resume", id: automation.id, tz: "UTC" },
+        { action: "run", id: automation.id, schedule: "0 9 * * *" },
         { ...create(), name: "" },
         { ...create(), instructions: " " },
         { ...create(), instructions: "x".repeat(256 * 1024 + 1) },
@@ -218,7 +220,7 @@ describe("task proposals", () => {
         { ...create(), schedule: "not cron" },
         { ...create(), tz: "no-zone" },
         { ...create(), once: "yes" },
-        { action: "update", id: task.id, schedule: "* * * * *" },
+        { action: "update", id: automation.id, schedule: "* * * * *" },
       ];
       for (let i = 0; i < refused.length; i += 4) {
         const result = await round(chat, current, refused.slice(i, i + 4));
@@ -240,19 +242,19 @@ describe("task proposals", () => {
     }
   });
 
-  test("missing and other-project tasks, a taken name, retired agent and lowered deadline are refused", async () => {
+  test("missing and other-project automations, a taken name, retired agent and lowered deadline are refused", async () => {
     const chat = await app();
     try {
-      const task = await createAutomation(chat, {
+      const automation = await createAutomation(chat, {
         name: "taken",
         deadlineMs: DEFAULT_LIMITS.runDeadlineMs,
       });
       const otherProject = chat.app.projects.personal(chat.adminId)!.id;
       const hidden = chat.app.automations.create({
-        ...task,
+        ...automation,
         name: "hidden",
         projectId: otherProject,
-        nextAt: task.nextAt!,
+        nextAt: automation.nextAt!,
         now: chat.app.now.value,
       });
       const { script, sessionId } = await startChat(chat);
@@ -260,11 +262,11 @@ describe("task proposals", () => {
         create("taken"),
         { action: "run", id: "gone00000000" },
         { action: "update", id: hidden.id, name: "new-name" },
-        { action: "update", id: task.id, name: "hidden" },
+        { action: "update", id: automation.id, name: "hidden" },
       ]);
-      expect(first.answers[0]).toContain(`/automations/${task.id}`);
-      expect(first.answers[1]).toContain("no scheduled task");
-      expect(first.answers[2]).toContain("no scheduled task");
+      expect(first.answers[0]).toContain(`/automations/${automation.id}`);
+      expect(first.answers[1]).toContain("no automation");
+      expect(first.answers[2]).toContain("no automation");
       expect(drafts(chat, sessionId)).toHaveLength(1);
       chat.app.db
         .query(
@@ -272,9 +274,9 @@ describe("task proposals", () => {
         )
         .run(chat.app.now.value, chat.agentId);
       const retired = await round(chat, first.script, [
-        { action: "update", id: task.id, instructions: "new" },
+        { action: "update", id: automation.id, instructions: "new" },
       ]);
-      expect(retired.answers[0]).toContain(`/automations/${task.id}`);
+      expect(retired.answers[0]).toContain(`/automations/${automation.id}`);
       expect(retired.answers[0]).toContain("agent or deadline first");
       chat.app.db
         .query(
@@ -287,9 +289,9 @@ describe("task proposals", () => {
         )
         .run();
       const deadline = await round(chat, retired.script, [
-        { action: "update", id: task.id, once: true },
+        { action: "update", id: automation.id, once: true },
       ]);
-      expect(deadline.answers[0]).toContain(`/automations/${task.id}`);
+      expect(deadline.answers[0]).toContain(`/automations/${automation.id}`);
       expect(drafts(chat, sessionId)).toHaveLength(1);
       await finish(chat, deadline.script, sessionId);
     } finally {
@@ -310,10 +312,10 @@ describe("task proposals", () => {
         first.answers.filter((s) => s.includes("waits for a person")),
       ).toHaveLength(5);
       expect(
-        first.answers.filter((s) => s.includes("5 task proposals")),
+        first.answers.filter((s) => s.includes("5 automation proposals")),
       ).toHaveLength(3);
       const again = await round(chat, first.script, [create("later")]);
-      expect(again.answers[0]).toContain("5 task proposals");
+      expect(again.answers[0]).toContain("5 automation proposals");
       expect(drafts(chat, sessionId)).toHaveLength(5);
       await finish(chat, again.script, sessionId);
     } finally {
@@ -520,11 +522,11 @@ describe("forged proposals", () => {
   test("a run, its attention step and memory phase refuse forged proposals", async () => {
     const chat = await app();
     try {
-      const task = await createAutomation(chat, {
+      const automation = await createAutomation(chat, {
         ownMemory: true,
         attentionMode: "agent",
       });
-      const run = await startRun(chat, task.id);
+      const run = await startRun(chat, automation.id);
       const main = await round(chat, run.main, [create()]);
       expect(main.answers[0]).toContain("not found");
       const nextCount = chat.scripted.scripts.length + 1;

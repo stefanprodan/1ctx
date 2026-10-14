@@ -281,7 +281,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     providers,
     usage,
   });
-  // a deleted object leaves no key behind in a chat or a task; a
+  // a deleted object leaves no key behind in a chat or an automation; a
   // repository was its project's, so only that project's rows are read
   const capabilities = {
     forget(key: string, projectId?: string) {
@@ -570,7 +570,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
           judged: session !== null && session.attention !== null,
         };
       },
-      // the names the task's page shows: its agent's switchable servers
+      // the names the automation's page shows: its agent's switchable servers
       // and skills, its project's credentials and repositories
       switchNames(agentId, projectId) {
         const agent = agents.byId(agentId);

@@ -46,15 +46,15 @@ export function waitingSince(
     : null;
 }
 
-// a once task's fire with its year: "today 09:00", "on Sun Oct 11 2026
+// a once automation's fire with its year: "today 09:00", "on Sun Oct 11 2026
 // 09:00"
 const onceAt = (fire: number, now: number, tz: string) => {
   const label = fireLabel(fire, now, tz, true, true);
   return /^to(day|morrow) /.test(label) ? label : `on ${label}`;
 };
 
-// "Next run tomorrow 09:00, in 14h", the summary's and the editor's; a
-// task that runs once names its one fire's date with the year, "Runs
+// "Next run tomorrow 09:00, in 14h", the summary's and the editor's; an
+// automation that runs once names its one fire's date with the year, "Runs
 // once on Sun Oct 11 2026 09:00, in 3d"
 export const nextRunWords = (
   fire: number,
@@ -80,8 +80,8 @@ export function nextLine(
   return `Waiting since ${at.replace(/^today /, "")}`;
 }
 
-// The page's next runs: the preview's fires still ahead. A task that
-// runs once has one, and while its fire waits for a slot that fire is
+// The page's next runs: the preview's fires still ahead. An automation
+// that runs once has one, and while its fire waits for a slot that fire is
 // it, said as the summary says a wait, since the next occurrence never
 // comes once the waiting one runs.
 export function nextRunsOf(
@@ -203,7 +203,7 @@ export function automationPageOf<P extends { id: string }>(input: {
   return { row, projectId, shown, error };
 }
 
-// A task keeps no memory or its own note.
+// An automation keeps no memory or its own note.
 type MemoryMode = "none" | "own";
 
 export const MEMORY_MODES: { value: MemoryMode; label: string }[] = [

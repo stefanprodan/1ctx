@@ -112,7 +112,7 @@ export type MemoryScope = {
   // the agent's Subagents switch: a main offer carries delegate
   delegate?: boolean;
   // the send's origin; a subagent's offer has no automation of its own,
-  // so it carries its parent's, and a run's children read no tasks
+  // so it carries its parent's, and a run's children read no automations
   origin?: SessionOrigin;
 };
 

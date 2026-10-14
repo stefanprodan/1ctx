@@ -40,7 +40,7 @@ async function outsider(chat: ChatApp) {
 }
 
 // a team chat of the member's, the admin in the project too, whose
-// agent delegates one task that calls the clock, then answers
+// agent hands off work that calls the clock, then answers
 async function delegated(chat: ChatApp) {
   const team = await createTeam(chat.admin, "ops", [chat.memberId]);
   const started = await startChat(chat, "survey", chat.member, team.id);
@@ -83,7 +83,7 @@ describe("a subagent's live rows", () => {
           expect(frame).toMatchObject({ sessionId, messageId: row!.id });
           expect(frame.child.sessionId).toBe(childId!);
         }
-        // the first frame is the task and the first reply; a frame
+        // the first frame is the handed work and the first reply; a frame
         // carries only the rows its commit changed
         expect(got[0]!.child.rows.map((r) => r.kind)).toEqual([
           "user",

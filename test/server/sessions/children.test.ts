@@ -36,7 +36,7 @@ async function doneChat(chat: ChatApp, message = "hello") {
   return started.sessionId;
 }
 
-// a finished manual run of a new task, the scheduler stopped
+// a finished manual run of a new automation, the scheduler stopped
 async function doneRun(chat: ChatApp, retentionDays = 30) {
   chat.app.automationScheduler.stop();
   const automation = await createAutomation(chat, { retentionDays });
@@ -591,7 +591,7 @@ describe("a run as the root", () => {
     const sums = scan(chat.app.db, { now: chat.app.now.value, since: 0 });
     expect(sums.sessions.map((row) => row.id)).toEqual([runId]);
     expect(sums.sessions[0]!.messageBytes).toBeGreaterThan(own.messageBytes);
-    // a run past its task's retention takes its child
+    // a run past its automation's retention takes its child
     ago(chat, runId, 2);
     expect(chat.app.automationScheduler.sweep()).toBe(1);
     expect(chat.app.sessions.byId(runId)).toBeNull();

@@ -396,7 +396,7 @@ describe("the storage answer", () => {
     });
   });
 
-  test("sums a task's runs and splits chats from runs", async () => {
+  test("sums an automation's runs and splits chats from runs", async () => {
     const chat = await chatApp();
     const chatId = await settledChat(chat);
     const automation = await createAutomation(chat, { retentionDays: 14 });
@@ -412,7 +412,7 @@ describe("the storage answer", () => {
       0,
     );
     const body = await storage(chat);
-    expect(body.largest.tasks).toEqual([
+    expect(body.largest.automations).toEqual([
       {
         id: null,
         name: null,
@@ -511,7 +511,7 @@ describe("the storage answer", () => {
     expect(keptMcp?.bytes).toBe(700);
     const runs = body.retention.cleaned.find((row) => row.key === "runs")!;
     expect(runs.bytes).toBeGreaterThanOrEqual(messageBytes(chat, runId) + 300);
-    expect(body.largest.tasks[0]?.parts).toEqual([
+    expect(body.largest.automations[0]?.parts).toEqual([
       { part: "mcp", bytes: 300 },
       { part: "runs", bytes: messageBytes(chat, runId) },
     ]);
@@ -653,11 +653,11 @@ describe("the storage answer", () => {
     );
   });
 
-  test("never names a personal project, its chats or its tasks", async () => {
+  test("never names a personal project, its chats or its automations", async () => {
     const chat = await chatApp();
     const sessionId = await settledChat(chat);
     const automation = await createAutomation(chat, {
-      name: "secret-task",
+      name: "secret-automation",
     });
     const { sessionId: runId, main } = await startRun(chat, automation.id);
     main.reply("done");
@@ -669,7 +669,7 @@ describe("the storage answer", () => {
       runId,
       automation.id,
       "hello there",
-      "secret-task",
+      "secret-automation",
     ]) {
       expect(text).not.toContain(secret);
     }

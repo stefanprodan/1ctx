@@ -38,27 +38,27 @@ layer, the primitives and the styles are in `docs/ui.md`.
   `inApp()` still opens a page of the app in place, so it never leaves
   the app.
 - **A `/knowledge/<name>` path links only with a `project`.** The
-  runner's replies and a task's entries pass one; every other render
-  keeps paths as text. A plain path in prose or a link's target links
-  to `/projects/<project>/knowledge/path?name=`, whose page reads the
-  file of that name at the click and replaces itself with the file's
+  runner's replies and an external task's entries pass one; every other
+  render keeps paths as text. A plain path in prose or a link's target
+  links to `/projects/<project>/knowledge/path?name=`, whose page reads
+  the file of that name at the click and replaces itself with the file's
   page. A path in code, a link's label, a web address or glued to an
-  inline element stays text. Bun hands code and labels to `text` too
-  and splits a run at `_` and `*`, so `text` marks its runs, code and
-  links drop the marks, and paths are matched on the joined runs.
-  Source without `/knowledge/` renders as with no project.
-- **The tab's title names the page, most specific first** and the
-  brand last, joined by ` · ` (`app/Title.model.ts`,
-  `app/Title.state.ts`): a chat's or a task's title, "Run of" its
-  automation, an automation's name (its Memory tab and edit page too)
-  or a file's path, then its project, then `1ctx`. A project's page is
-  its tab's word (Feed for the project) and the project; any other page
-  is the route's word. An admin page is the word or its object's name,
-  then Admin. Signed out it is Sign in. The name is the row the page
-  read, as Recent reads it, and the project's is the rail's list, so no
-  request is added; until they are in, the title is the route's word.
-  An effect over those signals sets it, so a rename frame changes the
-  tab. The browser cuts a long title, never the page.
+  inline element stays text. Bun hands code and labels to `text` too and
+  splits a run at `_` and `*`, so `text` marks its runs, code and links
+  drop the marks, and paths are matched on the joined runs. Source
+  without `/knowledge/` renders as with no project.
+- **The tab's title names the page, most specific first** and the brand
+  last, joined by ` · ` (`app/Title.model.ts`, `app/Title.state.ts`): a
+  chat's or an external task's title, "Run of" its automation, an
+  automation's name (its Memory tab and edit page too) or a file's path,
+  then its project, then `1ctx`. A project's page is its tab's word
+  (Feed for the project) and the project; any other page is the route's
+  word. An admin page is the word or its object's name, then Admin.
+  Signed out it is Sign in. The name is the row the page read, as Recent
+  reads it, and the project's is the rail's list, so no request is
+  added; until they are in, the title is the route's word. An effect
+  over those signals sets it, so a rename frame changes the tab. The
+  browser cuts a long title, never the page.
 - **The address picks what the rail shows.** Under an admin address it
   shows the admin panel's zones (Monitor, Access, Config) from
   `app/zones.ts`; an admin page lives under its zone's address and
@@ -119,16 +119,17 @@ layer, the primitives and the styles are in `docs/ui.md`.
   backs it.
 - **A row follows its object and never moves for it.** The socket's
   frames reach every tab for each project its user sees, and
-  `recentFrame()` changes a held row in place: `session` renames a
-  chat (a run's own frame changes nothing), `automation` renames the
+  `recentFrame()` changes a held row in place: `session` renames a chat
+  (a run's own frame changes nothing), `automation` renames the
   automation and its runs' row, `externalTask` and `knowledge` rename
   theirs; `deleted`, `automationDeleted` (its runs' row too, with
-  `runs`), `externalTaskDeleted` and `knowledge` with `deleted` drop
-  the row, and `revoked` drops every row of the project. A frame never
-  adds a row. A page that answers not found (a 404, a task page closed
-  by a delete, a file missing or deleted) drops its row; a chat's,
-  automation's and task's failure is one signal for any page, so one
-  left by the page before counts only once it changed in the visit.
+  `runs`), `externalTaskDeleted` and `knowledge` with `deleted` drop the
+  row, and `revoked` drops every row of the project. A frame never adds
+  a row. A page that answers not found (a 404, an external task page
+  closed by a delete, a file missing or deleted) drops its row; a
+  chat's, automation's and external task's failure is one signal for any
+  page, so one left by the page before counts only once it changed in
+  the visit.
 - **Every tab of the user holds one list.** A tab takes the list
   another wrote from the `storage` event on its user's key, dropping a
   bad value as on read, and never writes back for it, so two tabs

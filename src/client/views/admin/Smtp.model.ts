@@ -171,5 +171,5 @@ export function resultLine(
 export function agentEmailLine(on: boolean, emailOn: boolean): string {
   if (!on) return "Agents cannot email users.";
   if (!emailOn) return "Agents can email users once the server is set up.";
-  return "Agents may email users who can open the chat or task and turned email from agents on. Each chat and task can turn it off.";
+  return "Agents may email users who can open the chat or run and turned email from agents on. Each chat and automation can turn it off.";
 }

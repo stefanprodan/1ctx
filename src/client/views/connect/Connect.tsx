@@ -55,7 +55,7 @@ export function Connect() {
           </Rows>
           <p class="connect-lead">
             Connect your coding agents to projects over MCP and let them pick up
-            tasks to work on.
+            external tasks to work on.
           </p>
           {setup && (
             <Rows>

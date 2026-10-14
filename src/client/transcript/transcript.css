@@ -378,8 +378,8 @@
     display: flex;
     flex-direction: column;
   }
-  /* a subagent's group: its description cut first, its task and its
-     answer one step in like the rounds */
+  /* a subagent's group: its description cut first, its task input and
+     its answer one step in like the rounds */
   .transcript-child-title {
     min-width: 0;
     color: var(--fg);

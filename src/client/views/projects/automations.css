@@ -1,5 +1,5 @@
 /* The automation pages: the icons and the run length the rows hold,
-   the automation page's actions and summary, and the editor's task box,
+   the automation page's actions and summary, and the editor's instructions box,
    schedule builder and its next run. */
 
 @layer tokens, base, owners;
@@ -178,7 +178,7 @@
     margin: 0;
     font-size: var(--text-ui);
   }
-  /* what a save does to a task someone else owns, a line of its own
+  /* what a save does to an automation someone else owns, a line of its own
      over the buttons */
   .automations-owner-note {
     flex-basis: 100%;
@@ -186,7 +186,7 @@
     font-size: var(--text-ui);
     color: var(--dim);
   }
-  .automations-task {
+  .automations-instructions {
     display: flex;
     flex-direction: column;
     min-width: 0;
@@ -196,18 +196,18 @@
     background: var(--inset);
     border: 1px solid var(--line);
   }
-  .automations-task:focus-within {
+  .automations-instructions:focus-within {
     border-color: var(--line-strong);
   }
-  .automations-task-invalid,
-  .automations-task-invalid:focus-within {
+  .automations-instructions-invalid,
+  .automations-instructions-invalid:focus-within {
     border-color: var(--failed);
   }
   /* the guidance under its box, apart from the next box */
   .automations-guidance {
     margin: var(--space-1) 0 var(--space-2);
   }
-  .automations-task .automations-task-text {
+  .automations-instructions .automations-instructions-text {
     min-width: 0;
     padding: var(--space-1) 0;
     border: 0;
@@ -217,7 +217,7 @@
     resize: vertical;
     outline: none;
   }
-  .automations-task-bar {
+  .automations-instructions-bar {
     display: flex;
     align-items: center;
   }

@@ -21,10 +21,10 @@ import {
 const build = { id: "l1", name: "build", description: "New work" };
 
 describe("a project's labels", () => {
-  test("the delete ask says how many tasks carry the label", () => {
+  test("the delete ask says how many external tasks carry the label", () => {
     expect(deleteAsk(0)).toBe("Delete this label?");
-    expect(deleteAsk(1)).toBe("Delete this label? 1 task uses it.");
-    expect(deleteAsk(3)).toBe("Delete this label? 3 tasks use it.");
+    expect(deleteAsk(1)).toBe("Delete this label? 1 external task uses it.");
+    expect(deleteAsk(3)).toBe("Delete this label? 3 external tasks use it.");
   });
 
   test("a delete asked for gives way once its label is the last", () => {

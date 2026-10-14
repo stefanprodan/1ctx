@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The task editor's Needs attention step, drawn as Memory's: who marks
+// The automation editor's Needs attention step, drawn as Memory's: who marks
 // a run, and when a mode is on, the automation's own words on when,
 // which its agent and the decider read.
 

@@ -5,20 +5,20 @@ objects with: `automation` (`tools/builtin/automation*.ts`) and
 `external_task` (`tools/builtin/external-task*.ts`). The offered set,
 errors and cuts every tool shares are in `docs/tools.md`.
 
-## Scheduled tasks
+## Automations
 
-- **`automation` manages the chat's project's tasks, in a chat only.**
-  Its main rounds, a summoned agent's and a chat's subagents are
+- **`automation` manages the chat's project's automations, in a chat
+  only.** Its main rounds, a summoned agent's and a chat's subagents are
   offered it; a run, a run's subagents (the scope's `origin`), the
-  memory phase and the attention step never are, and a call whose
-  actor is not a chat is refused. The row starts on; its switch is a
-  card on the Config board (`ChatToolCard.tsx`), saved on Save.
-  The Config catalog shows the main chat's proposal-enabled schema and
-  description, including their token count, not a child's read-only offer.
+  memory phase and the attention step never are, and a call whose actor
+  is not a chat is refused. The row starts on; its switch is a card on
+  the Config board (`ChatToolCard.tsx`), saved on Save. The Config
+  catalog shows the main chat's proposal-enabled schema and description,
+  including their token count, not a child's read-only offer.
 - **Only chat main rounds propose create, update, suspend, resume or
   run.** A summoned agent's too; a child's enum stays `list`/`show`.
   Dispatch refuses proposals elsewhere, including forged calls in runs,
-  memory and attention. Proposals write a draft, never a task, so
+  memory and attention. Proposals write a draft, never an automation, so
   `automation` stays a read for cuts. `DRAFTS_PER_SEND` (5) lives in
   `shared/automation-limits.ts`; no cap counts a project's pending drafts.
   A shared send counter reserves before
@@ -26,21 +26,21 @@ errors and cuts every tool shares are in `docs/tools.md`.
 - **Create takes name, instructions, schedule, optional tz, once, own
   memory and both guidances.** The zone defaults to the user's profile.
   Update needs id and at least one of those fields; an omitted zone
-  keeps the task's. Suspend, resume and run take id alone. Defaults and
-  checks are `docs/automations.md`'s. The description asks for
-  standalone instructions, attention and memory in their guidances, and
-  proposals only on the user's ask, never on task or tool text. Each
-  answer says it waits for a person; suspend says a run already going
-  keeps going.
+  keeps the automation's. Suspend, resume and run take id alone.
+  Defaults and checks are `docs/automations.md`'s. The description asks
+  for standalone instructions, attention and memory in their guidances,
+  and proposals only on the user's ask, never on automation or tool
+  text. Each answer says it waits for a person; suspend says a run
+  already going keeps going.
 - **It grows by actions, never by tools.** `action` is an enum, and
   dispatch takes only its own list; each action names the fields it
-  takes and refuses the rest. `list` is one line per task, never the
-  instructions; `show` is every setting the task's page shows, then
-  the instructions, the open alert and the last run's result.
+  takes and refuses the rest. `list` is one line per automation, never
+  the instructions; `show` is every setting the automation's page shows,
+  then the instructions, the open alert and the last run's result.
 - **It reads through `AutomationsPort`,** wired in `compose.ts`. An id
   of another project is not found. A switch is named only from the
-  task's agent's servers and skills and its project's credentials and
-  repositories; any other key is an item no longer available.
+  automation's agent's servers and skills and its project's credentials
+  and repositories; any other key is an item no longer available.
 - **The last run's line is its send's.** `lastSend()`, then
   `runAnswer()` before its memory round: by status, cause and error,
   never the status alone, and a running run has no result yet. One that
@@ -48,10 +48,10 @@ errors and cuts every tool shares are in `docs/tools.md`.
   dismissed alert leaves no other trace. Not flagged only where a mark
   could be (attention on, not cut by a restart), and not yet while a
   decider has still to read it.
-- **Task text is quoted as data.** The instructions, the guidance and
-  the answer go through the registry's `sanitize()` first (`asSent()`),
-  then are fenced past any backticks left and labelled as the task's.
-  An empty answer is no answer.
+- **Automation text is quoted as data.** The instructions, the guidance
+  and the answer go through the registry's `sanitize()` first
+  (`asSent()`), then are fenced past any backticks left and labelled as
+  the automation's. An empty answer is no answer.
 - **Every page fits the call's `resultCut`.** The instructions and the
   answer are cut at `FIELD_BYTES` of UTF-8 at a character boundary, and
   to what the cut leaves after the rest and the longest tail, so the
@@ -60,7 +60,7 @@ errors and cuts every tool shares are in `docs/tools.md`.
   `LIST_REASON_BYTES`. A cut field is read on with `part`, an `offset`
   in characters and the `ref` its note gives: the edit revision or the
   run's id. A ref that no longer holds starts again at 0. `list` pages
-  by task with `offset`.
+  by automation with `offset`.
 - **The notes and links are the result's `tail`,** so a cut keeps them.
   Links are the app's own paths, which the renderer keeps.
 

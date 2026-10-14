@@ -155,9 +155,9 @@ profile pages show of email. The links themselves are in
   reaches the user.
 - **What agents email shows only with email on.** The profile's Email
   from agents switch shows while `emailOn` (in every profile answer);
-  the Config board lists `email_user` only then. The SMTP page holds
-  the tool's switch (Agents email users). The composer's plus menu and
-  the task editor's Access step show an Email switch only while the
+  the Config board lists `email_user` only then. The SMTP page holds the
+  tool's switch (Agents email users). The composer's plus menu and the
+  automation editor's Access step show an Email switch only while the
   agents route lists `email` as switchable.
 - **The sign-in page offers its email links only with email on,**
   and says the same after an ask whoever was named. The link page

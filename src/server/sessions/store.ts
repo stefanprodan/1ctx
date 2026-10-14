@@ -138,7 +138,7 @@ export class SessionStore {
   }
 
   // a child belongs to its root's automation through the root alone, so
-  // a run's picks and its task's retention only ever meet roots
+  // a run's picks and its automation's retention only ever meet roots
   create(fields: CreateSession): SessionRow {
     if (fields.parent && fields.automationId) {
       throw new Error("a child session has no automation");

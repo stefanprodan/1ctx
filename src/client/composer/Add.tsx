@@ -3,7 +3,7 @@
 //
 // The plus at the start of the composer's row and its menu, placed as
 // the agent list is. Add files opens the file picker. Web access,
-// Visuals, Knowledge, Memory, Email, Scheduled tasks and External tasks
+// Visuals, Knowledge, Memory, Email, Automations and External tasks
 // are switches, drawn as the rail's theme switch is, and flipping one
 // leaves the menu open. MCP servers,
 // Skills and Repositories each swap the menu's rows for a switch per
@@ -128,7 +128,7 @@ export function Add({
   knowledge,
   memory,
   email,
-  tasks,
+  automations,
   externalTasks,
   servers,
   skills,
@@ -146,9 +146,9 @@ export function Add({
   memory: WebItem;
   // null while the instance does not offer email
   email: WebItem | null;
-  // the automation tool, which reads the project's scheduled tasks and
+  // the automation tool, which reads the project's automations and
   // proposes changes to them
-  tasks: WebItem;
+  automations: WebItem;
   // the external_task tool, which makes and follows the project's
   // external tasks
   externalTasks: WebItem;
@@ -294,9 +294,9 @@ export function Add({
             />
           )}
           <SwitchItem
-            name="Scheduled tasks"
+            name="Automations"
             icon="clock"
-            item={tasks}
+            item={automations}
             onFlip={() => onFlip(AUTOMATIONS)}
           />
           <SwitchItem

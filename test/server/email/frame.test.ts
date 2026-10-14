@@ -141,7 +141,7 @@ describe("an alert's email", () => {
     expect(email.subject).toBe("[1ctx] nightly needs attention");
     expect(email.fromName).toBeUndefined();
     expect(email.text).toBe(
-      "The task nightly in platform needs attention.\nOpen the run: https://x.test/run/r1\n\n----\n\npodinfo <down>\n",
+      "The automation nightly in platform needs attention.\nOpen the run: https://x.test/run/r1\n\n----\n\npodinfo <down>\n",
     );
     expect(email.html).toContain("<p>podinfo &lt;down&gt;</p>");
     expect(alertEmail({ ...base, reason: null }).text).toEndWith(
@@ -149,7 +149,7 @@ describe("an alert's email", () => {
     );
   });
 
-  test("drops bidi controls from the task's name", () => {
+  test("drops bidi controls from the automation's name", () => {
     const email = alertEmail({
       automation: "night\u202Ely",
       project: { name: "platform", kind: "team" },
@@ -157,7 +157,7 @@ describe("an alert's email", () => {
       link: "https://x.test/run/r1",
     });
     expect(email.subject).toBe("[1ctx] nightly needs attention");
-    expect(email.text).toStartWith("The task nightly in");
+    expect(email.text).toStartWith("The automation nightly in");
   });
 
   test("puts the reason after the link and drops its bidi controls", () => {
@@ -168,7 +168,7 @@ describe("an alert's email", () => {
       link: "https://x.test/run/r1",
     });
     expect(email.text.split("\n")).toEqual([
-      "The task nightly in platform needs attention.",
+      "The automation nightly in platform needs attention.",
       "Open the run: https://x.test/run/r1",
       "",
       "----",

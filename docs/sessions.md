@@ -17,13 +17,13 @@ written, the ids removed, the send row and the session's row in the
 session list. A summon is a chat message whose first word is `@name`:
 that agent answers the one turn (Summons below).
 
-Detail carries the chat's task proposals as `automationDrafts`, whole
-drafts with their state, who asked and decided, and the task or run a
-confirm made. Their lifecycle is in `docs/archive.md` and their `draft`
-frames in `docs/access.md`; a frame moves neither activity nor
+Detail carries the chat's automation proposals as `automationDrafts`,
+whole drafts with their state, who asked and decided, and the automation
+or run a confirm made. Their lifecycle is in `docs/archive.md` and their
+`draft` frames in `docs/access.md`; a frame moves neither activity nor
 revision. A reconnect reads detail again, and the `watched` answer
-carries the drafts, so one written between the read and the watch
-still arrives.
+carries the drafts, so one written between the read and the watch still
+arrives.
 
 ## Sends and caps
 
@@ -192,7 +192,8 @@ still arrives.
   `summonedLine()`, the user's or automation line, the skills catalog,
   the MCP catalog, `<mcp_instructions>`, project memory, automation
   memory, knowledge, the date, the off lines (web, visualize, knowledge,
-  memory, email, tasks, MCP, skills, repositories), the moved
+  memory, email, automations, external tasks, MCP, skills,
+  repositories), the moved
   branches (`docs/repos.md`), and last the MCP change note
   (`docs/mcp.md`). What is fixed per agent and project leads; the user's
   line follows, as a team chat's author changes it. A subagent's
@@ -272,7 +273,8 @@ still arrives.
   gets 403. A rename is allowed while the chat runs, since a send never
   writes the title. A delete waits for the end.
 - **Every delete goes through `removeSession()`**
-  (`sessions/delete.ts`): the route, a task's retention and the sweep.
+  (`sessions/delete.ts`): the route, an automation's retention and the
+  sweep.
   The foreign keys take the dependents.
 - **Usage outlives every delete** (`docs/monitor.md`). `latest()`
   counts only rows of sends still there.

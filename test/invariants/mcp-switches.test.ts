@@ -416,9 +416,12 @@ test.serial(
           disabledCapabilities,
         }),
       );
-      const tasks = await Promise.all(
+      const automations = await Promise.all(
         sets.map((disabledCapabilities, i) =>
-          createAutomation(chat, { name: `task-${i}`, disabledCapabilities }),
+          createAutomation(chat, {
+            name: `automation-${i}`,
+            disabledCapabilities,
+          }),
         ),
       );
       unsubscribe = subscribe((event) => events.push(event), silent);
@@ -426,10 +429,14 @@ test.serial(
         (await chat.admin.call("DELETE", `/api/mcp/${flux.id}`)).status,
       ).toBe(409);
       expect(chat.app.sessions.byId(chats[0]!.id)).toEqual(chats[0]);
-      expect(chat.app.automations.byId(tasks[0]!.id)).toEqual(tasks[0]);
+      expect(chat.app.automations.byId(automations[0]!.id)).toEqual(
+        automations[0],
+      );
       await assign(chat, [link(docs)]);
       expect(chat.app.sessions.byId(chats[0]!.id)).toEqual(chats[0]);
-      expect(chat.app.automations.byId(tasks[0]!.id)).toEqual(tasks[0]);
+      expect(chat.app.automations.byId(automations[0]!.id)).toEqual(
+        automations[0],
+      );
       const forget = chat.app.automations.forgetCapability.bind(
         chat.app.automations,
       );
@@ -457,7 +464,7 @@ test.serial(
       expect(chat.app.mcp.byId(flux.id)).toEqual(flux);
       for (const row of chats)
         expect(chat.app.sessions.byId(row.id)).toEqual(row);
-      for (const row of tasks)
+      for (const row of automations)
         expect(chat.app.automations.byId(row.id)).toEqual(row);
       expect(events).toEqual([]);
       expect(
@@ -472,7 +479,7 @@ test.serial(
           ),
         });
       }
-      for (const row of tasks) {
+      for (const row of automations) {
         expect(chat.app.automations.byId(row.id)).toEqual({
           ...row,
           disabledCapabilities: row.disabledCapabilities.filter(

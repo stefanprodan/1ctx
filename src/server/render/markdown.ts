@@ -29,7 +29,7 @@ function unescapeHtml(value: string): string {
 }
 
 const SAFE_HREF = /^(https?:|mailto:)/i;
-// the app's own pages an agent links to: a task, its memory, a run, a
+// the app's own pages an agent links to: an automation, its memory, a run, a
 // chat and an external task, with nothing after the id. A fixed list, since the
 // route table is the client's; any other relative path stays text
 const APP_HREF = new RegExp(
@@ -231,7 +231,7 @@ const LINKED = { ...OPTIONS, autolinks: { url: true } } as const;
 type RenderOptions = { autolinks?: boolean; project?: string };
 
 // Parser failures keep the reply readable. autolinks links bare http(s)
-// URLs, for text people paste links into, such as a task's entries.
+// URLs, for text people paste links into, such as an external task's entries.
 // project links /knowledge/ paths to that project's files; without it
 // they stay text.
 export function renderMarkdown(

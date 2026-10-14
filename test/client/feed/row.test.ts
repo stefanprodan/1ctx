@@ -291,7 +291,7 @@ describe("Home.model", () => {
   test("the empty line names what the filter hides", () => {
     expect(emptyLine("pods", "chat")).toBe("No sessions match");
     expect(emptyLine("", "chat")).toBe("No chats yet");
-    expect(emptyLine("", "automation")).toBe("No task runs yet");
+    expect(emptyLine("", "automation")).toBe("No runs yet");
     expect(emptyLine("", null)).toBe("No sessions found");
     expect(emptyLine("", "attention")).toBe("Nothing flagged");
   });

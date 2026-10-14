@@ -139,7 +139,7 @@ function NextRuns({
   if (automation.suspendedAt !== null) {
     return <AsideNote>Suspended</AsideNote>;
   }
-  // a task that runs once has one fire, named with its year
+  // an automation that runs once has one fire, named with its year
   const next = nextRunsOf(automation, held?.fires ?? [], now);
   return (
     <>

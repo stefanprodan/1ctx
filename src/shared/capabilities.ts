@@ -155,7 +155,7 @@ export const sameSet = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((key, i) => key === b[i]);
 
 // the last line of the system prompt but for a change note, while web access
-// is off in a chat or a task: constant, so every send after the flip shares it
+// is off in a chat or a run: constant, so every send after the flip shares it
 export const WEB_OFF_LINE =
   "Web access is off. Do not call webfetch or websearch or use curl. Say so if the web is needed.";
 
@@ -180,13 +180,13 @@ export const MEMORY_OFF_LINE =
 export const EMAIL_OFF_LINE =
   "Email to users is off. Do not call email_user. Say so in your answer if a user should be told.";
 
-// the line after it while a chat has the automation tool off: a
-// task read before the flip is in the history
+// the line after it while a chat has the automation tool off: an
+// automation read before the flip is in the history
 export const AUTOMATIONS_OFF_LINE =
-  "The user turned scheduled tasks off for this chat. Do not call automation. Say so if a task is asked about.";
+  "The user turned automations off for this chat. Do not call automation. Say so if an automation is asked about.";
 
-// the line after it while a chat has the external_task tool off: a
-// task made or read before the flip is in the history
+// the line after it while a chat has the external_task tool off: an
+// external task made or read before the flip is in the history
 export const EXTERNAL_TASKS_OFF_LINE =
   "The user turned external tasks off for this chat. Do not call external_task. Say so if an external task is asked about.";
 

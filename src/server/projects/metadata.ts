@@ -34,7 +34,7 @@ export type MetadataDeps = {
   detail(project: ProjectRow): ProjectDetail;
 };
 
-// a label rename or delete changes what the project's tasks show
+// a label rename or delete changes what the project's external tasks show
 const labelsChanged = (projectId: string): BusEvent => ({
   type: "project.labels",
   data: { projectId },
@@ -144,7 +144,7 @@ export function metadataRoutes(deps: MetadataDeps): RouteDescriptor[] {
     },
     {
       // a project always offers one label to pick. The label comes off
-      // its tasks by the cascade, in this transaction
+      // its external tasks by the cascade, in this transaction
       method: "DELETE",
       path: "/api/projects/:id/labels/:labelId",
       policy: "authenticated",

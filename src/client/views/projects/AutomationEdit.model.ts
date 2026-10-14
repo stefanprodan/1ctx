@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the automation editor says about a save without a DOM: that it
-// takes the task over, and that someone else's save came first.
+// takes the automation over, and that someone else's save came first.
 
 import {
   type AutomationSummary,
@@ -11,7 +11,7 @@ import {
 import { failure, sentence } from "../../lib/format.ts";
 
 // a save that changes a field makes its editor the owner, so the save
-// row says so on a task someone else owns
+// row says so on an automation someone else owns
 export function ownerNote(
   a: Pick<AutomationSummary, "ownerId"> | null,
   userId: string | null,

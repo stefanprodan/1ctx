@@ -73,10 +73,10 @@ note edits it in the memory phase, an extra step after its main rounds.
 - **The phase never resends the run.** `runner/memory-packet.ts` builds
   its input: its own system prompt (`memorySystem()`), and the run's
   record from `runner/run-record.ts`, shared with the attention step:
-  the task, the answer and a receipt per tool call (a line naming the
-  call and its outcome, with an excerpt of the result) inside tags,
-  never the rounds after the answer. A model that reads the task under
-  the run's prompt goes back to the task.
+  the instructions, the answer and a receipt per tool call (a line
+  naming the call and its outcome, with an excerpt of the result)
+  inside tags, never the rounds after the answer. A model that reads
+  the instructions under the run's prompt goes back to them.
 - **The packet fits the window by cutting the run, never the note.**
   The room check counts the tool schemas too; it drops excerpts, then
   receipts, then halves the answer. An unknown window skips the check.

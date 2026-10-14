@@ -45,7 +45,7 @@ export type ProposalsPort = {
   }): string | Promise<string>;
 };
 
-// a chat's alone: a task's runs are never offered what they switch
+// a chat's alone: an automation's runs are never offered what they switch
 const CHAT_KEYS: ReadonlySet<string> = new Set([
   AUTOMATIONS,
   EXTERNAL_TASKS,
@@ -63,7 +63,7 @@ export async function propose(
   const actor = ctx.actor!;
   const count = counts.get(ctx.budget) ?? 0;
   if (count >= DRAFTS_PER_SEND)
-    throw new Error("this turn already has 5 task proposals");
+    throw new Error("this turn already has 5 automation proposals");
   counts.set(ctx.budget, count + 1);
   let written = false;
   try {
@@ -72,7 +72,7 @@ export async function propose(
         ? {
             ...AUTOMATION_DEFAULTS,
             tz: port.userZone(actor.userId),
-            // the default guidance is for own memory, so a task
+            // the default guidance is for own memory, so an automation
             // without one stores none
             ...(call.fields.ownMemory === false ? { memoryGuidance: "" } : {}),
             ...call.fields,
@@ -102,7 +102,7 @@ export async function propose(
   } catch (error) {
     throw error instanceof ToolError
       ? error
-      : new ToolError(messageOf(error), "task proposal refused");
+      : new ToolError(messageOf(error), "automation proposal refused");
   } finally {
     if (!written) counts.set(ctx.budget, (counts.get(ctx.budget) ?? 1) - 1);
   }
