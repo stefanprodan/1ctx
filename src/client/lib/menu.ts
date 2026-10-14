@@ -3,13 +3,15 @@
 //
 // A menu: open on a click, closed by a click outside it or by
 // Escape. A menu with a pane inside passes `back`, which takes Escape
-// first and says whether it used it.
+// first and says whether it used it. A menu that two owners open passes
+// the signal they share.
 
-import { useSignal } from "@preact/signals";
+import { type Signal, useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 
-export function useMenu(back?: () => boolean) {
-  const open = useSignal(false);
+export function useMenu(back?: () => boolean, shared?: Signal<boolean>) {
+  const own = useSignal(false);
+  const open = shared ?? own;
   const root = useRef<HTMLDivElement>(null);
   // the latest one, so a caller's inline function never rebinds the keys
   const onBack = useRef(back);

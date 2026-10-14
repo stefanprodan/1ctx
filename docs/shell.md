@@ -72,6 +72,20 @@ layer, the primitives and the styles are in `docs/ui.md`.
   its list,** the order of `nav` in `app/routes.ts`: an admin sees
   every team project, so the long list comes last and scrolls in the
   nav.
+- **The hidden rail folds to the strip on a wide window**
+  (`app/Strip.tsx`): the show button, the mark, the rail's entries as
+  icons in its order from `navEntries()`, each lit as in the rail and
+  Projects on every page inside a project (`projectOnScreen()`); at the
+  foot the admin panel's icon to an admin, then the avatar. Each icon
+  is named by `aria-label` and `title`. Recent and the project list
+  have no page of their own, so they wait for the rail.
+- **The user's menu is `app/UserMenu.tsx`,** one for the rail's user
+  row and the strip's avatar, open in `userMenuOpen`. Each owner
+  places it with its own class (`rail-menu` above the user row,
+  `strip-menu` past the strip's edge, its foot on the avatar's) and
+  passes its button as the child, inside the box `useMenu` watches; it
+  closes on a click outside, Escape, a link in it followed, or its
+  owner leaving.
 - **Recent is the five pages opened last,** on the working face only
   (`app/Recent.model.ts`, `app/Recent.state.ts`): a chat, a run, an
   automation (its Memory tab too), an external task and a knowledge

@@ -1,7 +1,7 @@
-/* The shell: the rail beside the view, or folded to a strip with the
-   button that brings it back. Below 720 wide, or 500 tall on touch,
-   the rail covers the screen and the button floats over the view; the
-   query is DRAWER in shell.ts. */
+/* The shell: the rail beside the view, or folded to the strip
+   (strip.css). Below 720 wide, or 500 tall on touch, the rail covers
+   the screen and the button floats over the view; the query is DRAWER
+   in shell.ts. */
 
 @layer tokens, base, owners;
 
@@ -46,31 +46,6 @@
     /* a focused field scrolls into view below the stuck page head, its
        label included, never under it */
     scroll-padding-top: 96px;
-  }
-
-  /* the folded rail: its colour and edge, the button and the mark */
-  .shell-strip {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-3);
-    width: 56px;
-    flex-shrink: 0;
-    padding-top: var(--space-4);
-    border-right: 1px solid var(--line);
-    background: var(--rail);
-  }
-
-  .shell-strip-mark {
-    display: flex;
-    align-items: center;
-    color: var(--fg);
-  }
-
-  /* the strip is the rail's ground, so its lit fill is the one the
-     rail lights with, --card */
-  .shell-strip .shell-show:hover {
-    background: var(--card);
   }
 
   /* the first load failed: the reason and a retry, centred */
