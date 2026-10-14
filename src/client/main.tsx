@@ -13,6 +13,7 @@ import { watchRecent } from "./app/Recent.state.ts";
 import { boot } from "./app/router.ts";
 import { match } from "./app/routes.ts";
 import { watchPages, watchScreen, watchViewport } from "./app/shell.ts";
+import { watchTitle } from "./app/Title.state.ts";
 import { watchTheme } from "./app/theme.ts";
 import { startSocket } from "./data/socket.ts";
 
@@ -22,6 +23,7 @@ watchScreen();
 watchViewport();
 watchPages((pathname) => match(pathname) !== null);
 watchRecent();
+watchTitle();
 startLoading();
 startSocket({ reload });
 render(<App />, document.getElementById("app")!);

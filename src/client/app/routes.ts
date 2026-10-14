@@ -358,7 +358,7 @@ export const ROUTES: Route[] = [
     view: lazy(() =>
       import("../views/projects/Project.tsx").then((m) => m.Project),
     ),
-    title: () => "Project",
+    title: () => "Feed",
     role: "authenticated",
     load: async (params, query) => {
       await Promise.all([

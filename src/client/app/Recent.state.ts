@@ -119,7 +119,7 @@ type Read = { row: RecentRow; status: RecentStatus | null };
 // the row of the object on screen once its page has read it, and its
 // status from the same read, null before; only the signals of that
 // page are read, so no other page's loads run the watcher
-function readRow(page: RecentPage): Read | null {
+export function readRow(page: RecentPage): Read | null {
   switch (page.kind) {
     case "session": {
       const s = session.value?.session;

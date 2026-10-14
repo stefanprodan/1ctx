@@ -47,6 +47,18 @@ layer, the primitives and the styles are in `docs/ui.md`.
   and splits a run at `_` and `*`, so `text` marks its runs, code and
   links drop the marks, and paths are matched on the joined runs.
   Source without `/knowledge/` renders as with no project.
+- **The tab's title names the page, most specific first** and the
+  brand last, joined by ` · ` (`app/Title.model.ts`,
+  `app/Title.state.ts`): a chat's or a task's title, "Run of" its
+  automation, an automation's name (its Memory tab and edit page too)
+  or a file's path, then its project, then `1ctx`. A project's page is
+  its tab's word (Feed for the project) and the project; any other page
+  is the route's word. An admin page is the word or its object's name,
+  then Admin. Signed out it is Sign in. The name is the row the page
+  read, as Recent reads it, and the project's is the rail's list, so no
+  request is added; until they are in, the title is the route's word.
+  An effect over those signals sets it, so a rename frame changes the
+  tab. The browser cuts a long title, never the page.
 - **The address picks what the rail shows.** Under an admin address it
   shows the admin panel's zones (Monitor, Access, Config) from
   `app/zones.ts`; an admin page lives under its zone's address and

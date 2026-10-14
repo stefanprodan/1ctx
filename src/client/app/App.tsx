@@ -108,12 +108,6 @@ export function App() {
     void loadMe();
   }, []);
 
-  useEffect(() => {
-    const title =
-      user === null && needsUser ? "Sign in" : m ? m.route.title(m.params) : "";
-    document.title = title ? `1ctx · ${title}` : "1ctx";
-  }, [user, needsUser, m]);
-
   // one who must change the password they were handed lands on the
   // profile, where the server lets them go
   useEffect(() => {
