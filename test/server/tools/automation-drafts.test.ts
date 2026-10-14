@@ -265,8 +265,8 @@ describe("automation proposals", () => {
         { action: "update", id: automation.id, name: "hidden" },
       ]);
       expect(first.answers[0]).toContain(`/automations/${automation.id}`);
-      expect(first.answers[1]).toContain("no scheduled task");
-      expect(first.answers[2]).toContain("no scheduled task");
+      expect(first.answers[1]).toContain("no automation");
+      expect(first.answers[2]).toContain("no automation");
       expect(drafts(chat, sessionId)).toHaveLength(1);
       chat.app.db
         .query(
@@ -312,10 +312,10 @@ describe("automation proposals", () => {
         first.answers.filter((s) => s.includes("waits for a person")),
       ).toHaveLength(5);
       expect(
-        first.answers.filter((s) => s.includes("5 task proposals")),
+        first.answers.filter((s) => s.includes("5 automation proposals")),
       ).toHaveLength(3);
       const again = await round(chat, first.script, [create("later")]);
-      expect(again.answers[0]).toContain("5 task proposals");
+      expect(again.answers[0]).toContain("5 automation proposals");
       expect(drafts(chat, sessionId)).toHaveLength(5);
       await finish(chat, again.script, sessionId);
     } finally {

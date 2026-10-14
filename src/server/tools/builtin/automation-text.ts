@@ -294,9 +294,9 @@ export function showText(input: ShowInput): { body: string; tail: string } {
   const time = at(a);
   const off = switchedOff(a.disabledCapabilities, input.names);
   const lines = [
-    `Scheduled task ${automationLink(a)}, id ${a.id}`,
+    `Automation ${automationLink(a)}, id ${a.id}`,
     `Owner: @${a.ownerName}`,
-    `Agent: ${a.agentName}${a.agentRetired ? " (retired, the task stays suspended until another agent is picked)" : ""}`,
+    `Agent: ${a.agentName}${a.agentRetired ? " (retired, the automation stays suspended until another agent is picked)" : ""}`,
     `Schedule: ${scheduleText(a.schedule)} (${a.schedule}), zone ${a.tz}`,
     `Runs once: ${a.once ? "yes, the fire that starts its run suspends it" : "no"}`,
     `Suspended: ${suspendedText(a)}`,
@@ -418,7 +418,7 @@ export function partText(input: PartInput): { body: string; tail: string } {
         : runText(a, input.run).answer;
   if (text === null || current === null) {
     return {
-      body: `Scheduled task ${automationLink(a)}: its last run has no answer to read.`,
+      body: `Automation ${automationLink(a)}: its last run has no answer to read.`,
       tail: tailOf(a, []),
     };
   }
@@ -436,7 +436,7 @@ export function partText(input: PartInput): { body: string; tail: string } {
     ? `The ${part === "instructions" ? "instructions" : "last run"} changed since ref ${input.ref}, so this starts again at 0.\n`
     : "";
   const body = (shown: string) =>
-    `${head}Scheduled task ${automationLink(a)}\n${quoted(name, shown, fence)}`;
+    `${head}Automation ${automationLink(a)}\n${quoted(name, shown, fence)}`;
   const note = (page: Page, worst = false) =>
     worst || page.to < page.total
       ? `Characters ${page.from} to ${page.to} of ${page.total}. Read on with offset ${page.to}, ref ${current}.`
@@ -458,18 +458,18 @@ export function listText(
 ): { body: string; tail: string } {
   const total = automations.length;
   if (total === 0) {
-    return { body: "This project has no scheduled tasks.", tail: "" };
+    return { body: "This project has no automations.", tail: "" };
   }
   if (offset >= total) {
     throw new Error(
-      `offset is past the end: the project has ${plural(total, "scheduled task")}`,
+      `offset is past the end: the project has ${plural(total, "automation")}`,
     );
   }
-  const head = `This project has ${plural(total, "scheduled task")}. Read one with show and its id.`;
+  const head = `This project has ${plural(total, "automation")}. Read one with show and its id.`;
   const note = (to: number, worst = false) =>
     worst || to < total
-      ? `Tasks ${offset + 1} to ${to} of ${total}. Read on with list, offset ${to}.`
-      : `Tasks ${offset + 1} to ${to} of ${total}, the end.`;
+      ? `Automations ${offset + 1} to ${to} of ${total}. Read on with list, offset ${to}.`
+      : `Automations ${offset + 1} to ${to} of ${total}, the end.`;
   const room = cut - head.length - 2 - note(total, true).length;
   const lines: string[] = [];
   let used = 0;

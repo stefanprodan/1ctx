@@ -279,7 +279,7 @@ describe("memory and attention in a proposal", () => {
         .map((m) => m.content);
       expect(tools.slice(0, 3)).toEqual(
         Array(3).fill(
-          "Error: memoryGuidance needs ownMemory. Leave it out when the task keeps no memory.",
+          "Error: memoryGuidance needs ownMemory. Leave it out when the automation keeps no memory.",
         ),
       );
       expect(tools[3]).toContain(

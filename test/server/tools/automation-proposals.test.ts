@@ -41,7 +41,7 @@ test("the proposal parser refuses fields an action never takes", () => {
   }
   for (const action of ["update", "suspend", "resume", "run"]) {
     expect(() => parseAutomationArgs({ action }, true)).toThrow(
-      "needs the task's id",
+      "needs the automation's id",
     );
   }
   expect(() => parseAutomationArgs({ action: "delete" }, true)).toThrow(
@@ -187,7 +187,7 @@ test.serial(
     };
     const calls = Array.from({ length: 5 }, () => tool.run(args, ctx));
     expect(held).toHaveLength(5);
-    await expect(tool.run(args, ctx)).rejects.toThrow("5 task proposals");
+    await expect(tool.run(args, ctx)).rejects.toThrow("5 automation proposals");
     const refused = calls[0]!;
     held[0]!.reject(new Error("refused before writing"));
     await expect(refused).rejects.toThrow("refused before writing");
@@ -195,7 +195,7 @@ test.serial(
     expect(held).toHaveLength(6);
     for (const entry of held.slice(1)) entry.resolve("draft");
     await Promise.all([...calls.slice(1), replacement]);
-    await expect(tool.run(args, ctx)).rejects.toThrow("5 task proposals");
+    await expect(tool.run(args, ctx)).rejects.toThrow("5 automation proposals");
   },
 );
 

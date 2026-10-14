@@ -183,7 +183,7 @@ export const EMAIL_OFF_LINE =
 // the line after it while a chat has the automation tool off: an
 // automation read before the flip is in the history
 export const AUTOMATIONS_OFF_LINE =
-  "The user turned scheduled tasks off for this chat. Do not call automation. Say so if a task is asked about.";
+  "The user turned automations off for this chat. Do not call automation. Say so if an automation is asked about.";
 
 // the line after it while a chat has the external_task tool off: an
 // external task made or read before the flip is in the history

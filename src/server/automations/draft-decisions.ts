@@ -70,7 +70,7 @@ export function draftDecisions(deps: Deps) {
             : deps.store.byId(draft.automationId);
         if (draft.action !== "create") {
           if (current === null || current.projectId !== session.projectId) {
-            return finish(draft, "stale", null, "the task is gone");
+            return finish(draft, "stale", null, "the automation is gone");
           }
           if (current.editRevision !== draft.editRevision) {
             return finish(draft, "stale", null, STALE_EDIT);

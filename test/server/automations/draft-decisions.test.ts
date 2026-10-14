@@ -260,7 +260,7 @@ describe("automation draft decisions", () => {
       expect(deleted.status).toBe(409);
       expect(await deleted.json()).toEqual({
         state: "stale",
-        error: "the task is gone",
+        error: "the automation is gone",
       });
       expect(chat.app.automationDrafts.byId(gone.drafts[0]!.id)!.state).toBe(
         "stale",

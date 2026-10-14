@@ -285,7 +285,7 @@ describe("a chat reading its project's automations", () => {
       );
       expect(answers[1]).toContain(`[last run](/run/${run.sessionId})`);
       expect(answers[2]).toBe(
-        "Error: no scheduled task with that id in this project",
+        "Error: no automation with that id in this project",
       );
       expect(answers.join("\n")).not.toContain("secret words");
 

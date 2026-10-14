@@ -26,7 +26,7 @@ export type ProposalInput = {
 
 // a proposal never stores a guidance nothing reads
 const UNREAD_MEMORY =
-  "memoryGuidance needs ownMemory. Leave it out when the task keeps no memory.";
+  "memoryGuidance needs ownMemory. Leave it out when the automation keeps no memory.";
 
 export function proposeTask(
   deps: {
@@ -44,7 +44,7 @@ export function proposeTask(
       input.action !== "create" &&
       (current === null || current.projectId !== input.projectId)
     ) {
-      throw new BadRequest("no scheduled task with that id in this project");
+      throw new BadRequest("no automation with that id in this project");
     }
     let proposal: AutomationProposal;
     if (input.action === "create") {
@@ -75,7 +75,7 @@ export function proposeTask(
       ) {
         throw new ToolError(
           `Attention is off on [${current!.name}](/automations/${current!.id}). Open it to turn attention on first.`,
-          "task needs page edit",
+          "automation needs page edit",
         );
       }
       // as the page's pickMemory: turning own memory on fills a blank
@@ -103,7 +103,7 @@ export function proposeTask(
       ) {
         throw new ToolError(
           `Open [${current!.name}](/automations/${current!.id}) to change its agent or deadline first.`,
-          "task needs page edit",
+          "automation needs page edit",
         );
       }
       checkSchedule(next.schedule, next.tz, input.now);
@@ -124,7 +124,7 @@ export function proposeTask(
         .find((row) => row.name === name)!;
       throw new ToolError(
         `Name is taken: [${taken.name}](/automations/${taken.id}). Read it with show.`,
-        "task name taken",
+        "automation name taken",
       );
     }
     const draft = deps.drafts.create({

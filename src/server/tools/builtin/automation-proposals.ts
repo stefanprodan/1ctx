@@ -63,7 +63,7 @@ export async function propose(
   const actor = ctx.actor!;
   const count = counts.get(ctx.budget) ?? 0;
   if (count >= DRAFTS_PER_SEND)
-    throw new Error("this turn already has 5 task proposals");
+    throw new Error("this turn already has 5 automation proposals");
   counts.set(ctx.budget, count + 1);
   let written = false;
   try {
@@ -102,7 +102,7 @@ export async function propose(
   } catch (error) {
     throw error instanceof ToolError
       ? error
-      : new ToolError(messageOf(error), "task proposal refused");
+      : new ToolError(messageOf(error), "automation proposal refused");
   } finally {
     if (!written) counts.set(ctx.budget, (counts.get(ctx.budget) ?? 1) - 1);
   }
