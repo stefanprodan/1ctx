@@ -117,6 +117,7 @@ describe("work summaries", () => {
     ["token_limit", "token limit"],
     ["context_limit", "context full"],
     ["tool_loop", "tool loop"],
+    ["output_loop", "output loop"],
     ["tool_repeat", "repeat refused"],
   ])("names %s on the work row as %s", (finishReason, word) => {
     const work = message({ finishReason });
@@ -280,6 +281,23 @@ describe("work summaries", () => {
     expect(memorySummary(running, true, 13_900, retry).text).toBe(
       "Updating memory 3 s · retrying 1/3",
     );
+  });
+
+  test("names an output loop beside its one retry", () => {
+    const running = node({
+      send: send({ status: "running", finishedAt: null }),
+    });
+    const loop = { attempt: 1, max: 1, cause: "output_loop" as const };
+    expect(workSummary(running, true, 13_900, loop).text).toBe(
+      "Working 3 s · output loop · retrying 1/1",
+    );
+    expect(memorySummary(running, true, 13_900, loop).text).toBe(
+      "Updating memory 3 s · output loop · retrying 1/1",
+    );
+    // a transient retry of the new attempt counts as before
+    expect(
+      workSummary(running, true, 13_900, { attempt: 1, max: 3 }).text,
+    ).toBe("Working 3 s · retrying 1/3");
   });
 
   test("names the failures and the cap that ended the loop", () => {

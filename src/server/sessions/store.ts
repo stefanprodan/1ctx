@@ -54,6 +54,7 @@ import {
   readMessage,
   readMessages,
   readMountedRepos,
+  restartReply,
   setMountedRepos,
   type ToolFinish,
   writeReply,
@@ -400,6 +401,11 @@ export class SessionStore {
   // guarded by the null slot, so a second call delta writes nothing
   markRoundWork(id: string): Message | null {
     return markRoundWork(this.db, id) ? this.message(id) : null;
+  }
+
+  // a round asked again from its start
+  restartReply(id: string, slot: "work" | null): Message | null {
+    return restartReply(this.db, id, slot) ? this.message(id) : null;
   }
 
   // the repair places a reply before it ends it

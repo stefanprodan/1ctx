@@ -87,6 +87,20 @@ export function streamRetry(
   });
 }
 
+// the round starts over: the page drops the reply's live text and the
+// previews of its calls
+export function streamRestart(deps: StreamDeps, send: ActiveSend): void {
+  const round = send.round;
+  if (round === null) return;
+  deps.stream(send.sessionId, {
+    type: "restart",
+    sessionId: send.sessionId,
+    sendId: send.id,
+    messageId: round.messageId,
+    seq: ++send.seq,
+  });
+}
+
 function checkpoint(deps: StreamDeps, round: RoundState, now: number): void {
   const size =
     Buffer.byteLength(round.content) + Buffer.byteLength(round.reasoning);

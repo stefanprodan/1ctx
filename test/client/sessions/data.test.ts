@@ -44,6 +44,7 @@ import {
   sessionError,
   setFrames,
   toolResults,
+  visualPreviews,
 } from "../../../src/client/data/sessions.ts";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import { WEB } from "../../../src/shared/capabilities.ts";
@@ -1008,6 +1009,60 @@ describe("the sessions entity", () => {
     });
 
     expect(live.value.get("m1")?.content).toBe("AB");
+  });
+
+  test("a restart frame drops the live text and previews of its reply", async () => {
+    const base = liveDetail();
+    answer = () => Response.json(base);
+    await loadSession("s1");
+    onSocket({ type: "watched", sessionId: "s1", live: base.live });
+    const frame = { type: "delta", sessionId: "s1", sendId: "send1" } as const;
+    onSocket({
+      ...frame,
+      messageId: "m1",
+      seq: 1,
+      content: "looped",
+      contentAt: 0,
+      reasoning: "looped",
+      reasoningAt: 0,
+    });
+    onSocket({
+      type: "visual",
+      sessionId: "s1",
+      sendId: "send1",
+      messageId: "m1",
+      seq: 2,
+      callIndex: 0,
+      title: "A chart",
+      html: "<p>looped</p>",
+      htmlAt: 0,
+    });
+    expect(live.value.get("m1")?.content).toBe("looped");
+    expect(visualPreviews.value.size).toBe(1);
+    onSocket({
+      type: "restart",
+      sessionId: "s1",
+      sendId: "send1",
+      messageId: "m1",
+      seq: 3,
+    });
+    expect(live.value.get("m1")).toMatchObject({
+      content: "",
+      reasoning: "",
+      html: "",
+      htmlAt: 0,
+    });
+    expect(visualPreviews.value.size).toBe(0);
+    // the new attempt's text starts at zero again
+    onSocket({
+      ...frame,
+      messageId: "m1",
+      seq: 4,
+      content: "fresh",
+      contentAt: 0,
+      reasoningAt: 0,
+    });
+    expect(live.value.get("m1")?.content).toBe("fresh");
   });
 
   test("a watch joining mid-wait holds the retry, and frames move it", async () => {

@@ -17,6 +17,7 @@ import {
   chatApp,
   sessionSettled,
   setLimits,
+  varied,
 } from "../helpers/chat.ts";
 import { createTeam } from "../helpers/projects.ts";
 
@@ -1123,7 +1124,7 @@ describe("the composed inbound MCP endpoint", () => {
         },
       });
       const sessionId = (await started.json()).session.id;
-      (await pending).reply("é".repeat(40_000) + "😀".repeat(20_000));
+      (await pending).reply(varied(40_000, "é") + varied(40_000, "😀"));
       await settle(chat, sessionId);
 
       const pages: McpResult[] = [];
@@ -1172,7 +1173,7 @@ describe("the composed inbound MCP endpoint", () => {
           )
         ).status,
       ).toBe(201);
-      (await regenerated).reply(`replacement ${"x".repeat(80_000)}`);
+      (await regenerated).reply(`replacement ${varied(80_000)}`);
       await settle(chat, sessionId);
       const changed = await client.tool("sessions", {
         action: "read",

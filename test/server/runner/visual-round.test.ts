@@ -11,7 +11,13 @@ import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 import { isVisualFrame } from "../../../src/shared/socket.ts";
 import orders from "../../fixtures/providers/tool-call-order.json";
 import { settleRun } from "../../helpers/automations.ts";
-import { chatApp, startChat, tick, waitScript } from "../../helpers/chat.ts";
+import {
+  chatApp,
+  startChat,
+  tick,
+  varied,
+  waitScript,
+} from "../../helpers/chat.ts";
 import { frames, watch, watcher } from "../../helpers/socket.ts";
 
 describe("visual rounds", () => {
@@ -244,7 +250,7 @@ describe("visual rounds", () => {
       watch(chat, conn, sessionId);
       script.toolCall({
         name: "visualize",
-        arguments: `{"title":"Cap","html":"${"a".repeat(16 * 1024)}`,
+        arguments: `{"title":"Cap","html":"${varied(16 * 1024)}`,
       });
       await tick();
       expect(frames(conn, "visual")[0]?.html).toHaveLength(16 * 1024);
