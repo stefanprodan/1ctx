@@ -79,7 +79,7 @@ jobs:
           - name: Lint Helm chart
             run: helm lint --strict deploy/charts/onectx
           - name: Validate Kubernetes manifests
-            uses: fluxcd/flux-schema/actions/validate@fac00ee3cb2fb0bd904c77e9e7727e98ba8a3c05 # v0.15.0
+            uses: fluxcd/flux-schema/actions/validate@5a0846e4358013c06804d249d659cbf3fae59292 # v0.16.0
             with:
               path: deploy
               exclude: |
