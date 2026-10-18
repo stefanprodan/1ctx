@@ -4,7 +4,7 @@
 // A Unicode class under case folding matches as the class itself when
 // RE2 has no fold table for it, as ripgrep 15.2.0, GNU grep 3.12 -P,
 // jq 1.8.2 and mikefarah's yq 4.53.3 answered. re2js 1.4.0 threw a
-// TypeError for these until patches/re2js@1.4.0.patch.
+// TypeError for these.
 
 import { describe, expect, test } from "bun:test";
 import { Bash } from "just-bash";

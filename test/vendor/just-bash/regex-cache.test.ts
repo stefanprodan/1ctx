@@ -131,7 +131,7 @@ describe("the compiled regex cache", () => {
     const second = createUserRegex(pattern);
     expect(pattern.length).toBe(881);
     expect(compiledOf(first).programSize()).toBe(83);
-    expect(weightOf(first)).toBe(131_124);
+    expect(weightOf(first)).toBe(132_084);
     expect(compiledOf(first) === compiledOf(second)).toBe(false);
     expect(first.test(`${"a".repeat(80)}q`)).toBe(true);
     expect(second.test("a")).toBe(false);
