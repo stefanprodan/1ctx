@@ -128,7 +128,7 @@ function compilePattern(pattern: string, re2Flags: number): RE2JS {
     return compiled;
   }
 
-  // (1ctx regex-cache) RE2JS 1.4.0 keeps each Unicode class in Inst.runes.
+  // (1ctx regex-cache) RE2JS keeps each Unicode class in Inst.runes.
   const instructions: { runes: number[] }[] = compiled.re2().prog.inst;
   const weight = instructions.reduce(
     (sum, instruction) => sum + 1 + instruction.runes.length,

@@ -12,13 +12,10 @@ them on schedules (automations), with shared knowledge and memory.
   `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
   only `server/email/smtp.ts` imports `nodemailer`, only
   `server/mcp-server/` imports `@modelcontextprotocol/server`, and only
-  `client/ui/Plot.tsx` imports `uplot`. `patches/` holds two
-  patches: modern-tar's keeps the raw header `typeflag`, so GNU sparse
-  and unknown types are not read as regular files, and cancelling an
-  entry's body never drops the next entry's, which hung the stream;
-  re2js's matches a
-  Unicode class with no fold table as itself under `(?i)`, where 1.4.0
-  threw.
+  `client/ui/Plot.tsx` imports `uplot`. `patches/` holds modern-tar's
+  patch: it keeps the raw header `typeflag`, so GNU sparse and unknown
+  types are not read as regular files, and cancelling an entry's body
+  never drops the next entry's, which hung the stream.
 - **just-bash is ours.** Its source lives in `vendor/just-bash/` and we
   change it; `vendor/README.md` says how.
 - **Status:** alpha. The API and the socket change freely, with no

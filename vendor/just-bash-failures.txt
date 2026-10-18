@@ -157,9 +157,7 @@
 (fail) split > destructive-write preflight > does not truncate a real-backed input through a additional suffix hard-link alias
 (fail) split > destructive-write preflight > does not truncate a real-backed input through a alphabetic hard-link alias
 (fail) split > destructive-write preflight > does not truncate a real-backed input through a numeric hard-link alias
-(fail) tar > auto-compress (-a) > should auto-detect xz from .tar.xz extension
 (fail) tar > auto-compress (-a) > should auto-detect zstd from .tar.zst extension
-(fail) tar > xz compression (-J) > should preserve xz compression by default
 (fail) tar > zstd compression (--zstd) > should preserve zstd compression by default
 (fail) tar bundled binary > should auto-detect compression from filename (-a)
 (fail) tar bundled binary > should create and extract a bzip2-compressed archive
@@ -173,7 +171,6 @@
 (fail) tar bundled binary > should show help
 (fail) tar bundled binary > should use exclude-from (-X)
 (fail) tar bundled binary > should use files-from (-T)
-(fail) tar with binary data > binary stdin piping > should preserve xz compression by default
 (fail) tar with binary data > binary stdin piping > should preserve zstd compression by default
 (fail) worker protocol runtime desync probes > python3 stdout shaped like worker control payload is treated as plain output
 (fail) worker protocol runtime desync probes > sqlite3 output shaped like worker control payload is treated as query data

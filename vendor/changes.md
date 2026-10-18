@@ -1573,7 +1573,7 @@ included, for both compilation and its key. It keeps upstream's
 4,096 instructions and a weight of at most 8,192; the cached weight in
 all is at most 65,536. Weight is the instruction count plus every
 instruction's rune-array length, shared arrays counted each time, read
-from RE2JS 1.4.0's `re2().prog.inst`. Admission evicts the oldest
+from RE2JS's `re2().prog.inst`. Admission evicts the oldest
 entries until both count and weight fit. A larger program still
 compiles and runs, but neither enters the cache nor evicts an entry.
 These bounds count compiled storage units, not heap bytes, execution
