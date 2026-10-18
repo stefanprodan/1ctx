@@ -63,7 +63,7 @@ jobs:
         with:
           version: 2.9.6
           plugins: |
-            schema@0.15.0
+            schema@0.16.0
       - parallel:
           - name: Smoke test image
             run: |
