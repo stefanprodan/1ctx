@@ -10,6 +10,7 @@ import { options } from "preact";
 import { render } from "preact-render-to-string";
 import { Composer } from "../../../src/client/composer/Composer.tsx";
 import { draftKey } from "../../../src/client/composer/draft.ts";
+import type { Locate } from "../../../src/client/composer/location.ts";
 import { me } from "../../../src/client/data/me.ts";
 import {
   rememberAgent,
@@ -85,6 +86,7 @@ function keysOver(
   text: string,
   agents: AgentSummary[] | null = null,
   agentId: string | null = null,
+  reader: Locate | null = null,
 ): ((key: string) => boolean) & { html: string } {
   rows.set(draftKey("u1", SCOPE), JSON.stringify({ text, uploads: [] }));
   const previous = options.vnode;
@@ -108,6 +110,7 @@ function keysOver(
         busy={false}
         onSend={async () => {}}
         onStop={async () => {}}
+        reader={reader}
       />,
     );
   } finally {
@@ -142,6 +145,25 @@ describe("the composer's keys", () => {
     const press = keysOver("/");
     expect(press("ArrowDown")).toBe(true);
     expect(press("ArrowUp")).toBe(true);
+  });
+});
+
+describe("the / menu", () => {
+  const listed = (html: string) =>
+    [...html.matchAll(/composer-cmd-name">\/(?:<!-- -->)?([^<]*)</g)].map(
+      (m) => m[1],
+    );
+  const read: Locate = async () => ({
+    latitude: 0,
+    longitude: 0,
+    accuracy: 1,
+  });
+
+  test.serial("offers /location only where the browser can share it", () => {
+    expect(listed(keysOver("/lo", null, null, read).html)).toEqual([
+      "location",
+    ]);
+    expect(listed(keysOver("/lo").html)).toEqual([]);
   });
 });
 
