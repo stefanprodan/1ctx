@@ -18,7 +18,7 @@ import type { AutomationSummary } from "../../../shared/contracts/automation.ts"
 import { RETENTION_DAYS } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
-import { emailItem, switchItem } from "../../composer/Add.model.ts";
+import { switchItem } from "../../composer/Add.model.ts";
 import { AgentPicker } from "../../composer/AgentPicker.tsx";
 import {
   automationError,
@@ -32,7 +32,7 @@ import {
   updateAutomation,
 } from "../../data/automations.ts";
 import { switchable, switchablesOf } from "../../data/capabilities.ts";
-import { me } from "../../data/me.ts";
+import { emailOn, me } from "../../data/me.ts";
 import { startingAgent } from "../../data/project-agents.ts";
 import { project, projectError } from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
@@ -47,6 +47,7 @@ import { Page } from "../../ui/Page.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
+import { automationEmailItem } from "./Access.model.ts";
 import { AccessSection } from "./AccessSection.tsx";
 import { AttentionSection } from "./AttentionSection.tsx";
 import { ownerNote, staleFailure, staleWords } from "./AutomationEdit.model.ts";
@@ -282,7 +283,7 @@ function Editor({
         knowledge={kind(KNOWLEDGE)}
         knowledgeOn={d.knowledge}
         onKnowledge={() => set({ knowledge: !d.knowledge })}
-        email={emailItem(input)}
+        email={automationEmailItem(emailOn.value, switchable.value)}
         emailOn={d.email}
         onEmail={() => set({ email: !d.email })}
         servers={takesTools ? shown().servers : []}
