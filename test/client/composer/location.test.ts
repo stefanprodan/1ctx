@@ -3,12 +3,14 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  bounded,
   locate,
   locationAvailable,
   locationFailure,
   locationLine,
   locationMessage,
   NEEDS_HTTPS,
+  READ_LIMIT_MS,
 } from "../../../src/client/composer/location.ts";
 
 const FIX = { latitude: 44.426801234, longitude: 26.1025, accuracy: 29.6 };
@@ -63,5 +65,22 @@ describe("reading the position", () => {
     await expect(locate("x", blocked)).rejects.toThrow(
       "/location: blocked in the browser",
     );
+  });
+
+  test("a read with no answer is given up at the limit", async () => {
+    const due: { fn: () => void; ms: number }[] = [];
+    const cleared: unknown[] = [];
+    const timer = {
+      set: (fn: () => void, ms: number) => due.push({ fn, ms }) - 1,
+      clear: (handle: unknown) => cleared.push(handle),
+    };
+    const silent = bounded(() => new Promise(() => {}), timer);
+    const out = silent();
+    expect(due.map((d) => d.ms)).toEqual([READ_LIMIT_MS]);
+    due[0]!.fn();
+    await expect(out).rejects.toThrow("/location: no position found");
+    // an answer in time clears its timer
+    expect(await bounded(async () => FIX, timer)()).toEqual(FIX);
+    expect(cleared).toEqual([1]);
   });
 });

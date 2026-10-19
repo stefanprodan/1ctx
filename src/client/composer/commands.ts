@@ -52,6 +52,15 @@ export function commandFill(command: Command): string {
   return command.arg === null ? `/${command.name}` : `/${command.name} `;
 }
 
+// whether Enter fills the box with the highlighted command; a command
+// whose argument may be left out runs from its bare word
+export function enterFills(text: string, command: Command): boolean {
+  if (command.optional === true && text === `/${command.name}`) {
+    return false;
+  }
+  return text !== commandFill(command);
+}
+
 // what the menu filters on: the word after the slash, null when the
 // draft is not a lone slash word
 export function commandQuery(draft: string): string | null {
@@ -89,6 +98,22 @@ export function commandOf(
   const arg = match[2]?.trim() ?? "";
   if (command.arg === null && arg !== "") return null;
   return { command, arg };
+}
+
+// what Enter sends: a command to run, which carries no files, or a
+// message, /location's question included, which takes the draft's
+export type Dispatch =
+  | { kind: "command"; named: { command: Command; arg: string }; files: false }
+  | { kind: "location"; question: string; files: true }
+  | { kind: "message"; files: true };
+
+export function dispatchOf(content: string): Dispatch {
+  const named = commandOf(content);
+  if (named === null) return { kind: "message", files: true };
+  if (named.command.name === "location") {
+    return { kind: "location", question: named.arg, files: true };
+  }
+  return { kind: "command", named, files: false };
 }
 
 export type CommandHandlers = {

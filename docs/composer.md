@@ -42,11 +42,12 @@ in `docs/ui.md`.
   files and clears none, but for `/location`.
 - **`/location` is a message, not an action.** It is in the menu only
   where the browser can share a position (a secure context with
-  geolocation), and goes through the send like any message: files, a
-  chat not started yet and the queue included. It sends the question
-  with `My location: <lat>, <lon> (±<m> m)` on a line after it, or the
-  line alone. The position is read once on Enter, never in the
-  background; a failure sends nothing and keeps the draft.
+  geolocation); elsewhere Enter refuses it with `/location: needs
+  https`. It goes through the send like any message: files, a chat not
+  started yet and the queue included. It sends the question with `My
+  location: <lat>, <lng> (±<m> m)` on a line after it, or the line
+  alone. The position is read once on Enter, never in the background,
+  and given up after 30 s; a failure sends nothing and keeps the draft.
 - **Each plus menu switch is `switchItem()` in `Add.model.ts`.** The
   automation editor reads the same function, so the two never differ
   on why a key is off.

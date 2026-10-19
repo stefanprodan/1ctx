@@ -48,7 +48,8 @@ import {
   commandBlock,
   commandFill,
   commandMatches,
-  commandOf,
+  dispatchOf,
+  enterFills,
   runCommand,
 } from "./commands.ts";
 import { readout } from "./context.ts";
@@ -83,6 +84,8 @@ const MAX_HEIGHT = 160;
 
 const NONE_OFF: readonly string[] = [];
 
+const BROWSER_READER = browserLocate();
+
 export function Composer({
   scope,
   filesProjectId,
@@ -101,7 +104,7 @@ export function Composer({
   project,
   off = NONE_OFF,
   placeholder: idle = "Message",
-  reader = browserLocate(),
+  reader = BROWSER_READER,
 }: {
   scope: Scope;
   // the project a file is staged in: the chat's, or the one a new chat
@@ -180,6 +183,14 @@ export function Composer({
   const failure = useSignal<string | null>(null);
   // /location waits on the browser before the send is out
   const locating = useSignal(false);
+  // what the box is now, for a read that ends after a move or an unmount
+  const live = useRef({ mounted: true, key, agent: null as string | null });
+  useEffect(() => {
+    live.current.mounted = true;
+    return () => {
+      live.current.mounted = false;
+    };
+  }, []);
   // the menu's highlight, and whether Escape shut it for this draft
   const highlight = useSignal(0);
   const shut = useSignal(false);
@@ -189,6 +200,8 @@ export function Composer({
   // a new chat starts on the user's last pick, kept across composers
   // and visits; one not in this project's list falls back to the default
   const agent = fixed ? agentId : startingAgent(list);
+  live.current.key = key;
+  live.current.agent = agent;
 
   const grow = () => {
     const el = input.current;
@@ -254,32 +267,32 @@ export function Composer({
       return saveEdit(edit, content, onEdit, { ...box, saving });
     // the signal itself, since a second Enter may beat the render
     if (content === "" || agent === null || !ready || locating.value) return;
-    const said = commandOf(content);
-    // /location is a message, so it is sent and guarded like one
-    const asked = said?.command.name === "location" ? said.arg : null;
-    const named = asked === null ? said : null;
-    if (named === null && (!placed || files.busy)) return;
+    const to = dispatchOf(content);
+    if (to.files && (!placed || files.busy)) return;
     failure.value = null;
     const sent = text.value;
-    // a slash command carries no files and clears none, but /location
-    const uploads = named === null ? files.ids : [];
+    const uploads = to.files ? files.ids : [];
     try {
-      if (named !== null) {
-        await runCommand(named, block(named.command), {
+      if (to.kind === "command") {
+        await runCommand(to.named, block(to.named.command), {
           onCompact,
           onRename,
           onFork,
         });
-      } else if (asked !== null) {
+      } else if (to.kind === "location") {
         locating.value = true;
-        const message = await locate(asked, reader).finally(() => {
+        const message = await locate(to.question, reader).finally(() => {
           locating.value = false;
         });
+        // the box moved on while the browser asked: the stored draft
+        // still holds the text, so nothing is lost
+        const now = live.current;
+        if (!now.mounted || now.key !== key || now.agent !== agent) return;
         await onSend(message, agent, uploads);
       } else await onSend(content, agent, uploads);
       // this composer may be gone by now (a new chat navigates away), so
       // the stored draft is what loses them
-      if (named === null) {
+      if (to.files) {
         files.sent(uploads);
         dropDraftUploads(key, uploads);
         claimed(filesProjectId, uploads);
@@ -364,10 +377,11 @@ export function Composer({
               return;
             }
             const fill = fillAt(chosen);
-            if (
-              ev.key === "Tab" ||
-              (ev.key === "Enter" && text.value !== fill)
-            ) {
+            const fills =
+              matches.length > 0
+                ? enterFills(text.value, matches[chosen]!)
+                : text.value !== fill;
+            if (ev.key === "Tab" || (ev.key === "Enter" && fills)) {
               ev.preventDefault();
               text.value = fill;
               writeDraftText(key, fill);

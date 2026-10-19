@@ -9,6 +9,8 @@ import {
   commandMatches,
   commandOf,
   commandQuery,
+  dispatchOf,
+  enterFills,
   runCommand,
 } from "../../../src/client/composer/commands.ts";
 
@@ -133,6 +135,43 @@ describe("/location", () => {
       arg: "where is the nearest cafe?",
     });
     expect(commandOf("/locations")).toBeNull();
+  });
+
+  test("is sent as a message with the draft's files", () => {
+    expect(dispatchOf("/location  near me? ")).toEqual({
+      kind: "location",
+      question: "near me?",
+      files: true,
+    });
+    expect(dispatchOf("/location")).toEqual({
+      kind: "location",
+      question: "",
+      files: true,
+    });
+    expect(dispatchOf("hello /location")).toEqual({
+      kind: "message",
+      files: true,
+    });
+    expect(dispatchOf("/compact please")).toEqual({
+      kind: "message",
+      files: true,
+    });
+    expect(dispatchOf("/rename Mine")).toEqual({
+      kind: "command",
+      named: { command: named("rename"), arg: "Mine" },
+      files: false,
+    });
+  });
+
+  test("Enter runs the bare word, where a required argument fills", () => {
+    const location = named("location");
+    expect(enterFills("/location", location)).toBe(false);
+    expect(enterFills("/lo", location)).toBe(true);
+    expect(enterFills("/location ", location)).toBe(false);
+    expect(enterFills("/rename", named("rename"))).toBe(true);
+    expect(enterFills("/rename ", named("rename"))).toBe(false);
+    expect(enterFills("/compact", named("compact"))).toBe(false);
+    expect(enterFills("/co", named("compact"))).toBe(true);
   });
 
   test("is never blocked", () => {
