@@ -4,10 +4,12 @@
 // An alert's email: when a run opens its automation's alert, the
 // automation's owner is emailed the reason and a link to the run, in
 // the transaction that opened it, under the same opt-in as an agent's
-// email. A run that joins an open alert emails nobody, and an
-// automation that flaps between flagged and clean emails its owner at
-// most ALERT_EMAILS_PER_DAY times a day.
+// email and only while the automation's Email switch is on. A run that
+// joins an open alert emails nobody, and an automation that flaps
+// between flagged and clean emails its owner at most
+// ALERT_EMAILS_PER_DAY times a day.
 
+import { EMAIL } from "../../shared/capabilities.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
 import {
   alertEmail,
@@ -50,7 +52,8 @@ export type AlertEmailDeps = {
 
 export type AlertEmails = {
   // in the caller's transaction, when the run opened the alert; the
-  // events to return, none while email is off or the owner is not in
+  // events to return, none while email or the automation's Email switch
+  // is off or the owner is not in
   opened(automation: AutomationSummary, sessionId: string): BusEvent[];
 };
 
@@ -73,6 +76,7 @@ export function alertEmails(deps: AlertEmailDeps): AlertEmails {
     sessionId: string,
   ): BusEvent[] => {
     if (!deps.outbox.enabled()) return [];
+    if (automation.disabledCapabilities.includes(EMAIL)) return [];
     const owner = deps.users.byId(automation.ownerId);
     if (owner === null || !reaches(deps, owner, automation.projectId)) {
       return [];

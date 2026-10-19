@@ -316,8 +316,8 @@ none; `by` names who marked the latest.
   `ALERT_EMAILS_PER_DAY` (3) per automation a day, counted on the outbox
   rows that name it, which deleting runs keeps; over the cap the opening
   emails nobody and logs `alert email capped`. The automation's Email
-  switch is the `email_user` tool's alone (its meta says so) and never
-  stops an alert's email; the owner's profile opt-in does.
+  switch off drops its `email_user` tool and its alert emails; the
+  alert still opens in the app.
 - **The summary carries `alert`**: `since`, the count of its runs and
   the latest one's reason (`alertColumns()` in `sessions/alerts.ts`),
   read with the row, each feed row and each envelope. The feed's pick

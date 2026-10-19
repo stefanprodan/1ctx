@@ -4,8 +4,9 @@
 // An alert's email: the run that opens an automation's alert queues an
 // email to its owner in the transaction that opens it, with the reason
 // and a link to the run; a run that joins queues none, and nothing is
-// queued for an owner who did not take email from agents or while email
-// is off. The sender checks the owner again.
+// queued for an owner who did not take email from agents, while email
+// is off or while the automation's Email switch is off. The sender
+// checks the owner again.
 
 import { describe, expect, test } from "bun:test";
 import {
@@ -320,6 +321,21 @@ describe("an alert's email", () => {
       attentionMode: "agent",
     });
     await markedRun(chat, automation.id, "podinfo is not ready");
+    expect(outbox(chat)).toEqual([]);
+  });
+
+  test("nothing is queued while the automation's Email switch is off", async () => {
+    const chat = await setup();
+    const automation = await createAutomation(chat, {
+      attentionMode: "agent",
+      disabledCapabilities: ["email"],
+    });
+    await markedRun(chat, automation.id, "podinfo is not ready");
+    // the alert still opens in the app
+    expect(chat.app.automations.byId(automation.id)?.alert).toMatchObject({
+      runs: 1,
+      reason: "podinfo is not ready",
+    });
     expect(outbox(chat)).toEqual([]);
   });
 

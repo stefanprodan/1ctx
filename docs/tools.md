@@ -151,7 +151,8 @@ words.
     (`docs/bash.md`), and drops the knowledge block.
   - `memory`: drops a chat's `memory_edit`; the note stays in the
     prompt. It means nothing in a run.
-  - `email`: drops `email_user` only.
+  - `email`: drops `email_user`; in an automation it also stops the
+    alert's email (`docs/automations.md`).
   - `automations`: drops a chat's `automation`, `external_tasks` a
     chat's `external_task`. Neither means anything in a run.
   - `mcp:<id>`, `skill:<id>`, `credential:<id>`: removed before the

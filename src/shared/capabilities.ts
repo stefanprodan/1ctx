@@ -7,12 +7,12 @@
 // never touched a switch. A key is a kind, or a kind and a name after a
 // colon. Web access is a kind alone, and so are the visualize tool, the
 // project docs under /knowledge, saving to the project's memory,
-// which only a chat is offered, the email_user tool, and the
-// automation and external_task tools, which only a chat is offered too. An
-// MCP server is `mcp:<server id>`: the id, since the name is not what an
-// agent's links hold. A skill is `skill:<skill id>`, by the same rule. An
-// HTTP credential is `credential:<credential id>`, a repository
-// `repo:<repo id>`.
+// which only a chat is offered, the email_user tool with an automation's
+// alert emails, and the automation and external_task tools, which only
+// a chat is offered too. An MCP server is `mcp:<server id>`: the id,
+// since the name is not what an agent's links hold. A skill is
+// `skill:<skill id>`, by the same rule. An HTTP credential is
+// `credential:<credential id>`, a repository `repo:<repo id>`.
 
 export const WEB = "web";
 export const VISUALIZE = "visualize";

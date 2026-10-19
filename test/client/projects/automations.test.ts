@@ -30,6 +30,7 @@ import { filterOptions } from "../../../src/client/ui/Select.model.ts";
 import { zoneOptions } from "../../../src/client/ui/Zone.model.ts";
 import {
   accessOf,
+  automationEmailItem,
   disabledOf,
 } from "../../../src/client/views/projects/Access.model.ts";
 import {
@@ -159,6 +160,18 @@ const run = (changes: Partial<SessionSummary> = {}): FeedRow => ({
   automation: { id: "au1", name: "nightly", alert: null },
   runBy: null,
   runs: null,
+});
+
+describe("the editor's Email switch", () => {
+  test("shows while email is set up or the tool is offered, always live", () => {
+    expect(automationEmailItem(false, null)).toBeNull();
+    expect(automationEmailItem(false, ["web"])).toBeNull();
+    const live = { live: true, on: true, reason: null };
+    // the admin's email_user row off: alert emails still go out
+    expect(automationEmailItem(true, ["web"])).toEqual(live);
+    expect(automationEmailItem(true, null)).toEqual(live);
+    expect(automationEmailItem(false, ["email"])).toEqual(live);
+  });
 });
 
 describe("scheduleWords", () => {

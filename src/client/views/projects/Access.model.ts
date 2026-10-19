@@ -17,9 +17,21 @@ import {
   WEB,
 } from "../../../shared/capabilities.ts";
 import type { AutomationSummary } from "../../../shared/contracts/automation.ts";
+import type { WebItem } from "../../composer/Add.model.ts";
 import type { Switchables } from "../../data/capabilities.ts";
 
 export type Shown = Partial<Switchables>;
+
+// the editor's Email switch also stops the owner's alert emails, which
+// go out with email set up whatever the agent takes and the admin's
+// email_user row, so it shows and stays live then too
+export function automationEmailItem(
+  emailSetUp: boolean,
+  switchable: readonly string[] | null,
+): WebItem | null {
+  if (!emailSetUp && !(switchable?.includes(EMAIL) ?? false)) return null;
+  return { live: true, on: true, reason: null };
+}
 
 // the editor's switches, as its draft holds them
 export type AccessDraft = {

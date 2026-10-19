@@ -99,9 +99,10 @@ profile pages show of email. The links themselves are in
   anyway fails the try as `other`, which is retried.
 - **An `alert` row is an automation's alert opening.** `alerts.runEnded()`
   queues it for the automation's owner in the transaction that sets
-  `attention_since` (`automations/alert-email.ts`), only with email on
-  and the owner a recipient as below; a run that joins queues none, and
-  past 3 a day per automation it queues none (`docs/automations.md`).
+  `attention_since` (`automations/alert-email.ts`), only with email on,
+  the automation's Email switch on and the owner a recipient as below;
+  a run that joins queues none, and past 3 a day per automation it
+  queues none (`docs/automations.md`).
   The row names its automation (`automation_id`), so deleting runs keeps
   the cap. A failure to queue is logged `alert email failed` and never
   fails the run's end.
@@ -156,9 +157,10 @@ profile pages show of email. The links themselves are in
 - **What agents email shows only with email on.** The profile's Email
   from agents switch shows while `emailOn` (in every profile answer);
   the Config board lists `email_user` only then. The SMTP page holds the
-  tool's switch (Agents email users). The composer's plus menu and the
-  automation editor's Access step show an Email switch only while the
-  agents route lists `email` as switchable.
+  tool's switch (Agents email users). The composer's plus menu shows an
+  Email switch only while the agents route lists `email` as switchable.
+  The automation editor's Access step shows it then or while `emailOn`,
+  live whatever the agent takes, since it also stops alert emails.
 - **The sign-in page offers its email links only with email on,**
   and says the same after an ask whoever was named. The link page
   (`/link/<token>`) is a `bare` route: drawn outside the shell whoever
