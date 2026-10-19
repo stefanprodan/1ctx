@@ -135,7 +135,8 @@ change it in the same commit as the code that changes a rule.
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, themes, helpers |
 | `docs/shell.md` | the shell, the rail and its Recent list, the drawer, the installed app, app links and `/knowledge/` paths in replies |
-| `docs/views.md` | what a page draws: `views/`, the composer, the session list (feed) |
+| `docs/views.md` | what a page draws: `views/`, the session list (feed) |
+| `docs/composer.md` | `composer/`: the draft, its files and switches, the slash commands |
 | `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
 | `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |

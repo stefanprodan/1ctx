@@ -7,15 +7,18 @@
 // command cannot run right now. The menu is open only while the draft
 // is one word starting with a slash; a command that takes an argument
 // runs from the first word, and a sentence that happens to start with
-// a bare command's word is a message.
+// a bare command's word is a message. /location is a message too: it
+// goes through the send, so it is never blocked and never run here.
 
-export type CommandName = "compact" | "rename" | "fork";
+export type CommandName = "compact" | "fork" | "location" | "rename";
 
 export type Command = {
   name: CommandName;
   text: string;
   // the argument's name in the menu; null for a bare command
   arg: string | null;
+  // the argument may be left out; else Enter refuses the word alone
+  optional?: true;
 };
 
 // by name, the order the menu shows
@@ -29,6 +32,12 @@ export const COMMANDS: readonly Command[] = [
     name: "fork",
     text: "Copy the chat so far into a new one with this name",
     arg: "name",
+  },
+  {
+    name: "location",
+    text: "Send your location, with a question or alone",
+    arg: "question",
+    optional: true,
   },
   {
     name: "rename",
@@ -51,13 +60,20 @@ export function commandQuery(draft: string): string | null {
   return draft.slice(1);
 }
 
-// rename false leaves /rename out, for a chat its viewer may not retitle
-export function commandMatches(draft: string, rename = true): Command[] {
+// rename false leaves /rename out, for a chat its viewer may not retitle;
+// location false leaves /location out, where the browser cannot share it
+export function commandMatches(
+  draft: string,
+  rename = true,
+  location = true,
+): Command[] {
   const query = commandQuery(draft);
   if (query === null) return [];
   return COMMANDS.filter(
     (command) =>
-      command.name.startsWith(query) && (rename || command.name !== "rename"),
+      command.name.startsWith(query) &&
+      (rename || command.name !== "rename") &&
+      (location || command.name !== "location"),
   );
 }
 
@@ -95,16 +111,17 @@ export async function runCommand(
   if (block !== null || onCompact === undefined || onFork === undefined) {
     throw new Error(`/${named.command.name}: ${block ?? "not now"}`);
   }
-  if (named.command.name === "rename") {
-    if (onRename === undefined) {
-      throw new Error("/rename: only the owner or an admin");
-    }
-    if (named.arg === "") throw new Error("/rename needs a title");
-    await onRename(named.arg);
-  } else if (named.command.name === "fork") {
-    if (named.arg === "") throw new Error("/fork needs a name");
-    await onFork(named.arg);
-  } else await onCompact();
+  const { name, arg, optional } = named.command;
+  if (name === "rename" && onRename === undefined) {
+    throw new Error("/rename: only the owner or an admin");
+  }
+  if (arg !== null && optional !== true && named.arg === "") {
+    throw new Error(`/${name} needs a ${arg}`);
+  }
+  if (name === "rename") await onRename?.(named.arg);
+  else if (name === "fork") await onFork(named.arg);
+  else if (name === "compact") await onCompact();
+  else throw new Error(`/${name}: not now`);
 }
 
 export type CommandState = {
@@ -113,13 +130,15 @@ export type CommandState = {
   running: boolean;
 };
 
-// why a command is greyed in the menu and refused on Enter: every
-// command needs a started chat, and all but rename wait for a running
-// reply, since a title is never the send's to write
+// why a command is greyed in the menu and refused on Enter: /location
+// is a message, so it waits like one; the others need a started chat,
+// and all but rename wait for a running reply, since a title is never
+// the send's to write
 export function commandBlock(
   state: CommandState,
   command: Command,
 ): string | null {
+  if (command.name === "location") return null;
   if (!state.started) return "the chat has not started";
   if (state.running && command.name !== "rename") return "a reply is running";
   return null;

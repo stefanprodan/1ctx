@@ -6,7 +6,8 @@
 // context readout, and Send, with Stop before it while the reply runs: a
 // message sent then waits for the reply to end. Enter sends, Shift+Enter
 // breaks a line. A lone /word opens the command menu and, in a chat, a
-// lone @word the agents to summon. A waiting message's Edit puts its
+// lone @word the agents to summon; /location reads the position on
+// Enter and sends it as a message. A waiting message's Edit puts its
 // text here, and Send is Save until the edit is saved or let go. Two
 // modes: a chat, where the message goes into it, and a project, where
 // it starts one. Files come from the plus, a drop on the card or a
@@ -69,6 +70,7 @@ import {
 } from "./Edit.tsx";
 import { Files } from "./Files.tsx";
 import type { Editing } from "./handoff.ts";
+import { browserLocate, type Locate, locate } from "./location.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import { Summons } from "./Summons.tsx";
 import { summonFill, summonMatches } from "./summons.ts";
@@ -99,6 +101,7 @@ export function Composer({
   project,
   off = NONE_OFF,
   placeholder: idle = "Message",
+  reader = browserLocate(),
 }: {
   scope: Scope;
   // the project a file is staged in: the chat's, or the one a new chat
@@ -139,6 +142,9 @@ export function Composer({
   };
   // the box at rest, with an agent to send to
   placeholder?: string;
+  // /location's read of the position; null where the browser cannot
+  // share one, which leaves the command out of the menu
+  reader?: Locate | null;
 }) {
   const key = draftKey(me.value?.id ?? "", scope);
   const text = useSignal(readDraft(key).text);
@@ -172,6 +178,8 @@ export function Composer({
   const held = staged.value.get(filesProjectId) ?? null;
   useEffect(() => files.reconcile(held), [files, held]);
   const failure = useSignal<string | null>(null);
+  // /location waits on the browser before the send is out
+  const locating = useSignal(false);
   // the menu's highlight, and whether Escape shut it for this draft
   const highlight = useSignal(0);
   const shut = useSignal(false);
@@ -197,7 +205,7 @@ export function Composer({
   useEffect(grow, [text.value]);
 
   // a message sent while the reply runs waits for it to end
-  const ready = agent !== null && !busy;
+  const ready = agent !== null && !busy && !locating.value;
   const readable = list.find((a) => a.id === agent)?.model.tools ?? false;
   const chat = "sessionId" in scope ? scope.sessionId : null;
   const edit = editOf(chat);
@@ -220,7 +228,11 @@ export function Composer({
   const quiet = shut.value || edit !== null;
   const matches = quiet
     ? []
-    : commandMatches(text.value, !started || onRename !== undefined);
+    : commandMatches(
+        text.value,
+        !started || onRename !== undefined,
+        reader !== null,
+      );
   // the @ menu, in a chat only: a new chat cannot summon
   const summonable = quiet ? [] : summonMatches(text.value, agents, agentId);
   // one menu at most is open, since a draft starts with / or @
@@ -240,12 +252,16 @@ export function Composer({
     const content = text.value.trim();
     if (edit !== null)
       return saveEdit(edit, content, onEdit, { ...box, saving });
-    if (content === "" || agent === null || busy) return;
-    const named = commandOf(content);
-    if (named === null && (!ready || !placed || files.busy)) return;
+    // the signal itself, since a second Enter may beat the render
+    if (content === "" || agent === null || !ready || locating.value) return;
+    const said = commandOf(content);
+    // /location is a message, so it is sent and guarded like one
+    const asked = said?.command.name === "location" ? said.arg : null;
+    const named = asked === null ? said : null;
+    if (named === null && (!placed || files.busy)) return;
     failure.value = null;
     const sent = text.value;
-    // a slash command carries no files and clears none
+    // a slash command carries no files and clears none, but /location
     const uploads = named === null ? files.ids : [];
     try {
       if (named !== null) {
@@ -254,6 +270,12 @@ export function Composer({
           onRename,
           onFork,
         });
+      } else if (asked !== null) {
+        locating.value = true;
+        const message = await locate(asked, reader).finally(() => {
+          locating.value = false;
+        });
+        await onSend(message, agent, uploads);
       } else await onSend(content, agent, uploads);
       // this composer may be gone by now (a new chat navigates away), so
       // the stored draft is what loses them

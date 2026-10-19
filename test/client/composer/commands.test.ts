@@ -12,6 +12,8 @@ import {
   runCommand,
 } from "../../../src/client/composer/commands.ts";
 
+const named = (name: string) => COMMANDS.find((c) => c.name === name)!;
+
 describe("slash commands", () => {
   test("a lone slash word is a query, a sentence is not", () => {
     expect(commandQuery("/")).toBe("");
@@ -25,6 +27,7 @@ describe("slash commands", () => {
     expect(commandMatches("/").map((c) => c.name)).toEqual([
       "compact",
       "fork",
+      "location",
       "rename",
     ]);
     expect(commandMatches("/com").map((c) => c.name)).toEqual(["compact"]);
@@ -42,13 +45,13 @@ describe("slash commands", () => {
 
   test("a command with an argument keeps the rest as typed", () => {
     expect(commandOf("/rename  My Chat, As Typed ")).toEqual({
-      command: COMMANDS[2],
+      command: named("rename"),
       arg: "My Chat, As Typed",
     });
-    expect(commandOf("/rename")).toEqual({ command: COMMANDS[2], arg: "" });
+    expect(commandOf("/rename")).toEqual({ command: named("rename"), arg: "" });
     expect(commandOf("/renamed x")).toBeNull();
     expect(commandFill(COMMANDS[0]!)).toBe("/compact");
-    expect(commandFill(COMMANDS[2]!)).toBe("/rename ");
+    expect(commandFill(named("rename"))).toBe("/rename ");
   });
 
   test("Enter runs the handler, or refuses with the reason", async () => {
@@ -88,6 +91,7 @@ describe("slash commands", () => {
     expect(commandMatches("/", false).map((c) => c.name)).toEqual([
       "compact",
       "fork",
+      "location",
     ]);
     expect(commandMatches("/re", false)).toEqual([]);
     const rest = { onCompact: async () => {}, onFork: async () => {} };
@@ -113,6 +117,44 @@ describe("slash commands", () => {
     expect(commandBlock({ started: true, running: true }, fork)).toBe(
       "a reply is running",
     );
+  });
+});
+
+describe("/location", () => {
+  test("is a message with an optional question", () => {
+    expect(commandMatches("/lo").map((c) => c.name)).toEqual(["location"]);
+    expect(commandFill(named("location"))).toBe("/location ");
+    expect(commandOf("/location")).toEqual({
+      command: named("location"),
+      arg: "",
+    });
+    expect(commandOf("/location  where is the nearest cafe? ")).toEqual({
+      command: named("location"),
+      arg: "where is the nearest cafe?",
+    });
+    expect(commandOf("/locations")).toBeNull();
+  });
+
+  test("is never blocked", () => {
+    const location = named("location");
+    for (const started of [false, true]) {
+      for (const running of [false, true]) {
+        expect(commandBlock({ started, running }, location)).toBeNull();
+      }
+    }
+  });
+
+  test("is left out where the browser cannot share it", () => {
+    expect(commandMatches("/", true, false).map((c) => c.name)).toEqual([
+      "compact",
+      "fork",
+      "rename",
+    ]);
+    expect(commandMatches("/lo", true, false)).toEqual([]);
+    expect(commandMatches("/", false, false).map((c) => c.name)).toEqual([
+      "compact",
+      "fork",
+    ]);
   });
 });
 
