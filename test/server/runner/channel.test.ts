@@ -430,6 +430,21 @@ describe("channel summons", () => {
     ]);
   });
 
+  test("the detail names a pending turn's agent before it has rows", async () => {
+    const { chat, channelId, other, detail, post } = await setup();
+    const posted = await post("a plain post");
+    chat.app.sessions.pending.insert({
+      sessionId: channelId,
+      messageId: posted.body.messages[0]!.id,
+      authorId: chat.memberId,
+      agentId: other,
+      queuedAt: 1,
+    });
+    expect((await detail()).agents.map((agent) => agent.name)).toEqual([
+      "reviewer",
+    ]);
+  });
+
   test("a busy agent's next turn waits on its immutable post while an idle agent starts", async () => {
     const { chat, channelId, detail, post, summon } = await setup();
     const first = await summon("coder");

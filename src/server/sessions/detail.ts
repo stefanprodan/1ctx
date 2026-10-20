@@ -101,21 +101,24 @@ export function authors(db: Db, sessionId: string): SessionAuthor[] {
     .all(sessionId, sessionId);
 }
 
-// the agents the session and its rows name, a retired one included
+// the agents the session, its rows and a channel's pending turns name, a
+// retired one included
 export function agents(db: Db, sessionId: string): SessionAgent[] {
   return db
     .query<
       { id: string; name: string; avatar: Avatar; retired: number },
-      [string, string]
+      [string]
     >(
       `select id, name, avatar, deleted_at is not null as retired
          from agents
-        where id in (select agent_id from sessions where id = ?
+        where id in (select agent_id from sessions where id = ?1
                      union select agent_id from messages
-                      where session_id = ? and agent_id is not null)
+                      where session_id = ?1 and agent_id is not null
+                     union select agent_id from pending_turns
+                      where session_id = ?1)
         order by name`,
     )
-    .all(sessionId, sessionId)
+    .all(sessionId)
     .map((row) => ({ ...row, retired: row.retired === 1 }));
 }
 

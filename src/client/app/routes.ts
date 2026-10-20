@@ -237,7 +237,11 @@ const sessionPage = async (id: string, origin: SessionOrigin) => {
   await loadSession(id);
   const detail = session.value;
   if (detail === null || detail.session.id !== id) return;
-  if (detail.session.origin !== origin) return;
+  // a channel is a chat's page, and its turns name agents from the
+  // project's list, since it has none of its own
+  const page =
+    detail.session.origin === "channel" ? "chat" : detail.session.origin;
+  if (page !== origin) return;
   const projectId = detail.session.projectId;
   // a run names its automation under the title
   await Promise.all([
