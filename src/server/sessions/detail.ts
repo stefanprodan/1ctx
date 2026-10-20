@@ -30,7 +30,12 @@ type DetailStore = {
   channelPage(
     id: string,
     cursor: { before: number | null; around: number | null },
-  ): { messages: Message[]; before: number | null; after: number | null };
+  ): {
+    messages: Message[];
+    sends: NonNullable<SessionDetail["sends"]>;
+    before: number | null;
+    after: number | null;
+  };
   lastSend(id: string): SessionDetail["send"];
   authors(id: string): SessionAuthor[];
   agents(id: string): SessionAgent[];
@@ -64,7 +69,10 @@ export function detail(
     messages: (page?.messages ?? store.messages(session.id)).map(offWire),
     ...(page === null
       ? {}
-      : { page: { before: page.before, after: page.after } }),
+      : {
+          page: { before: page.before, after: page.after },
+          sends: page.sends,
+        }),
     send: store.lastSend(session.id),
     live,
     ...(session.origin === "channel"

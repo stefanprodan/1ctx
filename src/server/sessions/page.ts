@@ -1,15 +1,24 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { Message } from "../../shared/contracts/session.ts";
+import type { Message, SendSummary } from "../../shared/contracts/session.ts";
 import type { Db } from "../db/index.ts";
-import { MESSAGE_COLUMNS, message, type RawMessage } from "./rows.ts";
+import {
+  MESSAGE_COLUMNS,
+  message,
+  type RawMessage,
+  type RawSend,
+  send,
+  sendTokens,
+} from "./rows.ts";
 
 export const CHANNEL_PAGE_TURNS = 50;
 
 type Anchor = { id: string; seq: number };
 export type ChannelPage = {
   messages: Message[];
+  // the agent turns among the rows, by primary key
+  sends: SendSummary[];
   before: number | null;
   after: number | null;
 };
@@ -64,7 +73,7 @@ export function channelPage(
       ? ordered.slice(Math.max(0, ordered.length - CHANNEL_PAGE_TURNS))
       : ordered.slice(0, CHANNEL_PAGE_TURNS);
   if (selected.length === 0) {
-    return { messages: [], before: null, after: null };
+    return { messages: [], sends: [], before: null, after: null };
   }
   const ids = JSON.stringify(selected.map((row) => row.id));
   const rows = db
@@ -81,6 +90,15 @@ export function channelPage(
     )
     .all(sessionId, ids)
     .map(message);
+  const sends = db
+    .query<RawSend, [string, string]>(
+      `select *, ${sendTokens("sends")} from sends
+       where id in (select value from json_each(?2))
+         and session_id = ?1 and kind != 'post'
+       order by started_at, rowid`,
+    )
+    .all(sessionId, JSON.stringify([...new Set(rows.map((r) => r.sendId))]))
+    .map(send);
   const first = selected[0]!.seq;
   const last = selected.at(-1)!.seq;
   const older = db
@@ -103,6 +121,7 @@ export function channelPage(
     .get(sessionId, last)!.found;
   return {
     messages: rows,
+    sends,
     before: older === 1 ? first : null,
     after: newer === 1 ? last : null,
   };

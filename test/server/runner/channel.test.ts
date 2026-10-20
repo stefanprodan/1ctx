@@ -388,6 +388,13 @@ describe("channel summons", () => {
       first.send.id,
       second.send.id,
     ]);
+    // each agent turn on the page names its post and its summoner
+    expect(
+      shown.sends?.map((send) => [send.id, send.firstMessageId, send.userId]),
+    ).toEqual([
+      [first.send.id, first.body.messages[0]!.id, chat.memberId],
+      [second.send.id, second.body.messages[0]!.id, chat.adminId],
+    ]);
     expect((await post("a note while both work")).body.session.status).toBe(
       "running",
     );

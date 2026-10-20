@@ -311,6 +311,11 @@ export type SessionDetail = {
   // channel-only paging cursors; absent when a chat or run is read whole
   page?: { before: number | null; after: number | null };
   send: SendSummary | null;
+  // channel-only: the agent turns whose rows are on the page, so each
+  // names the post it answers and its summoner
+  sends?: SendSummary[];
+  // channel-only: the stream agents read against its budget, in tokens
+  stream?: { tokens: number; budget: number };
   live: LiveSend[];
   // channel-only turns whose posts are already in the transcript
   pending?: PendingTurn[];
