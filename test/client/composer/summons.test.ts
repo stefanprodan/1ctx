@@ -76,6 +76,16 @@ describe("the @ menu", () => {
     expect(summonMatches("@", null, "a1")).toEqual([]);
   });
 
+  test("a channel, which has no agent, lists every one", () => {
+    expect(summonMatches("@", AGENTS, null, true)).toEqual(AGENTS);
+    expect(names(summonMatches("@g", AGENTS, null, true))).toEqual([
+      "gemini",
+      "glm",
+      "grok",
+    ]);
+    expect(summonMatches("@", null, null, true)).toEqual([]);
+  });
+
   test("a pick fills the name and a space for the ask", () => {
     expect(summonFill(AGENTS[1]!)).toBe("@glm ");
   });

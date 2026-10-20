@@ -6,19 +6,23 @@
 // name leads to the author's page when the author is known.
 
 import type { Message } from "../../shared/contracts/session.ts";
-import { clock, initials, uploadNote } from "../lib/format.ts";
+import { clock, initials, stamp, uploadNote } from "../lib/format.ts";
 import { userHref } from "../lib/hrefs.ts";
 import { FileChip } from "../ui/FileChip.tsx";
 
 export function UserRow({
   message: m,
   author,
+  channel = false,
 }: {
   message: Message;
   author: { name: string; username: string | null };
+  // a channel has no day lines, so each post says its day; a quote finds
+  // it by its id
+  channel?: boolean;
 }) {
   return (
-    <div class="transcript-user">
+    <div class="transcript-user" data-post={channel ? m.id : undefined}>
       <div class="transcript-author">
         <span class="avatar avatar-24">{initials(author.name)}</span>
         {author.username === null ? (
@@ -31,7 +35,9 @@ export function UserRow({
             {author.name}
           </a>
         )}
-        <span class="transcript-when">{clock(m.createdAt)}</span>
+        <span class="transcript-when">
+          {channel ? stamp(m.createdAt) : clock(m.createdAt)}
+        </span>
       </div>
       <div class="card transcript-card">
         {m.content}

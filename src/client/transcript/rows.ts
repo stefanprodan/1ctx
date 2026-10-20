@@ -115,10 +115,13 @@ export function endedBy(node: ReplyNode): Message | null {
   return null;
 }
 
+// a channel passes every turn on its page, since several run at once
 export function groupRows(
   messages: Message[],
   currentSend: SendSummary | null = null,
+  turns: readonly SendSummary[] = [],
 ): Node[] {
+  const known = new Map(turns.map((send) => [send.id, send]));
   const ordered = [...messages].sort((left, right) => left.seq - right.seq);
   const sends = new Map<string, Message[]>();
   for (const message of ordered) {
@@ -134,7 +137,8 @@ export function groupRows(
 
     const answer =
       rows.find((row) => row.kind === "reply" && row.slot === "answer") ?? null;
-    const send = currentSend?.id === sendId ? currentSend : null;
+    const send =
+      (currentSend?.id === sendId ? currentSend : known.get(sendId)) ?? null;
     // the rows from the first round after the answer on are the attention
     // step's and the memory phase's, never the turn's; the boundary is
     // the server's word on the send

@@ -62,6 +62,12 @@ in `docs/ui.md`.
   `mcp:` and `skill:` flips (`dropKind()`); another project on Home
   drops `credential:` and `repo:` flips. The agent list going away for
   a moment is no pick (`agentMoved()`).
+- **A channel's composer posts** (`channel` on `Composer`): it reads
+  "Message #project", has no agent chip and no switches, its plus opens
+  the file picker, its @ menu lists every agent, its / menu only
+  `/location` (the others are refused "not in a channel"), and its meter
+  is the detail's `stream` against its budget, hidden while absent. A
+  turn's Stop is on the turn's own line, not the composer.
 - **A menu row that leaves the page on its own click stops the click.**
   Otherwise the menu reads it as a click outside. A pane takes the
   focus and gives it back.

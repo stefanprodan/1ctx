@@ -25,6 +25,7 @@ import {
 import {
   groupRows,
   type ReplyNode,
+  type WorkNode,
 } from "../../../src/client/transcript/rows.ts";
 import { workSummary } from "../../../src/client/transcript/Work.model.ts";
 import { Work } from "../../../src/client/transcript/Work.tsx";
@@ -463,5 +464,46 @@ describe("a watch's answer and the route", () => {
     const entry = childWork.value.get("delegate-1")!;
     expect(entry.error).toBeNull();
     expect(entry.work!.rows).toHaveLength(4);
+  });
+});
+
+describe("a gone subagent", () => {
+  // a channel turn whose tool output aged out: its child went with it
+  const sweptWork = (rows: Message[]) => {
+    const reply = replyOf(rows);
+    return render(
+      <Work
+        node={{
+          ...reply.work!,
+          send: { swept: true } as NonNullable<WorkNode["send"]>,
+        }}
+        reply={reply.message}
+        live={new Map()}
+        running={false}
+      />,
+    );
+  };
+
+  test("an aged turn's delegate row says gone, never an error", () => {
+    const html = sweptWork(withDelegate({ childSessionId: undefined }));
+    expect(html).toContain("check the clock");
+    expect(html).toContain('<span class="transcript-tool-state">gone</span>');
+    expect(html).toContain("Its work is gone with the turn's tool output.");
+    expect(html).not.toContain("transcript-tool-failed");
+  });
+
+  test("a child read that found nothing says gone too", () => {
+    onScreen();
+    childWork.value = new Map([
+      ["delegate-1", { work: null, loading: false, error: null, gone: true }],
+    ]);
+    const html = drawn(rootRows());
+    expect(html).toContain("Its work is gone");
+    expect(html).not.toContain("transcript-tool-failed");
+  });
+
+  test("an unswept turn without a child keeps its ordinary row", () => {
+    const html = drawn(withDelegate({ childSessionId: undefined }));
+    expect(html).not.toContain("Its work is gone");
   });
 });

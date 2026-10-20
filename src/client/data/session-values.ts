@@ -9,6 +9,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import type {
   LiveRetry,
+  LiveSend,
   SessionDetail,
 } from "../../shared/contracts/session.ts";
 import { says } from "../lib/format.ts";
@@ -33,9 +34,24 @@ export type StoredFile =
 export const toolResults = signal<ReadonlyMap<string, ToolResult>>(new Map());
 export const toolVisuals = signal<ReadonlyMap<string, StoredVisual>>(new Map());
 export const openedFiles = signal<ReadonlyMap<string, StoredFile>>(new Map());
-// the running round waiting to ask its provider again, from the snapshot
-// and the retry frames; never stored
-export const retrying = signal<LiveRetry | null>(null);
+// each send's round waiting to ask its provider again, by send id, from
+// the snapshot and the retry frames; never stored
+export const retries = signal<ReadonlyMap<string, LiveRetry>>(new Map());
+
+export const retriesOf = (live: readonly LiveSend[]) =>
+  new Map(
+    live.flatMap((send) =>
+      send.retry === undefined ? [] : [[send.sendId, send.retry] as const],
+    ),
+  );
+
+// one send's retry frame: a null retry clears it
+export function retried(sendId: string, retry: LiveRetry | null): void {
+  const next = new Map(retries.value);
+  if (retry === null) next.delete(sendId);
+  else next.set(sendId, retry);
+  retries.value = next;
+}
 let detail: SessionDetail | null = null;
 const requests = new Map<string, AbortController>();
 
@@ -47,7 +63,7 @@ export function resetValues(): void {
   toolResults.value = new Map();
   toolVisuals.value = new Map();
   openedFiles.value = new Map();
-  retrying.value = null;
+  retries.value = new Map();
 }
 
 export function syncValues(next: SessionDetail): void {

@@ -99,6 +99,8 @@ export function Reply({
   visuals,
   retry = null,
   marked = false,
+  quote,
+  head,
 }: {
   node: ReplyNode;
   live: ReadonlyMap<string, Live>;
@@ -117,6 +119,10 @@ export function Reply({
   // the fork action under a finished answer; absent where the session
   // cannot be forked yet
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
+  // a channel's: the post the turn answers, over its fold, and what ends
+  // the agent's line (a running turn's Stop)
+  quote?: ComponentChildren;
+  head?: ComponentChildren;
 }) {
   const m = node.message;
   const running = replyRunning(node, live);
@@ -191,8 +197,10 @@ export function Reply({
         ) : (
           <span class="transcript-name">agent</span>
         )}
+        {head}
       </div>
       <div class="transcript-body">
+        {quote}
         {!node.compact && !emptyFailure(work, m, failure, content) && (
           // once the memory phase opens the turn's own work is over
           <Work

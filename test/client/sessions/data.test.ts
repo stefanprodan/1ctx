@@ -23,8 +23,12 @@ import {
 } from "../../../src/client/data/project-agents.ts";
 import { sendMessage } from "../../../src/client/data/queued.ts";
 import {
-  BUFFER_MAX,
   compactSession,
+  regenerateSession,
+  renameSession,
+} from "../../../src/client/data/session-writes.ts";
+import {
+  BUFFER_MAX,
   createSession,
   deleteSession,
   leaveSession,
@@ -36,9 +40,7 @@ import {
   loadSession,
   onSocket,
   projectAgents,
-  regenerateSession,
-  renameSession,
-  retrying,
+  retries,
   sending,
   session,
   sessionError,
@@ -1240,7 +1242,7 @@ describe("the sessions entity", () => {
     const base = liveDetail();
     answer = () => Response.json(base);
     await loadSession("s1");
-    expect(retrying.value).toBeNull();
+    expect(retries.value.get("send1")).toBeUndefined();
     // a frame before the answer is kept and applied after the snapshot
     onSocket({
       type: "retry",
@@ -1266,7 +1268,7 @@ describe("the sessions entity", () => {
         },
       ],
     });
-    expect(retrying.value).toEqual({ attempt: 2, max: 3 });
+    expect(retries.value.get("send1")).toEqual({ attempt: 2, max: 3 });
     onSocket({
       type: "retry",
       sessionId: "s1",
@@ -1274,7 +1276,7 @@ describe("the sessions entity", () => {
       seq: 4,
       retry: null,
     });
-    expect(retrying.value).toBeNull();
+    expect(retries.value.get("send1")).toBeUndefined();
   });
 
   test("an envelope that ends the send clears a retry", async () => {
@@ -1290,7 +1292,7 @@ describe("the sessions entity", () => {
       messages: [],
       send: sent,
     });
-    expect(retrying.value).toEqual({ attempt: 2, max: 3 });
+    expect(retries.value.get("send1")).toEqual({ attempt: 2, max: 3 });
     onSocket({
       type: "session",
       row: null,
@@ -1299,7 +1301,7 @@ describe("the sessions entity", () => {
       messages: [],
       send: { ...sent, status: "failed" },
     });
-    expect(retrying.value).toBeNull();
+    expect(retries.value.get("send1")).toBeUndefined();
   });
 
   test("a detail that carries a retry shows it until the chat is left", async () => {
@@ -1307,9 +1309,9 @@ describe("the sessions entity", () => {
     if (base.live !== null) base.live[0]!.retry = { attempt: 1, max: 3 };
     answer = () => Response.json(base);
     await loadSession("s1");
-    expect(retrying.value).toEqual({ attempt: 1, max: 3 });
+    expect(retries.value.get("send1")).toEqual({ attempt: 1, max: 3 });
     leaveSession();
-    expect(retrying.value).toBeNull();
+    expect(retries.value.get("send1")).toBeUndefined();
   });
 
   test("a work-slot envelope keeps the reply's live buffer", async () => {

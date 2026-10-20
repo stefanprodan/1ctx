@@ -10,7 +10,8 @@
 // server, skill or repository, and so does Web access when the project
 // has credentials, and Escape or the pane's first row swaps them back.
 // A pane's item says how many are on. An item that cannot be used is
-// off and says why on a line of its own.
+// off and says why on a line of its own. Where the session has no
+// switches, as a channel, the plus opens the file picker itself.
 
 import { useSignal } from "@preact/signals";
 import type { Ref } from "preact";
@@ -121,6 +122,7 @@ function PaneLink({
 
 export function Add({
   readable,
+  filesOnly = false,
   onFiles,
   web,
   webPane,
@@ -137,6 +139,8 @@ export function Add({
 }: {
   // the picked agent can read files
   readable: boolean;
+  // the plus is Add files alone: the session takes no switch
+  filesOnly?: boolean;
   onFiles: (files: File[]) => void;
   web: WebItem;
   // Web access with the project's credentials, null without any
@@ -197,10 +201,12 @@ export function Add({
         ref={plus}
         type="button"
         class={`btn-icon composer-add${open.value ? " composer-add-on" : ""}`}
-        aria-label="Add"
-        aria-expanded={open.value}
+        aria-label={filesOnly ? "Add files" : "Add"}
+        title={filesOnly ? "Add files" : undefined}
+        aria-expanded={filesOnly ? undefined : open.value}
         onClick={() => {
-          open.value = !open.value;
+          if (filesOnly) picker.current?.click();
+          else open.value = !open.value;
         }}
       >
         <Icon name="plus" size={14} />

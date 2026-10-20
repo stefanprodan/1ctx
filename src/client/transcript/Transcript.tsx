@@ -21,7 +21,23 @@ import type {
 } from "../../shared/contracts/session.ts";
 import { visualPreviews } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
+import { useAction } from "../lib/save.ts";
 import { scrollParent } from "../lib/scroll.ts";
+import {
+  lineAt,
+  mayAct,
+  nodeKey,
+  prepended,
+  quoteOf,
+} from "./Channel.model.ts";
+import {
+  type ChannelView,
+  ContextLine,
+  MoreLine,
+  PendingLine,
+  QuoteLine,
+  StopTurn,
+} from "./Channel.tsx";
 import { copyCode } from "./copy.ts";
 import { FileCard } from "./FileCard.tsx";
 import type { OnFork } from "./Fork.tsx";
@@ -38,6 +54,10 @@ import { isFileCard, visualCards } from "./visuals.ts";
 import "./transcript.css";
 import "./md.css";
 import "./hljs.css";
+
+const NO_RETRIES: ReadonlyMap<string, LiveRetry> = new Map();
+// how near the top an older page starts loading
+const OLDER_AT = 600;
 
 const boxOf = (el: HTMLElement): Box => ({
   top: el.scrollTop,
@@ -56,14 +76,15 @@ export function Transcript({
   foot,
   queue,
   proposals,
-  retry = null,
+  retries = NO_RETRIES,
   marked = false,
+  channel,
 }: {
   sessionId: string;
   nodes: Node[];
   live: ReadonlyMap<string, Live>;
-  // the running round waiting to ask its provider again
-  retry?: LiveRetry | null;
+  // each send's round waiting to ask its provider again, by send id
+  retries?: ReadonlyMap<string, LiveRetry>;
   // a run its agent marked (agentMarked()), which the fold after its
   // answer says
   marked?: boolean;
@@ -87,6 +108,8 @@ export function Transcript({
     session: Pick<SessionSummary, "forkedFromId" | "createdAt">;
   };
   foot?: ComponentChildren;
+  // a project channel's lines, pages and turn actions
+  channel?: ChannelView;
 }) {
   const rows = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLElement | null>(null);
@@ -99,6 +122,15 @@ export function Transcript({
   const jumpHidden = useSignal(true);
 
   const footEl = useRef<HTMLDivElement>(null);
+  // the first row on screen and the box at the last render, so a page
+  // that lands above keeps the reader's place
+  const seen = useRef<{ first: string | null; top: number; height: number }>({
+    first: null,
+    top: 0,
+    height: 0,
+  });
+  const olderRef = useRef(channel?.older);
+  olderRef.current = channel?.older;
 
   const toEnd = () => {
     const scroller = box.current;
@@ -122,8 +154,18 @@ export function Transcript({
       const next = boxOf(scroller);
       stick.current = following(stick.current, last.current, next);
       last.current = next;
+      seen.current = { ...seen.current, top: next.top, height: next.height };
       jumpHidden.value =
         stick.current || next.height - next.top - next.client < 80;
+      const older = olderRef.current;
+      if (
+        older?.more &&
+        !older.loading &&
+        older.failure === null &&
+        next.top < OLDER_AT
+      ) {
+        older.onOlder();
+      }
     };
     // the foot grows with the draft, and the box shrinks while a
     // phone's keyboard is up: either would cover the last rows, so a
@@ -176,34 +218,126 @@ export function Transcript({
     toEnd();
     jumpHidden.value = true;
   }, [sessionId, jumpHidden]);
-  // a new row sticks the view to the bottom again, a waiting one too
+  // a new row sticks the view to the bottom again, a waiting one too;
+  // an older page lands above and moves nothing
   const waiting = queue?.rows.length ?? 0;
+  const shown = channel
+    ? nodes.filter(
+        (node) => node.kind !== "user" || channel.shown(node.message.seq),
+      )
+    : nodes;
+  const keys = shown.map(nodeKey);
+  const lastKey = keys.at(-1) ?? null;
   useLayoutEffect(() => {
     stick.current = true;
-  }, [nodes.length, waiting]);
+  }, [lastKey, waiting]);
   useLayoutEffect(() => {
+    const scroller = box.current;
+    const was = seen.current;
+    if (scroller !== null && !stick.current && prepended(was.first, keys)) {
+      scroller.scrollTop = was.top + (scroller.scrollHeight - was.height);
+    }
     if (stick.current) toEnd();
+    seen.current = {
+      first: keys[0] ?? null,
+      top: scroller?.scrollTop ?? 0,
+      height: scroller?.scrollHeight ?? 0,
+    };
   });
+  // a quote's post, once drawn
+  const focus = channel?.focus ?? null;
+  const onFocused = channel?.onFocused;
+  useLayoutEffect(() => {
+    if (focus === null) return;
+    const el = rows.current?.querySelector(
+      `[data-post="${CSS.escape(focus)}"]`,
+    );
+    if (!el) return;
+    stick.current = false;
+    el.scrollIntoView({ block: "center" });
+    onFocused?.();
+  }, [focus, onFocused]);
+  const posts = new Map(
+    nodes.flatMap((node) =>
+      node.kind === "user" ? [[node.message.id, node.message] as const] : [],
+    ),
+  );
+  const contextAt = lineAt(shown, channel?.droppedSeq ?? null);
+  const gapAt = lineAt(shown, channel?.gap?.before ?? null);
 
   return (
     <>
       <div class="transcript-rows" ref={rows}>
         <div class="transcript">
-          {nodes.map((node, index) => {
-            const last = index === nodes.length - 1;
+          {channel?.older.more && (
+            <MoreLine
+              words="Show older"
+              loading={channel.older.loading}
+              failure={channel.older.failure}
+              onMore={channel.older.onOlder}
+            />
+          )}
+          {shown.flatMap((node, index) => {
+            const last = index === shown.length - 1;
+            // flat and keyed, so a page landing above moves no row
+            const before = [
+              ...(index === contextAt ? [<ContextLine key="context" />] : []),
+              ...(index === gapAt && channel?.gap
+                ? [<GapLine key="gap" onGap={channel.gap.onGap} />]
+                : []),
+            ];
             if (node.kind === "user") {
-              return (
+              return [
+                ...before,
                 <UserRow
                   key={node.message.id}
                   message={node.message}
                   author={authorOf(node.message.userId)}
-                />
-              );
+                  channel={channel !== undefined}
+                />,
+                ...(channel?.pending ?? [])
+                  .filter((turn) => turn.messageId === node.message.id)
+                  .map((turn) => (
+                    <PendingLine
+                      key={`pending:${turn.id}`}
+                      turn={turn}
+                      agent={channel!.agentName(turn.agentId)}
+                      onCancel={
+                        mayAct(channel!.viewer, turn.authorId)
+                          ? () => channel!.onCancel(turn.id)
+                          : undefined
+                      }
+                    />
+                  )),
+              ];
             }
-            return (
+            const quote =
+              channel === undefined
+                ? null
+                : quoteOf(node.send?.firstMessageId ?? null, posts);
+            const send = node.send;
+            return [
+              ...before,
               <Reply
                 key={`reply:${node.sendId}`}
                 node={node}
+                quote={
+                  quote !== null &&
+                  channel !== undefined && (
+                    <QuoteLine
+                      quote={quote}
+                      author={authorOf(quote.post.userId).name}
+                      onOpen={() => void channel.onQuote(quote.post)}
+                    />
+                  )
+                }
+                head={
+                  channel !== undefined &&
+                  send?.status === "running" &&
+                  mayAct(channel.viewer, send.userId) && (
+                    <StopTurn onStop={() => channel.onStop(send.id)} />
+                  )
+                }
                 live={live}
                 agent={agentOf(
                   node.message?.agentId ??
@@ -212,7 +346,7 @@ export function Transcript({
                 )}
                 onRegenerate={last ? onRegenerate : undefined}
                 follow={last ? follow : undefined}
-                retry={last ? retry : null}
+                retry={retries.get(node.sendId) ?? null}
                 marked={marked}
                 fork={fork}
                 visuals={[
@@ -231,8 +365,8 @@ export function Transcript({
                         proposals.session,
                       ).map((line) => <Proposal key={line.key} line={line} />)),
                 ]}
-              />
-            );
+              />,
+            ];
           })}
           {queue !== undefined && <QueuedRows {...queue} />}
         </div>
@@ -260,5 +394,18 @@ export function Transcript({
         {foot}
       </div>
     </>
+  );
+}
+
+// the posts a window leaves between it and the newest pages
+function GapLine({ onGap }: { onGap: () => Promise<void> }) {
+  const action = useAction();
+  return (
+    <MoreLine
+      words="Show newer"
+      loading={action.busy.value}
+      failure={action.failure.value}
+      onMore={() => void action.run(onGap)}
+    />
   );
 }

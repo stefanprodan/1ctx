@@ -18,6 +18,7 @@ import {
   runHref,
 } from "../lib/hrefs.ts";
 import type { IconName } from "../lib/icons.tsx";
+import { channelName } from "../lib/names.ts";
 
 export const RECENT_MAX = 5;
 
@@ -134,7 +135,8 @@ export const sessionRecent = (s: {
         id: s.id,
         projectId: s.projectId,
         automationId: null,
-        title: s.title,
+        // a channel is its project's name
+        title: s.origin === "channel" ? channelName(s.title) : s.title,
       };
 
 type Named = { id: string; projectId: string };

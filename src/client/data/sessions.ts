@@ -7,11 +7,7 @@
 // while it loads again.
 
 import { effect, signal } from "@preact/signals";
-import type {
-  RegenerateRequest,
-  RenameSessionRequest,
-  SessionResponse,
-} from "../../shared/api/sessions.ts";
+import type { SessionResponse } from "../../shared/api/sessions.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { navigate } from "../app/router.ts";
@@ -31,7 +27,7 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { carry, changeOf } from "./capabilities.ts";
+import { channelLoaded, withSend } from "./channel.ts";
 import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
@@ -41,7 +37,13 @@ import { session } from "./session-held.ts";
 import { ahead, flushLive, live, publish, stage } from "./session-live.ts";
 import { onQueueSocket, queueShown } from "./session-queue.ts";
 import { sending } from "./session-start.ts";
-import { resetValues, retrying, syncValues } from "./session-values.ts";
+import {
+  resetValues,
+  retried,
+  retries,
+  retriesOf,
+  syncValues,
+} from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
 
@@ -58,7 +60,7 @@ export { createSession, sending, stopSession } from "./session-start.ts";
 export {
   loadToolResult,
   loadVisual,
-  retrying,
+  retries,
   toolResults,
   toolVisuals,
 } from "./session-values.ts";
@@ -107,7 +109,7 @@ function show(shown: SessionDetail): void {
   session.value = detail;
   publish(liveFrom(detail));
   syncValues(detail);
-  retrying.value = detail.live[0]?.retry ?? null;
+  retries.value = retriesOf(detail.live);
   sequences = new Map(detail.live.map((send) => [send.sendId, send.seq]));
 }
 
@@ -158,7 +160,8 @@ export async function loadSession(id: string): Promise<void> {
       held.session.id !== id ||
       detail.session.revision >= held.session.revision
     ) {
-      show(detail);
+      // a channel keeps the older pages it holds
+      show(channelLoaded(held, detail));
     }
     // registered before the watch is sent, so a frame that arrives
     // before the answer is kept
@@ -193,43 +196,6 @@ export function take(detail: SessionDetail): void {
   if (held === null || held.session.id !== detail.session.id) return;
   if (detail.session.revision <= held.session.revision) return;
   show(detail);
-}
-
-// a send of any kind answers the detail; the flips the person made ride
-// on the two kinds that take them and are forgotten once taken
-async function post(
-  id: string,
-  path: string,
-  body?: RegenerateRequest,
-): Promise<void> {
-  sending.value = true;
-  try {
-    const at = `/api/sessions/${encodeURIComponent(id)}/${path}`;
-    take(
-      await carry(id, body ?? {}, () => api<SessionResponse>(at, "POST", body)),
-    );
-  } finally {
-    sending.value = false;
-  }
-}
-
-// the last turn goes and its user message is sent again
-export const regenerateSession = (id: string): Promise<void> =>
-  post(id, "regenerate", changeOf(id));
-
-// a summary round on its own; the next reply starts from the summary
-export const compactSession = (id: string) => post(id, "compact");
-
-// a rename is not a send: it goes under a reply too, and the composer
-// stays free while it is on its way
-export async function renameSession(id: string, title: string): Promise<void> {
-  const body: RenameSessionRequest = { title };
-  const detail = await api<SessionResponse>(
-    `/api/sessions/${encodeURIComponent(id)}`,
-    "PATCH",
-    body,
-  );
-  take(detail);
 }
 
 // the row goes, and the page leaves the chat on screen or loading for
@@ -290,6 +256,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     messages,
     send: ev.send ?? held.send,
     channelContext: ev.channelContext ?? held.channelContext,
+    ...withSend(held, ev.send),
   };
   visualPreviews.value = reconcileVisuals(visualPreviews.value, session.value);
   session.value = {
@@ -311,8 +278,9 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
             })),
   };
   syncValues(session.value);
-  // a lost clear frame never outlives the send
-  if (ev.session.status !== "running") retrying.value = null;
+  // a lost clear frame never outlives its send
+  if (ev.session.status !== "running") retries.value = new Map();
+  else if (ev.send && ev.send.status !== "running") retried(ev.send.id, null);
   publish(map);
   onQueueSocket(ev);
   // who archived it and until when are the detail's alone, and so are
@@ -335,7 +303,7 @@ function applyFrame(frame: Frame): boolean {
   if (frame.seq !== seq + 1) return false;
   sequences.set(frame.sendId, frame.seq);
   if (frame.type === "retry") {
-    retrying.value = frame.retry;
+    retried(frame.sendId, frame.retry);
     return true;
   }
   if (frame.type === "restart") {
@@ -406,7 +374,7 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
     live: ev.live,
     channelContext: ev.channelContext ?? held.channelContext,
   };
-  retrying.value = ev.live[0]?.retry ?? null;
+  retries.value = retriesOf(ev.live);
   sequences = new Map(ev.live.map((send) => [send.sendId, send.seq]));
   if (ev.live.length === 0) {
     // the rows say running and the runner has nothing: the end went by
@@ -417,6 +385,8 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
     for (const snap of ev.live) {
       if (snap.phase === "tools") continue;
       const m = held.messages.find((x) => x.id === snap.messageId);
+      // a channel turn on a post above the pages held lands by envelope
+      if (m === undefined && held.session.origin === "channel") continue;
       if (m === undefined) {
         refetch();
         return;

@@ -211,6 +211,10 @@ is its root.
   back to running. A watch's answer drops every held child it does not
   name, since one that ended while the connection was down missed its
   last frames. A group opened with nothing held reads the route; after
-  a failed read, opening it again asks again.
+  a failed read, opening it again asks again. A 404 marks the child
+  gone and nothing asks again; so does a `done` delegate row with no
+  child in a swept turn (`send.swept`, `childGone()`). A gone group
+  heads "gone" and says its work went with the turn's tool output,
+  never an error.
 - **The fold counts the root's calls.** A `delegate` call is one of
   them; the child's calls are its own and never in the fold's count.

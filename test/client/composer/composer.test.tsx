@@ -87,6 +87,7 @@ function keysOver(
   agents: AgentSummary[] | null = null,
   agentId: string | null = null,
   reader: Locate | null = null,
+  channel?: { name: string; stream?: { tokens: number; budget: number } },
 ): ((key: string) => boolean) & { html: string } {
   rows.set(draftKey("u1", SCOPE), JSON.stringify({ text, uploads: [] }));
   const previous = options.vnode;
@@ -111,6 +112,7 @@ function keysOver(
         onSend={async () => {}}
         onStop={async () => {}}
         reader={reader}
+        channel={channel}
       />,
     );
   } finally {
@@ -268,5 +270,65 @@ describe("the composer's agent", () => {
   test.serial("a chat keeps its own agent", () => {
     startsOn.value = "a2";
     expect(chip("a1")).toBe("coder");
+  });
+});
+
+describe("the composer in a channel", () => {
+  const CHANNEL = {
+    name: "#finops",
+    stream: { tokens: 48_200, budget: 100_000 },
+  };
+  const AGENTS = [agent("a1", "coder"), agent("a2", "writer")];
+  const listed = (html: string) =>
+    [...html.matchAll(/composer-cmd-name">[/@](?:<!-- -->)?([^<]*)</g)].map(
+      (m) => m[1],
+    );
+  const read: Locate = async () => ({ latitude: 0, longitude: 0, accuracy: 1 });
+
+  test.serial("reads Message #project and has no agent chip", () => {
+    const { html } = keysOver("", AGENTS, null, null, CHANNEL);
+    expect(html).toContain('placeholder="Message #finops"');
+    expect(html).not.toContain("composer-chip");
+  });
+
+  test.serial("a channel with no agent still takes a post", () => {
+    const { html } = keysOver("", [], null, null, CHANNEL);
+    expect(html).toContain('placeholder="Message #finops"');
+    expect(html).toMatch(/<textarea(?![^>]*disabled)[^>]*>/);
+  });
+
+  test.serial("its plus adds files, with no switch behind it", () => {
+    const { html } = keysOver("", AGENTS, null, null, CHANNEL);
+    expect(html).toContain('aria-label="Add files"');
+    expect(html).not.toContain("aria-expanded");
+    expect(keysOver("", AGENTS, "a1").html).toContain('aria-label="Add"');
+  });
+
+  test.serial("its @ menu summons every agent", () => {
+    expect(listed(keysOver("@", AGENTS, null, null, CHANNEL).html)).toEqual([
+      "coder",
+      "writer",
+    ]);
+    // a chat leaves its own agent out
+    expect(listed(keysOver("@", AGENTS, "a1").html)).toEqual(["writer"]);
+  });
+
+  test.serial("its / menu holds no chat command", () => {
+    expect(listed(keysOver("/", AGENTS, null, read, CHANNEL).html)).toEqual([
+      "location",
+    ]);
+    expect(listed(keysOver("/co", AGENTS, null, read, CHANNEL).html)).toEqual(
+      [],
+    );
+  });
+
+  test.serial("the meter is the stream against its budget", () => {
+    const { html } = keysOver("", AGENTS, null, null, CHANNEL);
+    expect(html).toContain("48K / 100K");
+    expect(html).toContain("What agents read: 48,200 of 100,000 tokens");
+    // no stream counted yet: no meter
+    expect(
+      keysOver("", AGENTS, null, null, { name: "#finops" }).html,
+    ).not.toContain("composer-ctx");
   });
 });

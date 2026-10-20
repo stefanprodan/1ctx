@@ -44,7 +44,8 @@ admin pages in `docs/admin-pages.md`, the external task pages in
   `data/sessions.ts` applies an envelope (`docs/sessions.md`) only when
   its revision is above the one held, and applies stream frames in
   sequence per send through `transcript/stream.ts`. Live snapshots are lists;
-  ending one send removes only its tail. Pending channel turns follow queue
+  ending one send removes only its tail, and a retry frame marks only its
+  own send (`retries`, by send id). Pending channel turns follow queue
   revisions. The channel's server-counted `channelContext` meter follows
   detail, `watched` and newer envelopes; a work envelope without it keeps
   the held count. A gap, a frame ahead of the

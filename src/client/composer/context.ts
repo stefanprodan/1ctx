@@ -30,3 +30,16 @@ export function readout(usage: RoundUsage | null | undefined): Readout | null {
     title: `Last counted request: ${commas(used)} of ${commas(window)} tokens, prompt and reply`,
   };
 }
+
+// a channel's meter: the stream every agent reads against its budget,
+// counted by the server; nothing when the detail does not say
+export function streamReadout(
+  stream: { tokens: number; budget: number } | undefined,
+): Readout | null {
+  if (stream === undefined || stream.budget <= 0) return null;
+  return {
+    text: `${k(stream.tokens)} / ${k(stream.budget)}`,
+    percent: Math.min(100, (stream.tokens / stream.budget) * 100),
+    title: `What agents read: ${commas(stream.tokens)} of ${commas(stream.budget)} tokens`,
+  };
+}

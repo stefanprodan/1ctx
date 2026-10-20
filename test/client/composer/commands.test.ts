@@ -120,6 +120,19 @@ describe("slash commands", () => {
       "a reply is running",
     );
   });
+
+  test("a channel takes none of the chat's commands", () => {
+    const state = { started: false, running: false, channel: true };
+    for (const command of COMMANDS) {
+      expect(commandBlock(state, command)).toBe(
+        command.name === "location" ? null : "not in a channel",
+      );
+    }
+    expect(commandMatches("/", true, true, true).map((c) => c.name)).toEqual([
+      "location",
+    ]);
+    expect(commandMatches("/re", true, true, true)).toEqual([]);
+  });
 });
 
 describe("/location", () => {

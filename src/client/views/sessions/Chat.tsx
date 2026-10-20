@@ -16,7 +16,10 @@
 // the last turn; their author's Edit and Send again hand the text to the
 // composer. Leaving the page ends the watch on its session, unless the
 // next chat's load already owns the entity, as it does when a chat
-// moves to its fork.
+// moves to its fork. A project channel opens at /chat too: the same
+// transcript and composer, with no Regenerate, Fork, switches or chat
+// commands, its posts' answers quoting them, a pending turn under its
+// post, the line where agents stop reading and older turns on scroll up.
 
 import { useEffect } from "preact/hooks";
 import type { SessionOrigin } from "../../../shared/words.ts";
@@ -24,19 +27,32 @@ import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { archiveSession } from "../../data/archive.ts";
 import { automations, dismissAlert } from "../../data/automations.ts";
+import {
+  cancelTurn,
+  channelGap,
+  focusPost,
+  loadGap,
+  loadOlder,
+  olderPage,
+  showPost,
+  stopTurn,
+} from "../../data/channel.ts";
+import { inView } from "../../data/channel-pages.ts";
 import { forkSession } from "../../data/fork.ts";
 import { me } from "../../data/me.ts";
 import { project, projects } from "../../data/projects.ts";
 import { editQueued, sendMessage } from "../../data/queued.ts";
 import {
   compactSession,
+  regenerateSession,
+  renameSession,
+} from "../../data/session-writes.ts";
+import {
   deleteSession,
   leaveSession,
   live,
   projectAgents,
-  regenerateSession,
-  renameSession,
-  retrying,
+  retries,
   sending,
   session,
   sessionError,
@@ -45,6 +61,8 @@ import {
 import type { Failure } from "../../lib/format.ts";
 import { chatHref, markdownHref, runHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { channelName } from "../../lib/names.ts";
+import type { ChannelView } from "../../transcript/Channel.tsx";
 import { groupRows } from "../../transcript/rows.ts";
 import { Transcript } from "../../transcript/Transcript.tsx";
 import { agentMarked } from "../../transcript/Work.model.ts";
@@ -57,6 +75,10 @@ import { queueActions } from "./queue.ts";
 import { inOpenAlert, runOf } from "./RunFoot.model.ts";
 import { RunFoot } from "./RunFoot.tsx";
 import "./chat.css";
+
+const clearFocus = () => {
+  focusPost.value = null;
+};
 
 export const Chat = ({ params }: { params: Params }) => (
   <SessionPage params={params} origin="chat" />
@@ -78,7 +100,10 @@ function SessionPage({
   const id = params.id ?? "";
   const detail = session.value;
   const held = detail !== null && detail.session.id === id ? detail : null;
-  const wrong = held !== null && held.session.origin !== origin;
+  // a channel is a chat's page
+  const opened =
+    held?.session.origin === "channel" ? "chat" : held?.session.origin;
+  const wrong = held !== null && opened !== origin;
   const shown = wrong ? null : held;
   const error: Failure | null = wrong
     ? { words: origin === "chat" ? "no such chat" : "no such run", status: 404 }
@@ -116,10 +141,39 @@ function SessionPage({
   };
   const choices = forkAgents(agents, shown?.agents ?? []);
   const run = shown?.session.origin === "automation";
+  const channel = shown?.session.origin === "channel";
   const archived = shown?.session.archived != null;
-  // the owner renames and deletes, and so does an admin
+  // the owner renames and deletes, and so does an admin; a channel is
+  // neither renamed, archived nor deleted
   const manage = user?.id === shown?.session.ownerId || user?.role === "admin";
-  const items = menuItems({ run, archived, manage });
+  const items = channel
+    ? { rename: false, archive: false, delete: false }
+    : menuItems({ run, archived, manage });
+  const view: ChannelView | undefined =
+    shown === null || !channel
+      ? undefined
+      : {
+          viewer: user ? { id: user.id, admin: user.role === "admin" } : null,
+          pending: shown.pending ?? [],
+          droppedSeq: shown.session.droppedSeq ?? null,
+          shown: (seq) =>
+            inView(seq, shown.page?.before ?? null, channelGap.value),
+          agentName: (agentId) => agentOf(agentId)?.name ?? "agent",
+          onStop: (sendId) => stopTurn(shown.session.id, sendId),
+          onCancel: (turnId) => cancelTurn(shown.session.id, turnId),
+          onQuote: showPost,
+          older: {
+            more: (shown.page?.before ?? null) !== null,
+            ...olderPage.value,
+            onOlder: () => void loadOlder(),
+          },
+          gap:
+            channelGap.value === null
+              ? null
+              : { before: channelGap.value.before, onGap: loadGap },
+          focus: focusPost.value,
+          onFocused: clearFocus,
+        };
   // a run is forked whole from its foot, a chat at any settled turn
   const lastTurn = shown?.messages.findLast(
     (m) => m.kind === "user" || (m.kind === "reply" && m.slot === "answer"),
@@ -136,7 +190,15 @@ function SessionPage({
     <Page
       crumb={projectName}
       crumbHref={projectId === null ? undefined : `/projects/${projectId}`}
-      title={shown?.session.title ?? (origin === "chat" ? "Chat" : "Run")}
+      title={
+        shown === null
+          ? origin === "chat"
+            ? "Chat"
+            : "Run"
+          : channel
+            ? channelName(shown.session.title)
+            : shown.session.title
+      }
       menu={
         shown !== null ? (
           <Menu
@@ -210,14 +272,16 @@ function SessionPage({
           )}
           <Transcript
             sessionId={shown.session.id}
-            nodes={groupRows(shown.messages, shown.send)}
+            nodes={groupRows(shown.messages, shown.send, shown.sends)}
             live={live.value}
-            retry={retrying.value}
+            retries={retries.value}
+            channel={view}
             marked={agentMarked(shown.session)}
             agentOf={agentOf}
             authorOf={authorOf}
             onRegenerate={
               run ||
+              channel ||
               archived ||
               shown.session.status === "running" ||
               sending.value
@@ -225,7 +289,7 @@ function SessionPage({
                 : () => regenerateSession(shown.session.id)
             }
             fork={
-              run
+              run || channel
                 ? undefined
                 : {
                     agents: choices,
@@ -295,7 +359,16 @@ function SessionPage({
                   filesProjectId={shown.session.projectId}
                   agents={projectAgents.value}
                   agentId={shown.session.agentId}
-                  running={shown.session.status === "running"}
+                  channel={
+                    channel
+                      ? {
+                          name: channelName(shown.session.title),
+                          stream: shown.stream,
+                        }
+                      : undefined
+                  }
+                  // a channel stops each turn on its own line
+                  running={!channel && shown.session.status === "running"}
                   busy={sending.value}
                   usage={shown.session.usage}
                   off={shown.session.disabledCapabilities}
@@ -307,21 +380,27 @@ function SessionPage({
                     editQueued(shown.session.id, row, text)
                   }
                   onStop={() => stopSession(shown.session.id)}
-                  onCompact={() => compactSession(shown.session.id)}
+                  onCompact={
+                    channel ? undefined : () => compactSession(shown.session.id)
+                  }
                   onRename={
                     items.rename
                       ? (title) => renameSession(shown.session.id, title)
                       : undefined
                   }
-                  onFork={(title) =>
-                    lastTurn === undefined || shown.session.agentId === null
-                      ? Promise.reject(new Error("nothing to fork yet"))
-                      : forkSession(
-                          shown.session.id,
-                          lastTurn.id,
-                          shown.session.agentId,
-                          title,
-                        )
+                  onFork={
+                    channel
+                      ? undefined
+                      : (title) =>
+                          lastTurn === undefined ||
+                          shown.session.agentId === null
+                            ? Promise.reject(new Error("nothing to fork yet"))
+                            : forkSession(
+                                shown.session.id,
+                                lastTurn.id,
+                                shown.session.agentId,
+                                title,
+                              )
                   }
                 />
               )
