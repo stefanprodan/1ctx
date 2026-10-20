@@ -8,7 +8,9 @@
 // a run stands for its automation's runs and counts them with the
 // bolt. An archived chat wears the box, quiet, and says so before its
 // line, as a run that needs attention does and a run a restart started
-// again. The whole row is the link to the chat.
+// again. A project's channel is a row like a chat's under its
+// `#name`, with two bubbles, and never names its project twice. The
+// whole row is the link to the chat.
 
 import { type ComponentChild, Fragment } from "preact";
 import type { FeedRow } from "../../shared/api/sessions.ts";
@@ -24,6 +26,7 @@ import {
   iconOf,
   iconStatus,
   markOf,
+  rowTitle,
   stateLine,
   whenText,
 } from "./Row.model.ts";
@@ -59,6 +62,8 @@ export function Row({
   const archived = session.archived !== null;
   const mark = markOf(row);
   const alert = alertOf(row, line);
+  const channel = session.origin === "channel";
+  const title = rowTitle(session);
   return (
     <a class="feed-row" href={sessionHref(session)}>
       <Icon
@@ -67,8 +72,17 @@ export function Row({
         size={16}
       />
       <span class="feed-text">
-        <span class="feed-title cut">{session.title}</span>
-        <span class="feed-line cut">
+        <span class="feed-title cut" title={channel ? title : undefined}>
+          {title}
+        </span>
+        <span
+          class="feed-line cut"
+          title={
+            channel
+              ? `${state.author === null ? "" : `@${state.author} `}${state.text}`
+              : undefined
+          }
+        >
           {mark !== null && (
             <>
               <span class="feed-mark">{mark}</span>
@@ -76,7 +90,7 @@ export function Row({
             </>
           )}
           {joined([
-            projectName !== null && (
+            projectName !== null && !channel && (
               <span class="feed-project">#{projectName}</span>
             ),
             row.runs !== null && (

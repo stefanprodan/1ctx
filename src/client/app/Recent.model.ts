@@ -24,6 +24,7 @@ export const RECENT_MAX = 5;
 
 export const RECENT_KINDS = [
   "chat",
+  "channel",
   "run",
   "automation",
   "task",
@@ -41,13 +42,14 @@ export type RecentRow = {
   // a run's automation, whose runs share one row; null for any other
   // kind, and for a run whose automation was deleted
   automationId: string | null;
-  // a chat's or a task's title, an automation's or a run's
-  // automation's name, a file's path
+  // a chat's or a task's title, a channel's project name, an
+  // automation's or a run's automation's name, a file's path
   title: string;
 };
 
 const ICONS: Record<RecentKind, IconName> = {
   chat: "chat",
+  channel: "channel",
   run: "bolt",
   automation: "clock",
   task: "task",
@@ -56,13 +58,19 @@ const ICONS: Record<RecentKind, IconName> = {
 
 export const recentIcon = (row: RecentRow): IconName => ICONS[row.kind];
 
-// a run's title is its automation's name, so the words say it is a run
+// a run's title is its automation's name, so the words say it is a
+// run; a channel's is its project's, drawn as the channel
 export const recentText = (row: RecentRow): string =>
-  row.kind === "run" ? `Run of ${row.title}` : row.title;
+  row.kind === "run"
+    ? `Run of ${row.title}`
+    : row.kind === "channel"
+      ? `#${row.title}`
+      : row.title;
 
 export function recentHref(row: RecentRow): string {
   switch (row.kind) {
     case "chat":
+    case "channel":
       return chatHref(row.id);
     case "run":
       return runHref(row.id);
@@ -81,9 +89,9 @@ export const recentKey = (row: RecentRow): string =>
     ? `runs:${row.automationId}`
     : `${row.kind}:${row.id}`;
 
-// the object a page shows, before its row is read. A chat and a run
-// are one session until the row says which; an automation's edit page
-// is part of its visit but never recorded
+// the object a page shows, before its row is read. A chat, a channel
+// and a run are one session until the row says which; an automation's
+// edit page is part of its visit but never recorded
 export type RecentPage = {
   kind: "session" | "automation" | "task" | "file";
   id: string;
@@ -131,7 +139,7 @@ export const sessionRecent = (s: {
         title: s.title,
       }
     : {
-        kind: "chat",
+        kind: s.origin === "channel" ? "channel" : "chat",
         id: s.id,
         projectId: s.projectId,
         automationId: null,
@@ -257,17 +265,19 @@ function change(
 }
 
 const isSession = (row: RecentRow, id: string) =>
-  (row.kind === "chat" || row.kind === "run") && row.id === id;
+  (row.kind === "chat" || row.kind === "channel" || row.kind === "run") &&
+  row.id === id;
 
 // a frame of a project the user sees, whatever page is open. A run's
 // own session frame changes nothing: its title is its automation's
-// name, which the automation frame carries
+// name, which the automation frame carries. A channel's follows its
+// project's rename
 export function recentFrame(list: RecentRow[], ev: SocketEvent): RecentRow[] {
   switch (ev.type) {
     case "session": {
       const s = ev.session;
-      if (s.origin !== "chat") return list;
-      return change(list, (r) => r.kind === "chat" && r.id === s.id, s.title);
+      if (s.origin === "automation") return list;
+      return change(list, (r) => r.kind === s.origin && r.id === s.id, s.title);
     }
     case "automation": {
       const a = ev.automation;
@@ -348,7 +358,7 @@ const tone = (status: string): RecentTone | null =>
     ? status
     : null;
 
-// a chat and a run: the feed's icon colour
+// a chat, a channel and a run: the feed's icon colour
 export const sessionStatus = (
   s: Pick<SessionSummary, "attention" | "status">,
 ): RecentStatus => ({ tone: tone(iconStatus(s)), paused: false });
@@ -410,7 +420,9 @@ export function reopenStatus(
   const keep = (key: string) =>
     page?.record === true &&
     (page.kind === "session"
-      ? key === `chat:${page.id}` || key === `run:${page.id}`
+      ? key === `chat:${page.id}` ||
+        key === `channel:${page.id}` ||
+        key === `run:${page.id}`
       : key === `${page.kind}:${page.id}`);
   const kept = Object.keys(statuses).filter(keep);
   if (kept.length === Object.keys(statuses).length) return statuses;

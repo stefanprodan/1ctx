@@ -16,7 +16,11 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   feed returns it first under All and Chats, marked `pinned`; Runs and Flagged
   omit it. Search includes it only when its project-name title matches and
   does not pin it. Home returns every visible channel as an ordinary row in
-  last-activity order.
+  last-activity order. The client keeps a `pinned` row first through every
+  merge (`ordered()`), its envelopes included, and Chats takes a channel's
+  envelope (`listsOrigin()`). The row is `#<project>` with the channel icon,
+  the last post's author and start, or "No messages yet", and never names its
+  project twice.
 - **A channel detail is paged by whole turns.** Its first read returns the
   newest 50 post-anchored turns and a `before` seq when older turns remain.
   `before` reads the next older page; `around` reads one bounded window around

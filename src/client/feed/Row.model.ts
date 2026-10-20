@@ -23,11 +23,18 @@ export type StateLine = { author: string | null; text: string };
 const plain = (text: string): StateLine => ({ author: null, text });
 
 // the row's icon: the clock for an automation's run, the bubble for a
-// chat, the box for an archived chat
-export function iconOf(row: FeedRow): "clock" | "chat" | "archive" {
+// chat, two for a project channel, the box for an archived chat
+export function iconOf(row: FeedRow): "clock" | "chat" | "channel" | "archive" {
   if (row.session.archived !== null) return "archive";
+  if (row.session.origin === "channel") return "channel";
   return row.session.origin === "automation" ? "clock" : "chat";
 }
+
+// a channel's title is its project's name, drawn as the channel
+export const rowTitle = (session: Pick<SessionSummary, "origin" | "title">) =>
+  session.origin === "channel" ? `#${session.title}` : session.title;
+
+export const CHANNEL_EMPTY = "No messages yet";
 
 // the quiet word before the line: an archived chat, or a restart run
 export function markOf(row: FeedRow): string | null {
@@ -122,9 +129,8 @@ export function stateLine(row: FeedRow): StateLine {
             : "stopped",
       );
     default:
-      return last === null
-        ? plain("")
-        : { author: last.author, text: last.text };
+      if (last !== null) return { author: last.author, text: last.text };
+      return plain(session.origin === "channel" ? CHANNEL_EMPTY : "");
   }
 }
 

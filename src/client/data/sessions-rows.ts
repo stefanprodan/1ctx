@@ -39,12 +39,26 @@ export const feedOrder: RowOrder = (a, b) => {
   return ra !== rb ? rb - ra : runOrder(a, b);
 };
 
+// a pinned row, the project's channel, stays first whatever its place
 export function ordered(
   rows: FeedRow[],
   order: RowOrder = feedOrder,
 ): FeedRow[] {
-  return [...rows].sort(({ session: a }, { session: b }) => order(a, b));
+  const pin = (row: FeedRow) => (row.pinned ? 1 : 0);
+  return [...rows].sort(
+    (a, b) => pin(b) - pin(a) || order(a.session, b.session),
+  );
 }
+
+// the Chats pick lists a project's channel with the chats, as the
+// server does
+export const listsOrigin = (
+  shown: SessionOrigin | null,
+  origin: SessionOrigin,
+): boolean =>
+  shown === null ||
+  shown === origin ||
+  (shown === "chat" && origin === "channel");
 
 // of two copies of a row, the one at the higher revision
 const newest = (a: FeedRow, b: FeedRow | undefined) =>
@@ -213,9 +227,7 @@ export function reconcile(
 ): Reconciled {
   const same = (out: FeedRow[]) => ({ rows: out, reload: false });
   const { session } = ev;
-  if (shown.origin !== null && shown.origin !== session.origin) {
-    return same(rows);
-  }
+  if (!listsOrigin(shown.origin, session.origin)) return same(rows);
   const listed = shown.q === "" || searched(session.title, shown.q);
   const held = rows.find((row) => row.session.id === session.id);
   const newer = held !== undefined && held.session.revision < session.revision;
@@ -242,9 +254,15 @@ export function reconcile(
   }
   if (held !== undefined) {
     if (!newer) return same(rows);
+    // only a list read pins, so the held row keeps its pin
     const moved: FeedRow =
       ev.row !== null
-        ? { ...ev.row, session, runs: held.runs }
+        ? {
+            ...ev.row,
+            session,
+            runs: held.runs,
+            ...(held.pinned ? { pinned: true } : {}),
+          }
         : {
             ...held,
             session,
