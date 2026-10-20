@@ -19,6 +19,7 @@ const send = (
   projectId: string,
 ): ActiveSend =>
   ({
+    id: crypto.randomUUID(),
     sessionId: crypto.randomUUID(),
     kind,
     startedBy,
@@ -44,7 +45,12 @@ const caps = (
   sendsPerUser: number,
   sendsPerProject: number,
   sendsRunning: number,
-): SendCaps => ({ sendsPerUser, sendsPerProject, sendsRunning });
+): SendCaps => ({
+  sendsPerUser,
+  sendsPerProject,
+  sendsRunning,
+  sendsPerChannel: 4,
+});
 
 const DEFAULTS = caps(4, 16, 64);
 
@@ -239,6 +245,7 @@ describe("admission", () => {
     expect(
       refusal(() =>
         registry.admit("new", scheduled(), {
+          sendsPerChannel: 4,
           sendsPerUser: 1,
           sendsPerProject: 1,
           sendsRunning: 4,

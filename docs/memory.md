@@ -48,6 +48,11 @@ note edits it in the memory phase, an extra step after its main rounds.
   saved are gone. A run reads the note live.
 - **Edits run in call order.** A round's calls run in parallel, so
   each goes through the handle's queue.
+- **A channel turn has its own view.** It snapshots the current note at
+  start, keys `memory_views` by send id, and deletes that view at its end
+  or restart repair. Edits, refusals and the saving agent use the calling
+  send id, so another turn cannot change what it has seen. Chat views stay
+  keyed by session and keep their lifetime above.
 - **Two failed rounds stop the tool.** A settled round with edits but
   no success counts; a success resets it. After
   `MEMORY_EDIT_FAILED_ROUNDS` every call fails. Chat rounds and the

@@ -76,14 +76,24 @@ export type MemoryCapability = {
     sessionId: string,
     edit: ChatMemoryEdit,
     userId: string,
+    sendId?: string,
   ): ChatEditAnswer;
   // a refusal before any edit, the note listed and so seen whole
-  refuse(projectId: string, sessionId: string, reason: string): string;
+  refuse(
+    projectId: string,
+    sessionId: string,
+    reason: string,
+    sendId?: string,
+  ): string;
   // the note a chat's prompt carries, null before its first send and
   // after a summary
   view(sessionId: string): MemoryEntry[] | null;
   // inside the caller's transaction
-  startView(sessionId: string, snapshot: readonly MemoryEntry[]): void;
+  startView(
+    sessionId: string,
+    snapshot: readonly MemoryEntry[],
+    sendId?: string,
+  ): void;
   endView(sessionId: string): void;
   // what the chat saw falls back to its snapshot, inside the caller's
   // transaction
@@ -173,11 +183,12 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
         };
       });
     },
-    edit(projectId, sessionId, edit, userId) {
+    edit(projectId, sessionId, edit, userId, sendId) {
       return transact<ChatEditAnswer>(deps.db, () => {
         const note = target(projectId, null);
         const current = store.read(note);
-        const view = store.view(sessionId);
+        const viewId = store.viewId(sessionId, sendId);
+        const view = store.view(viewId);
         const outcome = chatEdit(
           current.entries,
           view?.seen ?? current.entries,
@@ -187,6 +198,7 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
           sessionId,
           outcome.seen,
           view?.snapshot ?? current.entries,
+          viewId,
         );
         if (!outcome.ok) {
           return {
@@ -209,6 +221,7 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
           userId,
           sessionId,
           deps.clock(),
+          sendId,
         );
         return {
           result: { error: false, content: savedWords(row.entries) },
@@ -216,20 +229,23 @@ export function memoryArea(deps: MemoryDeps): MemoryArea {
         };
       });
     },
-    refuse(projectId, sessionId, reason) {
+    refuse(projectId, sessionId, reason, sendId) {
       return transact(deps.db, () => {
         const current = store.read(target(projectId, null));
-        const view = store.view(sessionId);
+        const viewId = store.viewId(sessionId, sendId);
+        const view = store.view(viewId);
         store.setSeen(
           sessionId,
           current.entries,
           view?.snapshot ?? current.entries,
+          viewId,
         );
         return { result: noteWords(reason, current.entries) };
       });
     },
     view: (sessionId) => store.view(sessionId)?.snapshot ?? null,
-    startView: (sessionId, snapshot) => store.startView(sessionId, snapshot),
+    startView: (sessionId, snapshot, sendId) =>
+      store.startView(sessionId, snapshot, sendId),
     endView: (sessionId) => store.endView(sessionId),
     resetSeen: (sessionId) => store.resetSeen(sessionId),
   };

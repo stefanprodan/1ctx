@@ -117,7 +117,8 @@ async function send(
   expect(response.status).toBe(201);
   const detail = (await response.json()) as SessionDetail;
   const script = await waitScript(chat.scripted, count);
-  const policy = chat.app.runner.registry.get(detail.session.id)!.policy;
+  const policy = (chat.app.runner.registry.inSession(detail.session.id)[0] ??
+    null)!.policy;
   return { detail, script, policy, id: detail.session.id };
 }
 
@@ -395,7 +396,7 @@ test("a personal project's send has none, and a run keeps its automation's set",
     expect(started.status).toBe(201);
     const run = (await started.json()).session.id as string;
     const script = await pending;
-    const policy = chat.app.runner.registry.get(run)!.policy;
+    const policy = (chat.app.runner.registry.inSession(run)[0] ?? null)!.policy;
     expect(policy.offered.credentials.map((c) => c.id)).toEqual([prices]);
     expect(policy.offered.credentialsOff.map((c) => c.id)).toEqual([quotes]);
     expect(bashWords(script)).not.toContain("(quotes)");

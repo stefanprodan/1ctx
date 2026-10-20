@@ -303,11 +303,16 @@ connections watching that session.
   decisions are final and a reconnect reads the chat's drafts again. The
   `watched` answer carries them too, so none falls between read and watch.
   `isDraftFrame()` guards both shapes and the nested draft. The
-  `watched` guard only checks its `drafts` is a list; the client skips a
+  `watched` guard checks its live-tail list and that `drafts` is a list;
+  the client skips a
   draft `isAutomationDraft()` refuses, so one never stalls the answer.
 - **Stream frames go to the session's watchers.** `watch` is authorized
   through the sessions port, and the watcher is registered before the
   `watched` snapshot, so no frame falls between.
+  `watched.live` and detail's `live` are lists, one tail per running send;
+  an idle session has none and a chat has at most one.
+  Channel turn stop and pending cancellation are authenticated routes,
+  further restricted to that turn's summoner or an admin after visibility.
 - **`access.changed` recomputes a connection's set.** It sends
   `granted`, `revoked` and `role`, and unwatches a session out of
   sight. Connections between upgrade and open are updated too.

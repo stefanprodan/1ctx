@@ -95,7 +95,7 @@ function detail(changes: Partial<SessionDetail> = {}): SessionDetail {
     forkedFrom: null,
     messages: [],
     send: null,
-    live: null,
+    live: [],
     authors: [],
     queued: [],
     automationDrafts: [],
@@ -292,7 +292,7 @@ describe("the queue on screen", () => {
     const watched = (revision: number, rows: QueuedMessage[]): SocketEvent => ({
       type: "watched",
       sessionId: "s1",
-      live: null,
+      live: [],
       queue: { revision, rows },
     });
     onSocket(watched(2, [queued()]));

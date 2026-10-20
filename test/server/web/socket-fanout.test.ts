@@ -48,7 +48,7 @@ const area = (overrides: Partial<Parameters<typeof socketArea>[0]> = {}) => {
     refresh: (principal) => principal,
     visibleProjectIds: () => ["p"],
     sessionProject: () => "p",
-    live: () => null,
+    live: () => [],
     envelopeRow: () => null,
     queue: () => ({ revision: 0, rows: [] }),
     children: () => [],

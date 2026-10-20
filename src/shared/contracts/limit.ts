@@ -52,6 +52,7 @@ export const LIMIT_NAMES = [
   "mcpKeptFiles",
   "sendsPerUser",
   "sendsPerProject",
+  "sendsPerChannel",
   "sendsRunning",
   "queuedPerUser",
   "queuedMinutes",

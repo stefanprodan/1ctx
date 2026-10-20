@@ -352,10 +352,12 @@ describe("the socket", () => {
       {
         type: "watched",
         sessionId,
-        live: expect.objectContaining({
-          sendId: detail.send.id,
-          messageId: detail.messages[1].id,
-        }),
+        live: [
+          expect.objectContaining({
+            sendId: detail.send.id,
+            messageId: detail.messages[1].id,
+          }),
+        ],
         // the chat's queue as the queue frame carries it
         queue: { revision: detail.session.revision, rows: [] },
       },
@@ -841,7 +843,7 @@ describe("the envelope row read", () => {
       refresh: (principal) => principal,
       visibleProjectIds: () => [],
       sessionProject: () => null,
-      live: () => null,
+      live: () => [],
       queue: () => ({ revision: 0, rows: [] }),
       children: () => [],
       drafts: () => [],
@@ -873,7 +875,7 @@ describe("the envelope row read", () => {
       refresh: (principal) => principal,
       visibleProjectIds: () => [],
       sessionProject: () => null,
-      live: () => null,
+      live: () => [],
       queue: () => ({ revision: 0, rows: [] }),
       children: () => [],
       drafts: () => [],
@@ -901,7 +903,7 @@ describe("the envelope row read", () => {
       refresh: (principal) => principal,
       visibleProjectIds: () => [],
       sessionProject: () => null,
-      live: () => null,
+      live: () => [],
       queue: () => ({ revision: 0, rows: [] }),
       children: () => [],
       drafts: () => [],

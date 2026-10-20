@@ -67,7 +67,7 @@ export function openedDetail(
   fields: { status?: MessageStatus; files?: OpenedFile[] | null } = {},
 ): SessionDetail {
   const detail = visualDetail();
-  detail.live = null;
+  detail.live = [];
   detail.messages = [
     visualRow({ status: "done", toolCalls: [bashCall, visualCall] }),
     openedRow({

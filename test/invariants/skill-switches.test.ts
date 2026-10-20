@@ -93,7 +93,8 @@ async function send(
   expect(response.status).toBe(201);
   const detail = (await response.json()) as SessionDetail;
   const script = await waitScript(chat.scripted, count);
-  const policy = chat.app.runner.registry.get(detail.session.id)!.policy;
+  const policy = (chat.app.runner.registry.inSession(detail.session.id)[0] ??
+    null)!.policy;
   return { detail, script, policy };
 }
 
@@ -215,7 +216,8 @@ test("a run takes the automation's skills off", async () => {
       disabledCapabilities: keys,
     });
     const run = await startRun(chat, automation.id);
-    const policy = chat.app.runner.registry.get(run.sessionId)!.policy;
+    const policy = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+      null)!.policy;
     expect(policy.skillsOff).toEqual(["gitops"]);
     expect(policy.offered.skills.skills.map((s) => s.name)).toEqual(["plain"]);
     expect(system(run.main)).toContain(skillsOffLine(["gitops"]));

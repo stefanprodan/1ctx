@@ -13,11 +13,7 @@ import { messageOf } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { ProjectRow } from "../projects/index.ts";
-import {
-  refuseChannel,
-  type SessionRow,
-  titleFrom,
-} from "../sessions/index.ts";
+import { type SessionRow, titleFrom } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { attention } from "./attention.ts";
 import {
@@ -26,8 +22,8 @@ import {
   requiredAgent,
   requiredUser,
 } from "./authors.ts";
-import { channelMessage } from "./channel.ts";
-import { chatFor } from "./chat-guard.ts";
+import { cancelPending, channelMessage, pendingFields } from "./channel.ts";
+import { chatFor, sendToStop } from "./chat-guard.ts";
 import { childRowsTo, delegate } from "./child.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_RETRY_MS } from "./ending.ts";
@@ -44,7 +40,7 @@ import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
 import { drainRunner, shutdownRunner } from "./shutdown.ts";
-import type { QueuedClaim, StartFields, StartUser } from "./start.ts";
+import { newUser, type QueuedClaim, type StartFields } from "./start.ts";
 import { refuseNewSummon, regeneratedAgent, turnAgent } from "./summon.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { applyChanges, checkTurn, type TurnMessage } from "./turn.ts";
@@ -77,8 +73,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     usage: deps.usage,
     commitMemory: (send) => commitMemory({ memory: deps.memory }, send),
     views: {
-      start: (sessionId, snapshot) =>
-        deps.memory.startView(sessionId, snapshot),
+      start: (sessionId, snapshot, sendId) =>
+        deps.memory.startView(sessionId, snapshot, sendId),
       end: (sessionId) => deps.memory.endView(sessionId),
       resetSeen: (sessionId) => deps.memory.resetSeen(sessionId),
     },
@@ -237,6 +233,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       session,
       policy: sendPolicy(deps, {
         ...fields,
+        channel: session?.origin === "channel",
         event,
         disabledCapabilities: disabled,
       }),
@@ -261,18 +258,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
   };
   const begin = (fields: Parameters<typeof prepare>[0]): SessionDetail =>
     launched(prepare(fields));
-
-  const newUser = (
-    user: UserRow,
-    text: string,
-    uploads?: readonly string[],
-  ): StartUser => ({
-    id: newId(),
-    userId: user.id,
-    username: user.username,
-    text,
-    ...(uploads === undefined ? {} : { uploads }),
-  });
 
   const continueChat = (
     sessionId: string,
@@ -343,10 +328,11 @@ export function runnerArea(deps: RunnerDeps): Runner {
     );
   };
 
-  const liveOf = (sessionId: string) => {
-    const send = registry.get(sessionId);
-    return send === null || send.terminal !== null ? null : live(send);
-  };
+  const liveOf = (sessionId: string) =>
+    registry
+      .inSession(sessionId)
+      .filter((send) => send.terminal === null)
+      .map(live);
 
   const runner: Runner = {
     registry,
@@ -373,12 +359,18 @@ export function runnerArea(deps: RunnerDeps): Runner {
       return launched(prepareTurn(sessionId, messages, claim, starter));
     },
     message(principal, sessionId, fields) {
-      return channelMessage(deps, principal, sessionId, fields, () => {
-        const queued = runner.queue.enqueue(principal, sessionId, fields);
-        return queued === null
-          ? { status: 201, body: runner.send(principal, sessionId, fields) }
-          : { status: 202, body: queued };
-      });
+      return channelMessage(
+        { ...deps, registry, queue: runner.queue },
+        principal,
+        sessionId,
+        fields,
+        () => {
+          const queued = runner.queue.enqueue(principal, sessionId, fields);
+          return queued === null
+            ? { status: 201, body: runner.send(principal, sessionId, fields) }
+            : { status: 202, body: queued };
+        },
+      );
     },
     regenerate(principal, sessionId, fields = {}) {
       const session = chatFor(
@@ -446,12 +438,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
         changes: [],
       });
     },
-    stop(principal, sessionId) {
-      const session = deps.visible(principal, sessionId);
-      refuseChannel(session, "stopped");
-      const send = registry.get(session.id);
+    stop(principal, sessionId, sendId) {
+      const send = sendToStop(deps, registry, principal, sessionId, sendId);
       if (send !== null) void terminate(send, "stop");
     },
+    cancelPending: (principal, sessionId, id) =>
+      cancelPending(deps, principal, sessionId, id),
     stopAgent(agentId) {
       for (const send of registry.values()) {
         if (send.policy.agentId === agentId) void terminate(send, "stop");
@@ -459,9 +451,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     },
     delegate(input, call, ctx) {
       // the send of the call's session, started when the call's was
-      const parent =
-        ctx.actor === null ? null : registry.get(ctx.actor.sessionId);
-      if (parent === null || parent.startedAt !== ctx.actor?.sendStartedAt) {
+      const parent = ctx.actor === null ? null : registry.get(ctx.sendId);
+      if (parent === null || parent.sessionId !== ctx.actor?.sessionId) {
         throw new Error("the turn has ended");
       }
       return delegate(childDeps, parent, input, call, ctx);
@@ -486,6 +477,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     ...deps,
     registry,
     prepareTurn,
+    preparePending: (row) => prepare(pendingFields(deps, row)),
   });
   runner.routes = routes({
     start: (principal, fields) => runner.start(principal, fields),
@@ -493,7 +485,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
     regenerate: (principal, id, fields) =>
       runner.regenerate(principal, id, fields),
     compact: (principal, id) => runner.compact(principal, id),
-    stop: (principal, id) => runner.stop(principal, id),
+    stop: (principal, id, sendId) => runner.stop(principal, id, sendId),
+    cancelPending: (principal, id, turnId) =>
+      runner.cancelPending(principal, id, turnId),
   });
   return runner;
 }

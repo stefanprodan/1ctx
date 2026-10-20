@@ -141,7 +141,7 @@ const outbox = (chat: ChatApp) =>
 
 const offeredNames = (chat: ChatApp, sessionId: string) =>
   chat.app.runner.registry
-    .get(sessionId)!
+    .inSession(sessionId)[0]!
     .policy.offered.tools.map((tool) => tool.name);
 
 describe("email_user's schema", () => {

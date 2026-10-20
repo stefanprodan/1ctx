@@ -72,7 +72,8 @@ type Raw = {
 // running send's, a summoned one's included, else the session's
 const AGENT_OF = `coalesce(
   (select agents.name from sends join agents on agents.id = sends.agent_id
-   where sends.session_id = ? and sends.status = 'running'),
+   where sends.id = coalesce(?, (select id from sends
+     where session_id = ? and status = 'running' limit 1))),
   (select agents.name from sessions
    join agents on agents.id = sessions.agent_id where sessions.id = ?))`;
 
@@ -258,15 +259,16 @@ export class MemoryStore {
     userId: string,
     sessionId: string,
     now: number,
+    sendId: string | null = null,
   ): MemoryRow {
-    this.write(target, current, next, userId, sessionId, now);
+    this.write(target, current, next, userId, sessionId, now, sendId);
     return this.read(target);
   }
 
   view(sessionId: string): MemoryView | null {
     const raw = this.db
       .query<{ snapshot: string; seen: string }, [string]>(
-        "select snapshot, seen from memory_views where session_id = ?",
+        "select snapshot, seen from memory_views where id = ?",
       )
       .get(sessionId);
     return raw
@@ -276,14 +278,38 @@ export class MemoryStore {
 
   // the chat's first send after none, or after a summary: what it sees
   // starts as what its prompt carries
-  startView(sessionId: string, snapshot: readonly MemoryEntry[]): void {
+  startView(
+    sessionId: string,
+    snapshot: readonly MemoryEntry[],
+    sendId?: string,
+  ): void {
     const json = JSON.stringify(snapshot);
     this.db
       .query(
-        `insert into memory_views (session_id, snapshot, seen)
-         values (?, ?, ?) on conflict(session_id) do nothing`,
+        `insert into memory_views (id, session_id, send_id, snapshot, seen)
+         values (?, ?, ?, ?, ?) on conflict(id) do nothing`,
       )
-      .run(sessionId, json, json);
+      .run(sendId ?? sessionId, sessionId, sendId ?? null, json, json);
+  }
+
+  viewId(sessionId: string, sendId?: string): string {
+    const channel = this.db
+      .query<{ id: string }, [string]>(
+        "select id from sessions where id = ? and origin = 'channel' and parent_session_id is null",
+      )
+      .get(sessionId);
+    if (channel === null) return sessionId;
+    const view =
+      sendId === undefined
+        ? null
+        : this.db
+            .query<{ id: string }, [string, string]>(
+              "select id from memory_views where send_id = ? and session_id = ?",
+            )
+            .get(sendId, sessionId);
+    if (view === null)
+      throw new Error("the channel turn's memory view is gone");
+    return view.id;
   }
 
   // the snapshot is kept when the row is there
@@ -291,28 +317,33 @@ export class MemoryStore {
     sessionId: string,
     seen: readonly MemoryEntry[],
     snapshot: readonly MemoryEntry[],
+    viewId = sessionId,
   ): void {
     this.db
       .query(
-        `insert into memory_views (session_id, snapshot, seen)
-         values (?, ?, ?)
-         on conflict(session_id) do update set seen = excluded.seen`,
+        `insert into memory_views (id, session_id, send_id, snapshot, seen)
+         values (?, ?, ?, ?, ?)
+         on conflict(id) do update set seen = excluded.seen`,
       )
-      .run(sessionId, JSON.stringify(snapshot), JSON.stringify(seen));
+      .run(
+        viewId,
+        sessionId,
+        viewId === sessionId ? null : viewId,
+        JSON.stringify(snapshot),
+        JSON.stringify(seen),
+      );
   }
 
   // a regenerate drops the rows that saved, so the chat has seen only
   // what its prompt carries
   resetSeen(sessionId: string): void {
     this.db
-      .query("update memory_views set seen = snapshot where session_id = ?")
+      .query("update memory_views set seen = snapshot where id = ?")
       .run(sessionId);
   }
 
   endView(sessionId: string): void {
-    this.db
-      .query("delete from memory_views where session_id = ?")
-      .run(sessionId);
+    this.db.query("delete from memory_views where id = ?").run(sessionId);
   }
 
   private assertTarget(target: MemoryTarget): void {
@@ -334,6 +365,7 @@ export class MemoryStore {
     userId: string | null,
     sessionId: string | null,
     now: number,
+    sendId: string | null = null,
   ): void {
     if (current.revision === 0) {
       this.db
@@ -350,6 +382,7 @@ export class MemoryStore {
           now,
           userId,
           sessionId,
+          sendId,
           sessionId,
           sessionId,
         );
@@ -368,6 +401,7 @@ export class MemoryStore {
         now,
         userId,
         sessionId,
+        sendId,
         sessionId,
         sessionId,
         target.projectId,

@@ -41,6 +41,9 @@ export type SessionsPort = {
       claims: readonly { id: string; revision: number }[],
     ): boolean;
   };
+  pending: {
+    claim(id: string, sessionId: string, messageId: string): boolean;
+  };
   setDisabledCapabilities(id: string, keys: readonly string[]): void;
   create(fields: {
     id?: string;

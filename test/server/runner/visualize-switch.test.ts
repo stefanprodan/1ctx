@@ -38,7 +38,9 @@ describe("the chat's visualize switch", () => {
       const detail = await create(chat, { disable: [VISUALIZE, "web"] });
       const script = await waitScript(chat.scripted, 1);
       expect(detail.session.disabledCapabilities).toEqual(["visualize", "web"]);
-      const active = chat.app.runner.registry.get(detail.session.id)!;
+      const active = (chat.app.runner.registry.inSession(
+        detail.session.id,
+      )[0] ?? null)!;
       const names = active.policy.offered.tools.map((tool) => tool.name);
       expect(names).not.toContain("visualize");
       expect(names).toContain("bash");
@@ -62,7 +64,8 @@ describe("the chat's visualize switch", () => {
       );
       expect(sent.status).toBe(201);
       const second = await waitScript(chat.scripted, 2);
-      const again = chat.app.runner.registry.get(detail.session.id)!;
+      const again = (chat.app.runner.registry.inSession(detail.session.id)[0] ??
+        null)!;
       expect(again.policy.disabledCapabilities).toEqual(["web"]);
       expect(again.policy.offered.tools.map((tool) => tool.name)).toContain(
         "visualize",
@@ -110,7 +113,9 @@ describe("the chat's visualize switch", () => {
       const detail = await create(chat, { disable: [VISUALIZE] });
       const script = await waitScript(chat.scripted, 1);
       expect(detail.session.disabledCapabilities).toEqual(["visualize"]);
-      const active = chat.app.runner.registry.get(detail.session.id)!;
+      const active = (chat.app.runner.registry.inSession(
+        detail.session.id,
+      )[0] ?? null)!;
       expect(active.policy.offered.visuals).toBe(false);
       expect(
         active.policy.offered.tools.map((tool) => tool.name),

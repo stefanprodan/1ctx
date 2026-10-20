@@ -14,6 +14,7 @@ import type {
   ChildOf,
   LastLine,
   Message,
+  PendingTurn,
   QueuedMessage,
   SendSummary,
   SessionSummary,
@@ -50,6 +51,7 @@ export type BusEvents = {
     revision: number;
     turn: boolean;
     rows: QueuedMessage[];
+    pending?: PendingTurn[];
   };
   // a subagent's rows changed: for the watchers of its root alone,
   // keyed by the root's delegate row

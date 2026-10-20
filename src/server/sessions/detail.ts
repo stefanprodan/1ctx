@@ -32,12 +32,15 @@ type DetailStore = {
   queue: {
     ofChat(id: string, viewerId: string | null): SessionDetail["queued"];
   };
+  pending: {
+    ofSession(id: string): NonNullable<SessionDetail["pending"]>;
+  };
 };
 
 export function detail(
   store: DetailStore,
   session: SessionRow,
-  live: LiveSend | null,
+  live: LiveSend[],
   keptDays: number,
   // who reads it: a not-sent message shows to its author alone
   viewerId: string | null,
@@ -57,6 +60,9 @@ export function detail(
       : { page: { before: page.before, after: page.after } }),
     send: store.lastSend(session.id),
     live,
+    ...(session.origin === "channel"
+      ? { pending: store.pending.ofSession(session.id) }
+      : {}),
     authors: store.authors(session.id),
     agents: store.agents(session.id),
     archive: store.archiveOf(session.id, keptDays),

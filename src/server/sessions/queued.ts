@@ -19,6 +19,7 @@ import type { BusEvent } from "../lib/bus.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { newId } from "../lib/ids.ts";
 import { notSentOf } from "./not-sent.ts";
+import { pendingOf } from "./pending.ts";
 import { listJson } from "./rows.ts";
 
 // a chat's queue starts as one turn, so it holds at most what one turn
@@ -126,8 +127,8 @@ export function chatQueue(
 
 const chatOf = (db: Db, sessionId: string) =>
   db
-    .query<{ project_id: string; revision: number }, [string]>(
-      "select project_id, revision from sessions where id = ?",
+    .query<{ project_id: string; revision: number; origin: string }, [string]>(
+      "select project_id, revision, origin from sessions where id = ?",
     )
     .get(sessionId);
 
@@ -149,6 +150,9 @@ export function queueFrameEvent(
         revision: chat.revision,
         turn,
         rows: chatQueue(db, sessionId, null, { cut: true }),
+        ...(chat.origin === "channel"
+          ? { pending: pendingOf(db, sessionId) }
+          : {}),
       },
     },
   ];
@@ -441,11 +445,16 @@ export class QueueStore {
     return this.db
       .query<QueueLoad, []>(
         `select
-           (select count(*) from queued_messages where state = 'queued')
+           ((select count(*) from queued_messages where state = 'queued')
+             + (select count(*) from pending_turns where reason is null))
              as queued,
-           (select count(*) from queued_messages where state = 'not-sent')
+           ((select count(*) from queued_messages where state = 'not-sent')
+             + (select count(*) from pending_turns where reason is not null))
              as notSent,
-           (select min(queued_at) from queued_messages where state = 'queued')
+           (select min(at) from (
+             select min(queued_at) as at from queued_messages where state = 'queued'
+             union all
+             select min(queued_at) as at from pending_turns where reason is null))
              as oldestQueuedAt`,
       )
       .get()!;

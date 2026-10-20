@@ -67,7 +67,12 @@ function storedId(value: unknown, name: string): string {
   if (typeof value !== "string" || !/^[0-9a-z]{12}$/.test(value)) {
     throw new BadRequest(`${name} must be an id`);
   }
+
   return value;
+}
+
+export function parseTurnId(value: unknown): string {
+  return storedId(value, "turnId");
 }
 
 export function parseVisualParams(value: unknown): {

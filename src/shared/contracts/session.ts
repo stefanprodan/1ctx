@@ -309,7 +309,9 @@ export type SessionDetail = {
   // channel-only paging cursors; absent when a chat or run is read whole
   page?: { before: number | null; after: number | null };
   send: SendSummary | null;
-  live: LiveSend | null;
+  live: LiveSend[];
+  // channel-only turns whose posts are already in the transcript
+  pending?: PendingTurn[];
   authors: SessionAuthor[];
   // the agents its rows name, a retired one included, so a reply keeps
   // its agent's name and avatar once the agent is deleted
@@ -332,6 +334,15 @@ export const QUEUED_PREVIEW = 2048;
 // files. On a socket frame text is a preview of QUEUED_PREVIEW
 // characters at most, cut then true; the detail and an answer carry it
 // whole
+export type PendingTurn = {
+  id: string;
+  messageId: string;
+  authorId: string;
+  agentId: string;
+  queuedAt: number;
+  reason: "expired" | "agent-deleted" | "failed" | null;
+};
+
 export type QueuedMessage = {
   id: string;
   author: { id: string; username: string };

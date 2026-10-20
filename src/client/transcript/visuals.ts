@@ -61,12 +61,14 @@ export function snapshotVisuals(
   detail: SessionDetail,
 ): Previews {
   const next = new Map(previews);
-  for (const draft of detail.live?.drafts ?? []) {
-    next.set(visualKey(draft.messageId, draft.callIndex), {
-      ...draft,
-      sendId: detail.live!.sendId,
-      phase: "draft",
-    });
+  for (const send of detail.live) {
+    for (const draft of send.drafts ?? []) {
+      next.set(visualKey(draft.messageId, draft.callIndex), {
+        ...draft,
+        sendId: send.sendId,
+        phase: "draft",
+      });
+    }
   }
   return reconcileVisuals(next, detail);
 }

@@ -246,7 +246,7 @@ test("a stopped draft fades with its reason and is removed with its rows", () =>
   detail.messages = [
     visualRow({ status: "failed", error: "provider went quiet" }),
   ];
-  detail.live = null;
+  detail.live = [];
   const after = snapshotVisuals(before, detail);
   expect([...after.values()][0]).toMatchObject({
     phase: "failed",

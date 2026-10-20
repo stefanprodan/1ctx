@@ -185,7 +185,6 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
     agentId: "a",
     agentName: "agent",
     origin: "chat",
-    sendStartedAt: 0,
   };
   const tool = makeBashTool({
     bash: {

@@ -711,7 +711,8 @@ describe("a fire waiting for a free place", () => {
 
     // the process goes away with the run still marked running
     chat.app.automationScheduler.dispose();
-    const send = chat.app.runner.registry.get(held.sessionId)!;
+    const send = (chat.app.runner.registry.inSession(held.sessionId)[0] ??
+      null)!;
     chat.app.runner.registry.free(send);
     const pending = chat.scripted.next();
     const restarted = await testApp({

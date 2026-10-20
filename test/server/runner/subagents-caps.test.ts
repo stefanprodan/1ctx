@@ -26,7 +26,7 @@ const children = (chat: ChatApp) => chat.scripted.scripts.filter(isChild);
 // the last delegate call waits for a place, so it cannot ask; every
 // call takes or waits for its place in the turn the round launches
 function quiet(chat: ChatApp, parentId: string, count: number) {
-  const parent = chat.app.runner.registry.get(parentId)!;
+  const parent = (chat.app.runner.registry.inSession(parentId)[0] ?? null)!;
   expect(parent.children.waiting).toHaveLength(1);
   expect(chat.scripted.scripts.length).toBe(count);
 }

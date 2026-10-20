@@ -44,7 +44,7 @@ describe("visual draft gates", () => {
           chat.app.now.value += VISUAL_EVERY_MS;
           await tick();
           expect(frames(conn, "visual")).toEqual([]);
-          expect(chat.app.runner.live(sessionId)?.drafts).toBeUndefined();
+          expect(chat.app.runner.live(sessionId)[0]?.drafts).toBeUndefined();
         } finally {
           await chat.app.shutdown();
         }
@@ -75,7 +75,8 @@ describe("visual draft gates", () => {
     const chat = await chatApp();
     try {
       const { script, sessionId } = await startChat(chat);
-      const active = chat.app.runner.registry.get(sessionId)!;
+      const active = (chat.app.runner.registry.inSession(sessionId)[0] ??
+        null)!;
       active.policy.limits.rounds = 2;
       script.toolRound([{ name: "datetime", id: "time", arguments: "{}" }]);
       script.end();
@@ -98,7 +99,8 @@ describe("visual draft gates", () => {
     try {
       const automation = await createAutomation(chat, { ownMemory: true });
       const { sessionId, main } = await startRun(chat, automation.id);
-      const active = chat.app.runner.registry.get(sessionId)!;
+      const active = (chat.app.runner.registry.inSession(sessionId)[0] ??
+        null)!;
       expect(active.policy.offered.tools.map((tool) => tool.name)).toContain(
         "visualize",
       );
@@ -112,7 +114,7 @@ describe("visual draft gates", () => {
       chat.app.now.value += VISUAL_EVERY_MS;
       await tick();
       expect(frames(conn, "visual")).toEqual([]);
-      expect(chat.app.runner.live(sessionId)?.drafts).toBeUndefined();
+      expect(chat.app.runner.live(sessionId)[0]?.drafts).toBeUndefined();
     } finally {
       await chat.app.shutdown();
     }
@@ -137,7 +139,7 @@ describe("visual draft gates", () => {
       chat.app.now.value += VISUAL_EVERY_MS;
       await tick();
       expect(frames(conn, "visual")).toEqual([]);
-      expect(chat.app.runner.live(sessionId)?.drafts).toBeUndefined();
+      expect(chat.app.runner.live(sessionId)[0]?.drafts).toBeUndefined();
     } finally {
       await chat.app.shutdown();
     }
@@ -197,14 +199,14 @@ describe("visual draft gates", () => {
         chat.app.now.value += 1000;
         await tick();
         expect(frames(conn, "visual")).toHaveLength(count);
-        expect(chat.app.runner.live(sessionId)).toBeNull();
+        expect(chat.app.runner.live(sessionId)).toEqual([]);
         expect(chat.app.sessions.message(detail.messages[1].id)).toMatchObject({
           status: cause === "stop" ? "stopped" : "failed",
           toolCalls: null,
         });
         const fresh = await watcher(chat);
         watch(chat, fresh, sessionId);
-        expect(frames(fresh, "watched")[0]?.live).toBeNull();
+        expect(frames(fresh, "watched")[0]?.live).toEqual([]);
         const res = await chat.member.call(
           "POST",
           `/api/sessions/${sessionId}/regenerate`,

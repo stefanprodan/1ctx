@@ -308,14 +308,14 @@ export const streams = (m: Message) =>
 // every streaming row starts from itself
 export function liveFrom(detail: SessionDetail): Map<string, Live> {
   const map = new Map<string, Live>();
-  const snap = detail.live?.phase === "reply" ? detail.live : null;
   for (const m of detail.messages) {
     if (!streams(m) || m.status !== "streaming") continue;
+    const snap = detail.live.find(
+      (send) => send.phase === "reply" && send.messageId === m.id,
+    );
     map.set(
       m.id,
-      snap !== null && snap.messageId === m.id
-        ? liveOfSnapshot(snap, m)
-        : liveOf(m),
+      snap?.phase === "reply" ? liveOfSnapshot(snap, m) : liveOf(m),
     );
   }
   return map;

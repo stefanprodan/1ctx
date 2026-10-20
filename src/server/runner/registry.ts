@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Active sends by session and synchronous admission (docs/sessions.md).
+// Active sends by id and synchronous admission (docs/sessions.md).
 
 import {
   Conflict,
@@ -38,7 +38,7 @@ export class RunCapacity extends TooManyRequests {
 // which one from the class, never from the words
 export class CapFull extends TooManyRequests {
   constructor(
-    readonly cap: "user" | "project" | "process",
+    readonly cap: "user" | "project" | "process" | "channel",
     message: string,
   ) {
     super(message);
@@ -55,6 +55,12 @@ export class Restarting extends ServiceUnavailable {
   }
 }
 
+export const waitsForPlace = (error: unknown): boolean =>
+  error instanceof CapFull ||
+  error instanceof RunCapacity ||
+  error instanceof LockHeld ||
+  error instanceof Restarting;
+
 // the count, not the cap: a lowered cap leaves more going
 const going = (n: number): string =>
   n === 1 ? "1 chat or run" : `${n} chats and runs`;
@@ -64,6 +70,7 @@ const projectFull = (n: number): string =>
 
 export class Registry {
   private readonly sends = new Map<string, ActiveSend>();
+  private readonly sessions = new Map<string, Set<ActiveSend>>();
   // subagents streaming beside their parents, each a place under
   // sendsRunning; a parent's first child runs in its place, uncounted.
   // A scheduled send's extras count in its share too
@@ -71,8 +78,16 @@ export class Registry {
   private scheduledExtras = 0;
   private closed = false;
 
-  get(sessionId: string): ActiveSend | null {
-    return this.sends.get(sessionId) ?? null;
+  get(sendId: string): ActiveSend | null {
+    return this.sends.get(sendId) ?? null;
+  }
+
+  inSession(sessionId: string): ActiveSend[] {
+    return [...(this.sessions.get(sessionId) ?? [])];
+  }
+
+  hasSession(sessionId: string): boolean {
+    return this.sessions.has(sessionId);
   }
 
   values(): ActiveSend[] {
@@ -105,9 +120,11 @@ export class Registry {
 
   // the lock's refusals alone, for a caller that checks before it builds
   // a send
-  locked(sessionId: string): void {
+  locked(sessionId: string, agentId?: string): void {
     if (this.closed) throw new Restarting();
-    const own = this.sends.get(sessionId);
+    const own = this.inSession(sessionId).find(
+      (send) => agentId === undefined || send.policy.agentId === agentId,
+    );
     if (own === undefined) return;
     if (own.terminal !== null) {
       throw new LockHeld(
@@ -119,8 +136,19 @@ export class Registry {
 
   // throws the refusal, or returns; the caller reserves with set() in
   // the same turn, with no await between
-  admit(sessionId: string, who: Starter, caps: SendCaps): void {
-    this.locked(sessionId);
+  admit(
+    sessionId: string,
+    who: Starter,
+    caps: SendCaps,
+    channelAgent?: string,
+  ): void {
+    this.locked(sessionId, channelAgent);
+    if (
+      channelAgent !== undefined &&
+      this.inSession(sessionId).length >= caps.sendsPerChannel
+    ) {
+      throw new CapFull("channel", "this channel has too many turns running");
+    }
     let running = this.extras;
     let mine = 0;
     let project = 0;
@@ -208,13 +236,21 @@ export class Registry {
   }
 
   set(send: ActiveSend): void {
-    this.sends.set(send.sessionId, send);
+    const previous = this.sends.get(send.id);
+    if (previous !== undefined) this.free(previous);
+    this.sends.set(send.id, send);
+    const session = this.sessions.get(send.sessionId) ?? new Set<ActiveSend>();
+    session.add(send);
+    this.sessions.set(send.sessionId, session);
   }
 
   // an old send never frees its replacement's lock
   free(send: ActiveSend): boolean {
-    if (this.sends.get(send.sessionId) !== send) return false;
-    this.sends.delete(send.sessionId);
+    if (this.sends.get(send.id) !== send) return false;
+    this.sends.delete(send.id);
+    const session = this.sessions.get(send.sessionId)!;
+    session.delete(send);
+    if (session.size === 0) this.sessions.delete(send.sessionId);
     return true;
   }
 

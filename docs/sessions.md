@@ -29,14 +29,18 @@ arrives.
 
 ## Sends and caps
 
-- **One send per session, under the runner's lock.** The lock is taken
+- **Chats hold one send; channels hold one per agent.** The registry is
+  keyed by send id, with a session index. A channel admits distinct agents
+  up to `sendsPerChannel` (default 4, range 1 to 16), beside the other caps.
+  A stopped send holds its place until freed. Admission is taken
   synchronously in `runner/registry.ts` before anything is written.
   `admit()` checks the caps and the caller reserves with `set()` in the
   same turn, no `await` between.
 - **Every send counts in one tally.** A message, regenerate, compact,
   Run now and a scheduled run all count under `sendsPerUser`,
   `sendsPerProject` and `sendsRunning`. The user is whoever started it
-  (typed, regenerated, compacted, pressed Run now), in every project.
+  (typed, summoned, regenerated, compacted, pressed Run now), in every project.
+  A channel turn's usage and caps belong to its summoner; a post holds no place.
 - **`sendsRunning` defaults to 48 a core, 64 to 256.** A pod carries
   sends by its CPU; 48 is half what a bench machine's core carried, for
   slower x86 cores. The cores are `availableParallelism()` (a container's CPU
@@ -67,6 +71,9 @@ arrives.
   after commit.
 - **The reply in flight is checkpointed without a revision.** Every
   250 ms or 2 KB (`runner/stream.ts`).
+- **Channel running state is derived from its sends.** Every start and end
+  touches the session after writing the send row. It is `running` while any
+  send is running, otherwise `done`; the turn keeps its own end status.
 - **A streaming reply renders only whole blocks.** The timed `html`
   frame renders `content` up to `stableEnd()` (`render/blocks.ts`) and
   sets `htmlAt` there, since a block cut mid-way renders shorter than
@@ -91,9 +98,16 @@ arrives.
 - **A channel post is written at once.** A member or admin uses the message
   route; the server writes one done `post` send and its user row in one
   transaction, with no usage or model turn. A post is never edited. A leading
-  `@name` is a plain post when it names a project member, an agent summon when
-  it names a live agent, and an unknown name is refused. An agent wins a name
-  shared with a user. Until channel summons land, the summon case is a 409.
+  `@name` is a plain post when it names a project member or admin, an agent
+  summon when it names a live agent, and an unknown name is refused. An agent
+  wins a name shared with a user. A summon starts immediately when admitted, otherwise
+  its turn waits (`docs/queue.md`). Its `first_message_id` names the post
+  already written; starting never moves or rewrites that user row.
+  The response carries only the session summary, the new message and its
+  post send, at the post's revision, never a page or a later turn's revision.
+  Posting advances activity and revision without setting the channel status.
+  Channel sends currently use the summoned-send history path; the dedicated
+  channel context builder is separate work.
 - **A channel is permanent within its project.** It cannot be forked, renamed,
   archived, deleted, regenerated, compacted or stopped through chat routes.
 
@@ -120,6 +134,9 @@ arrives.
 - **A send ends for one cause.** Finish, stop, failure, shutdown or
   deadline, through one compare-and-set in the runner. `finalizeSend`
   runs exactly once, and the lock is held until the stream has let go.
+- **Stopping a channel names its send.** `POST
+  /api/sessions/:id/sends/:sendId/stop` stops only that turn, allowed to its
+  summoner or an admin. A chat's existing stop route stays unchanged.
 - **Stream bounds (`runner/round.ts`).** Two minutes quiet after the
   first event, or a reply past 1 MB, is a failure. The wait for the
   first event is bounded by the deadline and `streamChat()`'s

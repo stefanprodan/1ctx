@@ -1,9 +1,28 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SessionStatus } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 import { type RawSession, type SessionRow, session } from "./rows.ts";
+
+export function touchSession(
+  db: Db,
+  id: string,
+  status: SessionStatus,
+  now: number,
+): void {
+  db.query(`update sessions set status = case
+    when origin = 'channel' and parent_session_id is null then
+      case when exists (
+        select 1 from sends where session_id = sessions.id and status = 'running'
+      ) then 'running' else 'done' end
+    else ? end, last_activity_at = ?, revision = revision + 1 where id = ?`).run(
+    status,
+    now,
+    id,
+  );
+}
 
 export function createChannel(
   db: Db,

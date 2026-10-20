@@ -49,7 +49,8 @@ describe("a send's disabled capabilities", () => {
         disabledCapabilities: ["web"],
       });
       const run = await startRun(chat, automation.id);
-      const policy = chat.app.runner.registry.get(run.sessionId)!.policy;
+      const policy = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+        null)!.policy;
       expect(policy.disabledCapabilities).toEqual(["web"]);
       expect(policy.web).toBeNull();
       expect(
@@ -90,7 +91,7 @@ describe("a send's disabled capabilities", () => {
       });
       const next = await startRun(chat, automation.id);
       expect(
-        chat.app.runner.registry.get(next.sessionId)!.policy
+        (chat.app.runner.registry.inSession(next.sessionId)[0] ?? null)!.policy
           .disabledCapabilities,
       ).toEqual([]);
       expect(
@@ -127,7 +128,9 @@ describe("a send's disabled capabilities", () => {
           "user",
           "reply",
         ]);
-        const active = chat.app.runner.registry.get(detail.session.id)!;
+        const active = (chat.app.runner.registry.inSession(
+          detail.session.id,
+        )[0] ?? null)!;
         expect(active.policy.disabledCapabilities).toEqual(["web"]);
         expect(active.policy.web).toBeNull();
         const names = active.policy.offered.tools.map((tool) => tool.name);
@@ -178,7 +181,7 @@ describe("a send's disabled capabilities", () => {
       expect(JSON.stringify(third.body.messages)).not.toContain(WEB_OFF_LINE);
       expect(
         chat.app.runner.registry
-          .get(first.session.id)!
+          .inSession(first.session.id)[0]!
           .policy.offered.tools.map((tool) => tool.name),
       ).toContain("webfetch");
       third.reply("replacement");
@@ -214,7 +217,9 @@ describe("a send's disabled capabilities", () => {
         ).status,
       ).toBe(200);
       const started = await startChat(chat);
-      const policy = chat.app.runner.registry.get(started.sessionId)!.policy;
+      const policy = (chat.app.runner.registry.inSession(
+        started.sessionId,
+      )[0] ?? null)!.policy;
       const schemas = JSON.stringify(policy.offered.tools);
       expect(policy.web).toEqual({ mode: "listed", domains: ["docs.test"] });
       expect(policy.offered.web).toEqual(policy.web);
@@ -237,7 +242,8 @@ describe("a send's disabled capabilities", () => {
       expect(response.status).toBe(201);
       const next = await waitScript(chat.scripted, 2);
       expect(
-        chat.app.runner.registry.get(started.sessionId)!.policy.web,
+        (chat.app.runner.registry.inSession(started.sessionId)[0] ?? null)!
+          .policy.web,
       ).toBeNull();
       next.reply("done");
       await settled(chat, started.sessionId);
@@ -381,7 +387,9 @@ describe("a send's disabled capabilities", () => {
     const chat = await chatApp();
     try {
       const started = await startChat(chat);
-      const active = chat.app.runner.registry.get(started.sessionId)!;
+      const active = (chat.app.runner.registry.inSession(
+        started.sessionId,
+      )[0] ?? null)!;
       started.script.reply("first");
       await settled(chat, started.sessionId);
       const stale = chat.app.sessions.byId(started.sessionId)!;
@@ -442,7 +450,9 @@ describe("a send's disabled capabilities", () => {
       ).toBe(200);
       const detail = await create(chat, { enable: ["web"] });
       const script = await waitScript(chat.scripted, 1);
-      const policy = chat.app.runner.registry.get(detail.session.id)!.policy;
+      const policy = (chat.app.runner.registry.inSession(
+        detail.session.id,
+      )[0] ?? null)!.policy;
       expect(policy.web).toBeNull();
       expect(policy.disabledCapabilities).toEqual([]);
       expect(JSON.stringify(script.body.messages)).not.toContain(WEB_OFF_LINE);

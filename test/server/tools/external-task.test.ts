@@ -138,7 +138,7 @@ describe("the offer", () => {
         "reopen",
       ]);
       const child = chat.app.runner.registry
-        .get(sessionId)!
+        .inSession(sessionId)[0]!
         .policy.childOffered!.tools.find(
           (tool) => tool.name === "external_task",
         )!;

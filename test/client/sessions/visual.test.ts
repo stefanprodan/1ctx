@@ -70,7 +70,7 @@ function stored() {
       toolName: "visualize",
     }),
   ];
-  detail.live = null;
+  detail.live = [];
   detail.session.status = "done";
   return detail;
 }
@@ -90,7 +90,7 @@ test.serial(
     onSocket(visualFrame({ seq: 3, html: "</svg>", htmlAt: 5 }));
     expect(visualPreviews.value.size).toBe(0);
     const snapshot = {
-      ...detail.live!,
+      ...detail.live[0]!,
       seq: 2,
       drafts: [
         {
@@ -101,7 +101,11 @@ test.serial(
         },
       ],
     };
-    onSocket({ type: "watched", sessionId: detail.session.id, live: snapshot });
+    onSocket({
+      type: "watched",
+      sessionId: detail.session.id,
+      live: [snapshot],
+    });
     expect(visualPreviews.value.get(key)?.html).toBe("<svg></svg>");
     onSocket({
       type: "delta",
@@ -224,7 +228,7 @@ test.serial(
       error: "stopped",
     });
     leaveSession();
-    detail.live = null;
+    detail.live = [];
     await open(detail);
     expect(visualPreviews.value.size).toBe(0);
   },

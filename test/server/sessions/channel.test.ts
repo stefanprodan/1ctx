@@ -11,7 +11,7 @@ import type {
 } from "../../../src/shared/api/sessions.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 import { hashPassword } from "../../helpers/app.ts";
-import { chatApp } from "../../helpers/chat.ts";
+import { chatApp, idle } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { files, stage } from "../runner/uploads-helpers.ts";
 
@@ -220,7 +220,7 @@ describe("the project channel", () => {
     expect((await post(client.call, channelId, "hidden")).status).toBe(404);
   });
 
-  test("treats visible users as posts and refuses summons for K2", async () => {
+  test("treats visible users as posts and an agent wins a shared name", async () => {
     const { chat, project, channelId } = await setup();
     expect(
       (await post(chat.member.call, channelId, "@casey, look")).status,
@@ -243,12 +243,12 @@ describe("the project channel", () => {
       model: "deepseek/deepseek-v4.1-flash",
     });
     const collision = await post(chat.member.call, channelId, "@casey, look");
-    expect(collision.status).toBe(409);
+    expect(collision.status).toBe(201);
     const summon = await post(chat.member.call, channelId, "@coder check");
-    expect(summon.status).toBe(409);
-    expect(await summon.json()).toEqual({
-      error: "summons in a channel are not built yet",
-    });
+    expect(summon.status).toBe(201);
+    (await chat.scripted.reached(1)).reply("casey");
+    (await chat.scripted.reached(2)).reply("coder");
+    await idle(chat.app);
     const unknown = await post(chat.member.call, channelId, "@missing check");
     expect(unknown.status).toBe(400);
     expect(await unknown.json()).toEqual({ error: "no agent named missing" });

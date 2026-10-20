@@ -20,6 +20,8 @@ admin's attention, the server's load), Usage by month and Storage.
   process's CPU and memory, the running sends and the queue. Load reads
   memory, save the queue's counts, one statement over its partial
   indexes.
+  Pending channel turns join the queue's waiting and not-sent counts;
+  their table's storage belongs to the chats area.
 - **Load's CPU and memory are the process's, not the machine's.** CPU
   is over `availableParallelism()`, memory against
   `process.constrainedMemory()`, so both follow a container's caps.

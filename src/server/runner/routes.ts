@@ -20,6 +20,7 @@ import {
   parseCreateSession,
   parseRegenerate,
   parseSendMessage,
+  parseTurnId,
 } from "../sessions/index.ts";
 import type { MessageAnswer } from "./types.ts";
 
@@ -38,11 +39,38 @@ export type RoutesDeps = {
     fields: RegenerateRequest,
   ): SessionDetail;
   compact(principal: Principal, sessionId: string): SessionDetail;
-  stop(principal: Principal, sessionId: string): void;
+  stop(principal: Principal, sessionId: string, sendId?: string): void;
+  cancelPending(principal: Principal, sessionId: string, id: string): void;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   return [
+    {
+      method: "POST",
+      path: "/api/sessions/:id/sends/:sendId/stop",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        deps.stop(
+          ctx.principal!,
+          ctx.params.id,
+          parseTurnId(ctx.params.sendId),
+        );
+        return json({});
+      },
+    },
+    {
+      method: "DELETE",
+      path: "/api/sessions/:id/pending/:turnId",
+      policy: "authenticated",
+      handle(_req, ctx) {
+        deps.cancelPending(
+          ctx.principal!,
+          ctx.params.id,
+          parseTurnId(ctx.params.turnId),
+        );
+        return json({});
+      },
+    },
     {
       method: "POST",
       path: "/api/sessions",

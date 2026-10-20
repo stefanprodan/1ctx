@@ -83,7 +83,8 @@ describe("tools administration", () => {
       secrets: { "search-exa": "never-return-this-key" },
     });
     const first = await startChat(chat, "first");
-    const active = chat.app.runner.registry.get(first.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(first.sessionId)[0] ??
+      null)!;
     expect(names(active.policy.offered)).toContain("webfetch");
     expect(active.policy.offered.web).toEqual({ mode: "all", domains: [] });
 
@@ -120,13 +121,20 @@ describe("tools administration", () => {
     await finish(chat, first.script);
     const second = await startChat(chat, "second");
     expect(
-      names(chat.app.runner.registry.get(second.sessionId)!.policy.offered),
+      names(
+        (chat.app.runner.registry.inSession(second.sessionId)[0] ?? null)!
+          .policy.offered,
+      ),
     ).not.toContain("webfetch");
     expect(
-      chat.app.runner.registry.get(second.sessionId)!.policy.offered.web,
+      (chat.app.runner.registry.inSession(second.sessionId)[0] ?? null)!.policy
+        .offered.web,
     ).toBeNull();
     expect(
-      names(chat.app.runner.registry.get(second.sessionId)!.policy.offered),
+      names(
+        (chat.app.runner.registry.inSession(second.sessionId)[0] ?? null)!
+          .policy.offered,
+      ),
     ).toContain("visualize");
     await finish(chat, second.script);
     chat.app.socket.dispose();
@@ -141,7 +149,10 @@ describe("tools administration", () => {
 
     const keyed = await startChat(chat, "with key");
     expect(
-      names(chat.app.runner.registry.get(keyed.sessionId)!.policy.offered),
+      names(
+        (chat.app.runner.registry.inSession(keyed.sessionId)[0] ?? null)!.policy
+          .offered,
+      ),
     ).toContain("websearch");
     await finish(chat, keyed.script);
 
@@ -149,7 +160,10 @@ describe("tools administration", () => {
     delete chat.secrets["search-exa"];
     const missing = await startChat(chat, "without key");
     expect(
-      names(chat.app.runner.registry.get(missing.sessionId)!.policy.offered),
+      names(
+        (chat.app.runner.registry.inSession(missing.sessionId)[0] ?? null)!
+          .policy.offered,
+      ),
     ).toContain("websearch");
     await finish(chat, missing.script);
     const cleared = await chat.admin.call("PATCH", "/api/tools/websearch", {
@@ -158,7 +172,10 @@ describe("tools administration", () => {
     expect(cleared.status).toBe(200);
     const unchosen = await startChat(chat, "no provider");
     expect(
-      names(chat.app.runner.registry.get(unchosen.sessionId)!.policy.offered),
+      names(
+        (chat.app.runner.registry.inSession(unchosen.sessionId)[0] ?? null)!
+          .policy.offered,
+      ),
     ).not.toContain("websearch");
     await finish(chat, unchosen.script);
     chat.app.socket.dispose();
@@ -167,7 +184,8 @@ describe("tools administration", () => {
   test("limit changes are snapshotted by the next send", async () => {
     const chat = await chatApp();
     const first = await startChat(chat, "old limits");
-    const active = chat.app.runner.registry.get(first.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(first.sessionId)[0] ??
+      null)!;
     expect(active.policy.limits.rounds).toBe(DEFAULT_LIMITS.rounds);
 
     const changed = await chat.admin.call("PUT", "/api/limits", {
@@ -179,7 +197,8 @@ describe("tools administration", () => {
 
     const second = await startChat(chat, "new limits");
     expect(
-      chat.app.runner.registry.get(second.sessionId)!.policy.limits.rounds,
+      (chat.app.runner.registry.inSession(second.sessionId)[0] ?? null)!.policy
+        .limits.rounds,
     ).toBe(2);
     await finish(chat, second.script);
     chat.app.socket.dispose();
@@ -243,7 +262,8 @@ test("bash documents open and snapshots the Visuals row", async () => {
   expect(bash.tokens).toBe(461);
 
   const first = await startChat(chat, "first");
-  const active = chat.app.runner.registry.get(first.sessionId)!;
+  const active = (chat.app.runner.registry.inSession(first.sessionId)[0] ??
+    null)!;
   expect(active.policy.offered.visuals).toBe(true);
   expect(
     (
@@ -256,7 +276,8 @@ test("bash documents open and snapshots the Visuals row", async () => {
   await finish(chat, first.script);
   const second = await startChat(chat, "second");
   expect(
-    chat.app.runner.registry.get(second.sessionId)!.policy.offered.visuals,
+    (chat.app.runner.registry.inSession(second.sessionId)[0] ?? null)!.policy
+      .offered.visuals,
   ).toBe(false);
   await finish(chat, second.script);
   chat.app.socket.dispose();

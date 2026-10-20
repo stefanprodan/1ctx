@@ -84,6 +84,10 @@ is its root.
 
 ## The child loop
 
+- **Delegate resolves its parent by the calling send id.** A channel has
+  several root sends at once, so the session id alone cannot name a parent.
+  Channel roots still refuse subagents; their workspace and child support
+  are separate work.
 - **A child is not a send of the registry's** (`runner/child.ts`). It
   has its own session, `sends` row (`childSendRow()`, the one place it
   is written), rounds, `Budget`, `ToolBudget` and usage rows, on its

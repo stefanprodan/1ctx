@@ -100,8 +100,10 @@ export {
   parseDetailQuery,
   parseRegenerate,
   parseSendMessage,
+  parseTurnId,
   titleFrom,
 } from "./parse.ts";
+export type { PendingCursor, PendingRow } from "./pending.ts";
 export {
   MAX_QUEUED_PER_CHAT,
   NOT_SENT_KEPT_MS,
@@ -312,27 +314,40 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     sessionInfo: (sessionId) => sessionInfo(deps.db, sessionId),
     runAnswer: (sendId, memoryRound) => runAnswer(deps.db, sendId, memoryRound),
     dropQueued: (projectId, userId) =>
-      [...new Set(store.queue.dropInProject(projectId, userId))].flatMap(
-        (sessionId) => queueChanged(deps.db, sessionId, { shared: true }),
+      [
+        ...new Set([
+          ...store.queue.dropInProject(projectId, userId),
+          ...store.pending.dropInProject(projectId, userId),
+        ]),
+      ].flatMap((sessionId) =>
+        queueChanged(deps.db, sessionId, { shared: true }),
       ),
     queueFrame(sessionId) {
       return {
         revision: store.byId(sessionId)?.revision ?? 0,
         rows: chatQueue(deps.db, sessionId, null, { cut: true }),
+        ...(store.byId(sessionId)?.origin === "channel"
+          ? { pending: store.pending.ofSession(sessionId) }
+          : {}),
       };
     },
     sweepNotSent(now) {
       return transact(deps.db, () => {
         const gone = store.queue.sweep(now);
+        const pendingGone = store.pending.sweep(now);
         const byChat = new Map<string, string[]>();
         for (const { sessionId, authorId } of gone) {
           byChat.set(sessionId, [...(byChat.get(sessionId) ?? []), authorId]);
         }
         return {
-          result: gone.length,
-          events: [...byChat].flatMap(([chat, authors]) =>
-            queueChanged(deps.db, chat, { shared: false, authors }),
-          ),
+          result: gone.length + pendingGone.length,
+          events: [...new Set(pendingGone)]
+            .flatMap((id) => queueChanged(deps.db, id, { shared: true }))
+            .concat(
+              [...byChat].flatMap(([chat, authors]) =>
+                queueChanged(deps.db, chat, { shared: false, authors }),
+              ),
+            ),
         };
       });
     },

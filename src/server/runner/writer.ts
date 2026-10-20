@@ -409,6 +409,7 @@ export class Writer {
         mark: runMark(send, cause, error),
       })!;
       const alerted = alertEvents(this.deps.alerts, send, cause, now);
+      if (session.origin === "channel") this.deps.views.end(send.id);
       // the send after a summary takes the note as it is then
       if (reply?.kind === "summary" && reply.status === "done") {
         this.deps.views.end(send.sessionId);

@@ -47,6 +47,9 @@ function own(
   id: string,
 ): QueuedRow {
   const row = store.queue.byId(id);
+  if (store.byId(sessionId)?.origin === "channel") {
+    throw new Conflict("a channel has no editable queued messages");
+  }
   if (row === null || row.sessionId !== sessionId) throw new Conflict(GONE);
   if (row.authorId !== principal.userId) {
     throw new Forbidden("only its author changes a waiting message");

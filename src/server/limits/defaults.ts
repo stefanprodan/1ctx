@@ -66,6 +66,7 @@ export type SendCaps = {
   sendsPerUser: number;
   sendsPerProject: number;
   sendsRunning: number;
+  sendsPerChannel: number;
 };
 
 // the messages sent to a busy chat one user may have waiting, not sent
@@ -190,6 +191,7 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   mcpKeptFiles: limit(2000, 10, 20_000, "count", "knowledge"),
   sendsPerUser: limit(4, 1, 16, "count", "sends"),
   sendsPerProject: limit(16, 4, 64, "count", "sends"),
+  sendsPerChannel: limit(4, 1, 16, "count", "sends"),
   sendsRunning: limit(sendsRunningDefault(1), 4, 256, "count", "sends"),
   queuedPerUser: limit(8, 1, 32, "count", "sends"),
   queuedMinutes: limit(60, 10, 240, "minutes", "sends"),

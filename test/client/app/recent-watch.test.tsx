@@ -717,7 +717,7 @@ describe("a row's live status", () => {
       session: summary(id, status, origin),
       messages: [],
       send: null,
-      live: null,
+      live: [],
     } as never;
   };
   const sessionFrame = (id: string, status: string, origin = "chat") =>

@@ -36,7 +36,7 @@ async function start(chat: ChatApp, disable: string[] = []) {
 
 const childNames = (chat: ChatApp, sessionId: string) =>
   chat.app.runner.registry
-    .get(sessionId)!
+    .inSession(sessionId)[0]!
     .policy.childOffered!.tools.map((tool) => tool.name);
 
 const switchable = async (chat: ChatApp) =>

@@ -4,8 +4,8 @@
 import { expect, test } from "bun:test";
 import {
   type DraftFrame,
-  hasWatchedDrafts,
   isDraftFrame,
+  isWatchedFrame,
 } from "../../src/shared/socket.ts";
 import { pendingDraft } from "../fixtures/automations/draft-frame.ts";
 
@@ -202,13 +202,25 @@ test("an update carries memory and attention guidance", () => {
 });
 
 test("a watched answer's drafts are a list when present", () => {
-  const watched = { type: "watched", sessionId: "chat", live: null };
-  expect(hasWatchedDrafts(watched)).toBe(true);
-  expect(hasWatchedDrafts({ ...watched, drafts: [pendingDraft] })).toBe(true);
-  expect(hasWatchedDrafts({ ...watched, drafts: [] })).toBe(true);
-  expect(hasWatchedDrafts({ ...watched, drafts: pendingDraft })).toBe(false);
+  const watched = { type: "watched", sessionId: "chat", live: [] };
+  expect(isWatchedFrame(watched)).toBe(true);
+  expect(isWatchedFrame({ ...watched, live: null })).toBe(false);
+  expect(isWatchedFrame({ ...watched, live: { phase: "tools" } })).toBe(false);
+  expect(isWatchedFrame({ ...watched, live: [null] })).toBe(false);
+  expect(
+    isWatchedFrame({
+      ...watched,
+      live: [
+        { phase: "tools", sendId: "a", seq: 0 },
+        { phase: "tools", sendId: "b", seq: 1 },
+      ],
+    }),
+  ).toBe(true);
+  expect(isWatchedFrame({ ...watched, drafts: [pendingDraft] })).toBe(true);
+  expect(isWatchedFrame({ ...watched, drafts: [] })).toBe(true);
+  expect(isWatchedFrame({ ...watched, drafts: pendingDraft })).toBe(false);
   // a bad draft is the reader's to skip, never the whole answer's
   expect(
-    hasWatchedDrafts({ ...watched, drafts: [{ ...pendingDraft, id: "" }] }),
+    isWatchedFrame({ ...watched, drafts: [{ ...pendingDraft, id: "" }] }),
   ).toBe(true);
 });

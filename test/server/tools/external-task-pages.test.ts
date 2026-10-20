@@ -44,7 +44,6 @@ const context = (
     agentName: "coder",
     sessionId: "chat00000001",
     origin: "chat",
-    sendStartedAt: 0,
   },
   now: () => 0,
   signal: new AbortController().signal,

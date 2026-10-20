@@ -127,7 +127,12 @@ const policy: SendPolicy = {
   deadlineMs: null,
   limits: DEFAULT_LIMITS,
   toolCaps: DEFAULT_LIMITS,
-  sendCaps: { sendsPerUser: 4, sendsPerProject: 16, sendsRunning: 64 },
+  sendCaps: {
+    sendsPerUser: 4,
+    sendsPerProject: 16,
+    sendsRunning: 64,
+    sendsPerChannel: 4,
+  },
 };
 
 const row = (
@@ -525,7 +530,8 @@ describe("knowledge in a send", () => {
       );
       const first = await startChat(chat);
       expect(
-        chat.app.runner.registry.get(first.sessionId)!.policy.knowledge,
+        (chat.app.runner.registry.inSession(first.sessionId)[0] ?? null)!.policy
+          .knowledge,
       ).toEqual({ empty: false });
       const prompt = (script: { body: Record<string, unknown> }) =>
         (script.body.messages as { role: string; content: string }[])[0]!
@@ -615,7 +621,8 @@ describe("knowledge in a send", () => {
         const { script, sessionId } = await startChat(chat);
         expect(script.body.tools).toBeUndefined();
         expect(
-          chat.app.runner.registry.get(sessionId)!.policy.offered.tools,
+          (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!.policy
+            .offered.tools,
         ).toEqual([]);
         const prompt = (script.body.messages as { content: string }[])[0]!
           .content;

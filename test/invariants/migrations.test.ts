@@ -83,6 +83,7 @@ const EXPECTED_IDS = [
   "0069-external-task-labels",
   "0070-project-channels",
   "0071-team-project-channels",
+  "0072-channel-turns",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -225,6 +226,55 @@ describe("the schema", () => {
     `);
     return db;
   }
+
+  test("0072 preserves memory views and outbox rows while adding send identities", () => {
+    const db = seed(MIGRATIONS.slice(0, 71));
+    try {
+      db.exec(`
+        insert into memory_views (session_id, snapshot, seen)
+          values ('sess', '[{"topic":"deploy","text":"blue"}]', '[]');
+        insert into email_outbox (id, kind, user_id, project_id, session_id,
+          message_id, status, next_attempt_at, created_at, updated_at)
+          values ('mail', 'agent', 'u', 'p', 'sess', '<mail@x>', 'sent', 0, 0, 0);
+      `);
+      const old = db.query("select * from memory_views").get();
+      expect(migrate(db)).toEqual(["0072-channel-turns"]);
+      expect(
+        db.query("select session_id, snapshot, seen from memory_views").get(),
+      ).toEqual(old);
+      expect(db.query("select id, send_id from memory_views").get()).toEqual({
+        id: "sess",
+        send_id: null,
+      });
+      expect(
+        db.query("select id, status, send_id from email_outbox").get(),
+      ).toEqual({ id: "mail", status: "sent", send_id: null });
+      db.exec(`
+        insert into memory_views (id, session_id, send_id, snapshot, seen)
+          values ('send1', 'sess', 'send1', '[]', '[]'),
+                 ('send2', 'sess', 'send2', '[]', '[]');
+        insert into pending_turns
+          (id, session_id, message_id, author_id, agent_id, queued_at, changed_at)
+          values ('pending', 'sess', 'm1', 'u', 'a', 0, 0);
+      `);
+      expect(() =>
+        db.exec("update pending_turns set reason = 'invalid'"),
+      ).toThrow(/CHECK/);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      db.exec(
+        "delete from messages where send_id = 'send1'; delete from sends where id = 'send1'",
+      );
+      expect(db.query("select id from memory_views order by id").all()).toEqual(
+        [{ id: "send2" }, { id: "sess" }],
+      );
+      expect(db.query("select id from pending_turns").all()).toEqual([]);
+      expect(db.query("select id from email_outbox").all()).toEqual([
+        { id: "mail" },
+      ]);
+    } finally {
+      db.close();
+    }
+  });
 
   test("0018 defaults existing sessions and automations to an empty set without losing rows", () => {
     const db = seed(MIGRATIONS.slice(0, 17));
@@ -3995,6 +4045,7 @@ describe("project channel migrations", () => {
     expect(migrate(db)).toEqual([
       "0070-project-channels",
       "0071-team-project-channels",
+      "0072-channel-turns",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),

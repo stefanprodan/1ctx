@@ -476,10 +476,11 @@ export function sessionSettled(app: TestApp, sessionId: string) {
       const session = app.sessions.byId(sessionId);
       if (session?.status === "running") return;
       stop();
-      const held = app.runner.registry.get(sessionId);
+      const held = app.runner.registry.inSession(sessionId);
       // the runner frees the place right after it lets go
-      if (held === null) resolve(session);
-      else void held.drained.then(() => resolve(session));
+      void Promise.all(held.map((send) => send.drained)).then(() =>
+        resolve(session),
+      );
     };
     const stop = subscribe((event) => {
       if (event.type === "session.changed") check();
@@ -502,9 +503,9 @@ export function until(check: () => boolean): Promise<void> {
 
 // once the session's send let go of its place, or at once with none
 export async function freed(app: TestApp, sessionId: string): Promise<void> {
-  const held = app.runner.registry.get(sessionId);
+  const held = app.runner.registry.inSession(sessionId);
   // the runner frees the place in the same turn it lets go
-  if (held !== null) await held.drained;
+  await Promise.all(held.map((send) => send.drained));
 }
 
 // once every send let go of its place; one still held after it let go
@@ -515,7 +516,7 @@ export async function idle(app: TestApp): Promise<void> {
     if (held.length === 0) return;
     await Promise.all(held.map((send) => send.drained));
     const kept = (send: (typeof held)[number]) =>
-      app.runner.registry.get(send.sessionId) === send;
+      app.runner.registry.get(send.id) === send;
     if (held.every(kept)) return;
   }
 }

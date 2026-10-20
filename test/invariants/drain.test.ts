@@ -29,7 +29,7 @@ describe("drain", () => {
     expect(chat.app.sessions.byId(sessionId)!.status).toBe("stopped");
     // once it has let go the lock is free
     await tick();
-    expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+    expect(chat.app.runner.registry.inSession(sessionId)[0] ?? null).toBeNull();
     const next = chat.scripted.next();
     const res = await chat.member.call(
       "POST",
@@ -119,7 +119,7 @@ describe("drain", () => {
     // once the stream lets go the lock is free and a new send goes
     await tick();
     await tick();
-    expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+    expect(chat.app.runner.registry.inSession(sessionId)[0] ?? null).toBeNull();
     const next = chat.scripted.next();
     const res = await chat.member.call(
       "POST",
@@ -147,15 +147,20 @@ describe("drain", () => {
       },
     );
     const second = await next;
-    const held = chat.app.runner.registry.get(first.sessionId)!;
+    const held = (chat.app.runner.registry.inSession(first.sessionId)[0] ??
+      null)!;
     // the first send's stream lets go late: the registry still holds
     // the second
     first.script.end();
     await tick();
-    expect(chat.app.runner.registry.get(first.sessionId)).toBe(held);
+    expect(chat.app.runner.registry.inSession(first.sessionId)[0] ?? null).toBe(
+      held,
+    );
     second.reply("ok");
     await tick();
     await tick();
-    expect(chat.app.runner.registry.get(first.sessionId)).toBeNull();
+    expect(
+      chat.app.runner.registry.inSession(first.sessionId)[0] ?? null,
+    ).toBeNull();
   });
 });

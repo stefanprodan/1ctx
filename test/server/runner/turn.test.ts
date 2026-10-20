@@ -123,7 +123,8 @@ describe("a turn of several user messages", () => {
         });
 
         // the send counts against the first author
-        const active = chat.app.runner.registry.get(team.sessionId)!;
+        const active = (chat.app.runner.registry.inSession(team.sessionId)[0] ??
+          null)!;
         expect(active.startedBy).toBe(team.casey);
         expect(active.policy.userId).toBe(team.casey);
 
@@ -194,9 +195,10 @@ describe("a turn of several user messages", () => {
         { userId: team.casey, message: "one" },
         { userId: team.admin, message: "two" },
       ]);
-      expect(chat.app.runner.registry.get(detail.session.id)?.startedBy).toBe(
-        team.casey,
-      );
+      expect(
+        (chat.app.runner.registry.inSession(detail.session.id)[0] ?? null)
+          ?.startedBy,
+      ).toBe(team.casey);
       (await waitScript(chat.scripted, 3)).reply("done");
       other.script.reply("done");
       await settled(chat, team.sessionId);
@@ -226,7 +228,8 @@ describe("a turn of several user messages", () => {
         "memory",
         "visualize",
       ]);
-      const active = chat.app.runner.registry.get(team.sessionId)!;
+      const active = (chat.app.runner.registry.inSession(team.sessionId)[0] ??
+        null)!;
       expect(active.policy.disabledCapabilities).toEqual([
         "memory",
         "visualize",

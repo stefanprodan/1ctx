@@ -152,7 +152,7 @@ function detail(
     forkedFrom: null,
     messages: [],
     send: null,
-    live: null,
+    live: [],
     authors: [],
     queued: [],
     automationDrafts: [],
@@ -169,16 +169,18 @@ function liveDetail(): SessionDetail {
   return detail("s1", {
     session: summary({ status: "running" }),
     messages: [reply],
-    live: {
-      phase: "reply",
-      sendId: "send1",
-      messageId: reply.id,
-      seq: 0,
-      content: "",
-      reasoning: "",
-      html: "",
-      htmlAt: 0,
-    },
+    live: [
+      {
+        phase: "reply",
+        sendId: "send1",
+        messageId: reply.id,
+        seq: 0,
+        content: "",
+        reasoning: "",
+        html: "",
+        htmlAt: 0,
+      },
+    ],
   });
 }
 
@@ -290,6 +292,130 @@ afterEach(async () => {
 });
 
 describe("the sessions entity", () => {
+  test.serial(
+    "interleaved live tails and pending turns reconcile independently",
+    async () => {
+      const base = liveDetail();
+      base.session = summary({
+        origin: "channel",
+        agentId: null,
+        ownerId: null,
+        status: "running",
+      });
+      base.messages.push(
+        message({ id: "m2", sendId: "send2", seq: 2, status: "streaming" }),
+      );
+      base.live.push({
+        phase: "reply",
+        sendId: "send2",
+        messageId: "m2",
+        seq: 0,
+        content: "",
+        reasoning: "",
+        html: "",
+        htmlAt: 0,
+      });
+      base.pending = [
+        {
+          id: "pending1",
+          messageId: "post1",
+          agentId: "a1",
+          authorId: "u1",
+          queuedAt: 10,
+          reason: null,
+        },
+      ];
+      answer = () => Response.json(base);
+      const paints: (() => void)[] = [];
+      setFrames((draw) => paints.push(draw));
+      try {
+        await loadSession("s1");
+        for (const [sendId, messageId, content] of [
+          ["send1", "m1", "A"],
+          ["send2", "m2", "B"],
+        ]) {
+          onSocket({
+            type: "delta",
+            sessionId: "s1",
+            sendId,
+            messageId,
+            content,
+            seq: 1,
+            contentAt: 0,
+            reasoningAt: 0,
+          });
+        }
+        const secondTail = base.live[1]!;
+        if (secondTail.phase !== "reply") throw new Error("expected a reply");
+        onSocket({
+          type: "watched",
+          sessionId: "s1",
+          live: [base.live[0]!, { ...secondTail, seq: 1, content: "B" }],
+          queue: { revision: 1, rows: [], pending: base.pending },
+        });
+        for (const draw of paints.splice(0)) draw();
+        expect(live.value.get("m1")?.content).toBe("A");
+        expect(live.value.get("m2")?.content).toBe("B");
+        onSocket({
+          type: "session",
+          projectId: "p1",
+          session: { ...base.session, revision: 2 },
+          send: { ...sent, status: "done" },
+          messages: [message({ content: "A" })],
+          row: null,
+        });
+        expect(session.value?.live.map((send) => send.sendId)).toEqual([
+          "send2",
+        ]);
+        onSocket({
+          type: "delta",
+          sessionId: "s1",
+          sendId: "send2",
+          messageId: "m2",
+          content: "B",
+          seq: 2,
+          contentAt: 1,
+          reasoningAt: 0,
+        });
+        for (const draw of paints.splice(0)) draw();
+        expect(live.value.has("m1")).toBe(false);
+        expect(live.value.get("m2")?.content).toBe("BB");
+        onSocket({
+          type: "queue",
+          sessionId: "s1",
+          revision: 3,
+          turn: false,
+          rows: [],
+          pending: [],
+        });
+        expect(session.value?.pending).toEqual([]);
+        onSocket({
+          type: "queue",
+          sessionId: "s1",
+          revision: 2,
+          turn: false,
+          rows: [],
+          pending: base.pending,
+        });
+        expect(session.value?.pending).toEqual([]);
+        onSocket({
+          type: "session",
+          projectId: "p1",
+          session: { ...base.session, revision: 4, status: "done" },
+          send: { ...sent, id: "send2", status: "done" },
+          messages: [
+            message({ id: "m2", sendId: "send2", seq: 2, content: "BB" }),
+          ],
+          row: null,
+        });
+        expect(session.value?.live).toEqual([]);
+        expect(live.value.size).toBe(0);
+      } finally {
+        setFrames(null);
+      }
+    },
+  );
+
   test("an older detail answer never overwrites the newer turn", async () => {
     const gates: ((value: SessionDetail) => void)[] = [];
     globalThis.fetch = (() =>
@@ -644,16 +770,18 @@ describe("the sessions entity", () => {
         detail("s1", {
           session: summary({ status: "running" }),
           messages: [row],
-          live: {
-            phase: "reply",
-            sendId: "send1",
-            messageId: "sum1",
-            seq: 2,
-            content: "## Goal",
-            reasoning: "",
-            html: "",
-            htmlAt: 0,
-          },
+          live: [
+            {
+              phase: "reply",
+              sendId: "send1",
+              messageId: "sum1",
+              seq: 2,
+              content: "## Goal",
+              reasoning: "",
+              html: "",
+              htmlAt: 0,
+            },
+          ],
         }),
       );
     await loadSession("s1");
@@ -996,16 +1124,18 @@ describe("the sessions entity", () => {
     onSocket({
       type: "watched",
       sessionId: "s1",
-      live: {
-        phase: "reply",
-        sendId: "send1",
-        messageId: "m1",
-        seq: 1,
-        content: "A",
-        reasoning: "",
-        html: "",
-        htmlAt: 0,
-      },
+      live: [
+        {
+          phase: "reply",
+          sendId: "send1",
+          messageId: "m1",
+          seq: 1,
+          content: "A",
+          reasoning: "",
+          html: "",
+          htmlAt: 0,
+        },
+      ],
     });
 
     expect(live.value.get("m1")?.content).toBe("AB");
@@ -1081,17 +1211,19 @@ describe("the sessions entity", () => {
     onSocket({
       type: "watched",
       sessionId: "s1",
-      live: {
-        phase: "reply",
-        sendId: "send1",
-        messageId: "m1",
-        seq: 2,
-        content: "",
-        reasoning: "",
-        html: "",
-        htmlAt: 0,
-        retry: { attempt: 1, max: 3 },
-      },
+      live: [
+        {
+          phase: "reply",
+          sendId: "send1",
+          messageId: "m1",
+          seq: 2,
+          content: "",
+          reasoning: "",
+          html: "",
+          htmlAt: 0,
+          retry: { attempt: 1, max: 3 },
+        },
+      ],
     });
     expect(retrying.value).toEqual({ attempt: 2, max: 3 });
     onSocket({
@@ -1106,7 +1238,7 @@ describe("the sessions entity", () => {
 
   test("an envelope that ends the send clears a retry", async () => {
     const base = liveDetail();
-    if (base.live !== null) base.live.retry = { attempt: 2, max: 3 };
+    if (base.live !== null) base.live[0]!.retry = { attempt: 2, max: 3 };
     answer = () => Response.json(base);
     await loadSession("s1");
     onSocket({
@@ -1131,7 +1263,7 @@ describe("the sessions entity", () => {
 
   test("a detail that carries a retry shows it until the chat is left", async () => {
     const base = liveDetail();
-    if (base.live !== null) base.live.retry = { attempt: 1, max: 3 };
+    if (base.live !== null) base.live[0]!.retry = { attempt: 1, max: 3 };
     answer = () => Response.json(base);
     await loadSession("s1");
     expect(retrying.value).toEqual({ attempt: 1, max: 3 });
@@ -1141,7 +1273,8 @@ describe("the sessions entity", () => {
 
   test("a work-slot envelope keeps the reply's live buffer", async () => {
     const base = liveDetail();
-    if (base.live?.phase === "reply") base.live.content = "streaming text";
+    if (base.live[0]?.phase === "reply")
+      base.live[0]!.content = "streaming text";
     answer = () => Response.json(base);
     await loadSession("s1");
     onSocket({ type: "watched", sessionId: "s1", live: base.live });
@@ -1196,7 +1329,7 @@ describe("the sessions entity", () => {
           }),
         ],
         send: sent,
-        live: { phase: "tools", sendId: "send1", seq: 3 },
+        live: [{ phase: "tools", sendId: "send1", seq: 3 }],
       });
       answer = () => {
         fetches++;
@@ -1207,7 +1340,7 @@ describe("the sessions entity", () => {
       onSocket({
         type: "watched",
         sessionId: "s1",
-        live: { phase: "tools", sendId: "send1", seq: 3 },
+        live: [{ phase: "tools", sendId: "send1", seq: 3 }],
       });
       await settle();
 
@@ -1218,7 +1351,7 @@ describe("the sessions entity", () => {
 
   test("a delta before watched is buffered", async () => {
     const base = liveDetail();
-    base.live = null;
+    base.live = [];
     answer = () => Response.json(base);
     await loadSession("s1");
 
@@ -1234,7 +1367,7 @@ describe("the sessions entity", () => {
     });
     expect(live.value.get("m1")?.content).toBe("");
 
-    onSocket({ type: "watched", sessionId: "s1", live: null });
+    onSocket({ type: "watched", sessionId: "s1", live: [] });
     expect(live.value.get("m1")?.content).toBe("A");
   });
 
@@ -1481,8 +1614,8 @@ describe("a streaming reply drawn once per frame", () => {
     let fetches = 0;
     await streaming(() => fetches++);
     const fresh = liveDetail();
-    if (fresh.live?.phase === "reply") {
-      fresh.live = { ...fresh.live, seq: 3, content: "fresh" };
+    if (fresh.live[0]?.phase === "reply") {
+      fresh.live = [{ ...fresh.live[0], seq: 3, content: "fresh" }];
     }
     answer = () => {
       fetches++;

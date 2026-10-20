@@ -84,6 +84,7 @@ export type Enqueue = {
   userId: string;
   projectId?: string | null;
   sessionId?: string | null;
+  sendId?: string | null;
   // an alert's automation, which its cap counts
   automationId?: string | null;
   // a link email asked for at the sign-in page, which the asks' caps
@@ -255,6 +256,7 @@ export function emailArea(deps: EmailDeps): Email {
         userId: fields.userId,
         projectId: fields.projectId ?? null,
         sessionId: fields.sessionId ?? null,
+        sendId: fields.sendId ?? null,
         automationId: fields.automationId ?? null,
         asked: fields.asked ?? false,
         subject: fields.subject ?? null,

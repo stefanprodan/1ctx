@@ -70,7 +70,7 @@ export type SocketDeps = {
   // the session's project when the principal may see it, else null
   sessionProject(principal: Principal, sessionId: string): string | null;
   // the runner's snapshot of the send in flight
-  live(sessionId: string): LiveSend | null;
+  live(sessionId: string): LiveSend[];
   // the feed row a session envelope carries, null for a session gone
   envelopeRow(sessionId: string): EnvelopeRow | null;
   // the chat's queued rows as the queue frame carries them
@@ -447,7 +447,7 @@ export function socketArea(deps: SocketDeps): Socket {
       // registered before the snapshot is taken, so no frame falls
       // between the two
       const live = deps.live(parsed.sessionId);
-      const children = live === null ? [] : deps.children(parsed.sessionId);
+      const children = live.length === 0 ? [] : deps.children(parsed.sessionId);
       const drafts = deps.drafts(parsed.sessionId);
       deliver(conn, {
         type: "watched",

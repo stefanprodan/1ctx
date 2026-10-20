@@ -276,7 +276,7 @@ describe("GET /api/sessions/:id", () => {
     const detail = await detailRes.json();
     expect(detail.messages).toHaveLength(2);
     expect(detail.send.id).toBe(mine.detail.send.id);
-    expect(detail.live).toMatchObject({
+    expect(detail.live[0]).toMatchObject({
       sendId: mine.detail.send.id,
       messageId: mine.detail.messages[1].id,
     });

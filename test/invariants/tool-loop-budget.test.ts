@@ -27,7 +27,7 @@ test("tool work weighs cached tokens at a tenth, counts final usage once and kee
   try {
     await setLimits(chat, { toolWorkTokens: 10_000 });
     const { script, sessionId } = await startChat(chat);
-    const send = chat.app.runner.registry.get(sessionId)!;
+    const send = (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!;
     script.toolRound([time("first")], { prompt: 4000, completion: 1000 });
     script.end();
     const second = await waitScript(chat.scripted, 2);
@@ -103,7 +103,7 @@ test("rounds without usage accumulate the request estimate without fabricating u
   try {
     await setLimits(chat, { toolWorkTokens: 10_000 });
     const { script, sessionId } = await startChat(chat, " budget".repeat(6000));
-    const send = chat.app.runner.registry.get(sessionId)!;
+    const send = (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!;
     const estimate = () => {
       const req = buildRequest(
         send,
@@ -241,7 +241,7 @@ test("an exhausted main budget does not block the own-memory phase or count its 
     await setLimits(chat, { toolWorkTokens: 10_000 });
     const automation = await createAutomation(chat, { ownMemory: true });
     const { main, sessionId } = await startRun(chat, automation.id);
-    const send = chat.app.runner.registry.get(sessionId)!;
+    const send = (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!;
     main.toolRound([time("first")], { prompt: 10_000, completion: 0 });
     main.end();
     (await waitScript(chat.scripted, 2)).reply("done");

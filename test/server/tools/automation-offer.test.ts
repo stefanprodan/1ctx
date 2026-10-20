@@ -34,12 +34,12 @@ async function app(): Promise<ChatApp> {
 
 const offeredNames = (chat: ChatApp, sessionId: string) =>
   chat.app.runner.registry
-    .get(sessionId)!
+    .inSession(sessionId)[0]!
     .policy.offered.tools.map((tool) => tool.name);
 
 const childNames = (chat: ChatApp, sessionId: string) =>
   chat.app.runner.registry
-    .get(sessionId)!
+    .inSession(sessionId)[0]!
     .policy.childOffered!.tools.map((tool) => tool.name);
 
 async function start(

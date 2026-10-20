@@ -98,9 +98,14 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
   };
   // the wait's minutes too, so the queue's expiry timer moves with them
   const sendCaps = () => {
-    const { sendsPerUser, sendsPerProject, sendsRunning, queuedMinutes } =
-      current();
-    return `${sendsPerUser}/${sendsPerProject}/${sendsRunning}/${queuedMinutes}`;
+    const {
+      sendsPerUser,
+      sendsPerProject,
+      sendsRunning,
+      sendsPerChannel,
+      queuedMinutes,
+    } = current();
+    return `${sendsPerUser}/${sendsPerProject}/${sendsRunning}/${sendsPerChannel}/${queuedMinutes}`;
   };
   // after the commit, and only when a send cap or the wait moved
   const noticing = (write: () => void): void => {

@@ -33,12 +33,14 @@ export function reserve(
   wake: () => void,
   send: ActiveSend,
   admit = true,
+  channel = false,
 ): () => void {
   if (admit) {
     registry.admit(
       send.sessionId,
       { userId: send.startedBy, projectId: send.projectId },
       send.policy.sendCaps,
+      channel ? send.policy.agentId : undefined,
     );
   }
   registry.set(send);
@@ -70,7 +72,15 @@ export const startedDetail = (
   session: Parameters<typeof sessionDetail>[1],
   send: ActiveSend,
   userId: string | null,
-): SessionDetail => sessionDetail(sessions, session, live(send), 0, userId);
+  running: readonly ActiveSend[] = [send],
+): SessionDetail =>
+  sessionDetail(
+    sessions,
+    session,
+    running.filter((send) => send.terminal === null).map(live),
+    0,
+    userId,
+  );
 
 export function prepareSend(fields: {
   db: Db;
@@ -144,6 +154,7 @@ export function prepareSend(fields: {
     fields.wake,
     send,
     fields.probe !== true,
+    fields.session?.origin === "channel",
   );
   let started: ReturnType<Writer["startSend"]>;
   try {
@@ -203,6 +214,7 @@ export function prepareSend(fields: {
         started.session,
         send,
         fields.startedBy,
+        fields.registry.inSession(fields.sessionId),
       );
       return detail;
     },

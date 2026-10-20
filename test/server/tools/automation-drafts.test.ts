@@ -139,7 +139,7 @@ describe("automation proposals", () => {
         .query("update users set tz = 'Europe/Bucharest' where id = ?")
         .run(chat.memberId);
       const { script, sessionId } = await startChat(chat);
-      const send = chat.app.runner.registry.get(sessionId)!;
+      const send = (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!;
       // A page edit after admission must not replace the send's snapshot.
       send.policy.disabledCapabilities = [
         "automations",
@@ -497,7 +497,8 @@ describe("forged proposals", () => {
     try {
       allowSubagents(chat, chat.agentId);
       const { script, sessionId } = await startChat(chat);
-      const parent = chat.app.runner.registry.get(sessionId)!;
+      const parent = (chat.app.runner.registry.inSession(sessionId)[0] ??
+        null)!;
       const schema = parent.policy.childOffered!.tools.find(
         (t) => t.name === "automation",
       )!;

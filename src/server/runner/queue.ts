@@ -16,6 +16,7 @@ import { errorFields, type Log } from "../lib/log.ts";
 import type { Limits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import {
+  type PendingRow,
   type QueuedRow,
   queueChanged,
   type SessionRow,
@@ -25,6 +26,7 @@ import {
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { principalOf } from "./authors.ts";
+import { pendingTurns } from "./channel-queue.ts";
 import { chatFor } from "./chat-guard.ts";
 import { queueMessage } from "./enqueue.ts";
 import type { PreparedRun } from "./prepare.ts";
@@ -73,6 +75,7 @@ export type DispatcherDeps = {
     starter: number,
     probe?: boolean,
   ): PreparedRun;
+  preparePending(row: PendingRow): PreparedRun;
 };
 
 // what one chat's start came to; a full process ends the pass
@@ -94,6 +97,8 @@ const processFull = (err: unknown): boolean =>
 const PROBED = new Error("probed");
 
 export type Dispatcher = {
+  readonly closed: boolean;
+  changed(): void;
   // expire what waited too long, start what can, set the timer
   start(): void;
   // no pass after this, from the drain's start: a row left queued stays
@@ -113,6 +118,7 @@ export type Dispatcher = {
 export function dispatcher(deps: DispatcherDeps): Dispatcher {
   const { db, sessions, registry } = deps;
   const queue = sessions.queue;
+  const pending = pendingTurns(deps);
   let started = false;
   let closed = false;
   let dispatching = false;
@@ -343,7 +349,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
         if (closed) return;
         if (seen.has(row.sessionId)) continue;
         seen.add(row.sessionId);
-        if (registry.get(row.sessionId) !== null) continue;
+        if (registry.hasSession(row.sessionId)) continue;
         try {
           if (startChat(row.sessionId) === "process") return;
         } catch (err) {
@@ -371,7 +377,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       for (const sessionId of page) {
         tried.add(sessionId);
         try {
-          if (registry.get(sessionId) === null) startChat(sessionId);
+          if (!registry.hasSession(sessionId)) startChat(sessionId);
           else sort(sessionId);
         } catch (err) {
           deps.log.error("queue expiry failed", {
@@ -394,7 +400,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
   const arm = (floorMs = 0): void => {
     disarm();
     if (closed) return;
-    const oldest = queue.oldestQueuedAt();
+    const oldest = pending.oldest();
     if (oldest === null) return;
     const minutes = deps.limits.current().queuedMinutes;
     armedMinutes = minutes;
@@ -403,7 +409,8 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       if (mine !== token || closed) return;
       armedMinutes = null;
       expire();
-      arm(queue.oldestQueuedAt() === oldest ? MINUTE_MS : 0);
+      pending.pass(true);
+      arm(pending.oldest() === oldest ? MINUTE_MS : 0);
     };
     const ms = Math.max(oldest + minutes * MINUTE_MS - deps.clock(), floorMs);
     if (ms <= 0) {
@@ -432,6 +439,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
       for (let i = 0; i < PASSES_PER_WAKE; i++) {
         again = false;
         pass();
+        pending.pass();
         if (!again) break;
       }
       if (again) {
@@ -457,16 +465,23 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
   ): QueuedResponse | null => {
     const session = chatFor(deps, principal, sessionId, "continue");
     // a queue a full cap left behind goes before the new message
-    if (started && !closed && registry.get(session.id) === null) {
+    if (started && !closed && !registry.hasSession(session.id)) {
       startChat(session.id);
     }
-    if (!closed && registry.get(session.id) === null) return null;
+    if (!closed && !registry.hasSession(session.id)) return null;
     const queued = queueMessage(deps, session, principal.userId, fields);
     if (started && !closed && armedMinutes === null) arm();
     return queued;
   };
 
   return {
+    get closed() {
+      return closed;
+    },
+    changed() {
+      wake();
+      if (started && !closed) arm();
+    },
     start() {
       if (started || closed) return;
       started = true;

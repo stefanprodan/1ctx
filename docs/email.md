@@ -90,13 +90,15 @@ profile pages show of email. The links themselves are in
 ## Agents and alerts
 
 - **An `agent` row is an agent's `email_user` call, one per user.** It
-  carries the project and the session, and holds the email rendered
+  carries the project, session and send id, and holds the email rendered
   when it was queued (`packBody()`): the subject, the text, the HTML
   and the From name, so a rename later changes nothing sent. The link
   is stored as a path; `prepare` builds it with `link()` at the send,
   so a changed public address is the one sent. While email is off the
   sender claims no row, so rows wait for it; a `link()` that throws
   anyway fails the try as `other`, which is retried.
+  The send id is counting metadata, kept even if the send is deleted;
+  pre-existing rows have none. It isolates simultaneous turns' email caps.
 - **An `alert` row is an automation's alert opening.** `alerts.runEnded()`
   queues it for the automation's owner in the transaction that sets
   `attention_since` (`automations/alert-email.ts`), only with email on,

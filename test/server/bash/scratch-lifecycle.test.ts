@@ -58,7 +58,7 @@ function rows(db: Db, sessionId: string) {
 }
 
 async function finish(chat: ChatApp, sessionId: string, script: Script) {
-  const send = chat.app.runner.registry.get(sessionId)!;
+  const send = (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!;
   script.reply("done");
   await send.drained;
   expect(chat.app.sessions.byId(sessionId)?.status).toBe("done");

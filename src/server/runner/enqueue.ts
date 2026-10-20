@@ -62,7 +62,8 @@ export function queueMessage(
   }
   const now = deps.clock();
   const queued = transact(deps.db, () => {
-    const mine = queue.userCount(user.id);
+    const mine =
+      queue.userCount(user.id) + deps.sessions.pending.userCount(user.id);
     if (mine >= deps.limits.current().queuedPerUser) {
       throw new TooManyRequests(
         `${waiting(mine, "You have")}. Send or discard one first.`,

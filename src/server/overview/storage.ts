@@ -34,6 +34,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "sends",
     "opened_files",
     "queued_messages",
+    "pending_turns",
     "automation_drafts",
   ],
   knowledge: ["knowledge_files", "knowledge_versions"],

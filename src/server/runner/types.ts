@@ -93,7 +93,7 @@ export type RunnerDeps = {
 
 export type MessageAnswer =
   | { status: 201; body: SessionDetail | ChannelPostResponse }
-  | { status: 202; body: QueuedResponse };
+  | { status: 202; body: QueuedResponse | ChannelPostResponse };
 
 export type Runner = {
   registry: Registry;
@@ -126,7 +126,8 @@ export type Runner = {
   ): SessionDetail;
   compact(principal: Principal, sessionId: string): SessionDetail;
   startRun(event: Event): PreparedRun;
-  stop(principal: Principal, sessionId: string): void;
+  stop(principal: Principal, sessionId: string, sendId?: string): void;
+  cancelPending(principal: Principal, sessionId: string, id: string): void;
   // every send on a deleted agent ends as a stop does
   stopAgent(agentId: string): void;
   // the tools area's delegate port: a subagent of the send whose
@@ -136,7 +137,7 @@ export type Runner = {
     call: ToolCall,
     ctx: ToolContext,
   ): Promise<ToolResult>;
-  live: (sessionId: string) => ReturnType<typeof live> | null;
+  live: (sessionId: string) => ReturnType<typeof live>[];
   // no more admissions, then up to boundMs for the running sends and
   // their asks to end on their own; cut ends the wait
   drain(boundMs: number, cut?: Promise<void>): Promise<DrainResult>;

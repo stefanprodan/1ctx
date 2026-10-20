@@ -134,7 +134,8 @@ describe("admission", () => {
       );
       expect(started.status).toBe(action === "compact" ? 200 : 201);
       const script = await pending;
-      const send = chat.app.runner.registry.get(owned.sessionId)!;
+      const send = (chat.app.runner.registry.inSession(owned.sessionId)[0] ??
+        null)!;
       expect(send.startedBy).toBe(chat.memberId);
       expect(send.projectId).toBe(team.id);
       // it holds the member's one place, not the owner's

@@ -81,7 +81,7 @@ let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 // the watch in flight: the frames before its answer, and the sequence
 // the next frame must follow once answered
 let pending: { buffer: Frame[]; overflow: boolean } | null = null;
-let stream: { sendId: string; seq: number } | null = null;
+let sequences = new Map<string, number>();
 // the settled chats by id
 const chatsKept = new Held<SessionDetail>();
 
@@ -97,7 +97,7 @@ effect(() => {
   chatsKept.clear();
   sending.value = false;
   pending = null;
-  stream = null;
+  sequences.clear();
 });
 
 function show(shown: SessionDetail): void {
@@ -109,14 +109,14 @@ function show(shown: SessionDetail): void {
   session.value = detail;
   publish(liveFrom(detail));
   syncValues(detail);
-  retrying.value = detail.live?.retry ?? null;
-  stream = detail.live && { sendId: detail.live.sendId, seq: detail.live.seq };
+  retrying.value = detail.live[0]?.retry ?? null;
+  sequences = new Map(detail.live.map((send) => [send.sendId, send.seq]));
 }
 
 // a chat is held only settled: a running one would miss its frames
 function keep(detail: SessionDetail | null): void {
   if (detail === null) return;
-  if (detail.session.status === "running" || detail.live !== null) {
+  if (detail.session.status === "running" || detail.live.length > 0) {
     chatsKept.delete(detail.session.id);
   } else chatsKept.set(detail.session.id, detail);
 }
@@ -182,7 +182,7 @@ export function leaveSession(id?: string): void {
   if (id !== undefined && wanted.id !== "" && wanted.id !== id) return;
   wanted = { id: "", turn: wanted.turn + 1 };
   pending = null;
-  stream = null;
+  sequences.clear();
   keep(session.value);
   clear();
   watch(null);
@@ -297,15 +297,19 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     ...session.value,
     live:
       ev.session.status !== "running"
-        ? null
-        : session.value.live && {
-            ...session.value.live,
-            drafts: [...visualPreviews.value.values()].filter(
-              (draft) =>
-                draft.phase === "draft" &&
-                draft.sendId === session.value?.live?.sendId,
-            ),
-          },
+        ? []
+        : session.value.live
+            .filter(
+              (send) =>
+                ev.send?.id !== send.sendId || ev.send.status === "running",
+            )
+            .map((send) => ({
+              ...send,
+              drafts: [...visualPreviews.value.values()].filter(
+                (draft) =>
+                  draft.phase === "draft" && draft.sendId === send.sendId,
+              ),
+            })),
   };
   syncValues(session.value);
   // a lost clear frame never outlives the send
@@ -328,11 +332,9 @@ function refetch(): void {
 function applyFrame(frame: Frame): boolean {
   const held = session.value;
   if (held === null || held.session.id !== frame.sessionId) return true;
-  if (stream === null || stream.sendId !== frame.sendId) {
-    stream = { sendId: frame.sendId, seq: 0 };
-  }
-  if (frame.seq !== stream.seq + 1) return false;
-  stream.seq = frame.seq;
+  const seq = sequences.get(frame.sendId) ?? 0;
+  if (frame.seq !== seq + 1) return false;
+  sequences.set(frame.sendId, frame.seq);
   if (frame.type === "retry") {
     retrying.value = frame.retry;
     return true;
@@ -349,25 +351,25 @@ function applyFrame(frame: Frame): boolean {
     const result = applyVisual(visualPreviews.value, frame);
     if (result.gap) return false;
     visualPreviews.value = result.previews;
-    const snapshot =
-      held.live?.sendId === frame.sendId
-        ? held.live
-        : {
-            phase: "reply" as const,
-            sendId: frame.sendId,
-            messageId: row.id,
-            ...liveOf(row),
-            seq: frame.seq,
-          };
+    const snapshot = held.live.find((send) => send.sendId === frame.sendId) ?? {
+      phase: "reply" as const,
+      sendId: frame.sendId,
+      messageId: row.id,
+      ...liveOf(row),
+      seq: frame.seq,
+    };
     session.value = {
       ...held,
-      live: {
-        ...snapshot,
-        seq: frame.seq,
-        drafts: [...result.previews.values()].filter(
-          (draft) => draft.sendId === frame.sendId && draft.phase === "draft",
-        ),
-      },
+      live: [
+        ...held.live.filter((send) => send.sendId !== frame.sendId),
+        {
+          ...snapshot,
+          seq: frame.seq,
+          drafts: [...result.previews.values()].filter(
+            (draft) => draft.sendId === frame.sendId && draft.phase === "draft",
+          ),
+        },
+      ],
     };
     return true;
   }
@@ -401,31 +403,27 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
     live: ev.live,
   });
   session.value = { ...held, live: ev.live };
-  retrying.value = ev.live?.retry ?? null;
-  if (ev.live === null) {
+  retrying.value = ev.live[0]?.retry ?? null;
+  sequences = new Map(ev.live.map((send) => [send.sendId, send.seq]));
+  if (ev.live.length === 0) {
     // the rows say running and the runner has nothing: the end went by
     // before this connection heard it
     if (held.session.status === "running") refetch();
-  } else if (ev.live.phase === "tools") {
-    // a round's tools run: nothing streams, so no live entry and no
-    // refetch; the sequence still tracks the send for buffered frames
-    stream = { sendId: ev.live.sendId, seq: ev.live.seq };
   } else {
-    const snap = ev.live;
-    const m = held.messages.find((x) => x.id === snap.messageId);
-    if (m === undefined) {
-      refetch();
-      return;
-    }
     const map = new Map(ahead());
-    map.set(m.id, liveOfSnapshot(snap, m));
+    for (const snap of ev.live) {
+      if (snap.phase === "tools") continue;
+      const m = held.messages.find((x) => x.id === snap.messageId);
+      if (m === undefined) {
+        refetch();
+        return;
+      }
+      map.set(m.id, liveOfSnapshot(snap, m));
+    }
     publish(map);
-    stream = { sendId: snap.sendId, seq: snap.seq };
   }
   for (const frame of buffered.buffer) {
-    if (stream !== null && frame.sendId === stream.sendId) {
-      if (frame.seq <= stream.seq) continue;
-    }
+    if (frame.seq <= (sequences.get(frame.sendId) ?? -1)) continue;
     if (!applyFrame(frame)) {
       refetch();
       return;

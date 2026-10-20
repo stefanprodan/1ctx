@@ -528,8 +528,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       enabled: outbox.enabled,
       outbox: {
         ...outbox,
-        countSession: (sessionId, kind, since) =>
-          email.store.countSession(sessionId, kind, since),
+        countSend: (sendId, kind) => email.store.countSend(sendId, kind),
         countProject: (projectId, kind, since) =>
           email.store.countProject(projectId, kind, since),
       },
@@ -630,7 +629,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       read: (projectId, automationId) => memory.read(projectId, automationId),
       commit: (work, sessionId) => memory.commit(work, sessionId),
       view: (sessionId) => memory.view(sessionId),
-      startView: (sessionId, snapshot) => memory.startView(sessionId, snapshot),
+      startView: (sessionId, snapshot, sendId) =>
+        memory.startView(sessionId, snapshot, sendId),
       endView: (sessionId) => memory.endView(sessionId),
       resetSeen: (sessionId) => memory.resetSeen(sessionId),
     },

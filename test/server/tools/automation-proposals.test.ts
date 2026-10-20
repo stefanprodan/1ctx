@@ -165,7 +165,6 @@ test.serial(
         agentName: "agent",
         sessionId: "chat",
         origin: "chat",
-        sendStartedAt: 0,
       },
       signal: new AbortController().signal,
       now: () => 0,

@@ -43,7 +43,6 @@ const context = (): ToolContext => ({
     agentId: "a",
     agentName: "agent",
     origin: "chat",
-    sendStartedAt: 0,
   },
   now: () => 0,
   signal: new AbortController().signal,

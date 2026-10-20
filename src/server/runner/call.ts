@@ -41,7 +41,6 @@ export function toolContext(
       agentName: send.policy.agentName,
       sessionId: send.sessionId,
       origin: send.kind === "run" ? "automation" : "chat",
-      sendStartedAt: send.startedAt,
     },
     signal,
     now: clock,

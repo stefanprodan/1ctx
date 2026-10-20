@@ -49,7 +49,8 @@ describe("send deadlines", () => {
     const chat = await chatApp();
     const started = await startChat(chat);
     expect(
-      chat.app.runner.registry.get(started.sessionId)?.policy.deadlineMs,
+      (chat.app.runner.registry.inSession(started.sessionId)[0] ?? null)?.policy
+        .deadlineMs,
     ).toBe(DEFAULT_LIMITS.sendDeadlineMs);
     // a model that keeps thinking out loud never trips the quiet timer
     const step = STREAM_IDLE_MS - 20_000;
@@ -107,7 +108,8 @@ describe("send deadlines", () => {
   test("a finished send cancels its deadline", async () => {
     const chat = await chatApp();
     const started = await startChat(chat);
-    const send = chat.app.runner.registry.get(started.sessionId)!;
+    const send = (chat.app.runner.registry.inSession(started.sessionId)[0] ??
+      null)!;
     const at = send.startedAt + DEFAULT_LIMITS.sendDeadlineMs;
     expect(chat.app.sleeping()).toContain(at);
     started.script.reply("done");
@@ -135,7 +137,8 @@ describe("send deadlines", () => {
     const script = await pending;
 
     expect(
-      chat.app.runner.registry.get(detail.session.id)?.policy.deadlineMs,
+      (chat.app.runner.registry.inSession(detail.session.id)[0] ?? null)?.policy
+        .deadlineMs,
     ).toBe(60_000);
     script.reply("done");
     await sessionSettled(chat.app, detail.session.id);

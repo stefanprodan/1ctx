@@ -57,7 +57,8 @@ describe("who is offered delegate", () => {
       );
       expect(none.script.body.tools).toBeUndefined();
       expect(
-        chat.app.runner.registry.get(none.sessionId)?.policy.childOffered,
+        (chat.app.runner.registry.inSession(none.sessionId)[0] ?? null)?.policy
+          .childOffered,
       ).toBeNull();
       none.script.reply("done");
       await settled(chat, none.sessionId);
@@ -198,7 +199,8 @@ describe("delegated work", () => {
       chat.app.now.value += 30_000;
       child.reply("slow answer");
       await waitScript(chat.scripted, 3);
-      const parent = chat.app.runner.registry.get(sessionId)!;
+      const parent = (chat.app.runner.registry.inSession(sessionId)[0] ??
+        null)!;
       expect(parent.budget.toolMs).toBe(0);
       expect(parent.budget.calls).toBe(1);
       chat.scripted.scripts[2]!.reply("done");

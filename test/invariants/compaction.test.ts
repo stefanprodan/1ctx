@@ -278,7 +278,8 @@ describe("compaction", () => {
     summary.content("partial summary");
     await streamed;
     expect(
-      chat.app.runner.registry.get(started.sessionId)?.round?.content,
+      (chat.app.runner.registry.inSession(started.sessionId)[0] ?? null)?.round
+        ?.content,
     ).toBe("partial summary");
     const stopped = await chat.member.call(
       "POST",

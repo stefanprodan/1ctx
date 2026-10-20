@@ -36,7 +36,7 @@ describe("socket fixtures for delivery", () => {
     const watched = conn.frames.find((f) => f.type === "watched") as
       | Extract<SocketEvent, { type: "watched" }>
       | undefined;
-    expect(watched?.live?.phase).toBe("tools");
+    expect(watched?.live[0]?.phase).toBe("tools");
     chat.app.socket.dispose();
   });
 
@@ -66,9 +66,9 @@ describe("socket fixtures for delivery", () => {
     const watched = conn.frames.find((f) => f.type === "watched") as
       | Extract<SocketEvent, { type: "watched" }>
       | undefined;
-    expect(watched?.live?.phase).toBe("reply");
-    if (watched?.live?.phase === "reply") {
-      expect(watched.live.messageId).not.toBe(initial.messages[1].id);
+    expect(watched?.live[0]?.phase).toBe("reply");
+    if (watched?.live[0]?.phase === "reply") {
+      expect(watched.live[0]!.messageId).not.toBe(initial.messages[1].id);
     }
     r2.finish();
     r2.usage();

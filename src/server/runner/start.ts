@@ -16,6 +16,7 @@ import type { SendKind } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
+import { newId } from "../lib/ids.ts";
 import {
   envelope,
   queueFrameEvent,
@@ -44,6 +45,18 @@ export type StartUser = {
   uploads?: readonly string[];
 };
 
+export const newUser = (
+  user: { id: string; username: string },
+  text: string,
+  uploads?: readonly string[],
+): StartUser => ({
+  id: newId(),
+  userId: user.id,
+  username: user.username,
+  text,
+  ...(uploads === undefined ? {} : { uploads }),
+});
+
 export type StartFields = {
   sendId: string;
   replyId: string;
@@ -54,6 +67,7 @@ export type StartFields = {
   kind?: Exclude<SendKind, "post">;
   turn:
     | { users: readonly StartUser[] }
+    | { posted: Message; author: string; pendingId?: string }
     | { existing: readonly Message[]; lastAuthor: string };
   title: string;
   policy: SendPolicy;
@@ -80,7 +94,11 @@ export class ClaimLost extends Conflict {
 }
 
 export const firstMessageId = (turn: StartFields["turn"]): string =>
-  "users" in turn ? turn.users[0]!.id : turn.existing[0]!.id;
+  "users" in turn
+    ? turn.users[0]!.id
+    : "posted" in turn
+      ? turn.posted.id
+      : turn.existing[0]!.id;
 
 export type StartDeps = {
   db: Db;
@@ -88,7 +106,11 @@ export type StartDeps = {
   sessions: SessionsPort;
   uploads: UploadsPort;
   views: {
-    start(sessionId: string, snapshot: readonly MemoryEntry[]): void;
+    start(
+      sessionId: string,
+      snapshot: readonly MemoryEntry[],
+      sendId?: string,
+    ): void;
     resetSeen(sessionId: string): void;
   };
 };
@@ -116,6 +138,16 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
     if (fields.claim && !deps.sessions.queue.claim(base.id, fields.claim)) {
       throw new ClaimLost();
     }
+    if (
+      "posted" in fields.turn &&
+      fields.turn.pendingId !== undefined &&
+      !deps.sessions.pending.claim(
+        fields.turn.pendingId,
+        base.id,
+        fields.turn.posted.id,
+      )
+    )
+      throw new ClaimLost();
     const changed = applyChanges(
       base.disabledCapabilities,
       fields.changes ?? [],
@@ -169,6 +201,9 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
         }),
       );
       lastAuthor = turn.users.at(-1)!.username;
+    } else if ("posted" in turn) {
+      users = [turn.posted];
+      lastAuthor = turn.author;
     } else {
       const replacement = deps.sessions.replaceSend(turn.existing, send.id);
       users = replacement.users;
@@ -179,7 +214,11 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
     }
     // a chat keeps the note its first send read; a run reads it live
     if ((fields.kind ?? "chat") === "chat") {
-      deps.views.start(base.id, policy.projectMemory);
+      deps.views.start(
+        base.id,
+        policy.projectMemory,
+        base.origin === "channel" ? send.id : undefined,
+      );
     }
     const previousMcpDigest = deps.sessions.lastMcpDigest(
       base.id,
@@ -207,7 +246,7 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       events: [
         // the queue left goes first to the chat's watchers, which hold it
         // until the frame below brings the messages the rows became
-        ...(fields.claim === undefined
+        ...(fields.claim === undefined && !("posted" in turn && turn.pendingId)
           ? []
           : queueFrameEvent(deps.db, base.id, true)),
         envelope(

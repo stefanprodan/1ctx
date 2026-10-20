@@ -47,7 +47,7 @@ export type AccessPort = {
 // the runner's snapshot of the send in flight, so a reader gets the
 // whole partial in one answer; a closure, since the runner is built
 // after this area
-export type LivePort = (sessionId: string) => LiveSend | null;
+export type LivePort = (sessionId: string) => LiveSend[];
 
 export type UploadsPort = {
   copyUploads(
@@ -279,7 +279,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             ...detail(
               deps.store,
               session,
-              null,
+              [],
               deps.keptDays(),
               principal.userId,
             ),

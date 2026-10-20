@@ -126,7 +126,6 @@ const context = (
     agentName: "sre",
     sessionId: "chat00000001",
     origin,
-    sendStartedAt: NOW,
   },
   now: () => NOW,
   signal: new AbortController().signal,
