@@ -117,7 +117,7 @@ export const visitKey = (page: RecentPage): string => `${page.kind}:${page.id}`;
 export const sessionRecent = (s: {
   id: string;
   projectId: string;
-  origin: "chat" | "automation";
+  origin: "chat" | "automation" | "channel";
   automationId: string | null;
   title: string;
 }): RecentRow =>

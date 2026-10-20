@@ -28,9 +28,11 @@ import type { ToolCall } from "./tool.ts";
 export type SessionSummary = {
   id: string;
   projectId: string;
-  ownerId: string;
-  agentId: string;
+  ownerId: string | null;
+  agentId: string | null;
   origin: SessionOrigin;
+  // the first row agents still read in a channel; absent on chats and runs
+  droppedSeq?: number | null;
   forkedFromId: string | null;
   // the automation a run belongs to; null for a chat, and for a run
   // whose automation was deleted
@@ -216,9 +218,9 @@ export type SendSummary = {
   sessionId: string;
   kind: SendKind;
   userId: string;
-  agentId: string;
-  providerId: string;
-  model: string;
+  agentId: string | null;
+  providerId: string | null;
+  model: string | null;
   status: SessionStatus;
   cause: SendCause | null;
   error: string | null;
@@ -304,7 +306,8 @@ export type SessionDetail = {
     origin: SessionOrigin | null;
   } | null;
   messages: Message[];
-  // the send in flight, or the last one; null before the first
+  // channel-only paging cursors; absent when a chat or run is read whole
+  page?: { before: number | null; after: number | null };
   send: SendSummary | null;
   live: LiveSend | null;
   authors: SessionAuthor[];

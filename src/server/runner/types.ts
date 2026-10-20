@@ -51,7 +51,11 @@ export type RunnerDeps = {
     byId(id: string): AgentRow | null;
     byName(name: string): AgentRow | null;
   };
-  users: { byId(id: string): UserRow | null };
+  users: {
+    byId(id: string): UserRow | null;
+    byUsername(name: string): UserRow | null;
+  };
+  projects: { isMember(projectId: string, userId: string): boolean };
   providers: {
     chat: RoundDeps["chat"];
     byId(id: string): { name: string; wire: Wire } | null;

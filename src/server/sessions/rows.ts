@@ -59,8 +59,8 @@ export const RESULT_DISPLAY_CHARS = 20_000;
 export type RawSession = {
   id: string;
   project_id: string;
-  owner_id: string;
-  agent_id: string;
+  owner_id: string | null;
+  agent_id: string | null;
   origin: SessionOrigin;
   automation_id: string | null;
   run_source: EventSource | null;
@@ -82,6 +82,7 @@ export type RawSession = {
   attention_source: AttentionSource | null;
   parent_session_id: string | null;
   parent_message_id: string | null;
+  dropped_seq?: number | null;
 };
 
 export type UsagePort = {
@@ -98,6 +99,7 @@ export const session = (
   ownerId: raw.owner_id,
   agentId: raw.agent_id,
   origin: raw.origin,
+  ...(raw.origin === "channel" ? { droppedSeq: raw.dropped_seq ?? null } : {}),
   automationId: raw.automation_id,
   runSource: raw.run_source,
   forkedFromId: raw.forked_from_session_id,
@@ -266,9 +268,9 @@ export type RawSend = {
   session_id: string;
   kind: SendKind;
   user_id: string;
-  agent_id: string;
-  provider_id: string;
-  model: string;
+  agent_id: string | null;
+  provider_id: string | null;
+  model: string | null;
   status: SessionStatus;
   cause: SendCause | null;
   error: string | null;

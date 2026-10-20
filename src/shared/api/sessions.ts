@@ -42,6 +42,8 @@ export type SessionsResponse = { rows: FeedRow[]; next: string | null };
 // names; null before the first send
 export type FeedRow = {
   session: SessionSummary;
+  // true only for the channel pinned in an unsearched project feed
+  pinned?: boolean;
   agent: string | null;
   agentRetired: boolean;
   send: SendSummary | null;

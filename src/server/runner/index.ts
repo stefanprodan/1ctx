@@ -9,14 +9,24 @@ import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { after, sleep } from "../lib/clock.ts";
-import { BadRequest, messageOf } from "../lib/errors.ts";
+import { messageOf } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { ProjectRow } from "../projects/index.ts";
-import { type SessionRow, titleFrom } from "../sessions/index.ts";
+import {
+  refuseChannel,
+  type SessionRow,
+  titleFrom,
+} from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { attention } from "./attention.ts";
-import { liveAuthor, principalOf } from "./authors.ts";
+import {
+  liveAuthor,
+  principalOf,
+  requiredAgent,
+  requiredUser,
+} from "./authors.ts";
+import { postChannel } from "./channel.ts";
 import { chatFor } from "./chat-guard.ts";
 import { childRowsTo, delegate } from "./child.ts";
 import { compactSend } from "./compact.ts";
@@ -50,7 +60,6 @@ export type { DrainResult, ShutdownResult } from "./shutdown.ts";
 export { MAX_TURN_MESSAGES, type TurnMessage } from "./turn.ts";
 export type { Runner } from "./types.ts";
 
-// how long shutdown waits for the streams to let go
 export const SHUTDOWN_DRAIN_MS = 5000;
 export { FINALIZE_RETRY_MS };
 
@@ -90,9 +99,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
       .messages(send.sessionId)
       .filter((row) => row.id !== send.round?.messageId);
 
-  // The first cause wins. Stop and shutdown still abort a phase opened
-  // after another cause claimed the send, and the send remembers it, so
-  // its end leaves the open alert as a stop's would.
   const terminate = (
     send: ActiveSend,
     cause: SendCause,
@@ -101,7 +107,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     if (cause === "stop" || cause === "shutdown") {
       if (send.cause !== null && send.terminal === null) {
         send.interrupted = true;
-        // a main row waiting out its tools keeps the cause that cut it
         if (send.phase === "memory" || send.phase === "attention") {
           send.cutBy ??= cause;
         }
@@ -177,10 +182,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
         send,
       );
     } finally {
-      // a pending deadline would hold the whole send until it rang
       disarm();
       if (send.tools !== null) await send.tools.catch(() => {});
-      // no command runs past here, so the trees may go
       send.repos?.release();
       send.letGo();
       const freed = finalized && registry.free(send);
@@ -188,26 +191,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
     }
   };
 
-  const author = (principal: Principal): UserRow => {
-    const user = deps.users.byId(principal.userId);
-    if (user === null) throw new BadRequest("the user is gone");
-    return user;
-  };
-
-  const agentOf = (id: string): AgentRow => {
-    const agent = deps.agents.byId(id);
-    if (agent === null) throw new BadRequest("no such agent");
-    return agent;
-  };
-
   const prepare = (fields: {
     sessionId: string;
     session: SessionRow | null;
     project: ProjectRow;
-    // who starts it: the first author, the regenerator, the automation's
     user: UserRow;
     agent: AgentRow;
-    // the chat's agent, when the agent was summoned for the turn
     summoned?: string | null;
     title: string;
     event?: Event | null;
@@ -228,7 +217,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     return prepareSend({
       db: deps.db,
       registry,
-      // a run no one pressed takes the scheduled share of the caps
       startedBy: event === null || event.source === "manual" ? user.id : null,
       wake: deps.wake,
       writer,
@@ -280,7 +268,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     sessionId: string,
     messages: readonly (SendMessageRequest & {
       principal: Principal;
-      // the author's row when the caller read it already
       user?: UserRow;
     })[],
     claim?: readonly QueuedClaim[],
@@ -296,9 +283,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const own = deps.access.project(principal, seen.projectId);
       session ??= seen;
       project ??= own;
-      authors.push(user ?? author(principal));
+      authors.push(user ?? requiredUser(deps.users, principal.userId));
     }
     const first = session!;
+    if (first.agentId === null) {
+      throw new Error("a chat must name its agent");
+    }
     return prepare({
       sessionId: first.id,
       session: first,
@@ -307,7 +297,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       ...turnAgent(
         deps,
         first.id,
-        agentOf(first.agentId),
+        requiredAgent(deps.agents, first.agentId),
         messages.map((fields) => fields.message),
       ),
       title: first.title,
@@ -351,8 +341,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     registry,
     start(principal, fields) {
       const project = deps.access.project(principal, fields.projectId);
-      const user = author(principal);
-      const agent = agentOf(fields.agentId);
+      const user = requiredUser(deps.users, principal.userId);
+      const agent = requiredAgent(deps.agents, fields.agentId);
       refuseNewSummon(deps.agents, agent.name, fields.message);
       return begin({
         sessionId: newId(),
@@ -372,6 +362,19 @@ export function runnerArea(deps: RunnerDeps): Runner {
       return launched(prepareTurn(sessionId, messages, claim, starter));
     },
     message(principal, sessionId, fields) {
+      const session = deps.visible(principal, sessionId);
+      if (session.origin === "channel") {
+        return {
+          status: 201,
+          body: postChannel(
+            deps,
+            principal,
+            session,
+            fields,
+            requiredUser(deps.users, principal.userId),
+          ),
+        };
+      }
       const queued = runner.queue.enqueue(principal, sessionId, fields);
       return queued === null
         ? { status: 201, body: runner.send(principal, sessionId, fields) }
@@ -387,7 +390,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       );
       const existing = regenerateUsers(deps.sessions.messages(session.id));
       const project = deps.access.project(principal, session.projectId);
-      const user = author(principal);
+      const user = requiredUser(deps.users, principal.userId);
       const lastId = existing.at(-1)!.userId;
       return begin({
         sessionId: session.id,
@@ -397,7 +400,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         ...regeneratedAgent(
           deps,
           session.id,
-          agentOf(session.agentId),
+          requiredAgent(deps.agents, session.agentId),
           existing[0]!.sendId,
         ),
         title: session.title,
@@ -415,12 +418,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
     compact(principal, sessionId) {
       const session = chatFor(deps, principal, sessionId, "compact", registry);
       const project = deps.access.project(principal, session.projectId);
-      const user = author(principal);
+      const user = requiredUser(deps.users, principal.userId);
       const policy = sendPolicy(deps, {
         sessionId: session.id,
         project,
         user,
-        agent: agentOf(session.agentId),
+        agent: requiredAgent(deps.agents, session.agentId),
         offerTools: false,
         disabledCapabilities: session.disabledCapabilities,
       });
@@ -445,6 +448,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     },
     stop(principal, sessionId) {
       const session = deps.visible(principal, sessionId);
+      refuseChannel(session, "stopped");
       const send = registry.get(session.id);
       if (send !== null) void terminate(send, "stop");
     },

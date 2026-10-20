@@ -315,6 +315,7 @@ describe("POST /api/sessions/:id/fork", () => {
         title: "Fork of what time is it",
         status: "done",
         disabled_capabilities: "[]",
+        dropped_seq: null,
         revision: 0,
         created_at: chat.app.now.value,
         last_activity_at: chat.app.now.value,

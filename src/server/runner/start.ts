@@ -51,7 +51,7 @@ export type StartFields = {
   session: SessionRow | null;
   origin?: "chat" | "automation";
   automationId?: string | null;
-  kind?: SendKind;
+  kind?: Exclude<SendKind, "post">;
   turn:
     | { users: readonly StartUser[] }
     | { existing: readonly Message[]; lastAuthor: string };

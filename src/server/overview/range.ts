@@ -75,8 +75,8 @@ export type MonthResult = DayReads & {
   deciders: DeciderUsage[];
 };
 
-const SEND_SUMS = `sum(kind != 'run') as turns,
-       sum(kind != 'run' and status = 'failed') as turnsFailed,
+const SEND_SUMS = `sum(kind in ('chat', 'compact')) as turns,
+       sum(kind in ('chat', 'compact') and status = 'failed') as turnsFailed,
        sum(kind = 'run') as runs,
        sum(kind = 'run' and status = 'failed') as runsFailed`;
 
@@ -134,7 +134,7 @@ function ended(db: Db, bounds: Bounds): Ended {
     .query<{ at: number; ms: number }, Bounds>(
       `select started_at as at, max(finished_at - started_at, 0) as ms
          from sends
-         where kind != 'run' and status != 'running'
+         where kind in ('chat', 'compact') and status != 'running'
            and finished_at is not null
            and started_at >= ? and started_at < ?
            and child = 0

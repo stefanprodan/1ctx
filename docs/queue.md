@@ -5,6 +5,11 @@ Governs messages to a busy chat and their dispatcher:
 `src/server/sessions/queued.ts` and `queued-routes.ts`. Sends, caps
 and the writer are in `docs/sessions.md`.
 
+A channel post is written at once and never enters this queue. Its user row
+belongs to a done `post` send, cannot be edited, and moves the channel's
+activity when it is written. Channel summon turns use a separate pending-turn
+shape in the channel runner work, not an editable queued text row.
+
 ## The queue
 
 - **A message to a busy chat is queued, never sent.** `POST

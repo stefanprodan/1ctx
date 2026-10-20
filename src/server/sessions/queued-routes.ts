@@ -110,6 +110,9 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
           const row = own(store, principal, session.id, id);
           if (row.state !== "queued") throw new Conflict("it was not sent");
           // the runner's check, so an edit is refused as a send would be
+          if (session.agentId === null) {
+            throw new Conflict("a channel has no editable messages");
+          }
           const chatAgent = deps.agents.byId(session.agentId);
           if (chatAgent !== null) {
             summonOf(deps.agents, chatAgent.name, fields.message);

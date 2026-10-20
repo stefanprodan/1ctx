@@ -136,7 +136,7 @@ export type SessionsPort = {
   ): Message | null;
   createSend(fields: {
     id?: string;
-    kind?: SendKind;
+    kind?: Exclude<SendKind, "post">;
     sessionId: string;
     userId: string;
     agentId: string;

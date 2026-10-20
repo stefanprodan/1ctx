@@ -114,7 +114,7 @@ export function childSendRow(
   sessions: SessionsPort,
   fields: {
     id: string;
-    kind: SendKind;
+    kind: Exclude<SendKind, "post">;
     sessionId: string;
     policy: SendPolicy;
     firstMessageId: string;
@@ -153,6 +153,13 @@ function startChild(
   const parent = link.parent;
   const root = deps.sessions.byId(parent.sessionId);
   if (root === null) throw new Error("the chat is gone");
+  if (root.ownerId === null || root.origin === "channel") {
+    throw new Error("a channel cannot start a subagent yet");
+  }
+  if (parent.kind === "post") throw new Error("a post cannot run a subagent");
+  const parentKind = parent.kind;
+  const ownerId = root.ownerId;
+  const origin = root.origin;
   const sessionId = newId();
   const sendId = newId();
   const taskId = newId();
@@ -161,9 +168,9 @@ function startChild(
     deps.sessions.create({
       id: sessionId,
       projectId: root.projectId,
-      ownerId: root.ownerId,
+      ownerId,
       agentId: policy.agentId,
-      origin: root.origin,
+      origin,
       disabledCapabilities: policy.disabledCapabilities,
       parent: { sessionId: parent.sessionId, messageId: link.rowId },
       title: input.description,
@@ -171,7 +178,7 @@ function startChild(
     });
     childSendRow(deps.sessions, {
       id: sendId,
-      kind: parent.kind,
+      kind: parentKind,
       sessionId,
       policy,
       firstMessageId: taskId,

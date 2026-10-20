@@ -204,6 +204,12 @@ from `emailOn` in `GET /api/me`.
 
 ## Projects
 
+- **Every team project has one channel.** It is created with the project in
+  the same transaction, visible to the team's members and every admin, and
+  deleted only by the project cascade. A personal project has none. The
+  channel has no name of its own, so a project rename updates its stored title
+  in the rename transaction.
+
 - **A personal project is its owner's alone, an admin included.** The
   rule is `projects/visible.ts`; a team project is open to its members
   and every admin. Every personal project is named `personal` (a table

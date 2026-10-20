@@ -3,10 +3,12 @@
 Governs `src/server/sessions/` and the runner's sends in
 `src/server/runner/`.
 
-A session (`SESSION_ORIGINS`) is a chat users write in or an automation's
-run. Both share the writer, caps and sweep. A send (`SEND_KINDS`:
-`chat`, `compact`, `run`) is one turn, compaction or run. Its rounds each
-ask the model and run its calls. Rules for runs alone are in
+A session (`SESSION_ORIGINS`) is a chat users write in, a team project's
+channel, or an automation's run. A channel has no owner or agent. A send
+(`SEND_KINDS`: `chat`, `compact`, `run`, `post`) is one turn, compaction,
+run or channel post. A post has no provider or model and may have no agent;
+it is done with one round when written and starts no model turn. Model sends'
+rounds each ask the model and run its calls. Rules for runs alone are in
 `docs/automations.md`; the queue in `docs/queue.md`; the tool loop in
 `docs/tools.md`; memory in `docs/memory.md`; archive, packing and the
 sweep in `docs/archive.md`; compaction in `docs/compaction.md`.
@@ -85,6 +87,15 @@ arrives.
   large tool row's overflow pages.
 
 ## Turns
+
+- **A channel post is written at once.** A member or admin uses the message
+  route; the server writes one done `post` send and its user row in one
+  transaction, with no usage or model turn. A post is never edited. A leading
+  `@name` is a plain post when it names a project member, an agent summon when
+  it names a live agent, and an unknown name is refused. An agent wins a name
+  shared with a user. Until channel summons land, the summon case is a 409.
+- **A channel is permanent within its project.** It cannot be forked, renamed,
+  archived, deleted, regenerated, compacted or stopped through chat routes.
 
 - **A turn may open with 1 to `MAX_TURN_MESSAGES` user messages.**
   `runner.sendTurn()` (`runner/turn.ts`) writes each as its own

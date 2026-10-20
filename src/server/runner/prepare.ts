@@ -106,8 +106,8 @@ export function prepareSend(fields: {
     maxFiles: number;
   };
   title: string;
-  kind: SendKind;
-  origin: SessionOrigin;
+  kind: Exclude<SendKind, "post">;
+  origin: Exclude<SessionOrigin, "channel">;
   automationId: string | null;
   now: number;
 }): PreparedRun {

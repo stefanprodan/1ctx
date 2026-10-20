@@ -278,7 +278,7 @@ function SessionPage({
                       : undefined
                   }
                   fork={
-                    lastTurn === undefined
+                    lastTurn === undefined || shown.session.agentId === null
                       ? undefined
                       : {
                           agents: choices,
@@ -314,7 +314,7 @@ function SessionPage({
                       : undefined
                   }
                   onFork={(title) =>
-                    lastTurn === undefined
+                    lastTurn === undefined || shown.session.agentId === null
                       ? Promise.reject(new Error("nothing to fork yet"))
                       : forkSession(
                           shown.session.id,

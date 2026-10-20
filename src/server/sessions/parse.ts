@@ -254,6 +254,27 @@ export function parseStreamQuery(url: URL): {
   };
 }
 
+export function parseDetailQuery(url: URL): {
+  before: number | null;
+  around: number | null;
+} {
+  const get = queryParams(url, ["before", "around"]);
+  const value = (name: "before" | "around"): number | null => {
+    const raw = get(name);
+    if (raw === null) return null;
+    if (!/^[1-9][0-9]*$/.test(raw) || !Number.isSafeInteger(Number(raw))) {
+      throw new BadRequest(`${name} must be a positive integer`);
+    }
+    return Number(raw);
+  };
+  const before = value("before");
+  const around = value("around");
+  if (before !== null && around !== null) {
+    throw new BadRequest("before and around cannot be combined");
+  }
+  return { before, around };
+}
+
 // the first line of the first message, cut to the cap
 export function titleFrom(text: string): string {
   const line = text.trim().split(/\r?\n/, 1)[0]?.trim() ?? "";

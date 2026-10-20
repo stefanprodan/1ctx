@@ -23,7 +23,10 @@ type RawLastLine = {
   content: string;
 };
 
-type RawLastSend = RawSend & { agent_name: string; agent_retired: number };
+type RawLastSend = RawSend & {
+  agent_name: string | null;
+  agent_retired: number | null;
+};
 
 // the same row lastSend() answers for one session, for many at once,
 // with its agent
@@ -34,7 +37,7 @@ function lastSends(db: Db, sessionIds: string[]) {
       `select current.*, ${sendTokens("current")},
          agents.name as agent_name,
          agents.deleted_at is not null as agent_retired
-       from sends current join agents on agents.id = current.agent_id
+       from sends current left join agents on agents.id = current.agent_id
        where current.session_id in (${marks})
          and not exists (
            select 1 from sends later
@@ -50,7 +53,10 @@ function lastSends(db: Db, sessionIds: string[]) {
       raw.session_id,
       {
         send: send(raw),
-        agent: { name: agent_name, retired: agent_retired === 1 },
+        agent:
+          agent_name === null
+            ? null
+            : { name: agent_name, retired: agent_retired === 1 },
       },
     ]),
   );
@@ -123,10 +129,13 @@ function automations(db: Db, sessionIds: string[]) {
 function agentNames(db: Db, sessionIds: string[]) {
   const marks = sessionIds.map(() => "?").join(", ");
   const rows = db
-    .query<{ session_id: string; name: string; retired: number }, string[]>(
+    .query<
+      { session_id: string; name: string | null; retired: number | null },
+      string[]
+    >(
       `select sessions.id as session_id, agents.name,
          agents.deleted_at is not null as retired
-       from sessions join agents on agents.id = sessions.agent_id
+       from sessions left join agents on agents.id = sessions.agent_id
        where sessions.id in (${marks})`,
     )
     .all(...sessionIds);
@@ -140,7 +149,10 @@ function agentNames(db: Db, sessionIds: string[]) {
 
 // who pressed Run now on each manual run, by the session's owner
 function runners(db: Db, raws: RawSession[]) {
-  const manual = raws.filter((raw) => raw.run_source === "manual");
+  const manual = raws.filter(
+    (raw): raw is RawSession & { owner_id: string } =>
+      raw.run_source === "manual" && raw.owner_id !== null,
+  );
   if (manual.length === 0) return new Map<string, string>();
   const ids = [...new Set(manual.map((raw) => raw.owner_id))];
   const marks = ids.map(() => "?").join(", ");
@@ -168,7 +180,9 @@ export function feedRows(
   const agents = agentNames(db, ids);
   return raws.map((raw) => {
     const username =
-      raw.run_source === "manual" ? names.get(raw.owner_id) : undefined;
+      raw.run_source === "manual" && raw.owner_id !== null
+        ? names.get(raw.owner_id)
+        : undefined;
     return {
       session: session(raw, usage.get(raw.id) ?? null),
       agent: agents.get(raw.id)?.name ?? null,
@@ -177,7 +191,10 @@ export function feedRows(
       sendAgent: sends.get(raw.id)?.agent ?? null,
       last: lines.get(raw.id) ?? null,
       automation: automationRows.get(raw.id) ?? null,
-      runBy: username === undefined ? null : { id: raw.owner_id, username },
+      runBy:
+        username === undefined || raw.owner_id === null
+          ? null
+          : { id: raw.owner_id, username },
       runs:
         raw.automation_id === null
           ? null
@@ -218,13 +235,13 @@ type SendColumn = Listed<
 >;
 
 type RawEnvelopeRow = {
-  agent: string;
-  retired: number;
+  agent: string | null;
+  retired: number | null;
   send_agent: string | null;
   send_agent_retired: number | null;
   automation_id: string | null;
   automation_name: string | null;
-  owner_id: string;
+  owner_id: string | null;
   run_by: string | null;
   line_seq: number | null;
   line_author: string;
@@ -246,7 +263,7 @@ export const ENVELOPE_ROW = `select agents.name as agent,
     ${sendTokens("last")},
     turn.name as send_agent, turn.deleted_at is not null as send_agent_retired
   from sessions
-  join agents on agents.id = sessions.agent_id
+  left join agents on agents.id = sessions.agent_id
   left join automations on automations.id = sessions.automation_id
   left join users runner
     on sessions.run_source = 'manual' and runner.id = sessions.owner_id
@@ -298,6 +315,8 @@ export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
             alert: alertOf(raw),
           },
     runBy:
-      raw.run_by === null ? null : { id: raw.owner_id, username: raw.run_by },
+      raw.run_by === null || raw.owner_id === null
+        ? null
+        : { id: raw.owner_id, username: raw.run_by },
   };
 }

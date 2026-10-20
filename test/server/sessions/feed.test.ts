@@ -531,9 +531,14 @@ function assertPlan(db: Db, sql: string, scanAutomations = false) {
     // a sort of the walk would read every run even for the first match
     expect(plan).not.toContain("USE TEMP B-TREE FOR LAST TERM OF ORDER BY");
   } else {
+    const chats = sql.includes("sessions_feed_chats");
     const unowned = sql.includes("sessions_feed_unowned");
-    const index = unowned ? "sessions_feed_unowned" : "sessions_feed";
-    const origin = unowned ? "" : " AND origin=?";
+    const index = unowned
+      ? "sessions_feed_unowned"
+      : chats
+        ? "sessions_feed_chats"
+        : "sessions_feed";
+    const origin = unowned || chats ? "" : " AND origin=?";
     const rank = /and \(status = 'running'\) = [01]/.test(sql)
       ? " AND <expr>=?"
       : "";

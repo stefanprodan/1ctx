@@ -12,6 +12,16 @@ primitives, forms and the data layer's general rules are in
 The feed is the session list on Home and on a project's Feed tab: chats
 and runs, one row each, under the filters All, Chats, Runs and Flagged.
 
+- **A team project's channel is its pinned feed row.** An unsearched project
+  feed returns it first under All and Chats, marked `pinned`; Runs and Flagged
+  omit it. Search includes it only when its project-name title matches and
+  does not pin it. Home returns every visible channel as an ordinary row in
+  last-activity order.
+- **A channel detail is paged by whole turns.** Its first read returns the
+  newest 50 post-anchored turns and a `before` seq when older turns remain.
+  `before` reads the next older page; `around` reads one bounded window around
+  a quoted post's seq. Chats and runs still return every row in one read.
+
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the feed lands on both.
 - **The Not sent card reads its own route, never the feed.** `GET

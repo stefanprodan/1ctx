@@ -21,6 +21,8 @@ export type ListQuery = {
   origin?: "chat" | "automation" | null;
   before?: FeedCursor | null;
   limit?: number;
+  // one project's unsearched All or Chats feed pins its channel first
+  pinProjectId?: string | null;
 };
 
 type Part = { sql: string; args: (string | number)[] };
@@ -39,9 +41,18 @@ function arm(
   rank: 0 | 1 | null,
   limit: number,
 ): Part {
-  const index = origin === null ? "sessions_feed_unowned" : "sessions_feed";
+  const index =
+    origin === null
+      ? "sessions_feed_unowned"
+      : origin === "chat"
+        ? "sessions_feed_chats"
+        : "sessions_feed";
   const kind =
-    origin === null ? "automation_id is null" : `origin = '${origin}'`;
+    origin === null
+      ? "automation_id is null"
+      : origin === "chat"
+        ? "origin in ('chat', 'channel')"
+        : "origin = 'automation'";
   const at =
     before === null
       ? ""
@@ -143,19 +154,54 @@ export function listSessions(
   usagePort: UsagePort,
   query: ListQuery,
 ): SessionsResponse {
-  const { origin = null, limit = FEED_LIMIT } = query;
-  const read = feedRead(db, query);
-  const rows = read.slice(0, limit);
-  const last = rows.at(-1);
-  const usage = usagePort.latestFor(rows.map((row) => row.id));
+  const {
+    origin = null,
+    before = null,
+    limit = FEED_LIMIT,
+    pinProjectId = null,
+  } = query;
+  const pin =
+    pinProjectId !== null &&
+    query.q === "" &&
+    (origin === null || origin === "chat");
+  const channel = pin
+    ? db
+        .query<RawSession, [string]>(
+          "select * from sessions indexed by sessions_channel where project_id = ? and origin = 'channel'",
+        )
+        .get(pinProjectId)
+    : null;
+  const capacity = channel !== null && before === null ? limit - 1 : limit;
+  const read = feedRead(db, {
+    ...query,
+    limit: channel === null ? limit : limit + 1,
+  });
+  const ordinary =
+    channel === null ? read : read.filter((row) => row.id !== channel.id);
+  const selected = ordinary.slice(0, Math.max(0, capacity));
+  const raws =
+    channel !== null && before === null ? [channel, ...selected] : selected;
+  const last = selected.at(-1);
+  const usage = usagePort.latestFor(raws.map((row) => row.id));
+  const rows = feedRows(
+    db,
+    raws,
+    usage,
+    origin === null ? runCounts(db, raws) : undefined,
+  );
+  if (
+    channel !== null &&
+    before === null &&
+    rows[0]?.session.id === channel.id
+  ) {
+    rows[0] = { ...rows[0], pinned: true };
+  }
   return {
-    rows: feedRows(
-      db,
-      rows,
-      usage,
-      origin === null ? runCounts(db, rows) : undefined,
-    ),
-    next: read.length > limit && last !== undefined ? feedCursor(last) : null,
+    rows,
+    next:
+      ordinary.length > capacity && last !== undefined
+        ? feedCursor(last)
+        : null,
   };
 }
 

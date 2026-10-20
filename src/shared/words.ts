@@ -291,10 +291,10 @@ export const SEND_CAUSES = [
 export type SendCause = (typeof SEND_CAUSES)[number];
 
 // a run is the send an automation opens its session with
-export const SEND_KINDS = ["chat", "compact", "run"] as const;
+export const SEND_KINDS = ["chat", "compact", "run", "post"] as const;
 export type SendKind = (typeof SEND_KINDS)[number];
 
-export const SESSION_ORIGINS = ["chat", "automation"] as const;
+export const SESSION_ORIGINS = ["chat", "automation", "channel"] as const;
 export type SessionOrigin = (typeof SESSION_ORIGINS)[number];
 
 export const ARCHIVE_REASONS = ["manual", "agent", "idle"] as const;

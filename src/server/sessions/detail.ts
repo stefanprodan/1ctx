@@ -20,6 +20,10 @@ import { offWire, type SessionRow } from "./rows.ts";
 type DetailStore = {
   forkedFrom(id: string): SessionDetail["forkedFrom"];
   messages(id: string): Message[];
+  channelPage(
+    id: string,
+    cursor: { before: number | null; around: number | null },
+  ): { messages: Message[]; before: number | null; after: number | null };
   lastSend(id: string): SessionDetail["send"];
   authors(id: string): SessionAuthor[];
   agents(id: string): SessionAgent[];
@@ -37,11 +41,20 @@ export function detail(
   keptDays: number,
   // who reads it: a not-sent message shows to its author alone
   viewerId: string | null,
+  cursor: { before: number | null; around: number | null } = {
+    before: null,
+    around: null,
+  },
 ): SessionResponse {
+  const page =
+    session.origin === "channel" ? store.channelPage(session.id, cursor) : null;
   return {
     session,
     forkedFrom: store.forkedFrom(session.id),
-    messages: store.messages(session.id).map(offWire),
+    messages: (page?.messages ?? store.messages(session.id)).map(offWire),
+    ...(page === null
+      ? {}
+      : { page: { before: page.before, after: page.after } }),
     send: store.lastSend(session.id),
     live,
     authors: store.authors(session.id),

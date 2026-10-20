@@ -3,7 +3,11 @@
 
 import { Conflict } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
-import { refuseArchived, type SessionRow } from "../sessions/index.ts";
+import {
+  refuseArchived,
+  refuseChannel,
+  type SessionRow,
+} from "../sessions/index.ts";
 import type { Registry } from "./registry.ts";
 
 // a chat the principal sees that takes a turn: no run, no archive; with
@@ -14,10 +18,21 @@ export function chatFor(
   sessionId: string,
   verb: "continue" | "regenerate" | "compact",
   registry: Registry | null = null,
-): SessionRow {
+): SessionRow & { ownerId: string; agentId: string } {
   const session = deps.visible(principal, sessionId);
+  refuseChannel(
+    session,
+    verb === "continue"
+      ? "stopped"
+      : verb === "regenerate"
+        ? "regenerated"
+        : "compacted",
+  );
   if (session.origin === "automation") {
     throw new Conflict(`a run cannot ${verb}`);
+  }
+  if (session.agentId === null || session.ownerId === null) {
+    throw new Error("a chat must name its agent and owner");
   }
   refuseArchived(session);
   if (registry !== null) {
@@ -26,5 +41,5 @@ export function chatFor(
       throw new Conflict("the chat is running");
     }
   }
-  return session;
+  return session as SessionRow & { ownerId: string; agentId: string };
 }

@@ -339,6 +339,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: {
       count: (projectId) => sessions.store.count(projectId),
       running: (projectId) => sessions.store.running(projectId),
+      createChannel: (projectId, name, now) =>
+        sessions.createChannel(projectId, name, now),
+      renameChannel: (projectId, name) =>
+        sessions.renameChannel(projectId, name),
       dropQueued: (projectId, userId) => sessions.dropQueued(projectId, userId),
     },
     knowledge: {
@@ -605,6 +609,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     visible: (principal, id) => sessions.visible(principal, id),
     agents: agentNames,
     users,
+    projects: {
+      isMember: (projectId, userId) => projects.isMember(projectId, userId),
+    },
     providers,
     tools,
     knowledge,

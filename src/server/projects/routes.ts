@@ -47,6 +47,8 @@ export type UsersPort = {
 export type SessionsPort = {
   count(projectId: string): number;
   running(projectId: string): boolean;
+  createChannel(projectId: string, name: string, now: number): void;
+  renameChannel(projectId: string, name: string): BusEvent[];
   // in the caller's transaction: a member who left loses the messages
   // they had waiting in its chats, with the envelopes to publish
   dropQueued(projectId: string, userId: string): BusEvent[];
@@ -176,6 +178,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
               now: deps.clock(),
             }),
           );
+          deps.sessions.createChannel(created.id, created.name, deps.clock());
           return {
             result: detail(created),
             events: [accessChanged(null)],
@@ -213,7 +216,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             }),
           );
           if (updated === null) throw new NotFound("no such project");
-          return { result: detail(updated) };
+          return {
+            result: detail(updated),
+            events: deps.sessions.renameChannel(updated.id, updated.name),
+          };
         });
         const body: ProjectResponse = { project };
         return json(body);

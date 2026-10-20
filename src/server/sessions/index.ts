@@ -67,7 +67,7 @@ export {
   openAlertRuns,
   type RawAlert,
 } from "./alerts.ts";
-export { refuseArchived } from "./archive.ts";
+export { refuseArchived, refuseChannel } from "./archive.ts";
 export { forgetCapabilityIn } from "./capabilities.ts";
 export { childChanged } from "./child-work.ts";
 export {
@@ -97,6 +97,7 @@ export {
   MAX_REGENERATE_BODY,
   MAX_SESSION_BODY,
   parseCreateSession,
+  parseDetailQuery,
   parseRegenerate,
   parseSendMessage,
   titleFrom,
@@ -163,6 +164,8 @@ export type SessionsDeps = {
 
 export type Sessions = {
   store: SessionStore;
+  createChannel(projectId: string, name: string, now: number): void;
+  renameChannel(projectId: string, name: string): BusEvent[];
   // the session when the principal may see its project, else the one
   // 404 access throws for the project
   visible(principal: Principal, id: string): SessionRow;
@@ -252,6 +255,13 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
   };
   return {
     store,
+    createChannel(projectId, name, now) {
+      store.createChannel({ projectId, title: name, now });
+    },
+    renameChannel(projectId, name) {
+      const row = store.renameChannel(projectId, name);
+      return row === null ? [] : [envelope(row, [], store.lastSend(row.id))];
+    },
     visible,
     sessionProject(principal, id) {
       try {

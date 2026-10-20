@@ -198,7 +198,10 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     if (session === null) return null;
     const cutoff =
       deps.clock() - deps.limits.current().queuedMinutes * MINUTE_MS;
-    const agent = deps.agents.byId(session.agentId)?.name ?? "";
+    const agent =
+      session.agentId === null
+        ? ""
+        : (deps.agents.byId(session.agentId)?.name ?? "");
     const whole: NotSentReason | null =
       session.archived !== null
         ? session.archived.reason === "agent"

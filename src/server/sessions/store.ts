@@ -16,6 +16,10 @@ import {
   type RunsQuery,
 } from "./automation.ts";
 import { forgetCapabilityIn, setDisabled } from "./capabilities.ts";
+import {
+  createChannel as insertChannel,
+  renameChannel as updateChannelName,
+} from "./channel.ts";
 import { descendants, ROOT } from "./children.ts";
 import { type Pruned, removeSession, type SessionDeleted } from "./delete.ts";
 import {
@@ -61,6 +65,7 @@ import {
 } from "./messages.ts";
 import { readOpenedFile } from "./opened-store.ts";
 import { packRows, resultText } from "./pack.ts";
+import { type ChannelPage, channelPage } from "./page.ts";
 import { titleFrom } from "./parse.ts";
 import { QueueStore } from "./queued.ts";
 import { replaceSendRows } from "./regenerate.ts";
@@ -77,7 +82,9 @@ import {
 import {
   bumpSendCounters,
   endSendRow,
+  insertPostSend,
   insertSend,
+  type PostSendFields,
   readLastSend,
   readReasoningDetails,
   readSend,
@@ -171,6 +178,22 @@ export class SessionStore {
         fields.parent?.messageId ?? null,
       );
     return this.byId(id)!;
+  }
+
+  createChannel(fields: {
+    projectId: string;
+    title: string;
+    now: number;
+  }): SessionRow {
+    return this.byId(insertChannel(this.db, fields))!;
+  }
+
+  renameChannel(projectId: string, title: string): SessionRow | null {
+    return updateChannelName(this.db, projectId, title);
+  }
+
+  createPost(fields: PostSendFields): SendSummary {
+    return this.send(insertPostSend(this.db, fields))!;
   }
 
   fork(fields: ForkFields): {
@@ -314,7 +337,8 @@ export class SessionStore {
   count(projectId: string): number {
     return this.db
       .query<{ n: number }, [string]>(
-        `select count(*) as n from sessions where project_id = ? and ${ROOT}`,
+        `select count(*) as n from sessions
+         where project_id = ? and origin != 'channel' and ${ROOT}`,
       )
       .get(projectId)!.n;
   }
@@ -342,6 +366,12 @@ export class SessionStore {
       .run(automationId).changes;
   }
 
+  channelPage(
+    sessionId: string,
+    cursor: { before: number | null; around: number | null },
+  ): ChannelPage {
+    return channelPage(this.db, sessionId, cursor);
+  }
   expiredRuns(now: number): SessionRow[] {
     return expiredAutomationRuns(this.db, this.usage, now);
   }

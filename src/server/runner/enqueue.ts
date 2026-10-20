@@ -9,7 +9,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadRequest, TooManyRequests } from "../lib/errors.ts";
+import { BadRequest, Conflict, TooManyRequests } from "../lib/errors.ts";
 import type { Log } from "../lib/log.ts";
 import type { Limits } from "../limits/index.ts";
 import {
@@ -52,6 +52,9 @@ export function queueMessage(
   const queue = deps.sessions.queue;
   const user = deps.users.byId(userId);
   if (user === null) throw new BadRequest("the user is gone");
+  if (session.agentId === null) {
+    throw new Conflict("a channel post cannot wait in the chat queue");
+  }
   const chatAgent = deps.agents.byId(session.agentId);
   if (chatAgent !== null) summonOf(deps.agents, chatAgent.name, fields.message);
   if (fields.uploads?.length) {

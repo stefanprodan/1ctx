@@ -16,6 +16,22 @@ export function refuseArchived(session: { archived: unknown }): void {
   if (session.archived !== null) throw new Conflict(ARCHIVED);
 }
 
+export function refuseChannel(
+  session: { origin: string },
+  verb:
+    | "forked"
+    | "renamed"
+    | "deleted"
+    | "archived"
+    | "regenerated"
+    | "compacted"
+    | "stopped",
+): void {
+  if (session.origin === "channel") {
+    throw new Conflict(`a channel cannot be ${verb}`);
+  }
+}
+
 // false when it is already archived, so a second archive writes nothing
 export function archiveRow(
   db: Db,
@@ -29,7 +45,7 @@ export function archiveRow(
       .query(
         `update sessions set archived_at = ?, archived_reason = ?,
            archived_by = ?, revision = revision + 1
-         where id = ? and archived_at is null`,
+         where id = ? and archived_at is null and origin != 'channel'`,
       )
       .run(now, reason, by, id).changes > 0
   );

@@ -19,7 +19,7 @@ import { BadRequest, Conflict, Forbidden, NotFound } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { parseZoneQuery } from "../usage/index.ts";
-import { refuseArchived } from "./archive.ts";
+import { refuseArchived, refuseChannel } from "./archive.ts";
 import { childAt, childOf, childWork } from "./child-work.ts";
 import { detail } from "./detail.ts";
 import { envelope } from "./envelope.ts";
@@ -28,6 +28,7 @@ import { chatMarkdown, markdownFilename } from "./markdown.ts";
 import { openedFileResponse } from "./opened.ts";
 import {
   MAX_SMALL_BODY,
+  parseDetailQuery,
   parseForkSession,
   parseMessageId,
   parseRenameSession,
@@ -107,6 +108,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
               q,
               origin: query.origin,
               before: query.before,
+              pinProjectId:
+                project !== null &&
+                q === "" &&
+                (query.origin === null || query.origin === "chat")
+                  ? project
+                  : null,
             });
         return json(body);
       },
@@ -124,6 +131,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             deps.live(session.id),
             deps.keptDays(),
             ctx.principal!.userId,
+            parseDetailQuery(ctx.url),
           ),
         );
       },
@@ -240,10 +248,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       async handle(req, ctx) {
         const principal = ctx.principal!;
-        deps.visible(principal, ctx.params.id);
+        const visible = deps.visible(principal, ctx.params.id);
+        refuseChannel(visible, "forked");
         const fields = parseForkSession(await jsonBody(req, MAX_SMALL_BODY));
         const body = transact(deps.db, () => {
           const source = deps.visible(principal, ctx.params.id);
+          refuseChannel(source, "forked");
           if (deps.agents.byId(fields.agentId) === null) {
             throw new BadRequest("no such agent");
           }
@@ -290,6 +300,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const principal = ctx.principal!;
         const session = deps.visible(principal, ctx.params.id);
+        refuseChannel(session, "renamed");
         ownerOrAdmin(principal, session, "renames");
         refuseArchived(session);
         const { title } = parseRenameSession(
@@ -300,6 +311,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           // safe: one more revision on the row, one envelope
           const current = deps.store.byId(session.id);
           if (current === null) throw new NotFound("no such chat");
+          refuseChannel(current, "renamed");
           refuseArchived(current);
           const row = deps.store.rename(session.id, title)!;
           return {
@@ -327,9 +339,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const principal = ctx.principal!;
         const session = deps.visible(principal, ctx.params.id);
+        refuseChannel(session, "archived");
         transact(deps.db, () => {
           const current = deps.store.byId(session.id);
           if (current === null) throw new NotFound("no such chat");
+          refuseChannel(current, "archived");
           if (current.origin === "automation") {
             throw new Conflict("a run cannot be archived");
           }
@@ -361,6 +375,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       handle(_req, ctx) {
         const principal = ctx.principal!;
         const session = deps.visible(principal, ctx.params.id);
+        refuseChannel(session, "deleted");
         ownerOrAdmin(principal, session, "deletes");
         transact(deps.db, () => {
           // the row is the truth after repair, and the runner keeps it

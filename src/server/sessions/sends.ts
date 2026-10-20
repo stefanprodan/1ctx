@@ -31,7 +31,7 @@ export type SendCounters = {
 
 export type SendFields = {
   id?: string;
-  kind?: SendKind;
+  kind?: Exclude<SendKind, "post">;
   sessionId: string;
   userId: string;
   agentId: string;
@@ -45,6 +45,35 @@ export type SendFields = {
   child?: boolean;
   now: number;
 };
+
+export type PostSendFields = {
+  id?: string;
+  sessionId: string;
+  userId: string;
+  agentId?: string | null;
+  firstMessageId: string;
+  now: number;
+};
+
+export function insertPostSend(db: Db, fields: PostSendFields): string {
+  const id = fields.id ?? newId();
+  db.query(
+    `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
+       provider_name, model, status, first_message_id, rounds, tool_calls,
+       summoned, child, started_at, finished_at)
+     values (?, ?, 'post', ?, ?, null, null, null, 'done', ?, 1, 0, 0, 0,
+       ?, ?)`,
+  ).run(
+    id,
+    fields.sessionId,
+    fields.userId,
+    fields.agentId ?? null,
+    fields.firstMessageId,
+    fields.now,
+    fields.now,
+  );
+  return id;
+}
 
 export function insertSend(db: Db, fields: SendFields): string {
   const id = fields.id ?? newId();
@@ -233,7 +262,7 @@ export function sendTurns(
       `select sends.id, sends.agent_id, agents.name, sends.summoned,
          sends.provider_id
        from sends join agents on agents.id = sends.agent_id
-       where sends.session_id = ?`,
+       where sends.session_id = ? and sends.kind != 'post'`,
     )
     .all(sessionId);
   return new Map(

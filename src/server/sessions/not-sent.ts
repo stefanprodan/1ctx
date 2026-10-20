@@ -36,6 +36,7 @@ export function notSentOf(
        join projects p on p.id = s.project_id
        join agents a on a.id = s.agent_id
        where q.author_id = ? and q.state = 'not-sent'
+         and s.origin = 'chat'
          and s.project_id in (select value from json_each(?))
        order by q.changed_at desc, q.id`,
     )

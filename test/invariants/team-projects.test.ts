@@ -465,7 +465,7 @@ describe("team project chat lifecycle", () => {
     await addMember(chat, project.id, chat.memberId);
     const started = await startChat(chat, "team chat", chat.member, project.id);
     await finish(chat, started.script);
-    expect(count(chat, "sessions", "project_id", project.id)).toBe(1);
+    expect(count(chat, "sessions", "project_id", project.id)).toBe(2);
     expect(count(chat, "messages", "session_id", started.sessionId)).toBe(2);
     expect(count(chat, "sends", "session_id", started.sessionId)).toBe(1);
     expect(count(chat, "usage", "session_id", started.sessionId)).toBe(1);

@@ -81,6 +81,8 @@ const EXPECTED_IDS = [
   "0067-project-labels",
   "0068-external-tasks-restart",
   "0069-external-task-labels",
+  "0070-project-channels",
+  "0071-team-project-channels",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -99,18 +101,21 @@ const LATER_COLUMNS = [
   "child",
   "output_limit",
   "edit_revision",
+  "dropped_seq",
   "once",
   "once_fired_at",
   "once_run_session_id",
 ];
 const earlier = (rows: unknown[]) =>
-  rows.map((row) =>
-    Object.fromEntries(
-      Object.entries(row as Record<string, unknown>).filter(
-        ([key]) => !LATER_COLUMNS.includes(key),
+  rows
+    .filter((row) => (row as { origin?: string }).origin !== "channel")
+    .map((row) =>
+      Object.fromEntries(
+        Object.entries(row as Record<string, unknown>).filter(
+          ([key]) => !LATER_COLUMNS.includes(key),
+        ),
       ),
-    ),
-  );
+    );
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
   EXPECTED_IDS.slice(EXPECTED_IDS.indexOf(first));
@@ -1759,6 +1764,7 @@ describe("the schema", () => {
         .map((row) => row.name);
       expect(partial).toEqual([
         "sessions_feed",
+        "sessions_feed_chats",
         "sessions_feed_unowned",
         "sessions_idle",
         "sessions_orphan_runs",
@@ -2882,7 +2888,8 @@ describe("the schema", () => {
               parent_session_id: _________,
               parent_message_id: __________,
               child: ___________,
-              output_limit: ____________,
+              dropped_seq: ____________,
+              output_limit: _____________,
               ...rest
             }) => rest,
           ),
@@ -3954,4 +3961,117 @@ test("a test's memory database is a fresh migrate", () => {
     first.close();
     second.close();
   }
+});
+
+describe("project channel migrations", () => {
+  test("rebuilds existing rows, then adds one channel per team", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 69));
+    db.exec(`
+      insert into users
+        (id, username, full_name, email, role, password_hash, created_at)
+      values ('u70', 'user70', 'User 70', 'u70@example.com', 'member', 'x', 1);
+      insert into projects (id, kind, name, owner_id, created_at) values
+        ('personal70', 'personal', 'personal', 'u70', 1),
+        ('team70', 'team', 'platform', 'u70', 2);
+      insert into providers (id, name, wire, base_url, created_at)
+      values ('provider70', 'provider70', 'openai-compatible', 'http://x', 1);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+      values ('agent70', 'agent70', 'provider70', 'm', 'M', 1);
+      insert into sessions
+        (id, project_id, owner_id, agent_id, origin, title, status,
+         created_at, last_activity_at)
+      values ('session70', 'team70', 'u70', 'agent70', 'chat', 'kept',
+        'done', 3, 4);
+      insert into sends
+        (id, session_id, kind, user_id, agent_id, provider_id, provider_name,
+         model, status, first_message_id, started_at, finished_at)
+      values ('send70', 'session70', 'chat', 'u70', 'agent70', 'provider70',
+        'provider70', 'm', 'done', 'message70', 3, 4);
+    `);
+    expect(migrate(db)).toEqual([
+      "0070-project-channels",
+      "0071-team-project-channels",
+    ]);
+    expect(
+      db.query("select id, title from sessions where id = 'session70'").get(),
+    ).toEqual({ id: "session70", title: "kept" });
+    expect(
+      db.query("select id, kind from sends where id = 'send70'").get(),
+    ).toEqual({ id: "send70", kind: "chat" });
+    expect(
+      db
+        .query(
+          `select project_id, owner_id, agent_id, origin, title, dropped_seq
+           from sessions where origin = 'channel'`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        project_id: "team70",
+        owner_id: null,
+        agent_id: null,
+        origin: "channel",
+        title: "platform",
+        dropped_seq: null,
+      },
+    ]);
+    const channel = db
+      .query<{ id: string }, []>(
+        "select id from sessions where origin = 'channel'",
+      )
+      .get()!;
+    db.query(
+      `insert into sends
+        (id, session_id, kind, user_id, first_message_id, status,
+         started_at, finished_at)
+       values ('post70', ?, 'post', 'u70', 'post-message', 'done', 5, 5)`,
+    ).run(channel.id);
+    expect(
+      db
+        .query(
+          "select agent_id, provider_id, provider_name, model from sends where id = 'post70'",
+        )
+        .get(),
+    ).toEqual({
+      agent_id: null,
+      provider_id: null,
+      provider_name: null,
+      model: null,
+    });
+    expect(() =>
+      db
+        .query(
+          `insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+         values ('bad70', 'team70', 'u70', null, 'channel', '', 'done', 1, 1)`,
+        )
+        .run(),
+    ).toThrow(/CHECK/);
+    expect(() =>
+      db
+        .query(
+          `insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+         values ('duplicate70', 'team70', null, null, 'channel', '', 'done', 1, 1)`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE/);
+    expect(() =>
+      db
+        .query(
+          `insert into sends
+          (id, session_id, kind, user_id, agent_id, status,
+           first_message_id, started_at)
+         values ('bad-send70', ?, 'chat', 'u70', 'agent70', 'running', 'x', 1)`,
+        )
+        .run(channel.id),
+    ).toThrow(/CHECK/);
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    db.close();
+  });
 });
