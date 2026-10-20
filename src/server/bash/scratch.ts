@@ -149,6 +149,7 @@ export class ScratchStore {
       .run(workspaceId(workspace));
   }
 
+  // the workspaces a command runs in now, whose scratch no sweep takes
   held(): ReadonlySet<string> {
     return heldWorkspaces();
   }
