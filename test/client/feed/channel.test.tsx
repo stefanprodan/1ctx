@@ -201,7 +201,21 @@ describe("a channel in Recent", () => {
       send: null,
       row: null,
     } as unknown as SocketEvent);
+    // stored raw, drawn with one # however often it is renamed
     expect(renamed[0]?.title).toBe("costs");
+    expect(recentText(renamed[0]!)).toBe("#costs");
+    expect(
+      recentText(
+        recentFrame(renamed, {
+          type: "session",
+          projectId: "p1",
+          session: session({ title: "finops" }),
+          messages: [],
+          send: null,
+          row: null,
+        } as unknown as SocketEvent)[0]!,
+      ),
+    ).toBe("#finops");
     expect(
       recentFrame([row], {
         type: "deleted",

@@ -15,6 +15,7 @@ import {
   lineAt,
   mayAct,
   nodeKey,
+  ownPost,
   pendingWords,
   prepended,
   quoteOf,
@@ -218,6 +219,19 @@ describe("the channel's lines", () => {
     expect(lineAt(nodes, 5)).toBeNull();
     expect(lineAt(nodes, 99)).toBeNull();
     expect(lineAt(nodes, null)).toBeNull();
+  });
+
+  test("only the reader's own post moves a channel to its end", () => {
+    const { messages, sends } = twoTurns();
+    const nodes = groupRows(messages, null, sends);
+    const reader = { viewer: { id: "u2", admin: false } };
+    // the last node is an agent's turn: it lands where the reader is not
+    expect(ownPost(nodes.at(-1), reader)).toBe(false);
+    // Robin's post, read by Robin and by Casey
+    expect(ownPost(nodes[2], reader)).toBe(true);
+    expect(ownPost(nodes[2], { viewer: { id: "u1" } })).toBe(false);
+    expect(ownPost(nodes[2], { viewer: null })).toBe(false);
+    expect(ownPost(undefined, reader)).toBe(false);
   });
 
   test("rows that land above the first one are a page prepended", () => {

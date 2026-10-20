@@ -11,6 +11,7 @@ import type { AutomationAlert } from "../../shared/contracts/automation.ts";
 import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
 import type { SessionSummary } from "../../shared/contracts/session.ts";
 import { ago, clock, dayMonth, elapsed, plural } from "../lib/format.ts";
+import { channelName } from "../lib/names.ts";
 
 // the first line of an error, so a provider's paragraph stays a line
 const firstLine = (text: string): string =>
@@ -32,7 +33,7 @@ export function iconOf(row: FeedRow): "clock" | "chat" | "channel" | "archive" {
 
 // a channel's title is its project's name, drawn as the channel
 export const rowTitle = (session: Pick<SessionSummary, "origin" | "title">) =>
-  session.origin === "channel" ? `#${session.title}` : session.title;
+  session.origin === "channel" ? channelName(session.title) : session.title;
 
 export const CHANNEL_EMPTY = "No messages yet";
 

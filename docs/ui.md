@@ -30,7 +30,8 @@ admin pages in `docs/admin-pages.md`, the external task pages in
 - **A page seen before draws at once.** An entity that shows one key
   at a time holds earlier answers in `data/held.ts` (or a per-id
   `data/slot.ts`) and draws them while its load runs again. Never a
-  running chat, since it would miss its frames. A held key goes on a
+  running chat, since it would miss its frames, nor a channel, which is
+  paged and whose gap state is the one on screen's. A held key goes on a
   user change, a revocation, a deletion or a failed load of it.
 - **The socket client reconciles, never reasons.** `data/socket.ts` is
   the tab's one connection, open while someone is signed in, with a

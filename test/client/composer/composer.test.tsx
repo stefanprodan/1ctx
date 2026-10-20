@@ -87,7 +87,7 @@ function keysOver(
   agents: AgentSummary[] | null = null,
   agentId: string | null = null,
   reader: Locate | null = null,
-  channel?: { name: string; stream?: { tokens: number; budget: number } },
+  channel?: { name: string; meter?: { tokens: number; budget: number } },
 ): ((key: string) => boolean) & { html: string } {
   rows.set(draftKey("u1", SCOPE), JSON.stringify({ text, uploads: [] }));
   const previous = options.vnode;
@@ -276,7 +276,7 @@ describe("the composer's agent", () => {
 describe("the composer in a channel", () => {
   const CHANNEL = {
     name: "#finops",
-    stream: { tokens: 48_200, budget: 100_000 },
+    meter: { tokens: 48_200, budget: 100_000 },
   };
   const AGENTS = [agent("a1", "coder"), agent("a2", "writer")];
   const listed = (html: string) =>
@@ -326,7 +326,7 @@ describe("the composer in a channel", () => {
     const { html } = keysOver("", AGENTS, null, null, CHANNEL);
     expect(html).toContain("48K / 100K");
     expect(html).toContain("What agents read: 48,200 of 100,000 tokens");
-    // no stream counted yet: no meter
+    // no meter counted yet: none drawn
     expect(
       keysOver("", AGENTS, null, null, { name: "#finops" }).html,
     ).not.toContain("composer-ctx");

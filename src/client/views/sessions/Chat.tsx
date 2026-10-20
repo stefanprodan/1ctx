@@ -199,8 +199,10 @@ function SessionPage({
             ? channelName(shown.session.title)
             : shown.session.title
       }
+      // a channel's menu would hold nothing: it is never renamed,
+      // archived or deleted, and its markdown export reads every row
       menu={
-        shown !== null ? (
+        shown !== null && !channel ? (
           <Menu
             key={shown.session.id}
             title={shown.session.title}
@@ -363,7 +365,7 @@ function SessionPage({
                     channel
                       ? {
                           name: channelName(shown.session.title),
-                          stream: shown.stream,
+                          meter: shown.channelContext,
                         }
                       : undefined
                   }

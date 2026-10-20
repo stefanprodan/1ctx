@@ -22,6 +22,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type {
+  ChannelMeter,
   QueuedMessage,
   RoundUsage,
 } from "../../shared/contracts/session.ts";
@@ -54,7 +55,7 @@ import {
   enterFills,
   runCommand,
 } from "./commands.ts";
-import { readout, streamReadout } from "./context.ts";
+import { meterReadout, readout } from "./context.ts";
 import {
   draftKey,
   dropDraftUploads,
@@ -151,8 +152,8 @@ export function Composer({
   // /location's read of the position; null where the browser cannot
   // share one, which leaves the command out of the menu
   reader?: Locate | null;
-  // a project channel by name ("#finops"), and its stream when counted
-  channel?: { name: string; stream?: { tokens: number; budget: number } };
+  // a project channel by name ("#finops"), and its meter when counted
+  channel?: { name: string; meter?: ChannelMeter };
 }) {
   const key = draftKey(me.value?.id ?? "", scope);
   const text = useSignal(readDraft(key).text);
@@ -318,7 +319,7 @@ export function Composer({
       if (uploads.length > 0) void loadUploads(filesProjectId);
     }
   };
-  const context = channel ? streamReadout(channel.stream) : readout(usage);
+  const context = channel ? meterReadout(channel.meter) : readout(usage);
   // a chat not started yet has the page to itself, so the box shows
   // two lines at rest; in a chat the transcript needs the room
   const tall = !("sessionId" in scope);

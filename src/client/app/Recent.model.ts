@@ -64,7 +64,7 @@ export const recentText = (row: RecentRow): string =>
   row.kind === "run"
     ? `Run of ${row.title}`
     : row.kind === "channel"
-      ? `#${row.title}`
+      ? channelName(row.title)
       : row.title;
 
 export function recentHref(row: RecentRow): string {
@@ -143,8 +143,8 @@ export const sessionRecent = (s: {
         id: s.id,
         projectId: s.projectId,
         automationId: null,
-        // a channel is its project's name
-        title: s.origin === "channel" ? channelName(s.title) : s.title,
+        // a channel's is its project's name, drawn by recentText()
+        title: s.title,
       };
 
 type Named = { id: string; projectId: string };

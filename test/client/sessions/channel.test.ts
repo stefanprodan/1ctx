@@ -26,6 +26,7 @@ import {
   mergeOlder,
 } from "../../../src/client/data/channel-pages.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { sendMessage } from "../../../src/client/data/queued.ts";
 import {
   childWork,
   loadChild,
@@ -529,5 +530,135 @@ describe("a gone subagent", () => {
     const before = asked.length;
     await loadChild("d1", true);
     expect(asked.length).toBe(before);
+  });
+});
+
+describe("the channel's meter", () => {
+  const meter = (tokens: number) => ({ tokens, budget: 100_000 });
+
+  test.serial("follows newer envelopes and the watch's answer", async () => {
+    answer = () =>
+      Response.json(page([post(10)], null, { channelContext: meter(40_000) }));
+    await loadSession("c1");
+    expect(session.value?.channelContext).toEqual(meter(40_000));
+    onSocket({
+      type: "watched",
+      sessionId: "c1",
+      live: [],
+      channelContext: meter(41_000),
+    });
+    expect(session.value?.channelContext).toEqual(meter(41_000));
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision: 2 }),
+      messages: [answerOf("t10", 11)],
+      send: turnOf("t10", 10),
+      channelContext: meter(48_000),
+    });
+    expect(session.value?.channelContext).toEqual(meter(48_000));
+    // a work envelope without one keeps the count held
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision: 3 }),
+      messages: [],
+      send: turnOf("t10", 10),
+    });
+    expect(session.value?.channelContext).toEqual(meter(48_000));
+  });
+
+  test.serial("moves with the frame of the reader's own post", async () => {
+    await open(page([post(10)], null, { channelContext: meter(40_000) }));
+    const posted = post(20);
+    answer = () =>
+      Response.json({
+        session: channelSummary({ revision: 2 }),
+        messages: [posted],
+        send: turnOf("post-20", 20, { kind: "post", agentId: null }),
+      });
+    await sendMessage("c1", "post 20", []);
+    expect(session.value?.session.revision).toBe(2);
+    // the frame of the same commit, which the answer beat, brings the meter
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision: 2 }),
+      messages: [posted],
+      send: turnOf("post-20", 20, { kind: "post", agentId: null }),
+      channelContext: meter(40_500),
+    });
+    expect(session.value?.channelContext).toEqual(meter(40_500));
+    // an older frame never does
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision: 1 }),
+      messages: [],
+      send: null,
+      channelContext: meter(1),
+    });
+    expect(session.value?.channelContext).toEqual(meter(40_500));
+  });
+});
+
+describe("a channel left and opened again", () => {
+  test.serial("is read afresh, never drawn from a held copy", async () => {
+    await open(page([post(30), post(40)], 30));
+    // a reload whose newest page shares no row: a gap above it
+    answer = () =>
+      Response.json(
+        page([post(80), post(90)], 80, {
+          session: channelSummary({ revision: 3 }),
+        }),
+      );
+    await loadSession("c1");
+    expect(channelGap.value).toEqual({ after: 40, before: 80 });
+    answer = () =>
+      Response.json(
+        page([post(5)], null, { session: channelSummary({ id: "c2" }) }),
+      );
+    await loadSession("c2");
+    // back to the first: no copy with gap rows and no marker drawn first
+    let shownBefore: string[] | undefined = ["unset"];
+    answer = () => {
+      shownBefore = ids();
+      return Response.json(
+        page([post(80), post(90)], 80, {
+          session: channelSummary({ revision: 3 }),
+        }),
+      );
+    };
+    await loadSession("c1");
+    expect(shownBefore).toBeUndefined();
+    expect(ids()).toEqual(["p80", "p90"]);
+    expect(session.value?.page?.before).toBe(80);
+    expect(channelGap.value).toBeNull();
+  });
+
+  test.serial("a failed older page never reaches a chat", async () => {
+    await open(page([post(30)], 30));
+    answer = () => Response.json({ error: "down" }, { status: 500 });
+    await loadOlder();
+    expect(olderPage.value.failure).not.toBeNull();
+    answer = () =>
+      Response.json({
+        ...page([], null, {
+          session: channelSummary({
+            id: "chat1",
+            origin: "chat",
+            ownerId: "u1",
+            agentId: "a1",
+          }),
+        }),
+        page: undefined,
+      });
+    await loadSession("chat1");
+    expect(olderPage.value).toEqual({ loading: false, failure: null });
+    expect(channelGap.value).toBeNull();
   });
 });

@@ -619,23 +619,3 @@ describe("a row's live status", () => {
     expect(look(chat("c1"), statuses).tone).toBe("running");
   });
 });
-
-describe("a channel in Recent", () => {
-  test("is a chat row named for its project's channel", () => {
-    expect(
-      sessionRecent({
-        id: "ch1",
-        projectId: "p1",
-        origin: "channel",
-        automationId: null,
-        title: "finops",
-      }),
-    ).toEqual({
-      kind: "chat",
-      id: "ch1",
-      projectId: "p1",
-      automationId: null,
-      title: "#finops",
-    });
-  });
-});

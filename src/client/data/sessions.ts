@@ -113,10 +113,16 @@ function show(shown: SessionDetail): void {
   sequences = new Map(detail.live.map((send) => [send.sendId, send.seq]));
 }
 
-// a chat is held only settled: a running one would miss its frames
+// a chat is held only settled: a running one would miss its frames. A
+// channel never is: it is paged, read again on every visit, and its gap
+// and older page state belong to the one on screen
 function keep(detail: SessionDetail | null): void {
   if (detail === null) return;
-  if (detail.session.status === "running" || detail.live.length > 0) {
+  if (
+    detail.session.status === "running" ||
+    detail.live.length > 0 ||
+    detail.session.origin === "channel"
+  ) {
     chatsKept.delete(detail.session.id);
   } else chatsKept.set(detail.session.id, detail);
 }
@@ -236,7 +242,15 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     chatsKept.delete(ev.session.id);
     return;
   }
-  if (ev.session.revision <= held.session.revision) return;
+  if (ev.session.revision <= held.session.revision) {
+    // a post's answer took this commit first; its frame still brings the
+    // meter the server counted after it
+    const meter = ev.channelContext;
+    if (meter && ev.session.revision === held.session.revision) {
+      session.value = { ...held, channelContext: meter };
+    }
+    return;
+  }
   const removed = new Set(ev.removedMessageIds ?? []);
   const messages = upsert(
     held.messages.filter((message) => !removed.has(message.id)),

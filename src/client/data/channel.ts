@@ -37,13 +37,13 @@ export const focusPost = signal<string | null>(null);
 // counts the reads, so an answer for a page that moved on is dropped
 let turn = 0;
 
-// a detail answer for the channel on screen: merged over the pages held
-// when it is the same channel, else its own start
+// a detail answer: a channel's merged over the pages held when it is the
+// one on screen; any other page starts the channel state afresh, so a
+// channel's gap or failed page never reaches the next one or a chat
 export function channelLoaded(
   held: SessionDetail | null,
   fresh: SessionDetail,
 ): SessionDetail {
-  if (fresh.session.origin !== "channel") return fresh;
   if (held === null || held.session.id !== fresh.session.id) {
     turn++;
     channelGap.value = null;
@@ -51,6 +51,7 @@ export function channelLoaded(
     focusPost.value = null;
     return fresh;
   }
+  if (fresh.session.origin !== "channel") return fresh;
   const merged = mergeNewest(held, fresh, channelGap.value);
   channelGap.value = merged.gap;
   return merged.detail;

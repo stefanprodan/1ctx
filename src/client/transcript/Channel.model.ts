@@ -75,3 +75,12 @@ export function prepended(
 ): boolean {
   return before !== null && keys[0] !== before && keys.includes(before);
 }
+
+// the reader's own post, the one new row that moves a channel to its end
+export const ownPost = (
+  node: Node | undefined,
+  channel: { viewer: { id: string } | null },
+): boolean =>
+  node?.kind === "user" &&
+  channel.viewer !== null &&
+  node.message.userId === channel.viewer.id;

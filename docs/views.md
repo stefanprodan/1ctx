@@ -110,7 +110,8 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
 ## The channel page
 
 The chat page with a channel's session (`views/sessions/Chat.tsx`):
-titled `#<project>`, no Regenerate, Fork, rename, archive or delete, and
+titled `#<project>`, no Regenerate, Fork and no title menu (no rename,
+archive, delete or markdown download, which would read every row), and
 no date dividers, since each post shows its day.
 
 - **An answer quotes its post.** Each agent turn opens with one line,
@@ -123,6 +124,9 @@ no date dividers, since each post shows its day.
   reads `around` the window's last post until it reaches the block. A
   post an envelope brought from above the pages is not drawn
   (`inView()`), its answer still quotes it.
+- **Only the reader's own post pulls them to the end** (`ownPost()`).
+  Other posts and turns land where a reader who scrolled up is not, and
+  Jump to latest shows; at the end, the view follows as a chat's does.
 - **Older turns load as the reader nears the top,** the only scroll
   load in the app, keeping the reader's place (`prepended()`). A failed
   page says why and waits for Try again.

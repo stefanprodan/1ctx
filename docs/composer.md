@@ -66,7 +66,8 @@ in `docs/ui.md`.
   "Message #project", has no agent chip and no switches, its plus opens
   the file picker, its @ menu lists every agent, its / menu only
   `/location` (the others are refused "not in a channel"), and its meter
-  is the detail's `stream` against its budget, hidden while absent. A
+  is the detail's `channelContext` against its budget, hidden while
+  absent, and follows the socket's meter updates. A
   turn's Stop is on the turn's own line, not the composer.
 - **A menu row that leaves the page on its own click stops the click.**
   Otherwise the menu reads it as a click outside. A pane takes the

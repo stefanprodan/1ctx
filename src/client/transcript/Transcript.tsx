@@ -27,6 +27,7 @@ import {
   lineAt,
   mayAct,
   nodeKey,
+  ownPost,
   prepended,
   quoteOf,
 } from "./Channel.model.ts";
@@ -228,8 +229,11 @@ export function Transcript({
     : nodes;
   const keys = shown.map(nodeKey);
   const lastKey = keys.at(-1) ?? null;
+  // in a channel only the reader's own post pulls them down: others'
+  // posts and turns land while they read, and Jump says so
+  const restick = channel === undefined || ownPost(shown.at(-1), channel);
   useLayoutEffect(() => {
-    stick.current = true;
+    if (restick) stick.current = true;
   }, [lastKey, waiting]);
   useLayoutEffect(() => {
     const scroller = box.current;
