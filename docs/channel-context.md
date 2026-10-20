@@ -31,9 +31,8 @@ Governs the channel's request history and stream meter in
 - **Only the latest retained own turn may go whole.** The tail's walk must
   fit all its rows, its post included, within `TAIL_MAX_TOKENS` (20,000);
   otherwise it is traced, without trying an older turn. A turn marked
-  `sends.swept = 1` is always traced. `sweptColumn()` detects that column
-  until the aging migration lands; after it lands the function can return
-  `sends.swept` directly.
+  `sends.swept = 1` is always traced, the agent's own last turn included.
+  The snapshot reads the aging mark directly (`docs/archive.md`).
 - **Thinking follows the tail's provider and model rules.** On `anthropic`
   no channel history replays thinking, the current turn's rounds included.
 

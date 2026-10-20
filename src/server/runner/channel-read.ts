@@ -59,16 +59,6 @@ const rowOf = (raw: RawRow): ChannelRow => ({
   nativeFinish: null,
 });
 
-// K4 adds the mark. Once merged this function is just "sends.swept".
-function sweptColumn(db: Db): string {
-  return db
-    .query<{ name: string }, []>("pragma table_info(sends)")
-    .all()
-    .some((row) => row.name === "swept")
-    ? "sends.swept"
-    : "null";
-}
-
 export function channelRead(db: Db, sessionId: string, from: number) {
   const raw = db
     .query<
@@ -85,7 +75,7 @@ export function channelRead(db: Db, sessionId: string, from: number) {
       `select ${columns(false)}, sends.agent_id as turnAgent,
          agents.name as agentName, sends.provider_id as providerId,
          sends.first_message_id as firstMessageId, first.seq as firstSeq,
-         ${sweptColumn(db)} as swept
+         sends.swept
        from messages
        cross join sends on sends.id = messages.send_id
        join messages as first on first.id = sends.first_message_id

@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, spyOn, test } from "bun:test";
+import { DAY_MS } from "../../../src/server/lib/clock.ts";
+import { silent } from "../../../src/server/lib/log.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { CHANNEL_LINE } from "../../../src/server/runner/channel-prompt.ts";
 import { channelRead } from "../../../src/server/runner/channel-read.ts";
 import { SKILLS_LEAD } from "../../../src/server/runner/context.ts";
 import { TRACE_HEADING } from "../../../src/server/runner/trace.ts";
+import { sweepChats } from "../../../src/server/sessions/sweep.ts";
 import { channelApp, localAt, messagesOf } from "../../helpers/channel.ts";
 import {
   ANTHROPIC_MODEL,
@@ -148,14 +152,6 @@ describe("channel context", () => {
             .run(varied(220_000, "RESULT_ONLY_"), a.send.id);
         }
         if (mode === "swept") {
-          if (
-            !chat.app.db
-              .query<{ name: string }, []>("pragma table_info(sends)")
-              .all()
-              .some((r) => r.name === "swept")
-          ) {
-            chat.app.db.exec("alter table sends add column swept integer");
-          }
           chat.app.db
             .query("update sends set swept = 1 where id = ?")
             .run(a.send.id);
@@ -191,6 +187,64 @@ describe("channel context", () => {
       }
     },
   );
+
+  test("the aging sweep makes the own last turn trace-only", async () => {
+    const { chat, channelId, summon, tool } = await channelApp();
+    try {
+      const a = await summon();
+      (await tool(a.script)).reply("the aged answer");
+      await idle(chat.app);
+      expect(
+        chat.app.db
+          .query<{ swept: number | null }, [string]>(
+            "select swept from sends where id = ?",
+          )
+          .get(a.send.id)?.swept,
+      ).toBe(0);
+      const swept = sweepChats(
+        {
+          db: chat.app.db,
+          store: chat.app.sessions,
+          scratch: chat.app.bash.scratch,
+          log: silent,
+        },
+        chat.app.now.value + (DEFAULT_LIMITS.archiveIdleDays + 1) * DAY_MS,
+        DEFAULT_LIMITS,
+      );
+      expect(swept.turns_swept).toBe(1);
+      expect(chat.app.sessions.send(a.send.id)?.swept).toBe(true);
+      expect(
+        channelRead(chat.app.db, channelId, 0).turns.get(a.send.id)?.swept,
+      ).toBe(true);
+      expect(
+        chat.app.sessions
+          .messages(channelId)
+          .filter((row) => row.sendId === a.send.id && row.kind === "tool")
+          .map((row) => row.content),
+      ).toEqual([""]);
+
+      const b = await summon();
+      const messages = messagesOf(b.script).slice(0, localAt(b.script));
+      const trace = messages.findIndex((m) =>
+        m.content.startsWith(TRACE_HEADING),
+      );
+      expect(trace).toBeGreaterThan(0);
+      expect(messages[trace]?.content).toContain(
+        "bash printf 'tool-%s' 'payload' ok",
+      );
+      expect(messages[trace + 1]).toMatchObject({
+        role: "assistant",
+        content: "the aged answer",
+      });
+      expect(messages.some((m) => m.tool_calls?.length)).toBe(false);
+      expect(messages.filter((m) => m.role === "tool")).toHaveLength(0);
+      expect(JSON.stringify(messages)).not.toContain("tool-payload");
+      b.script.reply("done");
+      await idle(chat.app);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
 
   test("older own turns are traces even when both fit the whole-turn cap", async () => {
     const { chat, summon, tool } = await channelApp();

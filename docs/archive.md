@@ -101,7 +101,7 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   status and saved docs remain. The transaction also deletes opened files,
   kept MCP files and child sessions, bumps the channel revision and publishes
   the changed turn. Posts and answers remain.
-- **`sends.swept` is the trace-only mark.** It exists for the context builder
-  to recognize an aged turn; this task preserves the fields `traceCalls()`
-  reads but does not change context construction. A read of a swept delegate's
-  child answers not found.
+- **`sends.swept` is the trace-only mark.** The context builder reads it
+  directly and always traces an aged turn, the agent's own last turn
+  included (`docs/channel-context.md`). Aging preserves the fields
+  `traceCalls()` reads. A read of a swept delegate's child answers not found.
