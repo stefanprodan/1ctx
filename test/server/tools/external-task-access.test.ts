@@ -55,6 +55,7 @@ const context = (f: Fixture, resultCut: number): ToolContext => ({
     agentId: "a1",
     agentName: "coder",
     sessionId: "chat00000001",
+    workspace: { id: "chat00000001", sessionId: "chat00000001" },
     origin: "chat",
   },
   now: () => 0,

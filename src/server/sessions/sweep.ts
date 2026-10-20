@@ -10,6 +10,7 @@ import type { ChatCaps } from "../limits/index.ts";
 import { ROOT } from "./children.ts";
 import type { DraftsPort } from "./drafts.ts";
 import { envelope } from "./envelope.ts";
+import { readSendMessages } from "./messages.ts";
 import { PACKABLE } from "./pack.ts";
 import type { SessionRow } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
@@ -131,6 +132,10 @@ function steps(deps: SweepDeps): Step[] {
            where send_id = ? and kind = 'tool'`,
         ).run(id);
         db.query(
+          `delete from opened_files where message_id in
+             (select id from messages where send_id = ? and kind = 'tool')`,
+        ).run(id);
+        db.query(
           `delete from mcp_kept_files where message_id in
              (select id from messages where send_id = ? and kind = 'tool')`,
         ).run(id);
@@ -144,7 +149,14 @@ function steps(deps: SweepDeps): Step[] {
              where id = ? and swept = 0 and status <> 'running'`,
           )
           .run(id).changes;
-        return marked === 1 ? [] : null;
+        if (marked !== 1) return null;
+        db.query(
+          "update sessions set revision = revision + 1 where id = ?",
+        ).run(current.session_id);
+        const session = store.byId(current.session_id);
+        return session === null
+          ? null
+          : [envelope(session, readSendMessages(db, id), store.send(id))];
       },
     },
     {
@@ -313,7 +325,7 @@ export function sweepChats(
         if (acted) counts[step.field]++;
       } catch (err) {
         deps.log.warn("chat sweep failed", {
-          chat: id,
+          ...(step.field === "turns_swept" ? { send: id } : { chat: id }),
           step: step.field,
           ...errorFields(err, false),
         });

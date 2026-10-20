@@ -53,6 +53,15 @@ export function readMessages(db: Db, sessionId: string): Message[] {
     .map(message);
 }
 
+export function readSendMessages(db: Db, sendId: string): Message[] {
+  return db
+    .query<RawMessage, [string]>(
+      `select ${MESSAGE_COLUMNS} from messages where send_id = ? order by seq`,
+    )
+    .all(sendId)
+    .map(message);
+}
+
 export function addUserMessage(
   db: Db,
   fields: {

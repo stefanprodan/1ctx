@@ -11,7 +11,7 @@
 import type { Message } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { SendKind } from "../../shared/words.ts";
-import type { BashCapability } from "../bash/index.ts";
+import { type BashCapability, sessionWorkspace } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { after, type Clock } from "../lib/clock.ts";
@@ -211,6 +211,7 @@ function startChild(
   const send = newSend({
     id: sendId,
     sessionId,
+    workspace: sessionWorkspace(sessionId),
     projectId: parent.projectId,
     startedBy: parent.startedBy,
     kind: parent.kind,

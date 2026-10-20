@@ -3,6 +3,10 @@
 
 import { Database } from "bun:sqlite";
 import { describe, expect, spyOn, test } from "bun:test";
+import {
+  sessionWorkspace,
+  writeKeptFiles,
+} from "../../../src/server/bash/index.ts";
 import { BadRequest, NotFound } from "../../../src/server/lib/errors.ts";
 import { MAX_QUEUED_PER_CHAT } from "../../../src/server/sessions/index.ts";
 import type { ChannelPostResponse } from "../../../src/shared/api/sessions.ts";
@@ -23,11 +27,13 @@ import { createTeam } from "../../helpers/projects.ts";
 import { frames, nextFrame, watch, watcher } from "../../helpers/socket.ts";
 import {
   allowSubagents,
+  bashCall,
   childrenOf,
   delegateCall,
   delegateRows,
   isChild,
   lastResult,
+  toolNames,
 } from "../../helpers/subagents.ts";
 
 async function setup() {
@@ -137,50 +143,176 @@ describe("channel summons", () => {
     }
   });
 
-  test("delegate finds each calling send but channel roots still refuse children", async () => {
+  test("a channel child belongs to its summoner and its agent workspace", async () => {
     const { chat, channelId, other, summon } = await setup();
     allowSubagents(chat, chat.agentId);
-    allowSubagents(chat, other);
     const first = await summon("coder");
     const second = await summon("reviewer", chat.admin);
-    first.script.toolRound([delegateCall("child-a", "first task")]);
+    first.script.toolRound([
+      bashCall("seed-coder", "printf coder > /tmp/coder.txt"),
+    ]);
     first.script.end();
-    const resumedA = await chat.scripted.reached(3);
-    second.script.toolRound([delegateCall("child-b", "second task")]);
+    const firstAgain = await chat.scripted.reached(3);
+    second.script.toolRound([
+      bashCall("seed-reviewer", "printf reviewer > /tmp/reviewer.txt"),
+    ]);
     second.script.end();
-    const resumedB = await chat.scripted.reached(4);
-    for (const script of [resumedA, resumedB]) {
-      expect(isChild(script)).toBe(false);
-      expect(lastResult(script)).toContain(
-        "a channel cannot start a subagent yet",
-      );
-    }
-    expect(first.send.children.started).toBe(1);
-    expect(second.send.children.started).toBe(1);
-    expect(childrenOf(chat, channelId)).toEqual([]);
+    const secondAgain = await chat.scripted.reached(4);
+    firstAgain.toolRound([delegateCall("child-a", "first task")]);
+    firstAgain.end();
+    const child = await chat.scripted.reached(5);
+    expect(isChild(child)).toBe(true);
+    child.toolRound([
+      bashCall(
+        "child-bash",
+        "cat /tmp/coder.txt; test ! -e /tmp/reviewer.txt; printf child > /tmp/child.txt",
+      ),
+    ]);
+    child.end();
+    const childAgain = await chat.scripted.reached(6);
+    expect(isChild(childAgain)).toBe(true);
+    expect(lastResult(childAgain)).toContain("coder");
+    const [childId] = childrenOf(chat, channelId);
+    expect(chat.app.sessions.byId(childId!)).toMatchObject({
+      ownerId: chat.memberId,
+      agentId: chat.agentId,
+      origin: "channel",
+    });
     expect(
-      delegateRows(chat, channelId).map((row) => [row.sendId, row.status]),
-    ).toEqual([
-      [first.send.id, "failed"],
-      [second.send.id, "failed"],
+      chat.app.db
+        .query("select swept from sends where session_id = ?")
+        .get(childId!),
+    ).toEqual({ swept: null });
+    const childTool = chat.app.sessions
+      .messages(childId!)
+      .find((row) => row.kind === "tool" && row.toolName === "bash")!;
+    writeKeptFiles(chat.app.db, childTool.id, [
+      {
+        folder: 1,
+        dir: "0001-bash",
+        name: "child.txt",
+        text: "child kept",
+        data: null,
+        bytes: 10,
+      },
     ]);
     expect(
-      (
-        await chat.member.call(
-          "POST",
-          `/api/sessions/${channelId}/sends/${first.send.id}/stop`,
+      chat.app.db
+        .query(
+          "select session_id, workspace_id from mcp_kept_files where message_id = ?",
         )
-      ).status,
-    ).toBe(200);
-    await first.send.drained;
-    expect(resumedA.aborted).toBe(true);
-    expect(resumedB.aborted).toBe(false);
-    expect(chat.app.sessions.byId(channelId)?.status).toBe("running");
-    resumedB.reply("second parent result");
+        .get(childTool.id),
+    ).toEqual({ session_id: childId, workspace_id: null });
+    expect(chat.app.bash.startKept(sessionWorkspace(childId!), null).next).toBe(
+      2,
+    );
+    childAgain.reply("child done");
+    const parentAgain = await chat.scripted.reached(7);
+    expect(isChild(parentAgain)).toBe(false);
+    expect(lastResult(parentAgain)).toContain("child done");
+    parentAgain.reply("first parent done");
+    secondAgain.reply("second parent done");
     await idle(chat.app);
-    expect(chat.app.sessions.byId(channelId)?.status).toBe("done");
+    expect(first.send.children.started).toBe(1);
+    expect(second.send.children.started).toBe(0);
+    expect(other).toBe(second.send.policy.agentId);
+    expect(
+      delegateRows(chat, channelId).map((row) => [row.sendId, row.status]),
+    ).toEqual([[first.send.id, "done"]]);
   });
 
+  test("channel project tools receive channel origin", async () => {
+    const { chat, channelId, project, summon } = await setup();
+    const turn = await summon("coder");
+    expect(turn.send).toMatchObject({
+      origin: "channel",
+      workspace: {
+        id: `${channelId}:${chat.agentId}`,
+        sessionId: channelId,
+      },
+    });
+    expect(
+      chat.app.db
+        .query("select swept from sends where id = ?")
+        .get(turn.send.id),
+    ).toEqual({ swept: 0 });
+    expect(toolNames(turn.script)).toEqual(
+      expect.arrayContaining(["automation", "external_task", "bash"]),
+    );
+    turn.script.toolRound([
+      {
+        id: "automation-list",
+        name: "automation",
+        arguments: '{"action":"list"}',
+      },
+      {
+        id: "external-list",
+        name: "external_task",
+        arguments: '{"action":"list"}',
+      },
+      bashCall("bash-origin", "printf channel > /knowledge/channel-origin.md"),
+    ]);
+    turn.script.end();
+    const next = await chat.scripted.reached(2);
+    expect(
+      chat.app.sessions
+        .messages(channelId)
+        .filter((row) => row.sendId === turn.send.id && row.kind === "tool")
+        .map((row) => [row.toolName, row.status, row.error]),
+    ).toEqual([
+      ["automation", "done", null],
+      ["external_task", "done", null],
+      ["bash", "done", null],
+    ]);
+    expect(
+      chat.app.db
+        .query(
+          `select session_id, origin from knowledge_files
+           where project_id = ? and name = 'channel-origin.md'`,
+        )
+        .get(project.id),
+    ).toEqual({ session_id: channelId, origin: "channel" });
+    next.reply("done");
+    await idle(chat.app);
+  });
+
+  test("real channel summons keep separate bash workspaces", async () => {
+    const { chat, channelId, summon } = await setup();
+    const first = await summon("coder");
+    const second = await summon("reviewer");
+    expect(first.send.workspace).not.toEqual(second.send.workspace);
+    first.script.toolRound([
+      bashCall("coder-seed", "printf coder > /tmp/owner"),
+    ]);
+    first.script.end();
+    const firstAgain = await chat.scripted.reached(3);
+    second.script.toolRound([
+      bashCall("reviewer-seed", "printf reviewer > /tmp/owner"),
+    ]);
+    second.script.end();
+    const secondAgain = await chat.scripted.reached(4);
+    firstAgain.toolRound([bashCall("coder-read", "cat /tmp/owner")]);
+    firstAgain.end();
+    const firstDone = await chat.scripted.reached(5);
+    secondAgain.toolRound([bashCall("reviewer-read", "cat /tmp/owner")]);
+    secondAgain.end();
+    const secondDone = await chat.scripted.reached(6);
+    expect(lastResult(firstDone)).toContain("coder");
+    expect(lastResult(firstDone)).not.toContain("reviewer");
+    expect(lastResult(secondDone)).toContain("reviewer");
+    expect(
+      chat.app.db
+        .query<{ workspace_id: string }, [string]>(
+          `select workspace_id from session_scratch
+           where session_id = ? order by workspace_id`,
+        )
+        .all(channelId)
+        .map((row) => row.workspace_id),
+    ).toEqual([first.send.workspace.id, second.send.workspace.id].sort());
+    firstDone.reply("coder done");
+    secondDone.reply("reviewer done");
+    await idle(chat.app);
+  });
   test("the fake clock expires a pending turn without deleting its post", async () => {
     const { chat, channelId, detail, post, summon } = await setup();
     await setLimits(chat, { queuedMinutes: 10, sendDeadlineMs: 60 * 60_000 });

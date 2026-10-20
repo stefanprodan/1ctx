@@ -14,7 +14,7 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkScratchNames } from "./names.ts";
 import { output } from "./output.ts";
 import type { Scratch, ScratchChanges, ScratchStore } from "./scratch.ts";
-import type { WorkspaceKey } from "./workspace.ts";
+import type { Workspace } from "./workspace.ts";
 
 // the docs commit, bound to knowledge's store; it opens no transaction
 // and runs inside the command's
@@ -33,7 +33,7 @@ export type CommandOutput = {
 };
 
 export type ScratchCommit = {
-  workspace: WorkspaceKey;
+  workspace: Workspace;
   before: Scratch;
   changes: ScratchChanges;
 };

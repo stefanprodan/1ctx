@@ -154,21 +154,34 @@ describe("kept MCP files in the mount", () => {
         writeKeptFiles(s.db, toolRow(s), [kept(folder, "result.txt", text)]);
       }
       const caps = { mcpKeptBytes: 1024 * 1024, mcpKeptFiles: 100 };
-      expect(startKept(s.db, s.session.id, caps).next).toBe(4);
-      expect(listKept(s.db, s.session.id).map((e) => e.path)).toEqual([
-        "/mcp/0002-get/result.txt",
-        "/mcp/0003-get/result.txt",
-      ]);
       expect(
-        startKept(s.db, s.session.id, {
-          mcpKeptBytes: caps.mcpKeptBytes,
-          mcpKeptFiles: 1,
-        }).next,
+        startKept(s.db, { id: s.session.id, sessionId: s.session.id }, caps)
+          .next,
       ).toBe(4);
-      expect(listKept(s.db, s.session.id)).toHaveLength(1);
+      expect(
+        listKept(s.db, { id: s.session.id, sessionId: s.session.id }).map(
+          (e) => e.path,
+        ),
+      ).toEqual(["/mcp/0002-get/result.txt", "/mcp/0003-get/result.txt"]);
+      expect(
+        startKept(
+          s.db,
+          { id: s.session.id, sessionId: s.session.id },
+          {
+            mcpKeptBytes: caps.mcpKeptBytes,
+            mcpKeptFiles: 1,
+          },
+        ).next,
+      ).toBe(4);
+      expect(
+        listKept(s.db, { id: s.session.id, sessionId: s.session.id }),
+      ).toHaveLength(1);
       s.db.exec("delete from mcp_kept_files");
       // a number is never given twice, the files gone or not
-      expect(startKept(s.db, s.session.id, caps).next).toBe(4);
+      expect(
+        startKept(s.db, { id: s.session.id, sessionId: s.session.id }, caps)
+          .next,
+      ).toBe(4);
     } finally {
       s.db.close();
     }
@@ -187,12 +200,21 @@ describe("kept MCP files in the mount", () => {
         .get(kept1)!;
       const caps = { mcpKeptBytes: 1024, mcpKeptFiles: 1 };
       // the second row goes with the regenerate, so the first fits
-      expect(startKept(s.db, s.session.id, caps, seq)).toEqual({
+      expect(
+        startKept(
+          s.db,
+          { id: s.session.id, sessionId: s.session.id },
+          caps,
+          seq,
+        ),
+      ).toEqual({
         next: 3,
         used: 3,
         files: 1,
       });
-      expect(listKept(s.db, s.session.id)).toHaveLength(2);
+      expect(
+        listKept(s.db, { id: s.session.id, sessionId: s.session.id }),
+      ).toHaveLength(2);
     } finally {
       s.db.close();
     }
@@ -206,15 +228,23 @@ describe("kept MCP files in the mount", () => {
       const fork = s.makeSession();
       const copy = toolRow(s, fork.id);
       copyKeptFiles(s.db, s.session.id, fork.id, new Map([[row, copy]]));
-      expect(listKept(s.db, fork.id).map((e) => e.path)).toEqual([
-        "/mcp/0005-get/result.txt",
-      ]);
       expect(
-        startKept(s.db, fork.id, { mcpKeptBytes: 1 << 20, mcpKeptFiles: 9 }),
+        listKept(s.db, { id: fork.id, sessionId: fork.id }).map((e) => e.path),
+      ).toEqual(["/mcp/0005-get/result.txt"]);
+      expect(
+        startKept(
+          s.db,
+          { id: fork.id, sessionId: fork.id },
+          { mcpKeptBytes: 1 << 20, mcpKeptFiles: 9 },
+        ),
       ).toEqual({ next: 6, used: 1, files: 1 });
       s.db.query("delete from messages where id = ?").run(row);
-      expect(listKept(s.db, s.session.id)).toEqual([]);
-      expect(listKept(s.db, fork.id)).toHaveLength(1);
+      expect(
+        listKept(s.db, { id: s.session.id, sessionId: s.session.id }),
+      ).toEqual([]);
+      expect(listKept(s.db, { id: fork.id, sessionId: fork.id })).toHaveLength(
+        1,
+      );
     } finally {
       s.db.close();
     }

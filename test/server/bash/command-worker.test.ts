@@ -9,7 +9,7 @@
 
 import { describe, expect, test } from "bun:test";
 import type { Job } from "../../../src/server/bash/protocol.ts";
-import { heldSessions } from "../../../src/server/bash/queue.ts";
+import { heldWorkspaces } from "../../../src/server/bash/queue.ts";
 import { exitAt } from "../../../src/server/bash/tree.ts";
 import {
   type CommandHooks,
@@ -281,7 +281,7 @@ describe("the command worker", () => {
           ended: { phase: "mount", cause: "error" },
         });
         expect(result.content).toStartWith("nothing saved: ");
-        expect(heldSessions().has(s.session.id)).toBe(false);
+        expect(heldWorkspaces().has(s.session.id)).toBe(false);
         const slots: (() => void)[] = [];
         for (let i = 0; i < PROCESS_SLOTS; i++)
           slots.push(await acquireProcess(new AbortController().signal));
@@ -389,7 +389,10 @@ describe("the command worker", () => {
         ended: { phase: "run", cause: "abort" },
       });
       expect(s.knowledge.list(s.projectId).files).toEqual([]);
-      expect(s.bash.scratch.read(s.session.id).entries).toEqual([]);
+      expect(
+        s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+          .entries,
+      ).toEqual([]);
     } finally {
       s.db.close();
     }

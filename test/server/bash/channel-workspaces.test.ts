@@ -181,6 +181,8 @@ describe("channel workspaces", () => {
     const c = channelSetup();
     try {
       expect((await c.run(c.first, "printf x > /tmp/x")).error).toBe(false);
+      writeKeptFiles(c.s.db, toolRow(c, c.s.agent.id, 1), [kept(1, "x")]);
+      c.s.caps.mcpKeptFiles = 0;
       const query = spyOn(c.s.db, "query");
       let sqls: string[];
       try {
@@ -218,15 +220,39 @@ describe("channel workspaces", () => {
       expect(plan("session_scratch where used_at <")).toContain(
         "SEARCH session_scratch USING INDEX session_scratch_used (used_at<?)",
       );
-      expect(plan("mcp_kept_files\n       where workspace_id")).toContain(
-        "SEARCH mcp_kept_files USING INDEX mcp_kept_files_workspace (workspace_id=?)",
+      expect(
+        plan("mcp_kept_files where session_id = ? and workspace_id is ?"),
+      ).toContain(
+        "SEARCH mcp_kept_files USING INDEX mcp_kept_files_session (session_id=?)",
+      );
+      expect(
+        plan("delete from mcp_kept_files\n       where session_id = ?"),
+      ).toContain(
+        "SEARCH mcp_kept_files USING INDEX mcp_kept_files_session (session_id=? AND folder<?)",
       );
       expect(plan("from session_workspaces where workspace_id")).toContain(
         "SEARCH session_workspaces USING INDEX sqlite_autoindex_session_workspaces_1 (workspace_id=?)",
       );
+      expect(
+        c.s.db
+          .query<{ detail: string }, []>(
+            `explain query plan
+             select parent_session_id is not null as child, origin
+             from sessions where id = ?`,
+          )
+          .all()
+          .map((row) => row.detail),
+      ).toContain(
+        "SEARCH sessions USING INDEX sqlite_autoindex_sessions_1 (id=?)",
+      );
       for (const details of plans.values()) {
-        expect(details.some((line) => line === "SCAN messages")).toBe(false);
-        expect(details.some((line) => line === "SCAN sessions")).toBe(false);
+        expect(
+          details.some((line) =>
+            /^(?:SCAN|SCAN TABLE) (?:messages|sessions|sends|mcp_kept_files)$/.test(
+              line,
+            ),
+          ),
+        ).toBe(false);
       }
     } finally {
       c.s.db.close();

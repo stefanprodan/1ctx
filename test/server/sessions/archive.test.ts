@@ -368,7 +368,7 @@ describe("the chats sweep", () => {
       addScratch(chat, archived);
       addScratch(chat, live);
       const release = await acquireSession(
-        archived,
+        { id: archived, sessionId: archived },
         new AbortController().signal,
       );
       chat.app.sweep();
@@ -397,7 +397,10 @@ describe("the chats sweep", () => {
       chat.app.automationScheduler.stop();
       const id = await doneChat(chat, "held");
       addScratch(chat, id);
-      const release = await acquireSession(id, new AbortController().signal);
+      const release = await acquireSession(
+        { id: id, sessionId: id },
+        new AbortController().signal,
+      );
       expect(
         (await chat.admin.call("DELETE", `/api/agents/${chat.agentId}`)).status,
       ).toBe(200);

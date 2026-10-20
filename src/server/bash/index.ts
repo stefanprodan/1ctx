@@ -26,7 +26,7 @@ import {
 } from "./mount.ts";
 import { ScratchStore } from "./scratch.ts";
 import { commandWorkers } from "./worker.ts";
-import type { WorkspaceKey } from "./workspace.ts";
+import type { Workspace } from "./workspace.ts";
 
 export type BashDeps = {
   db: Db;
@@ -44,7 +44,7 @@ export type BashDeps = {
 export type BashCapability = {
   run(
     projectId: string,
-    workspace: WorkspaceKey,
+    workspace: Workspace,
     author: KnowledgeAuthor,
     command: string,
     caps: CommandCaps,
@@ -54,7 +54,7 @@ export type BashCapability = {
   // and the number the next kept folder takes; files of rows past
   // afterSeq, which a regenerate deletes, are not counted
   startKept(
-    workspace: WorkspaceKey,
+    workspace: Workspace,
     afterSeq: number | null,
   ): {
     next: number;
@@ -66,15 +66,15 @@ export type BashCapability = {
   // a subagent's /tmp (bash/handoff.ts): its parent's files copied in
   // at its start, and what it added or changed copied back at its end
   // to a folder none of taken nor the parent's files hold
-  copyScratch(from: WorkspaceKey, to: WorkspaceKey): ScratchBaseline;
+  copyScratch(from: Workspace, to: Workspace): ScratchBaseline;
   returnScratch(
-    child: WorkspaceKey,
-    parent: WorkspaceKey,
+    child: Workspace,
+    parent: Workspace,
     taken: Set<string>,
     baseline: ScratchBaseline,
   ): Promise<Returned>;
   // a child's scratch, when its files could not come back
-  dropScratch(workspace: WorkspaceKey): void;
+  dropScratch(workspace: Workspace): void;
 };
 export type BashArea = BashCapability & {
   scratch: ScratchStore;
@@ -164,6 +164,5 @@ export type { CommandEnd, JobRepo } from "./protocol.ts";
 export {
   sessionWorkspace,
   type Workspace,
-  type WorkspaceKey,
   workspaceOf,
 } from "./workspace.ts";

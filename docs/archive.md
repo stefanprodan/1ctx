@@ -98,9 +98,10 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   never touched.
 - **Aged tool rows keep their trace fields.** Their content, reasoning,
   reasoning details and packed result are dropped; tool name, call id,
-  status and saved docs remain. The transaction also deletes the turn's
-  kept MCP files and child sessions. Posts and answers remain.
-- **`sends.swept` is the trace-only mark.** The context builder reads it
-  with the send and sends even the agent's newest aged turn as a trace.
-  `traceCalls()` needs no stored copy because it reads only fields that
-  remain. A missing child makes the child route answer not found.
+  status and saved docs remain. The transaction also deletes opened files,
+  kept MCP files and child sessions, bumps the channel revision and publishes
+  the changed turn. Posts and answers remain.
+- **`sends.swept` is the trace-only mark.** It exists for the context builder
+  to recognize an aged turn; this task preserves the fields `traceCalls()`
+  reads but does not change context construction. A read of a swept delegate's
+  child answers not found.

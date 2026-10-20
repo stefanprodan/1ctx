@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
+import { sessionWorkspace } from "../bash/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
@@ -82,9 +83,11 @@ export function compactSend(
   const send = newSend({
     id: sendId,
     sessionId: session.id,
+    workspace: sessionWorkspace(session.id),
     projectId: policy.projectId,
     startedBy: policy.userId,
     kind: "compact",
+    origin: session.origin,
     op: "compact",
     summarizing: true,
     used:

@@ -6,7 +6,7 @@
 import type { Db } from "../db/index.ts";
 import {
   sessionWorkspace,
-  type WorkspaceKey,
+  type Workspace,
   workspaceId,
   workspaceOf,
   workspaceSession,
@@ -99,6 +99,8 @@ export function writeKeptFiles(
     row.parent_session_id !== null || row.agent_id === null
       ? sessionWorkspace(row.session_id)
       : workspaceOf(row.session_id, row.origin, row.agent_id);
+  const keptWorkspace =
+    workspace.id === workspace.sessionId ? null : workspace.id;
   const insert = db.query(
     `insert into mcp_kept_files
        (message_id, position, session_id, folder, dir, name, bytes, text, data,
@@ -116,7 +118,7 @@ export function writeKeptFiles(
       file.bytes,
       file.text,
       file.data,
-      workspace.id,
+      keptWorkspace,
     );
   });
   const top = Math.max(...files.map((file) => file.folder));
@@ -128,7 +130,7 @@ export function writeKeptFiles(
   ).run(workspace.id, workspace.sessionId, top);
 }
 
-export function listKept(db: Db, workspace: WorkspaceKey): KeptEntry[] {
+export function listKept(db: Db, workspace: Workspace): KeptEntry[] {
   return db
     .query<
       {
@@ -138,12 +140,15 @@ export function listKept(db: Db, workspace: WorkspaceKey): KeptEntry[] {
         name: string;
         bytes: number;
       },
-      [string]
+      [string, string | null]
     >(
       `select message_id, position, dir, name, bytes from mcp_kept_files
-       where workspace_id = ? order by folder, position`,
+       where session_id = ? and workspace_id is ? order by folder, position`,
     )
-    .all(workspaceId(workspace))
+    .all(
+      workspaceSession(workspace),
+      workspace.id === workspace.sessionId ? null : workspace.id,
+    )
     .map((row) => ({
       messageId: row.message_id,
       position: row.position,
@@ -268,24 +273,30 @@ function unpackKept(frame: Uint8Array, bytes: number): Uint8Array {
  */
 export function startKept(
   db: Db,
-  workspace: WorkspaceKey,
+  workspace: Workspace,
   caps: { mcpKeptBytes: number; mcpKeptFiles: number },
   afterSeq: number | null = null,
 ): { next: number; used: number; files: number } {
   const id = workspaceId(workspace);
   const sessionId = workspaceSession(workspace);
+  const keptWorkspace = id === sessionId ? null : id;
   const folders = db
     .query<
       { folder: number; bytes: number; files: number },
-      [string, string, number]
+      [string, string | null, string, number]
     >(
       `select folder, sum(bytes) as bytes, count(*) as files
-       from mcp_kept_files where workspace_id = ?
+       from mcp_kept_files where session_id = ? and workspace_id is ?
        and message_id not in
          (select id from messages where session_id = ? and seq > ?)
        group by folder order by folder`,
     )
-    .all(id, sessionId, afterSeq ?? Number.MAX_SAFE_INTEGER);
+    .all(
+      sessionId,
+      keptWorkspace,
+      sessionId,
+      afterSeq ?? Number.MAX_SAFE_INTEGER,
+    );
   let bytes = folders.reduce((sum, f) => sum + f.bytes, 0);
   let files = folders.reduce((sum, f) => sum + f.files, 0);
   const drop: number[] = [];
@@ -297,8 +308,9 @@ export function startKept(
   }
   if (drop.length > 0) {
     db.query(
-      `delete from mcp_kept_files where workspace_id = ? and folder <= ?`,
-    ).run(id, drop[drop.length - 1]!);
+      `delete from mcp_kept_files
+       where session_id = ? and workspace_id is ? and folder <= ?`,
+    ).run(sessionId, keptWorkspace, drop[drop.length - 1]!);
   }
   const row = db
     .query<{ mcp_folders: number }, [string]>(
@@ -342,7 +354,7 @@ export function copyKeptFiles(
      values (?, ?, ?, ?, ?, ?, ?, null, ?, ?)`,
   );
   for (const [from, to] of messageIds) {
-    copy.run(to, targetSessionId, targetSessionId, from);
+    copy.run(to, targetSessionId, null, from);
     for (const row of packed.all(from)) {
       const raw = unpackKept(row.data, row.bytes);
       insert.run(
@@ -354,7 +366,7 @@ export function copyKeptFiles(
         row.name,
         row.bytes,
         raw,
-        targetSessionId,
+        null,
       );
     }
   }

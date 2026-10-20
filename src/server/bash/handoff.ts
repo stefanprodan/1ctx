@@ -11,7 +11,7 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkScratchNames, isScratchName, mountableScratch } from "./names.ts";
 import { acquireSession } from "./queue.ts";
 import type { ScratchFile, ScratchStore } from "./scratch.ts";
-import type { WorkspaceKey } from "./workspace.ts";
+import type { Workspace } from "./workspace.ts";
 
 // each copied file's bytes and mode, by path, as the child began
 export type ScratchBaseline = ReadonlyMap<string, string>;
@@ -35,7 +35,7 @@ const sizeOf = (path: string, bytes: number) => bytes + Buffer.byteLength(path);
 // back, so a folder the parent wrote meanwhile is never written into
 function scratchFolder(
   store: ScratchStore,
-  workspace: WorkspaceKey,
+  workspace: Workspace,
   taken: ReadonlySet<string>,
 ): string {
   const tops = new Set(
@@ -51,8 +51,8 @@ function scratchFolder(
 export function copyIn(
   db: Db,
   store: ScratchStore,
-  from: WorkspaceKey,
-  to: WorkspaceKey,
+  from: Workspace,
+  to: Workspace,
   now: number,
 ): ScratchBaseline {
   const files = mountableScratch(store.read(from).entries).kept;
@@ -70,8 +70,8 @@ export function copyIn(
 // same transaction, since a child is never continued
 export async function copyBack(
   deps: { db: Db; store: ScratchStore; current(): KnowledgeCaps },
-  child: WorkspaceKey,
-  parent: WorkspaceKey,
+  child: Workspace,
+  parent: Workspace,
   taken: Set<string>,
   baseline: ScratchBaseline,
   now: number,
@@ -96,8 +96,8 @@ export async function copyBack(
 // the changed files under the parent's folder, as many as fit
 function backInto(
   deps: { store: ScratchStore; current(): KnowledgeCaps },
-  child: WorkspaceKey,
-  parent: WorkspaceKey,
+  child: Workspace,
+  parent: Workspace,
   folder: string,
   baseline: ScratchBaseline,
   now: number,

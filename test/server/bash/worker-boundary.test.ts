@@ -82,7 +82,10 @@ describe("a command worker's answer is untrusted", () => {
         content: "printed\nnothing saved: why\nexit 0",
       });
       expect(s.knowledge.list(s.projectId).files).toEqual([]);
-      expect(s.bash.scratch.read(s.session.id).revision).toBe(0);
+      expect(
+        s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+          .revision,
+      ).toBe(0);
     } finally {
       s.db.close();
     }

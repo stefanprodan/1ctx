@@ -221,7 +221,7 @@ export function writeTurn(
           dir,
           v.kept.length,
           v.kept,
-          ctx.id,
+          null,
         );
         b.bump("mcp_kept_files");
       }

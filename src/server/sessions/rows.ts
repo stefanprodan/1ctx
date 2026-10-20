@@ -282,7 +282,7 @@ export type RawSend = {
   memory_error: string | null;
   memory_skipped: number | null;
   summoned: number;
-  swept: number;
+  swept: number | null;
   tokens: number;
   started_at: number;
   finished_at: number | null;

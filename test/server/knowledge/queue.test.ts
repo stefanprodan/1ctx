@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { heldSessions } from "../../../src/server/bash/queue.ts";
+import { heldWorkspaces } from "../../../src/server/bash/queue.ts";
 import {
   PROCESS_SLOTS,
   processSlots,
@@ -41,7 +41,7 @@ describe("process slots", () => {
       );
       try {
         await Promise.resolve();
-        expect(heldSessions().has(s.session.id)).toBe(true);
+        expect(heldWorkspaces().has(s.session.id)).toBe(true);
         controller.abort(new Error("process wait stopped"));
         expect(await canceled).toEqual({
           error: true,
@@ -50,7 +50,7 @@ describe("process slots", () => {
           interrupted: true,
           discarded: true,
         });
-        expect(heldSessions().has(s.session.id)).toBe(false);
+        expect(heldWorkspaces().has(s.session.id)).toBe(false);
         expect(scratchState(s).revision).toBe(0);
         slots[0]!();
         expect((await run(s, "echo next > /tmp/next")).error).toBe(false);
@@ -80,7 +80,7 @@ describe("process slots", () => {
           content: "nothing saved: mount failed",
           ended: { phase: "mount", cause: "error" },
         });
-        expect(heldSessions().has(s.session.id)).toBe(false);
+        expect(heldWorkspaces().has(s.session.id)).toBe(false);
         for (let i = 0; i < PROCESS_SLOTS; i++)
           slots.push(await acquireProcess(new AbortController().signal));
         for (const release of slots) release();

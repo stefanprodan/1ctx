@@ -8,8 +8,6 @@ export type Workspace = {
   sessionId: string;
 };
 
-export type WorkspaceKey = Workspace | string;
-
 export const sessionWorkspace = (sessionId: string): Workspace => ({
   id: sessionId,
   sessionId,
@@ -24,8 +22,7 @@ export const workspaceOf = (
     ? { id: `${sessionId}:${agentId}`, sessionId }
     : sessionWorkspace(sessionId);
 
-export const workspaceId = (workspace: WorkspaceKey): string =>
-  typeof workspace === "string" ? workspace : workspace.id;
+export const workspaceId = (workspace: Workspace): string => workspace.id;
 
-export const workspaceSession = (workspace: WorkspaceKey): string =>
-  typeof workspace === "string" ? workspace : workspace.sessionId;
+export const workspaceSession = (workspace: Workspace): string =>
+  workspace.sessionId;

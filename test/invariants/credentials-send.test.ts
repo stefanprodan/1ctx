@@ -208,7 +208,10 @@ test.serial(
         expect(result).toContain("session=[credential quotes]");
         expect(result).not.toContain(KEY);
         expect(JSON.stringify(next.body)).not.toContain(KEY);
-        const scratch = chat.app.bash.scratch.read(first.id);
+        const scratch = chat.app.bash.scratch.read({
+          id: first.id,
+          sessionId: first.id,
+        });
         expect(scratch.entries.map((file) => file.path).sort()).toEqual([
           "jar",
           "out",

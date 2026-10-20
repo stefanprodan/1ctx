@@ -244,7 +244,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       probe: fields.probe === true,
       title: fields.title,
       kind: event === null ? "chat" : "run",
-      origin: event === null ? "chat" : "automation",
+      origin: event === null ? (session?.origin ?? "chat") : "automation",
       automationId: event?.automation.id ?? null,
       checkUploads: deps.uploads.checkUploads,
       startKept: (id, afterSeq) => deps.bash.startKept(id, afterSeq),

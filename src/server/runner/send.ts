@@ -282,11 +282,11 @@ export function restartRound(send: ActiveSend, round: RoundState): RoundState {
 export function newSend(fields: {
   id: string;
   sessionId: string;
-  workspace?: Workspace;
+  workspace: Workspace;
   projectId: string;
   startedBy: string | null;
   kind?: SendKind;
-  origin?: SessionOrigin;
+  origin: SessionOrigin;
   op: SendOp;
   summarizing?: boolean;
   used?: number | null;
@@ -308,14 +308,11 @@ export function newSend(fields: {
   return {
     id: fields.id,
     sessionId: fields.sessionId,
-    workspace: fields.workspace ?? {
-      id: fields.sessionId,
-      sessionId: fields.sessionId,
-    },
+    workspace: fields.workspace,
     projectId: fields.projectId,
     startedBy: fields.startedBy,
     kind: fields.kind ?? "chat",
-    origin: fields.origin ?? (fields.kind === "run" ? "automation" : "chat"),
+    origin: fields.origin,
     op: fields.op,
     startedAt: fields.now,
     policy: fields.policy,

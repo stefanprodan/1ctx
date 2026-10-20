@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { writeKeptFiles } from "../../../src/server/bash/index.ts";
+import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
@@ -37,9 +38,9 @@ function addTurn(chat: ChatApp, channelId: string, status: "done" | "running") {
       `insert into sends
        (id, session_id, kind, user_id, agent_id, provider_id, provider_name,
         model, status, first_message_id, rounds, tool_calls, started_at,
-        finished_at)
+        finished_at, swept)
        values (?, ?, 'chat', ?, ?, ?, 'local', 'm', ?, 'question', 1, 2,
-         ?, ?)`,
+         ?, ?, 0)`,
     )
     .run(
       sendId,
@@ -134,89 +135,132 @@ function addTurn(chat: ChatApp, channelId: string, status: "done" | "running") {
 }
 
 describe("channel turn aging", () => {
-  test("drops old tool payloads, kept files and children but preserves the trace", async () => {
-    const chat = await chatApp();
-    try {
-      const channel = { id: channelOf(chat) };
-      const turn = addTurn(chat, channel.id, "done");
-      writeKeptFiles(chat.app.db, turn.bashId, [
-        {
-          folder: 1,
-          dir: "0001-bash",
-          name: "result.txt",
-          text: "kept result",
-          data: null,
-          bytes: 11,
-        },
-      ]);
-      const child = chat.app.sessions.create({
-        projectId: chat.projectId,
-        ownerId: chat.memberId,
-        agentId: chat.agentId,
-        origin: "channel",
-        parent: { sessionId: channel.id, messageId: turn.delegateId },
-        title: "check the api",
-        status: "done",
-        now: turn.at,
-      });
-      const beforeRows = chat.app.sessions
-        .messages(channel.id)
-        .filter((row) => row.sendId === turn.sendId);
-      const before = trace(traceCalls(beforeRows), yours);
-      const swept = sweepChats(
-        {
-          db: chat.app.db,
-          store: chat.app.sessions,
-          scratch: chat.app.bash.scratch,
-          log: silent,
-        },
-        chat.app.now.value,
-        DEFAULT_LIMITS,
-      );
-      expect(swept.turns_swept).toBe(1);
-      const afterRows = chat.app.sessions
-        .messages(channel.id)
-        .filter((row) => row.sendId === turn.sendId);
-      expect(trace(traceCalls(afterRows), yours)).toBe(before);
-      expect(before).toContain("delegate check the api ok");
-      const tools = afterRows.filter((row) => row.kind === "tool");
-      expect(tools).toEqual(
-        tools.map((row) => ({
-          ...row,
-          content: "",
-          reasoning: "",
-          resultBytes: null,
-        })),
-      );
-      expect(
-        chat.app.db
-          .query("select reasoning_details, packed from messages where id = ?")
-          .get(turn.bashId),
-      ).toEqual({ reasoning_details: null, packed: null });
-      expect(chat.app.sessions.send(turn.sendId)?.swept).toBe(true);
-      expect(sendTurns(chat.app.db, channel.id).get(turn.sendId)?.swept).toBe(
-        true,
-      );
-      expect(chat.app.sessions.message(turn.answerId)?.content).toBe(
-        "the answer",
-      );
-      expect(
+  test.serial(
+    "drops old tool payloads, files and children and publishes the trace",
+    async () => {
+      const chat = await chatApp();
+      try {
+        const channel = { id: channelOf(chat) };
+        const turn = addTurn(chat, channel.id, "done");
+        writeKeptFiles(chat.app.db, turn.bashId, [
+          {
+            folder: 1,
+            dir: "0001-bash",
+            name: "result.txt",
+            text: "kept result",
+            data: null,
+            bytes: 11,
+          },
+        ]);
         chat.app.db
           .query(
-            "select count(*) as n from mcp_kept_files where message_id = ?",
+            `insert into opened_files
+           (message_id, position, path, kind, language, bytes, lines, title,
+            text)
+           values (?, 0, '/tmp/result.md', 'markdown', 'markdown', 6, 1,
+             'result.md', 'opened')`,
           )
-          .get(turn.bashId),
-      ).toEqual({ n: 0 });
-      expect(chat.app.sessions.byId(child.id)).toBeNull();
-      const response = await chat.member.call(
-        "GET",
-        `/api/sessions/${channel.id}/messages/${turn.delegateId}/child`,
-      );
-      expect(response.status).toBe(404);
-    } finally {
-      await chat.app.shutdown();
-    }
-  });
+          .run(turn.bashId);
+        const child = chat.app.sessions.create({
+          projectId: chat.projectId,
+          ownerId: chat.memberId,
+          agentId: chat.agentId,
+          origin: "channel",
+          parent: { sessionId: channel.id, messageId: turn.delegateId },
+          title: "check the api",
+          status: "done",
+          now: turn.at,
+        });
+        const beforeRows = chat.app.sessions
+          .messages(channel.id)
+          .filter((row) => row.sendId === turn.sendId);
+        const before = trace(traceCalls(beforeRows), yours);
+        const beforeRevision = chat.app.sessions.byId(channel.id)!.revision;
+        const events: BusEvent[] = [];
+        const off = subscribe((event) => events.push(event), silent);
+        const swept = (() => {
+          try {
+            return sweepChats(
+              {
+                db: chat.app.db,
+                store: chat.app.sessions,
+                scratch: chat.app.bash.scratch,
+                log: silent,
+              },
+              chat.app.now.value,
+              DEFAULT_LIMITS,
+            );
+          } finally {
+            off();
+          }
+        })();
+        expect(swept.turns_swept).toBe(1);
+        const changed = events.find(
+          (event): event is Extract<BusEvent, { type: "session.changed" }> =>
+            event.type === "session.changed" &&
+            event.data.session.id === channel.id,
+        );
+        expect(changed?.data.session.revision).toBe(beforeRevision + 1);
+        expect(changed?.data.send).toMatchObject({
+          id: turn.sendId,
+          swept: true,
+        });
+        expect(
+          changed?.data.messages.find((row) => row.id === turn.bashId),
+        ).toMatchObject({ content: "", files: null });
+        const afterRows = chat.app.sessions
+          .messages(channel.id)
+          .filter((row) => row.sendId === turn.sendId);
+        expect(trace(traceCalls(afterRows), yours)).toBe(before);
+        expect(before).toContain("delegate check the api ok");
+        const tools = afterRows.filter((row) => row.kind === "tool");
+        expect(tools).toEqual(
+          tools.map((row) => ({
+            ...row,
+            content: "",
+            reasoning: "",
+            resultBytes: null,
+          })),
+        );
+        expect(
+          chat.app.db
+            .query(
+              "select reasoning_details, packed from messages where id = ?",
+            )
+            .get(turn.bashId),
+        ).toEqual({ reasoning_details: null, packed: null });
+        expect(chat.app.sessions.send(turn.sendId)?.swept).toBe(true);
+        expect(sendTurns(chat.app.db, channel.id).get(turn.sendId)?.swept).toBe(
+          true,
+        );
+        expect(chat.app.sessions.message(turn.answerId)?.content).toBe(
+          "the answer",
+        );
+        expect(
+          chat.app.db
+            .query(
+              "select count(*) as n from opened_files where message_id = ?",
+            )
+            .get(turn.bashId),
+        ).toEqual({ n: 0 });
+        expect(
+          chat.app.db
+            .query(
+              "select count(*) as n from mcp_kept_files where message_id = ?",
+            )
+            .get(turn.bashId),
+        ).toEqual({ n: 0 });
+        expect(chat.app.sessions.byId(child.id)).toBeNull();
+        const response = await chat.member.call(
+          "GET",
+          `/api/sessions/${channel.id}/messages/${turn.delegateId}/child`,
+        );
+        expect(response.status).toBe(404);
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
 
   test("never touches a running old turn", async () => {
     const chat = await chatApp();

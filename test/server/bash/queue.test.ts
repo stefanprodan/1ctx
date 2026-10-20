@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   acquireSession,
-  heldSessions,
+  heldWorkspaces,
 } from "../../../src/server/bash/queue.ts";
 import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
@@ -19,7 +19,7 @@ describe("command admission", () => {
         const first = run(s, "printf first > /tmp/file; sleep 0.05; cd /tmp");
         const second = run(s, "cat file; printf second > file");
         const third = run(s, "cat file");
-        expect(heldSessions().has(s.session.id)).toBe(true);
+        expect(heldWorkspaces().has(s.session.id)).toBe(true);
         expect((await first).error).toBe(false);
         expect(await second).toEqual({
           error: false,
@@ -34,7 +34,7 @@ describe("command admission", () => {
           tail: 6,
         });
         expect(scratchState(s)).toMatchObject({ cwd: "/tmp", revision: 3 });
-        expect(heldSessions().has(s.session.id)).toBe(false);
+        expect(heldWorkspaces().has(s.session.id)).toBe(false);
       } finally {
         s.db.close();
       }
@@ -45,7 +45,10 @@ describe("command admission", () => {
     "an abort leaves the session queue without disturbing the next waiter",
     async () => {
       const s = setup();
-      const release = await acquireSession(s.session.id, freshSignal());
+      const release = await acquireSession(
+        { id: s.session.id, sessionId: s.session.id },
+        freshSignal(),
+      );
       const controller = new AbortController();
       const canceled = run(
         s,
@@ -64,13 +67,13 @@ describe("command admission", () => {
           discarded: true,
         });
         expect(scratchState(s).revision).toBe(0);
-        expect(heldSessions().has(s.session.id)).toBe(true);
+        expect(heldWorkspaces().has(s.session.id)).toBe(true);
         release();
         expect((await next).error).toBe(false);
         expect(scratchState(s).entries.map((file) => file.path)).toEqual([
           "next",
         ]);
-        expect(heldSessions().has(s.session.id)).toBe(false);
+        expect(heldWorkspaces().has(s.session.id)).toBe(false);
       } finally {
         release();
         await next;
@@ -83,7 +86,10 @@ describe("command admission", () => {
     "session waiters do not consume process slots or block another session",
     async () => {
       const s = setup();
-      const release = await acquireSession(s.session.id, freshSignal());
+      const release = await acquireSession(
+        { id: s.session.id, sessionId: s.session.id },
+        freshSignal(),
+      );
       let finished = 0;
       const waiting = Array.from({ length: 5 }, (_, i) =>
         run(s, `echo ${i} >> /tmp/order`).then((result) => {
@@ -162,7 +168,7 @@ describe("command admission", () => {
             )
           ).error,
         ).toBe(true);
-        expect(heldSessions().has(s.session.id)).toBe(false);
+        expect(heldWorkspaces().has(s.session.id)).toBe(false);
         expect(scratchState(s).revision).toBe(0);
       } finally {
         s.db.close();
@@ -173,7 +179,10 @@ describe("command admission", () => {
     "a call that times out waiting for its chat's turn is busy and says to combine steps",
     async () => {
       const s = setup();
-      const release = await acquireSession(s.session.id, freshSignal());
+      const release = await acquireSession(
+        { id: s.session.id, sessionId: s.session.id },
+        freshSignal(),
+      );
       try {
         // the registry's own timer, as it ends a call
         expect(
@@ -196,7 +205,10 @@ describe("command admission", () => {
     "a command that waited and then hit the deadline says how long it had",
     async () => {
       const s = setup();
-      const release = await acquireSession(s.session.id, freshSignal());
+      const release = await acquireSession(
+        { id: s.session.id, sessionId: s.session.id },
+        freshSignal(),
+      );
       const realNow = Date.now;
       const pending = run(s, "while :; do sleep 0.05; done", {
         ...callCaps,

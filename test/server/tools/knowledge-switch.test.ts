@@ -39,6 +39,7 @@ const context = (): ToolContext => ({
   actor: {
     projectId: "p",
     sessionId: "s",
+    workspace: { id: "s", sessionId: "s" },
     userId: "u",
     agentId: "a",
     agentName: "agent",

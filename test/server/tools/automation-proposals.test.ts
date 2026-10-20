@@ -164,6 +164,7 @@ test.serial(
         agentId: "agent",
         agentName: "agent",
         sessionId: "chat",
+        workspace: { id: "chat", sessionId: "chat" },
         origin: "chat",
       },
       signal: new AbortController().signal,

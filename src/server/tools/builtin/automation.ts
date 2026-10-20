@@ -261,8 +261,8 @@ export function makeAutomationTool(
       const actor = ctx.actor;
       // a run and its subagents are never offered it; a forged call
       // there reads nothing
-      if (port === null || actor === null || actor.origin !== "chat") {
-        throw new Error("automations are only offered in a chat");
+      if (port === null || actor === null || actor.origin === "automation") {
+        throw new Error("automations are not offered in a run");
       }
       if (call.action !== "list" && call.action !== "show") {
         if (!proposals || ctx.subagent != null) {

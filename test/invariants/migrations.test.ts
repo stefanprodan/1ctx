@@ -241,7 +241,9 @@ describe("the schema", () => {
           values ('mail', 'agent', 'u', 'p', 'sess', '<mail@x>', 'sent', 0, 0, 0);
       `);
       const old = db.query("select * from memory_views").get();
-      expect(migrate(db)).toEqual(["0072-channel-turns"]);
+      expect(migrate(db, MIGRATIONS.slice(0, -1))).toEqual([
+        "0072-channel-turns",
+      ]);
       expect(
         db.query("select session_id, snapshot, seen from memory_views").get(),
       ).toEqual(old);
@@ -767,7 +769,7 @@ describe("the schema", () => {
             "select mcp_folders from session_workspaces where workspace_id = 'sess'",
           )
           .get(),
-      ).toEqual({ mcp_folders: 0 });
+      ).toBeNull();
       db.exec(`
         insert into mcp_kept_files
             (message_id, position, session_id, folder, dir, name, bytes, text,
@@ -4072,9 +4074,12 @@ describe("project channel migrations", () => {
       values ('agent70', 'agent70', 'provider70', 'm', 'M', 1);
       insert into sessions
         (id, project_id, owner_id, agent_id, origin, title, status,
-         created_at, last_activity_at)
-      values ('session70', 'team70', 'u70', 'agent70', 'chat', 'kept',
-        'done', 3, 4);
+         created_at, last_activity_at, mcp_folders)
+      values
+        ('session70', 'team70', 'u70', 'agent70', 'chat', 'kept',
+          'done', 3, 4, 7),
+        ('session-zero', 'personal70', 'u70', 'agent70', 'chat', 'zero',
+          'done', 3, 4, 0);
       insert into sends
         (id, session_id, kind, user_id, agent_id, provider_id, provider_name,
          model, status, first_message_id, started_at, finished_at)
@@ -4093,6 +4098,20 @@ describe("project channel migrations", () => {
     expect(
       db.query("select id, kind from sends where id = 'send70'").get(),
     ).toEqual({ id: "send70", kind: "chat" });
+    expect(db.query("select * from session_workspaces").all()).toEqual([
+      {
+        workspace_id: "session70",
+        session_id: "session70",
+        mcp_folders: 7,
+      },
+    ]);
+    expect(
+      db
+        .query(
+          "select name from pragma_table_info('sessions') where name = 'mcp_folders'",
+        )
+        .get(),
+    ).toBeNull();
     expect(
       db
         .query(
@@ -4247,7 +4266,9 @@ describe("project channel migrations", () => {
             'ans', 'done', 0, 1);
       `);
         db.exec(`
-        update sessions set mcp_folders = 7 where id = 'sess';
+        insert into session_workspaces
+          (workspace_id, session_id, mcp_folders)
+          values ('sess', 'sess', 7);
         insert into session_scratch
           (session_id, cwd, revision, bytes, files, used_at)
           values ('sess', '/tmp/work', 3, 4, 1, 9);
@@ -4307,11 +4328,11 @@ describe("project channel migrations", () => {
               "select workspace_id from mcp_kept_files where message_id = 'm2'",
             )
             .get(),
-        ).toEqual({ workspace_id: "sess" });
+        ).toEqual({ workspace_id: null });
         expect(
           db.query("select swept from sends where id = 'send1'").get(),
         ).toEqual({
-          swept: 0,
+          swept: null,
         });
         expect(
           db

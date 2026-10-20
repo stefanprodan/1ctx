@@ -42,7 +42,7 @@ import { acquireSession } from "./queue.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
 import { READ_ONLY_TO_SUBAGENT } from "./tree.ts";
 import type { CommandWorkers } from "./worker.ts";
-import { type WorkspaceKey, workspaceSession } from "./workspace.ts";
+import { type Workspace, workspaceSession } from "./workspace.ts";
 
 // the repositories a send mounted, read-only under /repos
 export type CommandRepos = {
@@ -174,7 +174,7 @@ function mountJob(
   command: string,
   started: number,
   projectId: string,
-  workspace: WorkspaceKey,
+  workspace: Workspace,
 ): Mount {
   const sessionId = workspaceSession(workspace);
   const repos = caps.repos;
@@ -285,7 +285,7 @@ function stopped(
 export async function run(
   deps: MountDeps,
   projectId: string,
-  workspace: WorkspaceKey,
+  workspace: Workspace,
   author: KnowledgeAuthor,
   command: string,
   caps: CommandCaps,

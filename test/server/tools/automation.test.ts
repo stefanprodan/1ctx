@@ -125,6 +125,7 @@ const context = (
     agentId: "a1",
     agentName: "sre",
     sessionId: "chat00000001",
+    workspace: { id: "chat00000001", sessionId: "chat00000001" },
     origin,
   },
   now: () => NOW,
@@ -246,7 +247,7 @@ describe("where it reads", () => {
     );
     expect(result).toMatchObject({
       error: true,
-      content: "Error: automations are only offered in a chat",
+      content: "Error: automations are not offered in a run",
     });
   });
 

@@ -150,7 +150,12 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
   expect(
     chat.app.db.query("select count(*) as n from mcp_kept_files").get(),
   ).toEqual({ n: 0 });
-  expect(chat.app.bash.startKept(first.sessionId, null).next).toBe(2);
+  expect(
+    chat.app.bash.startKept(
+      { id: first.sessionId, sessionId: first.sessionId },
+      null,
+    ).next,
+  ).toBe(2);
 });
 
 test("a refused start keeps the kept files it would have trimmed", async () => {

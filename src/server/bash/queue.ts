@@ -6,7 +6,7 @@
 // idle sweep off workspaces with a running or queued command.
 
 import { Queue } from "../lib/queue.ts";
-import { type WorkspaceKey, workspaceId } from "./workspace.ts";
+import { type Workspace, workspaceId } from "./workspace.ts";
 
 const workspaces = new Map<string, Queue>();
 
@@ -14,10 +14,8 @@ export function heldWorkspaces(): ReadonlySet<string> {
   return new Set(workspaces.keys());
 }
 
-export const heldSessions = heldWorkspaces;
-
 export async function acquireSession(
-  workspace: WorkspaceKey,
+  workspace: Workspace,
   signal: AbortSignal,
 ): Promise<() => void> {
   signal.throwIfAborted();

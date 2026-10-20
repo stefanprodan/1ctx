@@ -10,11 +10,7 @@ import { DAY_MS } from "../lib/clock.ts";
 import { Conflict } from "../lib/errors.ts";
 import type { ScratchEntry } from "./protocol.ts";
 import { heldWorkspaces } from "./queue.ts";
-import {
-  type WorkspaceKey,
-  workspaceId,
-  workspaceSession,
-} from "./workspace.ts";
+import { type Workspace, workspaceId, workspaceSession } from "./workspace.ts";
 
 export type ScratchFile = ScratchEntry;
 
@@ -32,12 +28,14 @@ export type ScratchChanges = {
   cwd: string;
 };
 
+// a file's size counts its name, so empty files cannot store megabytes
+// of paths under the byte cap
 const STORED_BYTES = "length(data) + length(cast(path as blob))";
 
 export class ScratchStore {
   constructor(private readonly db: Db) {}
 
-  read(workspace: WorkspaceKey): Scratch {
+  read(workspace: Workspace): Scratch {
     const id = workspaceId(workspace);
     const row = this.db
       .query<Omit<Scratch, "entries">, [string]>(
@@ -56,7 +54,9 @@ export class ScratchStore {
     };
   }
 
-  usedAt(workspace: WorkspaceKey): number | null {
+  // the last command's time, the mtime its files mount with, since a
+  // file keeps no time of its own
+  usedAt(workspace: Workspace): number | null {
     return (
       this.db
         .query<{ used_at: number }, [string]>(
@@ -66,8 +66,9 @@ export class ScratchStore {
     );
   }
 
+  // The caller owns the transaction so knowledge and scratch roll back together.
   write(
-    workspace: WorkspaceKey,
+    workspace: Workspace,
     expectedRevision: number,
     changes: ScratchChanges,
     now: number,
@@ -124,7 +125,9 @@ export class ScratchStore {
       .run(id, id);
   }
 
-  sizes(workspace: WorkspaceKey): { path: string; bytes: number }[] {
+  // the stored names and sizes, which a commit checks inside its
+  // transaction rather than trusting what the command worker counted
+  sizes(workspace: Workspace): { path: string; bytes: number }[] {
     return this.db
       .query<{ path: string; bytes: number }, [string]>(
         `select path, ${STORED_BYTES} as bytes from session_scratch_files
@@ -133,13 +136,14 @@ export class ScratchStore {
       .all(workspaceId(workspace));
   }
 
+  // an archived chat never runs a command again; its files go with the row
   drop(sessionId: string): void {
     this.db
       .query("delete from session_scratch where session_id = ?")
       .run(sessionId);
   }
 
-  dropWorkspace(workspace: WorkspaceKey): void {
+  dropWorkspace(workspace: Workspace): void {
     this.db
       .query("delete from session_scratch where workspace_id = ?")
       .run(workspaceId(workspace));

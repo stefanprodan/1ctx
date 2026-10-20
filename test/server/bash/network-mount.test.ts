@@ -134,7 +134,10 @@ test("listed access reaches its exact origin with all seven methods", async () =
       s.knowledge.read(s.projectId, s.knowledge.list(s.projectId).files[0]!.id)
         .text,
     ).toBe("kept\n");
-    expect(s.bash.scratch.read(s.session.id).entries[0]!.path).toBe("method");
+    expect(
+      s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+        .entries[0]!.path,
+    ).toBe("method");
     expect(methods).toHaveLength(7);
   } finally {
     server.stop();
@@ -174,7 +177,9 @@ test("a listed origin refuses other origins and redirects without discarding wri
       s.knowledge.list(s.projectId).files.map((file) => file.name),
     ).toEqual(["direct.txt", "redirect.txt"]);
     expect(
-      s.bash.scratch.read(s.session.id).entries.map((file) => file.path),
+      s.bash.scratch
+        .read({ id: s.session.id, sessionId: s.session.id })
+        .entries.map((file) => file.path),
     ).toEqual(["direct", "redirect"]);
     expect(refusedHits).toBe(0);
   } finally {
@@ -195,8 +200,14 @@ test("network downloads keep bytes in scratch and reject non-text knowledge atom
       all,
     );
     expect(scratch.error, scratch.content).toBe(false);
-    expect(s.bash.scratch.read(s.session.id).entries[0]!.data).toEqual(bytes);
-    const revision = s.bash.scratch.read(s.session.id).revision;
+    expect(
+      s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+        .entries[0]!.data,
+    ).toEqual(bytes);
+    const revision = s.bash.scratch.read({
+      id: s.session.id,
+      sessionId: s.session.id,
+    }).revision;
     const bad = await run(
       s,
       `echo unsaved > /tmp/new; curl -sS -o /knowledge/download ${server.url}/`,
@@ -204,7 +215,10 @@ test("network downloads keep bytes in scratch and reject non-text knowledge atom
     );
     expect(bad.error).toBe(true);
     expect(s.knowledge.list(s.projectId).files).toEqual([]);
-    expect(s.bash.scratch.read(s.session.id).revision).toBe(revision);
+    expect(
+      s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+        .revision,
+    ).toBe(revision);
   } finally {
     server.stop();
     s.db.close();
