@@ -53,6 +53,9 @@ note edits it in the memory phase, an extra step after its main rounds.
   or restart repair. Edits, refusals and the saving agent use the calling
   send id, so another turn cannot change what it has seen. Chat views stay
   keyed by session and keep their lifetime above.
+  The session foreign key has a full index for cascading deletes, beside
+  the partial unique chat-view index. Restart repair ends every running send,
+  then drops all send-scoped views without reading send history again.
 - **Two failed rounds stop the tool.** A settled round with edits but
   no success counts; a success resets it. After
   `MEMORY_EDIT_FAILED_ROUNDS` every call fails. Chat rounds and the

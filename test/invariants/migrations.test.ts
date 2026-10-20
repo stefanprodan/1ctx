@@ -276,6 +276,36 @@ describe("the schema", () => {
     }
   });
 
+  test("0072 indexes the memory view cascade from sessions", () => {
+    const db = seed();
+    try {
+      db.exec(`
+        insert into memory_views (id, session_id, send_id, snapshot, seen)
+          values ('sess', 'sess', null, '[]', '[]'),
+                 ('send1', 'sess', 'send1', '[]', '[]');
+      `);
+      for (const stats of [false, true]) {
+        if (stats) db.exec("analyze");
+        const plan = db
+          .query<{ detail: string }, [string]>(
+            "explain query plan delete from sessions where id = ?",
+          )
+          .all("sess")
+          .map((row) => row.detail);
+        expect(plan).toContain(
+          "SEARCH memory_views USING COVERING INDEX memory_views_session (session_id=?)",
+        );
+        expect(
+          plan.some((line) => /^SCAN (?:TABLE )?memory_views\b/.test(line)),
+        ).toBe(false);
+      }
+      db.exec("delete from sessions where id = 'sess'");
+      expect(db.query("select id from memory_views").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
   test("0018 defaults existing sessions and automations to an empty set without losing rows", () => {
     const db = seed(MIGRATIONS.slice(0, 17));
     try {

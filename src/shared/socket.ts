@@ -261,37 +261,10 @@ export function isDraftFrame(value: unknown): value is DraftFrame {
   );
 }
 
-// Drafts are checked individually by the reader; a malformed live list
-// cannot be reconciled, so it rejects the whole snapshot.
 export function isWatchedFrame(value: unknown): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
   const v = value as Record<string, unknown>;
-  return (
-    v.type === "watched" &&
-    typeof v.sessionId === "string" &&
-    v.sessionId !== "" &&
-    Array.isArray(v.live) &&
-    v.live.every((tail) => {
-      if (typeof tail !== "object" || tail === null || Array.isArray(tail))
-        return false;
-      return (
-        typeof tail.sendId === "string" &&
-        tail.sendId !== "" &&
-        Number.isSafeInteger(tail.seq) &&
-        tail.seq >= 0 &&
-        (tail.phase === "tools" ||
-          (tail.phase === "reply" &&
-            typeof tail.messageId === "string" &&
-            typeof tail.content === "string" &&
-            typeof tail.reasoning === "string" &&
-            typeof tail.html === "string" &&
-            Number.isSafeInteger(tail.htmlAt) &&
-            tail.htmlAt >= 0)) &&
-        (!Object.hasOwn(tail, "drafts") || Array.isArray(tail.drafts))
-      );
-    }) &&
-    (!Object.hasOwn(v, "drafts") || Array.isArray(v.drafts))
-  );
+  return v.type === "watched" && Array.isArray(v.live);
 }

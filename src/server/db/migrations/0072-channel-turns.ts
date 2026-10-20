@@ -35,13 +35,14 @@ export const m0072: Migration = {
         select session_id, session_id, snapshot, seen from memory_views;
       drop table memory_views;
       alter table memory_views_next rename to memory_views;
+      create index memory_views_session on memory_views(session_id);
       create unique index memory_chat_view on memory_views(session_id)
         where send_id is null;
 
       alter table email_outbox add column send_id text;
       create index email_send on email_outbox(send_id, kind)
         where send_id is not null;
-      create index sends_channel_running on sends(session_id, agent_id)
+      create index sends_channel_running on sends(session_id)
         where status = 'running';
     `);
   },

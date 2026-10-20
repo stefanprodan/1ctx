@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Database } from "bun:sqlite";
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import { BadRequest, NotFound } from "../../../src/server/lib/errors.ts";
 import { MAX_QUEUED_PER_CHAT } from "../../../src/server/sessions/index.ts";
 import type { ChannelPostResponse } from "../../../src/shared/api/sessions.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
@@ -82,6 +83,9 @@ async function setup() {
 describe("channel summons", () => {
   test("restart repairs every running turn, drops its memory view, and resumes pending turns", async () => {
     const { chat, channelId, detail, post, summon } = await setup();
+    const kept = await startChat(chat);
+    kept.script.reply("keep the chat view");
+    await idle(chat.app);
     const first = await summon("coder");
     const second = await summon("reviewer");
     await post("@coder after restart");
@@ -91,8 +95,24 @@ describe("channel summons", () => {
     db.exec("pragma foreign_keys = on");
     await chat.app.shutdown();
     const scripts = scriptedFetch();
+    const exec = spyOn(db, "exec");
     const app = await testApp({ db, fetcher: scripts.fetcher });
     try {
+      const deletes = exec.mock.calls
+        .map(([sql]) => sql)
+        .filter((sql) => sql.includes("delete from memory_views"));
+      expect(deletes).toHaveLength(1);
+      const explain = db.prepare<{ detail: string }, []>(
+        `explain query plan ${deletes[0]}`,
+      );
+      try {
+        const plan = explain.all().map((row) => row.detail);
+        expect(plan.some((line) => /^SCAN (?:TABLE )?sends\b/.test(line))).toBe(
+          false,
+        );
+      } finally {
+        explain.finalize();
+      }
       const script = await scripts.reached(1);
       expect(app.sessions.send(first.send.id)?.cause).toBe("restart");
       expect(app.sessions.send(second.send.id)?.cause).toBe("restart");
@@ -100,16 +120,19 @@ describe("channel summons", () => {
       expect(resumed.firstMessageId).toBe(posted.id);
       expect(app.sessions.message(posted.id)).toEqual(posted);
       expect(app.sessions.pending.ofSession(channelId)).toEqual([]);
-      expect(db.query("select send_id from memory_views").all()).toEqual([
-        { send_id: resumed.id },
-      ]);
+      expect(
+        db.query("select send_id from memory_views order by send_id").all(),
+      ).toEqual([{ send_id: null }, { send_id: resumed.id }]);
       expect(app.sessions.byId(channelId)?.status).toBe("running");
       script.reply("resumed");
       await idle(app);
-      expect(db.query("select send_id from memory_views").all()).toEqual([]);
+      expect(
+        db.query("select session_id, send_id from memory_views").all(),
+      ).toEqual([{ session_id: kept.sessionId, send_id: null }]);
       expect(app.sessions.byId(channelId)?.status).toBe("done");
     } finally {
       await app.shutdown();
+      exec.mockRestore();
       db.close();
     }
   });
@@ -336,6 +359,125 @@ describe("channel summons", () => {
     expect(resumed.startedBy).toBe(chat.memberId);
     admin.script.reply("admin");
     next.reply("member");
+    await idle(chat.app);
+  });
+
+  test("a capped summoner does not block another summoner of the same idle agent", async () => {
+    const { chat, channelId, post, summon } = await setup();
+    await setLimits(chat, { sendsPerUser: 1 });
+    const held = await startChat(chat);
+    expect((await post("@reviewer member waits")).status).toBe(202);
+    const waiting = chat.app.sessions.pending.ofSession(channelId)[0]!;
+    const admin = await summon("reviewer", chat.admin);
+    expect(admin.send.startedBy).toBe(chat.adminId);
+    expect(chat.app.sessions.pending.ofSession(channelId)).toEqual([waiting]);
+    admin.script.reply("admin done");
+    await admin.send.drained;
+    expect(chat.app.sessions.pending.ofSession(channelId)).toEqual([waiting]);
+    held.script.reply("member free");
+    const resumed = await chat.scripted.reached(3);
+    expect(chat.app.runner.registry.inSession(channelId)[0]).toMatchObject({
+      startedBy: chat.memberId,
+      firstMessageId: waiting.messageId,
+    });
+    resumed.reply("member done");
+    await idle(chat.app);
+  });
+
+  test.each(["agent", "channel"] as const)(
+    "a wake prepares no waiting turns behind a full %s",
+    async (cap) => {
+      const { chat, channelId, post, summon } = await setup();
+      await setLimits(chat, { sendsPerChannel: cap === "agent" ? 2 : 1 });
+      const first = await summon("coder");
+      const agent = cap === "agent" ? "coder" : "reviewer";
+      for (let i = 0; i < 5; i++) {
+        expect((await post(`@${agent} waiting ${i}`)).status).toBe(202);
+      }
+      const message = spyOn(chat.app.sessions, "message");
+      const memory = spyOn(chat.app.memory, "read");
+      try {
+        chat.app.runner.queue.wake();
+        expect(message).not.toHaveBeenCalled();
+        expect(memory).not.toHaveBeenCalled();
+        expect(chat.app.sessions.pending.ofSession(channelId)).toHaveLength(5);
+        expect(chat.scripted.scripts).toHaveLength(1);
+      } finally {
+        message.mockRestore();
+        memory.mockRestore();
+      }
+      for (const turn of chat.app.sessions.pending.ofSession(channelId)) {
+        await chat.member.call(
+          "DELETE",
+          `/api/sessions/${channelId}/pending/${turn.id}`,
+        );
+      }
+      first.script.reply("done");
+      await idle(chat.app);
+    },
+  );
+
+  test.each([
+    { error: new BadRequest("the turn cannot start"), reason: "failed" },
+    { error: new NotFound("no such project"), reason: null },
+  ])(
+    "a refused start answers its reason: $error.message",
+    async ({ error, reason }) => {
+      const { chat, channelId } = await setup();
+      const create = spyOn(chat.app.sessions, "createSend").mockImplementation(
+        () => {
+          throw error;
+        },
+      );
+      try {
+        const response = await chat.member.call(
+          "POST",
+          `/api/sessions/${channelId}/messages`,
+          { body: { message: "@coder cannot start" } },
+        );
+        expect(response.status).toBe(error.status);
+        expect(await response.json()).toEqual({ error: error.message });
+        expect(chat.app.sessions.messages(channelId)).toMatchObject([
+          { kind: "user", content: "@coder cannot start", status: "done" },
+        ]);
+        const pending = chat.app.sessions.pending.ofSession(channelId);
+        if (reason === null) expect(pending).toEqual([]);
+        else expect(pending).toMatchObject([{ reason }]);
+        expect(chat.app.runner.registry.inSession(channelId)).toEqual([]);
+        expect(chat.scripted.scripts).toHaveLength(0);
+      } finally {
+        create.mockRestore();
+      }
+    },
+  );
+
+  test("a removed pending turn without a running send never answers started", async () => {
+    const { chat, channelId, summon } = await setup();
+    const other = await summon("reviewer");
+    const changed = spyOn(chat.app.runner.queue, "changed").mockImplementation(
+      () => {
+        const turn = chat.app.sessions.pending.ofSession(channelId)[0]!;
+        chat.app.sessions.pending.remove(turn.id);
+      },
+    );
+    try {
+      const response = await chat.member.call(
+        "POST",
+        `/api/sessions/${channelId}/messages`,
+        { body: { message: "@coder cancelled" } },
+      );
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({
+        error: "the channel turn is no longer pending or running",
+      });
+      expect(chat.app.sessions.messages(channelId)).toHaveLength(3);
+      expect(chat.app.runner.registry.inSession(channelId)).toEqual([
+        other.send,
+      ]);
+    } finally {
+      changed.mockRestore();
+    }
+    other.script.reply("done");
     await idle(chat.app);
   });
 

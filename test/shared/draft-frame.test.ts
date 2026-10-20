@@ -201,12 +201,15 @@ test("an update carries memory and attention guidance", () => {
   ).toBe(true);
 });
 
-test("a watched answer's drafts are a list when present", () => {
+test("a watched answer checks its type and live list only", () => {
   const watched = { type: "watched", sessionId: "chat", live: [] };
+  expect(isWatchedFrame(null)).toBe(false);
+  expect(isWatchedFrame("watched")).toBe(false);
+  expect(isWatchedFrame({ ...watched, type: "delta" })).toBe(false);
   expect(isWatchedFrame(watched)).toBe(true);
   expect(isWatchedFrame({ ...watched, live: null })).toBe(false);
   expect(isWatchedFrame({ ...watched, live: { phase: "tools" } })).toBe(false);
-  expect(isWatchedFrame({ ...watched, live: [null] })).toBe(false);
+  expect(isWatchedFrame({ ...watched, live: [null] })).toBe(true);
   expect(
     isWatchedFrame({
       ...watched,
@@ -218,7 +221,7 @@ test("a watched answer's drafts are a list when present", () => {
   ).toBe(true);
   expect(isWatchedFrame({ ...watched, drafts: [pendingDraft] })).toBe(true);
   expect(isWatchedFrame({ ...watched, drafts: [] })).toBe(true);
-  expect(isWatchedFrame({ ...watched, drafts: pendingDraft })).toBe(false);
+  expect(isWatchedFrame({ ...watched, drafts: pendingDraft })).toBe(true);
   // a bad draft is the reader's to skip, never the whole answer's
   expect(
     isWatchedFrame({ ...watched, drafts: [{ ...pendingDraft, id: "" }] }),

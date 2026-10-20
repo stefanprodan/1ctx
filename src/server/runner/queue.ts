@@ -98,7 +98,7 @@ const PROBED = new Error("probed");
 
 export type Dispatcher = {
   readonly closed: boolean;
-  changed(): void;
+  changed(pendingId?: string): void;
   // expire what waited too long, start what can, set the timer
   start(): void;
   // no pass after this, from the drain's start: a row left queued stays
@@ -423,23 +423,21 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     }
   };
 
-  const wake = (): void => {
-    if (!started || closed) return;
+  const wake = (pendingId?: string): { error: unknown } | null => {
+    if (!started || closed) return null;
     // a pass writes its own transactions, so never inside another
-    if (db.inTransaction) {
-      wakeLater();
-      return;
+    if (db.inTransaction || dispatching) {
+      if (db.inTransaction) wakeLater();
+      else again = true;
+      return null;
     }
-    if (dispatching) {
-      again = true;
-      return;
-    }
+    let refusal: { error: unknown } | null = null;
     dispatching = true;
     try {
       for (let i = 0; i < PASSES_PER_WAKE; i++) {
         again = false;
         pass();
-        pending.pass();
+        refusal = pending.pass(false, pendingId) ?? refusal;
         if (!again) break;
       }
       if (again) {
@@ -456,6 +454,7 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     ) {
       arm();
     }
+    return refusal;
   };
 
   const enqueue = (
@@ -478,9 +477,10 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
     get closed() {
       return closed;
     },
-    changed() {
-      wake();
+    changed(pendingId) {
+      const refusal = wake(pendingId);
       if (started && !closed) arm();
+      if (refusal !== null) throw refusal.error;
     },
     start() {
       if (started || closed) return;

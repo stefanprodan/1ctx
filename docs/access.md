@@ -303,9 +303,9 @@ connections watching that session.
   decisions are final and a reconnect reads the chat's drafts again. The
   `watched` answer carries them too, so none falls between read and watch.
   `isDraftFrame()` guards both shapes and the nested draft. The
-  `watched` guard checks its live-tail list and that `drafts` is a list;
-  the client skips a
-  draft `isAutomationDraft()` refuses, so one never stalls the answer.
+  `watched` guard checks only the frame type and that `live` is a list,
+  not each tail's fields. The client skips a draft `isAutomationDraft()`
+  refuses, so one never stalls the answer.
 - **Stream frames go to the session's watchers.** `watch` is authorized
   through the sessions port, and the watcher is registered before the
   `watched` snapshot, so no frame falls between.

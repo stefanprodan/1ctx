@@ -92,10 +92,7 @@ export function repairRows(
   db.query(
     "update messages set status = 'failed', error = ?, finished_at = ? where status = 'streaming'",
   ).run(error, now);
-  db.exec(
-    `delete from memory_views where send_id in
-      (select id from sends where status <> 'running')`,
-  );
+  db.exec("delete from memory_views where send_id is not null");
   for (const id of children) {
     reads.touch(id);
     reads.dropScratch(id);

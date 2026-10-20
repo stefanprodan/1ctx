@@ -13,13 +13,14 @@ import {
   type SessionStore,
 } from "../sessions/index.ts";
 import type { PreparedRun } from "./prepare.ts";
-import { CapFull, waitsForPlace } from "./registry.ts";
+import { CapFull, type Registry, waitsForPlace } from "./registry.ts";
 
 export function pendingTurns(deps: {
   db: Db;
   clock: Clock;
   log: Log;
   sessions: SessionStore;
+  registry: Registry;
   limits: { current(): Limits };
   agents: { byId(id: string): unknown | null };
   preparePending(row: PendingRow): PreparedRun;
@@ -40,7 +41,8 @@ export function pendingTurns(deps: {
     deps.log.info("channel turn not started", { chat: row.sessionId, reason });
   };
   return {
-    pass(expireOnly = false) {
+    pass(expireOnly = false, requestedId?: string) {
+      let refusal: { error: unknown } | null = null;
       let after: PendingCursor | null = null;
       const busy = new Set<string>();
       const pageSize = 64;
@@ -58,6 +60,13 @@ export function pendingTurns(deps: {
           } else if (!expireOnly && !busy.has(key)) {
             busy.add(key);
             try {
+              deps.registry.locked(row.sessionId, row.agentId);
+              if (
+                deps.registry.inSession(row.sessionId).length >=
+                deps.limits.current().sendsPerChannel
+              ) {
+                continue;
+              }
               deps.preparePending(row).launch();
               deps.log.info("channel turn started", {
                 chat: row.sessionId,
@@ -65,9 +74,13 @@ export function pendingTurns(deps: {
               });
             } catch (error) {
               if (waitsForPlace(error)) {
-                if (error instanceof CapFull && error.cap === "process") return;
+                if (error instanceof CapFull) {
+                  if (error.cap === "process") return refusal;
+                  if (error.cap === "user") busy.delete(key);
+                }
                 continue;
               }
+              if (row.id === requestedId) refusal = { error };
               settle(
                 row,
                 error instanceof HttpError && error.status === 404
@@ -83,7 +96,7 @@ export function pendingTurns(deps: {
             }
           }
         }
-        if (page.length < pageSize) return;
+        if (page.length < pageSize) return refusal;
         after = page.at(-1)!;
       }
     },

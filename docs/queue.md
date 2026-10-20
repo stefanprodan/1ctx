@@ -15,12 +15,16 @@ table, not an editable queued text row.
 - **A summon writes its post before it waits.** A `pending_turns` row names
   the post, agent and summoner, never another copy of the text. The message
   route answers only the post's session, message and send with 201 when
-  started, 202 when pending. Detail and queue frames carry a channel-only
-  `pending` list.
+  a matching send is running, 202 only while pending with no reason.
+  A refused start answers its error, never a success status; its post stays.
+  Detail and queue frames carry a channel-only `pending` list.
 - **One idle agent starts at a time per pass.** The dispatcher walks pending
   turns by `queued_at`, then `rowid`, skipping busy agents and full user,
   project or channel caps. A full process ends the pass. Claiming a turn
   deletes its pending row in the send-start transaction.
+  A full user cap skips only that summoner, not later summons of the same
+  idle agent. The agent lock and channel cap are checked before building a
+  turn's policy, snapshots or tool offers.
 - **Waiting turns hold no running place.** `MAX_QUEUED_PER_CHAT` counts
   waiting turns per channel. `queuedPerUser` counts chat queued and not-sent
   rows together with channel pending rows, failed ones included.

@@ -36,7 +36,11 @@ import type { MessageAnswer, RunnerDeps } from "./types.ts";
 
 type ChannelDeps = RunnerDeps & {
   registry: Registry;
-  queue: { readonly closed: boolean; wake(): void; changed(): void };
+  queue: {
+    readonly closed: boolean;
+    wake(): void;
+    changed(pendingId?: string): void;
+  };
 };
 
 export function pendingFields(deps: RunnerDeps, row: PendingRow) {
@@ -173,14 +177,27 @@ function postChannel(
       ],
     };
   });
-  if (pendingId !== null) queue.changed();
-  return {
-    status:
-      pendingId !== null && deps.sessions.pending.byId(pendingId) !== null
-        ? 202
-        : 201,
-    body,
-  };
+  if (pendingId === null) return { status: 201, body };
+  queue.changed(pendingId);
+  const pending = deps.sessions.pending.byId(pendingId);
+  if (pending !== null) {
+    if (pending.reason !== null) {
+      throw new BadRequest(
+        `the channel turn was not started: ${pending.reason}`,
+      );
+    }
+    return { status: 202, body };
+  }
+  if (
+    !registry
+      .inSession(channel.id)
+      .some(
+        (send) => send.firstMessageId === messageId && send.terminal === null,
+      )
+  ) {
+    throw new Conflict("the channel turn is no longer pending or running");
+  }
+  return { status: 201, body };
 }
 
 export function cancelPending(
