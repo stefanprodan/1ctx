@@ -246,7 +246,13 @@ export function sendTurns(
   sessionId: string,
 ): Map<
   string,
-  { agentId: string; agentName: string; summoned: boolean; providerId: string }
+  {
+    agentId: string;
+    agentName: string;
+    summoned: boolean;
+    providerId: string;
+    swept: boolean;
+  }
 > {
   const rows = db
     .query<
@@ -256,11 +262,12 @@ export function sendTurns(
         name: string;
         summoned: number;
         provider_id: string;
+        swept: number;
       },
       [string]
     >(
       `select sends.id, sends.agent_id, agents.name, sends.summoned,
-         sends.provider_id
+         sends.provider_id, sends.swept
        from sends join agents on agents.id = sends.agent_id
        where sends.session_id = ? and sends.kind != 'post'`,
     )
@@ -273,6 +280,7 @@ export function sendTurns(
         agentName: row.name,
         summoned: row.summoned === 1,
         providerId: row.provider_id,
+        swept: row.swept === 1,
       },
     ]),
   );

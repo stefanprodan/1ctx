@@ -84,6 +84,7 @@ const EXPECTED_IDS = [
   "0070-project-channels",
   "0071-team-project-channels",
   "0072-channel-turns",
+  "0073-channel-workspaces",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -103,6 +104,8 @@ const LATER_COLUMNS = [
   "output_limit",
   "edit_revision",
   "dropped_seq",
+  "mcp_folders",
+  "swept",
   "once",
   "once_fired_at",
   "once_run_session_id",
@@ -759,7 +762,11 @@ describe("the schema", () => {
       expect(migrate(db)).toEqual(expectedFrom("0020-mcp-kept"));
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
-        db.query("select mcp_folders from sessions where id = 'sess'").get(),
+        db
+          .query(
+            "select mcp_folders from session_workspaces where workspace_id = 'sess'",
+          )
+          .get(),
       ).toEqual({ mcp_folders: 0 });
       db.exec(`
         insert into mcp_kept_files
@@ -2970,7 +2977,9 @@ describe("the schema", () => {
               parent_message_id: __________,
               child: ___________,
               dropped_seq: ____________,
-              output_limit: _____________,
+              mcp_folders: _____________,
+              swept: ______________,
+              output_limit: _______________,
               ...rest
             }) => rest,
           ),
@@ -4076,6 +4085,7 @@ describe("project channel migrations", () => {
       "0070-project-channels",
       "0071-team-project-channels",
       "0072-channel-turns",
+      "0073-channel-workspaces",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4195,5 +4205,139 @@ describe("project channel migrations", () => {
     );
     expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     db.close();
+  });
+
+  describe("0073 channel workspaces", () => {
+    test("copies existing workspace rows and permits owned channel children", () => {
+      const before = MIGRATIONS.slice(0, -1);
+      const db = new Database(":memory:");
+      db.exec("pragma foreign_keys = on");
+      migrate(db, before);
+      try {
+        db.exec(`
+        insert into users
+          (id, username, full_name, email, role, password_hash, created_at)
+          values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('p', 'personal', 'personal', 'u', 0);
+        insert into providers (id, name, wire, base_url, created_at)
+          values ('pr', 'prov', 'openai-compatible', 'http://x', 0);
+        insert into agents
+          (id, name, provider_id, model, model_name, created_at)
+          values ('a', 'agent', 'pr', 'm', 'M', 0);
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+          values ('sess', 'p', 'u', 'a', 'chat', 'chat', 'done', 0, 0);
+        insert into sends
+          (id, session_id, kind, user_id, agent_id, provider_id,
+           provider_name, model, status, first_message_id, started_at,
+           finished_at)
+          values ('send1', 'sess', 'chat', 'u', 'a', 'pr', 'prov', 'm',
+            'done', 'm1', 0, 1);
+        insert into messages
+          (id, session_id, seq, kind, send_id, round, user_id, content,
+           status, created_at, finished_at)
+          values ('m1', 'sess', 1, 'user', 'send1', 1, 'u', 'q', 'done',
+            0, 0);
+        insert into messages
+          (id, session_id, seq, kind, send_id, round, slot, agent_id, model,
+           content, status, created_at, finished_at)
+          values ('m2', 'sess', 2, 'reply', 'send1', 1, 'answer', 'a', 'm',
+            'ans', 'done', 0, 1);
+      `);
+        db.exec(`
+        update sessions set mcp_folders = 7 where id = 'sess';
+        insert into session_scratch
+          (session_id, cwd, revision, bytes, files, used_at)
+          values ('sess', '/tmp/work', 3, 4, 1, 9);
+        insert into session_scratch_files
+          (session_id, path, data, mode)
+          values ('sess', 'a', x'010203', 420);
+        insert into mcp_kept_files
+          (message_id, position, session_id, folder, dir, name, bytes, text,
+           data)
+          values ('m2', 0, 'sess', 7, '0007-read', 'result.txt', 1, 'x',
+            null);
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('team', 'team', 'workspace-team', 'u', 0);
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+          values ('channel', 'team', null, null, 'channel', 'workspace-team',
+            'done', 0, 0);
+        insert into sends
+          (id, session_id, kind, user_id, agent_id, provider_id,
+           provider_name, model, status, first_message_id, started_at,
+           finished_at)
+          values ('post', 'channel', 'post', 'u', null, null, null, null,
+            'done', 'post-message', 0, 0);
+        insert into messages
+          (id, session_id, seq, kind, send_id, round, user_id, content,
+           status, created_at, finished_at)
+          values ('post-message', 'channel', 1, 'user', 'post', 1, 'u',
+            'ask', 'done', 0, 0);
+      `);
+        expect(migrate(db)).toEqual(["0073-channel-workspaces"]);
+        expect(db.query("select * from session_scratch").get()).toEqual({
+          workspace_id: "sess",
+          session_id: "sess",
+          cwd: "/tmp/work",
+          revision: 3,
+          bytes: 4,
+          files: 1,
+          used_at: 9,
+        });
+        expect(db.query("select * from session_scratch_files").get()).toEqual({
+          workspace_id: "sess",
+          path: "a",
+          data: new Uint8Array([1, 2, 3]),
+          mode: 420,
+        });
+        expect(
+          db
+            .query(
+              "select workspace_id, session_id, mcp_folders from session_workspaces where workspace_id = 'sess'",
+            )
+            .get(),
+        ).toEqual({ workspace_id: "sess", session_id: "sess", mcp_folders: 7 });
+        expect(
+          db
+            .query(
+              "select workspace_id from mcp_kept_files where message_id = 'm2'",
+            )
+            .get(),
+        ).toEqual({ workspace_id: "sess" });
+        expect(
+          db.query("select swept from sends where id = 'send1'").get(),
+        ).toEqual({
+          swept: 0,
+        });
+        expect(
+          db
+            .query(
+              "select name from pragma_table_info('sessions') where name = 'mcp_folders'",
+            )
+            .get(),
+        ).toBeNull();
+        db.exec(`
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at, parent_session_id, parent_message_id)
+          values ('child', 'team', 'u', 'a', 'channel', 'task', 'done', 0, 0,
+            'channel', 'post-message');
+      `);
+        expect(
+          db
+            .query(
+              "select owner_id, agent_id, origin from sessions where id = 'child'",
+            )
+            .get(),
+        ).toEqual({ owner_id: "u", agent_id: "a", origin: "channel" });
+        expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      } finally {
+        db.close();
+      }
+    });
   });
 });

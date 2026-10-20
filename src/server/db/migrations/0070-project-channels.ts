@@ -11,6 +11,10 @@ export const m0070: Migration = {
   rebuilds: ["sessions", "sends"],
   up(db) {
     db.exec(`
+      create temp table workspace_counts as
+        select id as workspace_id, id as session_id, mcp_folders
+        from sessions where mcp_folders > 0;
+
       create table sessions_new (
         id text primary key,
         project_id text not null references projects(id) on delete cascade,
@@ -30,7 +34,6 @@ export const m0070: Migration = {
         forked_from_session_id text,
         forked_from_message_id text,
         disabled_capabilities text not null default '[]',
-        mcp_folders integer not null default 0,
         archived_at integer,
         archived_by text references users(id) on delete set null,
         archived_reason text
@@ -59,13 +62,13 @@ export const m0070: Migration = {
         (id, project_id, owner_id, agent_id, origin, automation_id, title,
          status, revision, created_at, last_activity_at, run_source,
          forked_from_session_id, forked_from_message_id,
-         disabled_capabilities, mcp_folders, archived_at, archived_by,
+         disabled_capabilities, archived_at, archived_by,
          archived_reason, attention, attention_by, attention_reason,
          attention_source, parent_session_id, parent_message_id)
       select id, project_id, owner_id, agent_id, origin, automation_id, title,
         status, revision, created_at, last_activity_at, run_source,
         forked_from_session_id, forked_from_message_id,
-        disabled_capabilities, mcp_folders, archived_at, archived_by,
+        disabled_capabilities, archived_at, archived_by,
         archived_reason, attention, attention_by, attention_reason,
         attention_source, parent_session_id, parent_message_id
       from sessions;
@@ -107,6 +110,18 @@ export const m0070: Migration = {
         on sessions(project_id, last_activity_at desc, id);
       create unique index sessions_channel on sessions(project_id)
         where origin = 'channel' and parent_session_id is null;
+
+      create table session_workspaces (
+        workspace_id text primary key,
+        session_id text not null references sessions(id) on delete cascade,
+        mcp_folders integer not null default 0
+      );
+      create index session_workspaces_session
+        on session_workspaces(session_id);
+      insert into session_workspaces
+        (workspace_id, session_id, mcp_folders)
+      select workspace_id, session_id, mcp_folders from workspace_counts;
+      drop table workspace_counts;
 
       create table sends_new (
         id text primary key,

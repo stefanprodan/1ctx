@@ -4,6 +4,7 @@
 import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
+import { type Workspace, workspaceOf } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
@@ -106,7 +107,7 @@ export function prepareSend(fields: {
   probe?: boolean;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   startKept(
-    sessionId: string,
+    workspace: Workspace,
     afterSeq: number | null,
   ): {
     next: number;
@@ -117,7 +118,7 @@ export function prepareSend(fields: {
   };
   title: string;
   kind: Exclude<SendKind, "post">;
-  origin: Exclude<SessionOrigin, "channel">;
+  origin: SessionOrigin;
   automationId: string | null;
   now: number;
 }): PreparedRun {
@@ -137,12 +138,19 @@ export function prepareSend(fields: {
   }
   const sendId = newId();
   const replyId = newId();
+  const workspace = workspaceOf(
+    fields.sessionId,
+    fields.origin,
+    fields.policy.agentId,
+  );
   const send = newSend({
     id: sendId,
     sessionId: fields.sessionId,
+    workspace,
     projectId: fields.policy.projectId,
     startedBy: fields.startedBy,
     kind: fields.kind,
+    origin: fields.origin,
     op: fields.op,
     policy: fields.policy,
     firstMessageId: firstMessageId(turn),
@@ -165,7 +173,7 @@ export function prepareSend(fields: {
       if (bash) {
         // a regenerate's kept files go with the rows it replaces
         const kept = fields.startKept(
-          fields.sessionId,
+          workspace,
           "existing" in turn ? turn.existing.at(-1)!.seq : null,
         );
         let next = kept.next;

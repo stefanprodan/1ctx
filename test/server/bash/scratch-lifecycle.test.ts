@@ -52,7 +52,7 @@ function rows(db: Db, sessionId: string) {
     .query<{ scratches: number; files: number }, [string, string]>(
       `select
          (select count(*) from session_scratch where session_id = ?) as scratches,
-         (select count(*) from session_scratch_files where session_id = ?) as files`,
+         (select count(*) from session_scratch_files where workspace_id = ?) as files`,
     )
     .get(sessionId, sessionId);
 }

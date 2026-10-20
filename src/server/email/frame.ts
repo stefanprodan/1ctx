@@ -22,7 +22,7 @@ export const SUBJECT_TAG = "[1ctx] ";
 // where a session opens in the app, as the client's chatHref and
 // runHref build it
 export const sessionPath = (
-  origin: "chat" | "automation",
+  origin: "chat" | "automation" | "channel",
   sessionId: string,
 ): string =>
   `/${origin === "automation" ? "run" : "chat"}/${encodeURIComponent(sessionId)}`;
@@ -72,7 +72,7 @@ export function withLink(framed: Framed, link: string): EmailContent {
 export type AgentEmail = {
   agent: string;
   project: { name: string; kind: "personal" | "team" };
-  origin: "chat" | "automation";
+  origin: "chat" | "automation" | "channel";
   sessionId: string;
   subject: string;
   body: string;

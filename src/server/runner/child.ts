@@ -153,12 +153,12 @@ function startChild(
   const parent = link.parent;
   const root = deps.sessions.byId(parent.sessionId);
   if (root === null) throw new Error("the chat is gone");
-  if (root.ownerId === null || root.origin === "channel") {
-    throw new Error("a channel cannot start a subagent yet");
+  if (root.ownerId === null && root.origin !== "channel") {
+    throw new Error("the chat has no owner");
   }
   if (parent.kind === "post") throw new Error("a post cannot run a subagent");
   const parentKind = parent.kind;
-  const ownerId = root.ownerId;
+  const ownerId = root.origin === "channel" ? policy.userId : root.ownerId!;
   const origin = root.origin;
   const sessionId = newId();
   const sendId = newId();
@@ -214,6 +214,7 @@ function startChild(
     projectId: parent.projectId,
     startedBy: parent.startedBy,
     kind: parent.kind,
+    origin,
     op: parent.op,
     policy,
     firstMessageId: taskId,
@@ -240,11 +241,11 @@ function startChild(
 function setUp(
   deps: ChildDeps,
   send: ActiveSend,
-  parentId: string,
+  parent: ActiveSend,
 ): Baseline | null {
   if (!offers(send.policy.offered, "bash")) return null;
   try {
-    const kept = deps.bash.startKept(send.sessionId, null);
+    const kept = deps.bash.startKept(send.workspace, null);
     let next = kept.next;
     send.keep = {
       take: () => next++,
@@ -253,10 +254,10 @@ function setUp(
       maxFiles: kept.maxFiles,
       files: kept.files,
     };
-    return deps.bash.copyScratch(parentId, send.sessionId);
+    return deps.bash.copyScratch(parent.workspace, send.workspace);
   } catch (error) {
     deps.log.warn("child setup failed", {
-      chat: parentId,
+      chat: parent.sessionId,
       child: send.sessionId,
       ...errorFields(error),
     });
@@ -344,7 +345,7 @@ async function runChild(
       : after(deps.clock, left, () => void claim(send, "deadline"));
   try {
     try {
-      baseline = setUp(deps, send, parent.sessionId);
+      baseline = setUp(deps, send, parent);
       const end = await toolLoop(deps.loop, send);
       claim(send, end.cause, end.error);
     } catch (error) {
@@ -412,8 +413,8 @@ async function returned(
   }
   try {
     return await deps.bash.returnScratch(
-      send.sessionId,
-      link.parent.sessionId,
+      send.workspace,
+      link.parent.workspace,
       link.parent.children.folders,
       baseline,
     );
@@ -431,7 +432,7 @@ async function returned(
 // a child is never continued, so its copy of the parent's /tmp goes
 function drop(deps: ChildDeps, send: ActiveSend, link: ChildLink): void {
   try {
-    deps.bash.dropScratch(send.sessionId);
+    deps.bash.dropScratch(send.workspace);
   } catch (error) {
     deps.log.warn("child scratch not dropped", {
       chat: link.parent.sessionId,

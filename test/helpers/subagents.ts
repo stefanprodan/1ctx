@@ -94,7 +94,7 @@ export const scratchLeft = (chat: ChatApp, sessionId: string) =>
   chat.app.db
     .query<{ n: number }, [string, string]>(
       `select (select count(*) from session_scratch where session_id = ?)
-         + (select count(*) from session_scratch_files where session_id = ?)
+         + (select count(*) from session_scratch_files where workspace_id = ?)
          as n`,
     )
     .get(sessionId, sessionId)!.n;

@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bashArea } from "../../../src/server/bash/index.ts";
+import { bashArea, type WorkspaceKey } from "../../../src/server/bash/index.ts";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import type { ScratchChanges } from "../../../src/server/bash/scratch.ts";
 import { transact } from "../../../src/server/db/index.ts";
@@ -56,10 +56,11 @@ export const run = (
   caps: CommandCaps = callCaps,
   signal = freshSignal(),
   sessionId = s.session.id,
+  workspace: WorkspaceKey = { id: sessionId, sessionId },
 ) =>
   s.bash.run(
     s.projectId,
-    sessionId,
+    workspace,
     { ...s.agent, sessionId },
     command,
     caps,

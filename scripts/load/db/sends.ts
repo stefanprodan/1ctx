@@ -214,7 +214,15 @@ export function writeTurn(
       if (v.kept !== null) {
         ctx.folders++;
         const dir = `${String(ctx.folders).padStart(4, "0")}-${c.tool.name.split("__").at(-1)}`;
-        b.q.kept.run(mid, ctx.id, ctx.folders, dir, v.kept.length, v.kept);
+        b.q.kept.run(
+          mid,
+          ctx.id,
+          ctx.folders,
+          dir,
+          v.kept.length,
+          v.kept,
+          ctx.id,
+        );
         b.bump("mcp_kept_files");
       }
       added += Math.ceil(v.bytes / 4);

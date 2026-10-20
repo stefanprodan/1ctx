@@ -225,6 +225,7 @@ const SEND_COLUMNS = [
   "memory_error",
   "memory_skipped",
   "summoned",
+  "swept",
   "started_at",
   "finished_at",
 ] as const satisfies readonly Exclude<keyof RawSend, "tokens">[];

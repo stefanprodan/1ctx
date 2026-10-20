@@ -319,7 +319,6 @@ describe("POST /api/sessions/:id/fork", () => {
         revision: 0,
         created_at: chat.app.now.value,
         last_activity_at: chat.app.now.value,
-        mcp_folders: 0,
         archived_at: null,
         archived_by: null,
         archived_reason: null,

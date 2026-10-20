@@ -122,7 +122,9 @@ const text = (args: Record<string, unknown>, key: string) =>
 export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
   const args = toolArguments(call.arguments);
   if (args === null) {
-    return call.name === "memory_edit" ? "" : oneLine(call.arguments);
+    return call.name === "memory_edit" || call.name === "delegate"
+      ? ""
+      : oneLine(call.arguments);
   }
   switch (call.name) {
     case "bash":
@@ -137,6 +139,8 @@ export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
       return oneLine(text(args, "query"));
     case "webfetch":
       return oneLine(text(args, "url"));
+    case "delegate":
+      return oneLine(text(args, "description"));
     case "skill":
     case "skill_file":
       return oneLine(text(args, "name"));

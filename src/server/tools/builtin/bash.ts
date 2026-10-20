@@ -12,6 +12,7 @@ import {
   type CommandCredential,
   type Refusal,
   scrubKeys,
+  sessionWorkspace,
 } from "../../bash/index.ts";
 import { headerValue, type KeyRead } from "../../credentials/index.ts";
 import type { OfferedCredential, Tool, ToolResult } from "../types.ts";
@@ -239,7 +240,7 @@ export function makeBashTool({
           : commandCredentials(credentials, keys, actor.projectId);
       const result = await bash.run(
         actor.projectId,
-        actor.sessionId,
+        actor.workspace ?? sessionWorkspace(actor.sessionId),
         {
           kind: "agent",
           id: actor.agentId,

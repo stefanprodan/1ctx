@@ -12,7 +12,7 @@ import type {
   SessionSummary,
 } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
-import type { SendKind } from "../../shared/words.ts";
+import type { SendKind, SessionOrigin } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
@@ -62,7 +62,7 @@ export type StartFields = {
   replyId: string;
   sessionId: string;
   session: SessionRow | null;
-  origin?: "chat" | "automation";
+  origin?: SessionOrigin;
   automationId?: string | null;
   kind?: Exclude<SendKind, "post">;
   turn:

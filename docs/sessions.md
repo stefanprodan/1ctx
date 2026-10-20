@@ -110,6 +110,11 @@ arrives.
   channel context builder is separate work.
 - **A channel is permanent within its project.** It cannot be forked, renamed,
   archived, deleted, regenerated, compacted or stopped through chat routes.
+- **A channel agent keeps its own workspace.** Its `/tmp`, cwd, `/mcp`
+  mount, folder counter and command queue use the channel and agent key
+  across that agent's turns. `/knowledge` and `/repos` remain the
+  project's, and `/uploads` remains the channel session's for every
+  agent.
 
 - **A turn may open with 1 to `MAX_TURN_MESSAGES` user messages.**
   `runner.sendTurn()` (`runner/turn.ts`) writes each as its own
@@ -256,7 +261,8 @@ arrives.
   and neither send is summoned, or both are summoned sends of the same
   agent.
 - **The trace never leaks a tool's content.** `memory_edit` shows
-  only `action=` and `topic=`. A saving bash call always keeps a
+  only `action=` and `topic=`; `delegate` shows its one-line
+  `description`, never the raw task. A saving bash call always keeps a
   ` saved` mark however it is cut. A tool the reader is not offered
   ends ` (not your tool)`; every builtin counts as the reader's, since
   the chat's switches hold for every agent.

@@ -12,6 +12,7 @@ import type {
   EventSource,
   SendCause,
   SendKind,
+  SessionOrigin,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { OpenedRecord } from "../bash/index.ts";
@@ -50,7 +51,7 @@ export type SessionsPort = {
     projectId: string;
     ownerId: string;
     agentId: string;
-    origin?: "chat" | "automation";
+    origin?: SessionOrigin;
     automationId?: string | null;
     runSource?: EventSource | null;
     disabledCapabilities?: readonly string[];

@@ -1,28 +1,31 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// One command per chat at a time, across all area instances, so parallel
-// calls of a round never mount the same scratch revision. The held set,
-// the chats holding or waiting for a command, keeps the sweep off their
-// scratch.
+// One command per workspace at a time. A chat or run has its session's
+// workspace; each channel agent has a separate one. The held set keeps the
+// idle sweep off workspaces with a running or queued command.
 
 import { Queue } from "../lib/queue.ts";
+import { type WorkspaceKey, workspaceId } from "./workspace.ts";
 
-const sessions = new Map<string, Queue>();
+const workspaces = new Map<string, Queue>();
 
-export function heldSessions(): ReadonlySet<string> {
-  return new Set(sessions.keys());
+export function heldWorkspaces(): ReadonlySet<string> {
+  return new Set(workspaces.keys());
 }
 
+export const heldSessions = heldWorkspaces;
+
 export async function acquireSession(
-  sessionId: string,
+  workspace: WorkspaceKey,
   signal: AbortSignal,
 ): Promise<() => void> {
   signal.throwIfAborted();
-  let queue = sessions.get(sessionId);
+  const id = workspaceId(workspace);
+  let queue = workspaces.get(id);
   if (queue === undefined) {
     queue = new Queue(1);
-    sessions.set(sessionId, queue);
+    workspaces.set(id, queue);
   }
   const release = await queue.acquire(signal);
   let released = false;
@@ -30,6 +33,6 @@ export async function acquireSession(
     if (released) return;
     released = true;
     release();
-    if (queue.active === 0) sessions.delete(sessionId);
+    if (queue.active === 0) workspaces.delete(id);
   };
 }

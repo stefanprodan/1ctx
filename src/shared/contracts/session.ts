@@ -245,6 +245,8 @@ export type SendSummary = {
   summoned: boolean;
   // prompt plus completion tokens over every round the provider counted
   tokens: number;
+  // its tool rows were aged to their trace-only form
+  swept?: true;
   startedAt: number;
   finishedAt: number | null;
 };

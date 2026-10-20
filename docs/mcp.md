@@ -125,3 +125,7 @@ reach the model in the sends of agents linked to it.
   chat's `mcpKeptBytes` or `mcpKeptFiles`, this send's files counted,
   and the result says so.
 - **A kept name is server text.** It never reaches a log field.
+- **Kept mounts are per workspace.** A channel agent sees only files
+  kept by its own turns. Chats and runs retain their existing
+  session-wide mount. Trimming and folder numbering use that same key;
+  packing still walks sessions after they end.

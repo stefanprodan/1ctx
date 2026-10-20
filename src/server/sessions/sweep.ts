@@ -33,6 +33,7 @@ export type SweepDeps = {
 
 // the fields of the sweep event, snake case like the startup event's
 export type ChatSweep = {
+  turns_swept: number;
   chats_archived: number;
   chats_packed: number;
   scratch_freed: number;
@@ -92,6 +93,59 @@ function steps(deps: SweepDeps): Step[] {
       field: "drafts_expired",
       candidates: (now, _caps, limit) => deps.drafts?.expired(now, limit) ?? [],
       apply: (id, now) => (deps.drafts?.expire(id, now) ? [] : null),
+    },
+    {
+      field: "turns_swept",
+      candidates: (now, caps, limit) =>
+        db
+          .query<{ id: string }, [number, number]>(
+            `select sends.id from sessions indexed by sessions_channel
+             cross join sends indexed by sends_channel_unswept
+               on sends.session_id = sessions.id
+             where sessions.origin = 'channel'
+               and sessions.parent_session_id is null
+               and sends.swept = 0 and sends.child = 0
+               and sends.kind <> 'post' and sends.status <> 'running'
+               and sends.finished_at < ?
+             order by sends.finished_at, sends.id limit ?`,
+          )
+          .all(idleBefore(now, caps), limit)
+          .map((row) => row.id),
+      apply(id, now, caps) {
+        const current = db
+          .query<
+            { session_id: string; status: string; finished_at: number | null },
+            [string, number]
+          >(
+            `select sends.session_id, sends.status, sends.finished_at
+             from sends join sessions on sessions.id = sends.session_id
+             where sends.id = ? and sends.swept = 0 and sends.child = 0
+               and sends.kind <> 'post' and sends.status <> 'running'
+               and sends.finished_at < ? and sessions.origin = 'channel'`,
+          )
+          .get(id, idleBefore(now, caps));
+        if (current === null) return null;
+        db.query(
+          `update messages set content = '', reasoning = '',
+             reasoning_details = null, packed = null, packed_bytes = null
+           where send_id = ? and kind = 'tool'`,
+        ).run(id);
+        db.query(
+          `delete from mcp_kept_files where message_id in
+             (select id from messages where send_id = ? and kind = 'tool')`,
+        ).run(id);
+        db.query(
+          `delete from sessions where parent_message_id in
+             (select id from messages where send_id = ? and kind = 'tool')`,
+        ).run(id);
+        const marked = db
+          .query(
+            `update sends set swept = 1
+             where id = ? and swept = 0 and status <> 'running'`,
+          )
+          .run(id).changes;
+        return marked === 1 ? [] : null;
+      },
     },
     {
       field: "chats_archived",
@@ -229,6 +283,7 @@ export function sweepChats(
   perStep = CHATS_PER_STEP,
 ): ChatSweep {
   const counts: ChatSweep = {
+    turns_swept: 0,
     chats_archived: 0,
     chats_packed: 0,
     scratch_freed: 0,

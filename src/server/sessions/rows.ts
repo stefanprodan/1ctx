@@ -31,7 +31,7 @@ export type CreateSession = {
   projectId: string;
   ownerId: string;
   agentId: string;
-  origin?: "chat" | "automation";
+  origin?: SessionOrigin;
   automationId?: string | null;
   runSource?: EventSource | null;
   forkedFromSessionId?: string | null;
@@ -72,7 +72,6 @@ export type RawSession = {
   revision: number;
   created_at: number;
   last_activity_at: number;
-  mcp_folders: number;
   archived_at: number | null;
   archived_reason: ArchiveReason | null;
   archived_by: string | null;
@@ -283,6 +282,7 @@ export type RawSend = {
   memory_error: string | null;
   memory_skipped: number | null;
   summoned: number;
+  swept: number;
   tokens: number;
   started_at: number;
   finished_at: number | null;
@@ -314,6 +314,7 @@ export const send = (raw: RawSend): SendSummary => ({
   memoryError: raw.memory_error,
   memorySkipped: raw.memory_skipped,
   summoned: raw.summoned === 1,
+  ...(raw.swept === 1 ? { swept: true as const } : {}),
   tokens: raw.tokens,
   startedAt: raw.started_at,
   finishedAt: raw.finished_at,

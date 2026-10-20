@@ -44,7 +44,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "upload_staged",
     "upload_staged_files",
   ],
-  scratch: ["session_scratch", "session_scratch_files"],
+  scratch: ["session_scratch", "session_scratch_files", "session_workspaces"],
   mcp: ["mcp_kept_files", "mcp_digests"],
   usage: ["usage", "decision_usage"],
   skills: ["skills", "skill_files", "agent_skills"],
@@ -209,7 +209,7 @@ const add = (parts: Parts, part: StoredPart, bytes: number) => {
 
 // what the session's rows hold, under the part its origin gives
 function sessionParts(session: SessionSum, into: Parts = {}): Parts {
-  const own = session.origin === "chat" ? "chats" : "runs";
+  const own = session.origin === "automation" ? "runs" : "chats";
   add(into, own, session.messageBytes + session.openedBytes);
   add(into, "uploads", session.uploadBytes);
   add(into, "scratch", session.scratchBytes);
@@ -257,7 +257,7 @@ function largest(result: ScanResult): StorageResponse["largest"] {
   const runs = new Map<string, { parts: Parts; count: number }>();
   for (const session of result.sessions) {
     sessionParts(session, partsFor(session.projectId));
-    if (session.origin === "chat") {
+    if (session.origin !== "automation") {
       const parts = sessionParts(session);
       chats.push({
         ...naming(

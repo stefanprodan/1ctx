@@ -35,7 +35,7 @@ export type PageRow = {
 export type SessionSum = {
   id: string;
   projectId: string;
-  origin: "chat" | "automation";
+  origin: "chat" | "automation" | "channel";
   automationId: string | null;
   // archived chats go with the chats sweep
   archived: boolean;
@@ -201,7 +201,8 @@ function sessions(db: Db): SessionSum[] {
   );
   const scratch = sums(
     db,
-    "select session_id as id, bytes from session_scratch",
+    `select session_id as id, sum(bytes) as bytes
+     from session_scratch group by session_id`,
   );
   const mcp = sums(
     db,
@@ -213,7 +214,7 @@ function sessions(db: Db): SessionSum[] {
       {
         id: string;
         projectId: string;
-        origin: "chat" | "automation";
+        origin: "chat" | "automation" | "channel";
         automationId: string | null;
         archived: number;
         title: string;

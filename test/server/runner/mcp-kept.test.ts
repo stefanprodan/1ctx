@@ -137,7 +137,8 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
   expect(
     chat.app.db
       .query<{ mcp_folders: number }, [string]>(
-        "select mcp_folders from sessions where id = ?",
+        `select mcp_folders from session_workspaces
+         where workspace_id = ?`,
       )
       .get(first.sessionId),
   ).toEqual({ mcp_folders: 1 });

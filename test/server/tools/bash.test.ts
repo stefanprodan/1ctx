@@ -115,7 +115,7 @@ describe("bash", () => {
           async run(projectId, sessionId, author, command, caps, signal) {
             calls++;
             expect(projectId).toBe("project");
-            expect(sessionId).toBe("session");
+            expect(sessionId).toEqual({ id: "session", sessionId: "session" });
             expect(author).toEqual({
               kind: "agent",
               id: "agent",

@@ -47,7 +47,7 @@ describe("bash area", () => {
       });
       expect(
         s.db
-          .query("select * from session_scratch_files where session_id = ?")
+          .query("select * from session_scratch_files where workspace_id = ?")
           .all(s.session.id),
       ).toEqual([]);
       expect(s.sessions.byId(s.session.id)).not.toBeNull();

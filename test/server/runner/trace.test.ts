@@ -81,6 +81,20 @@ describe("the trace", () => {
     expect(summary(done("webfetch", { url: "https://x.io", start: 3 }))).toBe(
       "https://x.io",
     );
+    expect(
+      summary(
+        done("delegate", {
+          description: "check the api",
+          task: "raw task details",
+        }),
+      ),
+    ).toBe("check the api");
+    expect(
+      summary({
+        name: "delegate",
+        arguments: '{"description":"safe","task":"never shown"',
+      }),
+    ).toBe("");
     expect(summary(done("skill_file", { name: "s", path: "a.md" }))).toBe("s");
     expect(summary(done("skill", { name: "flux-ops" }))).toBe("flux-ops");
     expect(summary(done("notes", { path: "/knowledge/a.md", n: 1 }))).toBe(

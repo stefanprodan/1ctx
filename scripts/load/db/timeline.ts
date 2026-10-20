@@ -92,7 +92,6 @@ export function writeTimeline(b: Build, h: History): Timeline {
       plan.created,
       plan.last,
       null,
-      0,
       plan.archivedAt,
       plan.archivedBy,
       plan.archivedReason,
@@ -229,9 +228,7 @@ export function writeTimeline(b: Build, h: History): Timeline {
     const ctx = plan.ctx!;
     const r = rng(hash(plan.turns[0]!.seed, 0x5c));
     if (ctx.folders > 0) {
-      b.db
-        .query("update sessions set mcp_folders = ? where id = ?")
-        .run(ctx.folders, ctx.id);
+      q.workspace.run(ctx.id, ctx.id, ctx.folders);
     }
     if (plan.archivedAt === null) {
       // a live chat: its memory view, and /tmp while it was used this week
@@ -253,6 +250,7 @@ export function writeTimeline(b: Build, h: History): Timeline {
           bytes += size;
         }
         q.scratch.run(
+          ctx.id,
           ctx.id,
           files * 2,
           bytes,
@@ -344,7 +342,6 @@ export function writeTimeline(b: Build, h: History): Timeline {
       at,
       isRunning ? at : end0,
       manual ? "manual" : "schedule",
-      0,
       null,
       null,
       null,

@@ -8,11 +8,12 @@ scratch `/tmp`, kept MCP files under `/mcp`, repositories under
 
 The bash tool runs a command in just-bash, a shell written in
 TypeScript, over a virtual filesystem: `/knowledge` (the project's
-docs), `/uploads` (the chat's attachments), `/tmp` (scratch: the chat's
-own files, kept between commands) and `/mcp` (kept MCP files: tool
-results too large for the context, `docs/mcp.md`) and `/repos` (the
-project's repositories, read-only). `open` is a command
-of that shell that shows a file on the chat page.
+docs), `/uploads` (the session's attachments), `/tmp` (scratch: the
+workspace's own files, kept between commands) and `/mcp` (kept MCP
+files: tool results too large for the context, `docs/mcp.md`) and
+`/repos` (the project's repositories, read-only). A chat or run has one
+workspace; each agent in a channel has its own. `open` is a command of
+that shell that shows a file on the chat page.
 
 ## The area
 
@@ -128,9 +129,10 @@ of that shell that shows a file on the chat page.
 - **A process slot per core holds a mount.** `PROCESS_SLOTS` is the
   cores read at start (a container's CPU limit, floored), at least 4
   (a command waiting on the network holds one idle) and at most 16,
-  logged at `startup`. The per-chat queue
-  (`bash/queue.ts`) is taken before a process slot (`acquireProcess()`,
-  shared with uploads) and released after it.
+  logged at `startup`. The per-workspace queue (`bash/queue.ts`) is
+  taken before a process slot (`acquireProcess()`, shared with uploads)
+  and released after it. Channel agents therefore never wait behind one
+  another's commands.
 - **Written doc paths go on the tool row.** `finishTool` stores them as
   `savedDocs` for another agent's trace (`docs/sessions.md`). A command
   that completed keeps them even when a cut writes its row; one the
@@ -142,12 +144,15 @@ of that shell that shows a file on the chat page.
 
 ## Scratch
 
-- **Scratch is the chat's `/tmp`.** Regular files of any bytes and
-  their modes, cascading with the session. A symlink or other type
-  fails the command.
-- **Sweeps skip a chat holding or waiting for a command.** The idle
-  sweep (`scratchIdleDays`) and archiving drop scratch, except for a
-  chat in the held set of `bash/queue.ts` (a command running or queued).
+- **Scratch is the workspace's `/tmp`.** A chat or run uses its session
+  id as its workspace; a channel uses its session and agent, so each
+  agent keeps separate files, cwd and revision across its turns. Regular
+  files of any bytes and their modes cascade with the session. A symlink
+  or other type fails the command.
+- **Sweeps skip a workspace holding or waiting for a command.** The idle
+  sweep (`scratchIdleDays`) expires each workspace by its own last use.
+  Archiving drops every workspace of the session; neither path takes one
+  held in `bash/queue.ts`.
 - **A scratch name is what a real `/tmp` takes.** `bash/names.ts`: any
   character but NUL, well-formed Unicode, Linux's `NAME_MAX` and
   `PATH_MAX`. The 64-segment cap bounds just-bash's tree walks; keep it.
@@ -184,7 +189,8 @@ of that shell that shows a file on the chat page.
   is `KEPT_PACK_FROM`, and a query-plan test fails if the job stops
   using it.
 - **Folders are never reused.** Each call's folder is
-  `/mcp/<NNNN>-<tool>/`, numbered from `sessions.mcp_folders`.
+  `/mcp/<NNNN>-<tool>/`, numbered by the workspace's counter in
+  `session_workspaces`.
 - **Trimming happens at send start, under the runner's lock.**
   `startKept()` trims the oldest folders to `mcpKeptBytes` and
   `mcpKeptFiles`, so no command loses a file while it reads. It runs in

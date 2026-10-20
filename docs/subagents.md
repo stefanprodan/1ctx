@@ -18,9 +18,12 @@ is its root.
   root and `parent_message_id` the root's tool row; both or neither,
   one child to a row (a unique index), and either delete takes the
   child with every row but its usage. It
-  has the root's project, owner, agent and origin, never an
-  automation (`store.create()` refuses one), so a run's picks and an
-  automation's retention meet roots alone. Its links never change.
+  has the root's project, agent and origin, never an automation
+  (`store.create()` refuses one). It has the root's owner except in a
+  channel, whose root is ownerless: there it has the member who summoned
+  the parent turn. A channel child therefore keeps origin `channel` with
+  a non-null owner and agent. A run's picks and an automation's retention
+  meet roots alone. Its links never change.
 - **A child's send carries `sends.child = 1`, and only a child's.**
   `insertSend()` takes `child: true` and refuses a mark that does not
   match its session, so every reader of turns tests the row it already
@@ -141,8 +144,9 @@ is its root.
 ## The workspace
 
 - **A child's `/tmp`, cwd, `/mcp` and command queue are its own
-  session's.** At its start the parent's mountable scratch is copied
-  in and the child starts in `/tmp` (`bash/handoff.ts`). It mounts
+  session's.** At its start the exact parent workspace is copied in:
+  for a channel this is the summoned agent's workspace, never another
+  agent's. The child starts in `/tmp` (`bash/handoff.ts`). It mounts
   `/knowledge`, `/repos` (the parent's trees) and the parent's
   `/uploads` (`subagent.uploadsFrom` on the call's context).
 - **`/knowledge` and `/uploads` are read-only to a child.** Its worker

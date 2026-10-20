@@ -6,6 +6,8 @@
 // of a zone, and what a personal project never gives away.
 
 import { describe, expect, spyOn, test } from "bun:test";
+import { workspaceOf } from "../../../src/server/bash/index.ts";
+import { transact } from "../../../src/server/db/index.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { SLOT_MS } from "../../../src/server/overview/read.ts";
 import { MESSAGE_BYTES, scan } from "../../../src/server/overview/scan.ts";
@@ -353,6 +355,56 @@ describe("the storage answer", () => {
     );
     expect(body.file.journalMode).toBe("memory");
     expect(body.readAt).toBe(chat.app.now.value);
+  });
+
+  test("sums every channel workspace into the channel", async () => {
+    const chat = await chatApp();
+    try {
+      const project = await createTeam(chat.admin, "workspaces", [
+        chat.memberId,
+      ]);
+      const channel = chat.app.db
+        .query<{ id: string }, [string]>(
+          "select id from sessions where project_id = ? and origin = 'channel'",
+        )
+        .get(project.id)!;
+      const write = (agentId: string, path: string, text: string) => {
+        const workspace = workspaceOf(channel.id, "channel", agentId);
+        transact(chat.app.db, () => {
+          chat.app.bash.scratch.write(
+            workspace,
+            0,
+            {
+              written: [
+                {
+                  path,
+                  data: new TextEncoder().encode(text),
+                  mode: 0o644,
+                },
+              ],
+              removed: [],
+              cwd: "/tmp",
+            },
+            chat.app.now.value,
+          );
+          return { result: undefined };
+        });
+      };
+      write("agent-one", "one", "first");
+      write("agent-two", "two", "second");
+      const result = scan(chat.app.db, {
+        now: chat.app.now.value,
+        since: 0,
+      });
+      expect(
+        result.sessions.find((row) => row.id === channel.id),
+      ).toMatchObject({
+        origin: "channel",
+        scratchBytes: 17,
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
   });
 
   test("sums a chat's messages and names it only in a team project", async () => {
