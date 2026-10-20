@@ -1572,6 +1572,72 @@ describe("a streaming reply drawn once per frame", () => {
   });
 });
 
+describe("a channel post response", () => {
+  test.serial("merges its message into the loaded page", async () => {
+    const old = message({
+      id: "old",
+      seq: 1,
+      kind: "user",
+      sendId: "post-old",
+      slot: null,
+      userId: "u1",
+      agentId: null,
+      content: "old post",
+      finishReason: null,
+      model: null,
+    });
+    const added = message({
+      id: "new",
+      seq: 2,
+      kind: "user",
+      sendId: "post-new",
+      slot: null,
+      userId: "u1",
+      agentId: null,
+      content: "new post",
+      finishReason: null,
+      model: null,
+    });
+    const channel = summary({
+      origin: "channel",
+      ownerId: null,
+      agentId: null,
+    });
+    answer = (url) =>
+      url === "/api/sessions/s1"
+        ? Response.json(
+            detail("s1", {
+              session: channel,
+              messages: [old],
+              page: { before: 1, after: null },
+            }),
+          )
+        : Response.json({
+            session: { ...channel, revision: 2 },
+            messages: [added],
+            send: {
+              ...sent,
+              id: "post-new",
+              kind: "post",
+              agentId: null,
+              providerId: null,
+              model: null,
+              status: "done",
+              firstMessageId: added.id,
+              finishedAt: 20,
+            },
+          });
+    await loadSession("s1");
+    await sendMessage("s1", "new post", []);
+    expect(session.value?.messages.map((row) => row.id)).toEqual([
+      "old",
+      "new",
+    ]);
+    expect(session.value?.page).toEqual({ before: 1, after: null });
+    expect(session.value?.send?.id).toBe("post-new");
+  });
+});
+
 describe("capability flips on a send", () => {
   const bodies: unknown[] = [];
   const take = (status = 200) => {

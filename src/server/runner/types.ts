@@ -4,6 +4,7 @@
 // The runner's ports and the capability it answers.
 
 import type {
+  ChannelPostResponse,
   CreateSessionRequest,
   QueuedResponse,
   RegenerateRequest,
@@ -91,7 +92,7 @@ export type RunnerDeps = {
 };
 
 export type MessageAnswer =
-  | { status: 201; body: SessionDetail }
+  | { status: 201; body: SessionDetail | ChannelPostResponse }
   | { status: 202; body: QueuedResponse };
 
 export type Runner = {

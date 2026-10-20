@@ -26,11 +26,13 @@ export function renameChannel(
 ): SessionRow | null {
   db.query(
     `update sessions set title = ?, revision = revision + 1
-     where project_id = ? and origin = 'channel'`,
+     where project_id = ? and origin = 'channel'
+       and parent_session_id is null`,
   ).run(title, projectId);
   const raw = db
     .query<RawSession, [string]>(
-      "select * from sessions where project_id = ? and origin = 'channel'",
+      `select * from sessions where project_id = ? and origin = 'channel'
+         and parent_session_id is null`,
     )
     .get(projectId);
   return raw ? session(raw, null) : null;

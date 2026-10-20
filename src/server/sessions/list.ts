@@ -167,7 +167,9 @@ export function listSessions(
   const channel = pin
     ? db
         .query<RawSession, [string]>(
-          "select * from sessions indexed by sessions_channel where project_id = ? and origin = 'channel'",
+          `select * from sessions indexed by sessions_channel
+           where project_id = ? and origin = 'channel'
+             and parent_session_id is null`,
         )
         .get(pinProjectId)
     : null;

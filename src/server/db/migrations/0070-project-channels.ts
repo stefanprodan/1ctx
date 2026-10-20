@@ -46,8 +46,14 @@ export const m0070: Migration = {
         dropped_seq integer check (dropped_seq is null or dropped_seq > 0),
         check ((archived_at is null) = (archived_reason is null)),
         check (archived_by is null or archived_reason is 'manual'),
-        check ((origin = 'channel') = (owner_id is null)),
-        check ((origin = 'channel') = (agent_id is null))
+        check (
+          (origin = 'channel' and parent_session_id is null) =
+            (owner_id is null)
+        ),
+        check (
+          (origin = 'channel' and parent_session_id is null) =
+            (agent_id is null)
+        )
       );
       insert into sessions_new
         (id, project_id, owner_id, agent_id, origin, automation_id, title,
@@ -74,7 +80,7 @@ export const m0070: Migration = {
       create index sessions_feed
         on sessions(project_id, origin, (status = 'running') desc,
           last_activity_at desc, id, title)
-        where parent_session_id is null;
+        where origin = 'automation' and parent_session_id is null;
       create index sessions_feed_chats
         on sessions(project_id, (status = 'running') desc,
           last_activity_at desc, id, title)
@@ -100,7 +106,7 @@ export const m0070: Migration = {
       create index sessions_activity
         on sessions(project_id, last_activity_at desc, id);
       create unique index sessions_channel on sessions(project_id)
-        where origin = 'channel';
+        where origin = 'channel' and parent_session_id is null;
 
       create table sends_new (
         id text primary key,

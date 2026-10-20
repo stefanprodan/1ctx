@@ -25,6 +25,7 @@ export function refuseChannel(
     | "archived"
     | "regenerated"
     | "compacted"
+    | "continued"
     | "stopped",
 ): void {
   if (session.origin === "channel") {

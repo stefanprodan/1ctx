@@ -70,12 +70,13 @@ export function channelPage(
   const rows = db
     .query<RawMessage, [string, string]>(
       `select ${MESSAGE_COLUMNS} from messages
-       where messages.session_id = ? and messages.send_id in (
+       where +messages.session_id = ? and messages.send_id in (
          select post.send_id from messages post
           where post.id in (select value from json_each(?2))
          union
          select sends.id from sends
-          where sends.first_message_id in (select value from json_each(?2))
+          where sends.session_id = ?1
+            and sends.first_message_id in (select value from json_each(?2))
        ) order by messages.seq`,
     )
     .all(sessionId, ids)

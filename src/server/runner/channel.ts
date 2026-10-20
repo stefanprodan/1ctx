@@ -1,25 +1,26 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { SendMessageRequest } from "../../shared/api/sessions.ts";
-import type { SessionDetail } from "../../shared/contracts/session.ts";
+import type {
+  ChannelPostResponse,
+  SendMessageRequest,
+} from "../../shared/api/sessions.ts";
 import { transact } from "../db/index.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
-import { envelope, type SessionRow, sessionDetail } from "../sessions/index.ts";
-import type { UserRow } from "../users/index.ts";
+import { envelope, type SessionRow } from "../sessions/index.ts";
+import { requiredUser } from "./authors.ts";
 import { lastLine } from "./envelope.ts";
 import { channelFirstWord } from "./summon.ts";
-import type { RunnerDeps } from "./types.ts";
+import type { MessageAnswer, RunnerDeps } from "./types.ts";
 
-export function postChannel(
+function postChannel(
   deps: RunnerDeps,
-  principal: Principal,
   channel: SessionRow,
   fields: SendMessageRequest,
-  user: UserRow,
-): SessionDetail {
+  userId: string,
+): ChannelPostResponse {
   if (fields.capabilities !== undefined) {
     throw new BadRequest("a channel has no capability switches");
   }
@@ -32,6 +33,7 @@ export function postChannel(
   ) {
     throw new Conflict("summons in a channel are not built yet");
   }
+  const user = requiredUser(deps.users, userId);
   const now = deps.clock();
   const messageId = newId();
   const sendId = newId();
@@ -61,21 +63,32 @@ export function postChannel(
       uploads,
       now,
     });
-    const touched = deps.sessions.touch(current.id, {
-      status: "done",
-      now,
-    })!;
+    deps.db
+      .query(
+        "update sessions set last_activity_at = ?, revision = revision + 1 where id = ?",
+      )
+      .run(now, current.id);
+    const touched = deps.sessions.byId(current.id)!;
     return {
-      result: sessionDetail(
-        deps.sessions,
-        touched,
-        null,
-        deps.limits.current().archivedDeleteDays,
-        principal.userId,
-      ),
+      result: { session: touched, messages: [posted], send },
       events: [
         envelope(touched, [posted], send, [], lastLine(posted, user.username)),
       ],
     };
   });
+}
+
+export function channelMessage(
+  deps: RunnerDeps,
+  principal: Principal,
+  sessionId: string,
+  fields: SendMessageRequest,
+  otherwise: () => MessageAnswer,
+): MessageAnswer {
+  const session = deps.visible(principal, sessionId);
+  if (session.origin !== "channel") return otherwise();
+  return {
+    status: 201,
+    body: postChannel(deps, session, fields, principal.userId),
+  };
 }

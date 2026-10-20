@@ -10,6 +10,7 @@ import type { AutomationAlert } from "../contracts/automation.ts";
 import type {
   ChildWork,
   LastLine,
+  Message,
   OpenedFile,
   QueuedMessage,
   SendSummary,
@@ -65,6 +66,14 @@ export type EnvelopeRow = Omit<FeedRow, "session" | "runs">;
 
 // GET /api/sessions/:id, and the answer of POST /api/sessions
 export type SessionResponse = SessionDetail;
+
+// The answer of a channel post is only the durable rows it added. The
+// client merges it as it does the socket envelope instead of replacing a page.
+export type ChannelPostResponse = {
+  session: SessionSummary;
+  messages: Message[];
+  send: SendSummary;
+};
 
 // GET /api/sessions/:id/messages/:messageId/result
 export type ToolResultResponse = {

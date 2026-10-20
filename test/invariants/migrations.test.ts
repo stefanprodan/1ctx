@@ -1763,6 +1763,7 @@ describe("the schema", () => {
         .all()
         .map((row) => row.name);
       expect(partial).toEqual([
+        "sessions_channel",
         "sessions_feed",
         "sessions_feed_chats",
         "sessions_feed_unowned",
@@ -4029,6 +4030,34 @@ describe("project channel migrations", () => {
          started_at, finished_at)
        values ('post70', ?, 'post', 'u70', 'post-message', 'done', 5, 5)`,
     ).run(channel.id);
+    db.query(
+      `insert into messages
+        (id, session_id, seq, kind, send_id, round, user_id, content,
+         status, created_at, finished_at)
+       values ('post-message', ?, 1, 'user', 'post70', 1, 'u70', 'ask',
+         'done', 5, 5)`,
+    ).run(channel.id);
+    db.query(
+      `insert into sessions
+        (id, project_id, owner_id, agent_id, origin, title, status,
+         created_at, last_activity_at, parent_session_id, parent_message_id)
+       values ('child70', 'team70', 'u70', 'agent70', 'channel', 'child',
+         'done', 5, 5, ?, 'post-message')`,
+    ).run(channel.id);
+    expect(
+      db
+        .query(
+          `select owner_id, agent_id, origin, parent_session_id,
+             parent_message_id from sessions where id = 'child70'`,
+        )
+        .get(),
+    ).toEqual({
+      owner_id: "u70",
+      agent_id: "agent70",
+      origin: "channel",
+      parent_session_id: channel.id,
+      parent_message_id: "post-message",
+    });
     expect(
       db
         .query(
@@ -4071,6 +4100,18 @@ describe("project channel migrations", () => {
         )
         .run(channel.id),
     ).toThrow(/CHECK/);
+    const indexSql = (name: string) =>
+      db
+        .query<{ sql: string }, [string]>(
+          "select sql from sqlite_schema where type = 'index' and name = ?",
+        )
+        .get(name)!.sql;
+    expect(indexSql("sessions_channel")).toContain(
+      "where origin = 'channel' and parent_session_id is null",
+    );
+    expect(indexSql("sessions_feed")).toContain(
+      "where origin = 'automation' and parent_session_id is null",
+    );
     expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     db.close();
   });

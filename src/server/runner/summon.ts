@@ -56,7 +56,9 @@ export function channelFirstWord(
   projectId: string,
   deps: {
     agents: Pick<SummonAgents, "byName">;
-    users: { byUsername(name: string): { id: string } | null };
+    users: {
+      byUsername(name: string): { id: string; role: "admin" | "member" } | null;
+    };
     projects: { isMember(projectId: string, userId: string): boolean };
   },
 ): "post" | "summon" {
@@ -65,7 +67,10 @@ export function channelFirstWord(
   if (word === null || name === null) return "post";
   if (deps.agents.byName(name) !== null) return "summon";
   const user = deps.users.byUsername(name);
-  if (user !== null && deps.projects.isMember(projectId, user.id)) {
+  if (
+    user !== null &&
+    (user.role === "admin" || deps.projects.isMember(projectId, user.id))
+  ) {
     return "post";
   }
   throw new BadRequest(noAgentNamed(word));

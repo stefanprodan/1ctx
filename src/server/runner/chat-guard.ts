@@ -23,7 +23,7 @@ export function chatFor(
   refuseChannel(
     session,
     verb === "continue"
-      ? "stopped"
+      ? "continued"
       : verb === "regenerate"
         ? "regenerated"
         : "compacted",

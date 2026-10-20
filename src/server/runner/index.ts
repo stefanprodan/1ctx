@@ -26,7 +26,7 @@ import {
   requiredAgent,
   requiredUser,
 } from "./authors.ts";
-import { postChannel } from "./channel.ts";
+import { channelMessage } from "./channel.ts";
 import { chatFor } from "./chat-guard.ts";
 import { childRowsTo, delegate } from "./child.ts";
 import { compactSend } from "./compact.ts";
@@ -60,6 +60,7 @@ export type { DrainResult, ShutdownResult } from "./shutdown.ts";
 export { MAX_TURN_MESSAGES, type TurnMessage } from "./turn.ts";
 export type { Runner } from "./types.ts";
 
+// how long shutdown waits for the streams to let go
 export const SHUTDOWN_DRAIN_MS = 5000;
 export { FINALIZE_RETRY_MS };
 
@@ -99,6 +100,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
       .messages(send.sessionId)
       .filter((row) => row.id !== send.round?.messageId);
 
+  // The first cause wins. Stop and shutdown still abort a phase opened
+  // after another cause claimed the send, and the send remembers it, so
+  // its end leaves the open alert as a stop's would.
   const terminate = (
     send: ActiveSend,
     cause: SendCause,
@@ -107,6 +111,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     if (cause === "stop" || cause === "shutdown") {
       if (send.cause !== null && send.terminal === null) {
         send.interrupted = true;
+        // a main row waiting out its tools keeps the cause that cut it
         if (send.phase === "memory" || send.phase === "attention") {
           send.cutBy ??= cause;
         }
@@ -182,8 +187,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
         send,
       );
     } finally {
+      // a pending deadline would hold the whole send until it rang
       disarm();
       if (send.tools !== null) await send.tools.catch(() => {});
+      // no command runs past here, so the trees may go
       send.repos?.release();
       send.letGo();
       const freed = finalized && registry.free(send);
@@ -195,8 +202,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
     sessionId: string;
     session: SessionRow | null;
     project: ProjectRow;
+    // who starts it: the first author, the regenerator, the automation's
     user: UserRow;
     agent: AgentRow;
+    // the chat's agent, when the agent was summoned for the turn
     summoned?: string | null;
     title: string;
     event?: Event | null;
@@ -217,6 +226,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     return prepareSend({
       db: deps.db,
       registry,
+      // a run no one pressed takes the scheduled share of the caps
       startedBy: event === null || event.source === "manual" ? user.id : null,
       wake: deps.wake,
       writer,
@@ -268,6 +278,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     sessionId: string,
     messages: readonly (SendMessageRequest & {
       principal: Principal;
+      // the author's row when the caller read it already
       user?: UserRow;
     })[],
     claim?: readonly QueuedClaim[],
@@ -362,23 +373,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
       return launched(prepareTurn(sessionId, messages, claim, starter));
     },
     message(principal, sessionId, fields) {
-      const session = deps.visible(principal, sessionId);
-      if (session.origin === "channel") {
-        return {
-          status: 201,
-          body: postChannel(
-            deps,
-            principal,
-            session,
-            fields,
-            requiredUser(deps.users, principal.userId),
-          ),
-        };
-      }
-      const queued = runner.queue.enqueue(principal, sessionId, fields);
-      return queued === null
-        ? { status: 201, body: runner.send(principal, sessionId, fields) }
-        : { status: 202, body: queued };
+      return channelMessage(deps, principal, sessionId, fields, () => {
+        const queued = runner.queue.enqueue(principal, sessionId, fields);
+        return queued === null
+          ? { status: 201, body: runner.send(principal, sessionId, fields) }
+          : { status: 202, body: queued };
+      });
     },
     regenerate(principal, sessionId, fields = {}) {
       const session = chatFor(
