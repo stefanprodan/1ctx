@@ -34,7 +34,7 @@ export function dateLine(now: number): string {
 
 // a personal project is only ever its owner's, who is the one talking,
 // and every one is named personal, so the owner names it
-function projectLine(
+export function projectLine(
   policy: Pick<
     SendPolicy,
     | "agentName"
@@ -70,7 +70,7 @@ export function summonedLine(chatAgent: string): string {
 export const SUBAGENT_LINE =
   "You are a subagent: another agent handed you the task below and reads your answer, not a user. Nobody can answer questions, so do the task and stop. Answer briefly with what the task asks for. Put long output in a file under /tmp and name the file in your answer: files you add or change in /tmp reach the other agent. /knowledge and /uploads are read-only to you. Copy anything from /mcp the other agent needs into /tmp.";
 
-function userLine(
+export function userLine(
   policy: Pick<SendPolicy, "fullName" | "username" | "about" | "tz">,
 ): string {
   const said = policy.about.trim();

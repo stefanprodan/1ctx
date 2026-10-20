@@ -15,6 +15,7 @@ import {
 import type { ExternalTaskRow } from "./contracts/external-task.ts";
 import type { KnowledgeFile } from "./contracts/knowledge.ts";
 import type {
+  ChannelMeter,
   ChildOf,
   LastLine,
   LiveRetry,
@@ -29,7 +30,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 20;
+export const PROTOCOL = 21;
 
 export type DraftFrame =
   | { type: "draft"; sessionId: string; draft: AutomationDraft }
@@ -82,6 +83,7 @@ export type SocketEvent =
       last?: LastLine;
       messagesCut?: true;
       row: EnvelopeRow | null;
+      channelContext?: ChannelMeter;
     }
   // to the chat's watchers alone: its queued rows, every member's, each
   // text a preview (QUEUED_PREVIEW), at the session revision of the
@@ -156,6 +158,7 @@ export type SocketEvent =
       type: "watched";
       sessionId: string;
       live: LiveSend[];
+      channelContext?: ChannelMeter;
       queue?: QueueFrame;
       children?: ChildOf[];
       // each checked with isAutomationDraft() before it is used

@@ -138,6 +138,7 @@ export type Runner = {
     ctx: ToolContext,
   ): Promise<ToolResult>;
   live: (sessionId: string) => ReturnType<typeof live>[];
+  channelMeter(sessionId: string): { tokens: number; budget: number };
   // no more admissions, then up to boundMs for the running sends and
   // their asks to end on their own; cut ends the wait
   drain(boundMs: number, cut?: Promise<void>): Promise<DrainResult>;

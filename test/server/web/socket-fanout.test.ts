@@ -53,6 +53,7 @@ const area = (overrides: Partial<Parameters<typeof socketArea>[0]> = {}) => {
     queue: () => ({ revision: 0, rows: [] }),
     children: () => [],
     drafts: () => [],
+    channelMeter: () => null,
     ...overrides,
   });
   built.push(socket);

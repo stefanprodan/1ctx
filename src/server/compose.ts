@@ -469,6 +469,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     agents: agentNames,
     live: (sessionId) => runner.live(sessionId),
+    channelMeter: (sessionId) => runner.channelMeter(sessionId),
     usage,
     limits,
     uploads: knowledge,
@@ -598,6 +599,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     queue: (sessionId) => sessions.queueFrame(sessionId),
     children: (sessionId) => sessions.runningChildren(sessionId),
     drafts: (sessionId) => automations.drafts.bySession(sessionId),
+    channelMeter: (sessionId) =>
+      sessions.store.root(sessionId)?.origin === "channel"
+        ? runner.channelMeter(sessionId)
+        : null,
   });
   const runner = runnerArea({
     db,

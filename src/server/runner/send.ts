@@ -12,6 +12,7 @@ import type {
 import type { SendCause, SendKind, SessionOrigin } from "../../shared/words.ts";
 import type { Workspace } from "../bash/index.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
+import type { ChannelContext } from "./channel-context.ts";
 import { type Children, noChildren } from "./child-slots.ts";
 import type {
   KeepPort,
@@ -107,6 +108,7 @@ export type ActiveSend = {
   op: SendOp;
   startedAt: number;
   policy: SendPolicy;
+  channel: ChannelContext | null;
   firstMessageId: string;
   // the round streaming now, or null while its tools run
   round: RoundState | null;
@@ -316,6 +318,7 @@ export function newSend(fields: {
     op: fields.op,
     startedAt: fields.now,
     policy: fields.policy,
+    channel: null,
     firstMessageId: fields.firstMessageId,
     round: newRound(fields.replyId, fields.now),
     roundNo: 1,

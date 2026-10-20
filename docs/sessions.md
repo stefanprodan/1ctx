@@ -106,8 +106,9 @@ arrives.
   The response carries only the session summary, the new message and its
   post send, at the post's revision, never a page or a later turn's revision.
   Posting advances activity and revision without setting the channel status.
-  Channel sends currently use the summoned-send history path; the dedicated
-  channel context builder is separate work.
+  Channel history uses a fixed start snapshot, grouped by turn with a shared
+  dropped mark and stream budget (`docs/channel-context.md`), never the
+  chat's per-round history path.
 - **A channel is permanent within its project.** It cannot be forked, renamed,
   archived, deleted, regenerated, compacted or stopped through chat routes.
 - **A channel agent keeps its own workspace.** Its `/tmp`, cwd, `/mcp`
@@ -231,6 +232,8 @@ arrives.
   (`docs/mcp.md`). What is fixed per agent and project leads; the user's
   line follows, as a team chat's author changes it. A subagent's
   is `subagentPrompt()` (`docs/subagents.md`).
+  A channel has its own stable head and one request-local message between
+  its frozen stream and the turn's own rows (`docs/channel-context.md`).
 
 ## Summons
 

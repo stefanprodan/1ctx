@@ -6,6 +6,22 @@ import { pluralCommas } from "../../lib/format.ts";
 import { K, thousandsText, thousandsValue } from "../../lib/thousands.ts";
 
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
+  channelContextFloor: {
+    label: "Channel context floor",
+    text: "Smallest agent context window allowed in a channel.",
+  },
+  channelStreamTokens: {
+    label: "Channel stream",
+    text: "Posts, answers and traces kept in a channel's context.",
+  },
+  channelDropTokens: {
+    label: "Channel drop step",
+    text: "Tokens freed at once when a channel's context fills.",
+  },
+  channelWorkTokens: {
+    label: "Channel work room",
+    text: "Tokens a channel turn must have free for its own work.",
+  },
   rounds: {
     label: "Rounds",
     text: "Provider requests in one turn, the answer included.",

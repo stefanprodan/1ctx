@@ -63,6 +63,16 @@ export const LIMITS_CARDS: readonly LimitsGroup[] = [
     ],
   },
   {
+    title: "Channels",
+    line: "What agents read, and the room left for each turn.",
+    names: [
+      "channelContextFloor",
+      "channelStreamTokens",
+      "channelDropTokens",
+      "channelWorkTokens",
+    ],
+  },
+  {
     title: "Running",
     line: "How many turns and runs go at once, and what waits.",
     names: [

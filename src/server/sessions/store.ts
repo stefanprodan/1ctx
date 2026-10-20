@@ -24,6 +24,8 @@ import {
 import { descendants, ROOT } from "./children.ts";
 import { type Pruned, removeSession, type SessionDeleted } from "./delete.ts";
 import {
+  type ChannelMeterPort,
+  missingChannelMeter,
   agents as readAgents,
   archive as readArchive,
   authors as readAuthors,
@@ -112,6 +114,7 @@ export class SessionStore {
     private readonly scratch: ScratchPort,
     private readonly pruned: Pruned = () => [],
     private readonly drafts: DraftsPort | null = null,
+    readonly channelMeter: ChannelMeterPort = missingChannelMeter,
   ) {
     this.queue = new QueueStore(db);
     this.pending = new PendingStore(db);

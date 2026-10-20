@@ -237,9 +237,9 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100, cores: 1 }).rows();
-      expect(rows).toHaveLength(55);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(55);
-      expect(rows.filter((row) => row.scope === "send")).toHaveLength(15);
+      expect(rows).toHaveLength(59);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(59);
+      expect(rows.filter((row) => row.scope === "send")).toHaveLength(19);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
       expect(rows.filter((row) => row.scope === "sends")).toHaveLength(6);
@@ -457,7 +457,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(55);
+      expect(body.limits).toHaveLength(59);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),

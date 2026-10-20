@@ -23,6 +23,7 @@ import {
   requiredUser,
 } from "./authors.ts";
 import { cancelPending, channelMessage, pendingFields } from "./channel.ts";
+import { channelMeter } from "./channel-context.ts";
 import { chatFor, sendToStop } from "./chat-guard.ts";
 import { childRowsTo, delegate } from "./child.ts";
 import { compactSend } from "./compact.ts";
@@ -92,9 +93,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
   };
   const pause = (ms: number) => sleep(deps.clock, ms).promise;
   const historyOf = (send: ActiveSend) =>
-    deps.sessions
-      .messages(send.sessionId)
-      .filter((row) => row.id !== send.round?.messageId);
+    (send.channel === null
+      ? deps.sessions.messages(send.sessionId)
+      : []
+    ).filter((row) => row.id !== send.round?.messageId);
 
   // The first cause wins. Stop and shutdown still abort a phase opened
   // after another cause claimed the send, and the send remembers it, so
@@ -237,6 +239,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
         event,
         disabledCapabilities: disabled,
       }),
+      ...(session?.origin === "channel"
+        ? { channelCaps: deps.limits.current() }
+        : {}),
       op,
       turn,
       changes: fields.changes,
@@ -458,6 +463,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       return delegate(childDeps, parent, input, call, ctx);
     },
     live: liveOf,
+    channelMeter: (id) => channelMeter(deps.db, id, deps.limits.current()),
     drain: (boundMs, cut = new Promise<void>(() => {})) =>
       drainRunner(registry, deps.clock, deps.log, boundMs, asks, cut),
     shutdown: (close) =>

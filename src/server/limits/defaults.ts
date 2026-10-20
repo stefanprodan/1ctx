@@ -27,6 +27,13 @@ export type LoopLimits = {
   childAnswerChars: number;
 };
 
+export type ChannelCaps = {
+  channelContextFloor: number;
+  channelStreamTokens: number;
+  channelDropTokens: number;
+  channelWorkTokens: number;
+};
+
 export type ToolCaps = {
   callTimeoutMs: number;
   resultCut: number;
@@ -117,6 +124,7 @@ export type ExternalCaps = {
 };
 
 export type Limits = LoopLimits &
+  ChannelCaps &
   ToolCaps &
   KnowledgeCaps &
   SendCaps &
@@ -155,6 +163,10 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   toolWorkTokens: limit(1_000_000, 10_000, 10_000_000, "tokens", "send"),
   contextReserve: limit(20_000, 1000, 200_000, "tokens", "send"),
   summaryMaxTokens: limit(4096, 1000, 32_000, "tokens", "send"),
+  channelContextFloor: limit(262_144, 32_000, 2_000_000, "tokens", "send"),
+  channelStreamTokens: limit(100_000, 1000, 1_000_000, "tokens", "send"),
+  channelDropTokens: limit(20_000, 1000, 1_000_000, "tokens", "send"),
+  channelWorkTokens: limit(100_000, 1000, 1_000_000, "tokens", "send"),
   memoryPhaseMs: limit(120_000, 10_000, 600_000, "ms", "send"),
   memoryPhaseRounds: limit(4, 1, 20, "count", "send"),
   childrenAtOnce: limit(2, 1, 4, "count", "send"),

@@ -45,7 +45,9 @@ admin pages in `docs/admin-pages.md`, the external task pages in
   its revision is above the one held, and applies stream frames in
   sequence per send through `transcript/stream.ts`. Live snapshots are lists;
   ending one send removes only its tail. Pending channel turns follow queue
-  revisions. A gap, a frame ahead of the
+  revisions. The channel's server-counted `channelContext` meter follows
+  detail, `watched` and newer envelopes; a work envelope without it keeps
+  the held count. A gap, a frame ahead of the
   buffer or an overflow before `watched` refetches the session's detail.
   Frames land in a map ahead of `live`, published once per animation
   frame (`data/session-live.ts`), so a burst draws once per paint; the

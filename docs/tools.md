@@ -25,6 +25,10 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
 - **A change applies to the next send.** A send in flight keeps the
   caps and the offered set it started on; a send cap applies at the
   next admission.
+- **Channel context has four token limits.** `channelContextFloor` (262,144),
+  `channelStreamTokens` (100,000), `channelDropTokens` (20,000), and
+  `channelWorkTokens` (100,000). Their counting, refusal and drop rules,
+  including why these defaults, are in `docs/channel-context.md`.
 
 ## The tool loop
 

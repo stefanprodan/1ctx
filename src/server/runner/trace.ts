@@ -168,8 +168,9 @@ function cut(value: string, chars: number): string {
 // the reading agent lacks the tool: another agent's MCP tool or skill
 function foreign(
   call: Pick<TraceCall, "name" | "arguments">,
-  yours: Yours,
+  yours: Yours | null,
 ): boolean {
+  if (yours === null) return false;
   if (call.name.startsWith("mcp__")) return !yours.mcp.has(call.name);
   if (call.name !== "skill" && call.name !== "skill_file") return false;
   return !yours.skills.has(text(toolArguments(call.arguments) ?? {}, "name"));
@@ -198,7 +199,7 @@ function savedForms(saved: SavedDocs | null): string[] {
 // name, summary and status, then the saved docs, then the mark. The
 // name, status, mark and a saved form always show: the fullest saved
 // form that fits, the summary cut to the room left
-export function traceLine(call: TraceCall, yours: Yours): string {
+export function traceLine(call: TraceCall, yours: Yours | null): string {
   const status = call.status === "done" ? "ok" : "failed";
   const mark = foreign(call, yours) ? NOT_YOURS : "";
   const forms = savedForms(call.saved);
@@ -221,7 +222,10 @@ export function traceLine(call: TraceCall, yours: Yours): string {
 // the heading and one line a call, identical lines as one with ×N where
 // the first stood; past the cap one line counts the calls left. Empty
 // for a turn without calls
-export function trace(calls: readonly TraceCall[], yours: Yours): string {
+export function trace(
+  calls: readonly TraceCall[],
+  yours: Yours | null,
+): string {
   if (calls.length === 0) return "";
   const counts = new Map<string, number>();
   for (const call of calls) {

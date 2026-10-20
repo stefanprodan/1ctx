@@ -7,7 +7,7 @@ import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { SkillLoads } from "../../shared/api/skills.ts";
 import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
-import type { ChildOf } from "../../shared/contracts/session.ts";
+import type { ChannelMeter, ChildOf } from "../../shared/contracts/session.ts";
 import type { QueueFrame } from "../../shared/socket.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
@@ -149,6 +149,7 @@ export type SessionsDeps = {
     byName(name: string): AgentRow | null;
   };
   live: LivePort;
+  channelMeter(sessionId: string): ChannelMeter;
   usage: UsagePort;
   uploads: UploadsPort;
   scratch: SweepScratch;
@@ -241,6 +242,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     deps.scratch,
     deps.pruned,
     deps.drafts,
+    deps.channelMeter,
   );
   // a subagent's child is never a chat of its own: every route and
   // watch by its id is the same 404 as a missing one

@@ -824,12 +824,12 @@ describe("automation socket events", () => {
 });
 
 describe("the envelope row read", () => {
-  const changed = (projectId: string) =>
+  const changed = (projectId: string, origin = "chat") =>
     publish({
       type: "session.changed",
       data: {
         projectId,
-        session: { id: `s-${projectId}`, projectId } as never,
+        session: { id: `s-${projectId}`, projectId, origin } as never,
         messages: [],
         send: null,
       },
@@ -847,6 +847,7 @@ describe("the envelope row read", () => {
       queue: () => ({ revision: 0, rows: [] }),
       children: () => [],
       drafts: () => [],
+      channelMeter: () => null,
       envelopeRow(sessionId) {
         reads.push(sessionId);
         return null;
@@ -879,6 +880,7 @@ describe("the envelope row read", () => {
       queue: () => ({ revision: 0, rows: [] }),
       children: () => [],
       drafts: () => [],
+      channelMeter: () => null,
       envelopeRow(sessionId) {
         reads.push(sessionId);
         return null;
@@ -895,30 +897,40 @@ describe("the envelope row read", () => {
     socket.dispose();
   });
 
-  test.serial("a failed read still sends the envelope, without a row", () => {
-    const logs = collectLogs();
-    const socket = socketArea({
-      version: "test",
-      log: logs.logFactory("socket"),
-      refresh: (principal) => principal,
-      visibleProjectIds: () => [],
-      sessionProject: () => null,
-      live: () => [],
-      queue: () => ({ revision: 0, rows: [] }),
-      children: () => [],
-      drafts: () => [],
-      envelopeRow() {
-        throw new Error("disk I/O error");
-      },
-    });
-    const conn = memberConn("a", ["p"]);
-    socket.open(conn);
-    changed("p");
-    expect(frames(conn, "session").map((frame) => frame.row)).toEqual([null]);
-    expect(logs.events.map((event) => [event.msg, event.fields.chat])).toEqual([
-      ["socket open", undefined],
-      ["envelope row failed", "s-p"],
-    ]);
-    socket.dispose();
-  });
+  test.serial(
+    "failed row and meter reads still send the channel envelope",
+    () => {
+      const logs = collectLogs();
+      const socket = socketArea({
+        version: "test",
+        log: logs.logFactory("socket"),
+        refresh: (principal) => principal,
+        visibleProjectIds: () => [],
+        sessionProject: () => null,
+        live: () => [],
+        queue: () => ({ revision: 0, rows: [] }),
+        children: () => [],
+        drafts: () => [],
+        channelMeter() {
+          throw new Error("disk I/O error");
+        },
+        envelopeRow() {
+          throw new Error("disk I/O error");
+        },
+      });
+      const conn = memberConn("a", ["p"]);
+      socket.open(conn);
+      changed("p", "channel");
+      expect(frames(conn, "session").map((frame) => frame.row)).toEqual([null]);
+      expect(frames(conn, "session")[0]?.channelContext).toBeUndefined();
+      expect(
+        logs.events.map((event) => [event.msg, event.fields.chat]),
+      ).toEqual([
+        ["socket open", undefined],
+        ["envelope row failed", "s-p"],
+        ["channel meter failed", "s-p"],
+      ]);
+      socket.dispose();
+    },
+  );
 });

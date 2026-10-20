@@ -29,6 +29,7 @@ import {
   requiredAgent,
   requiredUser,
 } from "./authors.ts";
+import { channelFloor } from "./channel-context.ts";
 import { lastLine } from "./envelope.ts";
 import { type Registry, waitsForPlace } from "./registry.ts";
 import { channelFirstWord } from "./summon.ts";
@@ -86,6 +87,12 @@ function postChannel(
       ? deps.agents.byName(summonName(fields.message)!)!
       : null;
   const user = requiredUser(deps.users, userId);
+  if (agent !== null) {
+    channelFloor(
+      { agentName: agent.name, contextLength: agent.model.contextLength },
+      deps.limits.current(),
+    );
+  }
   queue.wake();
   let waiting = queue.closed;
   if (agent !== null && !waiting) {

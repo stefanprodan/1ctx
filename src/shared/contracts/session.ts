@@ -314,6 +314,7 @@ export type SessionDetail = {
   live: LiveSend[];
   // channel-only turns whose posts are already in the transcript
   pending?: PendingTurn[];
+  channelContext?: ChannelMeter;
   authors: SessionAuthor[];
   // the agents its rows name, a retired one included, so a reply keeps
   // its agent's name and avatar once the agent is deleted
@@ -325,6 +326,11 @@ export type SessionDetail = {
   // one only to its author
   queued: QueuedMessage[];
   automationDrafts: AutomationDraft[];
+};
+
+export type ChannelMeter = {
+  tokens: number;
+  budget: number;
 };
 
 // the characters of a queued message's text a socket frame carries

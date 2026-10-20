@@ -4,6 +4,7 @@
 import type { SessionResponse } from "../../shared/api/sessions.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
 import type {
+  ChannelMeter,
   LiveSend,
   Message,
   SessionAgent,
@@ -16,8 +17,14 @@ import type { Db } from "../db/index.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { offWire, type SessionRow } from "./rows.ts";
 
+export type ChannelMeterPort = (sessionId: string) => ChannelMeter;
+export const missingChannelMeter: ChannelMeterPort = () => {
+  throw new Error("channel meter is not configured");
+};
+
 // the store's reads the detail is made of
 type DetailStore = {
+  channelMeter(sessionId: string): ChannelMeter;
   forkedFrom(id: string): SessionDetail["forkedFrom"];
   messages(id: string): Message[];
   channelPage(
@@ -61,7 +68,10 @@ export function detail(
     send: store.lastSend(session.id),
     live,
     ...(session.origin === "channel"
-      ? { pending: store.pending.ofSession(session.id) }
+      ? {
+          pending: store.pending.ofSession(session.id),
+          channelContext: store.channelMeter(session.id),
+        }
       : {}),
     authors: store.authors(session.id),
     agents: store.agents(session.id),

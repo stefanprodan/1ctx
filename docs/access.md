@@ -291,6 +291,10 @@ connections watching that session.
 - **Delivery is per connection, never a Bun topic.** A connection
   holds its user's visible project ids and at most one watched session,
   so a slow one is closed alone and a revoked one stops at once.
+- **Channel detail and watch share a server-counted context meter.**
+  `channelContext` refreshes with posts and turn starts and ends, never
+  live deltas; `docs/channel-context.md` defines what it counts. Like the
+  feed row, it is built once per durable frame's audience, not per viewer.
 - **A durable frame goes to the connections holding its project.** It
   is built and encoded once, on the first connection in its audience,
   so an unseen event costs nothing. A `session` frame's `row` holds only

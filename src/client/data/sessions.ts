@@ -85,8 +85,6 @@ let sequences = new Map<string, number>();
 // the settled chats by id
 const chatsKept = new Held<SessionDetail>();
 
-const clock = () => Date.now();
-
 effect(() => {
   const id = me.value?.id ?? null;
   if (id === owner) return;
@@ -291,6 +289,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     session: ev.session,
     messages,
     send: ev.send ?? held.send,
+    channelContext: ev.channelContext ?? held.channelContext,
   };
   visualPreviews.value = reconcileVisuals(visualPreviews.value, session.value);
   session.value = {
@@ -379,7 +378,7 @@ function applyFrame(frame: Frame): boolean {
     stage(frame.messageId, applyHtml(v, frame));
     return true;
   }
-  const r = applyDelta(v, frame, clock());
+  const r = applyDelta(v, frame, Date.now());
   if (r.gap) return false;
   stage(frame.messageId, r.live);
   return true;
@@ -402,7 +401,11 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
     ...held,
     live: ev.live,
   });
-  session.value = { ...held, live: ev.live };
+  session.value = {
+    ...held,
+    live: ev.live,
+    channelContext: ev.channelContext ?? held.channelContext,
+  };
   retrying.value = ev.live[0]?.retry ?? null;
   sequences = new Map(ev.live.map((send) => [send.sendId, send.seq]));
   if (ev.live.length === 0) {

@@ -58,6 +58,9 @@ reporting.
   server refusal to labels.
   Running includes the independent Per channel cap, default 4, range 1 to 16;
   the user, project and process caps still apply to every turn.
+  Channels has the context floor, stream budget, drop step and work room,
+  in whole thousands as the other token limits, with the exact stored
+  262,144 floor kept when its rounded display is untouched.
 - **A team project's labels are read-only on its admin page,** with
   Manage linking to the project's Settings tab, where every user who
   sees it writes them. New project starts with `DEFAULT_LABELS` filled

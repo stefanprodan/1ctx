@@ -74,10 +74,10 @@ export function unmarked(text: string, name: string): string {
 // another agent's turn: its answer as a user message opened by its
 // name, with no author field, then its trace as its own message, the
 // calls to tools the building agent lacks marked
-function foreignTurn(
+export function foreignTurn(
   turn: Turn,
   rows: readonly Message[],
-  yours: Yours,
+  yours: Yours | null,
 ): ChatMessageIn[] {
   const out: ChatMessageIn[] = [];
   const answer = rows
@@ -113,7 +113,7 @@ export function roundComplete(
 
 // a user message on the wire, with the author's name when it is not the
 // sender and is known
-function userMessage(
+export function userMessage(
   row: Message,
   policy: Pick<SendPolicy, "username" | "userId">,
   lookups: ContextLookups,

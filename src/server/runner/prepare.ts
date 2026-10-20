@@ -9,12 +9,14 @@ import { type Db, transact } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
+import type { ChannelCaps } from "../limits/index.ts";
 import { changeNote } from "../mcp/index.ts";
 import {
   type SessionRow,
   type SessionStore,
   sessionDetail,
 } from "../sessions/index.ts";
+import { channelContext } from "./channel-context.ts";
 import { offers, type SendPolicy } from "./policy.ts";
 import type { Registry } from "./registry.ts";
 import { type ActiveSend, live, newSend, type SendOp } from "./send.ts";
@@ -97,6 +99,7 @@ export function prepareSend(fields: {
   sessionId: string;
   session: SessionRow | null;
   policy: SendPolicy;
+  channelCaps?: ChannelCaps;
   op: SendOp;
   turn: StartFields["turn"];
   changes: readonly (CapabilityChange | undefined)[];
@@ -168,6 +171,25 @@ export function prepareSend(fields: {
   try {
     // a refused start rolls the trim back with it
     started = transact(fields.db, () => {
+      if (fields.channelCaps !== undefined && "posted" in turn) {
+        send.channel = channelContext({
+          db: fields.db,
+          sessionId: fields.sessionId,
+          sendId,
+          posted: turn.posted,
+          policy: fields.policy,
+          caps: fields.channelCaps,
+          now,
+          mcpNote: changeNote(
+            fields.sessions.lastMcpDigest(
+              fields.sessionId,
+              sendId,
+              fields.policy.agentId,
+            ),
+            fields.policy.offered.mcpPrompt.digest,
+          ),
+        });
+      }
       // under the lock, before the send is written and any command mounts:
       // the kept files trimmed to the budget stay put for the whole send
       if (bash) {

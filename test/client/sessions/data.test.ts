@@ -539,6 +539,47 @@ describe("the sessions entity", () => {
     expect(list.value?.rows[0].session.title).toBe("Changed");
   });
 
+  test.serial(
+    "the channel meter follows revisions and survives work frames",
+    async () => {
+      const initial = detail("s1", {
+        session: summary({ origin: "channel" }),
+        channelContext: { tokens: 10, budget: 100_000 },
+      });
+      answer = () => Response.json(initial);
+      await loadSession("s1");
+      expect(session.value?.channelContext?.tokens).toBe(10);
+      const frame = (revision: number, tokens?: number) => ({
+        type: "session" as const,
+        row: null,
+        projectId: "p1",
+        session: summary({ origin: "channel", revision }),
+        messages: [],
+        send: null,
+        ...(tokens === undefined
+          ? {}
+          : { channelContext: { tokens, budget: 100_000 } }),
+      });
+      onSocket(frame(2, 20));
+      expect(session.value?.channelContext?.tokens).toBe(20);
+      onSocket(frame(1, 1));
+      expect(session.value?.channelContext?.tokens).toBe(20);
+      onSocket(frame(3));
+      expect(session.value?.channelContext?.tokens).toBe(20);
+      onSocket({
+        type: "watched",
+        sessionId: "s1",
+        live: [],
+        channelContext: { tokens: 30, budget: 100_000 },
+        queue: { revision: 1, rows: [], pending: [] },
+      });
+      expect(session.value?.channelContext).toEqual({
+        tokens: 30,
+        budget: 100_000,
+      });
+    },
+  );
+
   test("automation frames rename and clear loaded run labels", async () => {
     answer = () =>
       Response.json({
