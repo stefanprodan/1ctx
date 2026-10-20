@@ -4,7 +4,7 @@
 import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
 import { type Db, transact } from "../db/index.ts";
-import { BadRequest } from "../lib/errors.ts";
+import { BadRequest, NotFound } from "../lib/errors.ts";
 import { CHARS_PER_TOKEN } from "../lib/tokens.ts";
 import type { ChannelCaps } from "../limits/index.ts";
 import { type ChatMessageIn, requestTokens } from "../providers/index.ts";
@@ -27,7 +27,7 @@ import { request } from "./context.ts";
 import type { SendPolicy } from "./policy.ts";
 import { NO_REPO_LINES, type RepoLines } from "./prompt.ts";
 import { renderRows } from "./render.ts";
-import { TAIL_MAX_TOKENS, tailOf, withoutThinking } from "./tail.ts";
+import { TAIL_MAX_TOKENS, tailOf } from "./tail.ts";
 import { yoursOf } from "./trace.ts";
 
 export type ChannelContext = {
@@ -59,18 +59,54 @@ const markOf = (db: Db, sessionId: string): number =>
     )
     .get(sessionId)?.dropped_seq ?? 0;
 
+const METER_CACHE_ENTRIES = 1024;
+
 export function channelMeter(
   db: Db,
-  sessionId: string,
-  caps: Pick<ChannelCaps, "channelStreamTokens">,
+  caps: () => Pick<ChannelCaps, "channelStreamTokens">,
 ) {
-  const { rows, turns } = channelRead(db, sessionId, markOf(db, sessionId));
-  return {
-    tokens: streamTurns(rows, turns).reduce(
-      (sum, part) => sum + part.tokens,
-      0,
-    ),
-    budget: caps.channelStreamTokens,
+  const cache = new Map<
+    string,
+    { revision: number; dropped_seq: number | null; tokens: number }
+  >();
+  return (sessionId: string) => {
+    const state = db
+      .query<{ revision: number; dropped_seq: number | null }, [string]>(
+        "select revision, dropped_seq from sessions where id = ?",
+      )
+      .get(sessionId);
+    if (state === null) {
+      cache.delete(sessionId);
+      throw new NotFound("no such chat");
+    }
+    // A speculative read must not survive a rollback at the same revision.
+    let entry = db.inTransaction ? undefined : cache.get(sessionId);
+    if (
+      entry === undefined ||
+      entry.revision !== state.revision ||
+      entry.dropped_seq !== state.dropped_seq
+    ) {
+      const { rows, turns } = channelRead(
+        db,
+        sessionId,
+        state.dropped_seq ?? 0,
+      );
+      entry = {
+        ...state,
+        tokens: streamTurns(rows, turns).reduce(
+          (sum, part) => sum + part.tokens,
+          0,
+        ),
+      };
+    }
+    if (!db.inTransaction) {
+      cache.delete(sessionId);
+      cache.set(sessionId, entry);
+      if (cache.size > METER_CACHE_ENTRIES) {
+        cache.delete(cache.keys().next().value!);
+      }
+    }
+    return { tokens: entry.tokens, budget: caps().channelStreamTokens };
   };
 }
 
@@ -165,10 +201,7 @@ export function channelContext(fields: {
     ]);
     const renderOwn = (rows: ChannelRow[]) => {
       const all = [question, ...rows];
-      return withoutThinking(
-        policy.wire,
-        renderRows(all, policy, channelLookups(all, own), own),
-      );
+      return renderRows(all, policy, channelLookups(all, own), own);
     };
     const fit = (local: ChatMessageIn) => {
       const head = requestTokens(

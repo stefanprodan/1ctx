@@ -329,7 +329,7 @@ describe("channel context", () => {
     }
   });
 
-  test("anthropic drops thinking from the whole tail and its own rounds", async () => {
+  test("anthropic keeps live thinking but drops it from the replayed whole tail", async () => {
     const { chat, summon, tool } = await channelApp({
       wire: "anthropic",
       model: ANTHROPIC_MODEL,
@@ -337,10 +337,13 @@ describe("channel context", () => {
     try {
       const a = await summon();
       a.script.reasoning("private-thought");
-      const next = await tool(a.script);
-      expect(JSON.stringify(next.body.messages)).not.toContain(
-        "private-thought",
+      a.script.sse(
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"past-signature"}}\n\n',
       );
+      const next = await tool(a.script);
+      expect(JSON.stringify(next.body.messages)).toContain("private-thought");
+      expect(JSON.stringify(next.body.messages)).toContain("past-signature");
+      expect(JSON.stringify(next.body.messages)).toContain('"type":"thinking"');
       next.reply("first answer");
       await idle(chat.app);
       expect(
@@ -362,8 +365,29 @@ describe("channel context", () => {
       expect(JSON.stringify(b.script.body.messages)).not.toContain(
         '"type":"thinking"',
       );
+      expect(JSON.stringify(b.script.body.messages)).not.toContain(
+        "past-signature",
+      );
       expect(JSON.stringify(b.script.body.messages)).toContain("tool_result");
-      b.script.reply("done");
+      b.script.reasoning("current-thought");
+      b.script.sse(
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"current-signature"}}\n\n',
+      );
+      const bNext = await tool(b.script);
+      expect(JSON.stringify(bNext.body.messages)).toContain("current-thought");
+      expect(JSON.stringify(bNext.body.messages)).toContain(
+        "current-signature",
+      );
+      expect(JSON.stringify(bNext.body.messages)).not.toContain(
+        "private-thought",
+      );
+      expect(JSON.stringify(bNext.body.messages)).not.toContain(
+        "past-signature",
+      );
+      expect(JSON.stringify(bNext.body.messages)).toContain(
+        '"type":"thinking"',
+      );
+      bNext.reply("done");
       await idle(chat.app);
     } finally {
       await chat.app.shutdown();

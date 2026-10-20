@@ -9,6 +9,7 @@ import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
 import type { ChannelMeter, ChildOf } from "../../shared/contracts/session.ts";
 import type { QueueFrame } from "../../shared/socket.ts";
+import type { SessionOrigin } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";
@@ -174,6 +175,7 @@ export type Sessions = {
   visible(principal: Principal, id: string): SessionRow;
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
+  origin(sessionId: string): SessionOrigin | null;
   // the feed row a session envelope carries, null for a session gone
   envelopeRow(sessionId: string): EnvelopeRow | null;
   // a project's sessions, children and archived ones included, newest
@@ -274,6 +276,15 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         if (err instanceof HttpError) return null;
         throw err;
       }
+    },
+    origin(id) {
+      return (
+        deps.db
+          .query<{ origin: SessionOrigin }, [string]>(
+            "select origin from sessions where id = ?",
+          )
+          .get(id)?.origin ?? null
+      );
     },
     envelopeRow: (sessionId) => envelopeRow(deps.db, sessionId),
     search(projectId, q, after, ask) {

@@ -600,7 +600,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     children: (sessionId) => sessions.runningChildren(sessionId),
     drafts: (sessionId) => automations.drafts.bySession(sessionId),
     channelMeter: (sessionId) =>
-      sessions.store.root(sessionId)?.origin === "channel"
+      sessions.origin(sessionId) === "channel"
         ? runner.channelMeter(sessionId)
         : null,
   });

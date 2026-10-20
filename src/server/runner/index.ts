@@ -463,7 +463,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       return delegate(childDeps, parent, input, call, ctx);
     },
     live: liveOf,
-    channelMeter: (id) => channelMeter(deps.db, id, deps.limits.current()),
+    channelMeter: channelMeter(deps.db, () => deps.limits.current()),
     drain: (boundMs, cut = new Promise<void>(() => {})) =>
       drainRunner(registry, deps.clock, deps.log, boundMs, asks, cut),
     shutdown: (close) =>

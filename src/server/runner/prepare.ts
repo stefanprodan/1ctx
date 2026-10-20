@@ -3,6 +3,7 @@
 
 import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
+import type { McpDigest } from "../../shared/mcp.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
 import { type Workspace, workspaceOf } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -171,7 +172,17 @@ export function prepareSend(fields: {
   try {
     // a refused start rolls the trim back with it
     started = transact(fields.db, () => {
+      let previousMcpDigest: McpDigest | null | undefined;
       if (fields.channelCaps !== undefined && "posted" in turn) {
+        previousMcpDigest = fields.sessions.lastMcpDigest(
+          fields.sessionId,
+          sendId,
+          fields.policy.agentId,
+        );
+        send.mcpNote = changeNote(
+          previousMcpDigest,
+          fields.policy.offered.mcpPrompt.digest,
+        );
         send.channel = channelContext({
           db: fields.db,
           sessionId: fields.sessionId,
@@ -180,14 +191,7 @@ export function prepareSend(fields: {
           policy: fields.policy,
           caps: fields.channelCaps,
           now,
-          mcpNote: changeNote(
-            fields.sessions.lastMcpDigest(
-              fields.sessionId,
-              sendId,
-              fields.policy.agentId,
-            ),
-            fields.policy.offered.mcpPrompt.digest,
-          ),
+          mcpNote: send.mcpNote,
         });
       }
       // under the lock, before the send is written and any command mounts:
@@ -221,15 +225,18 @@ export function prepareSend(fields: {
           policy: fields.policy,
           changes: fields.changes,
           mcpDigest: fields.policy.offered.mcpPrompt.digest,
+          ...(previousMcpDigest === undefined ? {} : { previousMcpDigest }),
           ...(fields.claim === undefined ? {} : { claim: fields.claim }),
         }),
         events: [],
       };
     });
-    send.mcpNote = changeNote(
-      started.previousMcpDigest,
-      fields.policy.offered.mcpPrompt.digest,
-    );
+    if (send.channel === null) {
+      send.mcpNote = changeNote(
+        started.previousMcpDigest,
+        fields.policy.offered.mcpPrompt.digest,
+      );
+    }
   } catch (err) {
     release();
     throw err;

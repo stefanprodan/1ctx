@@ -74,6 +74,8 @@ export type StartFields = {
   // applied in order, the later winning per key
   changes?: readonly (CapabilityChange | undefined)[];
   mcpDigest: McpDigest | null;
+  // A channel needs the note before its frozen context is admitted.
+  previousMcpDigest?: McpDigest | null;
   // the queued messages the turn opens with, taken by id and revision
   claim?: readonly QueuedClaim[];
 };
@@ -220,11 +222,10 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
         base.origin === "channel" ? send.id : undefined,
       );
     }
-    const previousMcpDigest = deps.sessions.lastMcpDigest(
-      base.id,
-      send.id,
-      policy.agentId,
-    );
+    const previousMcpDigest =
+      fields.previousMcpDigest !== undefined
+        ? fields.previousMcpDigest
+        : deps.sessions.lastMcpDigest(base.id, send.id, policy.agentId);
     const reply = deps.sessions.addReply({
       id: fields.replyId,
       sessionId: base.id,

@@ -34,7 +34,9 @@ Governs the channel's request history and stream meter in
   `sends.swept = 1` is always traced, the agent's own last turn included.
   The snapshot reads the aging mark directly (`docs/archive.md`).
 - **Thinking follows the tail's provider and model rules.** On `anthropic`
-  no channel history replays thinking, the current turn's rounds included.
+  the replayed whole last turn loses its thinking because its prefix changed.
+  The live turn keeps its own thinking between rounds: its prefix is fixed
+  at start and only appended to.
 
 ## Prefix and room
 
@@ -90,3 +92,9 @@ Governs the channel's request history and stream meter in
   the next admitted summon advances the mark before reading it.
   The page never tokenizes and never uses a particular agent's usage
   for this number.
+- **Meter reads share a per-runner cache by channel, revision and dropped
+  mark.** Detail, watch and frame fan-out reuse the count until either key
+  changes; a budget change alone reuses the count with the live budget.
+  The cache keeps the last 1,024 channels read, not their rows or text.
+  Reads inside a transaction bypass it, so a rollback cannot leave a
+  speculative count behind.
