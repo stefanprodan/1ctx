@@ -109,6 +109,15 @@ from jq 1.8.2 for the dialect rules. Where they part:
 - `strflocaltime`'s `%Z` is Intl's name for the zone, so outside the
   United States it reads `GMT+9` where jq reads `JST`.
 - yq's `to_number` still takes blanks around a number and hex.
+- A number with a leading dot (`jq -n '.02'`) is a parse error, exit 5,
+  where jq reads `0.02`.
+- An empty `-f` program file exits 5 with a parse error, where jq exits
+  3 with `Top-level program not given`.
+- `-f` with no operand prints our help on stderr, not jq's usage text.
+- An unknown option, `--from-file=FILE` included, answers `jq:
+  unrecognized option '...'` or `jq: invalid option -- 'x'`, exit 1,
+  where jq answers `jq: Unknown option ...` and its pointer to `jq
+  --help`, exit 2.
 
 ## Where our curl still differs from curl
 

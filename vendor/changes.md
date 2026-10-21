@@ -2219,12 +2219,17 @@ have their results, and raise an error that comes before them.
 to 7) and `--raw-output0` work, the last of `--indent`, `--tab` and `-c`
 wins, `-j` prints strings raw, and `-a` writes every character past
 ASCII as `\uXXXX`, every string as JSON, as jq does. An option error
-ends with jq's pointer to `jq --help`.
+ends with jq's pointer to `jq --help`. `-f` and `--from-file`, a flag
+in any position and in a group, make the first operand the filter
+file, read with the input files' limits; a missing one answers jq's
+`Could not open`, exit 2, and `-f` with no operand prints the usage,
+exit 2.
 
 Before: `input` and `inputs` were unknown functions, `-n` read no input,
 `first(error("x"))` and `isempty(error("x"))` answered as if nothing
 failed, `--stream`, `--indent` and `--raw-output0` were refused as
-unknown, `-j` printed strings quoted and `-a` was ignored.
+unknown, `-j` printed strings quoted, `-a` was ignored and `-f` was an
+invalid option.
 
 ### yq-split: -s splits results into files, as mikefarah's
 Files: `src/commands/yq/yq.ts`
