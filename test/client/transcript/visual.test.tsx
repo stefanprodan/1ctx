@@ -296,7 +296,6 @@ test("stored cards follow call order, never a failed whole call or memory row", 
   expect(markup).toContain('src="/api/visual?scheme=');
   expect(markup).toContain('sandbox="allow-scripts"');
   expect(markup).toContain('referrerpolicy="no-referrer"');
-  expect(markup).toContain('width="680"');
   expect(markup.indexOf("transcript-work")).toBeLessThan(
     markup.indexOf("visual-card"),
   );

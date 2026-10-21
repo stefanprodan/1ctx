@@ -179,7 +179,6 @@ export function Visual({
             src={src}
             sandbox="allow-scripts"
             referrerpolicy="no-referrer"
-            width={680}
             height={current.height}
             onLoad={() => {
               loaded.value = true;

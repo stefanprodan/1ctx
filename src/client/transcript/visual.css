@@ -1,9 +1,10 @@
 @layer tokens, base, owners;
 
 @layer owners {
+  /* the frame takes the column's width, never under 680 px: a
+     narrower column scrolls it rather than shrinking its text */
   .visual-card {
     width: 100%;
-    max-width: 680px;
     min-width: 0;
     margin-block: var(--space-4);
   }
@@ -25,14 +26,17 @@
     color: var(--faint);
     font-size: var(--text-small);
   }
+  /* the gutter is kept, so a scrollbar never narrows the frame and
+     sets off a resize and a remeasure */
   .visual-scroll {
     overflow: auto;
+    scrollbar-gutter: stable;
     min-height: 80px;
     max-height: 2000px;
   }
   .visual-frame {
     display: block;
-    width: 680px;
+    width: 100%;
     min-width: 680px;
     border: 0;
   }
