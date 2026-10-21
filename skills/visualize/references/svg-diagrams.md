@@ -128,8 +128,8 @@ Rules that keep it correct:
 Use this only where the shapes carry the meaning. Use a 680-unit-wide
 viewBox. Keep ordinary content between x=40 and x=640.
 Compute the height from the lowest shape or label plus 40 units; leave
-40 units at the top too. The frame stays 680 CSS pixels wide on narrow
-screens, so a 12-unit label remains 12px rather than being squeezed.
+40 units at the top too. The frame is never narrower than 680 CSS
+pixels, so a 12-unit label never drops below 12px.
 
 Use `th` for node titles, `t` for labels and `ts` for short secondary
 lines. For centered text, set both `text-anchor="middle"` and

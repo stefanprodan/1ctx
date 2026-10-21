@@ -3,8 +3,9 @@
 //
 // An HTML file drawn as a chat draws a visual, through the one player
 // in transcript/Visual.tsx: the sandboxed shell at /api/visual, themed
-// like the page, 680 wide and scrolling on a narrow screen. The text is
-// drawn once, so a new revision is a new frame (the key says which).
+// like the page, as wide as the page from 680 up, scrolling on a narrow
+// screen. The text is drawn once, so a new revision is a new frame (the
+// key says which).
 
 import { Visual } from "../../../transcript/Visual.tsx";
 import type { VisualCard } from "../../../transcript/visuals.ts";

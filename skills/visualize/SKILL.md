@@ -97,9 +97,11 @@ contains to that host, so do not place user data in a path or query.
 There are no preloaded libraries or bare module specifiers. Read
 `references/libraries.md` before adding a dependency.
 
-The frame is 680 CSS pixels wide even on a phone, where the card scrolls
-horizontally instead of shrinking text. Use `viewBox="0 0 680 H"` and
-`width="100%"` for SVG, computing H from the content. Leave generous
+The frame takes the chat column's width and is never narrower than 680
+CSS pixels: on a phone the card scrolls horizontally instead of
+shrinking text. Size HTML and canvas to the frame's width, never a fixed
+one. Use `viewBox="0 0 680 H"` and `width="100%"` for SVG, computing H
+from the content; it scales with the frame. Leave generous
 margins. Content taller than 2,000 pixels scrolls inside the card;
 prefer a shorter explanation. Avoid viewport-relative heights.
 

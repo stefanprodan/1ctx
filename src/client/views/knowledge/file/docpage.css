@@ -109,8 +109,8 @@
     padding-left: var(--space-5);
   }
 
-  /* an HTML file drawn as a chat's visual: the card keeps the frame
-     680 wide and scrolls it on a narrow screen */
+  /* an HTML file drawn as a chat's visual: the frame takes the page's
+     width, at least 680 px, and scrolls on a narrow screen */
   .docpage-visual {
     display: flex;
     justify-content: center;
