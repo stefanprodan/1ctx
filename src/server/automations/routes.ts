@@ -241,7 +241,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             throw new Conflict("automation has a running run");
           }
           // before the row, whose delete nulls the runs' automation
-          if (runs) deps.sessions.deleteRuns(current.id);
+          const unlinked = runs
+            ? deps.sessions.runPosts.deleteRuns(current.id)
+            : [];
           deps.store.delete(current.id);
           // one frame for the runs, not one per run, which would have
           // each tab load its list again per run
@@ -256,6 +258,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
                   runs,
                 },
               },
+              ...unlinked,
             ],
           };
         });

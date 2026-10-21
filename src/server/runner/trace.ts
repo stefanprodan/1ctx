@@ -8,7 +8,11 @@
 // by the same tools give the same bytes, so the trace never moves a
 // cached prefix.
 
-import type { Message, SavedDocs } from "../../shared/contracts/session.ts";
+import type {
+  Message,
+  SavedDocs,
+  TraceCall,
+} from "../../shared/contracts/session.ts";
 import { toolArguments } from "../../shared/contracts/tool.ts";
 import { cutAt, oneLine } from "../../shared/text.ts";
 import type { Offered } from "../tools/index.ts";
@@ -19,14 +23,7 @@ export const TRACE_LINE_CHARS = 200;
 // the most lines; the rest is one line counting them
 export const TRACE_LINES = 30;
 
-export type TraceCall = {
-  // the tool that ran: the row's name, an MCP call's wire name
-  name: string;
-  arguments: string;
-  status: Message["status"] | null;
-  // the docs a bash call wrote, from its row
-  saved: SavedDocs | null;
-};
+export type { TraceCall };
 
 // what the reading agent can call itself: its MCP tools by wire name and
 // its skills by name. Every other tool counts as its own: a builtin is
@@ -122,7 +119,9 @@ const text = (args: Record<string, unknown>, key: string) =>
 export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
   const args = toolArguments(call.arguments);
   if (args === null) {
-    return call.name === "memory_edit" ? "" : oneLine(call.arguments);
+    return call.name === "memory_edit" || call.name === "delegate"
+      ? ""
+      : oneLine(call.arguments);
   }
   switch (call.name) {
     case "bash":
@@ -137,6 +136,8 @@ export function summary(call: Pick<TraceCall, "name" | "arguments">): string {
       return oneLine(text(args, "query"));
     case "webfetch":
       return oneLine(text(args, "url"));
+    case "delegate":
+      return oneLine(text(args, "description"));
     case "skill":
     case "skill_file":
       return oneLine(text(args, "name"));
@@ -164,8 +165,9 @@ function cut(value: string, chars: number): string {
 // the reading agent lacks the tool: another agent's MCP tool or skill
 function foreign(
   call: Pick<TraceCall, "name" | "arguments">,
-  yours: Yours,
+  yours: Yours | null,
 ): boolean {
+  if (yours === null) return false;
   if (call.name.startsWith("mcp__")) return !yours.mcp.has(call.name);
   if (call.name !== "skill" && call.name !== "skill_file") return false;
   return !yours.skills.has(text(toolArguments(call.arguments) ?? {}, "name"));
@@ -194,7 +196,7 @@ function savedForms(saved: SavedDocs | null): string[] {
 // name, summary and status, then the saved docs, then the mark. The
 // name, status, mark and a saved form always show: the fullest saved
 // form that fits, the summary cut to the room left
-export function traceLine(call: TraceCall, yours: Yours): string {
+export function traceLine(call: TraceCall, yours: Yours | null): string {
   const status = call.status === "done" ? "ok" : "failed";
   const mark = foreign(call, yours) ? NOT_YOURS : "";
   const forms = savedForms(call.saved);
@@ -217,7 +219,10 @@ export function traceLine(call: TraceCall, yours: Yours): string {
 // the heading and one line a call, identical lines as one with ×N where
 // the first stood; past the cap one line counts the calls left. Empty
 // for a turn without calls
-export function trace(calls: readonly TraceCall[], yours: Yours): string {
+export function trace(
+  calls: readonly TraceCall[],
+  yours: Yours | null,
+): string {
   if (calls.length === 0) return "";
   const counts = new Map<string, number>();
   for (const call of calls) {

@@ -5,6 +5,39 @@ Governs messages to a busy chat and their dispatcher:
 `src/server/sessions/queued.ts` and `queued-routes.ts`. Sends, caps
 and the writer are in `docs/sessions.md`.
 
+A channel post is written at once and never enters this queue. Its user row
+belongs to a done `post` send, cannot be edited, and moves the channel's
+activity when it is written. Channel summon turns use a separate pending-turn
+table, not an editable queued text row.
+
+## Pending channel turns
+
+- **A summon writes its post before it waits.** A `pending_turns` row names
+  the post, agent and summoner, never another copy of the text. The message
+  route answers only the post's session, message and send with 201 when
+  a matching send is running, 202 only while pending with no reason.
+  A refused start answers its error, never a success status; its post stays.
+  Detail and queue frames carry a channel-only `pending` list.
+- **One idle agent starts at a time per pass.** The dispatcher walks pending
+  turns by `queued_at`, then `rowid`, skipping busy agents and full user,
+  project or channel caps. A full process ends the pass. Claiming a turn
+  deletes its pending row in the send-start transaction.
+  A full user cap skips only that summoner, not later summons of the same
+  idle agent. The agent lock and channel cap are checked before building a
+  turn's policy, snapshots or tool offers.
+- **Waiting turns hold no running place.** `MAX_QUEUED_PER_CHAT` counts
+  waiting turns per channel. `queuedPerUser` counts chat queued and not-sent
+  rows together with channel pending rows, failed ones included.
+- **Only the summoner or an admin cancels a pending turn.** `DELETE
+  /api/sessions/:id/pending/:turnId` removes the turn, never its post; one
+  already started or cancelled is a 409. Chat queue edit and delete routes
+  refuse channels.
+- **Pending turns share the dispatcher's lifetime and expiry clock.**
+  A drain leaves them for restart. Expired, retired-agent and failed starts
+  keep their reason in the pending list for seven days or until cancelled.
+  Loss of project access removes the pending row. The post always stays.
+  Changing a running cap wakes them; the queue runs before the scheduler.
+
 ## The queue
 
 - **A message to a busy chat is queued, never sent.** `POST
@@ -14,7 +47,7 @@ and the writer are in `docs/sessions.md`.
   the chat's own queue, then sends. Regenerate, compact, Run now and a
   new chat never queue.
 - **A queued row holds no place in any cap.** A user holds at most
-  `queuedPerUser` rows (queued and not sent together), a chat
+  `queuedPerUser` rows (including pending channel turns), a chat
   `MAX_QUEUED_PER_CHAT` queued ones; past either is a 429. A staged
   upload id may sit in one queued row of a chat only.
 - **A queue change bumps the revision alone.** It publishes no

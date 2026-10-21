@@ -6,6 +6,22 @@ import { pluralCommas } from "../../lib/format.ts";
 import { K, thousandsText, thousandsValue } from "../../lib/thousands.ts";
 
 export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
+  channelContextFloor: {
+    label: "Channel context floor",
+    text: "Smallest agent context window allowed in a channel.",
+  },
+  channelStreamTokens: {
+    label: "Channel stream",
+    text: "Posts, answers and traces kept in a channel's context.",
+  },
+  channelDropTokens: {
+    label: "Channel drop step",
+    text: "Tokens freed at once when a channel's context fills.",
+  },
+  channelWorkTokens: {
+    label: "Channel work room",
+    text: "Tokens a channel turn must have free for its own work.",
+  },
   rounds: {
     label: "Rounds",
     text: "Provider requests in one turn, the answer included.",
@@ -168,23 +184,27 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   sendsPerUser: {
     label: "Per user",
-    text: "Chats and runs one user has going at once. Scheduled runs are not counted.",
+    text: "Turns and runs one user has going at once. Scheduled runs are not counted.",
   },
   sendsPerProject: {
     label: "Per project",
-    text: "Chats and runs going at once in one project.",
+    text: "Turns and runs going at once in one project.",
+  },
+  sendsPerChannel: {
+    label: "Per channel",
+    text: "Agent turns going at once in one project channel.",
   },
   sendsRunning: {
     label: "At once",
-    text: "Chats and runs going at once, every project counted.",
+    text: "Turns and runs going at once, every project counted.",
   },
   queuedPerUser: {
     label: "Waiting per user",
-    text: "Messages one user may have waiting, not sent ones included.",
+    text: "Messages and channel turns one user may have waiting, failed ones included.",
   },
   queuedMinutes: {
     label: "Waiting time",
-    text: "How long a message may wait for the reply to end.",
+    text: "How long a message or channel turn may wait to start.",
   },
   archiveIdleDays: {
     label: "Archive idle chats",

@@ -35,7 +35,7 @@ export type AgentEmailDeps = {
     link(path: string): string;
     enqueue(fields: Enqueue): BusEvent[];
     register(kind: EmailKind, prepare: Prepare): void;
-    countSession(sessionId: string, kind: EmailKind, since: number): number;
+    countSend(sendId: string, kind: EmailKind): number;
     countProject(projectId: string, kind: EmailKind, since: number): number;
   };
   users: { byUsername(username: string): UserRow | null };
@@ -120,11 +120,7 @@ export function agentEmails(deps: AgentEmailDeps): AgentEmailPort {
       const body = packBody(content);
       return transact(deps.db, () => {
         const now = deps.clock();
-        const sent = deps.outbox.countSession(
-          actor.sessionId,
-          "agent",
-          actor.sendStartedAt,
-        );
+        const sent = deps.outbox.countSend(actor.sendId, "agent");
         if (sent + recipients.length > EMAILS_PER_SEND) {
           throw new Error(
             `email limit reached: a ${where === "run" ? "run" : "turn"} may email ${EMAILS_PER_SEND} users, ${Math.max(0, EMAILS_PER_SEND - sent)} left. Tell the user in your answer instead`,
@@ -146,6 +142,7 @@ export function agentEmails(deps: AgentEmailDeps): AgentEmailPort {
             userId: user.id,
             projectId: actor.projectId,
             sessionId: actor.sessionId,
+            sendId: actor.sendId,
             subject: content.subject,
             body,
           }),

@@ -51,6 +51,31 @@ export function refuseNewSummon(
   );
 }
 
+export function channelFirstWord(
+  text: string,
+  projectId: string,
+  deps: {
+    agents: Pick<SummonAgents, "byName">;
+    users: {
+      byUsername(name: string): { id: string; role: "admin" | "member" } | null;
+    };
+    projects: { isMember(projectId: string, userId: string): boolean };
+  },
+): "post" | "summon" {
+  const word = summonWord(text);
+  const name = summonName(text);
+  if (word === null || name === null) return "post";
+  if (deps.agents.byName(name) !== null) return "summon";
+  const user = deps.users.byUsername(name);
+  if (
+    user !== null &&
+    (user.role === "admin" || deps.projects.isMember(projectId, user.id))
+  ) {
+    return "post";
+  }
+  throw new BadRequest(noAgentNamed(word));
+}
+
 // whether a queued message, checked when it was queued, summons
 export const summons =
   (chatAgent: string) =>
@@ -161,6 +186,9 @@ export function regeneratedAgent(
   const turn = deps.sessions.send(sendId);
   if (turn === null || !turn.summoned) {
     return { agent: chatAgent, summoned: null };
+  }
+  if (turn.agentId === null) {
+    throw new BadRequest("a post cannot be regenerated");
   }
   const retired = deps.sessions
     .agents(sessionId)

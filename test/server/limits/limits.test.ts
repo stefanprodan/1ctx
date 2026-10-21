@@ -237,12 +237,12 @@ describe("limits area", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100, cores: 1 }).rows();
-      expect(rows).toHaveLength(54);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(54);
-      expect(rows.filter((row) => row.scope === "send")).toHaveLength(15);
+      expect(rows).toHaveLength(59);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(59);
+      expect(rows.filter((row) => row.scope === "send")).toHaveLength(19);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
-      expect(rows.filter((row) => row.scope === "sends")).toHaveLength(5);
+      expect(rows.filter((row) => row.scope === "sends")).toHaveLength(6);
       expect(rows.filter((row) => row.scope === "external")).toHaveLength(3);
       expect(rows.filter((row) => row.scope === "visuals")).toHaveLength(3);
       expect(rows.filter((row) => row.scope === "chats")).toHaveLength(2);
@@ -457,7 +457,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(54);
+      expect(body.limits).toHaveLength(59);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),
@@ -476,6 +476,7 @@ describe("limits area", () => {
       expect(body.limits.filter((row) => row.scope === "sends")).toEqual([
         expect.objectContaining({ name: "sendsPerUser", value: 2 }),
         expect.objectContaining({ name: "sendsPerProject", value: 8 }),
+        expect.objectContaining({ name: "sendsPerChannel", value: 4 }),
         expect.objectContaining({ name: "sendsRunning", value: 8 }),
         expect.objectContaining({ name: "queuedPerUser", value: 8 }),
         expect.objectContaining({ name: "queuedMinutes", value: 60 }),
@@ -493,6 +494,7 @@ describe("limits area", () => {
       expect(sends).toEqual([
         expect.objectContaining({ name: "sendsPerUser", value: 3 }),
         expect.objectContaining({ name: "sendsPerProject", value: 8 }),
+        expect.objectContaining({ name: "sendsPerChannel", value: 4 }),
         expect.objectContaining({ name: "sendsRunning", value: 8 }),
         expect.objectContaining({ name: "queuedPerUser", value: 8 }),
         expect.objectContaining({ name: "queuedMinutes", value: 60 }),

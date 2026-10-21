@@ -56,7 +56,7 @@ describe("visual rounds", () => {
         expect(first).not.toHaveProperty("title");
         const joined = await watcher(chat);
         watch(chat, joined, sessionId);
-        expect(frames(joined, "watched")[0]?.live).toMatchObject({
+        expect(frames(joined, "watched")[0]?.live[0]).toMatchObject({
           seq: first.seq,
           drafts: [
             {
@@ -81,7 +81,7 @@ describe("visual rounds", () => {
           html: "</p>",
           title: "Launch",
         });
-        expect(snapshot.live?.drafts?.[0]?.html).toBe("<p>\ud83d\ude80");
+        expect(snapshot.live[0]?.drafts?.[0]?.html).toBe("<p>\ud83d\ude80");
         chat.app.now.value += 1000;
         script.content(" Ready.\n\n");
         await tick();
@@ -95,7 +95,7 @@ describe("visual rounds", () => {
         script.finish("tool_calls");
         script.end();
         const answer = await waitScript(chat.scripted, 2);
-        expect(chat.app.runner.live(sessionId)?.drafts).toBeUndefined();
+        expect(chat.app.runner.live(sessionId)[0]?.drafts).toBeUndefined();
         const call = chat.app.sessions.message(first.messageId)?.toolCalls?.[0];
         expect(JSON.parse(call!.arguments)).toEqual({
           html: "<p>\ud83d\ude80</p>",
@@ -191,7 +191,7 @@ describe("visual rounds", () => {
           ).toBe(true);
           prefixes.set(draft.callIndex, prefix);
         }
-        expect(chat.app.runner.live(sessionId)?.drafts).toBeUndefined();
+        expect(chat.app.runner.live(sessionId)[0]?.drafts).toBeUndefined();
         answer.reply("Done.");
       } finally {
         await chat.app.shutdown();
@@ -217,7 +217,7 @@ describe("visual rounds", () => {
       chat.app.now.value += VISUAL_EVERY_MS;
       await tick();
       expect(frames(conn, "visual")).toHaveLength(1);
-      expect(chat.app.runner.live(sessionId)?.drafts).toBeUndefined();
+      expect(chat.app.runner.live(sessionId)[0]?.drafts).toBeUndefined();
       script.finish("tool_calls");
       script.end();
       const answer = await waitScript(chat.scripted, 2);
@@ -259,7 +259,7 @@ describe("visual rounds", () => {
       chat.app.now.value += VISUAL_EVERY_MS;
       await tick();
       expect(frames(conn, "visual")).toHaveLength(1);
-      expect(chat.app.runner.live(sessionId)?.drafts).toBeUndefined();
+      expect(chat.app.runner.live(sessionId)[0]?.drafts).toBeUndefined();
       script.finish("tool_calls");
       script.end();
       const answer = await waitScript(chat.scripted, 2);

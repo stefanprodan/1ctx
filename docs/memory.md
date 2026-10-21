@@ -5,8 +5,10 @@ Governs `src/server/memory/`, the `memory_edit` tools
 `src/server/runner/` and `shared/memory.ts`.
 
 Memory is what agents keep between sessions: one note per project, and
-one per automation that has its own (`ownMemory`), carried in the system
-prompt. A chat edits the project's note as it goes; a run with its own
+one per automation that has its own (`ownMemory`). Chats and runs carry it
+in the system prompt; a channel carries its fresh snapshot in the
+request-local message after the stream (`docs/channel-context.md`).
+A chat edits the project's note as it goes; a run with its own
 note edits it in the memory phase, an extra step after its main rounds.
 
 ## Notes
@@ -48,6 +50,16 @@ note edits it in the memory phase, an extra step after its main rounds.
   saved are gone. A run reads the note live.
 - **Edits run in call order.** A round's calls run in parallel, so
   each goes through the handle's queue.
+- **A channel turn has its own view.** It snapshots the current note at
+  start, keys `memory_views` by send id, and deletes that view at its end
+  or restart repair. Edits, refusals and the saving agent use the calling
+  send id, so another turn cannot change what it has seen. Chat views stay
+  keyed by session and keep their lifetime above.
+  The request-local block is fixed for its rounds, even after an edit;
+  the next summon reads the current note without moving the cached head.
+  The session foreign key has a full index for cascading deletes, beside
+  the partial unique chat-view index. Restart repair ends every running send,
+  then drops all send-scoped views without reading send history again.
 - **Two failed rounds stop the tool.** A settled round with edits but
   no success counts; a success resets it. After
   `MEMORY_EDIT_FAILED_ROUNDS` every call fails. Chat rounds and the

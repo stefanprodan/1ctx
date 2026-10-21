@@ -13,13 +13,16 @@
 // it starts one. Files come from the plus, a drop on the card or a
 // paste, are staged as they are picked, and go with the send. The
 // draft, text and staged files, survives a navigation; a refusal shows
-// under the box until the next keystroke.
+// under the box until the next keystroke. In a project channel the
+// message is a post: no agent chip, no switches, no chat commands, the
+// @ menu lists every agent and the meter is the stream's.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type {
+  ChannelMeter,
   QueuedMessage,
   RoundUsage,
 } from "../../shared/contracts/session.ts";
@@ -52,7 +55,7 @@ import {
   enterFills,
   runCommand,
 } from "./commands.ts";
-import { readout } from "./context.ts";
+import { meterReadout, readout } from "./context.ts";
 import {
   draftKey,
   dropDraftUploads,
@@ -105,6 +108,7 @@ export function Composer({
   off = NONE_OFF,
   placeholder: idle = "Message",
   reader = BROWSER_READER,
+  channel,
 }: {
   scope: Scope;
   // the project a file is staged in: the chat's, or the one a new chat
@@ -148,6 +152,8 @@ export function Composer({
   // /location's read of the position; null where the browser cannot
   // share one, which leaves the command out of the menu
   reader?: Locate | null;
+  // a project channel by name ("#finops"), and its meter when counted
+  channel?: { name: string; meter?: ChannelMeter };
 }) {
   const key = draftKey(me.value?.id ?? "", scope);
   const text = useSignal(readDraft(key).text);
@@ -196,10 +202,11 @@ export function Composer({
   const shut = useSignal(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const list = agents ?? [];
-  const fixed = agentId !== null;
+  const fixed = agentId !== null || channel !== undefined;
   // a new chat starts on the user's last pick, kept across composers
   // and visits; one not in this project's list falls back to the default
-  const agent = fixed ? agentId : startingAgent(list);
+  // a channel's post goes to no agent: its first word may summon one
+  const agent = channel ? "" : fixed ? agentId : startingAgent(list);
   live.current.key = key;
   live.current.agent = agent;
 
@@ -219,7 +226,9 @@ export function Composer({
 
   // a message sent while the reply runs waits for it to end
   const ready = agent !== null && !busy && !locating.value;
-  const readable = list.find((a) => a.id === agent)?.model.tools ?? false;
+  const readable =
+    channel !== undefined ||
+    (list.find((a) => a.id === agent)?.model.tools ?? false);
   const chat = "sessionId" in scope ? scope.sessionId : null;
   const edit = editOf(chat);
   const box = { key, text, failure };
@@ -237,7 +246,7 @@ export function Composer({
   };
   const started = onCompact !== undefined && onFork !== undefined;
   const block = (command: Command) =>
-    commandBlock({ started, running }, command);
+    commandBlock({ started, running, channel: channel !== undefined }, command);
   const quiet = shut.value || edit !== null;
   const matches = quiet
     ? []
@@ -245,9 +254,12 @@ export function Composer({
         text.value,
         !started || onRename !== undefined,
         reader !== null,
+        channel !== undefined,
       );
   // the @ menu, in a chat only: a new chat cannot summon
-  const summonable = quiet ? [] : summonMatches(text.value, agents, agentId);
+  const summonable = quiet
+    ? []
+    : summonMatches(text.value, agents, agentId, channel !== undefined);
   // one menu at most is open, since a draft starts with / or @
   const count = matches.length + summonable.length;
   const fillAt = (index: number): string =>
@@ -307,11 +319,16 @@ export function Composer({
       if (uploads.length > 0) void loadUploads(filesProjectId);
     }
   };
-  const context = readout(usage);
+  const context = channel ? meterReadout(channel.meter) : readout(usage);
   // a chat not started yet has the page to itself, so the box shows
   // two lines at rest; in a chat the transcript needs the room
   const tall = !("sessionId" in scope);
-  const placeholder = placeholderOf(agents, running, idle);
+  // a post needs no agent, so a channel without one still takes it
+  const placeholder = placeholderOf(
+    channel ? null : agents,
+    running,
+    channel ? `Message ${channel.name}` : idle,
+  );
   const refusal = failure.value ?? files.refusal.value;
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: a drop target has no role, and the plus does the same by keyboard
@@ -344,7 +361,7 @@ export function Composer({
         rows={tall ? 2 : 1}
         placeholder={placeholder}
         aria-label="Message"
-        disabled={agents !== null && list.length === 0}
+        disabled={!channel && agents !== null && list.length === 0}
         value={text.value}
         onInput={(ev) => {
           text.value = ev.currentTarget.value;
@@ -430,6 +447,7 @@ export function Composer({
       <div class="composer-row">
         <Add
           readable={readable}
+          filesOnly={channel !== undefined}
           onFiles={attach}
           {...switches}
           onFlip={(key) => flip(chat, off, key)}
@@ -441,11 +459,13 @@ export function Composer({
             onPick={project.onPick}
           />
         )}
-        <AgentPicker
-          agents={agents}
-          agentId={agent}
-          onPick={fixed ? undefined : (id) => void rememberAgent(id)}
-        />
+        {!channel && (
+          <AgentPicker
+            agents={agents}
+            agentId={agent}
+            onPick={fixed ? undefined : (id) => void rememberAgent(id)}
+          />
+        )}
         {context && (
           <span class="composer-ctx" title={context.title}>
             <span>{context.text}</span>

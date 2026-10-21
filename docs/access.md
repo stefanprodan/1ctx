@@ -204,6 +204,12 @@ from `emailOn` in `GET /api/me`.
 
 ## Projects
 
+- **Every team project has one channel.** It is created with the project in
+  the same transaction, visible to the team's members and every admin, and
+  deleted only by the project cascade. A personal project has none. The
+  channel has no name of its own, so a project rename updates its stored title
+  in the rename transaction.
+
 - **A personal project is its owner's alone, an admin included.** The
   rule is `projects/visible.ts`; a team project is open to its members
   and every admin. Every personal project is named `personal` (a table
@@ -285,6 +291,10 @@ connections watching that session.
 - **Delivery is per connection, never a Bun topic.** A connection
   holds its user's visible project ids and at most one watched session,
   so a slow one is closed alone and a revoked one stops at once.
+- **Channel detail and watch share a server-counted context meter.**
+  `channelContext` refreshes with posts and turn starts and ends, never
+  live deltas; `docs/channel-context.md` defines what it counts. Like the
+  feed row, it is built once per durable frame's audience, not per viewer.
 - **A durable frame goes to the connections holding its project.** It
   is built and encoded once, on the first connection in its audience,
   so an unseen event costs nothing. A `session` frame's `row` holds only
@@ -297,11 +307,16 @@ connections watching that session.
   decisions are final and a reconnect reads the chat's drafts again. The
   `watched` answer carries them too, so none falls between read and watch.
   `isDraftFrame()` guards both shapes and the nested draft. The
-  `watched` guard only checks its `drafts` is a list; the client skips a
-  draft `isAutomationDraft()` refuses, so one never stalls the answer.
+  `watched` guard checks only the frame type and that `live` is a list,
+  not each tail's fields. The client skips a draft `isAutomationDraft()`
+  refuses, so one never stalls the answer.
 - **Stream frames go to the session's watchers.** `watch` is authorized
   through the sessions port, and the watcher is registered before the
   `watched` snapshot, so no frame falls between.
+  `watched.live` and detail's `live` are lists, one tail per running send;
+  an idle session has none and a chat has at most one.
+  Channel turn stop and pending cancellation are authenticated routes,
+  further restricted to that turn's summoner or an admin after visibility.
 - **`access.changed` recomputes a connection's set.** It sends
   `granted`, `revoked` and `role`, and unwatches a session out of
   sight. Connections between upgrade and open are updated too.

@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bashArea } from "../../../src/server/bash/index.ts";
+import { bashArea, type Workspace } from "../../../src/server/bash/index.ts";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import type { ScratchChanges } from "../../../src/server/bash/scratch.ts";
 import { transact } from "../../../src/server/db/index.ts";
@@ -56,10 +56,11 @@ export const run = (
   caps: CommandCaps = callCaps,
   signal = freshSignal(),
   sessionId = s.session.id,
+  workspace: Workspace = { id: sessionId, sessionId },
 ) =>
   s.bash.run(
     s.projectId,
-    sessionId,
+    workspace,
     { ...s.agent, sessionId },
     command,
     caps,
@@ -69,8 +70,9 @@ export const run = (
 export function seedScratch(s: Setup, changes: Partial<ScratchChanges>) {
   transact(s.db, () => ({
     result: s.bash.scratch.write(
-      s.session.id,
-      s.bash.scratch.read(s.session.id).revision,
+      { id: s.session.id, sessionId: s.session.id },
+      s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+        .revision,
       { written: [], removed: [], cwd: "/knowledge", ...changes },
       s.now.value,
     ),
@@ -79,7 +81,7 @@ export function seedScratch(s: Setup, changes: Partial<ScratchChanges>) {
 
 export function scratchState(s: Setup) {
   return {
-    ...s.bash.scratch.read(s.session.id),
+    ...s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id }),
     usedAt: s.db
       .query<{ used_at: number }, [string]>(
         "select used_at from session_scratch where session_id = ?",

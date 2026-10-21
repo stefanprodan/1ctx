@@ -30,7 +30,8 @@ describe("automation memory phase", () => {
       memoryGuidance: guidance,
     });
     const run = await startRun(chat, automation.id);
-    const active = chat.app.runner.registry.get(run.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+      null)!;
     expect(active.policy.automation?.memoryGuidance).toBe(guidance);
     expect(JSON.stringify(run.main.body.messages)).not.toContain(guidance);
     const edited = await chat.member.call(
@@ -69,8 +70,8 @@ describe("automation memory phase", () => {
     await settle(chat, run.sessionId);
     const next = await startRun(chat, automation.id);
     expect(
-      chat.app.runner.registry.get(next.sessionId)?.policy.automation
-        ?.memoryGuidance,
+      (chat.app.runner.registry.inSession(next.sessionId)[0] ?? null)?.policy
+        .automation?.memoryGuidance,
     ).toBe("New guidance for later runs.");
     expect(JSON.stringify(next.main.body.messages)).not.toContain(
       "New guidance for later runs.",
@@ -535,7 +536,8 @@ describe("memory phase room", () => {
     );
     expect(saved.status).toBe(200);
     const run = await startRun(chat, automation.id);
-    const active = chat.app.runner.registry.get(run.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+      null)!;
     active.policy.contextLength = null;
     run.main.reply("");
     const phase = await waitScript(chat.scripted, 2);
@@ -557,7 +559,8 @@ describe("memory phase room", () => {
     await settle(chat, run.sessionId);
 
     const next = await startRun(chat, automation.id);
-    const nextActive = chat.app.runner.registry.get(next.sessionId)!;
+    const nextActive = (chat.app.runner.registry.inSession(next.sessionId)[0] ??
+      null)!;
     nextActive.policy.contextLength = messagesOnly;
     nextActive.policy.limits.contextReserve = 0;
     next.main.reply("");
@@ -582,7 +585,8 @@ describe("memory phase room", () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, { ownMemory: true });
     const run = await startRun(chat, automation.id);
-    const active = chat.app.runner.registry.get(run.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+      null)!;
     active.policy.contextLength = null;
     chat.scripted.refuse(400, "context window exceeded");
     run.main.reply("Done.");
@@ -599,7 +603,8 @@ describe("memory phase room", () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, { ownMemory: true });
     const run = await startRun(chat, automation.id);
-    const active = chat.app.runner.registry.get(run.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+      null)!;
     active.policy.contextLength = null;
     run.main.reply("");
     const phase = await waitScript(chat.scripted, 2);

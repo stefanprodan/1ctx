@@ -25,10 +25,12 @@ import {
 } from "../../helpers/subagents.ts";
 import { stage, start } from "./uploads-helpers.ts";
 
+const workspace = (sessionId: string) => ({ id: sessionId, sessionId });
+
 const scratchOf = (chat: ChatApp, sessionId: string) =>
   Object.fromEntries(
     new ScratchStore(chat.app.db)
-      .read(sessionId)
+      .read({ id: sessionId, sessionId: sessionId })
       .entries.map((file) => [file.path, Buffer.from(file.data).toString()]),
   );
 
@@ -216,7 +218,7 @@ describe("copying back", () => {
       const bytes = (text: string) => new TextEncoder().encode(text);
       transact(chat.app.db, () => {
         store.write(
-          parent.id,
+          workspace(parent.id),
           0,
           {
             written: [{ path: "old.txt", data: bytes("old"), mode: 0o644 }],
@@ -227,11 +229,17 @@ describe("copying back", () => {
         );
         return { result: undefined };
       });
-      const baseline = copyIn(chat.app.db, store, parent.id, child.id, 1);
+      const baseline = copyIn(
+        chat.app.db,
+        store,
+        workspace(parent.id),
+        workspace(child.id),
+        1,
+      );
       expect(scratchOf(chat, child.id)).toEqual({ "old.txt": "old" });
       transact(chat.app.db, () => {
         store.write(
-          child.id,
+          workspace(child.id),
           1,
           {
             written: [
@@ -251,8 +259,8 @@ describe("copying back", () => {
           store,
           current: () => ({ ...DEFAULT_LIMITS, scratchFiles: 2 }),
         },
-        child.id,
-        parent.id,
+        workspace(child.id),
+        workspace(parent.id),
         new Set(),
         baseline,
         3,
@@ -289,9 +297,9 @@ describe("copying back", () => {
       const bytes = (text: string) => new TextEncoder().encode(text);
       const write = (id: string, path: string, text: string) =>
         transact(chat.app.db, () => {
-          const at = store.read(id).revision;
+          const at = store.read(workspace(id)).revision;
           store.write(
-            id,
+            workspace(id),
             at,
             {
               written: [{ path, data: bytes(text), mode: 0o644 }],
@@ -302,15 +310,21 @@ describe("copying back", () => {
           );
           return { result: undefined };
         });
-      const baseline = copyIn(chat.app.db, store, parent, child, 1);
+      const baseline = copyIn(
+        chat.app.db,
+        store,
+        workspace(parent),
+        workspace(child),
+        1,
+      );
       // the parent's own command, while its child ran
       write(parent, "sub-1/report.md", "the parent's");
       write(child, "report.md", "the child's");
       const taken = new Set(["sub-2"]);
       const returned = await copyBack(
         { db: chat.app.db, store, current: () => DEFAULT_LIMITS },
-        child,
-        parent,
+        workspace(child),
+        workspace(parent),
         taken,
         baseline,
         3,

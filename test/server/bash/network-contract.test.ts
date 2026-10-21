@@ -80,9 +80,10 @@ for (const source of ["@/tmp/payload", "@-"]) {
             expect(seen[0].init.body).toEqual(bytes);
             expect(result.error, result.content).toBe(false);
             expect(result.content).toContain("posted");
-            expect(s.bash.scratch.read(s.session.id).entries[0].data).toEqual(
-              bytes,
-            );
+            expect(
+              s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+                .entries[0].data,
+            ).toEqual(bytes);
           },
         );
       } finally {

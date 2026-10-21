@@ -7,8 +7,9 @@ import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { SkillLoads } from "../../shared/api/skills.ts";
 import type { VisualCounts, WebCounts } from "../../shared/api/tools.ts";
 import type { Memory } from "../../shared/contracts/memory.ts";
-import type { ChildOf } from "../../shared/contracts/session.ts";
+import type { ChannelMeter, ChildOf } from "../../shared/contracts/session.ts";
 import type { QueueFrame } from "../../shared/socket.ts";
+import type { SessionOrigin } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import type { Db } from "../db/index.ts";
 import { transact } from "../db/index.ts";
@@ -67,7 +68,7 @@ export {
   openAlertRuns,
   type RawAlert,
 } from "./alerts.ts";
-export { refuseArchived } from "./archive.ts";
+export { refuseArchived, refuseChannel } from "./archive.ts";
 export { forgetCapabilityIn } from "./capabilities.ts";
 export { childChanged } from "./child-work.ts";
 export {
@@ -97,10 +98,13 @@ export {
   MAX_REGENERATE_BODY,
   MAX_SESSION_BODY,
   parseCreateSession,
+  parseDetailQuery,
   parseRegenerate,
   parseSendMessage,
+  parseTurnId,
   titleFrom,
 } from "./parse.ts";
+export type { PendingCursor, PendingRow } from "./pending.ts";
 export {
   MAX_QUEUED_PER_CHAT,
   NOT_SENT_KEPT_MS,
@@ -129,7 +133,12 @@ export {
   type SessionSearchLine,
   type SessionSearchPage,
 } from "./search.ts";
-export { forgetReasoning, lastPrompt, sendTurns } from "./sends.ts";
+export {
+  forgetReasoning,
+  lastPrompt,
+  REFUSABLE_REASONING,
+  sendTurns,
+} from "./sends.ts";
 export { SessionStore } from "./store.ts";
 export { type SummonAgents, summonOf } from "./summon.ts";
 
@@ -146,6 +155,7 @@ export type SessionsDeps = {
     byName(name: string): AgentRow | null;
   };
   live: LivePort;
+  channelMeter(sessionId: string): ChannelMeter;
   usage: UsagePort;
   uploads: UploadsPort;
   scratch: SweepScratch;
@@ -163,11 +173,14 @@ export type SessionsDeps = {
 
 export type Sessions = {
   store: SessionStore;
+  createChannel(projectId: string, name: string, now: number): void;
+  renameChannel(projectId: string, name: string): BusEvent[];
   // the session when the principal may see its project, else the one
   // 404 access throws for the project
   visible(principal: Principal, id: string): SessionRow;
   // the project id, or null: the socket's watch check
   sessionProject(principal: Principal, id: string): string | null;
+  origin(sessionId: string): SessionOrigin | null;
   // the feed row a session envelope carries, null for a session gone
   envelopeRow(sessionId: string): EnvelopeRow | null;
   // a project's sessions, children and archived ones included, newest
@@ -236,6 +249,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     deps.scratch,
     deps.pruned,
     deps.drafts,
+    deps.channelMeter,
   );
   // a subagent's child is never a chat of its own: every route and
   // watch by its id is the same 404 as a missing one
@@ -252,6 +266,13 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
   };
   return {
     store,
+    createChannel(projectId, name, now) {
+      store.createChannel({ projectId, title: name, now });
+    },
+    renameChannel(projectId, name) {
+      const row = store.renameChannel(projectId, name);
+      return row === null ? [] : [envelope(row, [], store.lastSend(row.id))];
+    },
     visible,
     sessionProject(principal, id) {
       try {
@@ -260,6 +281,15 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         if (err instanceof HttpError) return null;
         throw err;
       }
+    },
+    origin(id) {
+      return (
+        deps.db
+          .query<{ origin: SessionOrigin }, [string]>(
+            "select origin from sessions where id = ?",
+          )
+          .get(id)?.origin ?? null
+      );
     },
     envelopeRow: (sessionId) => envelopeRow(deps.db, sessionId),
     search(projectId, q, after, ask) {
@@ -302,27 +332,40 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
     sessionInfo: (sessionId) => sessionInfo(deps.db, sessionId),
     runAnswer: (sendId, memoryRound) => runAnswer(deps.db, sendId, memoryRound),
     dropQueued: (projectId, userId) =>
-      [...new Set(store.queue.dropInProject(projectId, userId))].flatMap(
-        (sessionId) => queueChanged(deps.db, sessionId, { shared: true }),
+      [
+        ...new Set([
+          ...store.queue.dropInProject(projectId, userId),
+          ...store.pending.dropInProject(projectId, userId),
+        ]),
+      ].flatMap((sessionId) =>
+        queueChanged(deps.db, sessionId, { shared: true }),
       ),
     queueFrame(sessionId) {
       return {
         revision: store.byId(sessionId)?.revision ?? 0,
         rows: chatQueue(deps.db, sessionId, null, { cut: true }),
+        ...(store.byId(sessionId)?.origin === "channel"
+          ? { pending: store.pending.ofSession(sessionId) }
+          : {}),
       };
     },
     sweepNotSent(now) {
       return transact(deps.db, () => {
         const gone = store.queue.sweep(now);
+        const pendingGone = store.pending.sweep(now);
         const byChat = new Map<string, string[]>();
         for (const { sessionId, authorId } of gone) {
           byChat.set(sessionId, [...(byChat.get(sessionId) ?? []), authorId]);
         }
         return {
-          result: gone.length,
-          events: [...byChat].flatMap(([chat, authors]) =>
-            queueChanged(deps.db, chat, { shared: false, authors }),
-          ),
+          result: gone.length + pendingGone.length,
+          events: [...new Set(pendingGone)]
+            .flatMap((id) => queueChanged(deps.db, id, { shared: true }))
+            .concat(
+              [...byChat].flatMap(([chat, authors]) =>
+                queueChanged(deps.db, chat, { shared: false, authors }),
+              ),
+            ),
         };
       });
     },

@@ -4,6 +4,8 @@
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { type DeletedRun, deletedRun } from "./alerts.ts";
+import type { UsagePort } from "./rows.ts";
+import { runPostsUnlinked } from "./run-post.ts";
 
 export type SessionDeleted = {
   type: "session.deleted";
@@ -29,22 +31,23 @@ function deleteSession(db: Db, id: string): SessionDeleted | "running" | null {
 export type Pruned = (run: DeletedRun) => BusEvent[];
 
 // a marked run's delete updates its automation's open alert, and one
-// the row names moves its revision, so a client drops the link
+// the row names moves its revision, so a client drops the link; so does
+// a channel whose post links it
 export function removeSession(
   db: Db,
   id: string,
   pruned: Pruned,
+  usage: UsagePort,
 ): SessionDeleted | "running" | null {
-  return transact(db, () => {
+  return transact<SessionDeleted | "running" | null>(db, () => {
     const run = deletedRun(db, id);
+    const unlinked = runPostsUnlinked(db, usage, { sessionId: id });
     const deleted = deleteSession(db, id);
+    if (deleted === null || deleted === "running") {
+      return { result: deleted, events: [] };
+    }
     const events =
-      run === null ||
-      (!run.marked && !run.named) ||
-      deleted === null ||
-      deleted === "running"
-        ? []
-        : pruned(run);
-    return { result: deleted, events };
+      run === null || (!run.marked && !run.named) ? [] : pruned(run);
+    return { result: deleted, events: [...events, ...unlinked()] };
   });
 }

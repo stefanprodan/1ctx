@@ -12,7 +12,8 @@ describe("visual tool administration", () => {
     const chat = await chatApp();
     try {
       const first = await startChat(chat, "first");
-      const before = chat.app.runner.registry.get(first.sessionId)!;
+      const before = (chat.app.runner.registry.inSession(first.sessionId)[0] ??
+        null)!;
       const initial = before.policy.offered.tools.find(
         (tool) => tool.name === "visualize",
       )!;
@@ -33,7 +34,7 @@ describe("visual tool administration", () => {
       await idle(chat.app);
       const second = await startChat(chat, "second");
       const offered = chat.app.runner.registry
-        .get(second.sessionId)!
+        .inSession(second.sessionId)[0]!
         .policy.offered.tools.find((tool) => tool.name === "visualize")!;
       expect(catalog.tokens).toBe(wireTokens([offered]));
       expect(catalog.description).toBe(offered.description);
@@ -110,7 +111,7 @@ describe("visual tool administration", () => {
       const start = await startChat(chat, "disabled");
       expect(
         chat.app.runner.registry
-          .get(start.sessionId)
+          .inSession(start.sessionId)[0]
           ?.policy.offered.tools.map((tool) => tool.name),
       ).not.toContain("visualize");
       start.script.reply("done");
@@ -130,7 +131,8 @@ describe("visual tool administration", () => {
         agentId,
       );
       expect(
-        chat.app.runner.registry.get(plain.sessionId)?.policy.offered.tools,
+        (chat.app.runner.registry.inSession(plain.sessionId)[0] ?? null)?.policy
+          .offered.tools,
       ).toEqual([]);
       expect(plain.script.body.tools).toBeUndefined();
       plain.script.reply("done");
@@ -174,7 +176,8 @@ describe("visual tool administration", () => {
         ]),
       );
       const first = await startChat(chat, "old caps");
-      const active = chat.app.runner.registry.get(first.sessionId)!;
+      const active = (chat.app.runner.registry.inSession(first.sessionId)[0] ??
+        null)!;
       const values = {
         ...DEFAULT_LIMITS,
         visualBytes: 16 * 1024,
@@ -191,7 +194,8 @@ describe("visual tool administration", () => {
       first.script.reply("done");
       const second = await startChat(chat, "new caps");
       expect(
-        chat.app.runner.registry.get(second.sessionId)?.policy.toolCaps,
+        (chat.app.runner.registry.inSession(second.sessionId)[0] ?? null)
+          ?.policy.toolCaps,
       ).toMatchObject({
         visualBytes: values.visualBytes,
         visualSendBytes: values.visualSendBytes,

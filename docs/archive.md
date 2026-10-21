@@ -7,6 +7,9 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
 
 ## Archive and agent retirement
 
+- **A channel is never archived, packed as an idle chat, or deleted alone.**
+  Fork, rename, archive and delete routes refuse it. Its project cascade is
+  the only deletion path; aging channel turns is separate channel work.
 - **An archived chat is read-only for good.** There is no unarchive;
   Fork is the way on. A run is never archived.
 - **Archiving expires pending automation drafts in the same
@@ -86,3 +89,20 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   Deleting a root takes its children by foreign key. A child's kept
   files are judged by its root (`KEPT_STILL`).
 - **No sweep vacuums.** SQLite reuses freed pages.
+
+## Channel turn aging
+
+- **Channel turns age independently.** Before chat archiving, the sweep
+  takes at most `CHATS_PER_STEP` ended, non-post channel sends older than
+  `archiveIdleDays`, one rechecking transaction each. A running send is
+  never touched.
+- **Aged tool rows keep their trace fields.** Their content, reasoning,
+  reasoning details, error (which also holds failed output) and packed result
+  are dropped; tool name, call id, status and saved docs remain.
+  The transaction also deletes opened files,
+  kept MCP files and child sessions, bumps the channel revision and publishes
+  the changed turn. Posts and answers remain.
+- **`sends.swept` is the trace-only mark.** The context builder reads it
+  directly and always traces an aged turn, the agent's own last turn
+  included (`docs/channel-context.md`). Aging preserves the fields
+  `traceCalls()` reads. A read of a swept delegate's child answers not found.

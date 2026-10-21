@@ -169,7 +169,11 @@ describe("uploads claimed by a send", () => {
         });
         expect(response.status).toBe(400);
         expect((await response.json()).error).toEqual(expect.any(String));
-        expect(chat.app.db.query("select * from sessions").all()).toEqual([]);
+        expect(
+          chat.app.db
+            .query("select * from sessions where origin != 'channel'")
+            .all(),
+        ).toEqual([]);
         expect(
           chat.app.db.query("select * from session_uploads").all(),
         ).toEqual([]);

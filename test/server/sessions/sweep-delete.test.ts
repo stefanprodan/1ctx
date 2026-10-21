@@ -152,11 +152,11 @@ describe("the chats sweep deletes", () => {
       .get(run)!.id;
     db.query(
       `insert into session_scratch
-         (session_id, cwd, revision, bytes, files, used_at)
-       values (?, '/', 1, 1, 1, 0)`,
-    ).run(run);
+         (workspace_id, session_id, cwd, revision, bytes, files, used_at)
+       values (?, ?, '/', 1, 1, 1, 0)`,
+    ).run(run, run);
     db.query(
-      `insert into session_scratch_files (session_id, path, data, mode)
+      `insert into session_scratch_files (workspace_id, path, data, mode)
        values (?, 'a', x'00', 420)`,
     ).run(run);
     db.query(
@@ -200,7 +200,9 @@ describe("the chats sweep deletes", () => {
       expect(
         chat.app.db
           .query<{ n: number }, [string]>(
-            `select count(*) as n from ${table} where session_id = ?`,
+            `select count(*) as n from ${table} where ${
+              table === "session_scratch_files" ? "workspace_id" : "session_id"
+            } = ?`,
           )
           .get(run)!.n,
       ).toBe(0);

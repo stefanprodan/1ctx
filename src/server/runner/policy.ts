@@ -364,6 +364,7 @@ export function buildPolicy(input: {
       maxVisuals: input.limits.maxVisuals,
     },
     sendCaps: {
+      sendsPerChannel: input.limits.sendsPerChannel,
       sendsPerUser: input.limits.sendsPerUser,
       sendsPerProject: input.limits.sendsPerProject,
       sendsRunning: input.limits.sendsRunning,

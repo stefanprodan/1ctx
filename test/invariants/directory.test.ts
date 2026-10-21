@@ -221,8 +221,8 @@ describe("the directory", () => {
     expect(body.tokens.skills).toBe(0);
     expect(body.tokens.tools).toBeGreaterThan(50);
     const started = await startChat(chat);
-    const offered = chat.app.runner.registry.get(started.sessionId)!.policy
-      .offered.tools;
+    const offered = (chat.app.runner.registry.inSession(started.sessionId)[0] ??
+      null)!.policy.offered.tools;
     expect(body.tokens.tools).toBe(wireTokens(offered));
     // each with the first sentence of the description the model reads,
     // all the page draws

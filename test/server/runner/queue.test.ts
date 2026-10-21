@@ -185,9 +185,9 @@ describe("the queue behind a busy chat", () => {
         expect(new Set(turn.map((row) => row.sendId)).size).toBe(1);
         expect(rows(chat, sessionId)).toEqual([]);
         // the turn counts against its oldest message's author
-        expect(chat.app.runner.registry.get(sessionId)?.startedBy).toBe(
-          chat.memberId,
-        );
+        expect(
+          (chat.app.runner.registry.inSession(sessionId)[0] ?? null)?.startedBy,
+        ).toBe(chat.memberId);
         next.reply("all read");
         await settleRun(chat, sessionId);
       } finally {
@@ -274,13 +274,17 @@ describe("the queue behind a busy chat", () => {
       expect(rows(chat, sessionId)).toEqual([
         { content: "from the admin", state: "queued", reason: null },
       ]);
-      expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+      expect(
+        chat.app.runner.registry.inSession(sessionId)[0] ?? null,
+      ).toBeNull();
 
       // the scheduler hears the wake after the queue has started
       const seen: boolean[] = [];
       const wake = chat.app.automationScheduler.wake;
       chat.app.automationScheduler.wake = () => {
-        seen.push(chat.app.runner.registry.get(sessionId) !== null);
+        seen.push(
+          (chat.app.runner.registry.inSession(sessionId)[0] ?? null) !== null,
+        );
         wake();
       };
       other.script.reply("done");
@@ -291,9 +295,9 @@ describe("the queue behind a busy chat", () => {
         content: "from the admin",
         name: "admin",
       });
-      expect(chat.app.runner.registry.get(sessionId)?.startedBy).toBe(
-        chat.adminId,
-      );
+      expect(
+        (chat.app.runner.registry.inSession(sessionId)[0] ?? null)?.startedBy,
+      ).toBe(chat.adminId);
       next.reply("done");
       await settleRun(chat, sessionId);
     } finally {
@@ -690,7 +694,9 @@ describe("the queue behind a busy chat", () => {
           .all(),
       ).toEqual([{ content: "stale", state: "not-sent", reason: "expired" }]);
       // the kept one started on the repaired chat
-      expect(app.runner.registry.get(sessionId)).not.toBeNull();
+      expect(
+        app.runner.registry.inSession(sessionId)[0] ?? null,
+      ).not.toBeNull();
       expect(
         app.sessions
           .messages(sessionId)
@@ -814,7 +820,9 @@ describe("the queue behind a busy chat", () => {
         expect(rows(chat, sessionId)).toEqual([
           { content: "read the archive", state: "not-sent", reason: "failed" },
         ]);
-        expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+        expect(
+          chat.app.runner.registry.inSession(sessionId)[0] ?? null,
+        ).toBeNull();
         expect(chat.scripted.scripts).toHaveLength(2);
       } finally {
         await chat.app.shutdown();
@@ -974,9 +982,9 @@ describe("the queue behind a busy chat", () => {
         { content: "from the admin", name: "admin" },
         { content: "from casey", name: "casey" },
       ]);
-      expect(chat.app.runner.registry.get(sessionId)?.startedBy).toBe(
-        chat.memberId,
-      );
+      expect(
+        (chat.app.runner.registry.inSession(sessionId)[0] ?? null)?.startedBy,
+      ).toBe(chat.memberId);
       next.reply("done");
       other.script.reply("done");
       await settleRun(chat, sessionId);
@@ -1002,7 +1010,8 @@ describe("the queue behind a busy chat", () => {
         "visualize",
       ]);
       expect(
-        chat.app.runner.registry.get(sessionId)?.policy.disabledCapabilities,
+        (chat.app.runner.registry.inSession(sessionId)[0] ?? null)?.policy
+          .disabledCapabilities,
       ).toEqual(["memory", "visualize"]);
       next.reply("done");
       await settleRun(chat, sessionId);
@@ -1216,7 +1225,9 @@ describe("the queue behind a busy chat", () => {
         expect(rows(chat, sessionId)).toEqual([
           { content: "tried", state: "not-sent", reason: "failed" },
         ]);
-        expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+        expect(
+          chat.app.runner.registry.inSession(sessionId)[0] ?? null,
+        ).toBeNull();
         expect(
           chat.app.sessions.messages(sessionId).map((row) => row.content),
         ).toEqual(["first", "done"]);

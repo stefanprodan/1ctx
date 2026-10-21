@@ -37,6 +37,7 @@ export function sendPolicy(
     disabledCapabilities?: readonly string[];
     // the chat's agent, when the agent was summoned into its chat
     summoned?: string | null;
+    channel?: boolean;
   },
 ): SendPolicy {
   const { sessionId, project, user, agent } = fields;
@@ -62,8 +63,9 @@ export function sendPolicy(
     sessionId: event === null ? sessionId : null,
     knowledge: deps.knowledge.snapshot(project.id),
     projectMemory:
-      (event === null ? deps.memory.view(sessionId) : null) ??
-      deps.memory.read(project.id, null).entries,
+      (event === null && !fields.channel
+        ? deps.memory.view(sessionId)
+        : null) ?? deps.memory.read(project.id, null).entries,
     automationMemory:
       automation?.ownMemory === true
         ? deps.memory.read(project.id, automation.id).entries

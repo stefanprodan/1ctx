@@ -49,6 +49,9 @@ export type AutomationSummary = {
   alert: AutomationAlert | null;
   // a run a restart cut starts again at the next start
   rerunOnRestart: boolean;
+  // a run that ends done with an answer posts it to the project's
+  // channel; never on in a personal project, which has none
+  postToChannel: boolean;
   // the first fire that starts a run suspends it; resume arms it again
   once: boolean;
   // when that fire suspended it, equal to suspendedAt until a resume

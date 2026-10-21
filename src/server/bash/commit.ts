@@ -14,6 +14,7 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { checkScratchNames } from "./names.ts";
 import { output } from "./output.ts";
 import type { Scratch, ScratchChanges, ScratchStore } from "./scratch.ts";
+import type { Workspace } from "./workspace.ts";
 
 // the docs commit, bound to knowledge's store; it opens no transaction
 // and runs inside the command's
@@ -32,7 +33,7 @@ export type CommandOutput = {
 };
 
 export type ScratchCommit = {
-  sessionId: string;
+  workspace: Workspace;
   before: Scratch;
   changes: ScratchChanges;
 };
@@ -80,7 +81,7 @@ export function commit(
       now,
     );
     deps.scratch.write(
-      scratch.sessionId,
+      scratch.workspace,
       scratch.before.revision,
       scratch.changes,
       now,
@@ -88,7 +89,7 @@ export function commit(
     // counted from the rows just written, so the caps hold whatever the
     // command worker answered, and bound the rows before their names are
     // walked
-    const stored = deps.scratch.sizes(scratch.sessionId);
+    const stored = deps.scratch.sizes(scratch.workspace);
     checkScratchTotals(
       scratch.before,
       {

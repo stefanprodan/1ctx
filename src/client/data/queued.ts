@@ -12,6 +12,7 @@
 // started row back.
 
 import type {
+  ChannelPostResponse,
   EditQueuedRequest,
   QueuedResponse,
   QueuedRowResponse,
@@ -24,14 +25,30 @@ import type { QueuedMessage } from "../../shared/contracts/session.ts";
 import { api } from "./api.ts";
 import { carry, changeOf } from "./capabilities.ts";
 import { partsOf } from "./queued-rows.ts";
+import { session } from "./session-held.ts";
 import { applyQueue } from "./session-queue.ts";
 import { sending } from "./session-start.ts";
+import { syncValues } from "./session-values.ts";
 import { take } from "./sessions.ts";
+import { upsert } from "./sessions-rows.ts";
 
 type Seen = Pick<QueuedMessage, "id" | "revision">;
 
 const answered = (sessionId: string, state: QueueState) =>
   applyQueue(sessionId, partsOf(state.revision, state.queue));
+
+function takePost(post: ChannelPostResponse): void {
+  const held = session.value;
+  if (held === null || held.session.id !== post.session.id) return;
+  if (post.session.revision <= held.session.revision) return;
+  session.value = {
+    ...held,
+    session: post.session,
+    messages: upsert(held.messages, post.messages),
+    send: post.send,
+  };
+  syncValues(session.value);
+}
 
 // the flips the person made ride on the message and are forgotten once
 // the server took it, as a turn or as a message that waits
@@ -48,13 +65,14 @@ export async function sendMessage(
   sending.value = true;
   try {
     const answer = await carry(id, body, () =>
-      api<SessionResponse | QueuedResponse>(
+      api<SessionResponse | ChannelPostResponse | QueuedResponse>(
         `/api/sessions/${encodeURIComponent(id)}/messages`,
         "POST",
         body,
       ),
     );
-    if ("session" in answer) take(answer);
+    if ("forkedFrom" in answer) take(answer);
+    else if ("session" in answer) takePost(answer);
     else answered(id, answer);
   } finally {
     sending.value = false;

@@ -99,10 +99,11 @@ layer, the primitives and the styles are in `docs/ui.md`.
   closes on a click outside, Escape, a link in it followed, or its
   owner leaving.
 - **Recent is the five pages opened last,** on the working face only
-  (`app/Recent.model.ts`, `app/Recent.state.ts`): a chat, a run, an
-  automation (its Memory tab too), an external task and a knowledge
-  file. A page records once it has read its own row, never a list, a
-  project page, an edit or new page, the profile or an admin page.
+  (`app/Recent.model.ts`, `app/Recent.state.ts`): a chat, a project
+  channel (`#<project>` with the channel icon), a run, an automation
+  (its Memory tab too), an external task and a knowledge file. A page
+  records once it has read its own row, never a list, a project page,
+  an edit or new page, the profile or an admin page.
   Every run of one automation shares a row, "Run of <automation>",
   linking to the run opened last. With nothing recorded the section
   and its label are not drawn.
@@ -120,7 +121,7 @@ layer, the primitives and the styles are in `docs/ui.md`.
 - **A row follows its object and never moves for it.** The socket's
   frames reach every tab for each project its user sees, and
   `recentFrame()` changes a held row in place: `session` renames a chat
-  (a run's own frame changes nothing), `automation` renames the
+  or a channel (a run's own frame changes nothing), `automation` renames the
   automation and its runs' row, `externalTask` and `knowledge` rename
   theirs; `deleted`, `automationDeleted` (its runs' row too, with
   `runs`), `externalTaskDeleted` and `knowledge` with `deleted` drop the

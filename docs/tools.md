@@ -25,6 +25,10 @@ MCP tools are in `docs/mcp.md`, the bash tool and curl in
 - **A change applies to the next send.** A send in flight keeps the
   caps and the offered set it started on; a send cap applies at the
   next admission.
+- **Channel context has four token limits.** `channelContextFloor` (262,144),
+  `channelStreamTokens` (100,000), `channelDropTokens` (20,000), and
+  `channelWorkTokens` (100,000). Their counting, refusal and drop rules,
+  including why these defaults, are in `docs/channel-context.md`.
 
 ## The tool loop
 
@@ -194,8 +198,8 @@ words.
   nothing is queued, so the model calls again with the users it may
   email. It logs `email refused`.
 - **The caps are constants, counted on the outbox.** `EMAILS_PER_SEND`
-  per send (the session's `agent` rows since `sendStartedAt`, sends
-  being serial per session) and `EMAILS_PER_PROJECT_DAY` per project
+  per send (the `agent` rows naming the tool context's `sendId`, never a
+  session time window) and `EMAILS_PER_PROJECT_DAY` per project
   over the last 24 hours. Over either, the call is an error the model
   reads, in the transaction that would queue it; the email is rendered
   before it, outside the write lock. The email itself is

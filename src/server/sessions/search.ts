@@ -26,7 +26,7 @@ export const SESSION_SCAN_BYTES = 8 * 1024 * 1024;
 
 export const SESSION_LIST_PAGE = FEED_LIMIT;
 
-export type SessionKind = "chat" | "run";
+export type SessionKind = "chat" | "run" | "channel";
 
 export type SessionSearchLine = SearchLine & { messageId: string };
 
@@ -52,8 +52,8 @@ export type SessionListRow = {
   id: string;
   title: string;
   kind: SessionKind;
-  agent: string;
-  owner: string;
+  agent: string | null;
+  owner: string | null;
   parentSessionId: string | null;
   lastActivityAt: number;
   archived: boolean;
@@ -68,7 +68,7 @@ type RawPlace = { id: string; last_activity_at: number };
 
 type RawFound = {
   title: string;
-  origin: "chat" | "automation";
+  origin: "chat" | "automation" | "channel";
   parent_session_id: string | null;
   bytes: number;
 };
@@ -83,8 +83,8 @@ type RawListed = Omit<RawFound, "bytes"> &
 const cursorOf = (row: { last_activity_at: number; id: string }) =>
   `${row.last_activity_at}.${row.id}`;
 
-const kindOf = (origin: "chat" | "automation"): SessionKind =>
-  origin === "chat" ? "chat" : "run";
+const kindOf = (origin: "chat" | "automation" | "channel"): SessionKind =>
+  origin === "automation" ? "run" : origin;
 
 // the range on last_activity_at lets the index seek past the cursor
 function past(after: RunsCursor | null): {
@@ -219,8 +219,8 @@ export function listSessionsOf(
          last_activity_at, archived_at, agents.name as agent,
          users.username as owner
        from sessions indexed by sessions_activity
-       cross join agents on agents.id = sessions.agent_id
-       cross join users on users.id = sessions.owner_id
+       left join agents on agents.id = sessions.agent_id
+       left join users on users.id = sessions.owner_id
        where project_id = ? and last_activity_at >= ? ${from.sql}
        order by last_activity_at desc, sessions.id limit ?`,
     )

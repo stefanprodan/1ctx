@@ -114,10 +114,11 @@ export function byAgents(db: Db, bounds: Bounds): GroupRow[] {
     db,
     bounds,
     USAGE_BY("agent_id"),
-    `select agent_id as key, sum(kind != 'run') as turns,
+    `select agent_id as key,
+            sum(kind in ('chat', 'compact')) as turns,
             sum(kind = 'run') as runs
        from sends where started_at >= ? and started_at < ?
-         and child = 0 group by key`,
+         and child = 0 and agent_id is not null group by key`,
     names,
   );
 }
@@ -148,7 +149,8 @@ export function byProjects(db: Db, bounds: Bounds): GroupRow[] {
     db,
     bounds,
     USAGE_BY("project_id"),
-    `select x.project_id as key, sum(s.kind != 'run') as turns,
+    `select x.project_id as key,
+            sum(s.kind in ('chat', 'compact')) as turns,
             sum(s.kind = 'run') as runs
        from sends s join sessions x on x.id = s.session_id
        where s.started_at >= ? and s.started_at < ?

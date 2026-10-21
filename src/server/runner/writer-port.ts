@@ -5,13 +5,18 @@
 // own port: compose passes the sessions area's store. Every method is a
 // single row write the writer wraps in one transact() with a touch().
 
-import type { Message, SendSummary } from "../../shared/contracts/session.ts";
+import type {
+  Message,
+  SendSummary,
+  TraceCall,
+} from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
   EventSource,
   SendCause,
   SendKind,
+  SessionOrigin,
   SessionStatus,
 } from "../../shared/words.ts";
 import type { OpenedRecord } from "../bash/index.ts";
@@ -41,13 +46,16 @@ export type SessionsPort = {
       claims: readonly { id: string; revision: number }[],
     ): boolean;
   };
+  pending: {
+    claim(id: string, sessionId: string, messageId: string): boolean;
+  };
   setDisabledCapabilities(id: string, keys: readonly string[]): void;
   create(fields: {
     id?: string;
     projectId: string;
     ownerId: string;
     agentId: string;
-    origin?: "chat" | "automation";
+    origin?: SessionOrigin;
     automationId?: string | null;
     runSource?: EventSource | null;
     disabledCapabilities?: readonly string[];
@@ -136,7 +144,7 @@ export type SessionsPort = {
   ): Message | null;
   createSend(fields: {
     id?: string;
-    kind?: SendKind;
+    kind?: Exclude<SendKind, "post">;
     sessionId: string;
     userId: string;
     agentId: string;
@@ -166,6 +174,17 @@ export type SessionsPort = {
       memoryFrom?: number;
     },
   ): SendSummary | null;
+  runPosts: {
+    // a done run's answer posted to its project's channel when its
+    // automation asks; null when it posts nothing
+    post(fields: {
+      runSessionId: string;
+      runSendId: string;
+      agentId: string;
+      now: number;
+      calls(rows: readonly Message[]): TraceCall[];
+    }): { channel: SessionRow; message: Message; send: SendSummary } | null;
+  };
   finishSend(
     id: string,
     fields: {

@@ -47,6 +47,8 @@ export type SaveAutomationRequest = {
   memoryGuidance?: string;
   // false when absent on create
   rerunOnRestart?: boolean;
+  // false when absent on create; true is refused in a personal project
+  postToChannel?: boolean;
   // false when absent on create
   once?: boolean;
   attentionMode?: AttentionMode;

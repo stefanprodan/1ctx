@@ -14,7 +14,7 @@ export type KnowledgeAuthor = {
   // the chat or run a command wrote from; null for the page
   sessionId: string | null;
   // key: a write over /mcp, its author the key's user
-  origin: "chat" | "automation" | "key" | null;
+  origin: "chat" | "automation" | "channel" | "key" | null;
   // the access key's name as it was at the write, so a revoked key's
   // history still reads; null for every other origin
   keyName: string | null;

@@ -442,8 +442,8 @@ test.each(["all", "catalog"] as const)(
             agentId: "agent",
             agentName: "coder",
             sessionId: "session",
+            workspace: { id: "session", sessionId: "session" },
             origin: "chat",
-            sendStartedAt: 0,
           },
         },
       );

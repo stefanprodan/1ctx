@@ -75,6 +75,11 @@ import { m0066 } from "./0066-external-task-cancelled.ts";
 import { m0067 } from "./0067-project-labels.ts";
 import { m0068 } from "./0068-external-tasks-restart.ts";
 import { m0069 } from "./0069-external-task-labels.ts";
+import { m0070 } from "./0070-project-channels.ts";
+import { m0071 } from "./0071-team-project-channels.ts";
+import { m0072 } from "./0072-channel-turns.ts";
+import { m0073 } from "./0073-channel-workspaces.ts";
+import { m0074 } from "./0074-run-posts.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -146,4 +151,9 @@ export const MIGRATIONS: Migration[] = [
   m0067,
   m0068,
   m0069,
+  m0070,
+  m0071,
+  m0072,
+  m0073,
+  m0074,
 ];

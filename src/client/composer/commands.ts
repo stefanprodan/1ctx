@@ -70,11 +70,13 @@ export function commandQuery(draft: string): string | null {
 }
 
 // rename false leaves /rename out, for a chat its viewer may not retitle;
-// location false leaves /location out, where the browser cannot share it
+// location false leaves /location out, where the browser cannot share it;
+// a channel, never compacted, forked or renamed, lists /location alone
 export function commandMatches(
   draft: string,
   rename = true,
   location = true,
+  channel = false,
 ): Command[] {
   const query = commandQuery(draft);
   if (query === null) return [];
@@ -82,7 +84,8 @@ export function commandMatches(
     (command) =>
       command.name.startsWith(query) &&
       (rename || command.name !== "rename") &&
-      (location || command.name !== "location"),
+      (location || command.name !== "location") &&
+      (!channel || command.name === "location"),
   );
 }
 
@@ -153,6 +156,8 @@ export type CommandState = {
   // the chat exists: a project page composer has none yet
   started: boolean;
   running: boolean;
+  // a project channel, which takes none of the chat's commands
+  channel?: boolean;
 };
 
 // why a command is greyed in the menu and refused on Enter: /location
@@ -164,6 +169,7 @@ export function commandBlock(
   command: Command,
 ): string | null {
   if (command.name === "location") return null;
+  if (state.channel) return "not in a channel";
   if (!state.started) return "the chat has not started";
   if (state.running && command.name !== "rename") return "a reply is running";
   return null;

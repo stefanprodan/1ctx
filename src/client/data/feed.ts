@@ -41,6 +41,7 @@ import {
   type Change,
   cursorPlace,
   feedOrder,
+  listsOrigin,
   mergeNextPage,
   ordered,
   reconcile,
@@ -161,7 +162,7 @@ const covers = (projectId: string, origin?: SessionOrigin) =>
   (origin === undefined ||
     (listFor.attention
       ? origin === "automation"
-      : listFor.origin === null || listFor.origin === origin));
+      : listsOrigin(listFor.origin, origin)));
 
 const shown = (): Shown => ({ origin: listFor.origin, q: listFor.q });
 
@@ -197,7 +198,7 @@ function firstPage(rows: FeedRow[]): {
     rows:
       edge === null
         ? rows.slice(0, head.size)
-        : rows.filter((row) => feedOrder(row.session, edge) <= 0),
+        : rows.filter((row) => row.pinned || feedOrder(row.session, edge) <= 0),
     next: head.next,
   };
 }

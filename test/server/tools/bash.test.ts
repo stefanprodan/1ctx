@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   acquireSession,
-  heldSessions,
+  heldWorkspaces,
 } from "../../../src/server/bash/queue.ts";
 import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
@@ -37,8 +37,8 @@ const context = (): ToolContext => ({
     agentId: "agent",
     agentName: "coder",
     sessionId: "session",
+    workspace: { id: "session", sessionId: "session" },
     origin: "chat",
-    sendStartedAt: 0,
   },
   signal: new AbortController().signal,
   now: () => 0,
@@ -64,8 +64,8 @@ function mountedContext(s: Setup): ToolContext {
       agentId: s.agent.id,
       agentName: s.agent.name,
       sessionId: s.session.id,
+      workspace: { id: s.session.id, sessionId: s.session.id },
       origin: "chat",
-      sendStartedAt: 0,
     },
   };
 }
@@ -117,7 +117,7 @@ describe("bash", () => {
           async run(projectId, sessionId, author, command, caps, signal) {
             calls++;
             expect(projectId).toBe("project");
-            expect(sessionId).toBe("session");
+            expect(sessionId).toEqual({ id: "session", sessionId: "session" });
             expect(author).toEqual({
               kind: "agent",
               id: "agent",
@@ -165,12 +165,15 @@ describe("bash", () => {
       let releaseSession: (() => void) | undefined;
       try {
         const refused = registry.run(call({ command: "echo no > file" }), ctx);
-        expect(heldSessions().has(s.session.id)).toBe(false);
+        expect(heldWorkspaces().has(s.session.id)).toBe(false);
         expect(await refused).toEqual({
           content: "the bash budget for this reply is spent",
           error: true,
         });
-        releaseSession = await acquireSession(s.session.id, freshSignal());
+        releaseSession = await acquireSession(
+          { id: s.session.id, sessionId: s.session.id },
+          freshSignal(),
+        );
         expect(
           await registry.run(call({ command: "echo no > file" }), ctx),
         ).toEqual({
@@ -178,8 +181,11 @@ describe("bash", () => {
           error: true,
         });
         releaseSession();
-        expect(heldSessions().has(s.session.id)).toBe(false);
-        expect(s.bash.scratch.read(s.session.id).revision).toBe(0);
+        expect(heldWorkspaces().has(s.session.id)).toBe(false);
+        expect(
+          s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+            .revision,
+        ).toBe(0);
         expect(s.knowledge.list(s.projectId).files).toEqual([]);
         expect(ctx.budget.bashCalls).toBe(1);
       } finally {
@@ -197,7 +203,10 @@ describe("bash", () => {
       const ctx = mountedContext(s);
       ctx.caps = { ...ctx.caps, maxBashCalls: 2 };
       const registry = new Registry([makeBashTool({ bash: s.bash })]);
-      const release = await acquireSession(s.session.id, freshSignal());
+      const release = await acquireSession(
+        { id: s.session.id, sessionId: s.session.id },
+        freshSignal(),
+      );
       const pending = ["first", "second", "third", "fourth"].map((name) =>
         registry.run(call({ command: `echo ${name} > ${name}` }), ctx),
       );
@@ -217,7 +226,10 @@ describe("bash", () => {
             .files.map((file) => file.name)
             .sort(),
         ).toEqual(["first", "second"]);
-        expect(s.bash.scratch.read(s.session.id).revision).toBe(2);
+        expect(
+          s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+            .revision,
+        ).toBe(2);
       } finally {
         release();
         await Promise.all(pending);

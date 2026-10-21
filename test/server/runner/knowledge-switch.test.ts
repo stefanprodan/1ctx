@@ -35,7 +35,9 @@ describe("the chat's knowledge switch", () => {
       const detail = (await response.json()) as SessionDetail;
       expect(detail.session.disabledCapabilities).toEqual(["knowledge"]);
       const script = await waitScript(chat.scripted, 1);
-      const active = chat.app.runner.registry.get(detail.session.id)!;
+      const active = (chat.app.runner.registry.inSession(
+        detail.session.id,
+      )[0] ?? null)!;
       expect(active.policy.offered.knowledge).toBe(false);
       expect(active.policy.offered.tools.map((tool) => tool.name)).toContain(
         "bash",
@@ -53,7 +55,8 @@ describe("the chat's knowledge switch", () => {
       );
       expect(sent.status).toBe(201);
       const second = await waitScript(chat.scripted, 2);
-      const again = chat.app.runner.registry.get(detail.session.id)!;
+      const again = (chat.app.runner.registry.inSession(detail.session.id)[0] ??
+        null)!;
       expect(again.policy.offered.knowledge).toBe(true);
       const text = (second.body.messages as { content: string }[])[0]!.content;
       expect(text).not.toContain(KNOWLEDGE_OFF_LINE);
@@ -71,7 +74,8 @@ describe("the chat's knowledge switch", () => {
         disabledCapabilities: [KNOWLEDGE],
       });
       const run = await startRun(chat, automation.id);
-      const policy = chat.app.runner.registry.get(run.sessionId)!.policy;
+      const policy = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+        null)!.policy;
       expect(policy.offered.knowledge).toBe(false);
       const prompt = (run.main.body.messages as { content: string }[])[0]!
         .content;
@@ -124,8 +128,8 @@ describe("the chat's knowledge switch", () => {
         KNOWLEDGE_OFF_LINE,
       );
       expect(
-        chat.app.runner.registry.get(detail.session.id)!.policy.offered
-          .knowledge,
+        (chat.app.runner.registry.inSession(detail.session.id)[0] ?? null)!
+          .policy.offered.knowledge,
       ).toBe(false);
       second.reply("again");
       await settled(chat, detail.session.id);

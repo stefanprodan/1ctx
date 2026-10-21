@@ -16,9 +16,16 @@ import {
   type RunsQuery,
 } from "./automation.ts";
 import { forgetCapabilityIn, setDisabled } from "./capabilities.ts";
+import {
+  createChannel as insertChannel,
+  touchSession,
+  renameChannel as updateChannelName,
+} from "./channel.ts";
 import { descendants, ROOT } from "./children.ts";
 import { type Pruned, removeSession, type SessionDeleted } from "./delete.ts";
 import {
+  type ChannelMeterPort,
+  missingChannelMeter,
   agents as readAgents,
   archive as readArchive,
   authors as readAuthors,
@@ -61,7 +68,9 @@ import {
 } from "./messages.ts";
 import { readOpenedFile } from "./opened-store.ts";
 import { packRows, resultText } from "./pack.ts";
+import { type ChannelPage, channelPage } from "./page.ts";
 import { titleFrom } from "./parse.ts";
+import { PendingStore } from "./pending.ts";
 import { QueueStore } from "./queued.ts";
 import { replaceSendRows } from "./regenerate.ts";
 import { repairRows } from "./repair.ts";
@@ -74,10 +83,13 @@ import {
   session,
   type UsagePort,
 } from "./rows.ts";
+import { RunPostStore } from "./run-post.ts";
 import {
   bumpSendCounters,
   endSendRow,
+  insertPostSend,
   insertSend,
+  type PostSendFields,
   readLastSend,
   readReasoningDetails,
   readSend,
@@ -96,14 +108,20 @@ export type ScratchPort = {
 export class SessionStore {
   // the messages waiting behind a busy chat
   readonly queue: QueueStore;
+  readonly pending: PendingStore;
+  // a run's answers in its channel, and an automation's runs deleted
+  readonly runPosts: RunPostStore;
   constructor(
     private readonly db: Db,
     private readonly usage: UsagePort,
     private readonly scratch: ScratchPort,
     private readonly pruned: Pruned = () => [],
     private readonly drafts: DraftsPort | null = null,
+    readonly channelMeter: ChannelMeterPort = missingChannelMeter,
   ) {
     this.queue = new QueueStore(db);
+    this.pending = new PendingStore(db);
+    this.runPosts = new RunPostStore(db, usage);
   }
 
   byId(id: string): SessionRow | null {
@@ -171,6 +189,22 @@ export class SessionStore {
         fields.parent?.messageId ?? null,
       );
     return this.byId(id)!;
+  }
+
+  createChannel(fields: {
+    projectId: string;
+    title: string;
+    now: number;
+  }): SessionRow {
+    return this.byId(insertChannel(this.db, fields))!;
+  }
+
+  renameChannel(projectId: string, title: string): SessionRow | null {
+    return updateChannelName(this.db, projectId, title);
+  }
+
+  createPost(fields: PostSendFields): SendSummary {
+    return this.send(insertPostSend(this.db, fields))!;
   }
 
   fork(fields: ForkFields): {
@@ -290,11 +324,7 @@ export class SessionStore {
     fields: { status: SessionStatus; now: number; mark?: RunMark | null },
   ): SessionRow | null {
     if (fields.mark) markRun(this.db, id, fields.mark);
-    this.db
-      .query(
-        "update sessions set status = ?, last_activity_at = ?, revision = revision + 1 where id = ?",
-      )
-      .run(fields.status, fields.now, id);
+    touchSession(this.db, id, fields.status, fields.now);
     return this.byId(id);
   }
 
@@ -308,13 +338,14 @@ export class SessionStore {
   }
 
   remove(id: string): SessionDeleted | "running" | null {
-    return removeSession(this.db, id, this.pruned);
+    return removeSession(this.db, id, this.pruned, this.usage);
   }
 
   count(projectId: string): number {
     return this.db
       .query<{ n: number }, [string]>(
-        `select count(*) as n from sessions where project_id = ? and ${ROOT}`,
+        `select count(*) as n from sessions
+         where project_id = ? and origin != 'channel' and ${ROOT}`,
       )
       .get(projectId)!.n;
   }
@@ -334,14 +365,12 @@ export class SessionStore {
     return automationRunning(this.db, automationId);
   }
 
-  // every run of the automation in the caller's transaction, in one
-  // statement however many runs it kept; their usage stays
-  deleteRuns(automationId: string): number {
-    return this.db
-      .query("delete from sessions where automation_id = ?")
-      .run(automationId).changes;
+  channelPage(
+    sessionId: string,
+    cursor: { before: number | null; around: number | null },
+  ): ChannelPage {
+    return channelPage(this.db, sessionId, cursor);
   }
-
   expiredRuns(now: number): SessionRow[] {
     return expiredAutomationRuns(this.db, this.usage, now);
   }

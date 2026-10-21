@@ -251,6 +251,8 @@ export type Draft = {
   // when a run needs attention, as typed
   attentionGuidance: string;
   rerunOnRestart: boolean;
+  // its runs post their answers to the project's channel
+  postToChannel: boolean;
   once: boolean;
 } & AccessDraft;
 
@@ -279,6 +281,8 @@ export function draftOf(
       attention: AUTOMATION_DEFAULTS.attentionMode,
       attentionGuidance: AUTOMATION_DEFAULTS.attentionGuidance,
       rerunOnRestart: AUTOMATION_DEFAULTS.rerunOnRestart,
+      // off until asked, and never in a proposal's defaults
+      postToChannel: false,
       once: AUTOMATION_DEFAULTS.once,
       web: true,
       visuals: true,
@@ -303,6 +307,7 @@ export function draftOf(
     attention: a.attentionMode,
     attentionGuidance: a.attentionGuidance,
     rerunOnRestart: a.rerunOnRestart,
+    postToChannel: a.postToChannel,
     once: a.once,
     web: !a.disabledCapabilities.includes(WEB),
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
@@ -415,6 +420,7 @@ export function requestOf(
       // kept while off, so turning a mode on again brings it back
       attentionGuidance: d.attentionGuidance.trim(),
       rerunOnRestart: d.rerunOnRestart,
+      postToChannel: d.postToChannel,
       once: d.once,
       disabledCapabilities: disabledOf(d, shown),
     },

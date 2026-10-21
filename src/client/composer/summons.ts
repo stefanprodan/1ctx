@@ -5,7 +5,8 @@
 // a draft is naming and what a pick fills. Whether a first word names
 // an agent is the server's to say, since the list here is loaded once
 // a visit and an agent made since would be refused. A new chat starts
-// on the picked agent and cannot summon, so its composer opens no menu.
+// on the picked agent and cannot summon, so its composer opens no menu;
+// in a channel every agent turn is a summon.
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 
@@ -18,14 +19,17 @@ export function summonQuery(draft: string): string | null {
 }
 
 // the project's agents the draft starts, the chat's own left out; a
-// new chat (no agent yet) lists none. The list holds live agents only
+// new chat (no agent yet) lists none, a channel (no agent of its own)
+// every one. The list holds live agents only
 export function summonMatches(
   draft: string,
   agents: readonly AgentSummary[] | null,
   chatAgentId: string | null,
+  channel = false,
 ): AgentSummary[] {
   const query = summonQuery(draft);
-  if (query === null || agents === null || chatAgentId === null) return [];
+  if (query === null || agents === null) return [];
+  if (chatAgentId === null && !channel) return [];
   return agents.filter(
     (agent) => agent.id !== chatAgentId && agent.name.startsWith(query),
   );

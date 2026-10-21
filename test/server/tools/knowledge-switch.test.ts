@@ -39,11 +39,11 @@ const context = (): ToolContext => ({
   actor: {
     projectId: "p",
     sessionId: "s",
+    workspace: { id: "s", sessionId: "s" },
     userId: "u",
     agentId: "a",
     agentName: "agent",
     origin: "chat",
-    sendStartedAt: 0,
   },
   now: () => 0,
   signal: new AbortController().signal,

@@ -36,6 +36,7 @@ type Raw = RawAlert & {
   attention_guidance: string;
   disabled_capabilities: string;
   rerun_on_restart: number;
+  post_to_channel: number;
   once: number;
   once_fired_at: number | null;
   once_run_session_id: string | null;
@@ -95,6 +96,7 @@ const row = (raw: Raw): AutomationSummary => ({
   alert: alertOf(raw),
   disabledCapabilities: JSON.parse(raw.disabled_capabilities),
   rerunOnRestart: raw.rerun_on_restart === 1,
+  postToChannel: raw.post_to_channel === 1,
   once: raw.once === 1,
   onceFiredAt: raw.once_fired_at,
   onceRunSessionId: raw.once_run_session_id,
@@ -134,6 +136,7 @@ export type AutomationFields = Pick<
   | "attentionGuidance"
   | "disabledCapabilities"
   | "rerunOnRestart"
+  | "postToChannel"
   | "once"
 >;
 
@@ -257,9 +260,9 @@ export class AutomationStore {
           (id, project_id, owner_id, agent_id, name, instructions, schedule,
            tz, deadline_ms, retention_days, own_memory,
            memory_guidance, attention_mode, attention_guidance,
-           disabled_capabilities, rerun_on_restart, once,
+           disabled_capabilities, rerun_on_restart, post_to_channel, once,
            next_at, created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -278,6 +281,7 @@ export class AutomationStore {
         fields.attentionGuidance,
         JSON.stringify(fields.disabledCapabilities),
         fields.rerunOnRestart ? 1 : 0,
+        fields.postToChannel ? 1 : 0,
         fields.once ? 1 : 0,
         fields.nextAt,
         fields.now,
@@ -295,7 +299,8 @@ export class AutomationStore {
            schedule = ?, tz = ?, deadline_ms = ?, retention_days = ?,
            next_at = ?, own_memory = ?, memory_guidance = ?,
            attention_mode = ?, attention_guidance = ?,
-           disabled_capabilities = ?, rerun_on_restart = ?, once = ?,
+           disabled_capabilities = ?, rerun_on_restart = ?,
+           post_to_channel = ?, once = ?,
            revision = revision + 1, edit_revision = edit_revision + 1,
            updated_at = ? where id = ?`,
       )
@@ -315,6 +320,7 @@ export class AutomationStore {
         fields.attentionGuidance,
         JSON.stringify(fields.disabledCapabilities),
         fields.rerunOnRestart ? 1 : 0,
+        fields.postToChannel ? 1 : 0,
         fields.once ? 1 : 0,
         fields.now,
         id,

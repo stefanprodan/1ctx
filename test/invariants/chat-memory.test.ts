@@ -444,7 +444,10 @@ describe("a chat saves to the project's memory", () => {
       expect(compacted.status).toBe(200);
       const summary = await pending;
       expect(promptOf(summary)).not.toContain("## Time");
-      expect(chat.app.runner.registry.get(a)!.policy.offered.tools).toEqual([]);
+      expect(
+        (chat.app.runner.registry.inSession(a)[0] ?? null)!.policy.offered
+          .tools,
+      ).toEqual([]);
       summary.reply("The chat so far.");
       await settled(chat, a);
       expect(views(chat, a)).toBe(0);
@@ -475,9 +478,10 @@ describe("a chat saves to the project's memory", () => {
       sent.script.usage({ prompt: 10_000_000 });
       sent.script.end();
       const summary = await waitScript(chat.scripted, count + 1);
-      expect(chat.app.runner.registry.get(a)!.policy.offered.tools).not.toEqual(
-        [],
-      );
+      expect(
+        (chat.app.runner.registry.inSession(a)[0] ?? null)!.policy.offered
+          .tools,
+      ).not.toEqual([]);
       summary.reply("The chat so far.");
       await settled(chat, a);
       const summaries = chat.app.sessions

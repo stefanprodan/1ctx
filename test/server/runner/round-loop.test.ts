@@ -109,7 +109,7 @@ describe("a loop in call arguments", () => {
     ]);
     const retry = { attempt: 1, max: 1, cause: "output_loop" as const };
     expect(frames(conn, "retry").map((frame) => frame.retry)).toEqual([retry]);
-    expect(chat.app.runner.live(sessionId)).toMatchObject({
+    expect(chat.app.runner.live(sessionId)[0]).toMatchObject({
       retry,
       content: "",
       reasoning: "",
@@ -215,7 +215,7 @@ describe("a loop in text", () => {
     expect(deltas.length).toBeGreaterThan(0);
     expect(frames(conn, "restart")).toHaveLength(1);
     expect(frames(conn, "restart")[0]!.seq).toBeGreaterThan(deltas.at(-1)!.seq);
-    expect(chat.app.runner.live(sessionId)).toMatchObject({
+    expect(chat.app.runner.live(sessionId)[0]).toMatchObject({
       content: "",
       reasoning: "",
     });

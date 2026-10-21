@@ -21,7 +21,7 @@ import {
 } from "../../../src/client/data/sessions.ts";
 import type { AutomationDraft } from "../../../src/shared/contracts/automation-draft.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
-import { hasWatchedDrafts } from "../../../src/shared/socket.ts";
+import { isWatchedFrame } from "../../../src/shared/socket.ts";
 import {
   automation,
   automationDraft,
@@ -190,7 +190,7 @@ describe("a watch's answer", () => {
     onSocket({
       type: "watched",
       sessionId: "chat-1",
-      live: null,
+      live: [],
       drafts: [automationDraft("run")],
     });
     expect(states()).toEqual([["draft-run", "pending"]]);
@@ -208,11 +208,11 @@ describe("a watch's answer", () => {
       JSON.stringify({
         type: "watched",
         sessionId: "chat-1",
-        live: null,
+        live: [],
         drafts: [{ ...createDraft(), fields: older }, automationDraft("run")],
       }),
     );
-    expect(hasWatchedDrafts(event)).toBe(true);
+    expect(isWatchedFrame(event)).toBe(true);
     onSocket(event);
     expect(states()).toEqual([["draft-run", "pending"]]);
   });

@@ -119,7 +119,10 @@ describe("open command", () => {
         ["/tmp/a", "last"],
         ["/tmp/b", "other"],
       ]);
-      expect(s.bash.scratch.read(s.session.id).entries).toContainEqual(
+      expect(
+        s.bash.scratch.read({ id: s.session.id, sessionId: s.session.id })
+          .entries,
+      ).toContainEqual(
         expect.objectContaining({ path: "a", data: Buffer.from("after") }),
       );
     } finally {

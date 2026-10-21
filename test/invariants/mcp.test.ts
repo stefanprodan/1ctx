@@ -1286,8 +1286,8 @@ describe("MCP snapshots across sends", () => {
     expect(changed.status).toBe(200);
     const started = await startChat(chat);
     expect(
-      chat.app.runner.registry.get(started.sessionId)?.policy.toolCaps
-        .callTimeoutMs,
+      (chat.app.runner.registry.inSession(started.sessionId)[0] ?? null)?.policy
+        .toolCaps.callTimeoutMs,
     ).toBe(1000);
     started.script.toolRound([
       {
@@ -1615,7 +1615,8 @@ describe("MCP catalog and lifecycle end to end", () => {
       }) as typeof fetch;
     const { chat } = await sendFixture({ timeoutMs: 60_000, wrap });
     const started = await startChat(chat);
-    const sendId = chat.app.runner.registry.get(started.sessionId)!.id;
+    const sendId = (chat.app.runner.registry.inSession(started.sessionId)[0] ??
+      null)!.id;
     started.script.toolRound([
       {
         id: "shutdown",
@@ -1771,7 +1772,9 @@ describe("MCP mid-send mutation matrix", () => {
   test("switches, patterns, and timeouts move only on following sends", async () => {
     const { chat, server } = await sendFixture({ mode: "all" });
     const first = await startChat(chat);
-    const firstPolicy = chat.app.runner.registry.get(first.sessionId)!.policy;
+    const firstPolicy = (chat.app.runner.registry.inSession(
+      first.sessionId,
+    )[0] ?? null)!.policy;
     const firstServer = firstPolicy.offered.mcp[0]!;
     expect(firstServer.timeoutMs).toBeNull();
     expect(firstServer.tools.map((tool) => tool.name)).toContain(
@@ -1783,8 +1786,8 @@ describe("MCP mid-send mutation matrix", () => {
     });
     expect(off.status).toBe(200);
     expect(
-      chat.app.runner.registry.get(first.sessionId)!.policy.offered.mcp[0]
-        ?.tools,
+      (chat.app.runner.registry.inSession(first.sessionId)[0] ?? null)!.policy
+        .offered.mcp[0]?.tools,
     ).toEqual(firstServer.tools);
     first.script.reply("first");
     await waitDone(chat.app, first.sessionId);
@@ -1802,7 +1805,8 @@ describe("MCP mid-send mutation matrix", () => {
     });
     expect(narrowed.status).toBe(200);
     expect(
-      chat.app.runner.registry.get(first.sessionId)!.policy.offered.mcp,
+      (chat.app.runner.registry.inSession(first.sessionId)[0] ?? null)!.policy
+        .offered.mcp,
     ).toEqual([]);
     second.reply("second");
     await waitDone(chat.app, first.sessionId);
@@ -1813,8 +1817,8 @@ describe("MCP mid-send mutation matrix", () => {
     );
     expect(mcpNames).toEqual(["mcp__flux__search_flux_docs"]);
     expect(
-      chat.app.runner.registry.get(first.sessionId)!.policy.offered.mcp[0]
-        ?.timeoutMs,
+      (chat.app.runner.registry.inSession(first.sessionId)[0] ?? null)!.policy
+        .offered.mcp[0]?.timeoutMs,
     ).toBe(1000);
     third.reply("third");
     await waitDone(chat.app, first.sessionId);
@@ -1871,7 +1875,8 @@ describe("MCP mid-send mutation matrix", () => {
     ).toBe(false);
     await saveServers(chat, links, "all");
     expect(
-      chat.app.runner.registry.get(first.sessionId)!.policy.offered.mcp,
+      (chat.app.runner.registry.inSession(first.sessionId)[0] ?? null)!.policy
+        .offered.mcp,
     ).toEqual([]);
     second.reply("second");
     await waitDone(chat.app, first.sessionId);
@@ -1905,7 +1910,8 @@ describe("MCP mid-send mutation matrix", () => {
       "all",
     );
     const first = await startChat(chat);
-    const active = chat.app.runner.registry.get(first.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(first.sessionId)[0] ??
+      null)!;
     expect(active.policy.offered.mcp[0]?.url).toBe("http://flux.test/mcp");
 
     const moved = await chat.admin.call("PATCH", `/api/mcp/${server.id}`, {
@@ -1945,7 +1951,8 @@ describe("MCP mid-send mutation matrix", () => {
       "mcp__flux__search_flux_operator_docs",
     );
     expect(
-      chat.app.runner.registry.get(first.sessionId)!.policy.offered.mcp[0]?.url,
+      (chat.app.runner.registry.inSession(first.sessionId)[0] ?? null)!.policy
+        .offered.mcp[0]?.url,
     ).toBe("http://docs.test/mcp");
     second.reply("second");
     await waitDone(chat.app, first.sessionId);

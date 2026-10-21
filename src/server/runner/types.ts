@@ -4,6 +4,7 @@
 // The runner's ports and the capability it answers.
 
 import type {
+  ChannelPostResponse,
   CreateSessionRequest,
   QueuedResponse,
   RegenerateRequest,
@@ -51,7 +52,11 @@ export type RunnerDeps = {
     byId(id: string): AgentRow | null;
     byName(name: string): AgentRow | null;
   };
-  users: { byId(id: string): UserRow | null };
+  users: {
+    byId(id: string): UserRow | null;
+    byUsername(name: string): UserRow | null;
+  };
+  projects: { isMember(projectId: string, userId: string): boolean };
   providers: {
     chat: RoundDeps["chat"];
     byId(id: string): { name: string; wire: Wire } | null;
@@ -87,8 +92,8 @@ export type RunnerDeps = {
 };
 
 export type MessageAnswer =
-  | { status: 201; body: SessionDetail }
-  | { status: 202; body: QueuedResponse };
+  | { status: 201; body: SessionDetail | ChannelPostResponse }
+  | { status: 202; body: QueuedResponse | ChannelPostResponse };
 
 export type Runner = {
   registry: Registry;
@@ -121,7 +126,8 @@ export type Runner = {
   ): SessionDetail;
   compact(principal: Principal, sessionId: string): SessionDetail;
   startRun(event: Event): PreparedRun;
-  stop(principal: Principal, sessionId: string): void;
+  stop(principal: Principal, sessionId: string, sendId?: string): void;
+  cancelPending(principal: Principal, sessionId: string, id: string): void;
   // every send on a deleted agent ends as a stop does
   stopAgent(agentId: string): void;
   // the tools area's delegate port: a subagent of the send whose
@@ -131,7 +137,8 @@ export type Runner = {
     call: ToolCall,
     ctx: ToolContext,
   ): Promise<ToolResult>;
-  live: (sessionId: string) => ReturnType<typeof live> | null;
+  live: (sessionId: string) => ReturnType<typeof live>[];
+  channelMeter(sessionId: string): { tokens: number; budget: number };
   // no more admissions, then up to boundMs for the running sends and
   // their asks to end on their own; cut ends the wait
   drain(boundMs: number, cut?: Promise<void>): Promise<DrainResult>;

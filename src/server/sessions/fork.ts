@@ -112,7 +112,9 @@ export function copyRows(
   );
   for (const [sendId, rows] of grouped) {
     const source = db
-      .query<RawSend, [string]>("select * from sends where id = ?")
+      .query<Pick<RawSend, "first_message_id">, [string]>(
+        "select first_message_id from sends where id = ?",
+      )
       .get(sendId);
     const first = source && ids.get(source.first_message_id);
     if (!first) throw new Error("fork send has no copied first message");

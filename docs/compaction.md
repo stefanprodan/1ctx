@@ -6,6 +6,10 @@ Governs the summary round and what a chat's history is after one:
 Sends and the writer are in `docs/sessions.md`, the queue in
 `docs/queue.md`.
 
+A channel never compacts. It reuses the tail's whole-turn walk and 20,000
+token cap for its own latest turn, and its thinking replay rule, under
+`docs/channel-context.md`'s shared stream budget.
+
 ## The summary and its tail
 
 - **A summary round triggers at `compactsAt()`**

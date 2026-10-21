@@ -78,6 +78,8 @@ Completions shape, about one token a tool under the azure one.
   `anthropic` only.** The history carries a reply's reasoning, with its
   model, only from sends on the same provider; the window fit counts it
   only where it is sent.
+  Channel history is always edited: as with a compaction tail, it never
+  replays thinking on `anthropic` (`docs/channel-context.md`).
 - **`openai-compatible` (mlx-serve, llama-server) reads
   `enable_thinking` on every request, off included.** It also gets
   `prompt_cache_key`, and no past reasoning.

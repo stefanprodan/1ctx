@@ -70,7 +70,7 @@ describe("startSend", () => {
           firstMessageId: detail.messages[0].id,
           userId: chat.memberId,
         });
-        expect(detail.live).toMatchObject({
+        expect(detail.live[0]).toMatchObject({
           sendId: detail.send.id,
           messageId: detail.messages[1].id,
           seq: 0,
@@ -154,7 +154,7 @@ describe("the checkpoint", () => {
     await tick();
     const res = await chat.member.call("GET", `/api/sessions/${sessionId}`);
     const body = await res.json();
-    expect(body.live.content).toBe(`${"a".repeat(3000)}b`);
+    expect(body.live[0]!.content).toBe(`${"a".repeat(3000)}b`);
     expect(body.session.revision).toBe(1);
     script.reply(" done");
   });
@@ -426,7 +426,9 @@ describe("finishTool rollback", () => {
               event.send?.status === "failed",
           ),
         ).toHaveLength(1);
-        expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+        expect(
+          chat.app.runner.registry.inSession(sessionId)[0] ?? null,
+        ).toBeNull();
       } finally {
         stop();
         chat.app.socket.dispose();
@@ -510,7 +512,7 @@ describe("finalizeSend rollback", () => {
       status: "stopped",
       cause: "stop",
     });
-    expect(chat.app.runner.registry.get(sessionId)).toBeNull();
+    expect(chat.app.runner.registry.inSession(sessionId)[0] ?? null).toBeNull();
     chat.app.socket.dispose();
   });
 });

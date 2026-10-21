@@ -31,7 +31,7 @@ export type SendCounters = {
 
 export type SendFields = {
   id?: string;
-  kind?: SendKind;
+  kind?: Exclude<SendKind, "post">;
   sessionId: string;
   userId: string;
   agentId: string;
@@ -46,29 +46,61 @@ export type SendFields = {
   now: number;
 };
 
+export type PostSendFields = {
+  id?: string;
+  sessionId: string;
+  userId: string;
+  agentId?: string | null;
+  firstMessageId: string;
+  now: number;
+};
+
+export function insertPostSend(db: Db, fields: PostSendFields): string {
+  const id = fields.id ?? newId();
+  db.query(
+    `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
+       provider_name, model, status, first_message_id, rounds, tool_calls,
+       summoned, child, started_at, finished_at)
+     values (?, ?, 'post', ?, ?, null, null, null, 'done', ?, 1, 0, 0, 0,
+       ?, ?)`,
+  ).run(
+    id,
+    fields.sessionId,
+    fields.userId,
+    fields.agentId ?? null,
+    fields.firstMessageId,
+    fields.now,
+    fields.now,
+  );
+  return id;
+}
+
 export function insertSend(db: Db, fields: SendFields): string {
   const id = fields.id ?? newId();
   const child = fields.child === true;
   const parent = db
-    .query<{ child: number }, [string]>(
-      "select parent_session_id is not null as child from sessions where id = ?",
+    .query<{ child: number; origin: string }, [string]>(
+      `select parent_session_id is not null as child, origin
+       from sessions where id = ?`,
     )
     .get(fields.sessionId);
   if (parent !== null && (parent.child === 1) !== child) {
     throw new Error("a send is a child's exactly when its session is");
   }
   const mcp = storeMcpDigest(db, fields.mcpDigest ?? null);
+  const kind = fields.kind ?? "chat";
+  const swept = parent?.origin === "channel" && !child ? 0 : null;
   db.query(
     `insert into sends (id, session_id, kind, user_id, agent_id, provider_id,
        provider_name, model, status, first_message_id, mcp, summoned,
-       child, started_at)
+       child, swept, started_at)
      values (?, ?, ?, ?, ?, ?,
        coalesce((select name from providers where id = ?), ?), ?,
-       'running', ?, ?, ?, ?, ?)`,
+       'running', ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     fields.sessionId,
-    fields.kind ?? "chat",
+    kind,
     fields.userId,
     fields.agentId,
     fields.providerId,
@@ -80,6 +112,7 @@ export function insertSend(db: Db, fields: SendFields): string {
     mcp,
     fields.summoned === true ? 1 : 0,
     child ? 1 : 0,
+    swept,
     fields.now,
   );
   return id;
@@ -124,7 +157,11 @@ export function readReasoningDetails(
 // reasoning and thinking records that this provider and model wrote are
 // dropped, so no later turn sends them again. Other records, the phase
 // among them, stay. Answers how many messages changed.
-const REFUSABLE = new Set(["reasoning", "thinking", "redacted_thinking"]);
+export const REFUSABLE_REASONING: ReadonlySet<string> = new Set([
+  "reasoning",
+  "thinking",
+  "redacted_thinking",
+]);
 
 export function forgetReasoning(
   db: Db,
@@ -153,7 +190,7 @@ export function forgetReasoning(
         continue;
       }
       if (!Array.isArray(items)) continue;
-      const kept = items.filter((item) => !REFUSABLE.has(item?.type));
+      const kept = items.filter((item) => !REFUSABLE_REASONING.has(item?.type));
       if (kept.length === items.length) continue;
       update.run(kept.length > 0 ? JSON.stringify(kept) : null, row.id);
       changed++;
@@ -217,7 +254,13 @@ export function sendTurns(
   sessionId: string,
 ): Map<
   string,
-  { agentId: string; agentName: string; summoned: boolean; providerId: string }
+  {
+    agentId: string;
+    agentName: string;
+    summoned: boolean;
+    providerId: string;
+    swept: boolean;
+  }
 > {
   const rows = db
     .query<
@@ -227,13 +270,14 @@ export function sendTurns(
         name: string;
         summoned: number;
         provider_id: string;
+        swept: number | null;
       },
       [string]
     >(
       `select sends.id, sends.agent_id, agents.name, sends.summoned,
-         sends.provider_id
+         sends.provider_id, sends.swept
        from sends join agents on agents.id = sends.agent_id
-       where sends.session_id = ?`,
+       where sends.session_id = ? and sends.kind != 'post'`,
     )
     .all(sessionId);
   return new Map(
@@ -244,6 +288,7 @@ export function sendTurns(
         agentName: row.name,
         summoned: row.summoned === 1,
         providerId: row.provider_id,
+        swept: row.swept === 1,
       },
     ]),
   );

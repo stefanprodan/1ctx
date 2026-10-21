@@ -295,7 +295,7 @@ test("oversized round results are stored cut with bash tails and the answer and 
   const chat = await chatApp({ window: 40_000 });
   try {
     const { script, sessionId } = await startChat(chat);
-    const send = chat.app.runner.registry.get(sessionId)!;
+    const send = (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!;
     const calls = Array.from({ length: 10 }, (_, index) => ({
       id: `read-${index}`,
       name: "bash",

@@ -3,10 +3,12 @@
 Governs `src/server/sessions/` and the runner's sends in
 `src/server/runner/`.
 
-A session (`SESSION_ORIGINS`) is a chat users write in or an automation's
-run. Both share the writer, caps and sweep. A send (`SEND_KINDS`:
-`chat`, `compact`, `run`) is one turn, compaction or run. Its rounds each
-ask the model and run its calls. Rules for runs alone are in
+A session (`SESSION_ORIGINS`) is a chat users write in, a team project's
+channel, or an automation's run. A channel has no owner or agent. A send
+(`SEND_KINDS`: `chat`, `compact`, `run`, `post`) is one turn, compaction,
+run or channel post. A post has no provider or model and may have no agent;
+it is done with one round when written and starts no model turn. Model sends'
+rounds each ask the model and run its calls. Rules for runs alone are in
 `docs/automations.md`; the queue in `docs/queue.md`; the tool loop in
 `docs/tools.md`; memory in `docs/memory.md`; archive, packing and the
 sweep in `docs/archive.md`; compaction in `docs/compaction.md`.
@@ -27,14 +29,18 @@ arrives.
 
 ## Sends and caps
 
-- **One send per session, under the runner's lock.** The lock is taken
+- **Chats hold one send; channels hold one per agent.** The registry is
+  keyed by send id, with a session index. A channel admits distinct agents
+  up to `sendsPerChannel` (default 4, range 1 to 16), beside the other caps.
+  A stopped send holds its place until freed. Admission is taken
   synchronously in `runner/registry.ts` before anything is written.
   `admit()` checks the caps and the caller reserves with `set()` in the
   same turn, no `await` between.
 - **Every send counts in one tally.** A message, regenerate, compact,
   Run now and a scheduled run all count under `sendsPerUser`,
   `sendsPerProject` and `sendsRunning`. The user is whoever started it
-  (typed, regenerated, compacted, pressed Run now), in every project.
+  (typed, summoned, regenerated, compacted, pressed Run now), in every project.
+  A channel turn's usage and caps belong to its summoner; a post holds no place.
 - **`sendsRunning` defaults to 48 a core, 64 to 256.** A pod carries
   sends by its CPU; 48 is half what a bench machine's core carried, for
   slower x86 cores. The cores are `availableParallelism()` (a container's CPU
@@ -65,6 +71,9 @@ arrives.
   after commit.
 - **The reply in flight is checkpointed without a revision.** Every
   250 ms or 2 KB (`runner/stream.ts`).
+- **Channel running state is derived from its sends.** Every start and end
+  touches the session after writing the send row. It is `running` while any
+  send is running, otherwise `done`; the turn keeps its own end status.
 - **A streaming reply renders only whole blocks.** The timed `html`
   frame renders `content` up to `stableEnd()` (`render/blocks.ts`) and
   sets `htmlAt` there, since a block cut mid-way renders shorter than
@@ -85,6 +94,31 @@ arrives.
   large tool row's overflow pages.
 
 ## Turns
+
+- **A channel post is written at once.** A member or admin uses the message
+  route; the server writes one done `post` send and its user row in one
+  transaction, with no usage or model turn. A post is never edited. A leading
+  `@name` is a plain post when it names a project member or admin, an agent
+  summon when it names a live agent, and an unknown name is refused. An agent
+  wins a name shared with a user. A summon starts immediately when admitted, otherwise
+  its turn waits (`docs/queue.md`). Its `first_message_id` names the post
+  already written; starting never moves or rewrites that user row.
+  The response carries only the session summary, the new message and its
+  post send, at the post's revision, never a page or a later turn's revision.
+  Posting advances activity and revision without setting the channel status.
+  Channel history uses a fixed start snapshot, grouped by turn with a shared
+  dropped mark and stream budget (`docs/channel-context.md`), never the
+  chat's per-round history path.
+- **A run may post its answer.** It is one reply row under a done `post`
+  send with the run's agent and no user row (`docs/automations.md`); it
+  starts no turn and has no send of its own to stop or run again.
+- **A channel is permanent within its project.** It cannot be forked, renamed,
+  archived, deleted, regenerated, compacted or stopped through chat routes.
+- **A channel agent keeps its own workspace.** Its `/tmp`, cwd, `/mcp`
+  mount, folder counter and command queue use the channel and agent key
+  across that agent's turns. `/knowledge` and `/repos` remain the
+  project's, and `/uploads` remains the channel session's for every
+  agent.
 
 - **A turn may open with 1 to `MAX_TURN_MESSAGES` user messages.**
   `runner.sendTurn()` (`runner/turn.ts`) writes each as its own
@@ -109,6 +143,9 @@ arrives.
 - **A send ends for one cause.** Finish, stop, failure, shutdown or
   deadline, through one compare-and-set in the runner. `finalizeSend`
   runs exactly once, and the lock is held until the stream has let go.
+- **Stopping a channel names its send.** `POST
+  /api/sessions/:id/sends/:sendId/stop` stops only that turn, allowed to its
+  summoner or an admin. A chat's existing stop route stays unchanged.
 - **Stream bounds (`runner/round.ts`).** Two minutes quiet after the
   first event, or a reply past 1 MB, is a failure. The wait for the
   first event is bounded by the deadline and `streamChat()`'s
@@ -198,6 +235,8 @@ arrives.
   (`docs/mcp.md`). What is fixed per agent and project leads; the user's
   line follows, as a team chat's author changes it. A subagent's
   is `subagentPrompt()` (`docs/subagents.md`).
+  A channel has its own stable head and one request-local message between
+  its frozen stream and the turn's own rows (`docs/channel-context.md`).
 
 ## Summons
 
@@ -228,7 +267,8 @@ arrives.
   and neither send is summoned, or both are summoned sends of the same
   agent.
 - **The trace never leaks a tool's content.** `memory_edit` shows
-  only `action=` and `topic=`. A saving bash call always keeps a
+  only `action=` and `topic=`; `delegate` shows its one-line
+  `description`, never the raw task. A saving bash call always keeps a
   ` saved` mark however it is cut. A tool the reader is not offered
   ends ` (not your tool)`; every builtin counts as the reader's, since
   the chat's switches hold for every agent.

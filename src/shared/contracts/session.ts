@@ -28,9 +28,11 @@ import type { ToolCall } from "./tool.ts";
 export type SessionSummary = {
   id: string;
   projectId: string;
-  ownerId: string;
-  agentId: string;
+  ownerId: string | null;
+  agentId: string | null;
   origin: SessionOrigin;
+  // the first row agents still read in a channel; absent on chats and runs
+  droppedSeq?: number | null;
   forkedFromId: string | null;
   // the automation a run belongs to; null for a chat, and for a run
   // whose automation was deleted
@@ -170,6 +172,9 @@ export type Message = {
   // the subagent's session a delegate row started, absent on every
   // other row; never in the result's text, which a low cut may cut
   childSessionId?: string;
+  // a run's answer its automation posted to the channel, absent on
+  // every other row
+  run?: RunPost;
   model: string | null;
   ttftMs: number | null;
   thinkingMs: number | null;
@@ -182,6 +187,25 @@ export type Message = {
   nativeFinish: string | null;
   createdAt: number;
   finishedAt: number | null;
+};
+
+// one call of a turn as a trace reads it: never its result
+export type TraceCall = {
+  // the tool that ran: the row's name, an MCP call's wire name
+  name: string;
+  arguments: string;
+  status: MessageStatus | null;
+  // the docs a bash call wrote, from its row
+  saved: SavedDocs | null;
+};
+
+// what a channel row posted by a run carries beside its answer: the
+// run's calls, drawn as a trace for each reader, and the run, whose
+// session and automation are null once deleted
+export type RunPost = {
+  calls: TraceCall[];
+  sessionId: string | null;
+  automationName: string | null;
 };
 
 // a subagent's work under its parent's delegate row: the child's
@@ -216,9 +240,9 @@ export type SendSummary = {
   sessionId: string;
   kind: SendKind;
   userId: string;
-  agentId: string;
-  providerId: string;
-  model: string;
+  agentId: string | null;
+  providerId: string | null;
+  model: string | null;
   status: SessionStatus;
   cause: SendCause | null;
   error: string | null;
@@ -243,6 +267,8 @@ export type SendSummary = {
   summoned: boolean;
   // prompt plus completion tokens over every round the provider counted
   tokens: number;
+  // its tool rows were aged to their trace-only form
+  swept?: true;
   startedAt: number;
   finishedAt: number | null;
 };
@@ -304,9 +330,16 @@ export type SessionDetail = {
     origin: SessionOrigin | null;
   } | null;
   messages: Message[];
-  // the send in flight, or the last one; null before the first
+  // channel-only paging cursors; absent when a chat or run is read whole
+  page?: { before: number | null; after: number | null };
   send: SendSummary | null;
-  live: LiveSend | null;
+  // channel-only: the agent turns whose rows are on the page, so each
+  // names the post it answers and its summoner
+  sends?: SendSummary[];
+  live: LiveSend[];
+  // channel-only turns whose posts are already in the transcript
+  pending?: PendingTurn[];
+  channelContext?: ChannelMeter;
   authors: SessionAuthor[];
   // the agents its rows name, a retired one included, so a reply keeps
   // its agent's name and avatar once the agent is deleted
@@ -320,6 +353,11 @@ export type SessionDetail = {
   automationDrafts: AutomationDraft[];
 };
 
+export type ChannelMeter = {
+  tokens: number;
+  budget: number;
+};
+
 // the characters of a queued message's text a socket frame carries
 export const QUEUED_PREVIEW = 2048;
 
@@ -329,6 +367,15 @@ export const QUEUED_PREVIEW = 2048;
 // files. On a socket frame text is a preview of QUEUED_PREVIEW
 // characters at most, cut then true; the detail and an answer carry it
 // whole
+export type PendingTurn = {
+  id: string;
+  messageId: string;
+  authorId: string;
+  agentId: string;
+  queuedAt: number;
+  reason: "expired" | "agent-deleted" | "failed" | null;
+};
+
 export type QueuedMessage = {
   id: string;
   author: { id: string; username: string };

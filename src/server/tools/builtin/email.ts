@@ -21,7 +21,7 @@ export const EMAILS_PER_PROJECT_DAY = 50;
 export type EmailRequest = { to: string[]; subject: string; body: string };
 
 // the send's chat or run, as the tool context names it
-export type EmailActor = NonNullable<ToolContext["actor"]>;
+export type EmailActor = NonNullable<ToolContext["actor"]> & { sendId: string };
 
 export type AgentEmailPort = {
   // the answer the model reads; a throw is a refusal it reads
@@ -114,7 +114,7 @@ export function makeEmailTool(port: AgentEmailPort | null): Tool {
       if (port === null || ctx.actor === null) {
         throw new Error("email is not available here");
       }
-      return port.email(ctx.actor, request);
+      return port.email({ ...ctx.actor, sendId: ctx.sendId }, request);
     },
   };
 }

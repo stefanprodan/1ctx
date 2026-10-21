@@ -59,6 +59,23 @@ function history(): Db {
   for (let c = 0; c < 2000; c++) {
     session.run(id(), "chat", null, NOW - c * HOUR, NOW - c * HOUR);
   }
+  db.exec(`
+    insert into sessions
+      (id, project_id, owner_id, agent_id, origin, title, status, created_at,
+       last_activity_at)
+      values ('channel-plan', 't', null, null, 'channel', 'team-one', 'done',
+        0, 0);
+    insert into sends
+      (id, session_id, kind, user_id, agent_id, provider_id, provider_name,
+       model, status, first_message_id, started_at, finished_at, swept)
+      values ('channel-send', 'channel-plan', 'chat', 'u', 'a', 'pr', 'prov',
+        'm', 'done', 'channel-tool', -10000000000, -9999999999, 0);
+    insert into messages
+      (id, session_id, seq, kind, send_id, round, content, status,
+       tool_call_id, tool_name, created_at, finished_at)
+      values ('channel-tool', 'channel-plan', 1, 'tool', 'channel-send', 1,
+        'result', 'done', 'call', 'bash', -10000000000, -9999999999);
+  `);
   return db;
 }
 
@@ -105,6 +122,74 @@ describe("the sweeps over runs", () => {
         const sweep = plans(db, () =>
           sweepChats({ db, store, scratch, log: silent }, 0, DEFAULT_LIMITS),
         );
+        const aged = [...sweep].find(([sql]) =>
+          sql.includes("indexed by sends_channel_unswept"),
+        );
+        expect(aged).toBeDefined();
+        expect(aged![1]).toContain(
+          "SCAN sessions USING INDEX sessions_channel",
+        );
+        expect(aged![1]).toContain(
+          "SEARCH sends USING INDEX sends_channel_unswept (session_id=? AND finished_at<?)",
+        );
+        expect(aged![1].some((line) => /SCAN sends/.test(line))).toBe(false);
+        if (!stats) {
+          const toolUpdate = [...sweep].find(([sql]) =>
+            sql.startsWith("update messages set content"),
+          );
+          expect(toolUpdate![1]).toContain(
+            "SEARCH messages USING INDEX messages_send (send_id=?)",
+          );
+          const childDelete = [...sweep].find(([sql]) =>
+            sql.startsWith("delete from sessions where parent_message_id"),
+          );
+          expect(childDelete![1]).toContain(
+            "SEARCH sessions USING COVERING INDEX sessions_parent_message (parent_message_id=?)",
+          );
+          expect(childDelete![1]).toContain(
+            "SEARCH messages USING INDEX messages_send (send_id=?)",
+          );
+          const openedDelete = [...sweep].find(([sql]) =>
+            sql.startsWith("delete from opened_files"),
+          );
+          expect(
+            openedDelete![1].some((line) =>
+              line.startsWith("SEARCH opened_files"),
+            ),
+          ).toBe(true);
+          expect(
+            openedDelete![1].some((line) => line.startsWith("SEARCH messages")),
+          ).toBe(true);
+          const keptDelete = [...sweep].find(([sql]) =>
+            sql.startsWith("delete from mcp_kept_files"),
+          );
+          expect(
+            keptDelete![1].some((line) =>
+              line.startsWith("SEARCH mcp_kept_files"),
+            ),
+          ).toBe(true);
+          expect(
+            keptDelete![1].some((line) => line.startsWith("SEARCH messages")),
+          ).toBe(true);
+          const sendRows = [...sweep].find(([sql]) =>
+            sql.includes("from messages where send_id = ? order by seq"),
+          );
+          expect(
+            sendRows![1].some((line) => line.startsWith("SEARCH messages")),
+          ).toBe(true);
+          const sessionBump = [...sweep].find(([sql]) =>
+            sql.startsWith("update sessions set revision"),
+          );
+          expect(
+            sessionBump![1].some((line) => line.startsWith("SEARCH sessions")),
+          ).toBe(true);
+          const sendMark = [...sweep].find(([sql]) =>
+            sql.startsWith("update sends set swept"),
+          );
+          expect(
+            sendMark![1].some((line) => line.startsWith("SEARCH sends")),
+          ).toBe(true);
+        }
         const orphans = [...sweep].filter(([sql]) =>
           sql.includes("automation_id is null"),
         );

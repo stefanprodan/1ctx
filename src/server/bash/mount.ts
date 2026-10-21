@@ -42,6 +42,7 @@ import { acquireSession } from "./queue.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
 import { READ_ONLY_TO_SUBAGENT } from "./tree.ts";
 import type { CommandWorkers } from "./worker.ts";
+import { type Workspace, workspaceSession } from "./workspace.ts";
 
 // the repositories a send mounted, read-only under /repos
 export type CommandRepos = {
@@ -173,13 +174,14 @@ function mountJob(
   command: string,
   started: number,
   projectId: string,
-  sessionId: string,
+  workspace: Workspace,
 ): Mount {
+  const sessionId = workspaceSession(workspace);
   const repos = caps.repos;
   const storage = deps.current();
   const docs = caps.knowledge;
   const rows = docs ? deps.knowledge.mountedDocs(projectId) : [];
-  const stored = deps.scratch.read(sessionId);
+  const stored = deps.scratch.read(workspace);
   // the worker writes each row at /tmp/<path>, so a row outside the
   // rule never mounts; the commit drops it
   const mountable = mountableScratch(stored.entries);
@@ -190,11 +192,11 @@ function mountJob(
     (skipped.length === 0
       ? ""
       : `left out ${skipped.length} file${skipped.length === 1 ? "" : "s"} in /tmp whose name is no longer allowed, dropped when the command saves\n`);
-  const scratchTime = deps.scratch.usedAt(sessionId) ?? 0;
+  const scratchTime = deps.scratch.usedAt(workspace) ?? 0;
   const uploads = deps.knowledge.mountedUploads(
     caps.subagent?.uploadsFrom ?? sessionId,
   );
-  const kept = listKept(deps.db, sessionId);
+  const kept = listKept(deps.db, workspace);
   const keptBytes = kept.reduce((bytes, entry) => bytes + entry.bytes, 0);
   // A lowered cap still permits deleting or shrinking the mounted base.
   const projectBytes = Math.max(
@@ -283,12 +285,13 @@ function stopped(
 export async function run(
   deps: MountDeps,
   projectId: string,
-  sessionId: string,
+  workspace: Workspace,
   author: KnowledgeAuthor,
   command: string,
   caps: CommandCaps,
   signal: AbortSignal,
 ): Promise<CommandResult> {
+  const sessionId = workspaceSession(workspace);
   const started = Date.now();
   const deadline = new AbortController();
   const timer = setTimeout(
@@ -331,7 +334,7 @@ export async function run(
     return signal.aborted ? "abort" : ended;
   };
   try {
-    releaseSession = await acquireSession(sessionId, combined);
+    releaseSession = await acquireSession(workspace, combined);
     turnAt = Date.now();
     release = await acquireProcess(combined);
     combined.throwIfAborted();
@@ -353,7 +356,7 @@ export async function run(
       command,
       started,
       projectId,
-      sessionId,
+      workspace,
     );
     const docs = caps.knowledge;
     notice = left;
@@ -427,7 +430,7 @@ export async function run(
       author,
       changes,
       {
-        sessionId,
+        workspace,
         before: scratch,
         changes: {
           written: answered.written,

@@ -339,6 +339,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     sessions: {
       count: (projectId) => sessions.store.count(projectId),
       running: (projectId) => sessions.store.running(projectId),
+      createChannel: (projectId, name, now) =>
+        sessions.createChannel(projectId, name, now),
+      renameChannel: (projectId, name) =>
+        sessions.renameChannel(projectId, name),
       dropQueued: (projectId, userId) => sessions.dropQueued(projectId, userId),
     },
     knowledge: {
@@ -465,6 +469,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     access,
     agents: agentNames,
     live: (sessionId) => runner.live(sessionId),
+    channelMeter: (sessionId) => runner.channelMeter(sessionId),
     usage,
     limits,
     uploads: knowledge,
@@ -524,8 +529,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       enabled: outbox.enabled,
       outbox: {
         ...outbox,
-        countSession: (sessionId, kind, since) =>
-          email.store.countSession(sessionId, kind, since),
+        countSend: (sendId, kind) => email.store.countSend(sendId, kind),
         countProject: (projectId, kind, since) =>
           email.store.countProject(projectId, kind, since),
       },
@@ -595,6 +599,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     queue: (sessionId) => sessions.queueFrame(sessionId),
     children: (sessionId) => sessions.runningChildren(sessionId),
     drafts: (sessionId) => automations.drafts.bySession(sessionId),
+    channelMeter: (sessionId) =>
+      sessions.origin(sessionId) === "channel"
+        ? runner.channelMeter(sessionId)
+        : null,
   });
   const runner = runnerArea({
     db,
@@ -605,6 +613,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     visible: (principal, id) => sessions.visible(principal, id),
     agents: agentNames,
     users,
+    projects: {
+      isMember: (projectId, userId) => projects.isMember(projectId, userId),
+    },
     providers,
     tools,
     knowledge,
@@ -623,7 +634,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       read: (projectId, automationId) => memory.read(projectId, automationId),
       commit: (work, sessionId) => memory.commit(work, sessionId),
       view: (sessionId) => memory.view(sessionId),
-      startView: (sessionId, snapshot) => memory.startView(sessionId, snapshot),
+      startView: (sessionId, snapshot, sendId) =>
+        memory.startView(sessionId, snapshot, sendId),
       endView: (sessionId) => memory.endView(sessionId),
       resetSeen: (sessionId) => memory.resetSeen(sessionId),
     },

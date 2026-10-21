@@ -19,6 +19,16 @@ export type AuthCase = {
 
 export const AUTH_CASES: AuthCase[] = [
   {
+    method: "POST",
+    path: "/api/sessions/:id/sends/:sendId/stop",
+    expect: { anonymous: 401, member: 400, admin: 400 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/sessions/:id/pending/:turnId",
+    expect: { anonymous: 401, member: 400, admin: 400 },
+  },
+  {
     method: "GET",
     path: "/api/projects/:id/external-tasks",
     expect: { anonymous: 401, member: 404, admin: 404 },

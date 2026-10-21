@@ -145,7 +145,9 @@ describe("the wake", () => {
     await tick();
     await tick();
     store.finishSend = original;
-    expect(chat.app.runner.registry.get(run.sessionId)).not.toBeNull();
+    expect(
+      chat.app.runner.registry.inSession(run.sessionId)[0] ?? null,
+    ).not.toBeNull();
     expect(wakes()).toBe(0);
   });
 

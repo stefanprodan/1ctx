@@ -17,6 +17,7 @@ import {
 } from "../providers/index.ts";
 import { history, request, summaryRequest, withExhausted } from "./context.ts";
 import { offers } from "./policy.ts";
+import { NO_REPO_LINES } from "./prompt.ts";
 import type { ContextLookups } from "./render.ts";
 import { MAX_RETRIES, type RetryState, retryWait } from "./retry.ts";
 import { cutLoop, loopFailure, RoundWatches } from "./round-loop.ts";
@@ -107,7 +108,14 @@ export function buildRequest(
       send.mcpNote,
       send.repos ?? undefined,
     );
-  const messages = historyOf(rows);
+  const messages =
+    send.channel === null
+      ? historyOf(rows)
+      : send.channel.messages(
+          send.round?.messageId ?? null,
+          send.mcpNote,
+          send.repos ?? NO_REPO_LINES,
+        );
   if (send.summarizing) {
     // when rows came after the counted round, the history before its
     // reply: the reply is estimated with the rest, since its calls
@@ -279,6 +287,7 @@ async function streamRound(
     // idle cap until it answers
     if (event.kind === "reasoningRefused") {
       deps.forgetReasoning?.(send.sessionId, send.policy.providerId, req.model);
+      send.channel?.forgetReasoning();
       continue;
     }
     // a frame with nothing to show starts no idle check, but one already

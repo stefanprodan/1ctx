@@ -27,3 +27,21 @@ export const principalOf = (user: UserRow): Principal => ({
   // no login stands behind a message that starts later
   via: { kind: "login", id: "" },
 });
+
+export function requiredUser(
+  users: { byId(id: string): UserRow | null },
+  id: string,
+): UserRow {
+  const user = users.byId(id);
+  if (user === null) throw new BadRequest("the user is gone");
+  return user;
+}
+
+export function requiredAgent<T>(
+  agents: { byId(id: string): T | null },
+  id: string,
+): T {
+  const agent = agents.byId(id);
+  if (agent === null) throw new BadRequest("no such agent");
+  return agent;
+}

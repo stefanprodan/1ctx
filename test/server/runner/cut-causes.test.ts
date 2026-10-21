@@ -175,7 +175,8 @@ describe("the cause a cut row names", () => {
       ]);
       run.main.end();
       await reached.promise;
-      const send = chat.app.runner.registry.get(run.sessionId)!;
+      const send = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+        null)!;
       const cut = new Promise((resolve) =>
         send.controller.signal.addEventListener("abort", resolve, {
           once: true,

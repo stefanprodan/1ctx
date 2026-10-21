@@ -95,7 +95,7 @@ export function runHref(id: string): string {
 // a session's page by its origin: a chat at /chat, a run at /run
 export const sessionHref = (session: {
   id: string;
-  origin: "chat" | "automation";
+  origin: "chat" | "automation" | "channel";
 }): string =>
   session.origin === "automation" ? runHref(session.id) : chatHref(session.id);
 

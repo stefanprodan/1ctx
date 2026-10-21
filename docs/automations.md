@@ -22,8 +22,10 @@ sweep) is in `docs/sessions.md`.
 - **A deadline may only tighten the `runDeadlineMs` limit.**
 - **Omitted fields: a create defaults, a PATCH keeps.**
   `disabledCapabilities` is a whole sorted set, empty on create;
-  `rerunOnRestart` and `once` are false on create. Each run snapshots
-  the set onto its session.
+  `rerunOnRestart`, `postToChannel` and `once` are false on create.
+  Each run snapshots the set onto its session.
+- **`postToChannel` is a team project's.** Turning it on in a personal
+  project, which has no channel, is a 400. A proposal never sets it.
 - **Anyone who sees the project runs, suspends, resumes, edits and
   deletes,** lowering retention included: a team project's members and
   every admin, a personal project's owner alone. A hidden project's
@@ -194,6 +196,9 @@ sweep) is in `docs/sessions.md`.
   the automation is published once, with its alert's change when the
   run was marked.
   `?runs=delete` needs none, since the row goes with them.
+- **A done run with `postToChannel` posts its answer** to its project's
+  channel in its closing transaction (`docs/channel-context.md`). A failed
+  or stopped run posts nothing, and the run itself is unchanged.
 - **Retention is per automation; orphaned runs fall to the chats
   sweep.** The scheduler deletes runs past `retention_days` through
   the sessions area's one delete. A run whose automation is gone is

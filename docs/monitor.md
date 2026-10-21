@@ -20,6 +20,8 @@ admin's attention, the server's load), Usage by month and Storage.
   process's CPU and memory, the running sends and the queue. Load reads
   memory, save the queue's counts, one statement over its partial
   indexes.
+  Pending channel turns join the queue's waiting and not-sent counts;
+  their table's storage belongs to the chats area.
 - **Load's CPU and memory are the process's, not the machine's.** CPU
   is over `availableParallelism()`, memory against
   `process.constrainedMemory()`, so both follow a container's caps.
@@ -43,8 +45,9 @@ admin's attention, the server's load), Usage by month and Storage.
 - **A child session's sends are no turns.** Turns, runs, lengths,
   active users and an agent's last use read root sends alone; its
   tokens and cost count under the root's project, user and agent.
-  Storage folds a child's bytes into its root, which alone is a chat
-  or run there.
+  Storage folds a child's bytes into its root, which alone is a chat,
+  channel or run there. Every workspace's scratch is summed into its
+  session; channels count with chats, never runs.
 - **Tool call counts include a subagent's calls.** They read every
   tool row (`sessions/activity.ts`), a child's included.
 - **A model's row is the model that answered** (`served_model`).

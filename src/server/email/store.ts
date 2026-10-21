@@ -26,6 +26,7 @@ export type OutboxRow = {
 // automationId names an alert's automation, for its cap; asked marks a
 // link email asked for at the sign-in page, for the caps on asks
 export type OutboxFields = Omit<OutboxRow, "attempts"> & {
+  sendId?: string | null;
   automationId: string | null;
   asked: boolean;
   now: number;
@@ -133,8 +134,8 @@ export class EmailStore {
       .query(
         `insert into email_outbox (id, kind, user_id, project_id, session_id,
            automation_id, subject, body, message_id, asked, next_attempt_at,
-           created_at, updated_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           created_at, updated_at, send_id)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         fields.id,
@@ -150,6 +151,7 @@ export class EmailStore {
         fields.now,
         fields.createdAt,
         fields.now,
+        fields.sendId ?? null,
       );
   }
 
@@ -260,15 +262,14 @@ export class EmailStore {
       .run(attempts, failure, now, id);
   }
 
-  // the rows of a kind written for a session at or after since, sent,
-  // failed or queued: a cap per send
-  countSession(sessionId: string, kind: EmailKind, since: number): number {
+  // Sent, failed and queued rows all count against their turn.
+  countSend(sendId: string, kind: EmailKind): number {
     return this.db
-      .query<{ n: number }, [string, string, number]>(
+      .query<{ n: number }, [string, string]>(
         `select count(*) as n from email_outbox
-         where session_id = ? and kind = ? and created_at >= ?`,
+         where send_id = ? and kind = ?`,
       )
-      .get(sessionId, kind, since)!.n;
+      .get(sendId, kind)!.n;
   }
 
   // the same for a project: a cap per day

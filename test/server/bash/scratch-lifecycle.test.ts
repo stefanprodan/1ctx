@@ -37,7 +37,7 @@ const emptyScratch = "pwd; find /tmp -type f; test ! -e /tmp/work/data.bin";
 
 function state(db: Db, sessionId: string) {
   return {
-    ...new ScratchStore(db).read(sessionId),
+    ...new ScratchStore(db).read({ id: sessionId, sessionId: sessionId }),
     usedAt:
       db
         .query<{ usedAt: number }, [string]>(
@@ -52,13 +52,13 @@ function rows(db: Db, sessionId: string) {
     .query<{ scratches: number; files: number }, [string, string]>(
       `select
          (select count(*) from session_scratch where session_id = ?) as scratches,
-         (select count(*) from session_scratch_files where session_id = ?) as files`,
+         (select count(*) from session_scratch_files where workspace_id = ?) as files`,
     )
     .get(sessionId, sessionId);
 }
 
 async function finish(chat: ChatApp, sessionId: string, script: Script) {
-  const send = chat.app.runner.registry.get(sessionId)!;
+  const send = (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!;
   script.reply("done");
   await send.drained;
   expect(chat.app.sessions.byId(sessionId)?.status).toBe("done");
@@ -397,7 +397,7 @@ describe("scratch lifecycle", () => {
       const scratch = new ScratchStore(db);
       transact(db, () => ({
         result: scratch.write(
-          fixture.session.id,
+          { id: fixture.session.id, sessionId: fixture.session.id },
           0,
           { written: entries, removed: [], cwd: "/tmp" },
           100,
@@ -405,7 +405,7 @@ describe("scratch lifecycle", () => {
       }));
       transact(db, () => ({
         result: scratch.write(
-          fixture.session.id,
+          { id: fixture.session.id, sessionId: fixture.session.id },
           1,
           { written: [], removed: [], cwd: "/tmp/work" },
           200,
@@ -429,7 +429,7 @@ describe("scratch lifecycle", () => {
       const reopened = new ScratchStore(db);
       transact(db, () => ({
         result: reopened.write(
-          fixture.session.id,
+          { id: fixture.session.id, sessionId: fixture.session.id },
           before.revision,
           { written: [], removed: [], cwd: before.cwd },
           300,

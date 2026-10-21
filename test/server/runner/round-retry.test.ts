@@ -360,7 +360,8 @@ describe("every round kind retries", () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, { ownMemory: true });
     const run = await startRun(chat, automation.id);
-    const active = chat.app.runner.registry.get(run.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+      null)!;
     active.policy.limits.memoryPhaseMs = 900;
     chat.scripted.refuse(503, BUSY, { times: 1 });
     run.main.reply("Done.");
@@ -445,7 +446,7 @@ describe("the working line while a round waits", () => {
         retry: { attempt: 1, max: 3 },
       },
     ]);
-    expect(chat.app.runner.live(sessionId)?.retry).toEqual({
+    expect(chat.app.runner.live(sessionId)[0]?.retry).toEqual({
       attempt: 1,
       max: 3,
     });
@@ -475,14 +476,14 @@ describe("the working line while a round waits", () => {
     await tick();
     const joined = await watcher(chat);
     watch(chat, joined, sessionId);
-    expect(frames(joined, "watched")[0]?.live).toMatchObject({
+    expect(frames(joined, "watched")[0]?.live[0]).toMatchObject({
       sendId,
       retry: { attempt: 1, max: 3 },
     });
     const held: SessionDetail = await (
       await chat.member.call("GET", `/api/sessions/${sessionId}`)
     ).json();
-    expect(held.live?.retry).toEqual({ attempt: 1, max: 3 });
+    expect(held.live[0]?.retry).toEqual({ attempt: 1, max: 3 });
     await chat.member.call("POST", `/api/sessions/${sessionId}/stop`);
     await tick();
     await tick();

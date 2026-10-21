@@ -21,6 +21,7 @@ import { AvatarIcon } from "../lib/avatars.tsx";
 import { reason, sentence, stamp } from "../lib/format.ts";
 import { agentHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
+import { RunOf, RunTrace } from "./Channel.tsx";
 import { CopyButton } from "./Copy.tsx";
 import { ForkButton, type OnFork } from "./Fork.tsx";
 import { useHeldHeight } from "./hold.ts";
@@ -99,6 +100,8 @@ export function Reply({
   visuals,
   retry = null,
   marked = false,
+  quote,
+  head,
 }: {
   node: ReplyNode;
   live: ReadonlyMap<string, Live>;
@@ -117,6 +120,10 @@ export function Reply({
   // the fork action under a finished answer; absent where the session
   // cannot be forked yet
   fork?: { agents: AgentSummary[]; agentId: string | null; onFork: OnFork };
+  // a channel's: the post the turn answers, over its fold, and what ends
+  // the agent's line (a running turn's Stop)
+  quote?: ComponentChildren;
+  head?: ComponentChildren;
 }) {
   const m = node.message;
   const running = replyRunning(node, live);
@@ -191,18 +198,25 @@ export function Reply({
         ) : (
           <span class="transcript-name">agent</span>
         )}
+        {head}
       </div>
       <div class="transcript-body">
-        {!node.compact && !emptyFailure(work, m, failure, content) && (
-          // once the memory phase opens the turn's own work is over
-          <Work
-            node={work}
-            reply={m}
-            live={live}
-            running={running && node.send?.memoryRound == null}
-            retry={retry}
-          />
+        {quote}
+        {m?.run !== undefined && m.run.calls.length > 0 && (
+          <RunTrace postId={m.id} calls={m.run.calls} />
         )}
+        {m?.run === undefined &&
+          !node.compact &&
+          !emptyFailure(work, m, failure, content) && (
+            // once the memory phase opens the turn's own work is over
+            <Work
+              node={work}
+              reply={m}
+              live={live}
+              running={running && node.send?.memoryRound == null}
+              retry={retry}
+            />
+          )}
         {visuals}
         {(html !== "" || current !== null) && !lead && (
           <div class="transcript-answer" ref={answer}>
@@ -244,8 +258,10 @@ export function Reply({
               <span class="transcript-cut">{cut.text}</span>
             )}
             {content !== "" && <CopyButton text={content} />}
+            {m?.run !== undefined && <RunOf run={m.run} />}
             {fork !== undefined &&
               m !== null &&
+              m.run === undefined &&
               m.slot === "answer" &&
               m.status !== "failed" && (
                 <ForkButton
@@ -255,7 +271,7 @@ export function Reply({
                   onFork={fork.onFork}
                 />
               )}
-            {regenerate !== undefined && (
+            {regenerate !== undefined && m?.run === undefined && (
               <button
                 type="button"
                 class="transcript-act"

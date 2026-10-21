@@ -81,6 +81,11 @@ const EXPECTED_IDS = [
   "0067-project-labels",
   "0068-external-tasks-restart",
   "0069-external-task-labels",
+  "0070-project-channels",
+  "0071-team-project-channels",
+  "0072-channel-turns",
+  "0073-channel-workspaces",
+  "0074-run-posts",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -99,18 +104,26 @@ const LATER_COLUMNS = [
   "child",
   "output_limit",
   "edit_revision",
+  "dropped_seq",
+  "mcp_folders",
+  "swept",
   "once",
   "once_fired_at",
   "once_run_session_id",
+  "post_to_channel",
+  "run_calls",
+  "run_session_id",
 ];
 const earlier = (rows: unknown[]) =>
-  rows.map((row) =>
-    Object.fromEntries(
-      Object.entries(row as Record<string, unknown>).filter(
-        ([key]) => !LATER_COLUMNS.includes(key),
+  rows
+    .filter((row) => (row as { origin?: string }).origin !== "channel")
+    .map((row) =>
+      Object.fromEntries(
+        Object.entries(row as Record<string, unknown>).filter(
+          ([key]) => !LATER_COLUMNS.includes(key),
+        ),
       ),
-    ),
-  );
+    );
 
 const expectedFrom = (first: (typeof EXPECTED_IDS)[number]) =>
   EXPECTED_IDS.slice(EXPECTED_IDS.indexOf(first));
@@ -220,6 +233,87 @@ describe("the schema", () => {
     `);
     return db;
   }
+
+  test("0072 preserves memory views and outbox rows while adding send identities", () => {
+    const db = seed(MIGRATIONS.slice(0, 71));
+    try {
+      db.exec(`
+        insert into memory_views (session_id, snapshot, seen)
+          values ('sess', '[{"topic":"deploy","text":"blue"}]', '[]');
+        insert into email_outbox (id, kind, user_id, project_id, session_id,
+          message_id, status, next_attempt_at, created_at, updated_at)
+          values ('mail', 'agent', 'u', 'p', 'sess', '<mail@x>', 'sent', 0, 0, 0);
+      `);
+      const old = db.query("select * from memory_views").get();
+      expect(migrate(db, MIGRATIONS.slice(0, 72))).toEqual([
+        "0072-channel-turns",
+      ]);
+      expect(
+        db.query("select session_id, snapshot, seen from memory_views").get(),
+      ).toEqual(old);
+      expect(db.query("select id, send_id from memory_views").get()).toEqual({
+        id: "sess",
+        send_id: null,
+      });
+      expect(
+        db.query("select id, status, send_id from email_outbox").get(),
+      ).toEqual({ id: "mail", status: "sent", send_id: null });
+      db.exec(`
+        insert into memory_views (id, session_id, send_id, snapshot, seen)
+          values ('send1', 'sess', 'send1', '[]', '[]'),
+                 ('send2', 'sess', 'send2', '[]', '[]');
+        insert into pending_turns
+          (id, session_id, message_id, author_id, agent_id, queued_at, changed_at)
+          values ('pending', 'sess', 'm1', 'u', 'a', 0, 0);
+      `);
+      expect(() =>
+        db.exec("update pending_turns set reason = 'invalid'"),
+      ).toThrow(/CHECK/);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      db.exec(
+        "delete from messages where send_id = 'send1'; delete from sends where id = 'send1'",
+      );
+      expect(db.query("select id from memory_views order by id").all()).toEqual(
+        [{ id: "send2" }, { id: "sess" }],
+      );
+      expect(db.query("select id from pending_turns").all()).toEqual([]);
+      expect(db.query("select id from email_outbox").all()).toEqual([
+        { id: "mail" },
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0072 indexes the memory view cascade from sessions", () => {
+    const db = seed();
+    try {
+      db.exec(`
+        insert into memory_views (id, session_id, send_id, snapshot, seen)
+          values ('sess', 'sess', null, '[]', '[]'),
+                 ('send1', 'sess', 'send1', '[]', '[]');
+      `);
+      for (const stats of [false, true]) {
+        if (stats) db.exec("analyze");
+        const plan = db
+          .query<{ detail: string }, [string]>(
+            "explain query plan delete from sessions where id = ?",
+          )
+          .all("sess")
+          .map((row) => row.detail);
+        expect(plan).toContain(
+          "SEARCH memory_views USING COVERING INDEX memory_views_session (session_id=?)",
+        );
+        expect(
+          plan.some((line) => /^SCAN (?:TABLE )?memory_views\b/.test(line)),
+        ).toBe(false);
+      }
+      db.exec("delete from sessions where id = 'sess'");
+      expect(db.query("select id from memory_views").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
 
   test("0018 defaults existing sessions and automations to an empty set without losing rows", () => {
     const db = seed(MIGRATIONS.slice(0, 17));
@@ -674,8 +768,12 @@ describe("the schema", () => {
       expect(migrate(db)).toEqual(expectedFrom("0020-mcp-kept"));
       expect(MIGRATIONS[19]?.rebuild).toBeUndefined();
       expect(
-        db.query("select mcp_folders from sessions where id = 'sess'").get(),
-      ).toEqual({ mcp_folders: 0 });
+        db
+          .query(
+            "select mcp_folders from session_workspaces where workspace_id = 'sess'",
+          )
+          .get(),
+      ).toBeNull();
       db.exec(`
         insert into mcp_kept_files
             (message_id, position, session_id, folder, dir, name, bytes, text,
@@ -1758,7 +1856,9 @@ describe("the schema", () => {
         .all()
         .map((row) => row.name);
       expect(partial).toEqual([
+        "sessions_channel",
         "sessions_feed",
+        "sessions_feed_chats",
         "sessions_feed_unowned",
         "sessions_idle",
         "sessions_orphan_runs",
@@ -2882,7 +2982,10 @@ describe("the schema", () => {
               parent_session_id: _________,
               parent_message_id: __________,
               child: ___________,
-              output_limit: ____________,
+              dropped_seq: ____________,
+              mcp_folders: _____________,
+              swept: ______________,
+              output_limit: _______________,
               ...rest
             }) => rest,
           ),
@@ -3954,4 +4057,397 @@ test("a test's memory database is a fresh migrate", () => {
     first.close();
     second.close();
   }
+});
+
+describe("project channel migrations", () => {
+  test("rebuilds existing rows, then adds one channel per team", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 69));
+    db.exec(`
+      insert into users
+        (id, username, full_name, email, role, password_hash, created_at)
+      values ('u70', 'user70', 'User 70', 'u70@example.com', 'member', 'x', 1);
+      insert into projects (id, kind, name, owner_id, created_at) values
+        ('personal70', 'personal', 'personal', 'u70', 1),
+        ('team70', 'team', 'platform', 'u70', 2);
+      insert into providers (id, name, wire, base_url, created_at)
+      values ('provider70', 'provider70', 'openai-compatible', 'http://x', 1);
+      insert into agents
+        (id, name, provider_id, model, model_name, created_at)
+      values ('agent70', 'agent70', 'provider70', 'm', 'M', 1);
+      insert into sessions
+        (id, project_id, owner_id, agent_id, origin, title, status,
+         created_at, last_activity_at, mcp_folders)
+      values
+        ('session70', 'team70', 'u70', 'agent70', 'chat', 'kept',
+          'done', 3, 4, 7),
+        ('session-zero', 'personal70', 'u70', 'agent70', 'chat', 'zero',
+          'done', 3, 4, 0);
+      insert into sends
+        (id, session_id, kind, user_id, agent_id, provider_id, provider_name,
+         model, status, first_message_id, started_at, finished_at)
+      values ('send70', 'session70', 'chat', 'u70', 'agent70', 'provider70',
+        'provider70', 'm', 'done', 'message70', 3, 4);
+    `);
+    expect(migrate(db)).toEqual([
+      "0070-project-channels",
+      "0071-team-project-channels",
+      "0072-channel-turns",
+      "0073-channel-workspaces",
+      "0074-run-posts",
+    ]);
+    expect(
+      db.query("select id, title from sessions where id = 'session70'").get(),
+    ).toEqual({ id: "session70", title: "kept" });
+    expect(
+      db.query("select id, kind from sends where id = 'send70'").get(),
+    ).toEqual({ id: "send70", kind: "chat" });
+    expect(db.query("select * from session_workspaces").all()).toEqual([
+      {
+        workspace_id: "session70",
+        session_id: "session70",
+        mcp_folders: 7,
+      },
+    ]);
+    expect(
+      db
+        .query(
+          "select name from pragma_table_info('sessions') where name = 'mcp_folders'",
+        )
+        .get(),
+    ).toBeNull();
+    expect(
+      db
+        .query(
+          `select project_id, owner_id, agent_id, origin, title, dropped_seq
+           from sessions where origin = 'channel'`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        project_id: "team70",
+        owner_id: null,
+        agent_id: null,
+        origin: "channel",
+        title: "platform",
+        dropped_seq: null,
+      },
+    ]);
+    const channel = db
+      .query<{ id: string }, []>(
+        "select id from sessions where origin = 'channel'",
+      )
+      .get()!;
+    db.query(
+      `insert into sends
+        (id, session_id, kind, user_id, first_message_id, status,
+         started_at, finished_at)
+       values ('post70', ?, 'post', 'u70', 'post-message', 'done', 5, 5)`,
+    ).run(channel.id);
+    db.query(
+      `insert into messages
+        (id, session_id, seq, kind, send_id, round, user_id, content,
+         status, created_at, finished_at)
+       values ('post-message', ?, 1, 'user', 'post70', 1, 'u70', 'ask',
+         'done', 5, 5)`,
+    ).run(channel.id);
+    db.query(
+      `insert into sessions
+        (id, project_id, owner_id, agent_id, origin, title, status,
+         created_at, last_activity_at, parent_session_id, parent_message_id)
+       values ('child70', 'team70', 'u70', 'agent70', 'channel', 'child',
+         'done', 5, 5, ?, 'post-message')`,
+    ).run(channel.id);
+    expect(
+      db
+        .query(
+          `select owner_id, agent_id, origin, parent_session_id,
+             parent_message_id from sessions where id = 'child70'`,
+        )
+        .get(),
+    ).toEqual({
+      owner_id: "u70",
+      agent_id: "agent70",
+      origin: "channel",
+      parent_session_id: channel.id,
+      parent_message_id: "post-message",
+    });
+    expect(
+      db
+        .query(
+          "select agent_id, provider_id, provider_name, model from sends where id = 'post70'",
+        )
+        .get(),
+    ).toEqual({
+      agent_id: null,
+      provider_id: null,
+      provider_name: null,
+      model: null,
+    });
+    expect(() =>
+      db
+        .query(
+          `insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+         values ('bad70', 'team70', 'u70', null, 'channel', '', 'done', 1, 1)`,
+        )
+        .run(),
+    ).toThrow(/CHECK/);
+    expect(() =>
+      db
+        .query(
+          `insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+         values ('duplicate70', 'team70', null, null, 'channel', '', 'done', 1, 1)`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE/);
+    expect(() =>
+      db
+        .query(
+          `insert into sends
+          (id, session_id, kind, user_id, agent_id, status,
+           first_message_id, started_at)
+         values ('bad-send70', ?, 'chat', 'u70', 'agent70', 'running', 'x', 1)`,
+        )
+        .run(channel.id),
+    ).toThrow(/CHECK/);
+    const indexSql = (name: string) =>
+      db
+        .query<{ sql: string }, [string]>(
+          "select sql from sqlite_schema where type = 'index' and name = ?",
+        )
+        .get(name)!.sql;
+    expect(indexSql("sessions_channel")).toContain(
+      "where origin = 'channel' and parent_session_id is null",
+    );
+    expect(indexSql("sessions_feed")).toContain(
+      "where origin = 'automation' and parent_session_id is null",
+    );
+    expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    db.close();
+  });
+
+  describe("0073 channel workspaces", () => {
+    test("copies existing workspace rows and permits owned channel children", () => {
+      const before = MIGRATIONS.slice(0, 72);
+      const db = new Database(":memory:");
+      db.exec("pragma foreign_keys = on");
+      migrate(db, before);
+      try {
+        db.exec(`
+        insert into users
+          (id, username, full_name, email, role, password_hash, created_at)
+          values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('p', 'personal', 'personal', 'u', 0);
+        insert into providers (id, name, wire, base_url, created_at)
+          values ('pr', 'prov', 'openai-compatible', 'http://x', 0);
+        insert into agents
+          (id, name, provider_id, model, model_name, created_at)
+          values ('a', 'agent', 'pr', 'm', 'M', 0);
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+          values ('sess', 'p', 'u', 'a', 'chat', 'chat', 'done', 0, 0);
+        insert into sends
+          (id, session_id, kind, user_id, agent_id, provider_id,
+           provider_name, model, status, first_message_id, started_at,
+           finished_at)
+          values ('send1', 'sess', 'chat', 'u', 'a', 'pr', 'prov', 'm',
+            'done', 'm1', 0, 1);
+        insert into messages
+          (id, session_id, seq, kind, send_id, round, user_id, content,
+           status, created_at, finished_at)
+          values ('m1', 'sess', 1, 'user', 'send1', 1, 'u', 'q', 'done',
+            0, 0);
+        insert into messages
+          (id, session_id, seq, kind, send_id, round, slot, agent_id, model,
+           content, status, created_at, finished_at)
+          values ('m2', 'sess', 2, 'reply', 'send1', 1, 'answer', 'a', 'm',
+            'ans', 'done', 0, 1);
+      `);
+        db.exec(`
+        insert into session_workspaces
+          (workspace_id, session_id, mcp_folders)
+          values ('sess', 'sess', 7);
+        insert into session_scratch
+          (session_id, cwd, revision, bytes, files, used_at)
+          values ('sess', '/tmp/work', 3, 4, 1, 9);
+        insert into session_scratch_files
+          (session_id, path, data, mode)
+          values ('sess', 'a', x'010203', 420);
+        insert into mcp_kept_files
+          (message_id, position, session_id, folder, dir, name, bytes, text,
+           data)
+          values ('m2', 0, 'sess', 7, '0007-read', 'result.txt', 1, 'x',
+            null);
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('team', 'team', 'workspace-team', 'u', 0);
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at)
+          values ('channel', 'team', null, null, 'channel', 'workspace-team',
+            'done', 0, 0);
+        insert into sends
+          (id, session_id, kind, user_id, agent_id, provider_id,
+           provider_name, model, status, first_message_id, started_at,
+           finished_at)
+          values ('post', 'channel', 'post', 'u', null, null, null, null,
+            'done', 'post-message', 0, 0);
+        insert into messages
+          (id, session_id, seq, kind, send_id, round, user_id, content,
+           status, created_at, finished_at)
+          values ('post-message', 'channel', 1, 'user', 'post', 1, 'u',
+            'ask', 'done', 0, 0);
+      `);
+        expect(migrate(db)).toEqual([
+          "0073-channel-workspaces",
+          "0074-run-posts",
+        ]);
+        expect(db.query("select * from session_scratch").get()).toEqual({
+          workspace_id: "sess",
+          session_id: "sess",
+          cwd: "/tmp/work",
+          revision: 3,
+          bytes: 4,
+          files: 1,
+          used_at: 9,
+        });
+        expect(db.query("select * from session_scratch_files").get()).toEqual({
+          workspace_id: "sess",
+          path: "a",
+          data: new Uint8Array([1, 2, 3]),
+          mode: 420,
+        });
+        expect(
+          db
+            .query(
+              "select workspace_id, session_id, mcp_folders from session_workspaces where workspace_id = 'sess'",
+            )
+            .get(),
+        ).toEqual({ workspace_id: "sess", session_id: "sess", mcp_folders: 7 });
+        expect(
+          db
+            .query(
+              "select workspace_id from mcp_kept_files where message_id = 'm2'",
+            )
+            .get(),
+        ).toEqual({ workspace_id: null });
+        expect(
+          db.query("select swept from sends where id = 'send1'").get(),
+        ).toEqual({
+          swept: null,
+        });
+        expect(
+          db
+            .query(
+              "select name from pragma_table_info('sessions') where name = 'mcp_folders'",
+            )
+            .get(),
+        ).toBeNull();
+        db.exec(`
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, title, status,
+           created_at, last_activity_at, parent_session_id, parent_message_id)
+          values ('child', 'team', 'u', 'a', 'channel', 'task', 'done', 0, 0,
+            'channel', 'post-message');
+      `);
+        expect(
+          db
+            .query(
+              "select owner_id, agent_id, origin from sessions where id = 'child'",
+            )
+            .get(),
+        ).toEqual({ owner_id: "u", agent_id: "a", origin: "channel" });
+        expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      } finally {
+        db.close();
+      }
+    });
+  });
+
+  test("0074 adds the run post switch and columns, keeping a post when its run goes", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 73));
+    try {
+      db.exec(`
+        insert into users
+          (id, username, full_name, email, role, password_hash, created_at)
+          values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('team', 'team', 'finops', 'u', 0);
+        insert into providers (id, name, wire, base_url, created_at)
+          values ('pr', 'prov', 'openai-compatible', 'http://x', 0);
+        insert into agents
+          (id, name, provider_id, model, model_name, created_at)
+          values ('a', 'agent', 'pr', 'm', 'M', 0);
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, next_at, created_at, updated_at)
+          values ('au', 'team', 'u', 'a', 'daily', 'check', '0 9 * * *',
+            'UTC', 30, 0, 0, 0);
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, automation_id, title,
+           status, created_at, last_activity_at)
+          values ('run', 'team', 'u', 'a', 'automation', 'au', 'daily',
+            'done', 0, 0),
+                 ('channel', 'team', null, null, 'channel', null, 'finops',
+            'done', 0, 0);
+        insert into sends
+          (id, session_id, kind, user_id, agent_id, provider_id,
+           provider_name, model, status, first_message_id, started_at,
+           finished_at)
+          values ('post', 'channel', 'post', 'u', 'a', null, null, null,
+            'done', 'answer', 0, 0);
+      `);
+      expect(migrate(db)).toEqual(["0074-run-posts"]);
+      expect(db.query("select post_to_channel from automations").get()).toEqual(
+        { post_to_channel: 0 },
+      );
+      expect(() =>
+        db.exec("update automations set post_to_channel = 2"),
+      ).toThrow();
+      db.exec(`
+        insert into messages
+          (id, session_id, seq, kind, send_id, round, slot, agent_id, model,
+           content, status, run_calls, run_session_id, created_at,
+           finished_at)
+          values ('answer', 'channel', 1, 'reply', 'post', 1, 'answer', 'a',
+            'm', 'all green', 'done', '[]', 'run', 0, 0);
+        delete from sessions where id = 'run';
+      `);
+      expect(
+        db
+          .query(
+            "select content, run_calls, run_session_id from messages where id = 'answer'",
+          )
+          .get(),
+      ).toEqual({
+        content: "all green",
+        run_calls: "[]",
+        run_session_id: null,
+      });
+      // the delete's set null finds the posts by the index, never a scan
+      const plan = db
+        .query<{ detail: string }, [string]>(
+          "explain query plan delete from sessions where id = ?",
+        )
+        .all("run")
+        .map((row) => row.detail);
+      expect(plan.some((line) => line.includes("messages_run_session"))).toBe(
+        true,
+      );
+      expect(
+        plan.some((line) => /^SCAN (?:TABLE )?messages\b/.test(line)),
+      ).toBe(false);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
 });

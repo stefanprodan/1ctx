@@ -181,11 +181,11 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
   ctx.actor = {
     projectId: "p",
     sessionId: "s",
+    workspace: { id: "s", sessionId: "s" },
     userId: "u",
     agentId: "a",
     agentName: "agent",
     origin: "chat",
-    sendStartedAt: 0,
   };
   const tool = makeBashTool({
     bash: {

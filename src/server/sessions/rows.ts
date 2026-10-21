@@ -8,6 +8,7 @@ import type {
   SavedDocs,
   SendSummary,
   SessionSummary,
+  TraceCall,
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
 import { cutAt } from "../../shared/text.ts";
@@ -31,7 +32,7 @@ export type CreateSession = {
   projectId: string;
   ownerId: string;
   agentId: string;
-  origin?: "chat" | "automation";
+  origin?: SessionOrigin;
   automationId?: string | null;
   runSource?: EventSource | null;
   forkedFromSessionId?: string | null;
@@ -59,8 +60,8 @@ export const RESULT_DISPLAY_CHARS = 20_000;
 export type RawSession = {
   id: string;
   project_id: string;
-  owner_id: string;
-  agent_id: string;
+  owner_id: string | null;
+  agent_id: string | null;
   origin: SessionOrigin;
   automation_id: string | null;
   run_source: EventSource | null;
@@ -72,7 +73,6 @@ export type RawSession = {
   revision: number;
   created_at: number;
   last_activity_at: number;
-  mcp_folders: number;
   archived_at: number | null;
   archived_reason: ArchiveReason | null;
   archived_by: string | null;
@@ -82,6 +82,7 @@ export type RawSession = {
   attention_source: AttentionSource | null;
   parent_session_id: string | null;
   parent_message_id: string | null;
+  dropped_seq?: number | null;
 };
 
 export type UsagePort = {
@@ -98,6 +99,7 @@ export const session = (
   ownerId: raw.owner_id,
   agentId: raw.agent_id,
   origin: raw.origin,
+  ...(raw.origin === "channel" ? { droppedSeq: raw.dropped_seq ?? null } : {}),
   automationId: raw.automation_id,
   runSource: raw.run_source,
   forkedFromId: raw.forked_from_session_id,
@@ -149,6 +151,9 @@ export type RawMessage = {
   served_model: string | null;
   native_finish: string | null;
   prompt_tokens: number | null;
+  run_calls: string | null;
+  run_session_id: string | null;
+  run_automation: string | null;
   created_at: number;
   finished_at: number | null;
 };
@@ -173,6 +178,11 @@ export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, 
    (select usage.prompt_tokens from usage
     where usage.send_id = messages.send_id and usage.round = messages.round)
     as prompt_tokens,
+   messages.run_calls, messages.run_session_id,
+   case when messages.run_session_id is not null then
+     (select automations.name from sessions runs
+        join automations on automations.id = runs.automation_id
+       where runs.id = messages.run_session_id) end as run_automation,
    messages.created_at, messages.finished_at`;
 
 // a JSON list column: null when absent or empty
@@ -228,6 +238,15 @@ export const message = (raw: RawMessage): Message => ({
   ...(raw.child_session_id === null
     ? {}
     : { childSessionId: raw.child_session_id }),
+  ...(raw.run_calls === null
+    ? {}
+    : {
+        run: {
+          calls: safeListOrNull<TraceCall>(raw.run_calls) ?? [],
+          sessionId: raw.run_session_id,
+          automationName: raw.run_automation,
+        },
+      }),
   model: raw.model,
   ttftMs: raw.ttft_ms,
   thinkingMs: raw.thinking_ms,
@@ -266,9 +285,9 @@ export type RawSend = {
   session_id: string;
   kind: SendKind;
   user_id: string;
-  agent_id: string;
-  provider_id: string;
-  model: string;
+  agent_id: string | null;
+  provider_id: string | null;
+  model: string | null;
   status: SessionStatus;
   cause: SendCause | null;
   error: string | null;
@@ -281,6 +300,7 @@ export type RawSend = {
   memory_error: string | null;
   memory_skipped: number | null;
   summoned: number;
+  swept: number | null;
   tokens: number;
   started_at: number;
   finished_at: number | null;
@@ -312,6 +332,7 @@ export const send = (raw: RawSend): SendSummary => ({
   memoryError: raw.memory_error,
   memorySkipped: raw.memory_skipped,
   summoned: raw.summoned === 1,
+  ...(raw.swept === 1 ? { swept: true as const } : {}),
   tokens: raw.tokens,
   startedAt: raw.started_at,
   finishedAt: raw.finished_at,

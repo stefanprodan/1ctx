@@ -18,9 +18,12 @@ is its root.
   root and `parent_message_id` the root's tool row; both or neither,
   one child to a row (a unique index), and either delete takes the
   child with every row but its usage. It
-  has the root's project, owner, agent and origin, never an
-  automation (`store.create()` refuses one), so a run's picks and an
-  automation's retention meet roots alone. Its links never change.
+  has the root's project, agent and origin, never an automation
+  (`store.create()` refuses one). It has the root's owner except in a
+  channel, whose root is ownerless: there it has the member who summoned
+  the parent turn. A channel child therefore keeps origin `channel` with
+  a non-null owner and agent. A run's picks and an automation's retention
+  meet roots alone. Its links never change.
 - **A child's send carries `sends.child = 1`, and only a child's.**
   `insertSend()` takes `child: true` and refuses a mark that does not
   match its session, so every reader of turns tests the row it already
@@ -84,6 +87,10 @@ is its root.
 
 ## The child loop
 
+- **Delegate resolves its parent by the calling send id.** A channel has
+  several root sends at once, so the session id alone cannot name a parent.
+  Channel roots still refuse subagents; their workspace and child support
+  are separate work.
 - **A child is not a send of the registry's** (`runner/child.ts`). It
   has its own session, `sends` row (`childSendRow()`, the one place it
   is written), rounds, `Budget`, `ToolBudget` and usage rows, on its
@@ -137,8 +144,9 @@ is its root.
 ## The workspace
 
 - **A child's `/tmp`, cwd, `/mcp` and command queue are its own
-  session's.** At its start the parent's mountable scratch is copied
-  in and the child starts in `/tmp` (`bash/handoff.ts`). It mounts
+  session's.** At its start the exact parent workspace is copied in:
+  for a channel this is the summoned agent's workspace, never another
+  agent's. The child starts in `/tmp` (`bash/handoff.ts`). It mounts
   `/knowledge`, `/repos` (the parent's trees) and the parent's
   `/uploads` (`subagent.uploadsFrom` on the call's context).
 - **`/knowledge` and `/uploads` are read-only to a child.** Its worker
@@ -203,6 +211,11 @@ is its root.
   back to running. A watch's answer drops every held child it does not
   name, since one that ended while the connection was down missed its
   last frames. A group opened with nothing held reads the route; after
-  a failed read, opening it again asks again.
+  a failed read, opening it again asks again. A 404 marks the child
+  gone and nothing asks again; so does a `done` delegate row with no
+  child in a swept turn (`send.swept`, `childGone()`). A gone group
+  heads "gone" and says its work went with the turn's tool output,
+  never an error. When a send turns swept on screen, the results and
+  child work loaded for its rows go (`syncValues()`).
 - **The fold counts the root's calls.** A `delegate` call is one of
   them; the child's calls are its own and never in the fold's count.

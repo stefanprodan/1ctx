@@ -8,7 +8,7 @@ import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import type { AutomationDraft } from "../../../src/shared/contracts/automation-draft.ts";
-import { hasWatchedDrafts, isDraftFrame } from "../../../src/shared/socket.ts";
+import { isDraftFrame, isWatchedFrame } from "../../../src/shared/socket.ts";
 import { FAIL_CONFIRM } from "../../fixtures/automations/draft-failure.ts";
 import {
   createProposal,
@@ -416,7 +416,7 @@ describe("draft state frames", () => {
         expect(frames(conn, "watched")).toEqual([
           expect.objectContaining({ sessionId, drafts: rows }),
         ]);
-        expect(hasWatchedDrafts(frames(conn, "watched")[0])).toBe(true);
+        expect(isWatchedFrame(frames(conn, "watched")[0])).toBe(true);
         expect(frames(conn, "draft")).toEqual([]);
       } finally {
         await chat.app.shutdown();

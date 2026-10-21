@@ -141,7 +141,7 @@ function runChatMemory(
           `This is the text refused for ${edit.topic}. Merge the text the note holds for it, below, into yours so both are kept, and set it again. If the user asked to replace that text, remove the topic first, then set it.`,
         );
       }
-      answer = chat.edit(edit);
+      answer = chat.edit(edit, ctx.sendId);
       if (answer.conflict === "wrote" && edit.action === "set") {
         handle.refused.set(topic, edit.text);
       } else if (!answer.error) {
@@ -155,7 +155,7 @@ function runChatMemory(
     // a refusal before the edit, of the arguments, lists the note too
     const content =
       answer === null
-        ? chat.refuse(result.content)
+        ? chat.refuse(result.content, ctx.sendId)
         : `Error: ${(answer as ChatEditAnswer).content}`;
     return {
       error: true,

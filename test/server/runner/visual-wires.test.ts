@@ -59,7 +59,7 @@ describe("visual provider frames through the composed runner", () => {
             expect(html.startsWith(prefix)).toBe(true);
           }
           if (deltas) expect(prefix).toBe(html);
-          expect(chat.app.runner.live(sessionId)?.drafts).toBeUndefined();
+          expect(chat.app.runner.live(sessionId)[0]?.drafts).toBeUndefined();
           const res = await chat.member.call(
             "GET",
             `/api/sessions/${sessionId}/messages/${stored.id}/calls/0/visual`,

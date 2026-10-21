@@ -9,15 +9,22 @@ import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
 import { after, sleep } from "../lib/clock.ts";
-import { BadRequest, messageOf } from "../lib/errors.ts";
+import { messageOf } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import { type SessionRow, titleFrom } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { attention } from "./attention.ts";
-import { liveAuthor, principalOf } from "./authors.ts";
-import { chatFor } from "./chat-guard.ts";
+import {
+  liveAuthor,
+  principalOf,
+  requiredAgent,
+  requiredUser,
+} from "./authors.ts";
+import { cancelPending, channelMessage, pendingFields } from "./channel.ts";
+import { channelMeter } from "./channel-context.ts";
+import { chatFor, sendToStop } from "./chat-guard.ts";
 import { childRowsTo, delegate } from "./child.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_RETRY_MS } from "./ending.ts";
@@ -34,7 +41,7 @@ import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
 import { drainRunner, shutdownRunner } from "./shutdown.ts";
-import type { QueuedClaim, StartFields, StartUser } from "./start.ts";
+import { newUser, type QueuedClaim, type StartFields } from "./start.ts";
 import { refuseNewSummon, regeneratedAgent, turnAgent } from "./summon.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
 import { applyChanges, checkTurn, type TurnMessage } from "./turn.ts";
@@ -67,8 +74,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     usage: deps.usage,
     commitMemory: (send) => commitMemory({ memory: deps.memory }, send),
     views: {
-      start: (sessionId, snapshot) =>
-        deps.memory.startView(sessionId, snapshot),
+      start: (sessionId, snapshot, sendId) =>
+        deps.memory.startView(sessionId, snapshot, sendId),
       end: (sessionId) => deps.memory.endView(sessionId),
       resetSeen: (sessionId) => deps.memory.resetSeen(sessionId),
     },
@@ -86,9 +93,10 @@ export function runnerArea(deps: RunnerDeps): Runner {
   };
   const pause = (ms: number) => sleep(deps.clock, ms).promise;
   const historyOf = (send: ActiveSend) =>
-    deps.sessions
-      .messages(send.sessionId)
-      .filter((row) => row.id !== send.round?.messageId);
+    (send.channel === null
+      ? deps.sessions.messages(send.sessionId)
+      : []
+    ).filter((row) => row.id !== send.round?.messageId);
 
   // The first cause wins. Stop and shutdown still abort a phase opened
   // after another cause claimed the send, and the send remembers it, so
@@ -188,18 +196,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
     }
   };
 
-  const author = (principal: Principal): UserRow => {
-    const user = deps.users.byId(principal.userId);
-    if (user === null) throw new BadRequest("the user is gone");
-    return user;
-  };
-
-  const agentOf = (id: string): AgentRow => {
-    const agent = deps.agents.byId(id);
-    if (agent === null) throw new BadRequest("no such agent");
-    return agent;
-  };
-
   const prepare = (fields: {
     sessionId: string;
     session: SessionRow | null;
@@ -239,9 +235,13 @@ export function runnerArea(deps: RunnerDeps): Runner {
       session,
       policy: sendPolicy(deps, {
         ...fields,
+        channel: session?.origin === "channel",
         event,
         disabledCapabilities: disabled,
       }),
+      ...(session?.origin === "channel"
+        ? { channelCaps: deps.limits.current() }
+        : {}),
       op,
       turn,
       changes: fields.changes,
@@ -249,7 +249,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       probe: fields.probe === true,
       title: fields.title,
       kind: event === null ? "chat" : "run",
-      origin: event === null ? "chat" : "automation",
+      origin: event === null ? (session?.origin ?? "chat") : "automation",
       automationId: event?.automation.id ?? null,
       checkUploads: deps.uploads.checkUploads,
       startKept: (id, afterSeq) => deps.bash.startKept(id, afterSeq),
@@ -263,18 +263,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
   };
   const begin = (fields: Parameters<typeof prepare>[0]): SessionDetail =>
     launched(prepare(fields));
-
-  const newUser = (
-    user: UserRow,
-    text: string,
-    uploads?: readonly string[],
-  ): StartUser => ({
-    id: newId(),
-    userId: user.id,
-    username: user.username,
-    text,
-    ...(uploads === undefined ? {} : { uploads }),
-  });
 
   const continueChat = (
     sessionId: string,
@@ -296,9 +284,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
       const own = deps.access.project(principal, seen.projectId);
       session ??= seen;
       project ??= own;
-      authors.push(user ?? author(principal));
+      authors.push(user ?? requiredUser(deps.users, principal.userId));
     }
     const first = session!;
+    if (first.agentId === null) {
+      throw new Error("a chat must name its agent");
+    }
     return prepare({
       sessionId: first.id,
       session: first,
@@ -307,7 +298,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       ...turnAgent(
         deps,
         first.id,
-        agentOf(first.agentId),
+        requiredAgent(deps.agents, first.agentId),
         messages.map((fields) => fields.message),
       ),
       title: first.title,
@@ -342,17 +333,18 @@ export function runnerArea(deps: RunnerDeps): Runner {
     );
   };
 
-  const liveOf = (sessionId: string) => {
-    const send = registry.get(sessionId);
-    return send === null || send.terminal !== null ? null : live(send);
-  };
+  const liveOf = (sessionId: string) =>
+    registry
+      .inSession(sessionId)
+      .filter((send) => send.terminal === null)
+      .map(live);
 
   const runner: Runner = {
     registry,
     start(principal, fields) {
       const project = deps.access.project(principal, fields.projectId);
-      const user = author(principal);
-      const agent = agentOf(fields.agentId);
+      const user = requiredUser(deps.users, principal.userId);
+      const agent = requiredAgent(deps.agents, fields.agentId);
       refuseNewSummon(deps.agents, agent.name, fields.message);
       return begin({
         sessionId: newId(),
@@ -372,10 +364,18 @@ export function runnerArea(deps: RunnerDeps): Runner {
       return launched(prepareTurn(sessionId, messages, claim, starter));
     },
     message(principal, sessionId, fields) {
-      const queued = runner.queue.enqueue(principal, sessionId, fields);
-      return queued === null
-        ? { status: 201, body: runner.send(principal, sessionId, fields) }
-        : { status: 202, body: queued };
+      return channelMessage(
+        { ...deps, registry, queue: runner.queue },
+        principal,
+        sessionId,
+        fields,
+        () => {
+          const queued = runner.queue.enqueue(principal, sessionId, fields);
+          return queued === null
+            ? { status: 201, body: runner.send(principal, sessionId, fields) }
+            : { status: 202, body: queued };
+        },
+      );
     },
     regenerate(principal, sessionId, fields = {}) {
       const session = chatFor(
@@ -387,7 +387,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       );
       const existing = regenerateUsers(deps.sessions.messages(session.id));
       const project = deps.access.project(principal, session.projectId);
-      const user = author(principal);
+      const user = requiredUser(deps.users, principal.userId);
       const lastId = existing.at(-1)!.userId;
       return begin({
         sessionId: session.id,
@@ -397,7 +397,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         ...regeneratedAgent(
           deps,
           session.id,
-          agentOf(session.agentId),
+          requiredAgent(deps.agents, session.agentId),
           existing[0]!.sendId,
         ),
         title: session.title,
@@ -415,12 +415,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
     compact(principal, sessionId) {
       const session = chatFor(deps, principal, sessionId, "compact", registry);
       const project = deps.access.project(principal, session.projectId);
-      const user = author(principal);
+      const user = requiredUser(deps.users, principal.userId);
       const policy = sendPolicy(deps, {
         sessionId: session.id,
         project,
         user,
-        agent: agentOf(session.agentId),
+        agent: requiredAgent(deps.agents, session.agentId),
         offerTools: false,
         disabledCapabilities: session.disabledCapabilities,
       });
@@ -443,11 +443,12 @@ export function runnerArea(deps: RunnerDeps): Runner {
         changes: [],
       });
     },
-    stop(principal, sessionId) {
-      const session = deps.visible(principal, sessionId);
-      const send = registry.get(session.id);
+    stop(principal, sessionId, sendId) {
+      const send = sendToStop(deps, registry, principal, sessionId, sendId);
       if (send !== null) void terminate(send, "stop");
     },
+    cancelPending: (principal, sessionId, id) =>
+      cancelPending(deps, principal, sessionId, id),
     stopAgent(agentId) {
       for (const send of registry.values()) {
         if (send.policy.agentId === agentId) void terminate(send, "stop");
@@ -455,14 +456,14 @@ export function runnerArea(deps: RunnerDeps): Runner {
     },
     delegate(input, call, ctx) {
       // the send of the call's session, started when the call's was
-      const parent =
-        ctx.actor === null ? null : registry.get(ctx.actor.sessionId);
-      if (parent === null || parent.startedAt !== ctx.actor?.sendStartedAt) {
+      const parent = ctx.actor === null ? null : registry.get(ctx.sendId);
+      if (parent === null || parent.sessionId !== ctx.actor?.sessionId) {
         throw new Error("the turn has ended");
       }
       return delegate(childDeps, parent, input, call, ctx);
     },
     live: liveOf,
+    channelMeter: channelMeter(deps.db, () => deps.limits.current()),
     drain: (boundMs, cut = new Promise<void>(() => {})) =>
       drainRunner(registry, deps.clock, deps.log, boundMs, asks, cut),
     shutdown: (close) =>
@@ -482,6 +483,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     ...deps,
     registry,
     prepareTurn,
+    preparePending: (row) => prepare(pendingFields(deps, row)),
   });
   runner.routes = routes({
     start: (principal, fields) => runner.start(principal, fields),
@@ -489,7 +491,9 @@ export function runnerArea(deps: RunnerDeps): Runner {
     regenerate: (principal, id, fields) =>
       runner.regenerate(principal, id, fields),
     compact: (principal, id) => runner.compact(principal, id),
-    stop: (principal, id) => runner.stop(principal, id),
+    stop: (principal, id, sendId) => runner.stop(principal, id, sendId),
+    cancelPending: (principal, id, turnId) =>
+      runner.cancelPending(principal, id, turnId),
   });
   return runner;
 }

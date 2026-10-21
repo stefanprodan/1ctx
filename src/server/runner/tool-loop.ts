@@ -120,6 +120,7 @@ export async function toolLoop(
       // nor a subagent, whose answer at the threshold is its last
       if (
         send.kind === "chat" &&
+        send.channel === null &&
         send.policy.summoned === null &&
         send.child === null &&
         threshold !== null &&

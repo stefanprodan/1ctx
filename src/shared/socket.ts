@@ -15,11 +15,13 @@ import {
 import type { ExternalTaskRow } from "./contracts/external-task.ts";
 import type { KnowledgeFile } from "./contracts/knowledge.ts";
 import type {
+  ChannelMeter,
   ChildOf,
   LastLine,
   LiveRetry,
   LiveSend,
   Message,
+  PendingTurn,
   QueuedMessage,
   SendSummary,
   SessionSummary,
@@ -28,7 +30,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 19;
+export const PROTOCOL = 21;
 
 export type DraftFrame =
   | { type: "draft"; sessionId: string; draft: AutomationDraft }
@@ -48,7 +50,11 @@ export type VisualFrame = {
 };
 
 // a chat's queued rows at a session revision, each text a preview
-export type QueueFrame = { revision: number; rows: QueuedMessage[] };
+export type QueueFrame = {
+  revision: number;
+  rows: QueuedMessage[];
+  pending?: PendingTurn[];
+};
 
 export type SocketCommand =
   | { type: "watch"; sessionId: string }
@@ -77,6 +83,7 @@ export type SocketEvent =
       last?: LastLine;
       messagesCut?: true;
       row: EnvelopeRow | null;
+      channelContext?: ChannelMeter;
     }
   // to the chat's watchers alone: its queued rows, every member's, each
   // text a preview (QUEUED_PREVIEW), at the session revision of the
@@ -88,6 +95,7 @@ export type SocketEvent =
       revision: number;
       turn: boolean;
       rows: QueuedMessage[];
+      pending?: PendingTurn[];
     }
   // to the author alone: their not-sent rows in the chat after one
   // turned not sent or went, at the session revision of that change,
@@ -143,13 +151,14 @@ export type SocketEvent =
   // changed, keyed by the parent's delegate row, with its status and
   // tally. Its stream deltas go nowhere
   | ({ type: "child"; sessionId: string } & ChildOf)
-  // the answer to a watch: the send in flight as far as it got, the
+  // the answer to a watch: every send in flight as far as it got, the
   // queue as the queue frame carries it, each running subagent's rows
   // so far, and the chat's automation proposals, any written since its read
   | {
       type: "watched";
       sessionId: string;
-      live: LiveSend | null;
+      live: LiveSend[];
+      channelContext?: ChannelMeter;
       queue?: QueueFrame;
       children?: ChildOf[];
       // each checked with isAutomationDraft() before it is used
@@ -255,13 +264,10 @@ export function isDraftFrame(value: unknown): value is DraftFrame {
   );
 }
 
-// a watched answer's drafts, when it carries them, are a list; each is
-// checked by the reader, so one draft of an older shape never stalls
-// the answer the chat's live tail waits on
-export function hasWatchedDrafts(value: unknown): boolean {
+export function isWatchedFrame(value: unknown): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
-  const drafts = (value as Record<string, unknown>).drafts;
-  return !Object.hasOwn(value, "drafts") || Array.isArray(drafts);
+  const v = value as Record<string, unknown>;
+  return v.type === "watched" && Array.isArray(v.live);
 }

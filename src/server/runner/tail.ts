@@ -69,7 +69,7 @@ export function costWithin(
 // a summary edits the history before its tail, and anthropic refuses a
 // thinking block after an edited history on newer accounts, so the
 // tail's replies go without theirs; replay starts again after the summary
-function withoutThinking(
+export function withoutThinking(
   wire: Wire | null,
   messages: ChatMessageIn[],
 ): ChatMessageIn[] {

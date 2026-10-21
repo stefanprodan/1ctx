@@ -171,8 +171,10 @@ function memoryFor(
     return scope.projectId;
   };
   return makeChatMemoryHandle({
-    edit: (edit) => memory.edit(projectId(), chat.sessionId, edit, chat.userId),
-    refuse: (reason) => memory.refuse(projectId(), chat.sessionId, reason),
+    edit: (edit, sendId) =>
+      memory.edit(projectId(), chat.sessionId, edit, chat.userId, sendId),
+    refuse: (reason, sendId) =>
+      memory.refuse(projectId(), chat.sessionId, reason, sendId),
   });
 }
 

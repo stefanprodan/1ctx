@@ -7,7 +7,10 @@
 // saw. Nothing to show before a round has finished or when the catalog
 // did not size the model.
 
-import type { RoundUsage } from "../../shared/contracts/session.ts";
+import type {
+  ChannelMeter,
+  RoundUsage,
+} from "../../shared/contracts/session.ts";
 import { commas, k } from "../lib/format.ts";
 
 export type Readout = {
@@ -28,5 +31,16 @@ export function readout(usage: RoundUsage | null | undefined): Readout | null {
     text: `${k(used)} / ${k(window)}`,
     percent,
     title: `Last counted request: ${commas(used)} of ${commas(window)} tokens, prompt and reply`,
+  };
+}
+
+// a channel's meter: the stream every agent reads against its budget,
+// counted by the server; nothing when the detail does not say
+export function meterReadout(meter: ChannelMeter | undefined): Readout | null {
+  if (meter === undefined || meter.budget <= 0) return null;
+  return {
+    text: `${k(meter.tokens)} / ${k(meter.budget)}`,
+    percent: Math.min(100, (meter.tokens / meter.budget) * 100),
+    title: `What agents read: ${commas(meter.tokens)} of ${commas(meter.budget)} tokens`,
   };
 }

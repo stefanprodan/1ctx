@@ -4,6 +4,13 @@
 // Kept MCP files, owned by their tool row and mounted under /mcp.
 
 import type { Db } from "../db/index.ts";
+import {
+  sessionWorkspace,
+  type Workspace,
+  workspaceId,
+  workspaceOf,
+  workspaceSession,
+} from "./workspace.ts";
 
 export type KeptFile = {
   folder: number;
@@ -70,15 +77,35 @@ export function writeKeptFiles(
 ): void {
   if (files.length === 0) return;
   const row = db
-    .query<{ session_id: string }, [string]>(
-      "select session_id from messages where id = ?",
+    .query<
+      {
+        session_id: string;
+        origin: "chat" | "automation" | "channel";
+        agent_id: string | null;
+        parent_session_id: string | null;
+      },
+      [string]
+    >(
+      `select messages.session_id, sessions.origin, sends.agent_id,
+         sessions.parent_session_id
+       from messages
+       join sessions on sessions.id = messages.session_id
+       join sends on sends.id = messages.send_id
+       where messages.id = ?`,
     )
     .get(messageId);
   if (row === null) return;
+  const workspace =
+    row.parent_session_id !== null || row.agent_id === null
+      ? sessionWorkspace(row.session_id)
+      : workspaceOf(row.session_id, row.origin, row.agent_id);
+  const keptWorkspace =
+    workspace.id === workspace.sessionId ? null : workspace.id;
   const insert = db.query(
     `insert into mcp_kept_files
-       (message_id, position, session_id, folder, dir, name, bytes, text, data)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (message_id, position, session_id, folder, dir, name, bytes, text, data,
+        workspace_id)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   files.forEach((file, position) => {
     insert.run(
@@ -91,15 +118,19 @@ export function writeKeptFiles(
       file.bytes,
       file.text,
       file.data,
+      keptWorkspace,
     );
   });
   const top = Math.max(...files.map((file) => file.folder));
   db.query(
-    "update sessions set mcp_folders = max(mcp_folders, ?) where id = ?",
-  ).run(top, row.session_id);
+    `insert into session_workspaces (workspace_id, session_id, mcp_folders)
+     values (?, ?, ?)
+     on conflict (workspace_id) do update set
+       mcp_folders = max(mcp_folders, excluded.mcp_folders)`,
+  ).run(workspace.id, workspace.sessionId, top);
 }
 
-export function listKept(db: Db, sessionId: string): KeptEntry[] {
+export function listKept(db: Db, workspace: Workspace): KeptEntry[] {
   return db
     .query<
       {
@@ -109,12 +140,15 @@ export function listKept(db: Db, sessionId: string): KeptEntry[] {
         name: string;
         bytes: number;
       },
-      [string]
+      [string, string | null]
     >(
       `select message_id, position, dir, name, bytes from mcp_kept_files
-       where session_id = ? order by folder, position`,
+       where session_id = ? and workspace_id is ? order by folder, position`,
     )
-    .all(sessionId)
+    .all(
+      workspaceSession(workspace),
+      workspace.id === workspace.sessionId ? null : workspace.id,
+    )
     .map((row) => ({
       messageId: row.message_id,
       position: row.position,
@@ -239,22 +273,30 @@ function unpackKept(frame: Uint8Array, bytes: number): Uint8Array {
  */
 export function startKept(
   db: Db,
-  sessionId: string,
+  workspace: Workspace,
   caps: { mcpKeptBytes: number; mcpKeptFiles: number },
   afterSeq: number | null = null,
 ): { next: number; used: number; files: number } {
+  const id = workspaceId(workspace);
+  const sessionId = workspaceSession(workspace);
+  const keptWorkspace = id === sessionId ? null : id;
   const folders = db
     .query<
       { folder: number; bytes: number; files: number },
-      [string, string, number]
+      [string, string | null, string, number]
     >(
       `select folder, sum(bytes) as bytes, count(*) as files
-       from mcp_kept_files where session_id = ?
+       from mcp_kept_files where session_id = ? and workspace_id is ?
        and message_id not in
          (select id from messages where session_id = ? and seq > ?)
        group by folder order by folder`,
     )
-    .all(sessionId, sessionId, afterSeq ?? Number.MAX_SAFE_INTEGER);
+    .all(
+      sessionId,
+      keptWorkspace,
+      sessionId,
+      afterSeq ?? Number.MAX_SAFE_INTEGER,
+    );
   let bytes = folders.reduce((sum, f) => sum + f.bytes, 0);
   let files = folders.reduce((sum, f) => sum + f.files, 0);
   const drop: number[] = [];
@@ -266,14 +308,15 @@ export function startKept(
   }
   if (drop.length > 0) {
     db.query(
-      `delete from mcp_kept_files where session_id = ? and folder <= ?`,
-    ).run(sessionId, drop[drop.length - 1]!);
+      `delete from mcp_kept_files
+       where session_id = ? and workspace_id is ? and folder <= ?`,
+    ).run(sessionId, keptWorkspace, drop[drop.length - 1]!);
   }
   const row = db
     .query<{ mcp_folders: number }, [string]>(
-      "select mcp_folders from sessions where id = ?",
+      "select mcp_folders from session_workspaces where workspace_id = ?",
     )
-    .get(sessionId);
+    .get(id);
   return { next: (row?.mcp_folders ?? 0) + 1, used: bytes, files };
 }
 
@@ -287,8 +330,8 @@ export function copyKeptFiles(
 ): void {
   const copy = db.query(
     `insert into mcp_kept_files (message_id, position, session_id, folder,
-       dir, name, bytes, text, data, packed)
-     select ?, position, ?, folder, dir, name, bytes, text, data, packed
+       dir, name, bytes, text, data, packed, workspace_id)
+     select ?, position, ?, folder, dir, name, bytes, text, data, packed, ?
      from mcp_kept_files where message_id = ? and packed <> 1`,
   );
   const packed = db.query<
@@ -307,11 +350,11 @@ export function copyKeptFiles(
   );
   const insert = db.query(
     `insert into mcp_kept_files (message_id, position, session_id, folder,
-       dir, name, bytes, text, data)
-     values (?, ?, ?, ?, ?, ?, ?, null, ?)`,
+       dir, name, bytes, text, data, workspace_id)
+     values (?, ?, ?, ?, ?, ?, ?, null, ?, ?)`,
   );
   for (const [from, to] of messageIds) {
-    copy.run(to, targetSessionId, from);
+    copy.run(to, targetSessionId, null, from);
     for (const row of packed.all(from)) {
       const raw = unpackKept(row.data, row.bytes);
       insert.run(
@@ -323,11 +366,15 @@ export function copyKeptFiles(
         row.name,
         row.bytes,
         raw,
+        null,
       );
     }
   }
   db.query(
-    `update sessions set mcp_folders =
-       (select mcp_folders from sessions where id = ?) where id = ?`,
-  ).run(sourceSessionId, targetSessionId);
+    `insert into session_workspaces (workspace_id, session_id, mcp_folders)
+     select ?, ?, mcp_folders from session_workspaces
+     where workspace_id = ?
+     on conflict (workspace_id) do update set
+       mcp_folders = excluded.mcp_folders`,
+  ).run(targetSessionId, targetSessionId, sourceSessionId);
 }

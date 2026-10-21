@@ -11,7 +11,11 @@
 
 import type { EnvelopeRow } from "../../shared/api/sessions.ts";
 import type { AutomationDraft } from "../../shared/contracts/automation-draft.ts";
-import type { ChildOf, LiveSend } from "../../shared/contracts/session.ts";
+import type {
+  ChannelMeter,
+  ChildOf,
+  LiveSend,
+} from "../../shared/contracts/session.ts";
 import {
   isSocketCommand,
   PROTOCOL,
@@ -25,8 +29,9 @@ import {
   type Principal,
   type RouteDescriptor,
 } from "../lib/http.ts";
-import { errorFields, type Log } from "../lib/log.ts";
+import type { Log } from "../lib/log.ts";
 import { externalTaskFrame } from "./external-task-frames.ts";
+import { channelMeterOf, sessionFrame } from "./session-frame.ts";
 
 // a frame could not be delivered: the client reconnects and reconciles
 export const CLOSE_DROPPED = 1013;
@@ -70,7 +75,7 @@ export type SocketDeps = {
   // the session's project when the principal may see it, else null
   sessionProject(principal: Principal, sessionId: string): string | null;
   // the runner's snapshot of the send in flight
-  live(sessionId: string): LiveSend | null;
+  live(sessionId: string): LiveSend[];
   // the feed row a session envelope carries, null for a session gone
   envelopeRow(sessionId: string): EnvelopeRow | null;
   // the chat's queued rows as the queue frame carries them
@@ -79,6 +84,7 @@ export type SocketDeps = {
   children(sessionId: string): ChildOf[];
   // the chat's automation proposals as the session read carries them
   drafts(sessionId: string): AutomationDraft[];
+  channelMeter(sessionId: string): ChannelMeter | null;
 };
 
 export type Socket = {
@@ -225,22 +231,6 @@ export function socketArea(deps: SocketDeps): Socket {
     rewatch(conn);
   };
 
-  // a failed read still sends the envelope, without its row, since an
-  // open chat needs the messages
-  const row = (
-    event: Extract<BusEvent, { type: "session.changed" }>,
-  ): EnvelopeRow | null => {
-    try {
-      return deps.envelopeRow(event.data.session.id);
-    } catch (err) {
-      deps.log.error("envelope row failed", {
-        chat: event.data.session.id,
-        ...errorFields(err),
-      });
-      return null;
-    }
-  };
-
   // A durable frame goes to the connections holding its project. It is
   // built and encoded on the first connection in its audience, so an
   // event nobody may see costs neither a read nor an encoding, and one
@@ -263,11 +253,7 @@ export function socketArea(deps: SocketDeps): Socket {
     if (externalTaskFrame(event, toProject)) return;
     switch (event.type) {
       case "session.changed":
-        toProject(event.data.projectId, () => ({
-          type: "session",
-          ...event.data,
-          row: row(event),
-        }));
+        toProject(event.data.projectId, () => sessionFrame(event, deps));
         break;
       case "queue.changed":
       case "child.changed":
@@ -447,12 +433,14 @@ export function socketArea(deps: SocketDeps): Socket {
       // registered before the snapshot is taken, so no frame falls
       // between the two
       const live = deps.live(parsed.sessionId);
-      const children = live === null ? [] : deps.children(parsed.sessionId);
+      const children = live.length === 0 ? [] : deps.children(parsed.sessionId);
       const drafts = deps.drafts(parsed.sessionId);
+      const channelContext = channelMeterOf(deps, parsed.sessionId);
       deliver(conn, {
         type: "watched",
         sessionId: parsed.sessionId,
         live,
+        ...(channelContext === null ? {} : { channelContext }),
         queue: deps.queue(parsed.sessionId),
         ...(children.length > 0 ? { children } : {}),
         ...(drafts.length > 0 ? { drafts } : {}),

@@ -80,6 +80,13 @@ function addChild(
   const root = chat.app.sessions.byId(rootId)!;
   const at = fields.at ?? chat.app.now.value + 60_000;
   const status = fields.status ?? "done";
+  if (
+    root.ownerId === null ||
+    root.agentId === null ||
+    root.origin === "channel"
+  ) {
+    throw new Error("a channel cannot be this child fixture");
+  }
   const child = chat.app.sessions.create({
     projectId: root.projectId,
     ownerId: root.ownerId,

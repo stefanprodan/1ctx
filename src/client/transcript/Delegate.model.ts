@@ -16,13 +16,28 @@ export type ChildStatus = "running" | "done" | "failed" | "stopped";
 
 // a delegate call that made a child, or may still: one refused before
 // its child began (spent, stopped, out of time) or never run is an
-// ordinary row, its result saying why. held: rows of its child are held
-export const isDelegate = (node: CallNode, held = false): boolean =>
+// ordinary row, its result saying why. held: rows of its child are held;
+// swept: its turn's tool output aged out, the child with it
+export const isDelegate = (
+  node: CallNode,
+  held = false,
+  swept = false,
+): boolean =>
   node.result !== null &&
   ranCall(node.call, node.result).name === "delegate" &&
   (node.result.childSessionId !== undefined ||
     node.result.status === "streaming" ||
-    held);
+    held ||
+    (swept && node.result.status === "done"));
+
+// a child that is no longer there: its read found nothing, or its aged
+// turn's row names none
+export const childGone = (
+  row: Message,
+  entry: { gone?: true } | undefined,
+  swept: boolean,
+): boolean =>
+  entry?.gone === true || (swept && row.childSessionId === undefined);
 
 function argument(node: CallNode, name: string): string {
   const value = toolArguments(node.call.arguments)?.[name];
@@ -47,7 +62,12 @@ export function childStatus(row: Message, work: ChildWork | null): ChildStatus {
     : "failed";
 }
 
-export function childHead(status: ChildStatus, work: ChildWork | null): string {
+export function childHead(
+  status: ChildStatus,
+  work: ChildWork | null,
+  gone = false,
+): string {
+  if (gone) return "gone";
   const parts: string[] = [status];
   if (work !== null && work.tokens > 0) parts.push(tokensText(work.tokens));
   return parts.join(" · ");

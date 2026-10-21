@@ -54,6 +54,7 @@ export function Work({
     ? memorySummary(node, running, Date.now(), retry, marked)
     : workSummary(node, running, Date.now(), retry);
   const wasRunning = useRef(running);
+  const swept = node.send?.swept === true;
 
   // only the transition shuts the fold: mounting a finished send must
   // preserve a reader's choice from an earlier view
@@ -95,8 +96,12 @@ export function Work({
           live={live}
           running={running}
           call={(call) =>
-            isDelegate(call, childWork.value.has(call.result?.id ?? "")) ? (
-              <Delegate key={call.key} node={call} />
+            isDelegate(
+              call,
+              childWork.value.has(call.result?.id ?? ""),
+              swept,
+            ) ? (
+              <Delegate key={call.key} node={call} swept={swept} />
             ) : (
               <Tool key={call.key} node={call} />
             )

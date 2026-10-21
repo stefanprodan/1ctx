@@ -358,6 +358,7 @@ describe("a send's subagent places", () => {
 describe("the registry's extra streams", () => {
   const send = (n: number, scheduled = false) =>
     ({
+      id: `send${n}`,
       sessionId: `s${n}`,
       projectId: `p${n}`,
       startedBy: scheduled ? null : `u${n}`,
@@ -365,7 +366,12 @@ describe("the registry's extra streams", () => {
       terminal: null,
       policy: { fullName: "x" },
     }) as unknown as ActiveSend;
-  const caps = { sendsPerUser: 4, sendsPerProject: 16, sendsRunning: 4 };
+  const caps = {
+    sendsPerUser: 4,
+    sendsPerProject: 16,
+    sendsRunning: 4,
+    sendsPerChannel: 4,
+  };
 
   test("count under sendsRunning, so an extra fills the process", () => {
     const registry = new Registry();

@@ -9,6 +9,7 @@ import type {
 } from "../../shared/api/sessions.ts";
 import type {
   LiveRetry,
+  LiveSend,
   SessionDetail,
 } from "../../shared/contracts/session.ts";
 import { says } from "../lib/format.ts";
@@ -16,7 +17,12 @@ import { baseName } from "../lib/tree.ts";
 import type { ToolResult } from "../transcript/Tool.model.ts";
 import { fileKey, visualKey } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { childRow, childRowIds, resetChildren } from "./session-children.ts";
+import {
+  childRow,
+  childRowIds,
+  dropChildren,
+  resetChildren,
+} from "./session-children.ts";
 
 export type StoredVisual =
   | { status: "loading" }
@@ -33,9 +39,24 @@ export type StoredFile =
 export const toolResults = signal<ReadonlyMap<string, ToolResult>>(new Map());
 export const toolVisuals = signal<ReadonlyMap<string, StoredVisual>>(new Map());
 export const openedFiles = signal<ReadonlyMap<string, StoredFile>>(new Map());
-// the running round waiting to ask its provider again, from the snapshot
-// and the retry frames; never stored
-export const retrying = signal<LiveRetry | null>(null);
+// each send's round waiting to ask its provider again, by send id, from
+// the snapshot and the retry frames; never stored
+export const retries = signal<ReadonlyMap<string, LiveRetry>>(new Map());
+
+export const retriesOf = (live: readonly LiveSend[]) =>
+  new Map(
+    live.flatMap((send) =>
+      send.retry === undefined ? [] : [[send.sendId, send.retry] as const],
+    ),
+  );
+
+// one send's retry frame: a null retry clears it
+export function retried(sendId: string, retry: LiveRetry | null): void {
+  const next = new Map(retries.value);
+  if (retry === null) next.delete(sendId);
+  else next.set(sendId, retry);
+  retries.value = next;
+}
 let detail: SessionDetail | null = null;
 const requests = new Map<string, AbortController>();
 
@@ -47,16 +68,35 @@ export function resetValues(): void {
   toolResults.value = new Map();
   toolVisuals.value = new Map();
   openedFiles.value = new Map();
-  retrying.value = null;
+  retries.value = new Map();
 }
+
+// the sends a detail holds as aged
+const sweptOf = (d: SessionDetail): Set<string> =>
+  new Set(
+    [...(d.sends ?? []), ...(d.send ? [d.send] : [])]
+      .filter((send) => send.swept === true)
+      .map((send) => send.id),
+  );
 
 export function syncValues(next: SessionDetail): void {
   if (detail !== null && detail.session.id !== next.session.id) resetValues();
+  const before = detail === null ? null : sweptOf(detail);
   detail = next;
+  // a turn that just aged lost its tool output and its subagents, so the
+  // results and child work loaded before go with them; the ids stay
+  const aged = new Set<string>();
+  if (before !== null) {
+    const swept = sweptOf(next);
+    for (const row of next.messages) {
+      if (swept.has(row.sendId) && !before.has(row.sendId)) aged.add(row.id);
+    }
+  }
+  dropChildren(aged);
   // a subagent's rows keep their results while the chat is on screen
   const keys = new Set<string>(childRowIds());
   for (const row of next.messages) {
-    keys.add(row.id);
+    if (!aged.has(row.id)) keys.add(row.id);
     row.toolCalls?.forEach((_, index) => {
       keys.add(visualKey(row.id, index));
     });

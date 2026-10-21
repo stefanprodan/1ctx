@@ -8,7 +8,12 @@ import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
 import type { SearchProvider, SessionOrigin } from "../../shared/words.ts";
-import type { CommandResult, JobRepo, KeptFile } from "../bash/index.ts";
+import type {
+  CommandResult,
+  JobRepo,
+  KeptFile,
+  Workspace,
+} from "../bash/index.ts";
 import type { CredentialRow } from "../credentials/index.ts";
 import type { ToolCaps } from "../limits/index.ts";
 import type { OfferedServer } from "../mcp/index.ts";
@@ -61,10 +66,8 @@ export type ToolContext = {
     agentId: string;
     agentName: string;
     sessionId: string;
-    origin: "chat" | "automation";
-    // when the send began: its sends are serial per session, so rows
-    // of the session from then on are this send's
-    sendStartedAt: number;
+    workspace: Workspace;
+    origin: "chat" | "automation" | "channel";
   } | null;
   signal: AbortSignal;
   now(): number;
@@ -118,8 +121,8 @@ export type MemoryScope = {
 
 // a chat's saves, bound to its project, session and author
 export type ChatMemoryPort = {
-  edit(edit: ChatMemoryEdit): ChatEditAnswer;
-  refuse(reason: string): string;
+  edit(edit: ChatMemoryEdit, sendId?: string): ChatEditAnswer;
+  refuse(reason: string, sendId?: string): string;
 };
 
 export type MemoryHandle = {

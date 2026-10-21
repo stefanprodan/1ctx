@@ -28,7 +28,8 @@ describe("memory round settlement", () => {
     const chat = await chatApp();
     const automation = await createAutomation(chat, { ownMemory: true });
     const run = await startRun(chat, automation.id);
-    const active = chat.app.runner.registry.get(run.sessionId)!;
+    const active = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+      null)!;
     const handle = active.policy.memoryOffered!.memory!;
     run.main.reply("Done.");
     const first = await waitScript(chat.scripted, 2);

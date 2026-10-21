@@ -28,3 +28,6 @@ export function nameTaken(
     (rows?.some((r) => r.name === n && r.id !== exceptId) ?? false)
   );
 }
+
+// a project's channel by name, as its page, the composer and Recent say it
+export const channelName = (project: string): string => `#${project}`;

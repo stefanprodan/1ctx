@@ -239,7 +239,7 @@ export function makeBashTool({
           : commandCredentials(credentials, keys, actor.projectId);
       const result = await bash.run(
         actor.projectId,
-        actor.sessionId,
+        actor.workspace,
         {
           kind: "agent",
           id: actor.agentId,

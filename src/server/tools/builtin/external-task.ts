@@ -276,8 +276,8 @@ export function makeExternalTaskTool(
       const actor = ctx.actor;
       // a run and its subagents are never offered it; a forged call
       // there reads nothing
-      if (port === null || actor === null || actor.origin !== "chat") {
-        throw new Error("external tasks are only offered in a chat");
+      if (port === null || actor === null || actor.origin === "automation") {
+        throw new Error("external tasks are not offered in a run");
       }
       if (call.action !== "list" && call.action !== "show") {
         if (!writes || ctx.subagent != null) {

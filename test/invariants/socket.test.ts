@@ -26,6 +26,7 @@ import {
   VERSION,
 } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
+import { channelApp } from "../helpers/channel.ts";
 import {
   type ChatApp,
   chatApp,
@@ -352,10 +353,12 @@ describe("the socket", () => {
       {
         type: "watched",
         sessionId,
-        live: expect.objectContaining({
-          sendId: detail.send.id,
-          messageId: detail.messages[1].id,
-        }),
+        live: [
+          expect.objectContaining({
+            sendId: detail.send.id,
+            messageId: detail.messages[1].id,
+          }),
+        ],
         // the chat's queue as the queue frame carries it
         queue: { revision: detail.session.revision, rows: [] },
       },
@@ -822,12 +825,12 @@ describe("automation socket events", () => {
 });
 
 describe("the envelope row read", () => {
-  const changed = (projectId: string) =>
+  const changed = (projectId: string, origin = "chat") =>
     publish({
       type: "session.changed",
       data: {
         projectId,
-        session: { id: `s-${projectId}`, projectId } as never,
+        session: { id: `s-${projectId}`, projectId, origin } as never,
         messages: [],
         send: null,
       },
@@ -841,10 +844,11 @@ describe("the envelope row read", () => {
       refresh: (principal) => principal,
       visibleProjectIds: () => [],
       sessionProject: () => null,
-      live: () => null,
+      live: () => [],
       queue: () => ({ revision: 0, rows: [] }),
       children: () => [],
       drafts: () => [],
+      channelMeter: () => null,
       envelopeRow(sessionId) {
         reads.push(sessionId);
         return null;
@@ -873,10 +877,11 @@ describe("the envelope row read", () => {
       refresh: (principal) => principal,
       visibleProjectIds: () => [],
       sessionProject: () => null,
-      live: () => null,
+      live: () => [],
       queue: () => ({ revision: 0, rows: [] }),
       children: () => [],
       drafts: () => [],
+      channelMeter: () => null,
       envelopeRow(sessionId) {
         reads.push(sessionId);
         return null;
@@ -893,30 +898,47 @@ describe("the envelope row read", () => {
     socket.dispose();
   });
 
-  test.serial("a failed read still sends the envelope, without a row", () => {
-    const logs = collectLogs();
-    const socket = socketArea({
-      version: "test",
-      log: logs.logFactory("socket"),
-      refresh: (principal) => principal,
-      visibleProjectIds: () => [],
-      sessionProject: () => null,
-      live: () => null,
-      queue: () => ({ revision: 0, rows: [] }),
-      children: () => [],
-      drafts: () => [],
-      envelopeRow() {
-        throw new Error("disk I/O error");
-      },
-    });
-    const conn = memberConn("a", ["p"]);
-    socket.open(conn);
-    changed("p");
-    expect(frames(conn, "session").map((frame) => frame.row)).toEqual([null]);
-    expect(logs.events.map((event) => [event.msg, event.fields.chat])).toEqual([
-      ["socket open", undefined],
-      ["envelope row failed", "s-p"],
-    ]);
-    socket.dispose();
-  });
+  test.serial(
+    "failed row and meter reads still send the channel envelope",
+    async () => {
+      const { chat, channelId, project, post } = await channelApp();
+      const logs = collectLogs();
+      const socket = socketArea({
+        version: "test",
+        log: logs.logFactory("socket"),
+        refresh: (principal) => principal,
+        visibleProjectIds: () => [],
+        sessionProject: () => null,
+        live: () => [],
+        queue: () => ({ revision: 0, rows: [] }),
+        children: () => [],
+        drafts: () => [],
+        channelMeter() {
+          throw new Error("disk I/O error");
+        },
+        envelopeRow() {
+          throw new Error("disk I/O error");
+        },
+      });
+      try {
+        const conn = memberConn(chat.memberId, [project.id]);
+        socket.open(conn);
+        expect((await post("a channel post")).status).toBe(201);
+        expect(frames(conn, "session").map((frame) => frame.row)).toEqual([
+          null,
+        ]);
+        expect(frames(conn, "session")[0]?.channelContext).toBeUndefined();
+        expect(
+          logs.events.map((event) => [event.msg, event.fields.chat]),
+        ).toEqual([
+          ["socket open", undefined],
+          ["envelope row failed", channelId],
+          ["channel meter failed", channelId],
+        ]);
+      } finally {
+        socket.dispose();
+        await chat.app.shutdown();
+      }
+    },
+  );
 });

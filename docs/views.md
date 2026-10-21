@@ -12,6 +12,25 @@ primitives, forms and the data layer's general rules are in
 The feed is the session list on Home and on a project's Feed tab: chats
 and runs, one row each, under the filters All, Chats, Runs and Flagged.
 
+- **A team project's channel is its pinned feed row.** An unsearched project
+  feed returns it first under All and Chats, marked `pinned`; Runs and Flagged
+  omit it. Search includes it only when its project-name title matches and
+  does not pin it. Home returns every visible channel as an ordinary row in
+  last-activity order. The client keeps a `pinned` row first through every
+  merge (`ordered()`), its envelopes included, and Chats takes a channel's
+  envelope (`listsOrigin()`). The row is `#<project>` with the channel icon,
+  the last post's author and start, or "No messages yet", and never names its
+  project twice.
+- **A channel detail is paged by whole turns.** Its first read returns the
+  newest 50 post-anchored turns and a `before` seq when older turns remain.
+  A turn's anchor is its user row, or a run's posted answer (a reply with
+  `run_calls`), which has none; that row carries `run`: its calls, the run's
+  session id and its automation's name, both null once gone.
+  `before` reads the next older page; `around` reads one bounded window around
+  a quoted post's seq. Chats and runs still return every row in one read. It
+  also names its agent turns (`sends`), so each answer finds its post and its
+  summoner.
+
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the feed lands on both.
 - **The Not sent card reads its own route, never the feed.** `GET
@@ -88,7 +107,8 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   Wales flags.
 
 - **A chat is `/chat/:id` and a run `/run/:id`.** Each shows the other
-  origin as not found, so every link picks its page by origin.
+  origin as not found, so every link picks its page by origin. A channel
+  opens at `/chat/:id`; its page is in `docs/channel-page.md`.
 - **A run's rounds after its answer are one fold.** `transcript/rows.ts`
   splits at the send's `memoryRound`, the first round after the answer,
   whether the attention step's or the memory phase's; never two
@@ -260,6 +280,8 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   have, so a stale key is dropped on save. Memory, Automations and
   External tasks, a chat's alone, have no switch there and are dropped
   too.
+- **Post to channel sits after Email in the Access step** and shows only
+  in a team project, naming its channel.
 - **An automation on a deleted agent cannot be saved as is.** Run now
   and Resume are off, and Save stays off until a live agent is picked
   (`retiredPick()`).

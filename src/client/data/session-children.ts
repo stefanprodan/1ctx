@@ -16,13 +16,16 @@ import type {
   Message,
 } from "../../shared/contracts/session.ts";
 import { says } from "../lib/format.ts";
-import { api } from "./api.ts";
+import { ApiError, api } from "./api.ts";
 import { session } from "./session-held.ts";
 
 export type ChildEntry = {
   work: ChildWork | null;
   loading: boolean;
   error: string | null;
+  // the child is no longer there: a channel turn's subagents go when its
+  // tool output ages, and nothing asks for them again
+  gone?: true;
 };
 
 export const childWork = signal<ReadonlyMap<string, ChildEntry>>(new Map());
@@ -99,6 +102,7 @@ export async function loadChild(
   const chat = session.value?.session.id;
   const held = childWork.value.get(messageId);
   if (chat === undefined) return;
+  if (held?.gone) return;
   if (held !== undefined && !(retry && held.error !== null && !held.loading))
     return;
   const request = new AbortController();
@@ -120,10 +124,12 @@ export async function loadChild(
     });
   } catch (error) {
     if (request.signal.aborted || requests.get(messageId) !== request) return;
+    const gone = error instanceof ApiError && error.status === 404;
     set(messageId, {
       loading: false,
-      error: says(error),
+      error: gone ? null : says(error),
       work: childWork.value.get(messageId)?.work ?? null,
+      ...(gone ? { gone: true as const } : {}),
     });
   } finally {
     if (requests.get(messageId) === request) requests.delete(messageId);
@@ -142,6 +148,18 @@ export function childRow(messageId: string): Message | null {
 export function childRowIds(): string[] {
   return [...childWork.value.values()].flatMap(
     (entry) => entry.work?.rows.map((row) => row.id) ?? [],
+  );
+}
+
+// the children of delegate rows whose turn aged: gone with its output
+export function dropChildren(messageIds: ReadonlySet<string>): void {
+  if (![...childWork.value.keys()].some((id) => messageIds.has(id))) return;
+  for (const id of messageIds) {
+    requests.get(id)?.abort();
+    requests.delete(id);
+  }
+  childWork.value = new Map(
+    [...childWork.value].filter(([id]) => !messageIds.has(id)),
   );
 }
 

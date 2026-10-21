@@ -177,7 +177,7 @@ export function detail(
     },
     messages: [],
     queued: [],
-    live: null,
+    live: [],
     authors: [],
     agents: [],
     forkedFrom: null,

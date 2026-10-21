@@ -67,7 +67,9 @@ describe("automation scheduler", () => {
             user: "casey",
           },
         });
-        const send = chat.app.runner.registry.get(first.detail.session.id)!;
+        const send = (chat.app.runner.registry.inSession(
+          first.detail.session.id,
+        )[0] ?? null)!;
         const policy = send.policy;
         expect(policy.automation).toMatchObject({
           source,
@@ -105,8 +107,10 @@ describe("automation scheduler", () => {
         await send.drained;
         const second = await launch();
         expect(
-          chat.app.runner.registry.get(second.detail.session.id)?.policy
-            .automation?.memoryGuidance,
+          (
+            chat.app.runner.registry.inSession(second.detail.session.id)[0] ??
+            null
+          )?.policy.automation?.memoryGuidance,
         ).toBe("Snapshot: remember the latest result");
         expect(events[1]?.automation.memoryGuidance).toBe(
           "Snapshot: remember the latest result",

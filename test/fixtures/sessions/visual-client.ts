@@ -79,10 +79,10 @@ export function visualDetail(): SessionDetail {
       memorySkipped: null, summoned: false, tokens: 0, startedAt: 1,
       finishedAt: null,
     },
-    live: {
+    live: [{
       phase: "reply", sendId: "send00000001", messageId: "reply0000001",
       seq: 0, content: "", reasoning: "", html: "", htmlAt: 0,
-    },
+    }],
     authors: [],
   };
 }

@@ -656,6 +656,7 @@ describe("the Config board", () => {
     expect([...placed].sort()).toEqual([...LIMIT_NAMES].sort());
     expect(LIMITS_CARDS.map((c) => c.title)).toEqual([
       "Turns",
+      "Channels",
       "Running",
       "Automations",
       "External tasks",
@@ -885,7 +886,7 @@ describe("the Config board", () => {
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
     // the tool cards stay mounted, hidden, so their drafts are kept
-    expect(html.match(/<form/g)).toHaveLength(11);
+    expect(html.match(/<form/g)).toHaveLength(12);
     expect(html).toMatch(
       /config-board-cards config-board-away"><form[\s\S]*?Agents manage automations/,
     );

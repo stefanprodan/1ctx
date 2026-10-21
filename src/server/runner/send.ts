@@ -9,8 +9,10 @@ import type {
   Message,
   VisualDraft,
 } from "../../shared/contracts/session.ts";
-import type { SendCause, SendKind } from "../../shared/words.ts";
+import type { SendCause, SendKind, SessionOrigin } from "../../shared/words.ts";
+import type { Workspace } from "../bash/index.ts";
 import type { ReasoningDetail, ToolCall, Usage } from "../providers/index.ts";
+import type { ChannelContext } from "./channel-context.ts";
 import { type Children, noChildren } from "./child-slots.ts";
 import type {
   KeepPort,
@@ -97,13 +99,16 @@ export type OpenTool = { rowId: string; name: string; after: boolean };
 export type ActiveSend = {
   id: string;
   sessionId: string;
+  workspace: Workspace;
   projectId: string;
   // the user the send counts against, null for a scheduled run
   startedBy: string | null;
   kind: SendKind;
+  origin: SessionOrigin;
   op: SendOp;
   startedAt: number;
   policy: SendPolicy;
+  channel: ChannelContext | null;
   firstMessageId: string;
   // the round streaming now, or null while its tools run
   round: RoundState | null;
@@ -279,9 +284,11 @@ export function restartRound(send: ActiveSend, round: RoundState): RoundState {
 export function newSend(fields: {
   id: string;
   sessionId: string;
+  workspace: Workspace;
   projectId: string;
   startedBy: string | null;
   kind?: SendKind;
+  origin: SessionOrigin;
   op: SendOp;
   summarizing?: boolean;
   used?: number | null;
@@ -303,12 +310,15 @@ export function newSend(fields: {
   return {
     id: fields.id,
     sessionId: fields.sessionId,
+    workspace: fields.workspace,
     projectId: fields.projectId,
     startedBy: fields.startedBy,
     kind: fields.kind ?? "chat",
+    origin: fields.origin,
     op: fields.op,
     startedAt: fields.now,
     policy: fields.policy,
+    channel: null,
     firstMessageId: fields.firstMessageId,
     round: newRound(fields.replyId, fields.now),
     roundNo: 1,

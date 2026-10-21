@@ -287,6 +287,7 @@ describe("sweep", () => {
         external_idle: 0,
         external_deleted: 0,
         removed: 1,
+        turns_swept: 0,
         chats_archived: 0,
         chats_packed: 0,
         scratch_freed: 0,

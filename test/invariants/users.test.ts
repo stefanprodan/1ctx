@@ -559,7 +559,7 @@ describe("admin users", () => {
         expect(conn.frames).toContainEqual({
           type: "watched",
           sessionId: chat.id,
-          live: null,
+          live: [],
           queue: { revision: expect.any(Number), rows: [] },
         });
         expect(seen).toContainEqual({

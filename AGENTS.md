@@ -136,6 +136,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, themes, helpers |
 | `docs/shell.md` | the shell, the rail and its Recent list, the drawer, the installed app, app links and `/knowledge/` paths in replies |
 | `docs/views.md` | what a page draws: `views/`, the session list (feed) |
+| `docs/channel-page.md` | a project channel's page: quotes, pending turns, the context line, its pages and gap |
 | `docs/composer.md` | `composer/`: the draft, its files and switches, the slash commands |
 | `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
@@ -143,6 +144,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, stream bounds |
+| `docs/channel-context.md` | a channel turn's snapshot, traces, stream budget, admission and meter, run posts |
 | `docs/queue.md` | messages to a busy chat: the queue, its dispatcher |
 | `docs/subagents.md` | the `delegate` tool, child sessions, the child loop and the child rows |
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |

@@ -30,7 +30,8 @@ admin pages in `docs/admin-pages.md`, the external task pages in
 - **A page seen before draws at once.** An entity that shows one key
   at a time holds earlier answers in `data/held.ts` (or a per-id
   `data/slot.ts`) and draws them while its load runs again. Never a
-  running chat, since it would miss its frames. A held key goes on a
+  running chat, since it would miss its frames, nor a channel, which is
+  paged and whose gap state is the one on screen's. A held key goes on a
   user change, a revocation, a deletion or a failed load of it.
 - **The socket client reconciles, never reasons.** `data/socket.ts` is
   the tab's one connection, open while someone is signed in, with a
@@ -43,7 +44,12 @@ admin pages in `docs/admin-pages.md`, the external task pages in
 - **`data/socket.ts` knows no entity.** Modules register for frames.
   `data/sessions.ts` applies an envelope (`docs/sessions.md`) only when
   its revision is above the one held, and applies stream frames in
-  sequence through `transcript/stream.ts`. A gap, a frame ahead of the
+  sequence per send through `transcript/stream.ts`. Live snapshots are lists;
+  ending one send removes only its tail, and a retry frame marks only its
+  own send (`retries`, by send id). Pending channel turns follow queue
+  revisions. The channel's server-counted `channelContext` meter follows
+  detail, `watched` and newer envelopes; a work envelope without it keeps
+  the held count. A gap, a frame ahead of the
   buffer or an overflow before `watched` refetches the session's detail.
   Frames land in a map ahead of `live`, published once per animation
   frame (`data/session-live.ts`), so a burst draws once per paint; the

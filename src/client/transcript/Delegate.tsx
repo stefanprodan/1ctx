@@ -12,6 +12,7 @@ import { childWork, loadChild } from "../data/session-children.ts";
 import { loadToolResult, toolResults } from "../data/session-values.ts";
 import { Icon } from "../lib/icons.tsx";
 import {
+  childGone,
   childHead,
   childStatus,
   childView,
@@ -27,10 +28,18 @@ import { Tool, Value } from "./Tool.tsx";
 const { useFoldOpen } = folds();
 const NO_LIVE = new Map();
 
-export function Delegate({ node }: { node: CallNode }) {
+export function Delegate({
+  node,
+  swept = false,
+}: {
+  node: CallNode;
+  // its turn's tool output aged out (a channel's), the child with it
+  swept?: boolean;
+}) {
   const row = node.result!;
   const { open, onToggle } = useFoldOpen(node.key);
   const entry = childWork.value.get(row.id);
+  const gone = childGone(row, entry, swept);
   const work = entry?.work ?? null;
   // read on opening, and again when a watch dropped what was held; a
   // failed read is asked again only by opening the group again
@@ -45,7 +54,7 @@ export function Delegate({ node }: { node: CallNode }) {
   // the parent's result: the answer as it got it, a failure's words or
   // the files copied back, off the wire like any call's
   const result = toolResults.value.get(row.id);
-  const wantsOwn = wantsResult(open, row, result);
+  const wantsOwn = !gone && wantsResult(open, row, result);
   useEffect(() => {
     if (wantsOwn) void loadToolResult(row.id);
   }, [wantsOwn, row.id]);
@@ -80,7 +89,7 @@ export function Delegate({ node }: { node: CallNode }) {
             status === "failed" ? " transcript-tool-failed" : ""
           }`}
         >
-          {childHead(status, work)}
+          {childHead(status, work, gone)}
         </span>
       </summary>
       <div class="transcript-work-rounds">
@@ -96,6 +105,11 @@ export function Delegate({ node }: { node: CallNode }) {
           running={false}
           call={(call) => <Tool key={call.key} node={call} />}
         />
+        {gone && (
+          <div class="transcript-work-plain">
+            Its work is gone with the turn's tool output.
+          </div>
+        )}
         {entry?.loading === true && work === null && (
           <div class="transcript-work-plain">loading</div>
         )}
@@ -116,7 +130,7 @@ export function Delegate({ node }: { node: CallNode }) {
             <Value text={files} />
           </div>
         )}
-        {row.status !== "streaming" && !answered && (
+        {row.status !== "streaming" && !answered && !gone && (
           <div class="transcript-tool-detail">
             <div class="transcript-tool-label">{shown.label}</div>
             <Value text={shown.text} failed={shown.err} />

@@ -9,7 +9,10 @@
 // became; it is held until that envelope is applied, so the rows turn
 // into messages at once, never shown twice and never gone early.
 
-import type { SessionDetail } from "../../shared/contracts/session.ts";
+import type {
+  PendingTurn,
+  SessionDetail,
+} from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import {
   partsOf,
@@ -41,13 +44,20 @@ export function queueShown(detail: SessionDetail): SessionDetail {
     return detail;
   }
   const next = queueOnto(held.queued, at, partsOf(revision, detail.queued));
+  if (held.pending !== undefined && at.shared > revision) {
+    detail = { ...detail, pending: held.pending };
+  }
   if (next === null) return { ...detail, queued: held.queued };
   at = { id, ...next.at };
   return { ...detail, queued: next.queued };
 }
 
 // a part of the queue for the chat on screen
-export function applyQueue(sessionId: string, part: QueuePart): void {
+export function applyQueue(
+  sessionId: string,
+  part: QueuePart,
+  pending?: PendingTurn[],
+): void {
   const held = session.value;
   if (held === null || held.session.id !== sessionId || at.id !== sessionId) {
     return;
@@ -55,11 +65,19 @@ export function applyQueue(sessionId: string, part: QueuePart): void {
   const next = queueOnto(held.queued, at, part);
   if (next === null) return;
   at = { id: sessionId, ...next.at };
-  session.value = { ...held, queued: next.queued };
+  session.value = {
+    ...held,
+    queued: next.queued,
+    ...(pending === undefined ? {} : { pending }),
+  };
 }
 
 const shared = (frame: QueueFrame) =>
-  applyQueue(frame.sessionId, { revision: frame.revision, shared: frame.rows });
+  applyQueue(
+    frame.sessionId,
+    { revision: frame.revision, shared: frame.rows },
+    frame.pending,
+  );
 
 // every frame that carries a part of the queue; the session envelope
 // after sessions.ts applied its rows
@@ -84,10 +102,14 @@ export function onQueueSocket(ev: SocketEvent): void {
     }
     case "watched":
       if (ev.queue !== undefined) {
-        applyQueue(ev.sessionId, {
-          revision: ev.queue.revision,
-          shared: ev.queue.rows,
-        });
+        applyQueue(
+          ev.sessionId,
+          {
+            revision: ev.queue.revision,
+            shared: ev.queue.rows,
+          },
+          ev.queue.pending,
+        );
       }
       break;
     case "notSent":

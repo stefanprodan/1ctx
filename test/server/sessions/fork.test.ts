@@ -315,10 +315,10 @@ describe("POST /api/sessions/:id/fork", () => {
         title: "Fork of what time is it",
         status: "done",
         disabled_capabilities: "[]",
+        dropped_seq: null,
         revision: 0,
         created_at: chat.app.now.value,
         last_activity_at: chat.app.now.value,
-        mcp_folders: 0,
         archived_at: null,
         archived_by: null,
         archived_reason: null,
@@ -329,7 +329,7 @@ describe("POST /api/sessions/:id/fork", () => {
         parent_session_id: null,
         parent_message_id: null,
       });
-      expect(copied.live).toBeNull();
+      expect(copied.live).toEqual([]);
       expect(copied.send?.kind).toBe("compact");
       expect(copied.send?.tokens).toBe(0);
       expect(
@@ -354,7 +354,9 @@ describe("POST /api/sessions/:id/fork", () => {
         sends: storedSends(chat, source.sessionId),
       }).toEqual(before);
       expect(chat.scripted.scripts).toHaveLength(4);
-      expect(chat.app.runner.registry.get(copied.session.id)).toBeNull();
+      expect(
+        chat.app.runner.registry.inSession(copied.session.id)[0] ?? null,
+      ).toBeNull();
     } finally {
       await chat.app.shutdown();
     }
@@ -607,7 +609,7 @@ describe("POST /api/sessions/:id/fork", () => {
       expect(copied.messages).toEqual([]);
       expect(storedSends(chat, copied.session.id)).toEqual([]);
       expect(copied.send).toBeNull();
-      expect(copied.live).toBeNull();
+      expect(copied.live).toEqual([]);
       expect(copied.session.status).toBe("done");
       expect(copied.session.revision).toBe(0);
       expect(copied.session.usage).toBeNull();

@@ -1,15 +1,16 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A session's working files, apart from the shared base: any bytes, no
-// versions, one revision per session so a command commits only against
+// A workspace's working files, apart from the shared base: any bytes, no
+// versions, one revision per workspace so a command commits only against
 // the scratch it mounted. Rows go with the session, or idle, by sweep.
 
 import type { Db } from "../db/index.ts";
 import { DAY_MS } from "../lib/clock.ts";
 import { Conflict } from "../lib/errors.ts";
 import type { ScratchEntry } from "./protocol.ts";
-import { heldSessions } from "./queue.ts";
+import { heldWorkspaces } from "./queue.ts";
+import { type Workspace, workspaceId, workspaceSession } from "./workspace.ts";
 
 export type ScratchFile = ScratchEntry;
 
@@ -34,97 +35,105 @@ const STORED_BYTES = "length(data) + length(cast(path as blob))";
 export class ScratchStore {
   constructor(private readonly db: Db) {}
 
-  read(sessionId: string): Scratch {
+  read(workspace: Workspace): Scratch {
+    const id = workspaceId(workspace);
     const row = this.db
       .query<Omit<Scratch, "entries">, [string]>(
         `select cwd, revision, bytes, files from session_scratch
-         where session_id = ?`,
+         where workspace_id = ?`,
       )
-      .get(sessionId);
+      .get(id);
     return {
       ...(row ?? { cwd: "/knowledge", revision: 0, bytes: 0, files: 0 }),
       entries: this.db
         .query<ScratchFile, [string]>(
           `select path, data, mode from session_scratch_files
-           where session_id = ? order by path`,
+           where workspace_id = ? order by path`,
         )
-        .all(sessionId),
+        .all(id),
     };
   }
 
   // the last command's time, the mtime its files mount with, since a
   // file keeps no time of its own
-  usedAt(sessionId: string): number | null {
+  usedAt(workspace: Workspace): number | null {
     return (
       this.db
         .query<{ used_at: number }, [string]>(
-          "select used_at from session_scratch where session_id = ?",
+          "select used_at from session_scratch where workspace_id = ?",
         )
-        .get(sessionId)?.used_at ?? null
+        .get(workspaceId(workspace))?.used_at ?? null
     );
   }
 
   // The caller owns the transaction so knowledge and scratch roll back together.
   write(
-    sessionId: string,
+    workspace: Workspace,
     expectedRevision: number,
     changes: ScratchChanges,
     now: number,
   ): void {
+    const id = workspaceId(workspace);
     const current = this.db
       .query<{ revision: number }, [string]>(
-        "select revision from session_scratch where session_id = ?",
+        "select revision from session_scratch where workspace_id = ?",
       )
-      .get(sessionId);
+      .get(id);
     if ((current?.revision ?? 0) !== expectedRevision) {
       throw new Conflict("the scratch changed while the command ran");
     }
     this.db
       .query(
         `insert into session_scratch
-         (session_id, cwd, revision, bytes, files, used_at)
-         values (?, ?, ?, 0, 0, ?)
-         on conflict (session_id) do update set
+         (workspace_id, session_id, cwd, revision, bytes, files, used_at)
+         values (?, ?, ?, ?, 0, 0, ?)
+         on conflict (workspace_id) do update set
            cwd = excluded.cwd, revision = excluded.revision,
            used_at = excluded.used_at`,
       )
-      .run(sessionId, changes.cwd, expectedRevision + 1, now);
+      .run(
+        id,
+        workspaceSession(workspace),
+        changes.cwd,
+        expectedRevision + 1,
+        now,
+      );
     for (const path of changes.removed) {
       this.db
         .query(
-          "delete from session_scratch_files where session_id = ? and path = ?",
+          "delete from session_scratch_files where workspace_id = ? and path = ?",
         )
-        .run(sessionId, path);
+        .run(id, path);
     }
     for (const file of changes.written) {
       this.db
         .query(
-          `insert into session_scratch_files (session_id, path, data, mode)
+          `insert into session_scratch_files (workspace_id, path, data, mode)
            values (?, ?, ?, ?)
-           on conflict (session_id, path) do update set
+           on conflict (workspace_id, path) do update set
              data = excluded.data, mode = excluded.mode`,
         )
-        .run(sessionId, file.path, file.data, file.mode);
+        .run(id, file.path, file.data, file.mode);
     }
     this.db
       .query(
         `update session_scratch set (bytes, files) = (
            select coalesce(sum(${STORED_BYTES}), 0), count(*)
-           from session_scratch_files where session_id = ?
-         ) where session_id = ?`,
+           from session_scratch_files where workspace_id = ?
+         ) where workspace_id = ?`,
       )
-      .run(sessionId, sessionId);
+      .run(id, id);
   }
 
   // the stored names and sizes, which a commit checks inside its
   // transaction rather than trusting what the command worker counted
-  sizes(sessionId: string): { path: string; bytes: number }[] {
+  sizes(workspace: Workspace): { path: string; bytes: number }[] {
     return this.db
       .query<{ path: string; bytes: number }, [string]>(
         `select path, ${STORED_BYTES} as bytes from session_scratch_files
-         where session_id = ?`,
+         where workspace_id = ?`,
       )
-      .all(sessionId);
+      .all(workspaceId(workspace));
   }
 
   // an archived chat never runs a command again; its files go with the row
@@ -134,26 +143,32 @@ export class ScratchStore {
       .run(sessionId);
   }
 
-  // the sessions a command runs in now, whose scratch no sweep takes
+  dropWorkspace(workspace: Workspace): void {
+    this.db
+      .query("delete from session_scratch where workspace_id = ?")
+      .run(workspaceId(workspace));
+  }
+
+  // the workspaces a command runs in now, whose scratch no sweep takes
   held(): ReadonlySet<string> {
-    return heldSessions();
+    return heldWorkspaces();
   }
 
   sweep(now: number, idleDays: number): number {
     const held = this.held();
     const expired = this.db
-      .query<{ session_id: string }, [number]>(
-        "select session_id from session_scratch where used_at < ?",
+      .query<{ workspace_id: string }, [number]>(
+        "select workspace_id from session_scratch where used_at < ?",
       )
       .all(now - idleDays * DAY_MS);
     let count = 0;
     for (const row of expired) {
-      if (held.has(row.session_id)) continue;
+      if (held.has(row.workspace_id)) continue;
       const deleted = this.db
         .query(
-          "delete from session_scratch where session_id = ? returning session_id",
+          "delete from session_scratch where workspace_id = ? returning workspace_id",
         )
-        .get(row.session_id);
+        .get(row.workspace_id);
       if (deleted !== null) count++;
     }
     return count;

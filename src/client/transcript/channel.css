@@ -1,0 +1,131 @@
+/* What a project channel adds to the transcript, each one quiet line:
+   the quote that opens an answer, a pending turn under its post, the
+   mark where agents stop reading, the pages above or between, and the
+   stop of one running turn in its agent's line. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  /* the whole line is the way to the post; the words give way first */
+  .channel-quote {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    max-width: 100%;
+    min-height: 22px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-family: var(--sans);
+    font-size: var(--text-small);
+    color: var(--faint);
+    text-align: left;
+    cursor: pointer;
+  }
+  .channel-quote:hover {
+    color: var(--dim);
+  }
+  .channel-quote-icon {
+    flex-shrink: 0;
+  }
+  .channel-quote-author {
+    flex-shrink: 0;
+    font-weight: 600;
+    color: var(--dim);
+  }
+
+  /* a pending turn: drawn as a fold's line, under its post */
+  .channel-pending {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: 22px;
+    padding-left: 32px;
+    font-family: var(--mono);
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+  .channel-pending-icon {
+    flex-shrink: 0;
+  }
+  .channel-act {
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+  .channel-failed {
+    font-size: var(--text-small);
+    color: var(--failed);
+  }
+
+  .channel-context {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--faint);
+    white-space: nowrap;
+  }
+  .channel-context-rule {
+    flex-grow: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .channel-more {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: 22px;
+  }
+  .channel-more .channel-act {
+    margin-left: 0;
+  }
+  .channel-more-busy {
+    font-size: var(--text-small);
+    color: var(--faint);
+  }
+
+  .channel-stop {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    margin-left: auto;
+  }
+
+  /* a run's call in its post's fold: a fold's small line with nothing
+     behind it */
+  .channel-call {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: 24px;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--dim);
+  }
+  /* "Run of" in the actions line, before the stamp */
+  .channel-run {
+    min-width: 0;
+    margin-left: var(--space-2);
+    color: var(--faint);
+  }
+  .channel-run-link:hover {
+    color: var(--fg);
+  }
+
+  /* a finger's height for the line's one action */
+  @media (pointer: coarse) {
+    .channel-pending,
+    .channel-quote,
+    .channel-more {
+      min-height: 44px;
+    }
+  }
+}

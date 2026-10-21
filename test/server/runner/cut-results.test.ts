@@ -155,8 +155,8 @@ describe("a cut send's tool rows", () => {
     });
     try {
       const { script, sessionId } = await startChat(chat);
-      const resultCut =
-        chat.app.runner.registry.get(sessionId)!.policy.toolCaps.resultCut;
+      const resultCut = (chat.app.runner.registry.inSession(sessionId)[0] ??
+        null)!.policy.toolCaps.resultCut;
       script.toolRound(
         [call("done", "bash"), call("open", "visualize")],
         BUFFERED,

@@ -20,6 +20,7 @@ import { parseRunsQuery } from "../../src/server/automations/parse.ts";
 import { BadRequest } from "../../src/server/lib/errors.ts";
 import {
   parseCreateSession,
+  parseDetailQuery,
   parseRenameSession,
   parseSendMessage,
   parseStreamQuery,
@@ -663,6 +664,32 @@ describe("parseStreamQuery", () => {
   ])("refuses the cursor %s", (search) => {
     const url = new URL(`http://one.test/api/sessions?${search}`);
     expect(() => parseStreamQuery(url)).toThrow(BadRequest);
+  });
+});
+
+describe("parseDetailQuery", () => {
+  test.each([
+    ["", { before: null, around: null }],
+    ["?before=51", { before: 51, around: null }],
+    ["?around=9", { before: null, around: 9 }],
+  ])("accepts %s", (search, expected) => {
+    expect(parseDetailQuery(new URL(`http://one.test/chat${search}`))).toEqual(
+      expected,
+    );
+  });
+
+  test.each([
+    "?before=0",
+    "?before=-1",
+    "?around=1.5",
+    "?before=9007199254740992",
+    "?before=1&around=2",
+    "?before=1&before=2",
+    "?other=1",
+  ])("refuses %s", (search) => {
+    expect(() =>
+      parseDetailQuery(new URL(`http://one.test/chat${search}`)),
+    ).toThrow(BadRequest);
   });
 });
 

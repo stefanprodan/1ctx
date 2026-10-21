@@ -26,6 +26,7 @@ import {
 } from "./mount.ts";
 import { ScratchStore } from "./scratch.ts";
 import { commandWorkers } from "./worker.ts";
+import type { Workspace } from "./workspace.ts";
 
 export type BashDeps = {
   db: Db;
@@ -43,7 +44,7 @@ export type BashDeps = {
 export type BashCapability = {
   run(
     projectId: string,
-    sessionId: string,
+    workspace: Workspace,
     author: KnowledgeAuthor,
     command: string,
     caps: CommandCaps,
@@ -53,7 +54,7 @@ export type BashCapability = {
   // and the number the next kept folder takes; files of rows past
   // afterSeq, which a regenerate deletes, are not counted
   startKept(
-    sessionId: string,
+    workspace: Workspace,
     afterSeq: number | null,
   ): {
     next: number;
@@ -65,15 +66,15 @@ export type BashCapability = {
   // a subagent's /tmp (bash/handoff.ts): its parent's files copied in
   // at its start, and what it added or changed copied back at its end
   // to a folder none of taken nor the parent's files hold
-  copyScratch(from: string, to: string): ScratchBaseline;
+  copyScratch(from: Workspace, to: Workspace): ScratchBaseline;
   returnScratch(
-    child: string,
-    parent: string,
+    child: Workspace,
+    parent: Workspace,
     taken: Set<string>,
     baseline: ScratchBaseline,
   ): Promise<Returned>;
   // a child's scratch, when its files could not come back
-  dropScratch(sessionId: string): void;
+  dropScratch(workspace: Workspace): void;
 };
 export type BashArea = BashCapability & {
   scratch: ScratchStore;
@@ -88,7 +89,7 @@ export function bashArea(deps: BashDeps): BashArea {
   const workers = commandWorkers(deps.worker, deps.log);
   return {
     scratch,
-    run: (projectId, sessionId, author, command, caps, signal) =>
+    run: (projectId, workspace, author, command, caps, signal) =>
       run(
         {
           db: deps.db,
@@ -101,18 +102,18 @@ export function bashArea(deps: BashDeps): BashArea {
           ...(deps.backstopMs ? { backstopMs: deps.backstopMs } : {}),
         },
         projectId,
-        sessionId,
+        workspace,
         author,
         command,
         caps,
         signal,
       ),
-    startKept: (sessionId, afterSeq) =>
+    startKept: (workspace, afterSeq) =>
       transact(deps.db, () => {
         const caps = deps.limits.current();
         return {
           result: {
-            ...startKept(deps.db, sessionId, caps, afterSeq),
+            ...startKept(deps.db, workspace, caps, afterSeq),
             maxBytes: caps.mcpKeptBytes,
             maxFiles: caps.mcpKeptFiles,
           },
@@ -129,7 +130,7 @@ export function bashArea(deps: BashDeps): BashArea {
         baseline,
         deps.clock(),
       ),
-    dropScratch: (sessionId) => scratch.drop(sessionId),
+    dropScratch: (workspace) => scratch.dropWorkspace(workspace),
     sweep: (now) => scratch.sweep(now, deps.limits.current().scratchIdleDays),
     close: () => workers.close(),
   };
@@ -160,3 +161,8 @@ export {
 export type { CommandResult } from "./mount.ts";
 export type { OpenedRecord } from "./open.ts";
 export type { CommandEnd, JobRepo } from "./protocol.ts";
+export {
+  sessionWorkspace,
+  type Workspace,
+  workspaceOf,
+} from "./workspace.ts";

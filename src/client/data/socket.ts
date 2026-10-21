@@ -10,8 +10,8 @@
 
 import { effect } from "@preact/signals";
 import {
-  hasWatchedDrafts,
   isDraftFrame,
+  isWatchedFrame,
   PROTOCOL,
   type SocketCommand,
   type SocketEvent,
@@ -81,7 +81,7 @@ const isEvent = (value: unknown): value is SocketEvent => {
     return false;
   const type = (value as { type?: unknown }).type;
   if (type === "draft") return isDraftFrame(value);
-  if (type === "watched") return hasWatchedDrafts(value);
+  if (type === "watched") return isWatchedFrame(value);
   return typeof type === "string";
 };
 

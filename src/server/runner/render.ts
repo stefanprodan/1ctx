@@ -73,11 +73,12 @@ export function unmarked(text: string, name: string): string {
 
 // another agent's turn: its answer as a user message opened by its
 // name, with no author field, then its trace as its own message, the
-// calls to tools the building agent lacks marked
-function foreignTurn(
+// calls to tools the building agent lacks marked. A run's post brings
+// its calls on its row
+export function foreignTurn(
   turn: Turn,
   rows: readonly Message[],
-  yours: Yours,
+  yours: Yours | null,
 ): ChatMessageIn[] {
   const out: ChatMessageIn[] = [];
   const answer = rows
@@ -93,7 +94,10 @@ function foreignTurn(
   if (answer !== "") {
     out.push({ role: "user", content: `${markOf(turn.agentName)}${answer}` });
   }
-  const calls = trace(traceCalls(rows), yours);
+  const calls = trace(
+    [...traceCalls(rows), ...rows.flatMap((row) => row.run?.calls ?? [])],
+    yours,
+  );
   if (calls !== "") out.push({ role: "user", content: calls });
   return out;
 }
@@ -113,7 +117,7 @@ export function roundComplete(
 
 // a user message on the wire, with the author's name when it is not the
 // sender and is known
-function userMessage(
+export function userMessage(
   row: Message,
   policy: Pick<SendPolicy, "username" | "userId">,
   lookups: ContextLookups,

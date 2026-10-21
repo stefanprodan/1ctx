@@ -295,7 +295,9 @@ describe("the terminal transition", () => {
       store.finishSend = original;
     }
     expect(attempts).toBe(3);
-    expect(chat.app.runner.registry.get(sessionId)).not.toBeNull();
+    expect(
+      chat.app.runner.registry.inSession(sessionId)[0] ?? null,
+    ).not.toBeNull();
     expect(chat.app.sessions.byId(sessionId)!.status).toBe("running");
     const running = chat.app.db
       .query(

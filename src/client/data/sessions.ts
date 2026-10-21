@@ -7,11 +7,7 @@
 // while it loads again.
 
 import { effect, signal } from "@preact/signals";
-import type {
-  RegenerateRequest,
-  RenameSessionRequest,
-  SessionResponse,
-} from "../../shared/api/sessions.ts";
+import type { SessionResponse } from "../../shared/api/sessions.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { navigate } from "../app/router.ts";
@@ -31,7 +27,7 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { carry, changeOf } from "./capabilities.ts";
+import { channelLoaded, framed, withSend } from "./channel.ts";
 import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
@@ -41,7 +37,13 @@ import { session } from "./session-held.ts";
 import { ahead, flushLive, live, publish, stage } from "./session-live.ts";
 import { onQueueSocket, queueShown } from "./session-queue.ts";
 import { sending } from "./session-start.ts";
-import { resetValues, retrying, syncValues } from "./session-values.ts";
+import {
+  resetValues,
+  retried,
+  retries,
+  retriesOf,
+  syncValues,
+} from "./session-values.ts";
 import { liveFrom, streams, upsert } from "./sessions-rows.ts";
 import { onSocketEvent, watch } from "./socket.ts";
 
@@ -58,7 +60,7 @@ export { createSession, sending, stopSession } from "./session-start.ts";
 export {
   loadToolResult,
   loadVisual,
-  retrying,
+  retries,
   toolResults,
   toolVisuals,
 } from "./session-values.ts";
@@ -81,11 +83,9 @@ let wanted: { id: string; turn: number } = { id: "", turn: 0 };
 // the watch in flight: the frames before its answer, and the sequence
 // the next frame must follow once answered
 let pending: { buffer: Frame[]; overflow: boolean } | null = null;
-let stream: { sendId: string; seq: number } | null = null;
+let sequences = new Map<string, number>();
 // the settled chats by id
 const chatsKept = new Held<SessionDetail>();
-
-const clock = () => Date.now();
 
 effect(() => {
   const id = me.value?.id ?? null;
@@ -97,7 +97,7 @@ effect(() => {
   chatsKept.clear();
   sending.value = false;
   pending = null;
-  stream = null;
+  sequences.clear();
 });
 
 function show(shown: SessionDetail): void {
@@ -109,14 +109,20 @@ function show(shown: SessionDetail): void {
   session.value = detail;
   publish(liveFrom(detail));
   syncValues(detail);
-  retrying.value = detail.live?.retry ?? null;
-  stream = detail.live && { sendId: detail.live.sendId, seq: detail.live.seq };
+  retries.value = retriesOf(detail.live);
+  sequences = new Map(detail.live.map((send) => [send.sendId, send.seq]));
 }
 
-// a chat is held only settled: a running one would miss its frames
+// a chat is held only settled: a running one would miss its frames. A
+// channel never is: it is paged, read again on every visit, and its gap
+// and older page state belong to the one on screen
 function keep(detail: SessionDetail | null): void {
   if (detail === null) return;
-  if (detail.session.status === "running" || detail.live !== null) {
+  if (
+    detail.session.status === "running" ||
+    detail.live.length > 0 ||
+    detail.session.origin === "channel"
+  ) {
     chatsKept.delete(detail.session.id);
   } else chatsKept.set(detail.session.id, detail);
 }
@@ -160,7 +166,8 @@ export async function loadSession(id: string): Promise<void> {
       held.session.id !== id ||
       detail.session.revision >= held.session.revision
     ) {
-      show(detail);
+      // a channel keeps the older pages it holds
+      show(channelLoaded(held, detail));
     }
     // registered before the watch is sent, so a frame that arrives
     // before the answer is kept
@@ -182,7 +189,7 @@ export function leaveSession(id?: string): void {
   if (id !== undefined && wanted.id !== "" && wanted.id !== id) return;
   wanted = { id: "", turn: wanted.turn + 1 };
   pending = null;
-  stream = null;
+  sequences.clear();
   keep(session.value);
   clear();
   watch(null);
@@ -195,43 +202,6 @@ export function take(detail: SessionDetail): void {
   if (held === null || held.session.id !== detail.session.id) return;
   if (detail.session.revision <= held.session.revision) return;
   show(detail);
-}
-
-// a send of any kind answers the detail; the flips the person made ride
-// on the two kinds that take them and are forgotten once taken
-async function post(
-  id: string,
-  path: string,
-  body?: RegenerateRequest,
-): Promise<void> {
-  sending.value = true;
-  try {
-    const at = `/api/sessions/${encodeURIComponent(id)}/${path}`;
-    take(
-      await carry(id, body ?? {}, () => api<SessionResponse>(at, "POST", body)),
-    );
-  } finally {
-    sending.value = false;
-  }
-}
-
-// the last turn goes and its user message is sent again
-export const regenerateSession = (id: string): Promise<void> =>
-  post(id, "regenerate", changeOf(id));
-
-// a summary round on its own; the next reply starts from the summary
-export const compactSession = (id: string) => post(id, "compact");
-
-// a rename is not a send: it goes under a reply too, and the composer
-// stays free while it is on its way
-export async function renameSession(id: string, title: string): Promise<void> {
-  const body: RenameSessionRequest = { title };
-  const detail = await api<SessionResponse>(
-    `/api/sessions/${encodeURIComponent(id)}`,
-    "PATCH",
-    body,
-  );
-  take(detail);
 }
 
 // the row goes, and the page leaves the chat on screen or loading for
@@ -272,11 +242,19 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     chatsKept.delete(ev.session.id);
     return;
   }
-  if (ev.session.revision <= held.session.revision) return;
+  if (ev.session.revision <= held.session.revision) {
+    // a post's answer took this commit first; its frame still brings the
+    // meter the server counted after it
+    const meter = ev.channelContext;
+    if (meter && ev.session.revision === held.session.revision) {
+      session.value = { ...held, channelContext: meter };
+    }
+    return;
+  }
   const removed = new Set(ev.removedMessageIds ?? []);
   const messages = upsert(
     held.messages.filter((message) => !removed.has(message.id)),
-    ev.messages,
+    framed(held, ev.messages),
   );
   const map = new Map(ahead());
   for (const id of removed) map.delete(id);
@@ -291,25 +269,32 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     session: ev.session,
     messages,
     send: ev.send ?? held.send,
+    channelContext: ev.channelContext ?? held.channelContext,
+    ...withSend(held, ev.send),
   };
   visualPreviews.value = reconcileVisuals(visualPreviews.value, session.value);
   session.value = {
     ...session.value,
     live:
       ev.session.status !== "running"
-        ? null
-        : session.value.live && {
-            ...session.value.live,
-            drafts: [...visualPreviews.value.values()].filter(
-              (draft) =>
-                draft.phase === "draft" &&
-                draft.sendId === session.value?.live?.sendId,
-            ),
-          },
+        ? []
+        : session.value.live
+            .filter(
+              (send) =>
+                ev.send?.id !== send.sendId || ev.send.status === "running",
+            )
+            .map((send) => ({
+              ...send,
+              drafts: [...visualPreviews.value.values()].filter(
+                (draft) =>
+                  draft.phase === "draft" && draft.sendId === send.sendId,
+              ),
+            })),
   };
   syncValues(session.value);
-  // a lost clear frame never outlives the send
-  if (ev.session.status !== "running") retrying.value = null;
+  // a lost clear frame never outlives its send
+  if (ev.session.status !== "running") retries.value = new Map();
+  else if (ev.send && ev.send.status !== "running") retried(ev.send.id, null);
   publish(map);
   onQueueSocket(ev);
   // who archived it and until when are the detail's alone, and so are
@@ -328,13 +313,11 @@ function refetch(): void {
 function applyFrame(frame: Frame): boolean {
   const held = session.value;
   if (held === null || held.session.id !== frame.sessionId) return true;
-  if (stream === null || stream.sendId !== frame.sendId) {
-    stream = { sendId: frame.sendId, seq: 0 };
-  }
-  if (frame.seq !== stream.seq + 1) return false;
-  stream.seq = frame.seq;
+  const seq = sequences.get(frame.sendId) ?? 0;
+  if (frame.seq !== seq + 1) return false;
+  sequences.set(frame.sendId, frame.seq);
   if (frame.type === "retry") {
-    retrying.value = frame.retry;
+    retried(frame.sendId, frame.retry);
     return true;
   }
   if (frame.type === "restart") {
@@ -349,25 +332,25 @@ function applyFrame(frame: Frame): boolean {
     const result = applyVisual(visualPreviews.value, frame);
     if (result.gap) return false;
     visualPreviews.value = result.previews;
-    const snapshot =
-      held.live?.sendId === frame.sendId
-        ? held.live
-        : {
-            phase: "reply" as const,
-            sendId: frame.sendId,
-            messageId: row.id,
-            ...liveOf(row),
-            seq: frame.seq,
-          };
+    const snapshot = held.live.find((send) => send.sendId === frame.sendId) ?? {
+      phase: "reply" as const,
+      sendId: frame.sendId,
+      messageId: row.id,
+      ...liveOf(row),
+      seq: frame.seq,
+    };
     session.value = {
       ...held,
-      live: {
-        ...snapshot,
-        seq: frame.seq,
-        drafts: [...result.previews.values()].filter(
-          (draft) => draft.sendId === frame.sendId && draft.phase === "draft",
-        ),
-      },
+      live: [
+        ...held.live.filter((send) => send.sendId !== frame.sendId),
+        {
+          ...snapshot,
+          seq: frame.seq,
+          drafts: [...result.previews.values()].filter(
+            (draft) => draft.sendId === frame.sendId && draft.phase === "draft",
+          ),
+        },
+      ],
     };
     return true;
   }
@@ -377,7 +360,7 @@ function applyFrame(frame: Frame): boolean {
     stage(frame.messageId, applyHtml(v, frame));
     return true;
   }
-  const r = applyDelta(v, frame, clock());
+  const r = applyDelta(v, frame, Date.now());
   if (r.gap) return false;
   stage(frame.messageId, r.live);
   return true;
@@ -400,32 +383,34 @@ function onWatched(ev: Extract<SocketEvent, { type: "watched" }>): void {
     ...held,
     live: ev.live,
   });
-  session.value = { ...held, live: ev.live };
-  retrying.value = ev.live?.retry ?? null;
-  if (ev.live === null) {
+  session.value = {
+    ...held,
+    live: ev.live,
+    channelContext: ev.channelContext ?? held.channelContext,
+  };
+  retries.value = retriesOf(ev.live);
+  sequences = new Map(ev.live.map((send) => [send.sendId, send.seq]));
+  if (ev.live.length === 0) {
     // the rows say running and the runner has nothing: the end went by
     // before this connection heard it
     if (held.session.status === "running") refetch();
-  } else if (ev.live.phase === "tools") {
-    // a round's tools run: nothing streams, so no live entry and no
-    // refetch; the sequence still tracks the send for buffered frames
-    stream = { sendId: ev.live.sendId, seq: ev.live.seq };
   } else {
-    const snap = ev.live;
-    const m = held.messages.find((x) => x.id === snap.messageId);
-    if (m === undefined) {
-      refetch();
-      return;
-    }
     const map = new Map(ahead());
-    map.set(m.id, liveOfSnapshot(snap, m));
+    for (const snap of ev.live) {
+      if (snap.phase === "tools") continue;
+      const m = held.messages.find((x) => x.id === snap.messageId);
+      // a channel turn on a post above the pages held lands by envelope
+      if (m === undefined && held.session.origin === "channel") continue;
+      if (m === undefined) {
+        refetch();
+        return;
+      }
+      map.set(m.id, liveOfSnapshot(snap, m));
+    }
     publish(map);
-    stream = { sendId: snap.sendId, seq: snap.seq };
   }
   for (const frame of buffered.buffer) {
-    if (stream !== null && frame.sendId === stream.sendId) {
-      if (frame.seq <= stream.seq) continue;
-    }
+    if (frame.seq <= (sequences.get(frame.sendId) ?? -1)) continue;
     if (!applyFrame(frame)) {
       refetch();
       return;

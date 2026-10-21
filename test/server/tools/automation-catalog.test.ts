@@ -16,7 +16,7 @@ test("the Config catalog shows the main chat's proposal schema, description and 
     const catalog = (await response.json()).automation;
     const { sessionId, script } = await startChat(chat);
     const offer = chat.app.runner.registry
-      .get(sessionId)!
+      .inSession(sessionId)[0]!
       .policy.offered.tools.find((tool) => tool.name === "automation")!;
     expect(catalog.parameters).toEqual(offer.parameters);
     expect(catalog.description).toBe(offer.description);

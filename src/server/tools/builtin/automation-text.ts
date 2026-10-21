@@ -310,6 +310,7 @@ export function showText(input: ShowInput): { body: string; tail: string } {
     `Own memory: ${a.ownMemory ? "yes" : "no"}`,
     `Attention: ${ATTENTION_WORDS[a.attentionMode]}`,
     `Rerun after a restart: ${a.rerunOnRestart ? "yes" : "no"}`,
+    `Post to channel: ${a.postToChannel ? "yes" : "no"}`,
     `Turned off for its runs: ${off.length === 0 ? "nothing" : off.join(", ")}`,
     `Last event: ${lastEventText(a)}`,
   ];

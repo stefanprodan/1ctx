@@ -3,17 +3,21 @@
 
 import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
+import type { McpDigest } from "../../shared/mcp.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
+import { type Workspace, workspaceOf } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
+import type { ChannelCaps } from "../limits/index.ts";
 import { changeNote } from "../mcp/index.ts";
 import {
   type SessionRow,
   type SessionStore,
   sessionDetail,
 } from "../sessions/index.ts";
+import { channelContext } from "./channel-context.ts";
 import { offers, type SendPolicy } from "./policy.ts";
 import type { Registry } from "./registry.ts";
 import { type ActiveSend, live, newSend, type SendOp } from "./send.ts";
@@ -33,12 +37,14 @@ export function reserve(
   wake: () => void,
   send: ActiveSend,
   admit = true,
+  channel = false,
 ): () => void {
   if (admit) {
     registry.admit(
       send.sessionId,
       { userId: send.startedBy, projectId: send.projectId },
       send.policy.sendCaps,
+      channel ? send.policy.agentId : undefined,
     );
   }
   registry.set(send);
@@ -70,7 +76,15 @@ export const startedDetail = (
   session: Parameters<typeof sessionDetail>[1],
   send: ActiveSend,
   userId: string | null,
-): SessionDetail => sessionDetail(sessions, session, live(send), 0, userId);
+  running: readonly ActiveSend[] = [send],
+): SessionDetail =>
+  sessionDetail(
+    sessions,
+    session,
+    running.filter((send) => send.terminal === null).map(live),
+    0,
+    userId,
+  );
 
 export function prepareSend(fields: {
   db: Db;
@@ -86,6 +100,7 @@ export function prepareSend(fields: {
   sessionId: string;
   session: SessionRow | null;
   policy: SendPolicy;
+  channelCaps?: ChannelCaps;
   op: SendOp;
   turn: StartFields["turn"];
   changes: readonly (CapabilityChange | undefined)[];
@@ -96,7 +111,7 @@ export function prepareSend(fields: {
   probe?: boolean;
   checkUploads(userId: string, projectId: string, ids: readonly string[]): void;
   startKept(
-    sessionId: string,
+    workspace: Workspace,
     afterSeq: number | null,
   ): {
     next: number;
@@ -106,7 +121,7 @@ export function prepareSend(fields: {
     maxFiles: number;
   };
   title: string;
-  kind: SendKind;
+  kind: Exclude<SendKind, "post">;
   origin: SessionOrigin;
   automationId: string | null;
   now: number;
@@ -127,12 +142,19 @@ export function prepareSend(fields: {
   }
   const sendId = newId();
   const replyId = newId();
+  const workspace = workspaceOf(
+    fields.sessionId,
+    fields.origin,
+    fields.policy.agentId,
+  );
   const send = newSend({
     id: sendId,
     sessionId: fields.sessionId,
+    workspace,
     projectId: fields.policy.projectId,
     startedBy: fields.startedBy,
     kind: fields.kind,
+    origin: fields.origin,
     op: fields.op,
     policy: fields.policy,
     firstMessageId: firstMessageId(turn),
@@ -144,17 +166,40 @@ export function prepareSend(fields: {
     fields.wake,
     send,
     fields.probe !== true,
+    fields.session?.origin === "channel",
   );
   let started: ReturnType<Writer["startSend"]>;
   try {
     // a refused start rolls the trim back with it
     started = transact(fields.db, () => {
+      let previousMcpDigest: McpDigest | null | undefined;
+      if (fields.channelCaps !== undefined && "posted" in turn) {
+        previousMcpDigest = fields.sessions.lastMcpDigest(
+          fields.sessionId,
+          sendId,
+          fields.policy.agentId,
+        );
+        send.mcpNote = changeNote(
+          previousMcpDigest,
+          fields.policy.offered.mcpPrompt.digest,
+        );
+        send.channel = channelContext({
+          db: fields.db,
+          sessionId: fields.sessionId,
+          sendId,
+          posted: turn.posted,
+          policy: fields.policy,
+          caps: fields.channelCaps,
+          now,
+          mcpNote: send.mcpNote,
+        });
+      }
       // under the lock, before the send is written and any command mounts:
       // the kept files trimmed to the budget stay put for the whole send
       if (bash) {
         // a regenerate's kept files go with the rows it replaces
         const kept = fields.startKept(
-          fields.sessionId,
+          workspace,
           "existing" in turn ? turn.existing.at(-1)!.seq : null,
         );
         let next = kept.next;
@@ -180,15 +225,18 @@ export function prepareSend(fields: {
           policy: fields.policy,
           changes: fields.changes,
           mcpDigest: fields.policy.offered.mcpPrompt.digest,
+          ...(previousMcpDigest === undefined ? {} : { previousMcpDigest }),
           ...(fields.claim === undefined ? {} : { claim: fields.claim }),
         }),
         events: [],
       };
     });
-    send.mcpNote = changeNote(
-      started.previousMcpDigest,
-      fields.policy.offered.mcpPrompt.digest,
-    );
+    if (send.channel === null) {
+      send.mcpNote = changeNote(
+        started.previousMcpDigest,
+        fields.policy.offered.mcpPrompt.digest,
+      );
+    }
   } catch (err) {
     release();
     throw err;
@@ -203,6 +251,7 @@ export function prepareSend(fields: {
         started.session,
         send,
         fields.startedBy,
+        fields.registry.inSession(fields.sessionId),
       );
       return detail;
     },

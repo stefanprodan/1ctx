@@ -89,7 +89,8 @@ async function send(
   expect(response.status).toBe(201);
   const detail = (await response.json()) as SessionDetail;
   const script = await waitScript(chat.scripted, count);
-  const policy = chat.app.runner.registry.get(detail.session.id)!.policy;
+  const policy = (chat.app.runner.registry.inSession(detail.session.id)[0] ??
+    null)!.policy;
   return { detail, script, policy };
 }
 
@@ -165,7 +166,8 @@ test.serial(
         disabledCapabilities: ["web"],
       });
       const regenerated = await waitScript(chat.scripted, 4);
-      const active = chat.app.runner.registry.get(first.sessionId)!.policy;
+      const active = (chat.app.runner.registry.inSession(first.sessionId)[0] ??
+        null)!.policy;
       expect(active.mcpOff).toEqual([]);
       expect(Object.keys(active.offered.mcpPrompt.digest)).toEqual([
         "docs",
@@ -296,7 +298,8 @@ test.each(["manual", "schedule"] as const)(
                 main: await waitScript(chat.scripted, 1),
               };
             })();
-      const policy = chat.app.runner.registry.get(run.sessionId)!.policy;
+      const policy = (chat.app.runner.registry.inSession(run.sessionId)[0] ??
+        null)!.policy;
       expect(policy.disabledCapabilities).toEqual(keys);
       expect(policy.mcpOff).toEqual(["flux"]);
       expect(policy.offered.mcp.map((server) => server.name)).toEqual(["docs"]);
