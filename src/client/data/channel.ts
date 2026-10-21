@@ -36,6 +36,9 @@ export const focusPost = signal<string | null>(null);
 
 // counts the reads, so an answer for a page that moved on is dropped
 let turn = 0;
+// run posts an envelope unlinked while the page did not hold them, so a
+// page read before that commit never brings their link back
+let unlinked = new Set<string>();
 
 // a detail answer: a channel's merged over the pages held when it is the
 // one on screen; any other page starts the channel state afresh, so a
@@ -46,6 +49,7 @@ export function channelLoaded(
 ): SessionDetail {
   if (held === null || held.session.id !== fresh.session.id) {
     turn++;
+    unlinked = new Set();
     channelGap.value = null;
     olderPage.value = { loading: false, failure: null };
     focusPost.value = null;
@@ -54,22 +58,40 @@ export function channelLoaded(
   if (fresh.session.origin !== "channel") return fresh;
   const merged = mergeNewest(held, fresh, channelGap.value);
   channelGap.value = merged.gap;
-  return merged.detail;
+  return unlink(merged.detail);
 }
 
-// an envelope's rows for the page held: a run's post above the pages or
-// in the gap, as unlinking an old run sends, is updated when held and
-// never added, so the page draws only what it holds
+// a page's rows with the unlinks the page saw before it landed
+function unlink(detail: SessionDetail): SessionDetail {
+  if (unlinked.size === 0) return detail;
+  return {
+    ...detail,
+    messages: detail.messages.map((row) =>
+      row.run !== undefined &&
+      row.run.sessionId !== null &&
+      unlinked.has(row.id)
+        ? { ...row, run: { ...row.run, sessionId: null } }
+        : row,
+    ),
+  };
+}
+
+// an envelope's rows for the page held: a row above the pages or in the
+// gap, as aging an old turn or unlinking an old run sends, is updated
+// when held and never added, so the page draws only what it holds. A
+// post stays, since a live turn's start brings its old post to quote
 export function framed(held: SessionDetail, rows: Message[]): Message[] {
   if (held.session.origin !== "channel") return rows;
   const top = held.page?.before ?? null;
   const ids = new Set(held.messages.map((row) => row.id));
-  return rows.filter(
-    (row) =>
-      row.run === undefined ||
+  return rows.filter((row) => {
+    const kept =
+      row.kind === "user" ||
       ids.has(row.id) ||
-      inView(row.seq, top, channelGap.value),
-  );
+      inView(row.seq, top, channelGap.value);
+    if (!kept && row.run?.sessionId === null) unlinked.add(row.id);
+    return kept;
+  });
 }
 
 const read = (id: string, query: string) =>
@@ -82,6 +104,7 @@ function current(id: string, at: number): SessionDetail | null {
 }
 
 function land(next: SessionDetail): void {
+  next = unlink(next);
   session.value = next;
   syncValues(next);
 }

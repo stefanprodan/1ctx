@@ -55,6 +55,8 @@ no date dividers, since each post shows its day.
   (`mergeRows()`, `mergeSends()`).
 - **A reconnect drops older pages that still hold a running turn**: its
   end went with the lost frames, so scrolling up reads them again.
-- **A run's post outside the pages held is never drawn or added.** A
-  frame updates one the page holds (`framed()`), and the transcript
-  filters it as it filters posts.
+- **A frame never adds a row outside the pages held** (`framed()`): an
+  aged old turn or an unlinked old run updates only what the page
+  holds, and the transcript filters a run's post as it filters posts. A
+  post stays, for a live turn's quote. An unlink the page did not hold
+  is remembered, so a page read before it never brings the link back.

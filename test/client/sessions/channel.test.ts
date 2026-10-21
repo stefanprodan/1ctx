@@ -932,3 +932,66 @@ describe("a turn that ages on screen", () => {
     expect(toolResults.value.get("tb")).toBeDefined();
   });
 });
+
+describe("frames for rows above the pages", () => {
+  const swept = { ...turnOf("t10", 10), swept: true as const };
+
+  test.serial("an aged turn the page does not hold is not added", async () => {
+    await open(page([post(100), answerOf("t100", 101)], 100));
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision: 2 }),
+      messages: [
+        row({ id: "w11", seq: 11, sendId: "t10", slot: "work" }),
+        row({
+          id: "tb",
+          seq: 12,
+          sendId: "t10",
+          kind: "tool",
+          slot: null,
+          toolCallId: "c1",
+          toolName: "bash",
+        }),
+        answerOf("t10", 14),
+      ],
+      send: swept,
+    });
+    expect(ids()).toEqual(["p100", "r101"]);
+  });
+
+  test.serial(
+    "a run unlinked above the pages stays unlinked when a late page lands",
+    async () => {
+      await open(page([post(100)], 100));
+      let release: (body: SessionDetail) => void = () => {};
+      const answered = new Promise<SessionDetail>((done) => {
+        release = done;
+      });
+      answer = () => answered.then((body) => Response.json(body));
+      const older = loadOlder();
+      const runPost = (sessionId: string | null) =>
+        row({
+          id: "run10",
+          seq: 10,
+          sendId: "post-10",
+          run: { calls: [], sessionId, automationName: "daily-check" },
+        });
+      // the run is deleted while the older page is out
+      onSocket({
+        type: "session",
+        row: null,
+        projectId: "p1",
+        session: channelSummary({ revision: 2 }),
+        messages: [runPost(null)],
+        send: null,
+      });
+      expect(ids()).toEqual(["p100"]);
+      release(page([runPost("r1")], null));
+      await older;
+      expect(ids()).toEqual(["run10", "p100"]);
+      expect(session.value?.messages[0]?.run?.sessionId).toBeNull();
+    },
+  );
+});
