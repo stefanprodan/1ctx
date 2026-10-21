@@ -454,3 +454,93 @@ describe("the channel's transcript", () => {
     expect(html.match(/Oct 20, /g)).toHaveLength(1);
   });
 });
+
+describe("a run's post", () => {
+  const runPost = (changes: Partial<Message["run"] & object> = {}): Message =>
+    row({
+      id: "rp5",
+      seq: 5,
+      sendId: "post-5",
+      agentId: "a2",
+      content: "Spend is flat.",
+      html: "<p>Spend is flat.</p>",
+      run: {
+        calls: [
+          {
+            name: "bash",
+            arguments: JSON.stringify({ command: "cat /knowledge/costs.csv" }),
+            status: "done",
+            saved: null,
+          },
+          {
+            name: "webfetch",
+            arguments: JSON.stringify({ url: "https://example.test/prices" }),
+            status: "failed",
+            saved: null,
+          },
+        ],
+        sessionId: "run1",
+        automationName: "daily-check",
+        ...changes,
+      },
+    });
+  const drawPost = (post: Message) =>
+    render(
+      <Transcript
+        sessionId="c1"
+        nodes={groupRows([post], null, [])}
+        live={new Map()}
+        agentOf={(id) =>
+          id === "a2" ? { name: "reviewer", avatar: "bot" } : null
+        }
+        authorOf={() => ({ name: "Casey", username: "casey" })}
+        // offered, and still never drawn for a run's post
+        onRegenerate={async () => {}}
+        fork={{ agents: [], agentId: null, onFork: async () => {} }}
+        channel={view()}
+      />,
+    );
+
+  test("is its agent's message with the run's calls, answer and link", () => {
+    const html = drawPost(runPost());
+    expect(html).toContain(">reviewer</a>");
+    expect(html).toContain("<span>Ran 2 tools</span>");
+    expect(html).toContain(
+      'title="cat /knowledge/costs.csv">cat /knowledge/costs.csv</span>',
+    );
+    expect(html).toContain(">example.test/prices</span>");
+    expect(html).toContain("transcript-tool-failed");
+    expect(html).toContain("<p>Spend is flat.</p>");
+    expect(html).toContain('aria-label="Copy"');
+    expect(html).toContain(
+      '<a class="channel-run channel-run-link cut" href="/run/run1" title="Run of daily-check">Run of daily-check</a>',
+    );
+    // Copy, then the run, then the time
+    expect(html.indexOf('aria-label="Copy"')).toBeLessThan(
+      html.indexOf("Run of daily-check"),
+    );
+    expect(html.indexOf("Run of daily-check")).toBeLessThan(
+      html.indexOf("transcript-when"),
+    );
+    expect(html).not.toContain("channel-quote");
+    expect(html).not.toContain('aria-label="Fork"');
+    expect(html).not.toContain('aria-label="Regenerate"');
+    expect(html).not.toContain('aria-label="Stop"');
+    expect(html).not.toContain("Worked for");
+  });
+
+  test("keeps its words once the run is gone, and nothing without a name", () => {
+    const gone = drawPost(runPost({ sessionId: null }));
+    expect(gone).toContain(
+      '<span class="channel-run cut" title="Run of daily-check">Run of daily-check</span>',
+    );
+    expect(gone).not.toContain('href="/run/');
+    const nameless = drawPost(runPost({ automationName: null }));
+    expect(nameless).not.toContain("Run of");
+    expect(nameless).toContain("<p>Spend is flat.</p>");
+  });
+
+  test("a run with no calls has no fold", () => {
+    expect(drawPost(runPost({ calls: [] }))).not.toContain("Ran ");
+  });
+});

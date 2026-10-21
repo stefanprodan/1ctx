@@ -45,6 +45,10 @@ export function withSend(
   return { sends: mergeSends(detail.sends, [send]) };
 }
 
+// a turn's anchor: a post, or a run's posted answer, which has no user row
+export const isAnchor = (row: Message): boolean =>
+  row.kind === "user" || row.run !== undefined;
+
 // the seq a row's turn is anchored on: a post's own, an agent row's
 // post's when held, else its own
 export function anchors(detail: SessionDetail): (row: Message) => number {
@@ -159,9 +163,7 @@ export function mergeNewest(
   if (kept.length === 0) return { detail: fresh, gap: null };
   const touches = base.messages.some((row) => ids.has(row.id));
   const top = base.page?.before ?? null;
-  const last = Math.max(
-    ...kept.filter((row) => row.kind === "user").map((row) => row.seq),
-  );
+  const last = Math.max(...kept.filter(isAnchor).map((row) => row.seq));
   return {
     detail: {
       ...fresh,

@@ -6,8 +6,16 @@
 // turn, where the context line and the gap fall among the nodes, and
 // whether rows landed above the ones on screen.
 
-import type { Message, PendingTurn } from "../../shared/contracts/session.ts";
+import type {
+  Message,
+  PendingTurn,
+  RunPost,
+  TraceCall,
+} from "../../shared/contracts/session.ts";
+import { plural } from "../lib/format.ts";
+import { runHref } from "../lib/hrefs.ts";
 import type { Node } from "./rows.ts";
+import { shortArg, toolLabel } from "./Tool.model.ts";
 
 // the summoner and an admin act on a turn
 export const mayAct = (
@@ -84,3 +92,37 @@ export const ownPost = (
   node?.kind === "user" &&
   channel.viewer !== null &&
   node.message.userId === channel.viewer.id;
+
+// a run's posted answer: its fold's line, one line per call it made
+// (no result travels with it), and the run it links to
+export const runTraceWords = (calls: readonly TraceCall[]): string =>
+  `Ran ${plural(calls.length, "tool")}`;
+
+export function traceLine(call: TraceCall): {
+  server: string | null;
+  tool: string;
+  argument: string;
+  state: string;
+  failed: boolean;
+} {
+  const label = toolLabel(call.name);
+  const failed = call.status === "failed";
+  return {
+    ...label,
+    argument: shortArg(call.name, call.arguments),
+    state: failed || call.status === "stopped" ? call.status! : "",
+    failed,
+  };
+}
+
+// "Run of <automation>", linked while the run is kept; no words once its
+// automation is gone
+export function runOfLine(
+  run: RunPost,
+): { words: string; href: string | null } | null {
+  if (run.automationName === null) return null;
+  return {
+    words: `Run of ${run.automationName}`,
+    href: run.sessionId === null ? null : runHref(run.sessionId),
+  };
+}

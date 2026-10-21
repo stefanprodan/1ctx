@@ -98,6 +98,28 @@
     margin-left: auto;
   }
 
+  /* a run's call in its post's fold: a fold's small line with nothing
+     behind it */
+  .channel-call {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: 24px;
+    font-family: var(--mono);
+    font-size: var(--text-label);
+    color: var(--dim);
+  }
+  /* "Run of" in the actions line, before the stamp */
+  .channel-run {
+    min-width: 0;
+    margin-left: var(--space-2);
+    color: var(--faint);
+  }
+  .channel-run-link:hover {
+    color: var(--fg);
+  }
+
   /* a finger's height for the line's one action */
   @media (pointer: coarse) {
     .channel-pending,

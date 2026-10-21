@@ -662,3 +662,45 @@ describe("a channel left and opened again", () => {
     expect(channelGap.value).toBeNull();
   });
 });
+
+describe("a run's post", () => {
+  const runPost = (seq: number): Message =>
+    row({
+      id: `run${seq}`,
+      seq,
+      sendId: `post-${seq}`,
+      content: "Spend is flat.",
+      run: { calls: [], sessionId: "r1", automationName: "daily-check" },
+    });
+
+  test.serial("arrives by the channel's frame", async () => {
+    await open(page([post(10)], null));
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision: 2 }),
+      messages: [runPost(20)],
+      send: turnOf("post-20", 20, { kind: "post" }),
+    });
+    expect(ids()).toEqual(["p10", "run20"]);
+    expect(session.value?.messages.at(-1)?.run?.automationName).toBe(
+      "daily-check",
+    );
+    // its post send is no turn of the page
+    expect(session.value?.sends).toEqual([]);
+  });
+
+  test.serial("arrives with an older page", async () => {
+    await open(page([post(30)], 30));
+    answer = () => Response.json(page([runPost(10), post(20)], null));
+    await loadOlder();
+    expect(ids()).toEqual(["run10", "p20", "p30"]);
+  });
+
+  test("anchors a reload's gap as a post does", () => {
+    const held = page([post(10), runPost(20)], 10);
+    const merged = mergeNewest(held, page([post(80)], 80), null);
+    expect(merged.gap).toEqual({ after: 20, before: 80 });
+  });
+});

@@ -42,3 +42,10 @@ no date dividers, since each post shows its day.
 - **"Context starts here" sits at the dropped mark** before the first
   node at or past `droppedSeq`, never above the first node held, and
   nowhere while the mark is null.
+- **A run's post is its agent's message** (`Message.run`): its calls in
+  the turn's fold, one line each with nothing behind them, since no
+  result is posted (`RunTrace`), then the answer, and in the actions
+  line Copy, "Run of <automation>" linking to the run, then the time.
+  Once the run is gone the words stay without the link; with no
+  automation name there are none. No quote, Fork, Regenerate or Stop.
+  It is an anchor of its own (`isAnchor()`).
