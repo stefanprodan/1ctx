@@ -464,6 +464,20 @@ describe("the note card", () => {
       session: { id: "c1", chat: "Pricing check" },
       run: false,
     });
+    // a channel's save names the channel, never a run
+    const channel = {
+      ...chat,
+      id: "ch1",
+      title: "platform",
+      origin: "channel" as const,
+    };
+    expect(
+      writerOf(memory({ updatedBy: user, session: channel }), now),
+    ).toMatchObject({
+      kind: "agent",
+      session: { id: "ch1", chat: "#platform", automationId: null },
+      run: false,
+    });
     // the chat deleted: still the agent, in a chat since deleted
     expect(
       writerOf(
