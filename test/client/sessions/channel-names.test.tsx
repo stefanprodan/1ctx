@@ -135,6 +135,7 @@ const send = (changes: Partial<SendSummary>): SendSummary => ({
   memorySkipped: null,
   summoned: true,
   tokens: 0,
+  cost: null,
   startedAt: 1,
   finishedAt: null,
   ...changes,
@@ -145,6 +146,7 @@ const detail = (changes: Partial<SessionDetail>): SessionDetail => ({
   forkedFrom: null,
   messages: [],
   send: null,
+  sends: [],
   live: [],
   authors: [],
   // a fresh read names only the agents its rows do: none yet

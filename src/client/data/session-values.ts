@@ -74,7 +74,7 @@ export function resetValues(): void {
 // the sends a detail holds as aged
 const sweptOf = (d: SessionDetail): Set<string> =>
   new Set(
-    [...(d.sends ?? []), ...(d.send ? [d.send] : [])]
+    [...d.sends, ...(d.send ? [d.send] : [])]
       .filter((send) => send.swept === true)
       .map((send) => send.id),
   );

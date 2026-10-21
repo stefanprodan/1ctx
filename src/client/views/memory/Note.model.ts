@@ -13,6 +13,7 @@ import {
   normalize,
 } from "../../../shared/memory.ts";
 import { ago } from "../../lib/format.ts";
+import { channelName } from "../../lib/names.ts";
 
 export type Writer =
   | { kind: "none" }
@@ -27,7 +28,7 @@ export type Writer =
       // the chat or the run, null once it is deleted
       session: {
         id: string;
-        // the chat's title, null for a run
+        // the chat's title or the channel's name, null for a run
         chat: string | null;
         automationId: string | null;
         automationName: string | null;
@@ -52,7 +53,12 @@ export function writerOf(memory: Memory, now: number): Writer {
           ? null
           : {
               id: session.id,
-              chat: session.origin === "chat" ? session.title : null,
+              chat:
+                session.origin === "chat"
+                  ? session.title
+                  : session.origin === "channel"
+                    ? channelName(session.title)
+                    : null,
               automationId: session.automationId,
               automationName: session.automationName,
             },

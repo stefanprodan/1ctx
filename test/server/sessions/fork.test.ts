@@ -42,7 +42,7 @@ import { createTeam } from "../../helpers/projects.ts";
 type StoredMessage = Omit<RawMessage, "prompt_tokens"> & {
   reasoning_details: string | null;
 };
-type StoredSend = Omit<RawSend, "tokens"> & { mcp: string | null };
+type StoredSend = Omit<RawSend, "tokens" | "cost"> & { mcp: string | null };
 
 const timeCall = {
   id: "time-1",

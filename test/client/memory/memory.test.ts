@@ -85,6 +85,7 @@ function send(changes: Partial<SendSummary> = {}): SendSummary {
     memorySkipped: null,
     summoned: false,
     tokens: 0,
+    cost: null,
     startedAt: 9_000,
     finishedAt: 40_000,
     ...changes,
@@ -462,6 +463,20 @@ describe("the note card", () => {
       kind: "agent",
       agentName: "sre",
       session: { id: "c1", chat: "Pricing check" },
+      run: false,
+    });
+    // a channel's save names the channel, never a run
+    const channel = {
+      ...chat,
+      id: "ch1",
+      title: "platform",
+      origin: "channel" as const,
+    };
+    expect(
+      writerOf(memory({ updatedBy: user, session: channel }), now),
+    ).toMatchObject({
+      kind: "agent",
+      session: { id: "ch1", chat: "#platform", automationId: null },
       run: false,
     });
     // the chat deleted: still the agent, in a chat since deleted

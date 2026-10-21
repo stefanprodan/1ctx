@@ -30,7 +30,7 @@ import type { Role } from "./words.ts";
 
 // bumped when a frame changes shape; a client on another protocol
 // reloads the page
-export const PROTOCOL = 21;
+export const PROTOCOL = 22;
 
 export type DraftFrame =
   | { type: "draft"; sessionId: string; draft: AutomationDraft }

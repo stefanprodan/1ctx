@@ -302,15 +302,18 @@ export type RawSend = {
   summoned: number;
   swept: number | null;
   tokens: number;
+  cost: number | null;
   started_at: number;
   finished_at: number | null;
 };
 
-// the send's token count, from its usage rows, for a query over sends
-// under the given name
-export const sendTokens = (table: string) =>
+// the send's tokens and its priced rounds' cost, null with none priced,
+// from its usage rows, for a query over sends under the given name
+export const sendUsage = (table: string) =>
   `(select coalesce(sum(usage.prompt_tokens + usage.completion_tokens), 0)
-     from usage where usage.send_id = ${table}.id) as tokens`;
+     from usage where usage.send_id = ${table}.id) as tokens,
+   (select sum(usage.cost) from usage where usage.send_id = ${table}.id)
+     as cost`;
 
 export const send = (raw: RawSend): SendSummary => ({
   id: raw.id,
@@ -334,6 +337,7 @@ export const send = (raw: RawSend): SendSummary => ({
   summoned: raw.summoned === 1,
   ...(raw.swept === 1 ? { swept: true as const } : {}),
   tokens: raw.tokens,
+  cost: raw.cost,
   startedAt: raw.started_at,
   finishedAt: raw.finished_at,
 });

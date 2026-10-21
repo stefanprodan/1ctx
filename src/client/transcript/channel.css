@@ -97,6 +97,20 @@
     min-width: 0;
     margin-left: auto;
   }
+  /* the reader's one action on a running turn, filled like Confirm */
+  .channel-stop-button {
+    flex-shrink: 0;
+    /* the avatar's height, so the line never moves when Stop goes */
+    height: 24px;
+    border-color: var(--brand);
+    background: var(--brand);
+    color: var(--on-brand);
+  }
+  .channel-stop-button:hover {
+    border-color: var(--brand-hover);
+    background: var(--brand-hover);
+    color: var(--on-brand);
+  }
 
   /* a run's call in its post's fold: a fold's small line with nothing
      behind it */
@@ -126,6 +140,20 @@
     .channel-quote,
     .channel-more {
       min-height: 44px;
+    }
+  }
+
+  /* a finger's area around the drawn button, so the line keeps its
+     height and the fill stays small */
+  @media (pointer: coarse) {
+    .channel-stop-button {
+      position: relative;
+    }
+    .channel-stop-button::after {
+      content: "";
+      position: absolute;
+      /* 8px down is the gap to the fold head, which it must not cover */
+      inset: -8px 0;
     }
   }
 }

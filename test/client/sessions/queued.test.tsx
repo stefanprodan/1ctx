@@ -95,6 +95,7 @@ function detail(changes: Partial<SessionDetail> = {}): SessionDetail {
     forkedFrom: null,
     messages: [],
     send: null,
+    sends: [],
     live: [],
     authors: [],
     queued: [],

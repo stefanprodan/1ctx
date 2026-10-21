@@ -140,13 +140,12 @@ export function StopTurn({ onStop }: { onStop: () => Promise<void> }) {
       )}
       <button
         type="button"
-        class="transcript-act"
-        title="Stop"
-        aria-label="Stop"
+        class="btn btn-small channel-stop-button"
         disabled={action.busy.value}
         onClick={() => void action.run(onStop)}
       >
         <Icon name="stop" size={12} />
+        Stop
       </button>
     </span>
   );

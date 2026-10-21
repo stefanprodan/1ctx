@@ -267,6 +267,8 @@ export type SendSummary = {
   summoned: boolean;
   // prompt plus completion tokens over every round the provider counted
   tokens: number;
+  // USD over the priced rounds; null when no round was priced
+  cost: number | null;
   // its tool rows were aged to their trace-only form
   swept?: true;
   startedAt: number;
@@ -333,9 +335,10 @@ export type SessionDetail = {
   // channel-only paging cursors; absent when a chat or run is read whole
   page?: { before: number | null; after: number | null };
   send: SendSummary | null;
-  // channel-only: the agent turns whose rows are on the page, so each
-  // names the post it answers and its summoner
-  sends?: SendSummary[];
+  // the agent turns whose rows are held: a chat's and a run's every
+  // send, a channel's those on the page, so each names the post it
+  // answers, its summoner and its usage
+  sends: SendSummary[];
   live: LiveSend[];
   // channel-only turns whose posts are already in the transcript
   pending?: PendingTurn[];

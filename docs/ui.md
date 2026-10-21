@@ -46,7 +46,10 @@ admin pages in `docs/admin-pages.md`, the external task pages in
   its revision is above the one held, and applies stream frames in
   sequence per send through `transcript/stream.ts`. Live snapshots are lists;
   ending one send removes only its tail, and a retry frame marks only its
-  own send (`retries`, by send id). Pending channel turns follow queue
+  own send (`retries`, by send id). The detail's `sends` are kept by id
+  in every session (`withSend()`): an envelope's send replaces the one
+  with its id and never drops the others, so older turns keep their
+  usage. Pending channel turns follow queue
   revisions. The channel's server-counted `channelContext` meter follows
   detail, `watched` and newer envelopes; a work envelope without it keeps
   the held count. A gap, a frame ahead of the
@@ -225,7 +228,8 @@ One helper per job, never a copy in a view.
 
 - **Words for numbers and times are in `lib/format.ts`:** `ago()`,
   `elapsed()`, `count()`, `plural()`, `commas()`, `k()`, `size()`,
-  `share()` and their siblings.
+  `share()`, `money()` for the Monitor, `turnCost()` for one turn, and
+  their siblings.
 - **Tokens are typed in whole thousands, K in the box,** through
   `thousandsText()` and `thousandsValue()` in `lib/thousands.ts`: a
   stored value shows rounded and, left as shown, is sent back exact.

@@ -209,6 +209,11 @@
   .transcript-after .transcript-cut {
     margin-right: var(--space-2);
   }
+  /* what the turn spent, in the stamp's style, before it */
+  .transcript-usage {
+    margin-right: var(--space-2);
+    white-space: nowrap;
+  }
   /* the time and the upstream stay whole; the model that answered
      gives way on a narrow screen */
   .transcript-served {
@@ -445,6 +450,24 @@
   }
   .transcript-tool-value-all {
     max-height: none;
+  }
+
+  /* a phone's line is two rows: the actions, then the usage, the time
+     and the model, which alone gives way; the hairline is the break */
+  @media (max-width: 719px) {
+    .transcript-after {
+      flex-wrap: wrap;
+      /* clear of the actions' 44px touch areas, which reach 10px down */
+      row-gap: var(--space-3);
+    }
+    .transcript-sep {
+      flex-basis: 100%;
+      height: 0;
+      margin: 0;
+    }
+    .transcript-served {
+      flex: 1 1 0;
+    }
   }
 
   /* a finger's 44px: an action's square side by side with the next,

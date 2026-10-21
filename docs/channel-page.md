@@ -35,7 +35,8 @@ no date dividers, since each post shows its day.
   row with them leaves a gap. A live tail whose row is not held is left
   to its envelopes, never a reload.
 - **Each running turn has its own working line, retry and Stop.** Stop
-  names the send and shows to its summoner and to admins (`mayAct()`).
+  names the send and shows to its summoner and to admins (`mayAct()`),
+  as a filled text button at the right of the agent's line.
 - **A pending turn is one line under its post:** "Waiting for @agent",
   or why it did not start, with Cancel (Dismiss once it did not start)
   for its summoner and admins.

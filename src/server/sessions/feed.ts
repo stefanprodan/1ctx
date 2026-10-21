@@ -12,7 +12,7 @@ import {
   type RawSend,
   type RawSession,
   send,
-  sendTokens,
+  sendUsage,
   session,
 } from "./rows.ts";
 
@@ -34,7 +34,7 @@ function lastSends(db: Db, sessionIds: string[]) {
   const marks = sessionIds.map(() => "?").join(", ");
   const rows = db
     .query<RawLastSend, string[]>(
-      `select current.*, ${sendTokens("current")},
+      `select current.*, ${sendUsage("current")},
          agents.name as agent_name,
          agents.deleted_at is not null as agent_retired
        from sends current left join agents on agents.id = current.agent_id
@@ -203,8 +203,9 @@ export function feedRows(
   });
 }
 
-// the send's columns but its computed tokens; the compiler holds the
-// list to RawSend both ways
+// the send's columns but its computed tokens and cost; the compiler
+// holds the list to RawSend both ways
+type Computed = "tokens" | "cost";
 const SEND_COLUMNS = [
   "id",
   "session_id",
@@ -228,11 +229,11 @@ const SEND_COLUMNS = [
   "swept",
   "started_at",
   "finished_at",
-] as const satisfies readonly Exclude<keyof RawSend, "tokens">[];
+] as const satisfies readonly Exclude<keyof RawSend, Computed>[];
 // Unlisted is never unless RawSend has a column the list lacks
 type Listed<_Unlisted extends never> = (typeof SEND_COLUMNS)[number];
 type SendColumn = Listed<
-  Exclude<keyof RawSend, "tokens" | (typeof SEND_COLUMNS)[number]>
+  Exclude<keyof RawSend, Computed | (typeof SEND_COLUMNS)[number]>
 >;
 
 type RawEnvelopeRow = {
@@ -248,6 +249,7 @@ type RawEnvelopeRow = {
   line_author: string;
   line_content: string | null;
   tokens: number;
+  cost: number | null;
 } & RawAlert & { [K in SendColumn as `send_${K}`]: RawSend[K] | null };
 
 // The same last send and last line feedRows() reads, for one session,
@@ -261,7 +263,7 @@ export const ENVELOPE_ROW = `select agents.name as agent,
     line.seq as line_seq, substr(line.content, 1, 600) as line_content,
     coalesce(author.username, speaker.name) as line_author,
     ${SEND_COLUMNS.map((column) => `last.${column} as send_${column}`).join(", ")},
-    ${sendTokens("last")},
+    ${sendUsage("last")},
     turn.name as send_agent, turn.deleted_at is not null as send_agent_retired
   from sessions
   left join agents on agents.id = sessions.agent_id
@@ -294,6 +296,7 @@ export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
             SEND_COLUMNS.map((column) => [column, raw[`send_${column}`]]),
           ) as Pick<RawSend, SendColumn>),
           tokens: raw.tokens,
+          cost: raw.cost,
         });
   return {
     agent: raw.agent,

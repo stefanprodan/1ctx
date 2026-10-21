@@ -1080,6 +1080,7 @@ describe("the run log", () => {
       memorySkipped: null,
       summoned: false,
       tokens: 0,
+      cost: null,
       startedAt: now - 250_000,
       finishedAt: null,
     };
