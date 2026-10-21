@@ -362,7 +362,7 @@ describe("the channel's transcript", () => {
   test("Stop shows only to the turn's summoner and to admins", () => {
     const { messages, sends } = twoTurns();
     const stops = (viewer: ChannelView["viewer"]) =>
-      draw(messages, sends, view({ viewer })).match(/aria-label="Stop"/g)
+      draw(messages, sends, view({ viewer })).match(/channel-stop-button/g)
         ?.length ?? 0;
     // t20 runs, summoned by u2
     expect(stops({ id: "u2", admin: false })).toBe(1);
@@ -525,7 +525,7 @@ describe("a run's post", () => {
     expect(html).not.toContain("channel-quote");
     expect(html).not.toContain('aria-label="Fork"');
     expect(html).not.toContain('aria-label="Regenerate"');
-    expect(html).not.toContain('aria-label="Stop"');
+    expect(html).not.toContain("channel-stop-button");
     expect(html).not.toContain("Worked for");
   });
 
