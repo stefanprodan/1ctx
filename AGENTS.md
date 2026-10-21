@@ -144,7 +144,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, stream bounds |
-| `docs/channel-context.md` | a channel turn's snapshot, traces, stream budget, admission and meter |
+| `docs/channel-context.md` | a channel turn's snapshot, traces, stream budget, admission and meter, run posts |
 | `docs/queue.md` | messages to a busy chat: the queue, its dispatcher |
 | `docs/subagents.md` | the `delegate` tool, child sessions, the child loop and the child rows |
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |

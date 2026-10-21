@@ -1,8 +1,9 @@
 # Channel context
 
 Governs the channel's request history and stream meter in
-`runner/channel-*.ts`, and a run's posts (`sessions/run-post.ts`). Posting and parallel turns are in
-`docs/sessions.md`, pending turns in `docs/queue.md`.
+`runner/channel-*.ts`, and a run's posts (`sessions/run-post.ts`).
+Posting and parallel turns are in `docs/sessions.md`, pending turns in
+`docs/queue.md`.
 
 ## The snapshot
 
