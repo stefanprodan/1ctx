@@ -59,6 +59,7 @@ export const KNOWLEDGE_COMMANDS = [
   "mkdir",
   "rmdir",
   "touch",
+  "mktemp",
   "stat",
   "file",
   "ln",

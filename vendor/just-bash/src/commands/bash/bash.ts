@@ -2,23 +2,31 @@
 import { readErrorWords } from "../../fs/error-words.js";
 import { decodeBytesToUtf8, latin1FromBytes } from "../../encoding.js";
 import { mergeToNullPrototype } from "../../helpers/env.js";
+import type { ShellOptions } from "../../interpreter/types.js"; // (1ctx shell-options)
 import type {
   ExecResult,
   RuntimeCommand,
   RuntimeCommandContext,
 } from "../../types.js";
-import { hasHelpFlag, showHelp } from "../help.js";
+import { showHelp } from "../help.js"; // (1ctx shell-options)
 
 const bashHelp = {
   name: "bash",
   summary: "execute shell commands or scripts",
   usage: "bash [OPTIONS] [SCRIPT_FILE] [ARGUMENTS...]",
+  // (1ctx shell-options)
   options: [
-    "-c COMMAND  execute COMMAND string",
-    "    --help  display this help and exit",
+    "-c            read commands from the first argument",
+    "-e -u -x -v   errexit, nounset, xtrace, verbose, as set does",
+    "-n -f -a -C   noexec, noglob, allexport, noclobber, as set does",
+    "-o NAME       set -o NAME; a + form, as +e or +o NAME, unsets",
+    "--            end the options",
+    "--noprofile   accepted, does nothing",
+    "--norc        accepted, does nothing",
+    "--help        display this help and exit",
   ],
   notes: [
-    "Without -c, reads and executes commands from SCRIPT_FILE.",
+    "Without -c, reads and executes commands from SCRIPT_FILE, or stdin.",
     "Arguments are passed as $1, $2, etc. to the script.",
     '$0 is set to the script name (or "bash" with -c).',
   ],
@@ -31,47 +39,7 @@ export const bashCommand: RuntimeCommand = {
     args: string[],
     ctx: RuntimeCommandContext,
   ): Promise<ExecResult> {
-    if (hasHelpFlag(args)) {
-      return showHelp(bashHelp);
-    }
-
-    // Handle -c flag
-    // With -c: bash -c 'command' arg0 arg1 arg2
-    // arg0 becomes $0, arg1 becomes $1, arg2 becomes $2
-    if (args[0] === "-c" && args.length >= 2) {
-      const command = args[1];
-      const scriptName = args[2] || "bash";
-      const scriptArgs = args.slice(3);
-      return executeScript(command, scriptName, scriptArgs, ctx);
-    }
-
-    // No arguments - read script from stdin if available. Decode bytes — a
-    // bash script's UTF-8 string literals must reach the parser as text.
-    if (args.length === 0) {
-      const stdinText = decodeBytesToUtf8(ctx.stdin);
-      if (stdinText.trim()) {
-        return executeScript(stdinText, "bash", [], ctx);
-      }
-      // No stdin - return success (interactive mode not supported)
-      return { stdout: "", stderr: "", exitCode: 0 };
-    }
-
-    // Read and execute script file
-    const scriptPath = args[0];
-    const scriptArgs = args.slice(1);
-
-    try {
-      const fullPath = ctx.fs.resolvePath(ctx.cwd, scriptPath);
-      const scriptContent = await ctx.fs.readFile(fullPath);
-      return executeScript(scriptContent, scriptPath, scriptArgs, ctx);
-    } catch (error) { // (1ctx readonly-errors)
-      return {
-        stdout: "",
-        // (1ctx readonly-errors) a file over the read limit says so
-        stderr: `bash: ${scriptPath}: ${readErrorWords(error)}\n`,
-        exitCode: 127,
-      };
-    }
+    return runShell("bash", bashHelp, args, ctx); // (1ctx shell-options)
   },
 };
 
@@ -83,57 +51,191 @@ export const shCommand: RuntimeCommand = {
     args: string[],
     ctx: RuntimeCommandContext,
   ): Promise<ExecResult> {
-    if (hasHelpFlag(args)) {
-      return showHelp({
+    // (1ctx shell-options)
+    return runShell(
+      "sh",
+      {
         ...bashHelp,
         name: "sh",
+        usage: bashHelp.usage.replace("bash", "sh"),
         summary: "execute shell commands or scripts (POSIX shell)",
-      });
-    }
-
-    // Same implementation as bash
-    // With -c: sh -c 'command' arg0 arg1 arg2
-    // arg0 becomes $0, arg1 becomes $1, arg2 becomes $2
-    if (args[0] === "-c" && args.length >= 2) {
-      const command = args[1];
-      const scriptName = args[2] || "sh";
-      const scriptArgs = args.slice(3);
-      return executeScript(command, scriptName, scriptArgs, ctx);
-    }
-
-    // No arguments - read script from stdin if available. Decode bytes — a
-    // shell script's UTF-8 string literals must reach the parser as text.
-    if (args.length === 0) {
-      const stdinText = decodeBytesToUtf8(ctx.stdin);
-      if (stdinText.trim()) {
-        return executeScript(stdinText, "sh", [], ctx);
-      }
-      // No stdin - return success (interactive mode not supported)
-      return { stdout: "", stderr: "", exitCode: 0 };
-    }
-
-    const scriptPath = args[0];
-    const scriptArgs = args.slice(1);
-
-    try {
-      const fullPath = ctx.fs.resolvePath(ctx.cwd, scriptPath);
-      const scriptContent = await ctx.fs.readFile(fullPath);
-      return executeScript(scriptContent, scriptPath, scriptArgs, ctx);
-    } catch (error) { // (1ctx readonly-errors)
-      return {
-        stdout: "",
-        // (1ctx readonly-errors) a file over the read limit says so
-        stderr: `sh: ${scriptPath}: ${readErrorWords(error)}\n`,
-        exitCode: 127,
-      };
-    }
+      },
+      args,
+      ctx,
+    );
   },
 };
+
+// (1ctx shell-options) the set letters and -o names a new shell takes, as
+// set takes them; null is accepted and does nothing
+const SHORT_OPTIONS = new Map<string, keyof ShellOptions | null>([
+  ["e", "errexit"],
+  ["u", "nounset"],
+  ["x", "xtrace"],
+  ["v", "verbose"],
+  ["f", "noglob"],
+  ["C", "noclobber"],
+  ["a", "allexport"],
+  ["n", "noexec"],
+  ..."hbmBHPTEp".split("").map((c) => [c, null] as [string, null]),
+]);
+const LONG_OPTIONS = new Map<string, keyof ShellOptions | null>([
+  ...(
+    [
+      "errexit",
+      "pipefail",
+      "nounset",
+      "xtrace",
+      "verbose",
+      "noclobber",
+      "noglob",
+      "allexport",
+      "noexec",
+      "posix",
+      "vi",
+      "emacs",
+    ] as const
+  ).map((k) => [k, k] as [string, keyof ShellOptions]),
+  ...[
+    "notify",
+    "monitor",
+    "braceexpand",
+    "histexpand",
+    "physical",
+    "functrace",
+    "errtrace",
+    "privileged",
+    "hashall",
+    "ignoreeof",
+    "interactive-comments",
+    "keyword",
+    "onecmd",
+  ].map((k) => [k, null] as [string, null]),
+]);
+
+type Invocation =
+  | { kind: "error"; result: ExecResult }
+  | { kind: "help" }
+  | {
+      kind: "run";
+      command: boolean;
+      operands: string[];
+      options: Partial<ShellOptions>;
+    };
+
+// (1ctx shell-options) bash's grammar: options first, -c a flag like any
+// other letter, an o in a group taking the next argument, -- or - ending
+// them; the first operand is then the command string or the script
+function parseInvocation(name: string, args: string[]): Invocation {
+  const fail = (message: string): Invocation => ({
+    kind: "error",
+    result: { stdout: "", stderr: `${name}: ${message}\n`, exitCode: 2 },
+  });
+  const options: Partial<ShellOptions> = {};
+  const set = (key: keyof ShellOptions | null, on: boolean) => {
+    if (key === null) return;
+    options[key] = on;
+    if (on && key === "vi") options.emacs = false;
+    if (on && key === "emacs") options.vi = false;
+  };
+  let command = false;
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i];
+    if (arg === "--" || arg === "-") {
+      i++;
+      break;
+    }
+    if (arg === "--help") return { kind: "help" };
+    if (arg === "--noprofile" || arg === "--norc") {
+      i++;
+      continue;
+    }
+    if (arg.startsWith("--")) return fail(`${arg}: invalid option`);
+    if (arg.length < 2 || (arg[0] !== "-" && arg[0] !== "+")) break;
+    const on = arg[0] === "-";
+    i++;
+    for (const c of arg.slice(1)) {
+      if (c === "c") command = true;
+      else if (c === "o") {
+        const optName = args[i++];
+        if (optName === undefined) {
+          return fail(`${arg[0]}o: option requires an argument`);
+        }
+        if (!LONG_OPTIONS.has(optName)) {
+          return fail(`line 0: ${name}: ${optName}: invalid option name`);
+        }
+        set(LONG_OPTIONS.get(optName) ?? null, on);
+      } else if (SHORT_OPTIONS.has(c)) set(SHORT_OPTIONS.get(c) ?? null, on);
+      else return fail(`${arg[0]}${c}: invalid option`);
+    }
+  }
+  const operands = args.slice(i);
+  if (command && operands.length === 0) {
+    return fail("-c: option requires an argument");
+  }
+  return { kind: "run", command, operands, options };
+}
+
+// (1ctx shell-options) bash and sh share the one implementation
+async function runShell(
+  name: string,
+  help: typeof bashHelp,
+  args: string[],
+  ctx: RuntimeCommandContext,
+): Promise<ExecResult> {
+  const invocation = parseInvocation(name, args);
+  if (invocation.kind === "error") return invocation.result;
+  if (invocation.kind === "help") return showHelp(help);
+  const { operands, options } = invocation;
+
+  // With -c: bash -c 'command' arg0 arg1 arg2
+  // arg0 becomes $0, arg1 becomes $1, arg2 becomes $2
+  if (invocation.command) {
+    const scriptName = operands[1] || name;
+    return executeScript(
+      operands[0],
+      scriptName,
+      operands.slice(2),
+      options,
+      ctx,
+    );
+  }
+
+  // No arguments - read script from stdin if available. Decode bytes — a
+  // bash script's UTF-8 string literals must reach the parser as text.
+  if (operands.length === 0) {
+    const stdinText = decodeBytesToUtf8(ctx.stdin);
+    if (stdinText.trim()) {
+      return executeScript(stdinText, name, [], options, ctx);
+    }
+    // No stdin - return success (interactive mode not supported)
+    return { stdout: "", stderr: "", exitCode: 0 };
+  }
+
+  // Read and execute script file
+  const scriptPath = operands[0];
+  const scriptArgs = operands.slice(1);
+
+  try {
+    const fullPath = ctx.fs.resolvePath(ctx.cwd, scriptPath);
+    const scriptContent = await ctx.fs.readFile(fullPath);
+    return executeScript(scriptContent, scriptPath, scriptArgs, options, ctx);
+  } catch (error) { // (1ctx readonly-errors)
+    return {
+      stdout: "",
+      // (1ctx readonly-errors) a file over the read limit says so
+      stderr: `${name}: ${scriptPath}: ${readErrorWords(error)}\n`,
+      exitCode: 127,
+    };
+  }
+}
 
 async function executeScript(
   script: string,
   scriptName: string,
   scriptArgs: string[],
+  shellOptions: Partial<ShellOptions>, // (1ctx shell-options)
   ctx: RuntimeCommandContext,
 ): Promise<ExecResult> {
   if (!ctx.exec) {
@@ -160,13 +262,12 @@ async function executeScript(
   // (1ctx exec-env) a new shell never takes IFS from its environment, as bash does
   if ("IFS" in positionalEnv) positionalEnv.IFS = " \t\n";
 
-  // Skip shebang line if present
+  // (1ctx shell-options) blank the shebang line, keeping its newline, so
+  // $LINENO and parse errors count lines as bash does
   let scriptToRun = script;
   if (scriptToRun.startsWith("#!")) {
     const firstNewline = scriptToRun.indexOf("\n");
-    if (firstNewline !== -1) {
-      scriptToRun = scriptToRun.slice(firstNewline + 1);
-    }
+    scriptToRun = firstNewline === -1 ? "" : scriptToRun.slice(firstNewline);
   }
 
   // Execute the script as-is, preserving newlines for proper parsing
@@ -183,6 +284,7 @@ async function executeScript(
         replaceEnv: true,
         cwd: ctx.cwd,
         signal: ctx.signal,
+        shellOptions, // (1ctx shell-options)
       })
     : await ctx.exec(scriptToRun, {
         env: positionalEnv,
@@ -192,6 +294,7 @@ async function executeScript(
         stdin: latin1FromBytes(ctx.stdin),
         stdinKind: "bytes",
         signal: ctx.signal,
+        shellOptions, // (1ctx shell-options)
       });
   return result;
 }

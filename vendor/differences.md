@@ -351,6 +351,8 @@ a read-only Linux mount:
 - yes's refusals leave out GNU's `Try 'yes --help'` line.
 - mktemp names a missing `-p` folder by the template alone
   (`'tmp.XXXXXXXXXX'`), where GNU names the joined path.
+- Under a read-only folder mktemp says `EROFS: read-only file system,
+  open '<path>'`, where GNU says `Read-only file system`.
 
 ## Where our env still differs from GNU env
 
@@ -457,6 +459,26 @@ part:
   bash in the C locale counts its bytes.
 - `find d/ -printf %f` prints `d`, GNU `d/`.
 - `od` ignores `-t`, so the fixture reads bytes through `base64`.
+
+## Where our bash still differs from GNU bash
+
+`test/vendor/just-bash/shell-options.test.ts` holds bash's and sh's
+invocation options to bash 5.3. `sh` is bash under another name, not a
+POSIX shell. Where they part:
+
+- The invocation-only options (`-i -l -r -s -D -O`) and the long ones
+  but `--help`, `--noprofile` and `--norc` (`--login`, `--posix`,
+  `--rcfile` and the rest) are refused as invalid options.
+- `-k` and `-t` are refused, as `set` refuses them; bash takes them.
+- A bare `-o` answers `bash: -o: option requires an argument`, exit 2,
+  where bash prints the `set -o` table.
+- A long option after a short one (`bash -e --norc`) is read, where
+  bash refuses it; a bad letter after a good one in a group (`-eQ`)
+  exits 2, where bash exits 1.
+- A parse error reads `bash: syntax error: Parse error at L:C: ...` and
+  may name another line, where bash reads `f.sh: line 2: syntax error
+  near unexpected token ...`; a runtime error names `bash`, not the
+  script and its line.
 
 ## Where our read and mapfile still differ from bash
 

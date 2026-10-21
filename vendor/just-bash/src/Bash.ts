@@ -325,6 +325,8 @@ export interface ExecOptions {
    * positional parameters ($1, $2, "$@", etc.).
    */
   args?: string[];
+  /** (1ctx shell-options) set options a new shell starts with, as bash -e */
+  shellOptions?: Partial<InterpreterState["options"]>;
 }
 
 export class Bash {
@@ -767,7 +769,8 @@ export class Bash {
         // Deep copy mutable objects to prevent interference
         functions: new Map(this.state.functions),
         localScopes: [...this.state.localScopes],
-        options: { ...this.state.options },
+        // (1ctx shell-options) bash -e and the rest apply before line one
+        options: { ...this.state.options, ...effectiveOptions.shellOptions },
         // Share hashTable reference - it should persist across exec calls
         hashTable: this.state.hashTable,
         // Pass stdin through to commands (for bash -c with piped input).
