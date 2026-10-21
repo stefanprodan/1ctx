@@ -69,6 +69,13 @@ in `docs/ui.md`.
   is the detail's `channelContext` against its budget, hidden while
   absent, and follows the socket's meter updates. A
   turn's Stop is on the turn's own line, not the composer.
+- **A channel keeps the agent just summoned** (`nextPost()`): after a
+  post whose first word named a listed agent, the box and the stored
+  draft hold `@name ` for the next ask, so it survives a reload. Any
+  other post leaves them empty. The server still summons only on the
+  first word, so deleting the name makes a plain post. A listed agent's
+  name alone, with no files, is never sent and Send is off
+  (`bareSummon()`), so Enter on the filled box starts no turn.
 - **A menu row that leaves the page on its own click stops the click.**
   Otherwise the menu reads it as a click outside. A pane takes the
   focus and gives it back.

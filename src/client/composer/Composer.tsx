@@ -77,7 +77,7 @@ import type { Editing } from "./handoff.ts";
 import { browserLocate, type Locate, locate } from "./location.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import { Summons } from "./Summons.tsx";
-import { summonFill, summonMatches } from "./summons.ts";
+import { bareSummon, nextPost, summonFill, summonMatches } from "./summons.ts";
 import { useSwitches } from "./switches.ts";
 import "./composer.css";
 import { says } from "../lib/format.ts";
@@ -273,12 +273,15 @@ export function Composer({
     writeDraftText(key, fill);
     input.current?.focus();
   };
+  const nameOnly = () =>
+    channel !== undefined && bareSummon(text.value, agents, files.ids.length);
   const submit = async () => {
     const content = text.value.trim();
     if (edit !== null)
       return saveEdit(edit, content, onEdit, { ...box, saving });
     // the signal itself, since a second Enter may beat the render
     if (content === "" || agent === null || !ready || locating.value) return;
+    if (nameOnly()) return;
     const to = dispatchOf(content);
     if (to.files && (!placed || files.busy)) return;
     failure.value = null;
@@ -311,8 +314,10 @@ export function Composer({
       }
       // what was typed while the send was on its way stays, here and in
       // the stored draft, which another composer may have written since
-      if (text.value === sent) text.value = "";
-      if (readDraft(key).text === sent) writeDraftText(key, "");
+      const next =
+        channel && to.kind === "message" ? nextPost(sent, agents) : "";
+      if (text.value === sent) text.value = next;
+      if (readDraft(key).text === sent) writeDraftText(key, next);
     } catch (err) {
       failure.value = says(err);
       // a file the send found gone moves to the log with the next list
@@ -483,6 +488,7 @@ export function Composer({
           failure={failure}
           off={
             text.value.trim() === "" ||
+            nameOnly() ||
             (edit !== null ? saving.value : !ready || !placed || files.busy)
           }
           onSend={() => void submit()}

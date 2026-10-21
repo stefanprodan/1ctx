@@ -3,6 +3,8 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  bareSummon,
+  nextPost,
   summonFill,
   summonMatches,
   summonQuery,
@@ -88,5 +90,38 @@ describe("the @ menu", () => {
 
   test("a pick fills the name and a space for the ask", () => {
     expect(summonFill(AGENTS[1]!)).toBe("@glm ");
+  });
+});
+
+describe("a channel's box after a post", () => {
+  test("keeps the agent the post summoned", () => {
+    expect(nextPost("@glm check the chart", AGENTS)).toBe("@glm ");
+    expect(nextPost("@GLM, check", AGENTS)).toBe("@glm ");
+    expect(nextPost("  @writer: draft it", AGENTS)).toBe("@writer ");
+  });
+
+  test("is empty after a post that summoned no listed agent", () => {
+    expect(nextPost("draw", AGENTS)).toBe("");
+    expect(nextPost("@alice what do you think", AGENTS)).toBe("");
+    expect(nextPost("hi @glm", AGENTS)).toBe("");
+    expect(nextPost("@glm check", null)).toBe("");
+  });
+});
+
+describe("a bare summon", () => {
+  test("is a listed agent's name alone, with no files", () => {
+    expect(bareSummon("@glm", AGENTS, 0)).toBe(true);
+    expect(bareSummon("@glm ", AGENTS, 0)).toBe(true);
+    expect(bareSummon("@glm,", AGENTS, 0)).toBe(true);
+  });
+
+  test("anything else is sent", () => {
+    expect(bareSummon("@glm check", AGENTS, 0)).toBe(false);
+    // a file is the ask
+    expect(bareSummon("@glm", AGENTS, 1)).toBe(false);
+    // a member, or a typo the server refuses
+    expect(bareSummon("@alice", AGENTS, 0)).toBe(false);
+    expect(bareSummon("@glm", null, 0)).toBe(false);
+    expect(bareSummon("glm", AGENTS, 0)).toBe(false);
   });
 });
