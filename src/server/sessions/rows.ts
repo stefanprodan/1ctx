@@ -8,6 +8,7 @@ import type {
   SavedDocs,
   SendSummary,
   SessionSummary,
+  TraceCall,
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
 import { cutAt } from "../../shared/text.ts";
@@ -150,6 +151,9 @@ export type RawMessage = {
   served_model: string | null;
   native_finish: string | null;
   prompt_tokens: number | null;
+  run_calls: string | null;
+  run_session_id: string | null;
+  run_automation: string | null;
   created_at: number;
   finished_at: number | null;
 };
@@ -174,6 +178,11 @@ export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, 
    (select usage.prompt_tokens from usage
     where usage.send_id = messages.send_id and usage.round = messages.round)
     as prompt_tokens,
+   messages.run_calls, messages.run_session_id,
+   case when messages.run_session_id is not null then
+     (select automations.name from sessions runs
+        join automations on automations.id = runs.automation_id
+       where runs.id = messages.run_session_id) end as run_automation,
    messages.created_at, messages.finished_at`;
 
 // a JSON list column: null when absent or empty
@@ -229,6 +238,15 @@ export const message = (raw: RawMessage): Message => ({
   ...(raw.child_session_id === null
     ? {}
     : { childSessionId: raw.child_session_id }),
+  ...(raw.run_calls === null
+    ? {}
+    : {
+        run: {
+          calls: safeListOrNull<TraceCall>(raw.run_calls) ?? [],
+          sessionId: raw.run_session_id,
+          automationName: raw.run_automation,
+        },
+      }),
   model: raw.model,
   ttftMs: raw.ttft_ms,
   thinkingMs: raw.thinking_ms,

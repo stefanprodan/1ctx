@@ -11,6 +11,9 @@ export type ChannelTurn = Turn & {
   firstMessageId: string;
   firstSeq: number;
   swept: boolean;
+  // a run's answer its automation posted: another agent's answer to
+  // every reader, its own agent included, traced from its stored calls
+  run?: true;
 };
 
 export type ChannelRow = Message & {
@@ -20,12 +23,13 @@ export type ChannelRow = Message & {
 
 type RawRow = Omit<
   ChannelRow,
-  "toolCalls" | "uploads" | "saved" | "details"
+  "toolCalls" | "uploads" | "saved" | "details" | "run"
 > & {
   toolCalls: string | null;
   uploads: string | null;
   saved: string | null;
   details: string | null;
+  runCalls: string | null;
 };
 
 const columns = (whole: boolean) => `
@@ -37,11 +41,22 @@ const columns = (whole: boolean) => `
   messages.tool_calls as toolCalls, messages.tool_call_id as toolCallId,
   messages.tool_name as toolName, messages.created_at as createdAt,
   messages.finished_at as finishedAt, users.username,
+  messages.run_calls as runCalls,
   ${whole ? "messages.reasoning" : "''"} as reasoning,
   ${whole ? "messages.reasoning_details" : "null"} as details`;
 
-const rowOf = (raw: RawRow): ChannelRow => ({
+const rowOf = ({ runCalls, ...raw }: RawRow): ChannelRow => ({
   ...raw,
+  // only the calls are read here: the run's link and name are the page's
+  ...(runCalls === null
+    ? {}
+    : {
+        run: {
+          calls: JSON.parse(runCalls),
+          sessionId: null,
+          automationName: null,
+        },
+      }),
   toolCalls: raw.toolCalls === null ? null : JSON.parse(raw.toolCalls),
   uploads: raw.uploads === null ? null : JSON.parse(raw.uploads),
   saved: raw.saved === null ? null : JSON.parse(raw.saved),
@@ -69,13 +84,14 @@ export function channelRead(db: Db, sessionId: string, from: number) {
         firstMessageId: string;
         firstSeq: number;
         swept: number | null;
+        sendKind: string;
       },
       [string, number, number]
     >(
       `select ${columns(false)}, sends.agent_id as turnAgent,
          agents.name as agentName, sends.provider_id as providerId,
          sends.first_message_id as firstMessageId, first.seq as firstSeq,
-         sends.swept
+         sends.swept, sends.kind as sendKind
        from messages
        cross join sends on sends.id = messages.send_id
        join messages as first on first.id = sends.first_message_id
@@ -98,6 +114,7 @@ export function channelRead(db: Db, sessionId: string, from: number) {
       firstMessageId: row.firstMessageId,
       firstSeq: row.firstSeq,
       swept: row.swept === 1,
+      ...(row.sendKind === "post" ? { run: true as const } : {}),
     });
   }
   return { rows: raw.map(rowOf), turns };

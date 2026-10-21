@@ -73,7 +73,8 @@ export function unmarked(text: string, name: string): string {
 
 // another agent's turn: its answer as a user message opened by its
 // name, with no author field, then its trace as its own message, the
-// calls to tools the building agent lacks marked
+// calls to tools the building agent lacks marked. A run's post brings
+// its calls on its row
 export function foreignTurn(
   turn: Turn,
   rows: readonly Message[],
@@ -93,7 +94,10 @@ export function foreignTurn(
   if (answer !== "") {
     out.push({ role: "user", content: `${markOf(turn.agentName)}${answer}` });
   }
-  const calls = trace(traceCalls(rows), yours);
+  const calls = trace(
+    [...traceCalls(rows), ...rows.flatMap((row) => row.run?.calls ?? [])],
+    yours,
+  );
   if (calls !== "") out.push({ role: "user", content: calls });
   return out;
 }

@@ -58,6 +58,7 @@ const automation = (
   attentionGuidance: "",
   alert: null,
   rerunOnRestart: false,
+  postToChannel: false,
   once: false,
   onceFiredAt: null,
   onceRunSessionId: null,

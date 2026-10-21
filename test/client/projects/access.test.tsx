@@ -26,6 +26,8 @@ const section = (
   web: { live: boolean; on: boolean; reason: string | null },
   knowledgeOn = true,
   shownRepos: typeof repos = [],
+  channel: string | null = null,
+  channelOn = false,
 ) =>
   render(
     <AccessSection
@@ -41,6 +43,9 @@ const section = (
       email={null}
       emailOn
       onEmail={() => {}}
+      channel={channel}
+      channelOn={channelOn}
+      onChannel={() => {}}
       servers={[]}
       mcpOff={[]}
       onServer={() => {}}
@@ -100,6 +105,23 @@ describe("the Access section's Knowledge switch", () => {
     expect(on).toContain('aria-label="Knowledge on"');
     expect(on.indexOf("Visuals")).toBeLessThan(on.indexOf("Knowledge"));
     expect(section(web, false)).toContain('aria-label="Knowledge off"');
+  });
+});
+
+describe("the Access section's Post to channel switch", () => {
+  const web = { live: true, on: true, reason: null };
+
+  test("shows only in a team project, naming its channel", () => {
+    expect(section(web)).not.toContain("Post to channel");
+    const off = section(web, true, [], "finops");
+    expect(off).toContain('aria-label="Post to channel off"');
+    expect(off).toContain("the answer in #finops");
+    expect(off.indexOf("Knowledge")).toBeLessThan(
+      off.indexOf("Post to channel"),
+    );
+    expect(section(web, true, [], "finops", true)).toContain(
+      'aria-label="Post to channel on"',
+    );
   });
 });
 

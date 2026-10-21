@@ -14,6 +14,10 @@ import {
 
 export const CHANNEL_PAGE_TURNS = 50;
 
+// a turn's anchor is the post that opens it: a user row, or a run's
+// answer, a reply under a post send with no user row
+const ANCHOR = "(messages.kind = 'user' or messages.run_calls is not null)";
+
 type Anchor = { id: string; seq: number };
 export type ChannelPage = {
   messages: Message[];
@@ -33,7 +37,7 @@ const anchorsBefore = (
     .query<Anchor, [string, number | null, number | null, number]>(
       `select messages.id, messages.seq from messages
        join sends on sends.id = messages.send_id
-       where messages.session_id = ? and messages.kind = 'user'
+       where messages.session_id = ? and ${ANCHOR}
          and sends.kind = 'post' and (? is null or messages.seq < ?)
        order by messages.seq desc limit ?`,
     )
@@ -50,7 +54,7 @@ const around = (db: Db, sessionId: string, seq: number): Anchor[] => {
     .query<Anchor, [string, number, number]>(
       `select messages.id, messages.seq from messages
        join sends on sends.id = messages.send_id
-       where messages.session_id = ? and messages.kind = 'user'
+       where messages.session_id = ? and ${ANCHOR}
          and sends.kind = 'post' and messages.seq > ?
        order by messages.seq limit ?`,
     )
@@ -105,7 +109,7 @@ export function channelPage(
     .query<{ found: number }, [string, number]>(
       `select exists (
          select 1 from messages join sends on sends.id = messages.send_id
-          where messages.session_id = ? and messages.kind = 'user'
+          where messages.session_id = ? and ${ANCHOR}
             and sends.kind = 'post' and messages.seq < ?
        ) as found`,
     )
@@ -114,7 +118,7 @@ export function channelPage(
     .query<{ found: number }, [string, number]>(
       `select exists (
          select 1 from messages join sends on sends.id = messages.send_id
-          where messages.session_id = ? and messages.kind = 'user'
+          where messages.session_id = ? and ${ANCHOR}
             and sends.kind = 'post' and messages.seq > ?
        ) as found`,
     )

@@ -172,6 +172,9 @@ export type Message = {
   // the subagent's session a delegate row started, absent on every
   // other row; never in the result's text, which a low cut may cut
   childSessionId?: string;
+  // a run's answer its automation posted to the channel, absent on
+  // every other row
+  run?: RunPost;
   model: string | null;
   ttftMs: number | null;
   thinkingMs: number | null;
@@ -184,6 +187,25 @@ export type Message = {
   nativeFinish: string | null;
   createdAt: number;
   finishedAt: number | null;
+};
+
+// one call of a turn as a trace reads it: never its result
+export type TraceCall = {
+  // the tool that ran: the row's name, an MCP call's wire name
+  name: string;
+  arguments: string;
+  status: MessageStatus | null;
+  // the docs a bash call wrote, from its row
+  saved: SavedDocs | null;
+};
+
+// what a channel row posted by a run carries beside its answer: the
+// run's calls, drawn as a trace for each reader, and the run, whose
+// session and automation are null once deleted
+export type RunPost = {
+  calls: TraceCall[];
+  sessionId: string | null;
+  automationName: string | null;
 };
 
 // a subagent's work under its parent's delegate row: the child's

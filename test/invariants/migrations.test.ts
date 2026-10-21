@@ -85,6 +85,7 @@ const EXPECTED_IDS = [
   "0071-team-project-channels",
   "0072-channel-turns",
   "0073-channel-workspaces",
+  "0074-run-posts",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -109,6 +110,9 @@ const LATER_COLUMNS = [
   "once",
   "once_fired_at",
   "once_run_session_id",
+  "post_to_channel",
+  "run_calls",
+  "run_session_id",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -241,7 +245,7 @@ describe("the schema", () => {
           values ('mail', 'agent', 'u', 'p', 'sess', '<mail@x>', 'sent', 0, 0, 0);
       `);
       const old = db.query("select * from memory_views").get();
-      expect(migrate(db, MIGRATIONS.slice(0, -1))).toEqual([
+      expect(migrate(db, MIGRATIONS.slice(0, 72))).toEqual([
         "0072-channel-turns",
       ]);
       expect(
@@ -4091,6 +4095,7 @@ describe("project channel migrations", () => {
       "0071-team-project-channels",
       "0072-channel-turns",
       "0073-channel-workspaces",
+      "0074-run-posts",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4228,7 +4233,7 @@ describe("project channel migrations", () => {
 
   describe("0073 channel workspaces", () => {
     test("copies existing workspace rows and permits owned channel children", () => {
-      const before = MIGRATIONS.slice(0, -1);
+      const before = MIGRATIONS.slice(0, 72);
       const db = new Database(":memory:");
       db.exec("pragma foreign_keys = on");
       migrate(db, before);
@@ -4299,7 +4304,10 @@ describe("project channel migrations", () => {
           values ('post-message', 'channel', 1, 'user', 'post', 1, 'u',
             'ask', 'done', 0, 0);
       `);
-        expect(migrate(db)).toEqual(["0073-channel-workspaces"]);
+        expect(migrate(db)).toEqual([
+          "0073-channel-workspaces",
+          "0074-run-posts",
+        ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
           session_id: "sess",
@@ -4360,5 +4368,86 @@ describe("project channel migrations", () => {
         db.close();
       }
     });
+  });
+
+  test("0074 adds the run post switch and columns, keeping a post when its run goes", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 73));
+    try {
+      db.exec(`
+        insert into users
+          (id, username, full_name, email, role, password_hash, created_at)
+          values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('team', 'team', 'finops', 'u', 0);
+        insert into providers (id, name, wire, base_url, created_at)
+          values ('pr', 'prov', 'openai-compatible', 'http://x', 0);
+        insert into agents
+          (id, name, provider_id, model, model_name, created_at)
+          values ('a', 'agent', 'pr', 'm', 'M', 0);
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, next_at, created_at, updated_at)
+          values ('au', 'team', 'u', 'a', 'daily', 'check', '0 9 * * *',
+            'UTC', 30, 0, 0, 0);
+        insert into sessions
+          (id, project_id, owner_id, agent_id, origin, automation_id, title,
+           status, created_at, last_activity_at)
+          values ('run', 'team', 'u', 'a', 'automation', 'au', 'daily',
+            'done', 0, 0),
+                 ('channel', 'team', null, null, 'channel', null, 'finops',
+            'done', 0, 0);
+        insert into sends
+          (id, session_id, kind, user_id, agent_id, provider_id,
+           provider_name, model, status, first_message_id, started_at,
+           finished_at)
+          values ('post', 'channel', 'post', 'u', 'a', null, null, null,
+            'done', 'answer', 0, 0);
+      `);
+      expect(migrate(db)).toEqual(["0074-run-posts"]);
+      expect(db.query("select post_to_channel from automations").get()).toEqual(
+        { post_to_channel: 0 },
+      );
+      expect(() =>
+        db.exec("update automations set post_to_channel = 2"),
+      ).toThrow();
+      db.exec(`
+        insert into messages
+          (id, session_id, seq, kind, send_id, round, slot, agent_id, model,
+           content, status, run_calls, run_session_id, created_at,
+           finished_at)
+          values ('answer', 'channel', 1, 'reply', 'post', 1, 'answer', 'a',
+            'm', 'all green', 'done', '[]', 'run', 0, 0);
+        delete from sessions where id = 'run';
+      `);
+      expect(
+        db
+          .query(
+            "select content, run_calls, run_session_id from messages where id = 'answer'",
+          )
+          .get(),
+      ).toEqual({
+        content: "all green",
+        run_calls: "[]",
+        run_session_id: null,
+      });
+      // the delete's set null finds the posts by the index, never a scan
+      const plan = db
+        .query<{ detail: string }, [string]>(
+          "explain query plan delete from sessions where id = ?",
+        )
+        .all("run")
+        .map((row) => row.detail);
+      expect(plan.some((line) => line.includes("messages_run_session"))).toBe(
+        true,
+      );
+      expect(
+        plan.some((line) => /^SCAN (?:TABLE )?messages\b/.test(line)),
+      ).toBe(false);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
   });
 });

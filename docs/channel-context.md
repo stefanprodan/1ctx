@@ -1,7 +1,7 @@
 # Channel context
 
 Governs the channel's request history and stream meter in
-`runner/channel-*.ts`. Posting and parallel turns are in
+`runner/channel-*.ts`, and a run's posts (`sessions/run-post.ts`). Posting and parallel turns are in
 `docs/sessions.md`, pending turns in `docs/queue.md`.
 
 ## The snapshot
@@ -28,6 +28,10 @@ Governs the channel's request history and stream meter in
   Results, reasoning and signatures stay out. Older own turns are the trace
   in a user message followed by the answer as assistant. No skill load in a
   traced turn remains loaded.
+- **A run's post is always another agent's answer.** Its turn is its `post`
+  send with an agent (`ChannelTurn.run`), its trace drawn per reader from
+  the row's `run_calls`, and `ownsChannelTurn()` never claims it, even for
+  the run's own agent. It counts in the meter as any traced turn.
 - **Only the latest retained own turn may go whole.** The tail's walk must
   fit all its rows, its post included, within `TAIL_MAX_TOKENS` (20,000);
   otherwise it is traced, without trying an older turn. A turn marked
@@ -98,3 +102,22 @@ Governs the channel's request history and stream meter in
   The cache keeps the last 1,024 channels read, not their rows or text.
   Reads inside a transaction bypass it, so a rollback cannot leave a
   speculative count behind.
+
+## Run posts
+
+- **A done run posts its answer once when its automation asks.** With
+  `postToChannel` on, the closing transaction of a run that ends `done` with
+  a non-empty answer writes one reply row in its project's channel, under a
+  done `post` send naming the run's agent, `user_id` the automation's owner.
+  `run_calls` holds the `traceCalls()` of the run's rows up to the answer
+  (not the memory or attention step) as JSON, never text or results;
+  `run_session_id` names the run. The channel's activity and revision move
+  and its envelope is published as a post's. It starts no turn. A failed,
+  stopped or deadline run posts nothing.
+- **A page anchors it on its own row.** It has no user row, so `run_calls`
+  marks the anchor. `Message.run` carries the calls, the run's session id
+  and its automation's name, both null once gone.
+- **The post outlives its run.** Deleting the run sets `run_session_id` null
+  by its foreign key; `removeSession()` and `?runs=delete` move the channel's
+  revision once and publish the rows, so a page drops the link. The text and
+  calls stay.

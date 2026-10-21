@@ -72,11 +72,14 @@ import "./automations.css";
 function Editor({
   automation,
   projectId,
+  channel,
   agents,
   limitMs,
 }: {
   automation: AutomationSummary | null;
   projectId: string;
+  // the team project's name, null in a personal project
+  channel: string | null;
   agents: AgentSummary[];
   // the run deadline limit, in ms
   limitMs: number;
@@ -286,6 +289,9 @@ function Editor({
         email={automationEmailItem(emailOn.value, switchable.value)}
         emailOn={d.email}
         onEmail={() => set({ email: !d.email })}
+        channel={channel}
+        channelOn={d.postToChannel}
+        onChannel={() => set({ postToChannel: !d.postToChannel })}
         servers={takesTools ? shown().servers : []}
         mcpOff={d.mcpOff}
         onServer={(key) => set({ mcpOff: toggledId(d.mcpOff, key) })}
@@ -442,6 +448,7 @@ export function NewAutomation({ params }: { params: Params }) {
             key={id}
             automation={null}
             projectId={id}
+            channel={shown.kind === "team" ? shown.name : null}
             agents={agents}
             limitMs={limit}
           />
@@ -480,6 +487,7 @@ export function EditAutomation({ params }: { params: Params }) {
             key={row.id}
             automation={row}
             projectId={row.projectId}
+            channel={shown.kind === "team" ? shown.name : null}
             agents={agents}
             limitMs={limit}
           />

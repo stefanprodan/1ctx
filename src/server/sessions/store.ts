@@ -83,6 +83,7 @@ import {
   session,
   type UsagePort,
 } from "./rows.ts";
+import { RunPostStore } from "./run-post.ts";
 import {
   bumpSendCounters,
   endSendRow,
@@ -108,6 +109,8 @@ export class SessionStore {
   // the messages waiting behind a busy chat
   readonly queue: QueueStore;
   readonly pending: PendingStore;
+  // a run's answers in its channel, and an automation's runs deleted
+  readonly runPosts: RunPostStore;
   constructor(
     private readonly db: Db,
     private readonly usage: UsagePort,
@@ -118,6 +121,7 @@ export class SessionStore {
   ) {
     this.queue = new QueueStore(db);
     this.pending = new PendingStore(db);
+    this.runPosts = new RunPostStore(db, usage);
   }
 
   byId(id: string): SessionRow | null {
@@ -334,7 +338,7 @@ export class SessionStore {
   }
 
   remove(id: string): SessionDeleted | "running" | null {
-    return removeSession(this.db, id, this.pruned);
+    return removeSession(this.db, id, this.pruned, this.usage);
   }
 
   count(projectId: string): number {
@@ -359,14 +363,6 @@ export class SessionStore {
 
   runningAutomation(automationId: string): boolean {
     return automationRunning(this.db, automationId);
-  }
-
-  // every run of the automation in the caller's transaction, in one
-  // statement however many runs it kept; their usage stays
-  deleteRuns(automationId: string): number {
-    return this.db
-      .query("delete from sessions where automation_id = ?")
-      .run(automationId).changes;
   }
 
   channelPage(

@@ -23,6 +23,9 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   project twice.
 - **A channel detail is paged by whole turns.** Its first read returns the
   newest 50 post-anchored turns and a `before` seq when older turns remain.
+  A turn's anchor is its user row, or a run's posted answer (a reply with
+  `run_calls`), which has none; that row carries `run`: its calls, the run's
+  session id and its automation's name, both null once gone.
   `before` reads the next older page; `around` reads one bounded window around
   a quoted post's seq. Chats and runs still return every row in one read. It
   also names its agent turns (`sends`), so each answer finds its post and its
@@ -277,6 +280,8 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   have, so a stale key is dropped on save. Memory, Automations and
   External tasks, a chat's alone, have no switch there and are dropped
   too.
+- **Post to channel sits after Email in the Access step** and shows only
+  in a team project, naming its channel.
 - **An automation on a deleted agent cannot be saved as is.** Run now
   and Resume are off, and Save stays off until a live agent is picked
   (`retiredPick()`).

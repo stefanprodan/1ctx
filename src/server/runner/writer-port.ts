@@ -5,7 +5,11 @@
 // own port: compose passes the sessions area's store. Every method is a
 // single row write the writer wraps in one transact() with a touch().
 
-import type { Message, SendSummary } from "../../shared/contracts/session.ts";
+import type {
+  Message,
+  SendSummary,
+  TraceCall,
+} from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
@@ -170,6 +174,17 @@ export type SessionsPort = {
       memoryFrom?: number;
     },
   ): SendSummary | null;
+  runPosts: {
+    // a done run's answer posted to its project's channel when its
+    // automation asks; null when it posts nothing
+    post(fields: {
+      runSessionId: string;
+      runSendId: string;
+      agentId: string;
+      now: number;
+      calls(rows: readonly Message[]): TraceCall[];
+    }): { channel: SessionRow; message: Message; send: SendSummary } | null;
+  };
   finishSend(
     id: string,
     fields: {

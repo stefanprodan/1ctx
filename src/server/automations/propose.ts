@@ -48,7 +48,8 @@ export function proposeTask(
     }
     let proposal: AutomationProposal;
     if (input.action === "create") {
-      const fields = parseSaveAutomation(input.fields);
+      // a proposal never posts to the channel: only a member turns it on
+      const { postToChannel: _, ...fields } = parseSaveAutomation(input.fields);
       if (!fields.ownMemory && fields.memoryGuidance !== "") {
         throw new BadRequest(UNREAD_MEMORY);
       }

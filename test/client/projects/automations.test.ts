@@ -105,6 +105,7 @@ const automation = (
   attentionGuidance: "",
   alert: null,
   rerunOnRestart: false,
+  postToChannel: false,
   once: false,
   onceFiredAt: null,
   onceRunSessionId: null,
@@ -573,6 +574,7 @@ describe("the form", () => {
       attention: "agent",
       attentionGuidance: "",
       rerunOnRestart: false,
+      postToChannel: false,
       once: false,
       web: true,
       visuals: true,
@@ -602,6 +604,7 @@ describe("the form", () => {
         attentionMode: "agent",
         attentionGuidance: "",
         rerunOnRestart: false,
+        postToChannel: false,
         once: false,
         disabledCapabilities: [],
       },
@@ -645,6 +648,17 @@ describe("the form", () => {
     expect(shown.rerunOnRestart).toBe(true);
     expect(dirtyOf(shown, row, LIMIT)).toBe(false);
     expect(dirtyOf({ ...shown, rerunOnRestart: false }, row, LIMIT)).toBe(true);
+  });
+
+  test("posting to the channel is off for a new automation and saved as drafted", () => {
+    expect(draftOf(null, "a1", "UTC", LIMIT).postToChannel).toBe(false);
+    const on = requestOf(filled({ postToChannel: true }), LIMIT);
+    expect("body" in on && on.body.postToChannel).toBe(true);
+    const row = automation({ postToChannel: true });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.postToChannel).toBe(true);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, postToChannel: false }, row, LIMIT)).toBe(true);
   });
 
   test("run once is off for a new automation and saved as drafted", () => {

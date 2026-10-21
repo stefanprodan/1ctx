@@ -8,7 +8,11 @@
 // by the same tools give the same bytes, so the trace never moves a
 // cached prefix.
 
-import type { Message, SavedDocs } from "../../shared/contracts/session.ts";
+import type {
+  Message,
+  SavedDocs,
+  TraceCall,
+} from "../../shared/contracts/session.ts";
 import { toolArguments } from "../../shared/contracts/tool.ts";
 import { cutAt, oneLine } from "../../shared/text.ts";
 import type { Offered } from "../tools/index.ts";
@@ -19,14 +23,7 @@ export const TRACE_LINE_CHARS = 200;
 // the most lines; the rest is one line counting them
 export const TRACE_LINES = 30;
 
-export type TraceCall = {
-  // the tool that ran: the row's name, an MCP call's wire name
-  name: string;
-  arguments: string;
-  status: Message["status"] | null;
-  // the docs a bash call wrote, from its row
-  saved: SavedDocs | null;
-};
+export type { TraceCall };
 
 // what the reading agent can call itself: its MCP tools by wire name and
 // its skills by name. Every other tool counts as its own: a builtin is

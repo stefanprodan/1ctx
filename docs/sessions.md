@@ -109,6 +109,9 @@ arrives.
   Channel history uses a fixed start snapshot, grouped by turn with a shared
   dropped mark and stream budget (`docs/channel-context.md`), never the
   chat's per-round history path.
+- **A run may post its answer.** It is one reply row under a done `post`
+  send with the run's agent and no user row (`docs/automations.md`); it
+  starts no turn and has no send of its own to stop or run again.
 - **A channel is permanent within its project.** It cannot be forked, renamed,
   archived, deleted, regenerated, compacted or stopped through chat routes.
 - **A channel agent keeps its own workspace.** Its `/tmp`, cwd, `/mcp`

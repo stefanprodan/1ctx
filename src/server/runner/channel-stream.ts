@@ -140,7 +140,9 @@ export function trimStream(
   };
 }
 
+// a run's post is never a reader's own turn, even its own agent's: it
+// went to the channel after the run, never through this stream
 export const ownsChannelTurn = (
   part: StreamTurn,
   policy: Pick<RenderPolicy, "agentId">,
-) => part.turn?.agentId === policy.agentId;
+) => part.turn?.run !== true && part.turn?.agentId === policy.agentId;

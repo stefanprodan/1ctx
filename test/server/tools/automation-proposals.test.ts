@@ -95,7 +95,11 @@ test("draft fields use all the form parsers' value bounds", () => {
       parsePatchAutomation({ editRevision: 0, ...invalid }),
     ).toThrow();
   }
-  expect(parseSaveAutomation(fields)).toEqual(fields);
+  // a proposal never posts to the channel: a confirmed create leaves it off
+  expect(parseSaveAutomation(fields)).toEqual({
+    ...fields,
+    postToChannel: false,
+  });
 });
 
 test("a create deadline above the current limit writes no draft", async () => {

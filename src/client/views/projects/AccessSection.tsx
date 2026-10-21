@@ -3,8 +3,8 @@
 //
 // The automation editor's Access step: one list of switches, the web with
 // the project's credentials after it, visuals, the project docs, email
-// while the instance offers it, then
-// the picked agent's MCP servers and skills, and the project's
+// while the instance offers it, posting to the channel in a team project,
+// then the picked agent's MCP servers and skills, and the project's
 // repositories. Each row's meta says what it is, a repository's the ref
 // it follows. A switch that cannot be flipped is off and faint, its meta
 // saying why.
@@ -81,6 +81,9 @@ export function AccessSection({
   email,
   emailOn,
   onEmail,
+  channel,
+  channelOn,
+  onChannel,
   servers,
   mcpOff,
   onServer,
@@ -111,6 +114,11 @@ export function AccessSection({
   email: WebItem | null;
   emailOn: boolean;
   onEmail: () => void;
+  // the team project's name, whose channel a run posts to; null in a
+  // personal project, which has none
+  channel: string | null;
+  channelOn: boolean;
+  onChannel: () => void;
   // the picked agent's servers, none when its model takes no tools
   servers: readonly SwitchableServer[];
   mcpOff: readonly string[];
@@ -183,6 +191,20 @@ export function AccessSection({
             emailOn,
             onEmail,
           ),
+        ]),
+    ...(channel === null
+      ? []
+      : [
+          {
+            key: "channel",
+            name: "Post to channel",
+            icon: "hash" as const,
+            meta: `the answer in #${channel}`,
+            mono: false,
+            on: channelOn,
+            blocked: false,
+            onFlip: onChannel,
+          },
         ]),
     ...servers.map((server) => {
       const key = mcpKey(server.id);

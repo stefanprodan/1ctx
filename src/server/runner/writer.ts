@@ -20,7 +20,7 @@ import type { Log } from "../lib/log.ts";
 import type { ChatEvent } from "../providers/index.ts";
 import { envelope } from "../sessions/index.ts";
 import type { UsageFields } from "../usage/index.ts";
-import { answerLine } from "./envelope.ts";
+import { answerLine, lastLine } from "./envelope.ts";
 import { type AlertsPort, alertEvents, runMark } from "./marks.ts";
 import type { ToolResult } from "./policy.ts";
 import {
@@ -54,6 +54,7 @@ import {
   startAfterAnswer,
   startCompact as startCompactRows,
 } from "./summary.ts";
+import { traceCalls } from "./trace.ts";
 import type { SessionsPort, UploadsPort } from "./writer-port.ts";
 
 export type { Started } from "./start.ts";
@@ -409,6 +410,18 @@ export class Writer {
         mark: runMark(send, cause, error),
       })!;
       const alerted = alertEvents(this.deps.alerts, send, cause, now);
+      // a run that ends done with an answer posts it to the channel when
+      // its automation asks, in this transaction; the run is unchanged
+      const posted =
+        status === "done" && send.kind === "run" && send.child === null
+          ? this.deps.sessions.runPosts.post({
+              runSessionId: send.sessionId,
+              runSendId: send.id,
+              agentId: send.policy.agentId,
+              now,
+              calls: traceCalls,
+            })
+          : null;
       if (session.origin === "channel") this.deps.views.end(send.id);
       // the send after a summary takes the note as it is then
       if (reply?.kind === "summary" && reply.status === "done") {
@@ -423,6 +436,17 @@ export class Writer {
             envelope(session, changed, row, [], last),
           ),
           ...alerted,
+          ...(posted === null
+            ? []
+            : [
+                envelope(
+                  posted.channel,
+                  [posted.message],
+                  posted.send,
+                  [],
+                  lastLine(posted.message, send.policy.agentName),
+                ),
+              ]),
         ],
       };
     });

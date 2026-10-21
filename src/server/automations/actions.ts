@@ -57,6 +57,9 @@ export type AutomationActions = {
   run(principal: Principal, id: string): PreparedRun;
 };
 
+// the personal project has no channel to post to
+const NO_CHANNEL = "a personal project has no channel";
+
 const changes = (
   current: AutomationSummary,
   patch: Partial<AutomationSummary>,
@@ -90,6 +93,9 @@ export function automationActions(deps: ActionsDeps): AutomationActions {
     visible,
     create(principal, projectId, body) {
       const project = deps.access.project(principal, projectId);
+      if (body.postToChannel && project.kind !== "team") {
+        throw new BadRequest(NO_CHANNEL);
+      }
       agent(body.agentId);
       deadline(body.deadlineMs);
       const now = deps.clock();
@@ -122,6 +128,12 @@ export function automationActions(deps: ActionsDeps): AutomationActions {
         if (current.editRevision !== editRevision)
           throw new Conflict(STALE_EDIT);
         const next = { ...current, ...patch };
+        if (
+          next.postToChannel &&
+          deps.access.project(principal, current.projectId).kind !== "team"
+        ) {
+          throw new BadRequest(NO_CHANNEL);
+        }
         if (next.agentId === current.agentId && current.agentRetired) {
           throw new Conflict(RETIRED);
         }

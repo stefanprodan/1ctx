@@ -120,6 +120,13 @@ function parseValues(
     }
     out.rerunOnRestart = value;
   }
+  if (take("postToChannel")) {
+    const value = given("postToChannel", false);
+    if (typeof value !== "boolean") {
+      throw new BadRequest("postToChannel must be boolean");
+    }
+    out.postToChannel = value;
+  }
   if (take("once")) {
     const value = given("once", false);
     if (typeof value !== "boolean") {
@@ -166,6 +173,7 @@ const OPTIONAL = [
   "memoryGuidance",
   "disabledCapabilities",
   "rerunOnRestart",
+  "postToChannel",
   "once",
   "attentionMode",
   "attentionGuidance",
