@@ -93,8 +93,13 @@ describe("counts", () => {
     expect(turnCost(0.03)).toBe("$0.03");
     expect(turnCost(1.2)).toBe("$1.20");
     expect(turnCost(0.0042)).toBe("$0.0042");
-    expect(turnCost(0.000_012_34)).toBe("$0.000012");
+    expect(turnCost(0.000_12)).toBe("$0.00012");
+    expect(turnCost(0.000_012_34)).toBe("<$0.0001");
+    expect(turnCost(0.004_5)).toBe("$0.0045");
+    expect(turnCost(0.007_2)).toBe("$0.0072");
+    expect(turnCost(0.005)).toBe("$0.005");
     expect(turnCost(0.009_99)).toBe("$0.01");
+    expect(turnCost(0.995)).toBe("$1.00");
     expect(turnCost(0)).toBe("$0");
   });
 

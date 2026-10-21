@@ -116,13 +116,15 @@ export function money(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-// one turn's cost: cents from a cent up, two significant digits under
-// it ("$0.0042"), and "$0" when the provider charged nothing
+// one turn's cost: rounded cents from a cent up, up to two significant
+// digits under it ("$0.0042"), a floor for dust, and "$0" when the
+// provider charged nothing
 export function turnCost(usd: number): string {
-  if (usd <= 0) return "$0";
+  if (!Number.isFinite(usd) || usd <= 0) return "$0";
   const shown = Number(usd.toPrecision(2));
-  if (shown >= 0.01) return `$${usd.toFixed(2)}`;
-  return `$${shown.toFixed(1 - Math.floor(Math.log10(shown)))}`;
+  if (shown >= 0.01) return `$${(Math.round(usd * 100) / 100).toFixed(2)}`;
+  if (usd < 0.0001) return "<$0.0001";
+  return `$${shown}`;
 }
 
 // "41s", "3m 20s", "1h 5m"

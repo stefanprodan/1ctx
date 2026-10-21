@@ -457,6 +457,7 @@
   @media (max-width: 719px) {
     .transcript-after {
       flex-wrap: wrap;
+      /* clear of the actions' 44px touch areas, which reach 10px down */
       row-gap: var(--space-3);
     }
     .transcript-sep {
