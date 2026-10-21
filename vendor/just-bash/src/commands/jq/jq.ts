@@ -244,6 +244,7 @@ const jqHelp = {
     "-j, --join-output don't print newlines after each output",
     "-a, --ascii       force ASCII output",
     "-S, --sort-keys   sort object keys",
+    "-f, --from-file   read the filter from the first file argument", // (1ctx jq-inputs)
     "-C, --color       colorize output (ignored)",
     "-M, --monochrome  monochrome output (ignored)",
     "    --tab         use tabs for indentation",
@@ -292,6 +293,7 @@ export const jqCommand: RuntimeCommand = {
     let ascii = false;
     let nulOutput = false;
     let indent = 2;
+    let fromFile = false; // (1ctx jq-inputs)
     let filter = ".";
     let filterSet = false;
     let positionalMode: "none" | "args" | "jsonargs" = "none";
@@ -355,6 +357,8 @@ export const jqCommand: RuntimeCommand = {
       } else if (a === "-S" || a === "--sort-keys") sortKeys = true;
       else if (a === "--stream") stream = true;
       else if (a === "--raw-output0") nulOutput = true;
+      // (1ctx jq-inputs) a flag, as in jq: the first operand is the file
+      else if (a === "-f" || a === "--from-file") fromFile = true;
       else if (a === "--indent") {
         // jq's range, -1 is a tab, and the last of --indent, --tab and -c
         // wins (1ctx jq-inputs)
@@ -451,6 +455,7 @@ export const jqCommand: RuntimeCommand = {
           else if (c === "j") joinOutput = true;
           else if (c === "a") ascii = true;
           else if (c === "S") sortKeys = true;
+          else if (c === "f") fromFile = true; // (1ctx jq-inputs)
           else if (c === "C") {
             /* ignored */
           } else if (c === "M") {
@@ -461,6 +466,25 @@ export const jqCommand: RuntimeCommand = {
         const error = operand(a);
         if (error) return error;
       }
+    }
+
+    // (1ctx jq-inputs) -f reads the filter from the first operand, and
+    // without one prints the usage, never running the "." default
+    if (fromFile) {
+      if (!filterSet) {
+        return { stdout: "", stderr: showHelp(jqHelp).stdout, exitCode: 2 };
+      }
+      const result = await withDefenseContext("filter file read", () =>
+        readFiles(ctx, [filter], { cmdName: "jq", stopOnError: true }),
+      );
+      if (result.exitCode !== 0 || !result.files[0]) {
+        return {
+          stdout: "",
+          stderr: result.stderr.replace(/^jq: /, "jq: Could not open "),
+          exitCode: 2,
+        };
+      }
+      filter = decodeBytesToUtf8(result.files[0].content);
     }
 
     // Read files bound via --rawfile/--slurpfile through the shared file

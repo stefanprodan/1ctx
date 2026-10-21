@@ -197,6 +197,29 @@ shell's variables, as did `timeout` and `find -exec`; `export -n` did
 not hide a variable from `time`; `local -x` exported nothing; and `env`
 and `printenv` listed unexported variables and `0=sh`.
 
+### shell-options: bash and sh read their invocation options
+Files: `src/commands/bash/bash.ts`, `src/types.ts`, `src/Bash.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/shell-options.test.ts`
+
+Now: bash and sh read their options as bash does, sharing one parser.
+Options come first; `-c` is a flag like any other letter, so `sh -ec`,
+`bash -xc`, `bash -euo pipefail -c` and `bash -c -e 'cmd'` work, an
+`o` in a group takes the next argument, and `--` or `-` ends the
+options. The set letters (`-e -u -x -v -n -f -a -C`), `-o NAME` and
+their `+` forms reach the new shell through the exec's `shellOptions`,
+merged into its options before its first line, never as a `set` line
+prefixed to the script. `--noprofile` and `--norc` do nothing, and
+`--help` counts only where an option can be, so `bash a.sh --help`
+passes it to the script. An unknown letter, an unknown `-o` name and a
+bare `-c` answer bash's first line, exit 2. A shebang line is blanked,
+not cut, so `$LINENO` counts lines as bash does.
+
+Before: only `-c` as the first argument was read, so `bash -n f.sh`,
+`bash -e f.sh` and `bash -o pipefail f.sh` answered `bash: -n: No such
+file or directory`, exit 127; `--help` anywhere printed the help, and
+`$LINENO` after a shebang was one short.
+
 ### exported-env: commands read the exported variables only
 Files: `src/helpers/env.ts`, `src/commands/awk/awk2.ts`,
   `src/commands/jq/jq.ts`, `src/commands/yq/yq.ts`,
@@ -2196,12 +2219,17 @@ have their results, and raise an error that comes before them.
 to 7) and `--raw-output0` work, the last of `--indent`, `--tab` and `-c`
 wins, `-j` prints strings raw, and `-a` writes every character past
 ASCII as `\uXXXX`, every string as JSON, as jq does. An option error
-ends with jq's pointer to `jq --help`.
+ends with jq's pointer to `jq --help`. `-f` and `--from-file`, a flag
+in any position and in a group, make the first operand the filter
+file, read with the input files' limits; a missing one answers jq's
+`Could not open`, exit 2, and `-f` with no operand prints the usage,
+exit 2.
 
 Before: `input` and `inputs` were unknown functions, `-n` read no input,
 `first(error("x"))` and `isempty(error("x"))` answered as if nothing
 failed, `--stream`, `--indent` and `--raw-output0` were refused as
-unknown, `-j` printed strings quoted and `-a` was ignored.
+unknown, `-j` printed strings quoted, `-a` was ignored and `-f` was an
+invalid option.
 
 ### yq-split: -s splits results into files, as mikefarah's
 Files: `src/commands/yq/yq.ts`

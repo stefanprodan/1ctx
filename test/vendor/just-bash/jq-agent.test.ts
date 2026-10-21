@@ -73,3 +73,79 @@ describe("jq strftime flags, as glibc", () => {
     expect(result.stderr).toContain("strftime/1: unknown system failure");
   });
 });
+
+// -f as jq 1.8.2 answered over the same files: stdout, the first stderr
+// line and the exit code
+describe("jq -f, as jq 1.8", () => {
+  const files = {
+    "/w/prog.jq": ".a\n",
+    "/w/in.json": '{"a":"x"}\n',
+    "/w/pos.jq": "$ARGS.positional\n",
+    "/w/empty.jq": "",
+  };
+  const run = async (script: string) => {
+    const result = await new Bash({ files, cwd: "/w" }).exec(script);
+    return {
+      stdout: result.stdout,
+      stderr: result.stderr.split("\n")[0],
+      exitCode: result.exitCode,
+    };
+  };
+  const cases: [string, string, string, number][] = [
+    ["jq -f prog.jq in.json", '"x"\n', "", 0],
+    ["jq prog.jq in.json -f", '"x"\n', "", 0],
+    ["jq --from-file prog.jq in.json", '"x"\n', "", 0],
+    ["jq -rf prog.jq in.json", "x\n", "", 0],
+    ["jq -nf pos.jq --args a b", '[\n  "a",\n  "b"\n]\n', "", 0],
+    ["jq -n -f pos.jq --args a b", '[\n  "a",\n  "b"\n]\n', "", 0],
+    ["jq -f -f prog.jq in.json", '"x"\n', "", 0],
+    ["jq -f prog.jq -n", "null\n", "", 0],
+    ["echo '{\"a\":1}' | jq -f prog.jq", "1\n", "", 0],
+    [
+      "jq -f missing.jq in.json",
+      "",
+      "jq: Could not open missing.jq: No such file or directory",
+      2,
+    ],
+    [
+      "jq -nf missing.jq",
+      "",
+      "jq: Could not open missing.jq: No such file or directory",
+      2,
+    ],
+  ];
+  test.each(cases)("%s", async (command, stdout, stderr, exitCode) => {
+    expect(await run(command)).toEqual({ stdout, stderr, exitCode });
+  });
+
+  // jq reads in.json as the program; our parse error words differ
+  test("-f after the inputs reads the first operand as the program", async () => {
+    const result = await run("jq in.json -f prog.jq");
+    expect(result.stdout).toBe("");
+    expect(result.exitCode).toBe(5);
+  });
+
+  // jq: "jq: Unknown option --from-file=prog.jq", exit 2
+  test("--from-file= is an unknown option", async () => {
+    expect(await run("jq --from-file=prog.jq in.json")).toEqual({
+      stdout: "",
+      stderr: "jq: unrecognized option '--from-file=prog.jq'",
+      exitCode: 1,
+    });
+  });
+
+  // jq prints its usage on stderr, exit 2; ours is the help text
+  test("-f with no operand prints the usage", async () => {
+    const result = await new Bash().exec("jq -f");
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("-f, --from-file");
+    expect(result.exitCode).toBe(2);
+  });
+
+  // jq exits 3 with "Top-level program not given"
+  test("an empty program file is a parse error", async () => {
+    const result = await run("jq -f empty.jq in.json");
+    expect(result.stdout).toBe("");
+    expect(result.exitCode).toBe(5);
+  });
+});

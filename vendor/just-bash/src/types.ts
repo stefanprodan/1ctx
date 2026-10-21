@@ -1,6 +1,7 @@
 import type { ByteString } from "./encoding.js";
 import type { CommandExecutionBudget } from "./execution-scope.js";
 import type { IFileSystem } from "./fs/interface.js";
+import type { ShellOptions } from "./interpreter/types.js"; // (1ctx shell-options)
 import type { ExecutionLimits } from "./limits.js";
 import type { SecureFetch } from "./network/index.js";
 
@@ -110,6 +111,8 @@ export interface CommandExecOptions {
    * Like child_process.spawnSync(cmd, args).
    */
   args?: string[];
+  /** (1ctx shell-options) set options a new shell starts with, as bash -e */
+  shellOptions?: Partial<ShellOptions>;
 }
 
 /**
