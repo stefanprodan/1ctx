@@ -114,6 +114,10 @@ from jq 1.8.2 for the dialect rules. Where they part:
 - An empty `-f` program file exits 5 with a parse error, where jq exits
   3 with `Top-level program not given`.
 - `-f` with no operand prints our help on stderr, not jq's usage text.
+- With `-f`, a `-` operand stays stdin and the next operand is taken
+  as the filter file (with none, the help prints); jq opens a file
+  named `-`. A directory given to `-f` says `No such file or
+  directory`, where jq says `It's a directory`.
 - An unknown option, `--from-file=FILE` included, answers `jq:
   unrecognized option '...'` or `jq: invalid option -- 'x'`, exit 1,
   where jq answers `jq: Unknown option ...` and its pointer to `jq
@@ -479,11 +483,14 @@ POSIX shell. Where they part:
   but `--help`, `--noprofile` and `--norc` (`--login`, `--posix`,
   `--rcfile` and the rest) are refused as invalid options.
 - `-k` and `-t` are refused, as `set` refuses them; bash takes them.
-- A bare `-o` answers `bash: -o: option requires an argument`, exit 2,
-  where bash prints the `set -o` table.
+- A bare `-o` or `+o` answers `bash: -o: option requires an argument`
+  (or `+o`), exit 2, where bash prints the `set -o` or `set +o` table.
 - A long option after a short one (`bash -e --norc`) is read, where
-  bash refuses it; a bad letter after a good one in a group (`-eQ`)
-  exits 2, where bash exits 1.
+  bash refuses it. After another option, a bad letter (`-eQ`) or a
+  `-c` with no operand (`-ec`) exits 2 and a missing script 127, where
+  bash exits 1.
+- `-v` does not echo the shebang line, which is blanked before the
+  script runs.
 - A parse error reads `bash: syntax error: Parse error at L:C: ...` and
   may name another line, where bash reads `f.sh: line 2: syntax error
   near unexpected token ...`; a runtime error names `bash`, not the
