@@ -17,7 +17,12 @@ import { baseName } from "../lib/tree.ts";
 import type { ToolResult } from "../transcript/Tool.model.ts";
 import { fileKey, visualKey } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { childRow, childRowIds, resetChildren } from "./session-children.ts";
+import {
+  childRow,
+  childRowIds,
+  dropChildren,
+  resetChildren,
+} from "./session-children.ts";
 
 export type StoredVisual =
   | { status: "loading" }
@@ -66,13 +71,32 @@ export function resetValues(): void {
   retries.value = new Map();
 }
 
+// the sends a detail holds as aged
+const sweptOf = (d: SessionDetail): Set<string> =>
+  new Set(
+    [...(d.sends ?? []), ...(d.send ? [d.send] : [])]
+      .filter((send) => send.swept === true)
+      .map((send) => send.id),
+  );
+
 export function syncValues(next: SessionDetail): void {
   if (detail !== null && detail.session.id !== next.session.id) resetValues();
+  const before = detail === null ? null : sweptOf(detail);
   detail = next;
+  // a turn that just aged lost its tool output and its subagents, so the
+  // results and child work loaded before go with them; the ids stay
+  const aged = new Set<string>();
+  if (before !== null) {
+    const swept = sweptOf(next);
+    for (const row of next.messages) {
+      if (swept.has(row.sendId) && !before.has(row.sendId)) aged.add(row.id);
+    }
+  }
+  dropChildren(aged);
   // a subagent's rows keep their results while the chat is on screen
   const keys = new Set<string>(childRowIds());
   for (const row of next.messages) {
-    keys.add(row.id);
+    if (!aged.has(row.id)) keys.add(row.id);
     row.toolCalls?.forEach((_, index) => {
       keys.add(visualKey(row.id, index));
     });

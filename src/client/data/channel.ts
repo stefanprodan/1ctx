@@ -9,7 +9,7 @@
 
 import { signal } from "@preact/signals";
 import type { SessionResponse } from "../../shared/api/sessions.ts";
-import type { SessionDetail } from "../../shared/contracts/session.ts";
+import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
 import { says } from "../lib/format.ts";
 import { api } from "./api.ts";
 import {
@@ -55,6 +55,21 @@ export function channelLoaded(
   const merged = mergeNewest(held, fresh, channelGap.value);
   channelGap.value = merged.gap;
   return merged.detail;
+}
+
+// an envelope's rows for the page held: a run's post above the pages or
+// in the gap, as unlinking an old run sends, is updated when held and
+// never added, so the page draws only what it holds
+export function framed(held: SessionDetail, rows: Message[]): Message[] {
+  if (held.session.origin !== "channel") return rows;
+  const top = held.page?.before ?? null;
+  const ids = new Set(held.messages.map((row) => row.id));
+  return rows.filter(
+    (row) =>
+      row.run === undefined ||
+      ids.has(row.id) ||
+      inView(row.seq, top, channelGap.value),
+  );
 }
 
 const read = (id: string, query: string) =>

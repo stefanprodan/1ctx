@@ -151,6 +151,18 @@ export function childRowIds(): string[] {
   );
 }
 
+// the children of delegate rows whose turn aged: gone with its output
+export function dropChildren(messageIds: ReadonlySet<string>): void {
+  if (![...childWork.value.keys()].some((id) => messageIds.has(id))) return;
+  for (const id of messageIds) {
+    requests.get(id)?.abort();
+    requests.delete(id);
+  }
+  childWork.value = new Map(
+    [...childWork.value].filter(([id]) => !messageIds.has(id)),
+  );
+}
+
 export function resetChildren(): void {
   for (const request of requests.values()) request.abort();
   requests.clear();

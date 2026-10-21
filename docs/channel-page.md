@@ -49,3 +49,12 @@ no date dividers, since each post shows its day.
   Once the run is gone the words stay without the link; with no
   automation name there are none. No quote, Fork, Regenerate or Stop.
   It is an anchor of its own (`isAnchor()`).
+- **A fetched page never undoes a newer row.** A page read at a revision
+  below the one held fills only what is missing, and at any revision an
+  ended row or send never goes back to streaming or running
+  (`mergeRows()`, `mergeSends()`).
+- **A reconnect drops older pages that still hold a running turn**: its
+  end went with the lost frames, so scrolling up reads them again.
+- **A run's post outside the pages held is never drawn or added.** A
+  frame updates one the page holds (`framed()`), and the transcript
+  filters it as it filters posts.

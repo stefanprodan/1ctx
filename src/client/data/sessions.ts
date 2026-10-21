@@ -27,7 +27,7 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { channelLoaded, withSend } from "./channel.ts";
+import { channelLoaded, framed, withSend } from "./channel.ts";
 import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
@@ -254,7 +254,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   const removed = new Set(ev.removedMessageIds ?? []);
   const messages = upsert(
     held.messages.filter((message) => !removed.has(message.id)),
-    ev.messages,
+    framed(held, ev.messages),
   );
   const map = new Map(ahead());
   for (const id of removed) map.delete(id);

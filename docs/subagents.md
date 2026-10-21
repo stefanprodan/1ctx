@@ -215,6 +215,7 @@ is its root.
   gone and nothing asks again; so does a `done` delegate row with no
   child in a swept turn (`send.swept`, `childGone()`). A gone group
   heads "gone" and says its work went with the turn's tool output,
-  never an error.
+  never an error. When a send turns swept on screen, the results and
+  child work loaded for its rows go (`syncValues()`).
 - **The fold counts the root's calls.** A `delegate` call is one of
   them; the child's calls are its own and never in the fold's count.

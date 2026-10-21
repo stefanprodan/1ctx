@@ -540,6 +540,21 @@ describe("a run's post", () => {
     expect(nameless).toContain("<p>Spend is flat.</p>");
   });
 
+  test("one outside the pages held is not drawn", () => {
+    const html = render(
+      <Transcript
+        sessionId="c1"
+        nodes={groupRows([runPost(), post(100, "newest")], null, [])}
+        live={new Map()}
+        agentOf={() => ({ name: "reviewer", avatar: "bot" })}
+        authorOf={() => ({ name: "Casey", username: "casey" })}
+        channel={view({ shown: (seq) => seq >= 100 })}
+      />,
+    );
+    expect(html).toContain("newest");
+    expect(html).not.toContain("Spend is flat.");
+  });
+
   test("a run with no calls has no fold", () => {
     expect(drawPost(runPost({ calls: [] }))).not.toContain("Ran ");
   });

@@ -19,21 +19,46 @@ import type {
 // not held
 export type Gap = { after: number; before: number };
 
-// the rows by id, the newer copy winning, in the session's order
-export function mergeRows(held: Message[], next: Message[]): Message[] {
+// the rows by id, in the session's order. A fetched copy replaces the
+// held one unless the held one is newer: a page read at an older revision
+// (stale) never replaces a row it holds, and an ended row never goes
+// back to streaming
+export function mergeRows(
+  held: Message[],
+  next: Message[],
+  stale = false,
+): Message[] {
   const out = new Map(held.map((row) => [row.id, row]));
-  for (const row of next) out.set(row.id, row);
+  for (const row of next) {
+    const old = out.get(row.id);
+    const ended = old?.status !== "streaming" && row.status === "streaming";
+    if (old !== undefined && (stale || ended)) continue;
+    out.set(row.id, row);
+  }
   return [...out.values()].sort((a, b) => a.seq - b.seq);
 }
 
+// the sends by id, on the same rule: an ended send never goes back to
+// running
 export function mergeSends(
   held: readonly SendSummary[] | undefined,
   next: readonly SendSummary[],
+  stale = false,
 ): SendSummary[] {
   const out = new Map((held ?? []).map((send) => [send.id, send]));
-  for (const send of next) out.set(send.id, send);
+  for (const send of next) {
+    const old = out.get(send.id);
+    const ended = old?.status !== "running" && send.status === "running";
+    if (old !== undefined && (stale || ended)) continue;
+    out.set(send.id, send);
+  }
   return [...out.values()];
 }
+
+// a page read before the commit the held rows are at, as one answered
+// late while a turn ended
+const staleFor = (held: SessionDetail, page: SessionDetail): boolean =>
+  page.session.revision < held.session.revision;
 
 // an envelope's send joins a channel's turns; a post's send is no turn
 export function withSend(
@@ -79,10 +104,11 @@ export function mergeOlder(
   held: SessionDetail,
   older: SessionDetail,
 ): SessionDetail {
+  const stale = staleFor(held, older);
   return {
     ...held,
-    messages: mergeRows(held.messages, older.messages),
-    sends: mergeSends(held.sends, older.sends ?? []),
+    messages: mergeRows(held.messages, older.messages, stale),
+    sends: mergeSends(held.sends, older.sends ?? [], stale),
     page: { before: older.page?.before ?? null, after: null },
   };
 }
@@ -109,10 +135,11 @@ export function mergeAround(
   const base = dropWindow(held, gap);
   const top = base.page?.before ?? null;
   const after = window.page?.after ?? null;
+  const stale = staleFor(held, window);
   const merged: SessionDetail = {
     ...base,
-    messages: mergeRows(base.messages, window.messages),
-    sends: mergeSends(base.sends, window.sends ?? []),
+    messages: mergeRows(base.messages, window.messages, stale),
+    sends: mergeSends(base.sends, window.sends ?? [], stale),
     page: {
       before: top === null ? null : (window.page?.before ?? null),
       after: null,
@@ -133,11 +160,12 @@ export function fillGap(
   gap: Gap,
 ): { detail: SessionDetail; gap: Gap | null } {
   const after = window.page?.after ?? null;
+  const stale = staleFor(held, window);
   return {
     detail: {
       ...held,
-      messages: mergeRows(held.messages, window.messages),
-      sends: mergeSends(held.sends, window.sends ?? []),
+      messages: mergeRows(held.messages, window.messages, stale),
+      sends: mergeSends(held.sends, window.sends ?? [], stale),
     },
     gap: after === null || after >= gap.before ? null : { ...gap, after },
   };
@@ -145,7 +173,9 @@ export function fillGap(
 
 // the newest page read again after a stream gap or a cut: its turns are
 // the server's, the older pages held stay, the window goes. A newest
-// page that shares no row with them leaves a gap above it
+// page that shares no row with them leaves a gap above it. An older
+// turn still held as running missed its end while the frames were lost,
+// so the older pages go and scrolling up reads them again
 export function mergeNewest(
   held: SessionDetail,
   fresh: SessionDetail,
@@ -160,7 +190,14 @@ export function mergeNewest(
   const kept = base.messages.filter(
     (row) => anchor(row) < from && !ids.has(row.id) && !turns.has(row.sendId),
   );
-  if (kept.length === 0) return { detail: fresh, gap: null };
+  const keptSends = base.sends?.filter((send) => !turns.has(send.id)) ?? [];
+  if (
+    kept.length === 0 ||
+    kept.some((row) => row.status === "streaming") ||
+    keptSends.some((send) => send.status === "running")
+  ) {
+    return { detail: fresh, gap: null };
+  }
   const touches = base.messages.some((row) => ids.has(row.id));
   const top = base.page?.before ?? null;
   const last = Math.max(...kept.filter(isAnchor).map((row) => row.seq));
@@ -168,10 +205,7 @@ export function mergeNewest(
     detail: {
       ...fresh,
       messages: mergeRows(kept, fresh.messages),
-      sends: mergeSends(
-        base.sends?.filter((send) => !turns.has(send.id)),
-        fresh.sends ?? [],
-      ),
+      sends: mergeSends(keptSends, fresh.sends ?? []),
       page: { before: top, after: null },
     },
     gap:

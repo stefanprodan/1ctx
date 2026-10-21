@@ -34,9 +34,11 @@ import {
 import {
   leaveSession,
   loadSession,
+  loadToolResult,
   onSocket,
   retries,
   session,
+  toolResults,
 } from "../../../src/client/data/sessions.ts";
 import type {
   LiveSend,
@@ -702,5 +704,231 @@ describe("a run's post", () => {
     const held = page([post(10), runPost(20)], 10);
     const merged = mergeNewest(held, page([post(80)], 80), null);
     expect(merged.gap).toEqual({ after: 20, before: 80 });
+  });
+});
+
+describe("pages that answer late or after a cut", () => {
+  // a read held until the test lets it answer
+  const later = () => {
+    let release: (body: SessionDetail) => void = () => {};
+    const answered = new Promise<SessionDetail>((done) => {
+      release = done;
+    });
+    return { answered, release };
+  };
+  const streaming = { status: "streaming" as const, slot: null };
+  const ended = (revision: number) =>
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision }),
+      messages: [answerOf("t20", 21, { content: "the end" })],
+      send: turnOf("t20", 20),
+    });
+
+  test.serial(
+    "a window read before a turn ended leaves its end in place",
+    async () => {
+      await open(
+        page([post(20), answerOf("t20", 21, streaming)], 20, {
+          session: channelSummary({ status: "running" }),
+          sends: [turnOf("t20", 20, { status: "running" })],
+        }),
+      );
+      const read = later();
+      answer = () => read.answered.then((body) => Response.json(body));
+      const shown = showPost({ id: "p10", seq: 10 });
+      ended(2);
+      read.release({
+        ...page([post(10), post(20), answerOf("t20", 21, streaming)], null, {
+          sends: [turnOf("t20", 20, { status: "running" })],
+        }),
+        page: { before: null, after: null },
+      });
+      await shown;
+      expect(ids()).toEqual(["p10", "p20", "r21"]);
+      const end = session.value?.messages.find((m) => m.id === "r21");
+      expect([end?.status, end?.content]).toEqual(["done", "the end"]);
+      expect(session.value?.sends?.find((s) => s.id === "t20")?.status).toBe(
+        "done",
+      );
+      expect(session.value?.session.revision).toBe(2);
+    },
+  );
+
+  test.serial(
+    "an older page read before a turn ended leaves its end in place",
+    async () => {
+      await open(
+        page([post(20), answerOf("t20", 21, streaming)], 20, {
+          session: channelSummary({ status: "running" }),
+          sends: [turnOf("t20", 20, { status: "running" })],
+        }),
+      );
+      const read = later();
+      answer = () => read.answered.then((body) => Response.json(body));
+      const older = loadOlder();
+      ended(2);
+      // an older page that still names the turn as it stood at its read
+      read.release(
+        page([post(10), answerOf("t20", 21, streaming)], null, {
+          sends: [turnOf("t20", 20, { status: "running" })],
+        }),
+      );
+      await older;
+      expect(session.value?.messages.find((m) => m.id === "r21")?.status).toBe(
+        "done",
+      );
+      expect(session.value?.sends?.find((s) => s.id === "t20")?.status).toBe(
+        "done",
+      );
+    },
+  );
+
+  test("an ended row or send never goes back to running", () => {
+    const held = page([post(20), answerOf("t20", 21)], 20, {
+      session: channelSummary({ revision: 4 }),
+      sends: [turnOf("t20", 20)],
+    });
+    // a page at the same revision still never puts a stream back
+    const late = page([post(10), answerOf("t20", 21, streaming)], null, {
+      session: channelSummary({ revision: 4 }),
+      sends: [turnOf("t20", 20, { status: "running" })],
+    });
+    const merged = mergeOlder(held, late);
+    expect(merged.messages.find((m) => m.id === "r21")?.status).toBe("done");
+    expect(merged.sends?.[0]?.status).toBe("done");
+  });
+
+  test.serial(
+    "a reconnect drops older pages that still hold a running turn",
+    async () => {
+      await open(page([post(30)], 30));
+      answer = () =>
+        Response.json(
+          page([post(10), answerOf("t10", 11, streaming)], null, {
+            sends: [turnOf("t10", 10, { status: "running" })],
+          }),
+        );
+      await loadOlder();
+      expect(ids()).toEqual(["p10", "r11", "p30"]);
+      // the frames went while the connection was down: t10 ended unseen
+      answer = () =>
+        Response.json(
+          page([post(30)], 30, { session: channelSummary({ revision: 5 }) }),
+        );
+      await loadSession("c1");
+      expect(ids()).toEqual(["p30"]);
+      expect(session.value?.page?.before).toBe(30);
+      expect(session.value?.sends).toEqual([]);
+    },
+  );
+});
+
+describe("a run's post outside the pages", () => {
+  const runPost = (seq: number, sessionId: string | null = "r1"): Message =>
+    row({
+      id: `run${seq}`,
+      seq,
+      sendId: `post-${seq}`,
+      run: { calls: [], sessionId, automationName: "daily-check" },
+    });
+  const frame = (revision: number, messages: Message[]) =>
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision }),
+      messages,
+      send: null,
+    });
+
+  test.serial("is updated when held and never added", async () => {
+    await open(page([post(100), runPost(110)], 100));
+    // unlinking old runs sends their posts, one far above the pages
+    frame(2, [runPost(10, null), runPost(110, null)]);
+    expect(ids()).toEqual(["p100", "run110"]);
+    expect(session.value?.messages.at(-1)?.run?.sessionId).toBeNull();
+    // a run that posts now lands as ever
+    frame(3, [runPost(120)]);
+    expect(ids()).toEqual(["p100", "run110", "run120"]);
+  });
+});
+
+describe("a turn that ages on screen", () => {
+  test.serial("drops the results and subagent work it had loaded", async () => {
+    const call = (id: string, name: string) => ({
+      id,
+      name,
+      arguments: "{}",
+    });
+    const rows = (swept: boolean): Message[] => [
+      post(10),
+      row({
+        id: "w11",
+        seq: 11,
+        sendId: "t10",
+        slot: "work",
+        toolCalls: [call("c1", "bash"), call("c2", "delegate")],
+      }),
+      row({
+        id: "tb",
+        seq: 12,
+        sendId: "t10",
+        kind: "tool",
+        slot: null,
+        toolCallId: "c1",
+        toolName: "bash",
+        resultBytes: swept ? 0 : 5,
+      }),
+      row({
+        id: "td",
+        seq: 13,
+        sendId: "t10",
+        kind: "tool",
+        slot: null,
+        toolCallId: "c2",
+        toolName: "delegate",
+        ...(swept ? {} : { childSessionId: "child1" }),
+      }),
+      answerOf("t10", 14),
+    ];
+    await open(page(rows(false), null, { sends: [turnOf("t10", 10)] }));
+    // the member opens a result and the subagent's fold
+    answer = (url) =>
+      url.endsWith("/tb/result")
+        ? Response.json({ content: "hello", bytes: 5, cut: false })
+        : Response.json({
+            sessionId: "child1",
+            status: "done",
+            tokens: 10,
+            rows: [],
+          });
+    await loadToolResult("tb");
+    await loadChild("td");
+    expect(toolResults.value.get("tb")).toBeDefined();
+    expect(childWork.value.get("td")?.work).not.toBeNull();
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision: 2 }),
+      messages: rows(true).slice(1, 4),
+      send: { ...turnOf("t10", 10), swept: true },
+    });
+    expect(toolResults.value.has("tb")).toBe(false);
+    expect(childWork.value.has("td")).toBe(false);
+    // read again once aged, a result stays through the next envelope
+    await loadToolResult("tb");
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision: 3 }),
+      messages: [],
+      send: { ...turnOf("t10", 10), swept: true },
+    });
+    expect(toolResults.value.get("tb")).toBeDefined();
   });
 });

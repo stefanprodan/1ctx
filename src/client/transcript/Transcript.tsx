@@ -222,9 +222,12 @@ export function Transcript({
   // a new row sticks the view to the bottom again, a waiting one too;
   // an older page lands above and moves nothing
   const waiting = queue?.rows.length ?? 0;
+  // a post, or a run's posted answer, outside the pages held waits for them
   const shown = channel
-    ? nodes.filter(
-        (node) => node.kind !== "user" || channel.shown(node.message.seq),
+    ? nodes.filter((node) =>
+        node.kind === "user"
+          ? channel.shown(node.message.seq)
+          : node.message?.run === undefined || channel.shown(node.message.seq),
       )
     : nodes;
   const keys = shown.map(nodeKey);
