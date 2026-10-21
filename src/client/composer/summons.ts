@@ -9,6 +9,7 @@
 // in a channel every agent turn is a summon.
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import { summonName } from "../../shared/summon.ts";
 
 // what the menu filters on: the word after the @, lowercase since
 // names are; null when the draft is not a lone @ word
@@ -37,3 +38,27 @@ export function summonMatches(
 
 // what the box fills on Tab or a click: the name and a space for the ask
 export const summonFill = (agent: AgentSummary): string => `@${agent.name} `;
+
+// a channel's box after a post: the agent it summoned, ready for the
+// next ask, so a talk with one agent needs no @ each time. A post that
+// named no listed agent (a plain post, a member) leaves the box empty
+export function nextPost(
+  sent: string,
+  agents: readonly AgentSummary[] | null,
+): string {
+  const name = summonName(sent);
+  if (name === null || agents === null) return "";
+  return agents.some((agent) => agent.name === name) ? `@${name} ` : "";
+}
+
+// a channel post that is only an agent's name, with no files, asks
+// nothing: Enter on the box nextPost() filled would otherwise start a
+// turn by accident. A member's name alone stays a post
+export const bareSummon = (
+  content: string,
+  agents: readonly AgentSummary[] | null,
+  files: number,
+): boolean =>
+  files === 0 &&
+  /^@\S+$/.test(content.trim()) &&
+  nextPost(content, agents) !== "";
