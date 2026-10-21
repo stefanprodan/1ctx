@@ -261,6 +261,9 @@ export function Automation({ params }: { params: Params }) {
                 {row.rerunOnRestart && (
                   <AsideNote>Restarts a run the server stopped</AsideNote>
                 )}
+                {row.postToChannel && (
+                  <AsideNote>Posts its answer to the channel</AsideNote>
+                )}
                 <AsideLine label="Owner" href={userHref(row.ownerName)}>
                   @{row.ownerName}
                 </AsideLine>
