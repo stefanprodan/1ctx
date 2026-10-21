@@ -113,7 +113,7 @@ describe("an agent turn's running state", () => {
 });
 
 describe("the line under an answer", () => {
-  test("says what the turn spent, nothing when no round counted", () => {
+  test("says what the turn spent, no price at $0, nothing when no round counted", () => {
     const spent = (tokens: number, cost: number | null) =>
       turnUsage({ ...send("done"), tokens, cost });
     expect(spent(2720, 0.03)).toBe("2.72K tokens · $0.03");
@@ -121,7 +121,7 @@ describe("the line under an answer", () => {
     expect(spent(0, null)).toBeNull();
     expect(spent(0, 0)).toBeNull();
     expect(spent(1, 0.0042)).toBe("1 token · $0.0042");
-    expect(spent(812, 0)).toBe("812 tokens · $0");
+    expect(spent(812, 0)).toBe("812 tokens");
     expect(turnUsage(null)).toBeNull();
   });
 

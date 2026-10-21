@@ -85,11 +85,14 @@ export function servedBy(
 }
 
 // what the turn's send spent: "2.72K tokens · $0.03", the tokens alone
-// with no priced round, nothing with no counted round
+// when no round was priced or the provider charged nothing, nothing
+// with no counted round
 export function turnUsage(send: SendSummary | null): string | null {
   if (send === null || send.tokens === 0) return null;
   const tokens = tokensText(send.tokens);
-  return send.cost === null ? tokens : `${tokens} · ${turnCost(send.cost)}`;
+  return send.cost === null || !(send.cost > 0)
+    ? tokens
+    : `${tokens} · ${turnCost(send.cost)}`;
 }
 
 // a turn that failed before it did anything: no rows, no thinking, no
@@ -303,7 +306,13 @@ export function Reply({
               </button>
             )}
             <span class="transcript-sep" aria-hidden="true" />
-            {usage !== null && <span class="transcript-usage">{usage}</span>}
+            {usage !== null && (
+              <span class="transcript-usage">
+                {usage}
+                {/* the time follows, so the usage ends with a dot */}
+                <span aria-hidden="true"> ·</span>
+              </span>
+            )}
             <span class="transcript-when">{stamp(endedAt)}</span>
             {served !== null && (
               <span class="transcript-served" title={served.title}>

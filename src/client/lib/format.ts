@@ -117,8 +117,8 @@ export function money(n: number): string {
 }
 
 // one turn's cost: rounded cents from a cent up, up to two significant
-// digits under it ("$0.0042"), a floor for dust, and "$0" when the
-// provider charged nothing
+// digits under it ("$0.0042") and a floor for dust; a reply's line
+// hides a cost of nothing before it gets here
 export function turnCost(usd: number): string {
   if (!Number.isFinite(usd) || usd <= 0) return "$0";
   const shown = Number(usd.toPrecision(2));

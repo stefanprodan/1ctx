@@ -300,13 +300,20 @@ describe("the channel's transcript", () => {
     );
     const html = draw(messages, spent, view());
     const usage = html.indexOf(
-      '<span class="transcript-usage">2.72K tokens · $0.03</span>',
+      '<span class="transcript-usage">2.72K tokens · $0.03<span aria-hidden="true"> ·</span></span>',
     );
     const sep = html.indexOf("transcript-sep");
     expect(usage).toBeGreaterThan(sep);
     expect(usage).toBeLessThan(html.indexOf("transcript-when", sep));
     // the running turn has no line yet, and a turn with no tokens says none
     expect(html.split("transcript-usage")).toHaveLength(2);
+    // a turn the provider charged nothing for shows its tokens alone
+    const free = sends.map((send) =>
+      send.id === "t10" ? { ...send, tokens: 2720, cost: 0 } : send,
+    );
+    expect(draw(messages, free, view())).toContain(
+      '<span class="transcript-usage">2.72K tokens<span aria-hidden="true"> ·</span></span>',
+    );
     expect(draw(messages, sends, view())).not.toContain("transcript-usage");
   });
 
