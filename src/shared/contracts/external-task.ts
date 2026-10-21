@@ -117,6 +117,9 @@ export type ExternalTaskDetail = {
   chatId: string | null;
   // its title, only when the reader may open that chat
   chatTitle: string | null;
+  // the key an outside agent made it through over /mcp, its name
+  // copied, null otherwise
+  createdKeyName: string | null;
 };
 
 // the moves a member makes on the page
@@ -131,8 +134,8 @@ export const MAX_TASK_LABELS = 3;
 export const MAX_ENTRY_BYTES = 16 * 1024;
 export const MAX_ENTRY_LINKS = 5;
 export const MAX_LINK_BYTES = 2048;
-// an agent's entries since the last reopen, claims too, against one in
-// a loop; a member's and 1ctx's never count
+// an agent's entries since the last reopen, claims and its own edits and
+// cancels too, against one in a loop; a member's and 1ctx's never count
 export const MAX_ENTRIES = 250;
 // from here an agent may only finish or give the task back, and no
 // agent may claim it
@@ -140,6 +143,9 @@ export const CLOSING_ENTRIES = 240;
 // claims since the last reopen, against an agent that loops
 export const MAX_CLAIMS = 20;
 export const MAX_UNFINISHED = 500;
+// unfinished tasks one access key made over /mcp, across every project,
+// against an agent fanning out; members and chats never meet it
+export const MAX_KEY_UNFINISHED = 20;
 // Home's section; the count says how many more await input
 export const ATTENTION_ROWS = 50;
 export const ENTRIES_PAGE = 50;

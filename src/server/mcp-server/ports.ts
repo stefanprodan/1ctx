@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
+  CreateExternalTaskRequest,
+  PatchExternalTaskRequest,
+} from "../../shared/api/external-tasks.ts";
+import type {
   KnowledgeListResponse,
   KnowledgeSearchResponse,
   KnowledgeVersionsResponse,
@@ -129,6 +133,8 @@ export type TaskListRow = ExternalTaskRow & {
   answered: boolean;
   // resumes after this row when the tool cuts a page to its byte budget
   cursor: string;
+  // the key that made it over /mcp, null or absent for any other task
+  createdKeyId?: string | null;
 };
 
 export type TaskShow = {
@@ -137,6 +143,8 @@ export type TaskShow = {
   // the entry id to ask before, null at the first
   next: string | null;
   idleHours: number;
+  // the key that made it over /mcp, null for any other task
+  createdKeyId: string | null;
 };
 
 // access is the caller's: the tool checks the key reaches the task's
@@ -154,6 +162,8 @@ export type TasksPort = {
     // label names, any of them; empty for every task
     labels: string[];
     held: TaskKey | null;
+    // only the tasks this key made, still filtered by states and labels
+    created?: TaskKey | null;
     after: string | null;
     limit: number;
   }): { rows: TaskListRow[]; next: string | null };
@@ -182,6 +192,21 @@ export type TasksPort = {
     claimId: string,
     text: string,
   ): { entry: ExternalTaskEntry; task: ExternalTaskRow };
+  // a task made by the key: the page's checks, the project's bound and
+  // the key's own; a retry of an unfinished title answers that task
+  agentCreate(
+    key: TaskKey,
+    projectId: string,
+    body: CreateExternalTaskRequest,
+  ): TaskShow;
+  // only the key's own task while in todo; anything else is refused
+  // with NOT_KEY_TODO's words
+  agentEdit(
+    key: TaskKey,
+    taskId: string,
+    body: PatchExternalTaskRequest,
+  ): TaskShow;
+  agentCancel(key: TaskKey, taskId: string): TaskShow;
 };
 
 export type McpServerDeps = {

@@ -2,7 +2,8 @@
 
 Governs `src/server/external-tasks/`: project work assigned to agents
 outside the server. Member operations use the HTTP routes; claims, agent
-reports and an agent's unclaim use the area's task capability. The pages
+reports, an agent's unclaim and an agent's own tasks use the area's task
+capability. The pages
 that show it (`views/projects/ExternalTask*`, `data/external-tasks*.ts`)
 follow `docs/external-task-pages.md`.
 
@@ -89,10 +90,10 @@ follow `docs/external-task-pages.md`.
   last reopen (`agentSince()`), those with a key name, sought by rowid on
   the partial indexes `external_task_entries_agent` and
   `external_task_entries_reopen`; members' and 1ctx's entries never
-  count. Only an agent's claim, report and unclaim are checked
-  (`roomFor()`): from 240 no claim, and its claim may only finish or
-  give the task back; from 250 only give it back. Its own unclaim always
-  lands, since it ends the loop. A member's answer, unclaim, cancel,
+  count. Only an agent's claim, report, unclaim and edit are checked
+  (`roomFor()`): from 240 no claim and no edit, and its claim may only
+  finish or give the task back; from 250 only give it back. Its own
+  unclaim and cancel always land, since they end the loop. A member's answer, unclaim, cancel,
   reopen and edit are never refused by a bound.
 - An agent's report past them ends its claim as `limit` in the same
   transaction, writing 1ctx's unclaim (`limitNote()`) and putting the
@@ -110,8 +111,9 @@ follow `docs/external-task-pages.md`.
 - Every agent entry and every entry ending a claim carries its claim
   id, including member unclaims and cancels, and 1ctx's unclaims.
   Answers, reopens and cancels of open tasks have none. The entry stores
-  a key name only for claims, agent reports and an agent's unclaim,
-  never a member's or 1ctx's entry, so the bounds count by it.
+  a key name only for claims, agent reports, an agent's unclaim and the
+  edits and cancels of the key that made the task, never a member's or
+  1ctx's entry, so the bounds count by it.
 - `movedAt` is creation, the last state change or a question asked
   again while awaiting input, never another report or an answer. Every
   change still advances `revision`; a label rename or delete moves none.
@@ -143,6 +145,29 @@ follow `docs/external-task-pages.md`.
   `labels()` is the project's `openLabelCounts()`.
 - An answer or cancel may name the claim it saw, and is then refused as
   stale when that is not the current claim.
+
+## Agents' own tasks
+
+- `agentCreate()` makes a task for an outside agent's write key over
+  `/mcp` (`docs/mcp-server.md`) with the page's brief checks and the
+  project's `MAX_UNFINISHED`. `created_by` is the key's user; the
+  appended columns `created_key_id` and `created_key_name` (the name
+  copied, no foreign key) record the key, and the detail's
+  `createdKeyName` reads it. It writes no entry and starts in todo.
+- A key holds at most `MAX_KEY_UNFINISHED` unfinished tasks it made,
+  across every project, counted in the create's transaction on the
+  partial index `external_tasks_key_unfinished`; the count repeats the
+  index's predicate (`KEY_UNFINISHED`) or SQLite skips it. Tasks made on
+  the page or by a chat never count; a member finishing or cancelling
+  one makes room. A create whose trimmed title matches an unfinished
+  task of the same key in that project answers that task, so a retry
+  makes no second one.
+- `agentEdit()` and `agentCancel()` reach only a task whose
+  `created_key_id` is the calling key's and whose state is todo, checked
+  in the write's transaction, so a claim landing first wins; anything
+  else is refused with `NOT_KEY_TODO`. Their entries carry the key's
+  name and no claim. A cancel takes no state; there is no reopen or
+  delete by a key.
 
 ## Delivery and maintenance
 

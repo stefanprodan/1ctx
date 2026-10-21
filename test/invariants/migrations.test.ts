@@ -86,6 +86,7 @@ const EXPECTED_IDS = [
   "0072-channel-turns",
   "0073-channel-workspaces",
   "0074-run-posts",
+  "0075-external-task-keys",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -4096,6 +4097,7 @@ describe("project channel migrations", () => {
       "0072-channel-turns",
       "0073-channel-workspaces",
       "0074-run-posts",
+      "0075-external-task-keys",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4307,6 +4309,7 @@ describe("project channel migrations", () => {
         expect(migrate(db)).toEqual([
           "0073-channel-workspaces",
           "0074-run-posts",
+          "0075-external-task-keys",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4405,7 +4408,7 @@ describe("project channel migrations", () => {
           values ('post', 'channel', 'post', 'u', 'a', null, null, null,
             'done', 'answer', 0, 0);
       `);
-      expect(migrate(db)).toEqual(["0074-run-posts"]);
+      expect(migrate(db, MIGRATIONS.slice(0, 74))).toEqual(["0074-run-posts"]);
       expect(db.query("select post_to_channel from automations").get()).toEqual(
         { post_to_channel: 0 },
       );
@@ -4445,6 +4448,56 @@ describe("project channel migrations", () => {
       expect(
         plan.some((line) => /^SCAN (?:TABLE )?messages\b/.test(line)),
       ).toBe(false);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0075 records a task's key in added columns, keeping every task", () => {
+    const db = new Database(":memory:");
+    db.exec("pragma foreign_keys = on");
+    migrate(db, MIGRATIONS.slice(0, 74));
+    try {
+      db.exec(`
+        insert into users
+          (id, username, full_name, email, role, password_hash, created_at)
+          values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('team', 'team', 'finops', 'u', 0);
+        insert into external_tasks
+          (id, project_id, title, created_by, created_at, brief_at, moved_at)
+          values ('t', 'team', 'Kept', 'u', 0, 0, 0);
+      `);
+      expect(migrate(db)).toEqual(["0075-external-task-keys"]);
+      expect(
+        db
+          .query(
+            "select title, created_by, created_key_id, created_key_name from external_tasks",
+          )
+          .get(),
+      ).toEqual({
+        title: "Kept",
+        created_by: "u",
+        created_key_id: null,
+        created_key_name: null,
+      });
+      // no foreign key: a deleted key leaves its id and name
+      expect(
+        db
+          .query<{ from: string }, []>(
+            "select \"from\" from pragma_foreign_key_list('external_tasks')",
+          )
+          .all()
+          .map((row) => row.from),
+      ).not.toContain("created_key_id");
+      expect(
+        db
+          .query(
+            "select name from sqlite_schema where name = 'external_tasks_key_unfinished'",
+          )
+          .get(),
+      ).toEqual({ name: "external_tasks_key_unfinished" });
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
     } finally {
       db.close();

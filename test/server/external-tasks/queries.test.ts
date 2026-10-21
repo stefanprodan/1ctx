@@ -300,3 +300,32 @@ test("list queries bound the entry preview inside SQLite", () => {
   expect(raw.last_text).toBe(text.slice(0, 600));
   expect(f.port.show(task.id, null)!.entries[0]!.text).toBe(text);
 });
+
+test("a key's unfinished count and a retried create's lookup seek the key index", () => {
+  using f = fixture();
+  f.area.agentCreate(f.key, f.projectId, {
+    title: "Follow up",
+    labels: ["build"],
+    fileIds: ["brief"],
+  });
+  const reads = [
+    ...queries(f.db, () => f.area.store.keyUnfinishedCount("key")).map(
+      (sql) => [sql, ["key"]] as const,
+    ),
+    ...queries(f.db, () =>
+      f.area.store.keyUnfinishedTitled("key", f.projectId, "Follow up"),
+    ).map((sql) => [sql, ["key", f.projectId, "Follow up"]] as const),
+  ];
+  expect(reads).toHaveLength(2);
+  for (const [sql, args] of reads) {
+    const detail = plan(f.db, sql, [...args]);
+    expect(
+      detail.some((line) =>
+        /SEARCH t USING (COVERING )?INDEX external_tasks_key_unfinished \(created_key_id=\?\)/.test(
+          line,
+        ),
+      ),
+    ).toBe(true);
+    expect(detail.some((line) => /SCAN t\b/.test(line))).toBe(false);
+  }
+});

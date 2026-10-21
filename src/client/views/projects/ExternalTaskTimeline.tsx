@@ -201,15 +201,20 @@ function InChat({
   );
 }
 
-// the first line: who opened the task, and in which chat when the
-// reader may open it
+// the first line: who opened the task, through which key when an
+// outside agent made it, and in which chat when the reader may open it
 function Opened({ page, now }: { page: TaskPage; now: number }) {
-  const { task, chatId, chatTitle } = page.detail;
+  const { task, chatId, chatTitle, createdKeyName } = page.detail;
   return (
     <Line
       icon={<TaskStateIcon state="todo" size={14} />}
       verb="Opened"
-      who={<Who username={task.createdBy?.username ?? null} keyName={null} />}
+      who={
+        <Who
+          username={task.createdBy?.username ?? null}
+          keyName={createdKeyName}
+        />
+      }
       place={<InChat chatId={chatId} chatTitle={chatTitle} />}
       text=""
       at={task.createdAt}

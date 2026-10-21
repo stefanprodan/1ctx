@@ -5,7 +5,7 @@ import type { ExternalTaskRow } from "../../shared/contracts/external-task.ts";
 import type { ClaimEnd, ExternalTaskState } from "../../shared/words.ts";
 import { newId } from "../lib/ids.ts";
 import { ExternalTaskEntries } from "./entries.ts";
-import { CLOSED, UNFINISHED } from "./lists.ts";
+import { CLOSED, KEY_UNFINISHED, UNFINISHED } from "./lists.ts";
 import {
   type Claim,
   type OpenClaim,
@@ -44,10 +44,17 @@ export class ExternalTaskStore extends ExternalTaskEntries {
   made(id: string) {
     const raw = this.db
       .query<
-        { brief_at: number; chat_id: string | null; chat_title: string | null },
+        {
+          brief_at: number;
+          chat_id: string | null;
+          chat_title: string | null;
+          created_key_id: string | null;
+          created_key_name: string | null;
+        },
         [string]
       >(
-        `select t.brief_at, s.id as chat_id, s.title as chat_title
+        `select t.brief_at, s.id as chat_id, s.title as chat_title,
+          t.created_key_id, t.created_key_name
         from external_tasks t left join sessions s on s.id = t.chat_id
         where t.id = ?`,
       )
@@ -58,7 +65,48 @@ export class ExternalTaskStore extends ExternalTaskEntries {
           briefAt: raw.brief_at,
           chatId: raw.chat_id,
           chatTitle: raw.chat_title,
+          createdKeyId: raw.created_key_id,
+          createdKeyName: raw.created_key_name,
         };
+  }
+
+  // the key a task was made through over /mcp, null for any other
+  createdKey(id: string): string | null {
+    return (
+      this.db
+        .query<{ created_key_id: string | null }, [string]>(
+          "select created_key_id from external_tasks where id = ?",
+        )
+        .get(id)?.created_key_id ?? null
+    );
+  }
+
+  // the unfinished tasks a key made, across every project
+  keyUnfinishedCount(keyId: string): number {
+    return this.db
+      .query<{ n: number }, [string]>(
+        `select count(*) as n from external_tasks t
+        where t.created_key_id = ? and ${KEY_UNFINISHED}`,
+      )
+      .get(keyId)!.n;
+  }
+
+  // the key's unfinished task of that title in the project, which a
+  // retried create answers
+  keyUnfinishedTitled(
+    keyId: string,
+    projectId: string,
+    title: string,
+  ): string | null {
+    return (
+      this.db
+        .query<{ id: string }, [string, string, string]>(
+          `select t.id from external_tasks t
+          where t.created_key_id = ? and ${KEY_UNFINISHED}
+            and t.project_id = ? and t.title = ? limit 1`,
+        )
+        .get(keyId, projectId, title)?.id ?? null
+    );
   }
 
   labelIds(id: string): string[] {
@@ -156,15 +204,28 @@ export class ExternalTaskStore extends ExternalTaskEntries {
     brief: StoredBrief,
     now: number,
     chatId: string | null,
+    key: TaskKey | null = null,
   ): string {
     const id = newId();
     this.db
       .query(
         `insert into external_tasks
-        (id, project_id, title, created_by, chat_id, created_at, brief_at, moved_at)
-        values (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, project_id, title, created_by, chat_id, created_key_id,
+          created_key_name, created_at, brief_at, moved_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(id, projectId, brief.title, userId, chatId, now, now, now);
+      .run(
+        id,
+        projectId,
+        brief.title,
+        userId,
+        chatId,
+        key?.keyId ?? null,
+        key?.keyName ?? null,
+        now,
+        now,
+        now,
+      );
     this.setLinks(id, brief);
     return id;
   }

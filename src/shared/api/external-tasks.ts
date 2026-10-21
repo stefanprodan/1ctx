@@ -3,7 +3,8 @@
 //
 // Request and response bodies of the external task routes. Anyone who
 // sees the project creates, edits, answers, unclaims, cancels, reopens
-// and deletes; an agent claims and reports only over /mcp.
+// and deletes; an agent claims, reports, and makes, edits and cancels
+// its own tasks only over /mcp.
 
 import type {
   ExternalTaskDetail,

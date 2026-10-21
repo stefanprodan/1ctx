@@ -7,6 +7,7 @@ import {
   MAX_ENTRIES,
   MAX_ENTRY_BYTES,
   MAX_ENTRY_LINKS,
+  MAX_KEY_UNFINISHED,
   MAX_LINK_BYTES,
   MAX_TASK_FILES,
   MAX_TASK_LABELS,
@@ -32,6 +33,7 @@ export {
   MAX_ENTRIES,
   MAX_ENTRY_BYTES,
   MAX_ENTRY_LINKS,
+  MAX_KEY_UNFINISHED,
   MAX_LINK_BYTES,
   MAX_TASK_FILES,
   MAX_TASK_LABELS,
@@ -41,8 +43,9 @@ export {
 // limit is 1ctx ending a claim whose agent wrote past the entry bounds
 export type Actor = "agent" | "member" | "idle" | "access_gone" | "limit";
 export type Move = EntryKind;
-// what an agent's key writes, the only moves the entry bounds check
-export type AgentMove = "claim" | AgentEntryKind | "unclaim";
+// what an agent's key writes, the only moves the entry bounds check; an
+// edit is one over /mcp, on a task the key made
+export type AgentMove = "claim" | AgentEntryKind | "unclaim" | "edit";
 // labels by name as given, shaped by checkBrief's caller
 export type Brief = {
   title: string;
@@ -134,6 +137,18 @@ export function checkUnfinished(count: number): void {
   if (count >= MAX_UNFINISHED)
     throw new Conflict("project has too many unfinished external tasks");
 }
+
+// the unfinished tasks a key made over /mcp, across every project
+export function checkKeyUnfinished(count: number): void {
+  if (count >= MAX_KEY_UNFINISHED)
+    throw new Conflict(
+      `this key has ${MAX_KEY_UNFINISHED} unfinished tasks it created; cancel one or wait for a member to finish one`,
+    );
+}
+
+// a key edits or cancels over /mcp only what it made, before a claim
+export const NOT_KEY_TODO =
+  "only this key's tasks in todo can be changed over MCP";
 
 export function checkBrief(brief: Brief): void {
   if (

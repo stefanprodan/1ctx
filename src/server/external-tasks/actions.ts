@@ -14,22 +14,19 @@ import { shapeLabelName } from "../../shared/contracts/label.ts";
 import {
   AGENT_ENTRY_KINDS,
   type AgentEntryKind,
-  type ClaimEnd,
-  type EntryKind,
   isAgentEntryKind,
 } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
-import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, NotFound } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import type { TaskKey } from "./rows.ts";
 import {
-  type Actor,
   type Brief,
   checkBrief,
   checkClaims,
   checkEntry,
+  checkKeyUnfinished,
   checkMove,
   checkRoom,
   checkUnfinished,
@@ -37,77 +34,12 @@ import {
   isState,
   limitNote,
   NEW_TASK,
+  NOT_KEY_TODO,
   roomFor,
 } from "./rules.ts";
 import type { KnowledgePort, TaskRead } from "./show.ts";
 import type { ExternalTaskStore, StoredBrief } from "./store.ts";
-
-export const taskChanged = (task: ExternalTaskRow): BusEvent => ({
-  type: "externalTask.changed",
-  data: { projectId: task.projectId, task },
-});
-
-export function required(
-  store: ExternalTaskStore,
-  id: string,
-): ExternalTaskRow {
-  const task = store.byId(id);
-  if (task === null) throw new NotFound("no such external task");
-  return task;
-}
-
-export function writeEntry(
-  store: ExternalTaskStore,
-  task: ExternalTaskRow,
-  input: {
-    actor: Actor;
-    kind: EntryKind;
-    text: string;
-    links: string[];
-    userId: string | null;
-    at: number;
-  },
-) {
-  const { actor, kind, text, links, userId, at } = input;
-  const state = checkMove(task.state, kind, actor);
-  checkEntry(kind, text, links);
-  const end: ClaimEnd | null =
-    kind === "result"
-      ? "done"
-      : kind === "cancel" && task.claim !== null
-        ? "canceled"
-        : kind === "unclaim"
-          ? actor === "agent" || actor === "member"
-            ? "unclaimed"
-            : actor
-          : null;
-  const claim = task.claim;
-  if (claim !== null) {
-    store.active(claim.id, at);
-    if (end !== null) store.endClaim(claim.id, end, at);
-  }
-  const id = store.append(task.id, {
-    kind,
-    text,
-    links,
-    userId,
-    at,
-    claimId: actor === "agent" || end !== null ? (claim?.id ?? null) : null,
-    keyName: actor === "agent" ? claim!.keyName : null,
-    claimEnd: end,
-  });
-  // a question asked again restarts the wait Home orders by
-  store.move(
-    task.id,
-    state,
-    end === null ? (claim?.id ?? null) : null,
-    at,
-    kind === "question",
-  );
-  const row = required(store, task.id);
-  if (actor === "agent") store.remember(claim!.id, row);
-  return { entry: store.entry(task.id, id)!, task: row };
-}
+import { required, taskChanged, writeEntry } from "./writes.ts";
 
 type ActionsDeps = {
   db: Db;
@@ -259,6 +191,60 @@ export function taskActions(deps: ActionsDeps) {
       };
     });
 
+  // a todo task never holds a claim, so a key's own todo task is one
+  // no agent works on yet
+  const keyTodo = (key: TaskKey, id: string) => {
+    const task = required(store, id);
+    if (store.createdKey(id) !== key.keyId || task.state !== "todo")
+      throw new Conflict(NOT_KEY_TODO);
+    return task;
+  };
+  // the brief's change and its edit entry, inside the caller's
+  // transaction; a key's edit names the key and meets the bounds
+  const rebrief = (
+    task: ExternalTaskRow,
+    body: PatchExternalTaskRequest,
+    userId: string,
+    key: TaskKey | null,
+    viewer: Principal | null,
+    chatId: string | null,
+  ) => {
+    const id = task.id;
+    const old: StoredBrief = {
+      title: task.title,
+      labelIds: store.labelIds(id),
+      fileIds: store.fileIds(id),
+    };
+    // a task whose labels were all deleted takes one at its next edit
+    const brief = stored(
+      task.projectId,
+      {
+        title: body.title ?? old.title,
+        labels: body.labels ?? task.labels,
+        fileIds: body.fileIds ?? old.fileIds,
+      },
+      old.fileIds,
+    );
+    if (JSON.stringify(brief) === JSON.stringify(old))
+      return { result: detail(id, viewer) };
+    if (key !== null) checkRoom(store.counted(id), "edit");
+    const now = deps.clock();
+    store.edit(id, brief, now);
+    store.append(id, {
+      claimId: null,
+      kind: "edit",
+      text: "",
+      links: [],
+      userId,
+      keyName: key?.keyName ?? null,
+      claimEnd: null,
+      chatId,
+      at: now,
+    });
+    const result = detail(id, viewer);
+    return { result, events: [taskChanged(result.task.task)] };
+  };
+
   return {
     create(
       userId: string,
@@ -274,54 +260,81 @@ export function taskActions(deps: ActionsDeps) {
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
-    // an edit is an entry with no text, by the member or the chat's
-    // user, and never counts toward the bounds
-    edit(
+    // a member's or the chat user's edit: an entry with no text that
+    // never counts toward the bounds, as an agent's over /mcp does
+    edit: (
       userId: string,
       id: string,
       body: PatchExternalTaskRequest,
       viewer: Principal | null = null,
       chatId: string | null = null,
-    ) {
-      return transact(db, () => {
+    ) =>
+      transact(db, () => {
         const task = required(store, id);
         if (task.editRevision !== body.editRevision)
           throw new Conflict(STALE_TASK);
         if (closed(task.state)) throw new Conflict(isState(task.state));
-        const old: StoredBrief = {
-          title: task.title,
-          labelIds: store.labelIds(id),
-          fileIds: store.fileIds(id),
-        };
-        // a task whose labels were all deleted takes one at its next edit
-        const brief = stored(
-          task.projectId,
-          {
-            title: body.title ?? old.title,
-            labels: body.labels ?? task.labels,
-            fileIds: body.fileIds ?? old.fileIds,
-          },
-          old.fileIds,
+        return rebrief(task, body, userId, null, viewer, chatId);
+      }),
+    // an outside agent's task over /mcp, its key recorded. A retry
+    // answers the task the key made of that title while it is
+    // unfinished, so a lost answer makes no second task
+    agentCreate(
+      key: TaskKey,
+      projectId: string,
+      body: CreateExternalTaskRequest,
+    ) {
+      return transact(db, () => {
+        const first = store.keyUnfinishedTitled(
+          key.keyId,
+          projectId,
+          body.title.trim(),
         );
-        if (JSON.stringify(brief) === JSON.stringify(old))
-          return { result: detail(id, viewer) };
-        const now = deps.clock();
-        store.edit(id, brief, now);
-        store.append(id, {
-          claimId: null,
-          kind: "edit",
-          text: "",
-          links: [],
-          userId,
-          keyName: null,
-          claimEnd: null,
-          chatId,
-          at: now,
-        });
-        const result = detail(id, viewer);
+        if (first !== null) return { result: detail(first) };
+        const brief = stored(projectId, body);
+        checkUnfinished(store.unfinishedCount(projectId));
+        checkKeyUnfinished(store.keyUnfinishedCount(key.keyId));
+        const id = store.create(
+          projectId,
+          key.userId,
+          brief,
+          deps.clock(),
+          null,
+          key,
+        );
+        const result = detail(id);
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
+    // the key's own task before a claim: its edit carries the key's
+    // name, so the bounds count it, and is refused past them
+    agentEdit: (key: TaskKey, id: string, body: PatchExternalTaskRequest) =>
+      transact(db, () => {
+        const task = keyTodo(key, id);
+        if (task.editRevision !== body.editRevision)
+          throw new Conflict(STALE_TASK);
+        return rebrief(task, body, key.userId, key, null, null);
+      }),
+    // the key's own task before a claim; ending it always lands
+    agentCancel: (key: TaskKey, id: string) =>
+      transact(db, () => {
+        const task = keyTodo(key, id);
+        const state = checkMove(task.state, "cancel", "member");
+        const now = deps.clock();
+        store.append(id, {
+          claimId: null,
+          kind: "cancel",
+          text: "",
+          links: [],
+          userId: key.userId,
+          keyName: key.keyName,
+          claimEnd: null,
+          at: now,
+        });
+        store.move(id, state, null, now);
+        const result = detail(id);
+        return { result, events: [taskChanged(result.task.task)] };
+      }),
     answer: (
       userId: string,
       id: string,

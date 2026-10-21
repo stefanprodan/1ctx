@@ -27,6 +27,9 @@ export type TaskRead = {
   entries: ExternalTaskEntry[];
   next: string | null;
   idleHours: number;
+  // the key that made it over /mcp, so that key's read says so; never
+  // on the page's
+  createdKeyId: string | null;
 };
 
 type ShowDeps = {
@@ -58,7 +61,7 @@ export const taskShow =
       }
       return opens ? title : null;
     };
-    const { chatTitle, ...made } = store.made(id)!;
+    const { chatTitle, createdKeyId, ...made } = store.made(id)!;
     const files = store.fileIds(id).map((fileId) => {
       const live = deps.knowledge.file(task.projectId, fileId);
       return {
@@ -78,12 +81,16 @@ export const taskShow =
       })),
       next: page.next,
       idleHours: deps.externalTaskIdleHours(),
+      createdKeyId,
     };
   };
 
 // rendered once per read, with bare URLs and the task project's
 // knowledge paths linked
-export const forPage = (read: TaskRead): ExternalTaskResponse => ({
+export const forPage = ({
+  createdKeyId: _,
+  ...read
+}: TaskRead): ExternalTaskResponse => ({
   ...read,
   entries: read.entries.map((entry) => ({
     ...entry,

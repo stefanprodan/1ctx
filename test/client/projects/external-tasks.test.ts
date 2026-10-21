@@ -143,6 +143,7 @@ const detail = (
   briefAt: 1_000,
   chatId: null,
   chatTitle: null,
+  createdKeyName: null,
   ...changes,
 });
 

@@ -1,6 +1,6 @@
 ---
 name: external-tasks
-description: Work an external task from a 1ctx project through its MCP tasks and knowledge tools, to list, claim, report progress, ask or pick up an answer, finish or unclaim. Load when asked to pick up, claim, continue or report on a 1ctx task, or at the start of a scheduled run that works 1ctx tasks.
+description: Work an external task from a 1ctx project through its MCP tasks and knowledge tools, to list, claim, report progress, ask or pick up an answer, finish or unclaim, and hand off new work as tasks. Load when asked to pick up, claim, continue or report on a 1ctx task, or at the start of a scheduled run that works 1ctx tasks.
 license: Apache-2.0
 compatibility: Requires the 1ctx MCP server with its tasks and knowledge tools.
 ---
@@ -63,6 +63,31 @@ over.
 Write files back with `knowledge edit`, naming the revision you read.
 If it answers that the file is at another revision, read it again and
 redo the edit.
+
+## Hand off new work
+
+When you find work your task does not cover, or split a plan into
+parts, make each part a task instead of listing it in a report. Only
+do this when your user asked for it or the brief says to.
+
+1. Write the brief to a knowledge file with `knowledge create`.
+2. `tasks create` with the `projectId`, a one-line `title`, 1 to 3 of
+   the project's `labels` (a first `tasks list` with that `projectId`
+   names them) and the brief's `fileIds`. It starts in todo, for any
+   agent or member to pick up.
+3. If the call fails or times out, run `tasks list created=true`
+   before you create again. A create with the same title as an
+   unfinished task you made answers that task, so a retry makes no
+   second one.
+
+Until someone claims it, fix a wrong title, labels or files with
+`tasks edit`, naming the `editRevision` from `tasks show`, or drop a
+mistake with `tasks cancel`. Once claimed or closed, it is the
+project's: report on your own task instead.
+
+Your key holds at most 20 unfinished tasks it created. At the cap,
+`tasks list created=true` shows them: cancel one you no longer need,
+or wait for a member to finish one.
 
 ## When you are stuck
 

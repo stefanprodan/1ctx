@@ -494,10 +494,12 @@ describe("the largest show and claim pages", () => {
         keyName: "laptop",
         claimEnd: null,
       };
+      // a task this key made carries createdByYou too
       state.taskShow = {
         ...externalTaskShow(),
         task: detail,
         entries: [externalTaskEntry({ text, links: boundaryLinks })],
+        createdKeyId: "key000000001",
       };
       for (const action of ["show", "claim"] as const) {
         const answer = await toolCall(send, "tasks", {
@@ -511,6 +513,7 @@ describe("the largest show and claim pages", () => {
         expect(page).toEndWith("End of task task00000001.");
         const shown = JSON.parse(page.match(/^Task detail: (.*)$/m)![1]!);
         expect(shown.task.last).toBeUndefined();
+        expect(shown.task.createdByYou).toBe(true);
         if (action === "claim") {
           expect(page).toStartWith("Claim claim0000001 for task");
         }
