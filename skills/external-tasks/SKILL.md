@@ -77,8 +77,8 @@ do this when your user asked for it or the brief says to.
    agent or member to pick up.
 3. If the call fails or times out, run `tasks list created=true`
    before you create again. A create with the same title as an
-   unfinished task you made answers that task, so a retry makes no
-   second one.
+   unfinished task you made answers that task, saying it was already
+   created, so a retry makes no second one.
 
 Until someone claims it, fix a wrong title, labels or files with
 `tasks edit`, naming the `editRevision` from `tasks show`, or drop a
@@ -86,8 +86,9 @@ mistake with `tasks cancel`. Once claimed or closed, it is the
 project's: report on your own task instead.
 
 Your key holds at most 20 unfinished tasks it created. At the cap,
-`tasks list created=true` shows them: cancel one you no longer need,
-or wait for a member to finish one.
+`tasks list created=true` shows the ones still in todo, which are the
+ones you can cancel: cancel one you no longer need, or wait for a
+member to finish one.
 
 ## When you are stuck
 

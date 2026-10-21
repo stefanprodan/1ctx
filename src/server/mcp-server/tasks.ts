@@ -290,7 +290,11 @@ export function tasksTool(
         }),
       };
     });
-    return showResult(created, key.keyId, "Created task");
+    return showResult(
+      created,
+      key.keyId,
+      created.existing ? "Already created by this key: task" : "Created task",
+    );
   }
   const projectId = projectOf(deps, principal, input.taskId, input.projectId);
   if (input.action === "show") {

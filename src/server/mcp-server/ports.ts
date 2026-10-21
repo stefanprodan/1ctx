@@ -198,7 +198,7 @@ export type TasksPort = {
     key: TaskKey,
     projectId: string,
     body: CreateExternalTaskRequest,
-  ): TaskShow;
+  ): TaskShow & { existing: boolean };
   // only the key's own task while in todo; anything else is refused
   // with NOT_KEY_TODO's words
   agentEdit(

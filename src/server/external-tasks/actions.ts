@@ -260,8 +260,8 @@ export function taskActions(deps: ActionsDeps) {
         return { result, events: [taskChanged(result.task.task)] };
       });
     },
-    // a member's or the chat user's edit: an entry with no text that
-    // never counts toward the bounds, as an agent's over /mcp does
+    // a member's or a chat's edit: an entry with no text that never
+    // counts toward the bounds, unlike an agent's over /mcp
     edit: (
       userId: string,
       id: string,
@@ -278,7 +278,8 @@ export function taskActions(deps: ActionsDeps) {
       }),
     // an outside agent's task over /mcp, its key recorded. A retry
     // answers the task the key made of that title while it is
-    // unfinished, so a lost answer makes no second task
+    // unfinished, so a lost answer makes no second task; existing says
+    // it did
     agentCreate(
       key: TaskKey,
       projectId: string,
@@ -290,7 +291,8 @@ export function taskActions(deps: ActionsDeps) {
           projectId,
           body.title.trim(),
         );
-        if (first !== null) return { result: detail(first) };
+        if (first !== null)
+          return { result: { ...detail(first), existing: true } };
         const brief = stored(projectId, body);
         checkUnfinished(store.unfinishedCount(projectId));
         checkKeyUnfinished(store.keyUnfinishedCount(key.keyId));
@@ -302,7 +304,7 @@ export function taskActions(deps: ActionsDeps) {
           null,
           key,
         );
-        const result = detail(id);
+        const result = { ...detail(id), existing: false };
         return { result, events: [taskChanged(result.task.task)] };
       });
     },

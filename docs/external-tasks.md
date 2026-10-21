@@ -93,8 +93,8 @@ follow `docs/external-task-pages.md`.
   count. Only an agent's claim, report, unclaim and edit are checked
   (`roomFor()`): from 240 no claim and no edit, and its claim may only
   finish or give the task back; from 250 only give it back. Its own
-  unclaim and cancel always land, since they end the loop. A member's answer, unclaim, cancel,
-  reopen and edit are never refused by a bound.
+  unclaim and cancel always land, since they end the loop. A member's
+  answer, unclaim, cancel, reopen and edit are never refused by a bound.
 - An agent's report past them ends its claim as `limit` in the same
   transaction, writing 1ctx's unclaim (`limitNote()`) and putting the
   task back to todo, then throws the 409 after that commit; a caller
@@ -108,9 +108,10 @@ follow `docs/external-task-pages.md`.
   `keyName`, `claimEnd`). `by` is null when 1ctx wrote it or the user
   was deleted; only a `claimEnd` of `idle`, `access_gone` or `limit`
   says 1ctx wrote it.
-- Every agent entry and every entry ending a claim carries its claim
-  id, including member unclaims and cancels, and 1ctx's unclaims.
-  Answers, reopens and cancels of open tasks have none. The entry stores
+- A claim's entries and every entry ending a claim carry its claim id,
+  including member unclaims and cancels, and 1ctx's unclaims. Answers,
+  reopens and cancels of open tasks have none, nor does a key's edit or
+  cancel of its own task. The entry stores
   a key name only for claims, agent reports, an agent's unclaim and the
   edits and cancels of the key that made the task, never a member's or
   1ctx's entry, so the bounds count by it.
@@ -159,9 +160,10 @@ follow `docs/external-task-pages.md`.
   partial index `external_tasks_key_unfinished`; the count repeats the
   index's predicate (`KEY_UNFINISHED`) or SQLite skips it. Tasks made on
   the page or by a chat never count; a member finishing or cancelling
-  one makes room. A create whose trimmed title matches an unfinished
-  task of the same key in that project answers that task, so a retry
-  makes no second one.
+  one makes room. A key's unfinished tasks in a project its user lost
+  still count until a member closes them. A create whose trimmed title
+  matches an unfinished task of the same key in that project answers
+  that task, so a retry makes no second one.
 - `agentEdit()` and `agentCancel()` reach only a task whose
   `created_key_id` is the calling key's and whose state is todo, checked
   in the write's transaction, so a claim landing first wins; anything

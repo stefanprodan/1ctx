@@ -112,18 +112,17 @@ knowledge area's create, edit, replace, rename or revisioned remove. The
 answer holds only the file id, name and new revision.
 
 A task list passes only `reachableProjectIds()`, or one project resolved by the
-access port, to the task store. Show, claim, report, edit and cancel resolve the task's
-project before reading or writing it, and create its `projectId`; hidden and
-missing tasks and projects answer `not found`. Every task write calls
-`checkKey()` in the transaction and carries the key's user, id and copied
-name; a read key's are refused before parsing. A refusal is returned through that transaction's commit,
-never thrown through it: a report past the entry bounds ends
-its claim before refusing, and that end must commit. Report kinds are `progress`, `question` and `result`; text
-is at most 16 KiB and it accepts at most five HTTP(S) links of at most 2 KiB
-each. A claim's own entry, kind `claim`,
-shows in `show` like any other and no report writes one; so does a
-member's `edit`, with no text, so an agent reading again sees the brief
-moved.
+access port, to the task store. Show, claim, report, edit and cancel resolve the
+task's project before reading or writing it, and create its `projectId`; hidden
+and missing tasks and projects answer `not found`. Every task write calls
+`checkKey()` in the transaction and carries the key's user, id and copied name;
+a read key's are refused before parsing. A refusal is returned through that
+transaction's commit, never thrown through it: a report past the entry bounds
+ends its claim before refusing, and that end must commit. Report kinds are
+`progress`, `question` and `result`; text is at most 16 KiB and it accepts at
+most five HTTP(S) links of at most 2 KiB each. A claim's own entry, kind
+`claim`, shows in `show` like any other and no report writes one; so does a
+member's `edit`, with no text, so an agent reading again sees the brief moved.
 `skills/external-tasks/` teaches an outside agent this loop. The binary
 embeds that file and serves it at
 `/.well-known/skills/external-tasks/SKILL.md`, and Connect agents gives the

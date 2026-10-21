@@ -404,7 +404,7 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
           body,
         });
         if (state.taskShow === null) throw new NotFound();
-        return state.taskShow;
+        return { ...state.taskShow, existing: false };
       },
       agentEdit: (taskKey, taskId, body) => {
         state.taskCalls.push({ action: "edit", key: taskKey, taskId, body });

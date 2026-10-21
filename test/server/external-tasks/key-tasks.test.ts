@@ -54,8 +54,10 @@ test("a key's task records the key's user, id and name and writes no entry", () 
 test("a retried create answers the key's unfinished task of that title", () => {
   using f = fixture();
   const first = f.area.agentCreate(f.key, f.projectId, brief("Follow up"));
+  expect(first.existing).toBe(false);
   const again = f.area.agentCreate(f.key, f.projectId, brief(" Follow up"));
   expect(again.task.task.id).toBe(first.task.task.id);
+  expect(again.existing).toBe(true);
   const other = f.area.agentCreate(f.otherKey, f.projectId, brief("Follow up"));
   expect(other.task.task.id).not.toBe(first.task.task.id);
   expect(f.area.store.keyUnfinishedCount("key")).toBe(1);

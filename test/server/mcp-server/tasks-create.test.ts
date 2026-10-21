@@ -111,7 +111,12 @@ describe("an outside agent's own tasks over /mcp", () => {
 
     // a retry answers the first; another key makes its own
     const again = await tasks(f, token, brief);
-    expect(idOf(again.text)).toBe(id);
+    expect(again.text).toStartWith(
+      `Already created by this key: task "Split the parser", id ${id}, state todo.`,
+    );
+    expect(again.text.split("\n").slice(1)).toEqual(
+      made.text.split("\n").slice(1),
+    );
     const other = await tasks(f, await writeKey(f.creator.client, "desk"), {
       ...brief,
     });
