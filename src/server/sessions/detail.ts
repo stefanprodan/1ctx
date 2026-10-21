@@ -37,6 +37,7 @@ type DetailStore = {
     after: number | null;
   };
   lastSend(id: string): SessionDetail["send"];
+  sends(id: string): SessionDetail["sends"];
   authors(id: string): SessionAuthor[];
   agents(id: string): SessionAgent[];
   archiveOf(id: string, keptDays: number): SessionArchive | null;
@@ -69,10 +70,8 @@ export function detail(
     messages: (page?.messages ?? store.messages(session.id)).map(offWire),
     ...(page === null
       ? {}
-      : {
-          page: { before: page.before, after: page.after },
-          sends: page.sends,
-        }),
+      : { page: { before: page.before, after: page.after } }),
+    sends: page?.sends ?? store.sends(session.id),
     send: store.lastSend(session.id),
     live,
     ...(session.origin === "channel"

@@ -193,10 +193,11 @@ is its root.
 - **A `delegate` call is a group in the work fold** (`Delegate.tsx`),
   shut until opened like a call. Its head is the description, then the
   status (running while the root's row runs, then the child's own:
-  done, failed or stopped) and the child's context, never a price, as
-  chats show none. With none of the child's rows held, the status is
-  the root's row's (done, stopped, else failed) and no tokens show
-  until the group is opened or a watch brings them. Open, it shows the
+  done, failed or stopped) and the child's context, never a price: the
+  root's reply line counts no child send. With none of the child's rows
+  held, the status is the root's row's (done, stopped, else failed) and
+  no tokens show until the group is opened or a watch brings them.
+  Open, it shows the
   `task` input, the child's rounds drawn by the fold's own `Rounds` and
   `Tool`, the child's answer once it is done, then only the files part
   of the parent's result

@@ -8,7 +8,7 @@ import { type Db, transact } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
 import { storeMcpDigest } from "./mcp.ts";
-import { type RawSend, safeListOrNull, send, sendTokens } from "./rows.ts";
+import { type RawSend, safeListOrNull, send, sendUsage } from "./rows.ts";
 
 export type SendEnd = {
   status: Exclude<SessionStatus, "running">;
@@ -121,7 +121,7 @@ export function insertSend(db: Db, fields: SendFields): string {
 export function readSend(db: Db, id: string): SendSummary | null {
   const raw = db
     .query<RawSend, [string]>(
-      `select *, ${sendTokens("sends")} from sends where id = ?`,
+      `select *, ${sendUsage("sends")} from sends where id = ?`,
     )
     .get(id);
   return raw ? send(raw) : null;
@@ -130,11 +130,22 @@ export function readSend(db: Db, id: string): SendSummary | null {
 export function readLastSend(db: Db, sessionId: string): SendSummary | null {
   const raw = db
     .query<RawSend, [string]>(
-      `select *, ${sendTokens("sends")} from sends where session_id = ?
+      `select *, ${sendUsage("sends")} from sends where session_id = ?
        order by started_at desc, rowid desc limit 1`,
     )
     .get(sessionId);
   return raw ? send(raw) : null;
+}
+
+// every send of a chat or a run, in the order they started
+export function readSends(db: Db, sessionId: string): SendSummary[] {
+  return db
+    .query<RawSend, [string]>(
+      `select *, ${sendUsage("sends")} from sends where session_id = ?
+       order by started_at, rowid`,
+    )
+    .all(sessionId)
+    .map(send);
 }
 
 export function readReasoningDetails(

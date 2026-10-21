@@ -93,13 +93,13 @@ import {
   readLastSend,
   readReasoningDetails,
   readSend,
+  readSends,
   type SendCounters,
   type SendEnd,
   type SendFields,
 } from "./sends.ts";
 
-// the bash area's scratch of a chat, dropped when it is archived,
-// and the sessions a command holds now
+// a chat's bash scratch, dropped on archive, and the sessions a command holds
 export type ScratchPort = {
   drop(sessionId: string): void;
   held(): ReadonlySet<string>;
@@ -468,6 +468,10 @@ export class SessionStore {
 
   lastSend(sessionId: string): SendSummary | null {
     return readLastSend(this.db, sessionId);
+  }
+
+  sends(sessionId: string): SendSummary[] {
+    return readSends(this.db, sessionId);
   }
 
   finishSend(id: string, fields: SendEnd): SendSummary | null {

@@ -9,7 +9,7 @@ import {
   type RawMessage,
   type RawSend,
   send,
-  sendTokens,
+  sendUsage,
 } from "./rows.ts";
 
 export const CHANNEL_PAGE_TURNS = 50;
@@ -96,7 +96,7 @@ export function channelPage(
     .map(message);
   const sends = db
     .query<RawSend, [string, string]>(
-      `select *, ${sendTokens("sends")} from sends
+      `select *, ${sendUsage("sends")} from sends
        where id in (select value from json_each(?2))
          and session_id = ?1 and kind != 'post'
        order by started_at, rowid`,

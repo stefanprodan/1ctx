@@ -176,6 +176,7 @@ export function detail(
       ...changes,
     },
     messages: [],
+    sends: [],
     queued: [],
     live: [],
     authors: [],

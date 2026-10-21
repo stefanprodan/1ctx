@@ -29,7 +29,7 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   `before` reads the next older page; `around` reads one bounded window around
   a quoted post's seq. Chats and runs still return every row in one read. It
   also names its agent turns (`sends`), so each answer finds its post and its
-  summoner.
+  summoner. A chat's and a run's `sends` hold every send of the session.
 
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the feed lands on both.
@@ -106,6 +106,20 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   characters are marked everywhere but in the England, Scotland and
   Wales flags.
 
+- **A finished reply's last line ends in what its turn spent.** Every
+  reply `transcript/Reply.tsx` draws (chats, channels, runs, `/compact`
+  turns) shows, in order: the cut words, the actions, the hairline, the
+  usage (`turnUsage()`: "2.72K tokens · $0.03", the tokens alone when
+  `cost` is null, nothing at zero tokens), the time, then the model and
+  upstream. The usage is the send's, read with its row (`sendUsage()`),
+  so the end's envelope carries the last round: every round, its summary
+  round, attention step and memory phase included, never a decider or a
+  child send. `cost` sums the priced rounds, null when none was priced.
+  A run's post in a channel shows none. `turnCost()` shows cents from a
+  cent up, two significant digits under it, and `$0` when the provider
+  charged nothing. Below 720px the line wraps at the
+  hairline: the actions stay on the first row, the usage, time and model
+  move to the second, where only the model gives way.
 - **A chat is `/chat/:id` and a run `/run/:id`.** Each shows the other
   origin as not found, so every link picks its page by origin. A channel
   opens at `/chat/:id`; its page is in `docs/channel-page.md`.

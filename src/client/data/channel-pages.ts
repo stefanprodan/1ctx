@@ -60,12 +60,13 @@ export function mergeSends(
 const staleFor = (held: SessionDetail, page: SessionDetail): boolean =>
   page.session.revision < held.session.revision;
 
-// an envelope's send joins a channel's turns; a post's send is no turn
+// an envelope's send joins the turns held, a newer copy over the one
+// with its id, so a new turn never drops the older ones; a post's send
+// is no turn
 export function withSend(
   detail: SessionDetail,
   send: SendSummary | null | undefined,
-): Pick<SessionDetail, "sends"> | Record<string, never> {
-  if (detail.session.origin !== "channel") return {};
+): Pick<SessionDetail, "sends"> {
   if (send == null || send.kind === "post") return { sends: detail.sends };
   return { sends: mergeSends(detail.sends, [send]) };
 }
@@ -83,7 +84,7 @@ export function anchors(detail: SessionDetail): (row: Message) => number {
       .map((row) => [row.id, row.seq]),
   );
   const firsts = new Map(
-    (detail.sends ?? []).map((send) => [send.id, send.firstMessageId]),
+    detail.sends.map((send) => [send.id, send.firstMessageId]),
   );
   return (row) => {
     if (row.kind === "user") return row.seq;
@@ -108,7 +109,7 @@ export function mergeOlder(
   return {
     ...held,
     messages: mergeRows(held.messages, older.messages, stale),
-    sends: mergeSends(held.sends, older.sends ?? [], stale),
+    sends: mergeSends(held.sends, older.sends, stale),
     page: { before: older.page?.before ?? null, after: null },
   };
 }
@@ -139,7 +140,7 @@ export function mergeAround(
   const merged: SessionDetail = {
     ...base,
     messages: mergeRows(base.messages, window.messages, stale),
-    sends: mergeSends(base.sends, window.sends ?? [], stale),
+    sends: mergeSends(base.sends, window.sends, stale),
     page: {
       before: top === null ? null : (window.page?.before ?? null),
       after: null,
@@ -165,7 +166,7 @@ export function fillGap(
     detail: {
       ...held,
       messages: mergeRows(held.messages, window.messages, stale),
-      sends: mergeSends(held.sends, window.sends ?? [], stale),
+      sends: mergeSends(held.sends, window.sends, stale),
     },
     gap: after === null || after >= gap.before ? null : { ...gap, after },
   };
@@ -190,7 +191,7 @@ export function mergeNewest(
   const kept = base.messages.filter(
     (row) => anchor(row) < from && !ids.has(row.id) && !turns.has(row.sendId),
   );
-  const keptSends = base.sends?.filter((send) => !turns.has(send.id)) ?? [];
+  const keptSends = base.sends.filter((send) => !turns.has(send.id));
   if (
     kept.length === 0 ||
     kept.some((row) => row.status === "streaming") ||
@@ -205,7 +206,7 @@ export function mergeNewest(
     detail: {
       ...fresh,
       messages: mergeRows(kept, fresh.messages),
-      sends: mergeSends(keptSends, fresh.sends ?? []),
+      sends: mergeSends(keptSends, fresh.sends),
       page: { before: top, after: null },
     },
     gap:

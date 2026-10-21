@@ -717,6 +717,7 @@ describe("a row's live status", () => {
       session: summary(id, status, origin),
       messages: [],
       send: null,
+      sends: [],
       live: [],
     } as never;
   };

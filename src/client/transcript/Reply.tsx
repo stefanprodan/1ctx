@@ -7,18 +7,29 @@
 // so a code block in progress never breaks out of its element, then
 // the summary fold when the window filled. A compact turn is the
 // summary fold alone. Under a finished turn, why it was cut when it
-// was, Copy, Fork, Regenerate on the last turn, and when it was.
+// was, Copy, Fork, Regenerate on the last turn, what it spent,
+// and when it was.
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
-import type { LiveRetry, Message } from "../../shared/contracts/session.ts";
+import type {
+  LiveRetry,
+  Message,
+  SendSummary,
+} from "../../shared/contracts/session.ts";
 import { finishWords } from "../../shared/finish.ts";
 import type { Avatar } from "../../shared/words.ts";
 import { shortModel } from "../agents/meta.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
-import { reason, sentence, stamp } from "../lib/format.ts";
+import {
+  reason,
+  sentence,
+  stamp,
+  tokensText,
+  turnCost,
+} from "../lib/format.ts";
 import { agentHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { RunOf, RunTrace } from "./Channel.tsx";
@@ -71,6 +82,14 @@ export function servedBy(
     via,
     title: [m.servedModel, via].filter(Boolean).join(" "),
   };
+}
+
+// what the turn's send spent: "2.72K tokens · $0.03", the tokens alone
+// with no priced round, nothing with no counted round
+export function turnUsage(send: SendSummary | null): string | null {
+  if (send === null || send.tokens === 0) return null;
+  const tokens = tokensText(send.tokens);
+  return send.cost === null ? tokens : `${tokens} · ${turnCost(send.cost)}`;
 }
 
 // a turn that failed before it did anything: no rows, no thinking, no
@@ -160,6 +179,7 @@ export function Reply({
   // the stamp is when the turn ended: the answer's end, else the last
   // row's, a stopped work round included
   const served = servedBy(m);
+  const usage = turnUsage(node.send);
   const last = node.rows[node.rows.length - 1];
   const endedAt =
     m?.finishedAt ??
@@ -283,6 +303,7 @@ export function Reply({
               </button>
             )}
             <span class="transcript-sep" aria-hidden="true" />
+            {usage !== null && <span class="transcript-usage">{usage}</span>}
             <span class="transcript-when">{stamp(endedAt)}</span>
             {served !== null && (
               <span class="transcript-served" title={served.title}>

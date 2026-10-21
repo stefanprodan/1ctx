@@ -149,6 +149,7 @@ const turnOf = (
   memorySkipped: null,
   summoned: true,
   tokens: 0,
+  cost: null,
   startedAt: 1,
   finishedAt: 2,
   ...changes,

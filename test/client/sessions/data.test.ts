@@ -154,6 +154,7 @@ function detail(
     forkedFrom: null,
     messages: [],
     send: null,
+    sends: [],
     live: [],
     authors: [],
     queued: [],
@@ -207,6 +208,7 @@ const sent: SendSummary = {
   memorySkipped: null,
   summoned: false,
   tokens: 0,
+  cost: null,
   startedAt: 10,
   finishedAt: null,
 };
@@ -1303,6 +1305,64 @@ describe("the sessions entity", () => {
     });
     expect(retries.value.get("send1")).toBeUndefined();
   });
+
+  test.serial(
+    "a chat keeps every turn's send through a new turn and a reload",
+    async () => {
+      const older: SendSummary = {
+        ...sent,
+        id: "send0",
+        status: "done",
+        cause: "finish",
+        tokens: 2720,
+        cost: 0.03,
+        finishedAt: 15,
+      };
+      answer = () => Response.json(detail("s1", { sends: [older] }));
+      await loadSession("s1");
+      expect(session.value?.sends).toEqual([older]);
+
+      onSocket({
+        type: "session",
+        row: null,
+        projectId: "p1",
+        session: summary({ revision: 2, status: "running" }),
+        messages: [],
+        send: sent,
+      });
+      expect(session.value?.sends).toEqual([older, sent]);
+
+      const ended: SendSummary = {
+        ...sent,
+        status: "done",
+        cause: "finish",
+        tokens: 30,
+        cost: 0.002,
+        finishedAt: 30,
+      };
+      onSocket({
+        type: "session",
+        row: null,
+        projectId: "p1",
+        session: summary({ revision: 3 }),
+        messages: [],
+        send: ended,
+      });
+      expect(session.value?.sends).toEqual([older, ended]);
+      expect(session.value?.send).toEqual(ended);
+
+      answer = () =>
+        Response.json(
+          detail("s1", {
+            session: summary({ revision: 3 }),
+            send: ended,
+            sends: [older, ended],
+          }),
+        );
+      await loadSession("s1");
+      expect(session.value?.sends).toEqual([older, ended]);
+    },
+  );
 
   test("a detail that carries a retry shows it until the chat is left", async () => {
     const base = liveDetail();

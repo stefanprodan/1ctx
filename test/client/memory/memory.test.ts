@@ -85,6 +85,7 @@ function send(changes: Partial<SendSummary> = {}): SendSummary {
     memorySkipped: null,
     summoned: false,
     tokens: 0,
+    cost: null,
     startedAt: 9_000,
     finishedAt: 40_000,
     ...changes,

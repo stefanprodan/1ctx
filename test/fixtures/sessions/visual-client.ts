@@ -76,9 +76,10 @@ export function visualDetail(): SessionDetail {
       providerId: "provider0001", model: "test", status: "running",
       cause: null, error: null, firstMessageId: "userrow00001",
       rounds: 1, toolCalls: 0, memoryRound: null, attentionRound: null, memoryFrom: null, memoryError: null,
-      memorySkipped: null, summoned: false, tokens: 0, startedAt: 1,
+      memorySkipped: null, summoned: false, tokens: 0, cost: null, startedAt: 1,
       finishedAt: null,
     },
+    sends: [],
     live: [{
       phase: "reply", sendId: "send00000001", messageId: "reply0000001",
       seq: 0, content: "", reasoning: "", html: "", htmlAt: 0,

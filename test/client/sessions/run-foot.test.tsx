@@ -50,6 +50,7 @@ const send: SendSummary = {
   memorySkipped: null,
   summoned: false,
   tokens: 54_500,
+  cost: null,
   startedAt: now - 60_000,
   finishedAt: now - 8_000,
 };

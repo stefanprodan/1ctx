@@ -7,6 +7,7 @@ import {
   emptyFailure,
   replyRunning,
   servedBy,
+  turnUsage,
 } from "../../../src/client/transcript/Reply.tsx";
 import type {
   ReplyNode,
@@ -77,6 +78,7 @@ function send(status: SendSummary["status"]): SendSummary {
     memorySkipped: null,
     summoned: false,
     tokens: 0,
+    cost: null,
     startedAt: 10_000,
     finishedAt: status === "running" ? null : 20_000,
   };
@@ -111,6 +113,18 @@ describe("an agent turn's running state", () => {
 });
 
 describe("the line under an answer", () => {
+  test("says what the turn spent, nothing when no round counted", () => {
+    const spent = (tokens: number, cost: number | null) =>
+      turnUsage({ ...send("done"), tokens, cost });
+    expect(spent(2720, 0.03)).toBe("2.72K tokens · $0.03");
+    expect(spent(2720, null)).toBe("2.72K tokens");
+    expect(spent(0, null)).toBeNull();
+    expect(spent(0, 0)).toBeNull();
+    expect(spent(1, 0.0042)).toBe("1 token · $0.0042");
+    expect(spent(812, 0)).toBe("812 tokens · $0");
+    expect(turnUsage(null)).toBeNull();
+  });
+
   test("says how a send was cut short, and nothing for a plain end", () => {
     expect(cutReason(answer())).toBeNull();
     expect(cutReason(answer({ status: "stopped" }))).toEqual({

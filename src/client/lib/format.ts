@@ -116,6 +116,15 @@ export function money(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
+// one turn's cost: cents from a cent up, two significant digits under
+// it ("$0.0042"), and "$0" when the provider charged nothing
+export function turnCost(usd: number): string {
+  if (usd <= 0) return "$0";
+  const shown = Number(usd.toPrecision(2));
+  if (shown >= 0.01) return `$${usd.toFixed(2)}`;
+  return `$${shown.toFixed(1 - Math.floor(Math.log10(shown)))}`;
+}
+
 // "41s", "3m 20s", "1h 5m"
 export function lengthWord(ms: number): string {
   const s = Math.round(ms / 1000);

@@ -15,6 +15,7 @@ import {
   size,
   sizeWords,
   stamp,
+  turnCost,
   uploadNote,
 } from "../../../src/client/lib/format.ts";
 
@@ -86,6 +87,15 @@ describe("counts", () => {
     expect(k(12_500)).toBe("13K");
     expect(k(131_072)).toBe("131K");
     expect(k(1_250_000)).toBe("1.3M");
+  });
+
+  test("a turn's cost shows cents, or two figures under a cent", () => {
+    expect(turnCost(0.03)).toBe("$0.03");
+    expect(turnCost(1.2)).toBe("$1.20");
+    expect(turnCost(0.0042)).toBe("$0.0042");
+    expect(turnCost(0.000_012_34)).toBe("$0.000012");
+    expect(turnCost(0.009_99)).toBe("$0.01");
+    expect(turnCost(0)).toBe("$0");
   });
 
   test("since when a row was made", () => {

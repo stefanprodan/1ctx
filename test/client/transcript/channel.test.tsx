@@ -104,6 +104,7 @@ const turn = (
   memorySkipped: null,
   summoned: true,
   tokens: 0,
+  cost: null,
   startedAt: Date.UTC(2026, 9, 20, 9),
   finishedAt: null,
   ...changes,
@@ -290,6 +291,23 @@ describe("the channel's transcript", () => {
     }
     clicks[0]!();
     expect(opened[0]).toMatchObject({ id: "p10", seq: 10 });
+  });
+
+  test("a finished answer says what its turn spent before the time", () => {
+    const { messages, sends } = twoTurns();
+    const spent = sends.map((send) =>
+      send.id === "t10" ? { ...send, tokens: 2720, cost: 0.03 } : send,
+    );
+    const html = draw(messages, spent, view());
+    const usage = html.indexOf(
+      '<span class="transcript-usage">2.72K tokens · $0.03</span>',
+    );
+    const sep = html.indexOf("transcript-sep");
+    expect(usage).toBeGreaterThan(sep);
+    expect(usage).toBeLessThan(html.indexOf("transcript-when", sep));
+    // the running turn has no line yet, and a turn with no tokens says none
+    expect(html.split("transcript-usage")).toHaveLength(2);
+    expect(draw(messages, sends, view())).not.toContain("transcript-usage");
   });
 
   test("a quoted post above the pages still names its answer", () => {
@@ -527,6 +545,8 @@ describe("a run's post", () => {
     expect(html).not.toContain('aria-label="Regenerate"');
     expect(html).not.toContain("channel-stop-button");
     expect(html).not.toContain("Worked for");
+    // the run's page has its numbers
+    expect(html).not.toContain("transcript-usage");
   });
 
   test("keeps its words once the run is gone, and nothing without a name", () => {
