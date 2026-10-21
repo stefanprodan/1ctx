@@ -251,9 +251,11 @@ test("each agent row resumes a merged page, including its last row", () => {
       .filter((row) => held === null || row.claim !== null)
       .sort((a, b) => b.movedAt - a.movedAt || a.id.localeCompare(b.id));
     const ids = expected.map((row) => row.id);
-    expect(page.rows.map(({ answered: _, cursor: __, ...row }) => row)).toEqual(
-      expected,
-    );
+    expect(
+      page.rows.map(
+        ({ answered: _, cursor: __, createdKeyId: ___, ...row }) => row,
+      ),
+    ).toEqual(expected);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toHaveLength(held === null ? 7 : 3);
     for (const [i, row] of page.rows.entries()) {

@@ -80,6 +80,7 @@ import { m0071 } from "./0071-team-project-channels.ts";
 import { m0072 } from "./0072-channel-turns.ts";
 import { m0073 } from "./0073-channel-workspaces.ts";
 import { m0074 } from "./0074-run-posts.ts";
+import { m0075 } from "./0075-external-task-keys.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -156,4 +157,5 @@ export const MIGRATIONS: Migration[] = [
   m0072,
   m0073,
   m0074,
+  m0075,
 ];

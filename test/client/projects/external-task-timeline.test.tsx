@@ -92,6 +92,7 @@ const page = (
     briefAt: 0,
     chatId: null,
     chatTitle: null,
+    createdKeyName: null,
   },
   entries: written
     .toReversed()
@@ -403,6 +404,31 @@ describe("the activity", () => {
     });
     expect(hidden).toContain("<span>a chat</span>");
     expect(hidden).not.toContain("/chat/s1");
+  });
+
+  test("a task an outside agent made reads Opened and Canceled via its key", () => {
+    const base = page(
+      [entry("cancel", { text: "", keyName: "laptop-claude" })],
+      task({ state: "canceled", claim: null }),
+    );
+    const html = draw({
+      ...base,
+      detail: { ...base.detail, createdKeyName: "laptop-claude" },
+    });
+    const [opened, canceled] = html.split("<li").slice(1);
+    for (const [line, verb] of [
+      [opened!, "Opened"],
+      [canceled!, "Canceled"],
+    ] as const) {
+      expect(line).toContain(`>${verb}</span>`);
+      expect(line).toContain(">@stefan</a>");
+      expect(line).toMatch(
+        />via<\/span><span class="tag external-tasks-key" title="laptop-claude">laptop-claude</,
+      );
+    }
+    // a member's task names no key
+    const [plain] = draw(page([])).split("<li").slice(1);
+    expect(plain).not.toContain(">via<");
   });
 
   test("a line's words are the text's first line as a reader sees it", () => {

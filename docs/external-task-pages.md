@@ -106,8 +106,9 @@ are in `docs/external-tasks.md`; the other pages in `docs/views.md`.
   file keeps its row, off, drawn as a live one so the names line up.
 - **Activity runs oldest first, one line per entry** (`activityOf()`),
   no card and no coloured edge. A move that changes who holds the task
-  names who (`by @user via key`): Opened, with the chat it was made in
-  when the reader may open it, else "in a chat"; Claimed, Unclaimed,
+  names who (`by @user via key`): Opened, via the key an outside agent
+  made it through (`createdKeyName`), with the chat it was made in when
+  the reader may open it, else "in a chat"; Claimed, Unclaimed,
   Answered, Canceled, Reopened, and Edited, which has no words and adds
   the chat it came through as Opened does. An agent's report names no one:
   Reported, Asked, Finished. 1ctx's release reads `Unclaimed by 1ctx`

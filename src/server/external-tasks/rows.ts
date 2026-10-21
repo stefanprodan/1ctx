@@ -15,7 +15,8 @@ import type {
 import { lineFrom } from "../sessions/index.ts";
 
 // An agent's entries since the task's last reopen, which the bounds
-// count: those with a key name (claims, reports, its own unclaims), on
+// count: those with a key name (claims, reports, its own unclaims, and
+// the edits and cancels of the key that made the task), on
 // the agent index by rowid, since entries append in order. A reopen
 // starts both counts again.
 export const agentSince = (task: string, kind?: "claim") => `(select count(*)
@@ -34,7 +35,7 @@ export const claimsSince = (task: string) => agentSince(task, "claim");
 // either.
 export const TASK_SELECT = `select t.id, t.project_id, t.title, t.state,
     t.revision, t.edit_revision, t.claim_id, t.created_by,
-    t.created_at, t.moved_at, u.username as creator_name,
+    t.created_key_id, t.created_at, t.moved_at, u.username as creator_name,
     (select json_group_array(p.name order by l.position)
       from external_task_labels l join project_labels p on p.id = l.label_id
       where l.task_id = t.id) as labels,
@@ -67,6 +68,8 @@ export type TaskKey = { userId: string; keyId: string; keyName: string };
 export type TaskListRow = ExternalTaskRow & {
   answered: boolean;
   cursor: string;
+  // the key that made it over /mcp, for that key's own reads only
+  createdKeyId: string | null;
 };
 export type ListInput = {
   projectIds: string[];
@@ -75,6 +78,8 @@ export type ListInput = {
   // every task
   labels: string[];
   held: TaskKey | null;
+  // only the tasks this key made, still filtered by states and labels
+  created?: TaskKey | null;
   after: string | null;
   limit: number;
 };
@@ -103,6 +108,7 @@ export type RawTask = {
   revision: number;
   edit_revision: number;
   created_by: string | null;
+  created_key_id: string | null;
   creator_name: string | null;
   created_at: number;
   moved_at: number;

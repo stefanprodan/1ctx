@@ -88,6 +88,7 @@ describe("the inbound MCP tasks tool", () => {
             keyId: "key000000001",
             keyName: "laptop",
           },
+          created: null,
           after: null,
           limit: 100,
         },
@@ -248,17 +249,30 @@ describe("the inbound MCP tasks tool", () => {
     expect(readTasks.description).toStartWith(
       "Work handed to you from a 1ctx project: list and show.",
     );
-    expect(readTasks.description).not.toMatch(/claim|report|write/i);
+    expect(readTasks.description).not.toMatch(
+      /claim|report|write|create|\bedit|\bcancel\b/i,
+    );
     expect(readTasks.inputSchema.properties.action.enum).toEqual([
       "list",
       "show",
     ]);
-    expect(readTasks.inputSchema.properties.claimId).toBeUndefined();
+    for (const field of [
+      "claimId",
+      "created",
+      "title",
+      "fileIds",
+      "editRevision",
+    ])
+      expect(readTasks.inputSchema.properties[field]).toBeUndefined();
     expect(readTasks.inputSchema.properties.labels).toBeDefined();
+    // refused before parsing: a malformed write gets the same answer
     for (const args of [
       { action: "claim", taskId: "task00000001" },
       unclaim,
       report,
+      { action: "create", projectId: project.id, title: 7 },
+      { action: "edit", taskId: "task00000001", nonsense: true },
+      { action: "cancel" },
     ]) {
       const refused = await toolCall(read.send, "tasks", args);
       expect(refused.result.isError).toBe(true);
@@ -278,10 +292,15 @@ describe("the inbound MCP tasks tool", () => {
       "claim",
       "unclaim",
       "report",
+      "create",
+      "edit",
+      "cancel",
     ]);
     expect(writeTasks.description).toStartWith(
-      "Work handed to you from a 1ctx project: list, claim, report back.",
+      "Work handed to you from a 1ctx project: list, claim, report back, create.",
     );
+    for (const field of ["created", "title", "fileIds", "editRevision"])
+      expect(writeTasks.inputSchema.properties[field]).toBeDefined();
     expect(writeTasks.inputSchema.properties.kind.enum).toEqual([
       ...AGENT_ENTRY_KINDS,
     ]);

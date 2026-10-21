@@ -17,6 +17,10 @@ import { ATTENTION_ROWS, CLOSED_PAGE, closed, parseCursor } from "./rules.ts";
 export const UNFINISHED =
   "t.state in ('todo', 'in_progress', 'awaiting_input')";
 export const CLOSED = "t.state in ('done', 'canceled')";
+// a key's unfinished tasks, in the words of the partial index
+// external_tasks_key_unfinished, which SQLite uses only when the query
+// repeats its predicate
+export const KEY_UNFINISHED = `t.created_key_id is not null and ${UNFINISHED}`;
 
 // a task carrying any of the label names bound as JSON
 const LABELED = `exists (select 1 from external_task_labels l
@@ -119,6 +123,7 @@ export class ExternalTaskLists {
         ...taskRow(raw),
         answered: raw.answered === 1,
         cursor: `${raw.moved_at}.${raw.id}`,
+        createdKeyId: raw.created_key_id,
       })),
       next: rows.length > limit && last ? `${last.moved_at}.${last.id}` : null,
     };
@@ -132,7 +137,9 @@ export class ExternalTaskLists {
   ) {
     const page = this.page([closedWhere(projectId, filter)], after, limit);
     return {
-      tasks: page.rows.map(({ answered: _, cursor: __, ...row }) => row),
+      tasks: page.rows.map(
+        ({ answered: _, cursor: __, createdKeyId: ___, ...row }) => row,
+      ),
       next: page.next,
     };
   }
@@ -165,12 +172,14 @@ export class ExternalTaskLists {
       input.labels.length === 0
         ? null
         : [...new Set(input.labels.map(shapeLabelName))];
+    const created = input.created ?? null;
     const filters = [...new Set(input.projectIds)].flatMap((projectId) =>
       [...new Set(states)].map((state) => ({
-        where: `t.project_id = ? and t.state = ? and ${closed(state) ? CLOSED : UNFINISHED}${labels === null ? "" : ` and ${LABELED}`}`,
+        where: `t.project_id = ? and t.state = ? and ${closed(state) ? CLOSED : UNFINISHED}${created === null ? "" : " and t.created_key_id = ?"}${labels === null ? "" : ` and ${LABELED}`}`,
         args: [
           projectId,
           state,
+          ...(created === null ? [] : [created.keyId]),
           ...(labels === null ? [] : [JSON.stringify(labels)]),
         ],
       })),

@@ -143,6 +143,7 @@ export const externalTaskDetail = (
   briefAt: 100,
   chatId: null,
   chatTitle: null,
+  createdKeyName: null,
 });
 
 // the largest detail a task can carry, so a page leaves its entries
@@ -184,6 +185,7 @@ export const externalTaskShow = (
   entries: [externalTaskEntry()],
   next: null,
   idleHours: 24,
+  createdKeyId: null,
 });
 
 export const session = {
@@ -248,7 +250,10 @@ type TaskCall =
       kind: string;
       text: string;
       links: string[];
-    };
+    }
+  | { action: "create"; key: TaskKey; projectId: string; body: unknown }
+  | { action: "edit"; key: TaskKey; taskId: string; body: unknown }
+  | { action: "cancel"; key: TaskKey; taskId: string };
 
 type State = {
   now: number;
@@ -390,6 +395,26 @@ export function fixture(scope: "read" | "write" = "read", log: Log = silent) {
         state.taskCalls.push({ action: "claim", key: taskKey, taskId });
         if (state.taskShow === null) throw new NotFound();
         return { ...state.taskShow, claimId: state.taskClaimId };
+      },
+      agentCreate: (taskKey, projectId, body) => {
+        state.taskCalls.push({
+          action: "create",
+          key: taskKey,
+          projectId,
+          body,
+        });
+        if (state.taskShow === null) throw new NotFound();
+        return { ...state.taskShow, existing: false };
+      },
+      agentEdit: (taskKey, taskId, body) => {
+        state.taskCalls.push({ action: "edit", key: taskKey, taskId, body });
+        if (state.taskShow === null) throw new NotFound();
+        return state.taskShow;
+      },
+      agentCancel: (taskKey, taskId) => {
+        state.taskCalls.push({ action: "cancel", key: taskKey, taskId });
+        if (state.taskShow === null) throw new NotFound();
+        return state.taskShow;
       },
       report: (taskKey, taskId, claimId, kind, text, links) => {
         state.taskCalls.push({

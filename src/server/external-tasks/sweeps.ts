@@ -4,10 +4,10 @@
 import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
-import { taskChanged, writeEntry } from "./actions.ts";
 import type { OpenClaim } from "./rows.ts";
 import { closed } from "./rules.ts";
 import type { ExternalTaskStore } from "./store.ts";
+import { taskChanged, writeEntry } from "./writes.ts";
 
 const hoursText = (hours: number) =>
   hours === 1 ? "1 hour" : `${hours} hours`;

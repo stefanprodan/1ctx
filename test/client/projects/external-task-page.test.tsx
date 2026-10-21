@@ -89,6 +89,7 @@ const page = (
     briefAt: task.createdAt,
     chatId: null,
     chatTitle: null,
+    createdKeyName: null,
     ...changes,
   },
   entries,

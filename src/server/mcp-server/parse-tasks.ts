@@ -28,6 +28,8 @@ export type TasksInput =
       // shaped names, any of them; empty for every task
       labels: string[];
       held: boolean;
+      // only the tasks this key made
+      created: boolean;
       after: string | null;
     }
   | {
@@ -52,7 +54,25 @@ export type TasksInput =
       kind: AgentEntryKind;
       text: string;
       links: string[];
-    };
+    }
+  | {
+      action: "create";
+      projectId: string;
+      title: string;
+      // as given; the area shapes and checks them as the page's create
+      labels: string[];
+      fileIds: string[];
+    }
+  | {
+      action: "edit";
+      projectId: string | null;
+      taskId: string;
+      editRevision: number;
+      title?: string;
+      labels?: string[];
+      fileIds?: string[];
+    }
+  | { action: "cancel"; projectId: string | null; taskId: string };
 
 const action = <T extends string>(value: unknown, allowed: readonly T[]): T => {
   if (typeof value !== "string" || !allowed.includes(value as T)) {
@@ -107,6 +127,18 @@ function taskLabels(value: unknown): string[] {
   const names = value.map(shapeLabelName);
   if (!names.every(isLabelName)) throw new BadRequest(rule);
   return [...new Set(names)];
+}
+
+// a brief's list as given: the area checks it as the page's create does
+function briefList(value: unknown, field: string): string[] {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string"))
+    throw new BadRequest(`${field} must be a list of strings`);
+  return value;
+}
+
+function briefTitle(value: unknown): string {
+  if (typeof value !== "string") throw new BadRequest("title must be a string");
+  return value;
 }
 
 function reportKind(value: unknown): AgentEntryKind {
@@ -180,6 +212,10 @@ export function parseTasks(value: unknown, canHold: boolean): TasksInput {
     "kind",
     "text",
     "links",
+    "created",
+    "title",
+    "fileIds",
+    "editRevision",
   ]);
   const picked = action(head.action, [
     "list",
@@ -187,21 +223,48 @@ export function parseTasks(value: unknown, canHold: boolean): TasksInput {
     "claim",
     "unclaim",
     "report",
+    "create",
+    "edit",
+    "cancel",
   ] as const);
   if (picked === "list") {
     fields(
       value,
       canHold
-        ? ["action", "projectId", "states", "labels", "held", "after"]
+        ? [
+            "action",
+            "projectId",
+            "states",
+            "labels",
+            "held",
+            "created",
+            "after",
+          ]
         : ["action", "projectId", "states", "labels", "after"],
     );
+    const held = canHold ? optionalBoolean(head.held, "held") : false;
+    const created = canHold ? optionalBoolean(head.created, "created") : false;
+    if (held && created) {
+      throw new BadRequest("choose held or created, not both");
+    }
     return {
       action: picked,
       projectId: optionalId(head.projectId, "projectId"),
       states: taskStates(head.states),
       labels: taskLabels(head.labels),
-      held: canHold ? optionalBoolean(head.held, "held") : false,
+      held,
+      created,
       after: listCursor(head.after),
+    };
+  }
+  if (picked === "create") {
+    fields(value, ["action", "projectId", "title", "labels", "fileIds"]);
+    return {
+      action: picked,
+      projectId: requiredId(head.projectId, "projectId"),
+      title: briefTitle(head.title),
+      labels: briefList(head.labels, "labels"),
+      fileIds: briefList(head.fileIds, "fileIds"),
     };
   }
   const taskId = requiredId(head.taskId, "taskId");
@@ -215,9 +278,47 @@ export function parseTasks(value: unknown, canHold: boolean): TasksInput {
       before: optionalId(head.before, "before"),
     };
   }
-  if (picked === "claim") {
+  if (picked === "claim" || picked === "cancel") {
     fields(value, ["action", "projectId", "taskId"]);
     return { action: picked, projectId, taskId };
+  }
+  if (picked === "edit") {
+    fields(value, [
+      "action",
+      "projectId",
+      "taskId",
+      "editRevision",
+      "title",
+      "labels",
+      "fileIds",
+    ]);
+    const { editRevision } = head;
+    if (
+      typeof editRevision !== "number" ||
+      !Number.isSafeInteger(editRevision) ||
+      editRevision < 0
+    ) {
+      throw new BadRequest("editRevision must be a non-negative integer");
+    }
+    const edit: Extract<TasksInput, { action: "edit" }> = {
+      action: picked,
+      projectId,
+      taskId,
+      editRevision,
+    };
+    if (head.title !== undefined) edit.title = briefTitle(head.title);
+    if (head.labels !== undefined)
+      edit.labels = briefList(head.labels, "labels");
+    if (head.fileIds !== undefined)
+      edit.fileIds = briefList(head.fileIds, "fileIds");
+    if (
+      edit.title === undefined &&
+      edit.labels === undefined &&
+      edit.fileIds === undefined
+    ) {
+      throw new BadRequest("edit needs a title, labels or fileIds to change");
+    }
+    return edit;
   }
   if (picked === "unclaim") {
     fields(value, ["action", "projectId", "taskId", "claimId", "text"]);
