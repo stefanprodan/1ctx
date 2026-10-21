@@ -157,7 +157,11 @@ export function readReasoningDetails(
 // reasoning and thinking records that this provider and model wrote are
 // dropped, so no later turn sends them again. Other records, the phase
 // among them, stay. Answers how many messages changed.
-const REFUSABLE = new Set(["reasoning", "thinking", "redacted_thinking"]);
+export const REFUSABLE_REASONING: ReadonlySet<string> = new Set([
+  "reasoning",
+  "thinking",
+  "redacted_thinking",
+]);
 
 export function forgetReasoning(
   db: Db,
@@ -186,7 +190,7 @@ export function forgetReasoning(
         continue;
       }
       if (!Array.isArray(items)) continue;
-      const kept = items.filter((item) => !REFUSABLE.has(item?.type));
+      const kept = items.filter((item) => !REFUSABLE_REASONING.has(item?.type));
       if (kept.length === items.length) continue;
       update.run(kept.length > 0 ? JSON.stringify(kept) : null, row.id);
       changed++;

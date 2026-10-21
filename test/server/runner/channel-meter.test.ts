@@ -9,6 +9,82 @@ import { idle, setLimits, startChat } from "../../helpers/chat.ts";
 import { frames, watch, watcher } from "../../helpers/socket.ts";
 
 test.serial(
+  "a watcher reads the meter on posts and turn boundaries, never work or restart envelopes",
+  async () => {
+    const { chat, channelId, post, summon, tool } = await channelApp();
+    const meter = spyOn(chat.app.runner, "channelMeter");
+    const query = spyOn(chat.app.db, "query");
+    try {
+      const conn = await watcher(chat);
+      watch(chat, conn, channelId);
+      expect(meter).toHaveBeenCalledTimes(1);
+      meter.mockClear();
+      await post("before the turn");
+      expect(meter).toHaveBeenCalledTimes(1);
+      meter.mockClear();
+      const turn = await summon();
+      expect(meter).toHaveBeenCalledTimes(2);
+      const startFrames = frames(conn, "session").length;
+      meter.mockClear();
+      query.mockClear();
+      let round = turn.script;
+      for (const command of ["printf first", "printf second"]) {
+        round = await tool(round, command);
+      }
+      const count = chat.scripted.scripts.length;
+      round.content("looped provider output ".repeat(1000));
+      round = await chat.scripted.reached(count + 1);
+      expect(frames(conn, "restart")).toHaveLength(1);
+      const work = frames(conn, "session").slice(startFrames);
+      expect(work.some((frame) => frame.send === null)).toBe(true);
+      expect(
+        work.some((frame) =>
+          frame.messages.some(
+            (row) => row.kind === "tool" && row.status === "done",
+          ),
+        ),
+      ).toBe(true);
+      expect(work.every((frame) => frame.channelContext === undefined)).toBe(
+        true,
+      );
+      expect(meter).not.toHaveBeenCalled();
+      expect(
+        query.mock.calls.filter(([sql]) => sql.includes("as firstSeq")),
+      ).toHaveLength(0);
+      await post("posted during work");
+      expect(meter).toHaveBeenCalledTimes(1);
+      meter.mockClear();
+      round.reply("finished");
+      await idle(chat.app);
+      expect(meter).toHaveBeenCalledTimes(1);
+      expect(
+        frames(conn, "session").at(-1)?.channelContext?.tokens,
+      ).toBeGreaterThan(0);
+
+      await post("stream ".repeat(2000));
+      await setLimits(chat, {
+        channelStreamTokens: 1000,
+        channelDropTokens: 1000,
+      });
+      meter.mockClear();
+      const next = await summon();
+      expect(meter).toHaveBeenCalledTimes(2);
+      expect(chat.app.sessions.byId(channelId)?.droppedSeq).toBeGreaterThan(0);
+      expect(frames(conn, "session").at(-1)?.channelContext).toEqual(
+        chat.app.runner.channelMeter(channelId),
+      );
+      next.script.reply("done");
+      await idle(chat.app);
+      chat.app.socket.close(conn);
+    } finally {
+      meter.mockRestore();
+      query.mockRestore();
+      await chat.app.shutdown();
+    }
+  },
+);
+
+test.serial(
   "a channel frame counts once for several watchers, and unchanged reads count nothing",
   async () => {
     const { chat, channelId, post, detail } = await channelApp();

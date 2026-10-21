@@ -10,15 +10,100 @@ import { channelRead } from "../../../src/server/runner/channel-read.ts";
 import { SKILLS_LEAD } from "../../../src/server/runner/context.ts";
 import { TRACE_HEADING } from "../../../src/server/runner/trace.ts";
 import { sweepChats } from "../../../src/server/sessions/sweep.ts";
+import { azureFetch, frames, refusal, stream } from "../../helpers/azure.ts";
 import { channelApp, localAt, messagesOf } from "../../helpers/channel.ts";
 import {
   ANTHROPIC_MODEL,
+  AZURE_MODEL,
   idle,
+  ringing,
+  sessionSettled,
   setLimits,
   varied,
 } from "../../helpers/chat.ts";
 
 describe("channel context", () => {
+  test.each([false, true])(
+    "refused whole-turn reasoning leaves the frozen prefix and later tool requests (retry %s)",
+    async (retry) => {
+      const fake = azureFetch();
+      const { chat, channelId, post } = await channelApp({
+        wire: "azure",
+        model: AZURE_MODEL,
+        fetcher: fake.fetcher,
+      });
+      const turn = async (text: string) => {
+        expect((await post(`@coder ${text}`)).status).toBe(201);
+        await ringing(chat.app, sessionSettled(chat.app, channelId), 2_000);
+        expect(chat.app.sessions.lastSend(channelId)?.status).toBe("done");
+      };
+      try {
+        fake.queue.push(
+          stream("chat-reasoning-tool.sse"),
+          stream("chat-text-after-tool.sse"),
+        );
+        await turn("first question");
+        fake.queue.push(
+          refusal("error-encrypted.json"),
+          ...(retry ? [{ status: 503, body: "provider busy" }] : []),
+          frames(
+            {
+              type: "response.output_item.done",
+              output_index: 0,
+              item: {
+                type: "function_call",
+                call_id: "channel-bash",
+                name: "bash",
+                arguments: JSON.stringify({ command: "printf 'tool-payload'" }),
+              },
+            },
+            { type: "response.completed", response: {} },
+          ),
+          stream("chat-text-after-tool.sse"),
+        );
+        await turn("second question");
+        const bodies = fake.bodies();
+        expect(bodies).toHaveLength(retry ? 6 : 5);
+        const original = bodies[2]!.input as { type?: string }[];
+        const clean = original.filter((item) => item.type !== "reasoning");
+        expect(
+          original.filter((item) => item.type === "reasoning"),
+        ).toHaveLength(6);
+        for (const body of bodies.slice(3, -1)) {
+          expect(JSON.stringify(body.input)).toBe(JSON.stringify(clean));
+        }
+        const next = bodies.at(-1)!.input as { type?: string }[];
+        expect(next.filter((item) => item.type === "reasoning")).toEqual([]);
+        expect(JSON.stringify(next.slice(0, clean.length))).toBe(
+          JSON.stringify(clean),
+        );
+        expect(next.slice(clean.length)).toEqual([
+          {
+            type: "function_call",
+            call_id: "channel-bash",
+            name: "bash",
+            arguments: JSON.stringify({ command: "printf 'tool-payload'" }),
+          },
+          expect.objectContaining({
+            type: "function_call_output",
+            call_id: "channel-bash",
+            output: expect.stringContaining("tool-payload"),
+          }),
+        ]);
+        expect(clean).toContainEqual(
+          expect.objectContaining({ role: "assistant", phase: "final_answer" }),
+        );
+        expect(chat.app.sessions.lastSend(channelId)).toMatchObject({
+          status: "done",
+          rounds: 2,
+          toolCalls: 1,
+        });
+      } finally {
+        await chat.app.shutdown();
+      }
+    },
+  );
+
   test("a fixed start snapshot keeps a running agent's post, not its work or later answer", async () => {
     const { chat, channelId, post, summon, tool } = await channelApp();
     try {

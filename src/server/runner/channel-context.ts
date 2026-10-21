@@ -8,6 +8,7 @@ import { BadRequest, NotFound } from "../lib/errors.ts";
 import { CHARS_PER_TOKEN } from "../lib/tokens.ts";
 import type { ChannelCaps } from "../limits/index.ts";
 import { type ChatMessageIn, requestTokens } from "../providers/index.ts";
+import { REFUSABLE_REASONING } from "../sessions/index.ts";
 import { channelLocal, channelSystem } from "./channel-prompt.ts";
 import {
   type ChannelRow,
@@ -31,6 +32,7 @@ import { TAIL_MAX_TOKENS, tailOf } from "./tail.ts";
 import { yoursOf } from "./trace.ts";
 
 export type ChannelContext = {
+  forgetReasoning(): void;
   messages(
     excludeId: string | null,
     mcpNote: string,
@@ -235,6 +237,19 @@ export function channelContext(fields: {
     let local: ChatMessageIn | null = null;
     return {
       result: {
+        forgetReasoning() {
+          for (const message of prefix) {
+            if (message.role !== "assistant" || !message.reasoningDetails) {
+              continue;
+            }
+            const kept = message.reasoningDetails.filter(
+              (item) => !REFUSABLE_REASONING.has(item.type),
+            );
+            // Retries of this round share these captured message objects.
+            if (kept.length > 0) message.reasoningDetails = kept;
+            else delete message.reasoningDetails;
+          }
+        },
         messages(excludeId, mcpNote, repos) {
           if (local === null) {
             local = localMessage(mcpNote, repos);

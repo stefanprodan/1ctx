@@ -26,6 +26,7 @@ import {
   VERSION,
 } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
+import { channelApp } from "../helpers/channel.ts";
 import {
   type ChatApp,
   chatApp,
@@ -899,7 +900,8 @@ describe("the envelope row read", () => {
 
   test.serial(
     "failed row and meter reads still send the channel envelope",
-    () => {
+    async () => {
+      const { chat, channelId, project, post } = await channelApp();
       const logs = collectLogs();
       const socket = socketArea({
         version: "test",
@@ -918,19 +920,25 @@ describe("the envelope row read", () => {
           throw new Error("disk I/O error");
         },
       });
-      const conn = memberConn("a", ["p"]);
-      socket.open(conn);
-      changed("p", "channel");
-      expect(frames(conn, "session").map((frame) => frame.row)).toEqual([null]);
-      expect(frames(conn, "session")[0]?.channelContext).toBeUndefined();
-      expect(
-        logs.events.map((event) => [event.msg, event.fields.chat]),
-      ).toEqual([
-        ["socket open", undefined],
-        ["envelope row failed", "s-p"],
-        ["channel meter failed", "s-p"],
-      ]);
-      socket.dispose();
+      try {
+        const conn = memberConn(chat.memberId, [project.id]);
+        socket.open(conn);
+        expect((await post("a channel post")).status).toBe(201);
+        expect(frames(conn, "session").map((frame) => frame.row)).toEqual([
+          null,
+        ]);
+        expect(frames(conn, "session")[0]?.channelContext).toBeUndefined();
+        expect(
+          logs.events.map((event) => [event.msg, event.fields.chat]),
+        ).toEqual([
+          ["socket open", undefined],
+          ["envelope row failed", channelId],
+          ["channel meter failed", channelId],
+        ]);
+      } finally {
+        socket.dispose();
+        await chat.app.shutdown();
+      }
     },
   );
 });

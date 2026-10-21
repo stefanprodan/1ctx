@@ -41,7 +41,10 @@ Posting and parallel turns are in `docs/sessions.md`, pending turns in
 - **Thinking follows the tail's provider and model rules.** On `anthropic`
   the replayed whole last turn loses its thinking because its prefix changed.
   The live turn keeps its own thinking between rounds: its prefix is fixed
-  at start and only appended to.
+  at start and only appended to. A provider's reasoning refusal also drops
+  the refused record types from the frozen whole-turn replay, including
+  requests retried within the round. Phases and every other prefix byte stay
+  unchanged; the stream is not read again.
 
 ## Prefix and room
 
@@ -93,8 +96,10 @@ Posting and parallel turns are in `docs/sessions.md`, pending turns in
 - **Detail carries `channelContext: {tokens, budget}`.** `watched` carries
   the same meter. A channel's `session` frame refreshes it on a post,
   a turn's start (which may move the mark), and a turn's end, not on work
-  rounds or live deltas. The meter can pass the budget between starts;
-  the next admitted summon advances the mark before reading it.
+  rounds or live deltas. Work-slot, tool completion and round restart
+  envelopes have no send and never read it; a cut start envelope still does.
+  The meter can pass the budget between starts; the next admitted summon
+  advances the mark before reading it.
   The page never tokenizes and never uses a particular agent's usage
   for this number.
 - **Meter reads share a per-runner cache by channel, revision and dropped

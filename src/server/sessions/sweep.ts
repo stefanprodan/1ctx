@@ -127,7 +127,7 @@ function steps(deps: SweepDeps): Step[] {
           .get(id, idleBefore(now, caps));
         if (current === null) return null;
         db.query(
-          `update messages set content = '', reasoning = '',
+          `update messages set content = '', error = null, reasoning = '',
              reasoning_details = null, packed = null, packed_bytes = null
            where send_id = ? and kind = 'tool'`,
         ).run(id);

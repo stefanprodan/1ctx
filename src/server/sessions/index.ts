@@ -133,7 +133,12 @@ export {
   type SessionSearchLine,
   type SessionSearchPage,
 } from "./search.ts";
-export { forgetReasoning, lastPrompt, sendTurns } from "./sends.ts";
+export {
+  forgetReasoning,
+  lastPrompt,
+  REFUSABLE_REASONING,
+  sendTurns,
+} from "./sends.ts";
 export { SessionStore } from "./store.ts";
 export { type SummonAgents, summonOf } from "./summon.ts";
 

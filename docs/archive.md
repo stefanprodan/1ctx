@@ -97,8 +97,9 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   `archiveIdleDays`, one rechecking transaction each. A running send is
   never touched.
 - **Aged tool rows keep their trace fields.** Their content, reasoning,
-  reasoning details and packed result are dropped; tool name, call id,
-  status and saved docs remain. The transaction also deletes opened files,
+  reasoning details, error (which also holds failed output) and packed result
+  are dropped; tool name, call id, status and saved docs remain.
+  The transaction also deletes opened files,
   kept MCP files and child sessions, bumps the channel revision and publishes
   the changed turn. Posts and answers remain.
 - **`sends.swept` is the trace-only mark.** The context builder reads it

@@ -287,6 +287,7 @@ async function streamRound(
     // idle cap until it answers
     if (event.kind === "reasoningRefused") {
       deps.forgetReasoning?.(send.sessionId, send.policy.providerId, req.model);
+      send.channel?.forgetReasoning();
       continue;
     }
     // a frame with nothing to show starts no idle check, but one already

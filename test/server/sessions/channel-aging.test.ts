@@ -10,7 +10,8 @@ import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { trace, traceCalls } from "../../../src/server/runner/trace.ts";
 import { sendTurns } from "../../../src/server/sessions/index.ts";
 import { sweepChats } from "../../../src/server/sessions/sweep.ts";
-import { type ChatApp, chatApp } from "../../helpers/chat.ts";
+import { channelApp } from "../../helpers/channel.ts";
+import { type ChatApp, chatApp, idle } from "../../helpers/chat.ts";
 
 const yours = { mcp: new Set<string>(), skills: new Set<string>() };
 
@@ -135,6 +136,57 @@ function addTurn(chat: ChatApp, channelId: string, status: "done" | "running") {
 }
 
 describe("channel turn aging", () => {
+  test("aging a failed bash call drops every copy of its output and keeps its trace", async () => {
+    const { chat, channelId, summon, tool } = await channelApp();
+    try {
+      const turn = await summon();
+      const next = await tool(
+        turn.script,
+        "printf 'failed-%s' 'payload' >&2; exit 1",
+      );
+      next.reply("the call failed");
+      await idle(chat.app);
+      const before = chat.app.sessions.messages(channelId);
+      const failed = before.find((row) => row.kind === "tool")!;
+      expect(failed.status).toBe("failed");
+      expect(failed.content).toContain("failed-payload");
+      expect(failed.error).toBe(failed.content);
+      const calls = traceCalls(before);
+      const swept = sweepChats(
+        {
+          db: chat.app.db,
+          store: chat.app.sessions,
+          scratch: chat.app.bash.scratch,
+          log: silent,
+        },
+        chat.app.now.value + (DEFAULT_LIMITS.archiveIdleDays + 1) * DAY_MS,
+        DEFAULT_LIMITS,
+      );
+      expect(swept.turns_swept).toBe(1);
+      const row = chat.app.db
+        .query("select * from messages where id = ?")
+        .get(failed.id);
+      expect(row).toMatchObject({
+        content: "",
+        reasoning: "",
+        reasoning_details: null,
+        error: null,
+        packed: null,
+        packed_bytes: null,
+        status: "failed",
+        tool_name: failed.toolName,
+        tool_call_id: failed.toolCallId,
+        saved: null,
+      });
+      expect(JSON.stringify(row)).not.toContain("failed-payload");
+      const after = traceCalls(chat.app.sessions.messages(channelId));
+      expect(after).toEqual(calls);
+      expect(trace(after, yours)).toBe(trace(calls, yours));
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test.serial(
     "drops old tool payloads, files and children and publishes the trace",
     async () => {
