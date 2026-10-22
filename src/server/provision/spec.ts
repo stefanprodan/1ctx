@@ -66,6 +66,7 @@ import {
   TOOL_FIELDS,
   type ToolName,
 } from "../tools/index.ts";
+import type { DictationSpec } from "./dictation.ts";
 import {
   at,
   boolean,
@@ -233,6 +234,7 @@ export type Specs = {
   Repository: RepositorySpec;
   Provider: ProviderSpec;
   Decider: DeciderSpec;
+  Dictation: DictationSpec;
   Skill: SkillSpec;
   McpServer: McpServerSpec;
   Agent: AgentSpec;

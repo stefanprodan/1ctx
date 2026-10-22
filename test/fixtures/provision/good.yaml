@@ -76,6 +76,15 @@ spec:
   default: true
 ---
 apiVersion: config.1ctx.dev/v1
+kind: Dictation
+metadata:
+  name: dictation
+spec:
+  provider: mock-provider
+  model: mlx-community/Qwen3-ASR-1.7B-8bit
+  enabled: true
+---
+apiVersion: config.1ctx.dev/v1
 kind: Skill
 metadata:
   name: paper-skill

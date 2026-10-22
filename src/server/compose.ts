@@ -835,6 +835,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       const held = email.settings();
       return held && { username: held.username, keyName: held.keyName };
     },
+    providerWire: (name) => providers.store.byName(name)?.wire ?? null,
     inventory: () =>
       inventoryOf({
         users,
@@ -847,6 +848,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         mcp: mcp.store,
         agents: agents.store,
         email,
+        dictation: dictation.store,
       }),
   });
   const sweepLog = log("sweep");

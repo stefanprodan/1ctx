@@ -33,6 +33,7 @@ const inventory = (existing: Partial<Inventory> = {}): Inventory => ({
   Repository: [],
   Provider: [],
   Decider: [],
+  Dictation: [],
   Skill: [],
   McpServer: [],
   Agent: [],

@@ -5,7 +5,7 @@ Governs `src/server/provision/`: `1ctx provision` and the server's
 
 Provisioning applies YAML documents, one object each (a `kind` from
 `KINDS`: users, the SMTP server, projects, credentials, repositories,
-providers, deciders, skills, MCP servers, agents, tools), to an
+providers, deciders, Dictation, skills, MCP servers, agents, tools), to an
 instance's database, creating or updating what they name.
 
 ## Running it
@@ -55,6 +55,14 @@ instance's database, creating or updating what they name.
   `publicAddress`; `keyFrom` names an `email-` key file, null takes it
   off, and must be present. Validation checks `username` and `keyFrom`
   over the held login: both set or both null.
+- **`Dictation` is the instance's one Dictation setting**
+  (`docs/dictation.md`). A second `Dictation` document is refused, and
+  any name updates the one held. A new one needs `provider` and
+  `model`. Validation checks that the provider is held or in the input
+  and on a `TRANSCRIPTION_WIRES` wire. The save checks the model
+  against the live transcription catalog, so it fails while the
+  provider's server is down. `enabled` left out on an update stays; a
+  new one without it is off.
 
 - **An `Agent` is matched by name among live agents.** One naming a
   deleted agent creates a new agent. The automations the delete paused

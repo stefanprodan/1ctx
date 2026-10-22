@@ -34,6 +34,7 @@ import {
   required,
 } from "./client.ts";
 import { decider } from "./decider.ts";
+import { applyDictation } from "./dictation.ts";
 import { type Document, KINDS, type LabelSpec, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
 import { applySmtpServer } from "./smtp.ts";
@@ -470,6 +471,9 @@ export async function apply(
             break;
           case "Decider":
             action = await decider(api, doc);
+            break;
+          case "Dictation":
+            action = await applyDictation(api, doc);
             break;
           case "Skill":
             action = await skill(api, doc);
