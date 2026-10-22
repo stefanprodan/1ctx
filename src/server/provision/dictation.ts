@@ -59,8 +59,8 @@ export function checkDictation(
   if (input === undefined && !inventory.Provider.includes(name)) {
     fail("provider", `references missing Provider/${name}`);
   }
-  // an update that leaves the wire out keeps the held one
-  const wire = input?.wire ?? providerWire(name);
+  // a held provider's wire never changes, so its own one decides
+  const wire = providerWire(name) ?? input?.wire ?? null;
   if (wire !== null && !servesTranscription(wire)) {
     fail(
       "provider",

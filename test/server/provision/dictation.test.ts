@@ -169,6 +169,14 @@ describe("provision Dictation", () => {
       await expect(
         apply(dictation({ provider: "gem", model: ASR })),
       ).rejects.toThrow(refusal);
+      // the held wire decides, whatever the input asks of it
+      await expect(
+        apply(
+          object("Provider", "gem", { wire: "openai-compatible" }),
+          dictation({ provider: "gem", model: ASR }),
+        ),
+      ).rejects.toThrow(refusal);
+      expect(app.providers.list()[0]?.wire).toBe("gemini");
       expect(held(app)).toBeNull();
     });
   });

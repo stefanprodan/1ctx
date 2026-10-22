@@ -61,8 +61,11 @@ instance's database, creating or updating what they name.
   `model`. Validation checks that the provider is held or in the input
   and on a `TRANSCRIPTION_WIRES` wire. The save checks the model
   against the live transcription catalog, so it fails while the
-  provider's server is down. `enabled` left out on an update stays; a
-  new one without it is off.
+  provider's server is down; it is asked only when the provider or the
+  model changes, so an unchanged apply skips it. `enabled` left out on
+  an update stays; a new one without it is off. A model change and a
+  switch flip are two writes: a failure between them leaves the model
+  saved with the old switch, and applying again finishes it.
 
 - **An `Agent` is matched by name among live agents.** One naming a
   deleted agent creates a new agent. The automations the delete paused
