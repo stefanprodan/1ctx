@@ -251,7 +251,7 @@ export function patchOf(
   return Object.keys(body).length === 0 ? null : body;
 }
 
-// without the lookalikes (0 O o, 1 l I), so it survives voice or paper
+// without the lookalikes (0 O o, 1 l I), so it survives dictation or paper
 const PASSWORD_CHARS =
   "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 

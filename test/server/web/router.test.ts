@@ -467,3 +467,65 @@ describe("a handler that throws", () => {
     });
   });
 });
+
+describe("idleSeconds", () => {
+  const principal: Principal = {
+    userId: "u",
+    username: "member",
+    fullName: "Member",
+    role: "member",
+    mustChangePassword: false,
+    via: { kind: "login", id: "l" },
+  };
+  const slow: RouteDescriptor = {
+    method: "GET",
+    path: "/api/slow",
+    policy: "authenticated",
+    idleSeconds: 180,
+    handle: () => json({}),
+  };
+
+  test("holds the connection only for a caller access let in", async () => {
+    const held: number[] = [];
+    const hold = (seconds: number) => held.push(seconds);
+    const build = (signedIn: boolean) =>
+      answered(
+        router({
+          routes: [slow, echo],
+          resolve: () => ({
+            principal: signedIn ? principal : null,
+            setCookie: null,
+          }),
+          trustProxy: false,
+          log: silent,
+        }),
+      );
+    const get = (path: string) => new Request(`http://app.test${path}`);
+    expect(
+      (await build(false)(get("/api/slow"), "1.2.3.4", undefined, hold)).status,
+    ).toBe(401);
+    expect(held).toEqual([]);
+    expect(
+      (await build(true)(get("/api/things/1"), "1.2.3.4", undefined, hold))
+        .status,
+    ).toBe(200);
+    expect(held).toEqual([]);
+    expect(
+      (await build(true)(get("/api/slow"), "1.2.3.4", undefined, hold)).status,
+    ).toBe(200);
+    expect(held).toEqual([180]);
+  });
+
+  test("the router refuses one past Bun's ceiling", () => {
+    for (const idleSeconds of [0, 256, 1.5]) {
+      expect(() =>
+        router({
+          routes: [{ ...slow, idleSeconds }],
+          resolve: nobody,
+          trustProxy: false,
+          log: silent,
+        }),
+      ).toThrow("idleSeconds");
+    }
+  });
+});

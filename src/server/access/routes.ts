@@ -54,7 +54,11 @@ export type RoutesDeps = {
   guard(ctx: RouteContext): void;
   // the sign-in page offers the email links
   email: { enabled(): boolean };
+  dictation: DictationPort;
 };
+
+// the composer offers its mic
+export type DictationPort = { enabled(): boolean };
 
 // the per-address limit of every sign-in route: a login, an ask for a
 // link and a link used share one window
@@ -143,6 +147,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const body: MeResponse = {
           user: p ? meOfPrincipal(p) : null,
           emailOn: deps.email.enabled(),
+          dictationOn: p !== null && deps.dictation.enabled(),
         };
         return json(body);
       },

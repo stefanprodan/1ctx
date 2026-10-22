@@ -1,0 +1,1 @@
+{"error":{"message":"`file` must be a WAV file (16- or 24-bit PCM, or 32-bit float)","type":"invalid_request_error","param":null,"code":400}}

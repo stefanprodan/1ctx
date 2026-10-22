@@ -176,6 +176,11 @@ export type OverviewTotals = {
   decisionTokens: number;
   pricedDecisions: number;
   decisionCost: number | null;
+  // the clips transcribed, their length in seconds, and the sum of the
+  // costs the provider named, null when none did (mlx-serve names none)
+  dictationClips: number;
+  dictationSeconds: number;
+  dictationCost: number | null;
 };
 
 // A row of a breakdown, by prompt plus completion tokens. name is the

@@ -5,7 +5,8 @@
 // runner in the round's transaction. The weekly summary reads the rows
 // here so the runner does not own dashboard policy. No delete removes
 // a row: usage is the record of what was spent and outlives its session,
-// send, project and agent. Decisions are counted apart, one row each.
+// send, project and agent. Decisions and transcribed clips are counted
+// apart, one row each.
 
 import type {
   DirectoryAgentDaysResponse,
@@ -20,6 +21,7 @@ import {
   type DecisionUsageRow,
   DecisionUsageStore,
 } from "./decisions.ts";
+import { type DictationUsageFields, DictationUsageStore } from "./dictation.ts";
 import { type AccessPort, routes } from "./routes.ts";
 import { type UsageFields, type UsageRow, UsageStore } from "./store.ts";
 import { type UsageWindow, usageWindow } from "./window.ts";
@@ -30,6 +32,12 @@ export {
   type DecisionUsageFields,
   decisionSlots,
 } from "./decisions.ts";
+export {
+  type DictationSlot,
+  type DictationSums,
+  type DictationUsageFields,
+  dictationSlots,
+} from "./dictation.ts";
 export { parseZoneQuery, zoneParam } from "./parse.ts";
 export { type UsageFields, UsageStore } from "./store.ts";
 export {
@@ -49,6 +57,9 @@ export type Usage = {
   store: UsageStore;
   record(fields: UsageFields): UsageRow;
   recordDecision(fields: DecisionUsageFields): DecisionUsageRow;
+  recordDictation(fields: DictationUsageFields): void;
+  dictationClipsSince: DictationUsageStore["clipsSince"];
+  dictationClipAt: DictationUsageStore["clipAt"];
   // the last round of a chat agent counted for a session, never a
   // summoned turn's, or for many at once
   latest(sessionId: string): RoundUsage | null;
@@ -71,6 +82,7 @@ export type Usage = {
 export function usageArea(deps: UsageDeps): Usage {
   const store = new UsageStore(deps.db);
   const decisions = new DecisionUsageStore(deps.db);
+  const dictation = new DictationUsageStore(deps.db);
   // the year of days in the zone, with what read sums over them
   const inWindow = <T extends object>(
     timeZone: string,
@@ -83,6 +95,10 @@ export function usageArea(deps: UsageDeps): Usage {
     store,
     record: (fields) => store.record(fields),
     recordDecision: (fields) => decisions.record(fields),
+    recordDictation: (fields) => dictation.record(fields),
+    dictationClipsSince: (userId, since) => dictation.clipsSince(userId, since),
+    dictationClipAt: (userId, since, skip) =>
+      dictation.clipAt(userId, since, skip),
     latest: (sessionId) => store.latest(sessionId),
     latestFor: (sessionIds) => store.latestFor(sessionIds),
     latestRound: (sessionId) => store.latestRound(sessionId),

@@ -3,6 +3,7 @@
 
 import { messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { refusalFields } from "../providers/index.ts";
 import type { Attention } from "./attention.ts";
 import { attentionStep, hasAttentionStep } from "./attention-step.ts";
 import {
@@ -11,7 +12,6 @@ import {
   memoryPhase,
   stopMainTools,
 } from "./memory-phase.ts";
-import { refusalFields } from "./round.ts";
 import type { ActiveSend } from "./send.ts";
 import type { Writer } from "./writer.ts";
 import { statusOf } from "./writer.ts";

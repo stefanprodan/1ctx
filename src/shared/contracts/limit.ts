@@ -69,6 +69,7 @@ export const LIMIT_NAMES = [
   "accessKeysPerUser",
   "externalTaskDays",
   "externalTaskIdleHours",
+  "dictationClipsPerUser",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 
@@ -94,6 +95,7 @@ export const LIMIT_SCOPES = [
   "chats",
   "repos",
   "external",
+  "dictation",
 ] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 

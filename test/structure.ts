@@ -26,6 +26,7 @@ export const LAYERS = [
   "audit",
   "providers",
   "deciders",
+  "dictation",
   "mcp",
   "skills",
   "projects",

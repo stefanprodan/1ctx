@@ -14,7 +14,11 @@ import type { Message } from "../../shared/contracts/session.ts";
 import { after, type Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
-import type { ChatRequest, ToolCall } from "../providers/index.ts";
+import {
+  type ChatRequest,
+  failureFields,
+  type ToolCall,
+} from "../providers/index.ts";
 import type { Offered, ToolContext, ToolResult } from "../tools/index.ts";
 import { asksAgain, attentionMessages } from "./attention-packet.ts";
 import { runOne, toolContext } from "./call.ts";
@@ -24,7 +28,7 @@ import { leastThinking } from "./policy.ts";
 import type { ContextLookups } from "./render.ts";
 import { OVER_ROUND } from "./reply-rows.ts";
 import type { RoundDeps } from "./round.ts";
-import { failureFields, runRound } from "./round.ts";
+import { runRound } from "./round.ts";
 import { type ActiveSend, nextRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
 import { statusOf } from "./writer.ts";

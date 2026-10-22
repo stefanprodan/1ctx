@@ -56,6 +56,9 @@ export const GROQ_URL = "http://groq.test/openai/v1";
 // a local decisions server on the openai-compatible wire, recorded from
 // kev.serve: TypeSafe's model list, which ignores the catalog's query
 export const KEV_URL = "http://kev.test/v1";
+// mlx-serve on the openai-compatible wire, recorded: its whole model
+// list, which ignores the catalog's query, and a transcript with no cost
+export const MLX_URL = "http://mlx.test/v1";
 // a Foundry resource on the azure wire: the Responses API under the
 // base, the deployments beside it (recorded from one with gpt-6-luna
 // and gpt-6.1-sol deployed)
@@ -151,7 +154,14 @@ export type FakeCall = {
   url: string;
   headers: Record<string, string>;
   body: string | null;
+  // a multipart body, as a transcription sends
+  form?: FormData;
 };
+
+const jsonAnswer = (...parts: string[]) =>
+  new Response(fixture("providers", ...parts), {
+    headers: { "content-type": "application/json" },
+  });
 
 // the recorded catalog and the recorded chat for the fake provider, a
 // 502-worthy answer for any other host; every call is kept so a test
@@ -168,7 +178,8 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
       headers[k] = v;
     });
     const body = typeof init?.body === "string" ? init.body : null;
-    calls.push({ url, headers, body });
+    const form = init?.body instanceof FormData ? init.body : undefined;
+    calls.push({ url, headers, body, form });
     if (url === `${PROVIDER_URL}/models`) {
       return new Response(catalogBody(), {
         headers: { "content-type": "application/json" },
@@ -178,6 +189,21 @@ export function fakeFetch(): { fetcher: typeof fetch; calls: FakeCall[] } {
       return new Response(decisionsCatalog(), {
         headers: { "content-type": "application/json" },
       });
+    }
+    if (url === `${PROVIDER_URL}/models?output_modalities=transcription`) {
+      return jsonAnswer("transcription", "openrouter-models.json");
+    }
+    if (url === `${PROVIDER_URL}/audio/transcriptions`) {
+      return jsonAnswer("transcription", "openrouter-transcript.json");
+    }
+    if (
+      url === `${MLX_URL}/models` ||
+      url === `${MLX_URL}/models?output_modalities=transcription`
+    ) {
+      return jsonAnswer("transcription", "mlx-models.json");
+    }
+    if (url === `${MLX_URL}/audio/transcriptions`) {
+      return jsonAnswer("transcription", "mlx-transcript.json");
     }
     if (url === `${PROVIDER_URL}/systemone` || url === `${KEV_URL}/systemone`) {
       return systemoneAnswer(body);
@@ -330,6 +356,10 @@ export type TestClient = {
       body?: unknown;
       // a raw body, sent as is
       raw?: string;
+      // a binary body, sent with the headers' own content-type
+      bytes?: Uint8Array<ArrayBuffer>;
+      // the request's signal, as a closed tab aborts it
+      signal?: AbortSignal;
       headers?: Record<string, string>;
       origin?: string | null;
     },
@@ -480,12 +510,14 @@ export async function testApp(
             headers.set("content-type", "application/json");
           }
           const body =
+            opts.bytes ??
             opts.raw ??
             (opts.body === undefined ? undefined : JSON.stringify(opts.body));
           const req = new Request(`${ORIGIN}${path}`, {
             method,
             headers,
             body,
+            signal: opts.signal,
           });
           // the address as serve() would derive it; without an upgrader
           // the router always answers, an upgrade route with a 426

@@ -14,6 +14,7 @@ import type {
 import { DAY_MS } from "../lib/clock.ts";
 import {
   type DecisionSums,
+  type DictationSums,
   daysWindow,
   type UsageWindow,
 } from "../usage/index.ts";
@@ -38,7 +39,12 @@ export const daysOf = (
 ): UsageWindow => daysWindow(now, timeZone, range === "30d" ? 30 : 90);
 
 export function firstOf(result: DayReads): number | null {
-  const firsts = [result.sends, result.usage, result.decisions]
+  const firsts = [
+    result.sends,
+    result.usage,
+    result.decisions,
+    result.dictation,
+  ]
     .map((rows) => rows[0]?.slot)
     .filter((slot): slot is number => slot !== undefined);
   return firsts.length === 0 ? null : Math.min(...firsts) * SLOT_MS;
@@ -86,6 +92,9 @@ const empty = (): OverviewTotals => ({
   decisionTokens: 0,
   pricedDecisions: 0,
   decisionCost: null,
+  dictationClips: 0,
+  dictationSeconds: 0,
+  dictationCost: null,
 });
 
 const addSends = (into: OverviewTotals, row: Omit<SendSlot, "slot">) => {
@@ -134,6 +143,14 @@ const decidedOf = (row: DecisionSums): Decided => ({
   pricedDecisions: row.priced,
   decisionCost: row.cost,
 });
+
+// the clips go to the totals alone; the days do not show them
+const addDictation = (into: OverviewTotals, row: DictationSums) => {
+  into.dictationClips += row.clips;
+  into.dictationSeconds += row.seconds;
+  if (row.priced > 0)
+    into.dictationCost = (into.dictationCost ?? 0) + (row.cost ?? 0);
+};
 
 const usageOf = (row: Omit<UsageSlot, "slot">): Usage => ({
   promptTokens: row.prompt,
@@ -225,6 +242,11 @@ function days(
     addUsage(totals, b);
     addDecisions(totals, b);
   }
+  eachDay(
+    result.dictation.map((row) => row.slot * SLOT_MS),
+    bounds,
+    (_day, k) => addDictation(totals, result.dictation[k]!),
+  );
   return {
     days: window.days.map(
       (label, i): OverviewDay => ({

@@ -456,6 +456,31 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 200 },
   },
   {
+    method: "GET",
+    path: "/api/admin/dictation",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "PUT",
+    path: "/api/admin/dictation",
+    // admin: no such provider
+    body: { providerId: "none", model: "openai/whisper-large-v3-turbo" },
+    expect: { anonymous: 401, member: 403, admin: 400 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/admin/dictation",
+    // admin: no model saved
+    body: { enabled: true },
+    expect: { anonymous: 401, member: 403, admin: 400 },
+  },
+  {
+    // Dictation is off
+    method: "POST",
+    path: "/api/transcribe",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
     method: "POST",
     path: "/api/admin/smtp/test",
     // admin: the bootstrap admin's address is a placeholder

@@ -8,6 +8,7 @@ import { isIP } from "node:net";
 import { BadRequest, HttpError, TooManyRequests } from "../lib/errors.ts";
 import {
   json,
+  MAX_IDLE_SECONDS,
   type Method,
   type Policy,
   type Principal,
@@ -25,10 +26,15 @@ export type Upgrader = (
   headers: Record<string, string>,
 ) => boolean;
 
+// what serve() gives a route with idleSeconds: Bun's timeout for this
+// request alone, so the listener's own stays short
+export type Holder = (seconds: number) => void;
+
 export type Router = (
   req: Request,
   address: string,
   upgrader?: Upgrader,
+  hold?: Holder,
 ) => Promise<RouteOutcome>;
 
 export type Resolver = (
@@ -128,6 +134,7 @@ async function dispatch(
     url: URL;
     address: string;
     upgrade?: (data: unknown) => boolean;
+    hold?: Holder;
   },
 ): Promise<RouteOutcome> {
   if (route.policy === "key" && principal?.via.kind !== "key") {
@@ -145,6 +152,8 @@ async function dispatch(
       return json({ error: "change your password first" }, 403);
     }
   }
+  // only a caller access let in may hold the connection longer
+  if (route.idleSeconds !== undefined) ctx.hold?.(route.idleSeconds);
   try {
     const params: Record<string, string> = {};
     route.names.forEach((name, i) => {
@@ -179,8 +188,17 @@ const PROBES = new Set(["/api/health", "/api/ready"]);
 export function router(deps: RouterDeps): Router {
   const clashes = conflicts(deps.routes);
   if (clashes.length > 0) throw new Error(`routes: ${clashes.join("; ")}`);
+  for (const route of deps.routes) {
+    const idle = route.idleSeconds;
+    if (
+      idle !== undefined &&
+      !(Number.isInteger(idle) && idle >= 1 && idle <= MAX_IDLE_SECONDS)
+    ) {
+      throw new Error(`routes: ${route.path} idleSeconds ${idle}`);
+    }
+  }
   const compiled = deps.routes.map(compile);
-  return async (req, address, upgrader) => {
+  return async (req, address, upgrader, hold) => {
     const started = performance.now();
     const url = new URL(req.url);
     const method = req.method as Method;
@@ -275,6 +293,7 @@ export function router(deps: RouterDeps): Router {
           url,
           address,
           upgrade,
+          hold,
         });
       } catch (error) {
         unexpected = error;

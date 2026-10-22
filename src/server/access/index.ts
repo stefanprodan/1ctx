@@ -43,6 +43,7 @@ import {
   profileRoutes,
 } from "./profile.ts";
 import {
+  type DictationPort,
   type UsersPort as LoginUsersPort,
   loginGuard,
   routes,
@@ -87,6 +88,7 @@ export type AccessDeps = {
   // a closure, the socket is built after access
   presence: PresencePort;
   email: EmailPort;
+  dictation: DictationPort;
   taskClaims: TaskClaimsPort;
 };
 
@@ -146,6 +148,7 @@ export function accessArea(deps: AccessDeps): Access {
         log: deps.log,
         guard,
         email: deps.email,
+        dictation: deps.dictation,
       }),
       ...linkRoutes({
         db: deps.db,

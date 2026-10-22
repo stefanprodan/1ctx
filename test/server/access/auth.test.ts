@@ -32,6 +32,7 @@ function build(secureCookie: boolean) {
   });
   const access = accessArea({
     db,
+    dictation: { enabled: () => false },
     email: {
       enabled: () => false,
       link: () => {

@@ -31,9 +31,10 @@ admin's attention, the server's load), Usage by month and Storage.
 
 ## Usage outlives every delete
 
-- **Tokens and cost read `usage` and `decision_usage` alone.** No
-  delete removes those rows (a chat, run, automation, project,
-  regenerated turn, decider or provider), so these totals never fall.
+- **Tokens and cost read `usage`, `decision_usage` and `dictation_usage`
+  alone.** No delete removes those rows (a chat, run, automation,
+  project, regenerated turn, decider or provider), so these totals
+  never fall.
   Turns, runs and turn lengths read `sends` and fall with a delete.
 - **A deleted object keeps its usage in the breakdowns.** Deleted
   projects sum into one row. A retired agent keeps its own row and
@@ -52,7 +53,9 @@ admin's attention, the server's load), Usage by month and Storage.
   tool row (`sessions/activity.ts`), a child's included.
 - **A model's row is the model that answered** (`served_model`).
 - **`cost` is the rounds' alone.** Decisions are summed into their own
-  fields. A cost total is 0 with no rows and null when rows came and
+  fields, and transcribed clips into the totals' `dictationClips`,
+  `dictationSeconds` and `dictationCost`, which no day or breakdown
+  shows. A cost total is 0 with no rows and null when rows came and
   none was priced.
 - **Nothing vacuums** (`docs/archive.md`). The file stays at its peak
   size and storage reports the pages a delete freed as free.

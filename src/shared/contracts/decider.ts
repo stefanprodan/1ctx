@@ -8,9 +8,10 @@
 // the wires whose servers answer decisions at <baseUrl>/systemone
 export const DECIDER_WIRES = ["openrouter", "openai-compatible"] as const;
 
-// which list a provider's catalog search reads: the chat models, or the
-// decision models at /models?output_modalities=decisions
-export const CATALOG_KINDS = ["chat", "decisions"] as const;
+// which list a provider's catalog search reads: the chat models, the
+// decision models at /models?output_modalities=decisions, or the speech
+// to text models at /models?output_modalities=transcription
+export const CATALOG_KINDS = ["chat", "decisions", "transcription"] as const;
 export type CatalogKind = (typeof CATALOG_KINDS)[number];
 export function isCatalogKind(value: unknown): value is CatalogKind {
   return (
