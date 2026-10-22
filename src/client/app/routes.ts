@@ -28,6 +28,7 @@ import {
   loadDecisionUsage,
 } from "../data/deciders.ts";
 import { loadDecisions } from "../data/decisions.ts";
+import { loadDictation } from "../data/dictation.ts";
 import {
   loadAgentDays,
   loadAgentPage,
@@ -726,7 +727,7 @@ export const ROUTES: Route[] = [
     role: "admin",
     load: (params) =>
       thenUsage(
-        [loadProviders(), loadAgents(), loadDeciders()],
+        [loadProviders(), loadAgents(), loadDeciders(), loadDictation()],
         providers,
         (p) => p.name === params.name,
         loadProviderUsage,
@@ -800,6 +801,17 @@ export const ROUTES: Route[] = [
         (d) => d.name === params.name,
         loadDeciderUsage,
       ),
+  },
+  {
+    path: "/admin/config/dictation",
+    view: lazy(() =>
+      import("../views/admin/Dictation.tsx").then((m) => m.Dictation),
+    ),
+    title: () => "Dictation",
+    role: "admin",
+    load: async () => {
+      await Promise.all([loadDictation(), loadProviders(), loadOverview()]);
+    },
   },
   {
     path: "/admin/config/decisions",

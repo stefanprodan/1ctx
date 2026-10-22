@@ -9,6 +9,7 @@ export const USERS_HREF = "/admin/access/users";
 export const CONFIG_HREF = "/admin/config";
 export const AGENTS_HREF = "/admin/config/agents";
 export const DECIDERS_HREF = "/admin/config/deciders";
+export const DICTATION_HREF = "/admin/config/dictation";
 export const DECISIONS_HREF = "/admin/config/decisions";
 export const LIMITS_HREF = "/admin/config/limits";
 export const SMTP_HREF = "/admin/config/smtp";

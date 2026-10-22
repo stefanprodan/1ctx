@@ -7,6 +7,7 @@ import type { Params } from "../../app/params.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { agents, agentsError } from "../../data/agents.ts";
 import { deciders, decidersError } from "../../data/deciders.ts";
+import { dictation, dictationError } from "../../data/dictation.ts";
 import {
   deleteProvider,
   providers,
@@ -18,6 +19,7 @@ import {
   configAgentHref,
   configDeciderHref,
   configProviderHref,
+  DICTATION_HREF,
   newAgentHref,
   PROVIDERS_HREF,
 } from "../../lib/hrefs.ts";
@@ -45,7 +47,10 @@ export function ProviderPage({ params }: { params: Params }) {
   const list = providers.value;
   const provider = list?.find((p) => p.name === params.name) ?? null;
   const error =
-    providersError.value ?? agentsError.value ?? decidersError.value;
+    providersError.value ??
+    agentsError.value ??
+    decidersError.value ??
+    dictationError.value;
   return (
     <Page
       steps={STEPS}
@@ -69,7 +74,10 @@ export function ProviderPage({ params }: { params: Params }) {
       }
       split
       loading={
-        (list === null || agents.value === null || deciders.value === null) &&
+        (list === null ||
+          agents.value === null ||
+          deciders.value === null ||
+          dictation.value === null) &&
         error === null
       }
       empty={
@@ -136,7 +144,8 @@ function UsedBy({ provider }: { provider: ProviderSummary }) {
   const onDeciders = byName(deciders.value ?? []).filter(
     (d) => d.providerId === provider.id,
   );
-  const total = onAgents.length + onDeciders.length;
+  const dictates = dictation.value?.settings?.providerId === provider.id;
+  const total = onAgents.length + onDeciders.length + (dictates ? 1 : 0);
   if (total === 0) {
     return (
       <Setting
@@ -163,6 +172,14 @@ function UsedBy({ provider }: { provider: ProviderSummary }) {
           <RowsTitle mono name={d.name} sub="Decider" />
         </RowsGo>
       ))}
+      {dictates && (
+        <RowsGo href={DICTATION_HREF}>
+          <RowsAvatar>
+            <Icon name="mic" size={15} />
+          </RowsAvatar>
+          <RowsTitle name="Dictation" sub={dictation.value?.settings?.model} />
+        </RowsGo>
+      )}
     </Setting>
   );
 }
@@ -174,13 +191,14 @@ function DeleteCard({ provider }: { provider: ProviderSummary }) {
   const deciderCount = (deciders.value ?? []).filter(
     (d) => d.providerId === provider.id,
   ).length;
+  const dictates = dictation.value?.settings?.providerId === provider.id;
   return (
     <SettingDelete
       title={`Delete ${provider.name}`}
-      line={providerDeleteLine(agentCount, deciderCount)}
+      line={providerDeleteLine(agentCount, deciderCount, dictates)}
       ask={`Delete ${provider.name}?`}
-      // the server refuses a provider an agent or a decider uses
-      off={agentCount + deciderCount > 0}
+      // the server refuses a provider an agent, a decider or Dictation uses
+      off={agentCount + deciderCount > 0 || dictates}
       onDelete={() => deleteProvider(provider.id)}
       leaveTo={PROVIDERS_HREF}
     />

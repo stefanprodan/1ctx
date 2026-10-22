@@ -13,7 +13,7 @@ import type {
 } from "../../shared/api/access.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
-import { setMe } from "./me.ts";
+import { loadDictationOn, setMe } from "./me.ts";
 
 // the link on screen: its token and what the server said of it, null
 // for a link no longer valid
@@ -52,6 +52,7 @@ export async function applyLink(
   turn++;
   link.value = null;
   setMe(user);
+  void loadDictationOn();
 }
 
 // answered the same whoever it names, so there is nothing to read back
