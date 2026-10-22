@@ -443,6 +443,13 @@
   .composer-stop + .composer-send {
     margin-left: 0;
   }
+  /* the mic (Dictation.tsx) sits before Stop and Send, quieter than both */
+  .composer-mic {
+    color: var(--dim);
+  }
+  .composer-mic + .composer-send {
+    margin-left: 0;
+  }
 
   /* an edit of a waiting message open over the box */
   .composer-editing {

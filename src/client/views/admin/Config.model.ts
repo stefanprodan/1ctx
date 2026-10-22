@@ -94,6 +94,11 @@ export const LIMITS_CARDS: readonly LimitsGroup[] = [
     line: "Access keys, claims and closed tasks.",
     names: ["accessKeysPerUser", "externalTaskIdleHours", "externalTaskDays"],
   },
+  {
+    title: "Dictation",
+    line: "How often a user may dictate.",
+    names: ["dictationClipsPerUser"],
+  },
 ];
 
 export const STORAGE_CARDS: readonly LimitsGroup[] = [

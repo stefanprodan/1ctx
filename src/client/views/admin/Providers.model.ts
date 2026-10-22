@@ -148,14 +148,22 @@ export function keyLine(keyName: string | null, hasKey: boolean): string {
   return hasKey ? `${keyName}.key` : `${keyName}.key missing`;
 }
 
-export function providerDeleteLine(agentCount: number, deciderCount: number) {
-  if (agentCount === 0 && deciderCount === 0) return "Nothing runs on it.";
+// dictation: the Dictation setting transcribes on it
+export function providerDeleteLine(
+  agentCount: number,
+  deciderCount: number,
+  dictation = false,
+) {
   const parts = [
     agentCount > 0 ? pluralCommas(agentCount, "agent", "agents") : "",
     deciderCount > 0 ? pluralCommas(deciderCount, "decider", "deciders") : "",
+    dictation ? "Dictation" : "",
   ].filter((part) => part !== "");
-  const one = agentCount + deciderCount === 1;
-  return `${parts.join(" and ")} ${one ? "runs" : "run"} on it. Move ${
+  if (parts.length === 0) return "Nothing runs on it.";
+  const one = agentCount + deciderCount + (dictation ? 1 : 0) === 1;
+  const last = parts.pop();
+  const named = parts.length === 0 ? last : `${parts.join(", ")} and ${last}`;
+  return `${named} ${one ? "runs" : "run"} on it. Move ${
     one ? "it" : "them"
   } to another provider first.`;
 }

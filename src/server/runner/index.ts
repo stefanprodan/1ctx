@@ -13,6 +13,7 @@ import { messageOf } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { ProjectRow } from "../projects/index.ts";
+import { refusalOf } from "../providers/index.ts";
 import { type SessionRow, titleFrom } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { attention } from "./attention.ts";
@@ -36,7 +37,7 @@ import { dispatcher } from "./queue.ts";
 import { regenerateUsers } from "./regenerate.ts";
 import { Registry } from "./registry.ts";
 import { mountRepos } from "./repos.ts";
-import { ProviderRefusal, type RoundDeps } from "./round.ts";
+import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
@@ -175,9 +176,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
         const end = await toolLoop(loopDeps, send);
         void terminate(send, end.cause, end.error);
       } catch (error) {
-        if (send.cause === null && error instanceof ProviderRefusal) {
-          send.refusal = { status: error.status };
-        }
+        const refusal = refusalOf(error);
+        if (send.cause === null && refusal !== null) send.refusal = refusal;
         void terminate(send, "failure", messageOf(error));
       }
       finalized = await endSend(

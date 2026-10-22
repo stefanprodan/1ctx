@@ -660,6 +660,7 @@ describe("the Config board", () => {
       "Running",
       "Automations",
       "External tasks",
+      "Dictation",
     ]);
     expect(STORAGE_CARDS.map((c) => c.title)).toEqual([
       "Knowledge",
@@ -886,7 +887,7 @@ describe("the Config board", () => {
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
     // the tool cards stay mounted, hidden, so their drafts are kept
-    expect(html.match(/<form/g)).toHaveLength(12);
+    expect(html.match(/<form/g)).toHaveLength(13);
     expect(html).toMatch(
       /config-board-cards config-board-away"><form[\s\S]*?Agents manage automations/,
     );
@@ -916,6 +917,14 @@ describe("the Config board", () => {
     expect(html).not.toContain("Disk use");
     path.value = "/admin/config/storage";
     expect(render(<ConfigBoard />)).toContain('href="/admin/monitor/storage"');
+    path.value = "/";
+  });
+
+  test.serial("Dictation has its own page, not a card here", () => {
+    tools.value = body();
+    limits.value = rows;
+    path.value = "/admin/config";
+    expect(render(<ConfigBoard />)).not.toContain(">Model<");
     path.value = "/";
   });
 

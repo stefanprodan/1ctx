@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "id": "mistralai/voxtral-mini-transcribe-3-0",
+      "name": "Mistral: Voxtral Mini Transcribe 3",
+      "pricing": { "prompt": "0.0000583333", "completion": "0" }
+    },
+    {
+      "id": "openai/whisper-large-v3-turbo",
+      "name": "OpenAI: Whisper Large v3 Turbo",
+      "pricing": { "prompt": "0.0000066667", "completion": "0" }
+    }
+  ]
+}

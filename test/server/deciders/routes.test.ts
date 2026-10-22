@@ -223,7 +223,7 @@ describe("deciders", () => {
     const unknown = await search(router, "q=jev&kind=images");
     expect(unknown.status).toBe(400);
     expect(await unknown.json()).toEqual({
-      error: "kind must be chat or decisions",
+      error: "kind must be chat, decisions or transcription",
     });
     const wire = await search(gemini, "q=x&kind=decisions");
     expect(wire.status).toBe(400);

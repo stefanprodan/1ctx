@@ -22,6 +22,7 @@ import {
 } from "../../../src/client/data/agents.ts";
 import { deciders } from "../../../src/client/data/deciders.ts";
 import { decisions } from "../../../src/client/data/decisions.ts";
+import { dictation } from "../../../src/client/data/dictation.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { overview, overviewError } from "../../../src/client/data/overview.ts";
 import {
@@ -134,6 +135,8 @@ beforeEach(() => {
   // have their own suites
   deciders.value = [];
   decisions.value = [];
+  // and for Dictation, off here: its card has its own suite
+  dictation.value = { enabled: false, settings: null };
 });
 
 describe("the words", () => {
@@ -1076,6 +1079,7 @@ describe("a provider's page", () => {
       providers.value = [router];
       agents.value = [];
       deciders.value = [];
+      dictation.value = { enabled: false, settings: null };
       const page = () => render(<ProviderPage params={{ name: "router" }} />);
       expect(page()).toContain('split-empty">Loading');
       let asked = "";

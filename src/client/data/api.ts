@@ -75,6 +75,29 @@ export async function api<T>(
   return data as T;
 }
 
+// a body of bytes in one fetch, answered like api(): no progress to show
+export async function postBytes<T>(
+  path: string,
+  body: Blob,
+  signal?: AbortSignal,
+): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      signal,
+      method: "POST",
+      headers: { "content-type": body.type },
+      body,
+    });
+  } catch {
+    signal?.throwIfAborted();
+    throw responseFailure(0, null);
+  }
+  const data: unknown = await res.json().catch(() => ({}));
+  if (!res.ok) throw responseFailure(res.status, data);
+  return data as T;
+}
+
 export function upload<T>(
   path: string,
   body: Blob,

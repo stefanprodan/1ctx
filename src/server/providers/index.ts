@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { CatalogKind } from "../../shared/contracts/decider.ts";
+import { servesTranscription } from "../../shared/contracts/dictation.ts";
 import type {
   CatalogMatch,
   Endpoint,
@@ -17,6 +18,7 @@ import { keyOf, providerFor } from "./provider.ts";
 import {
   type AgentsPort,
   type DecidersPort,
+  type DictationPort,
   routes,
   type UsagePort,
 } from "./routes.ts";
@@ -27,6 +29,11 @@ import {
   type Decisions,
   requestDecisions,
 } from "./systemone.ts";
+import {
+  requestTranscription,
+  type Transcript,
+  type TranscriptionRequest,
+} from "./transcription.ts";
 import type { ChatEvent, ChatRequest } from "./types.ts";
 
 export {
@@ -71,6 +78,13 @@ export { buildChatBody as buildOpenCodeChatBody } from "./opencode.ts";
 export { mergeReasoningDetail } from "./openrouter.ts";
 export { parseBaseUrl, parseKeyName } from "./parse.ts";
 export { requestText, requestTokens, wireTokens } from "./provider.ts";
+export {
+  failureFields,
+  ProviderRefusal,
+  REFUSED,
+  refusalFields,
+  refusalOf,
+} from "./refusal.ts";
 export { type ProviderRow, ProviderStore } from "./store.ts";
 export { buildChatBody as buildStrictChatBody } from "./strict.ts";
 export {
@@ -83,6 +97,13 @@ export {
   parseDecisions,
   refusedQuestion,
 } from "./systemone.ts";
+export {
+  parseTranscript,
+  TRANSCRIBE_TIMEOUT_MS,
+  type Transcript,
+  type TranscriptionRequest,
+  tidyTranscript,
+} from "./transcription.ts";
 export type {
   ChatEvent,
   ChatMessageIn,
@@ -104,6 +125,7 @@ export type ProvidersDeps = {
   log: Log;
   agents: AgentsPort;
   deciders: DecidersPort;
+  dictation: DictationPort;
   usage: UsagePort;
 };
 
@@ -138,6 +160,14 @@ export type Providers = {
     req: DecisionRequest,
     signal: AbortSignal,
   ): Promise<Decisions>;
+  // one clip to text at the provider's /audio/transcriptions, never
+  // retried. A provider deleted since is a 404; a refusal is a
+  // ProviderRefusal, anything else that fails an Error in our words
+  transcribe(
+    providerId: string,
+    req: TranscriptionRequest,
+    signal: AbortSignal,
+  ): Promise<Transcript>;
   routes: RouteDescriptor[];
 };
 
@@ -178,6 +208,14 @@ export function providersArea(deps: ProvidersDeps): Providers {
       }
       return requestDecisions(row, deps, req, signal);
     },
+    transcribe: async (providerId, req, signal) => {
+      const row = store.byId(providerId);
+      if (row === null) throw new NotFound("no such provider");
+      if (!servesTranscription(row.wire)) {
+        throw new Error(`${row.name} serves no transcription models`);
+      }
+      return requestTranscription(row, deps, req, signal);
+    },
     routes: routes({
       store,
       catalogs,
@@ -186,6 +224,7 @@ export function providersArea(deps: ProvidersDeps): Providers {
       keys: deps.keys,
       agents: deps.agents,
       deciders: deps.deciders,
+      dictation: deps.dictation,
       usage: deps.usage,
       clock: deps.clock,
     }),

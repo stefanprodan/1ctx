@@ -361,6 +361,9 @@ describe("the overview days", () => {
       decisionTokens: 0,
       pricedDecisions: 0,
       decisionCost: null,
+      dictationClips: 0,
+      dictationSeconds: 0,
+      dictationCost: null,
     });
   });
 
@@ -429,6 +432,41 @@ describe("the overview days", () => {
       decisionTokens: 550,
       pricedDecisions: 2,
       decisionCost: 0.00102,
+    });
+  });
+});
+
+describe("the overview dictation totals", () => {
+  test("sum clips, seconds and the costs named", async () => {
+    const chat = await fixture();
+    let ids = 0;
+    const clip = (at: number, seconds: number, cost: number | null) =>
+      chat.app.db
+        .query(
+          `insert into dictation_usage (id, user_id, provider_id, provider_name,
+             model, seconds, cost, created_at)
+           values (?, 'u1', 'p1', 'router', 'm', ?, ?, ?)`,
+        )
+        .run(`v${ids++}`, seconds, cost, at);
+    clip(NOW, 4.5, null);
+    clip(NOW - DAY, 2, null);
+    // each range is read once, since the board keeps its answer
+    expect((await overview(chat, "UTC", "90d")).totals).toMatchObject({
+      dictationClips: 2,
+      dictationSeconds: 6.5,
+      dictationCost: null,
+    });
+    clip(NOW - 2 * DAY, 3, 0.00002);
+    clip(NOW - 400 * DAY, 10, 0.001);
+    expect((await overview(chat)).totals).toMatchObject({
+      dictationClips: 3,
+      dictationSeconds: 9.5,
+      dictationCost: 0.00002,
+    });
+    expect((await overview(chat, "UTC", "all")).totals).toMatchObject({
+      dictationClips: 4,
+      dictationSeconds: 19.5,
+      dictationCost: 0.00102,
     });
   });
 });
@@ -890,6 +928,7 @@ describe("the overview cache", () => {
             sends: [],
             usage: [],
             decisions: [],
+            dictation: [],
             instance: {
               users: 0,
               projects: 0,

@@ -95,7 +95,11 @@ describe("login", () => {
     const client = app.client();
     const nobody = await client.call("GET", "/api/me");
     expect(nobody.status).toBe(200);
-    expect(await nobody.json()).toEqual({ user: null, emailOn: false });
+    expect(await nobody.json()).toEqual({
+      user: null,
+      emailOn: false,
+      dictationOn: false,
+    });
     await client.login("admin", "hunter2-test");
     const res = await client.call("GET", "/api/me");
     expect(res.status).toBe(200);
@@ -109,6 +113,7 @@ describe("login", () => {
     expect(await (await client.call("GET", "/api/me")).json()).toEqual({
       user: null,
       emailOn: false,
+      dictationOn: false,
     });
   });
 });
@@ -132,6 +137,7 @@ describe("logout", () => {
     expect(await (await client.call("GET", "/api/me")).json()).toEqual({
       user: null,
       emailOn: false,
+      dictationOn: false,
     });
   });
 
@@ -159,6 +165,7 @@ describe("expiry", () => {
     expect(await (await client.call("GET", "/api/me")).json()).toEqual({
       user: null,
       emailOn: false,
+      dictationOn: false,
     });
     expect(app.db.query("select count(*) as n from logins").get()).toEqual({
       n: 0,

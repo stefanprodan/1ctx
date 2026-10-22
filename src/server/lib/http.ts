@@ -81,8 +81,14 @@ export type RouteDescriptor = {
   // a websocket upgrade: same-origin is checked as for a write, and
   // the handler gets ctx.upgrade
   upgrade?: true;
+  // the seconds the connection may sit idle once access passed, for a
+  // route that waits on an upstream past Bun's 10 s default; at most
+  // MAX_IDLE_SECONDS, Bun's own ceiling
+  idleSeconds?: number;
   handle: RouteHandler;
 };
+
+export const MAX_IDLE_SECONDS = 255;
 
 export const json = (body: unknown, status = 200, headers?: HeadersInit) =>
   Response.json(body, {

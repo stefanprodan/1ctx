@@ -87,6 +87,7 @@ const EXPECTED_IDS = [
   "0073-channel-workspaces",
   "0074-run-posts",
   "0075-external-task-keys",
+  "0076-dictation",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -4098,6 +4099,7 @@ describe("project channel migrations", () => {
       "0073-channel-workspaces",
       "0074-run-posts",
       "0075-external-task-keys",
+      "0076-dictation",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4310,6 +4312,7 @@ describe("project channel migrations", () => {
           "0073-channel-workspaces",
           "0074-run-posts",
           "0075-external-task-keys",
+          "0076-dictation",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4469,7 +4472,10 @@ describe("project channel migrations", () => {
           (id, project_id, title, created_by, created_at, brief_at, moved_at)
           values ('t', 'team', 'Kept', 'u', 0, 0, 0);
       `);
-      expect(migrate(db)).toEqual(["0075-external-task-keys"]);
+      expect(migrate(db)).toEqual([
+        "0075-external-task-keys",
+        "0076-dictation",
+      ]);
       expect(
         db
           .query(

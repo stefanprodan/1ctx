@@ -7,7 +7,11 @@ import { after, type Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
 import { tokens } from "../lib/tokens.ts";
 import type { MemoryCapability } from "../memory/index.ts";
-import type { ChatRequest, ToolCall } from "../providers/index.ts";
+import {
+  type ChatRequest,
+  failureFields,
+  type ToolCall,
+} from "../providers/index.ts";
 import { envelope } from "../sessions/index.ts";
 import type { Offered, ToolContext, ToolResult } from "../tools/index.ts";
 import { runOne, toolContext } from "./call.ts";
@@ -17,7 +21,7 @@ import type { ContextLookups } from "./render.ts";
 import { cutOpenTools, NOT_RUN, OVER_ROUND } from "./reply-rows.ts";
 import { cutResult } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
-import { failureFields, runRound } from "./round.ts";
+import { runRound } from "./round.ts";
 import { type ActiveSend, nextRound } from "./send.ts";
 import type { Writer } from "./writer.ts";
 import { statusOf } from "./writer.ts";

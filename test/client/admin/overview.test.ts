@@ -69,6 +69,9 @@ const totals = (over: Partial<OverviewTotals> = {}): OverviewTotals => ({
   decisionTokens: 0,
   pricedDecisions: 0,
   decisionCost: null,
+  dictationClips: 0,
+  dictationSeconds: 0,
+  dictationCost: null,
   ...over,
 });
 

@@ -123,6 +123,10 @@ export type ExternalCaps = {
   externalTaskIdleHours: number;
 };
 
+// the clips one user may transcribe in an hour, counted on their usage
+// rows at each clip
+export type DictationCaps = { dictationClipsPerUser: number };
+
 export type Limits = LoopLimits &
   ChannelCaps &
   ToolCaps &
@@ -131,7 +135,8 @@ export type Limits = LoopLimits &
   QueueCaps &
   ChatCaps &
   RepoCaps &
-  ExternalCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  ExternalCaps &
+  DictationCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -218,6 +223,7 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   externalTaskDays: limit(365, 30, 1825, "days", "external"),
   // the floor is the hourly sweep's own lateness
   externalTaskIdleHours: limit(24, 1, 168, "hours", "external"),
+  dictationClipsPerUser: limit(30, 1, 120, "count", "dictation"),
 };
 
 // the table on the given cores; only the process cap's default moves

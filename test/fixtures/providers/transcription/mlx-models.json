@@ -1,0 +1,17 @@
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "mlx-community/Qwen3-ASR-1.7B-8bit",
+      "object": "model",
+      "owned_by": "mlx-serve",
+      "capabilities": ["transcription"]
+    },
+    {
+      "id": "mlx-community/Qwen3.6-27B-8bit",
+      "object": "model",
+      "owned_by": "mlx-serve",
+      "capabilities": ["chat", "tool_use", "streaming", "json_schema", "vision"]
+    }
+  ]
+}

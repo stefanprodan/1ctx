@@ -10,13 +10,13 @@ import type { WorkNode } from "../../../src/client/transcript/rows.ts";
 import { groupRows } from "../../../src/client/transcript/rows.ts";
 import { workSummary } from "../../../src/client/transcript/Work.model.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import type {
-  ChatEvent,
-  ChatRequest,
+import {
+  type ChatEvent,
+  type ChatRequest,
+  REFUSED,
 } from "../../../src/server/providers/index.ts";
 import { providerFor } from "../../../src/server/providers/provider.ts";
 import {
-  REFUSED,
   type RoundDeps,
   runRound,
   STREAM_IDLE_MS,

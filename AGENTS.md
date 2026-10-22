@@ -116,8 +116,8 @@ since a relative URL inside the binary resolves against `src/server`.
 **Test helpers.** `test/helpers/app.ts` wires the server over a test db
 with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
-`GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `AZURE_URL`,
-`ANTHROPIC_URL`) and fails every other, and a fake email sender that
+`GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `MLX_URL`,
+`AZURE_URL`, `ANTHROPIC_URL`) and fails every other, and a fake email sender that
 keeps every message; `sleeping`, `slept` and `commandPhase` await the
 fake clock and a command's phase. In `chat.ts`, `until`, `idle`,
 `freed`, `sessionSettled` and `ringing` await bus events, sends
@@ -160,6 +160,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/search.md` | `shared/search.ts`, knowledge search, session search and list |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
+| `docs/dictation.md` | `dictation/`: the Dictation setting, `POST /api/transcribe`, its WAV check, cap, call and usage row |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |

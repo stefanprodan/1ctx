@@ -8,6 +8,7 @@ import type {
   ProviderResponse,
   ProvidersResponse,
 } from "../../shared/api/providers.ts";
+import { servesTranscription } from "../../shared/contracts/dictation.ts";
 import type { Endpoint } from "../../shared/contracts/provider.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -26,6 +27,10 @@ export type DecidersPort = {
   usesProvider(providerId: string): boolean;
 };
 
+export type DictationPort = {
+  usesProvider(providerId: string): boolean;
+};
+
 export type UsagePort = {
   providerTotal(providerId: string, since: number, until: number): SendTotals;
 };
@@ -39,6 +44,7 @@ export type RoutesDeps = {
   keys: () => string[];
   agents: AgentsPort;
   deciders: DecidersPort;
+  dictation: DictationPort;
   usage: UsagePort;
   clock: Clock;
 };
@@ -103,6 +109,9 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         if (deps.deciders.usesProvider(provider.id)) {
           throw new Conflict(`a decider uses ${provider.name}`);
         }
+        if (deps.dictation.usesProvider(provider.id)) {
+          throw new Conflict(`Dictation uses ${provider.name}`);
+        }
         deps.store.delete(provider.id);
         deps.catalogs.forget(provider.id);
         return json({});
@@ -117,6 +126,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const { q, kind } = parseCatalogQuery(ctx.url);
         if (kind === "decisions" && !servesDecisions(provider.wire)) {
           throw new BadRequest(`${provider.name} serves no decision models`);
+        }
+        if (kind === "transcription" && !servesTranscription(provider.wire)) {
+          throw new BadRequest(
+            `${provider.name} serves no transcription models`,
+          );
         }
         const body: CatalogResponse = {
           matches:

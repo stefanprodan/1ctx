@@ -21,6 +21,7 @@ export {
   type ChannelCaps,
   type ChatCaps,
   DEFAULT_LIMITS,
+  type DictationCaps,
   type ExternalCaps,
   type KnowledgeCaps,
   LIMIT_DEFINITIONS,

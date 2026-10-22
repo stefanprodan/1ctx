@@ -8,8 +8,13 @@ export type LoginRequest = { username: string; password: string };
 export type LoginResponse = { user: Me };
 
 // GET /api/me: null when nobody is signed in; emailOn offers the email
-// links on the sign-in page
-export type MeResponse = { user: Me | null; emailOn: boolean };
+// links on the sign-in page; dictationOn offers the composer's mic, false
+// while nobody is signed in
+export type MeResponse = {
+  user: Me | null;
+  emailOn: boolean;
+  dictationOn: boolean;
+};
 
 // POST /api/login/forgot and /api/login/link: a username or an email,
 // answered 202 with no body whoever it names

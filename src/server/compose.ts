@@ -22,6 +22,7 @@ import { type BashArea, type BashDeps, bashArea } from "./bash/index.ts";
 import { credentialsArea, httpKeys } from "./credentials/index.ts";
 import type { Db } from "./db/index.ts";
 import { type Deciders, decidersArea } from "./deciders/index.ts";
+import { type Dictation, dictationArea } from "./dictation/index.ts";
 import {
   type Email,
   type EmailSender,
@@ -269,6 +270,9 @@ export async function compose(options: ComposeOptions): Promise<App> {
     deciders: {
       usesProvider: (providerId) => deciders.usesProvider(providerId),
     },
+    dictation: {
+      usesProvider: (providerId) => dictation.usesProvider(providerId),
+    },
     usage: {
       providerTotal: (providerId, since, until) =>
         usage.total({ providerId }, since, until),
@@ -280,6 +284,16 @@ export async function compose(options: ComposeOptions): Promise<App> {
     log: log("deciders"),
     providers,
     usage,
+  });
+  const dictation: Dictation = dictationArea({
+    db,
+    clock,
+    log: log("dictation"),
+    providers,
+    usage,
+    limits: {
+      dictationClipsPerUser: () => limits.current().dictationClipsPerUser,
+    },
   });
   // a deleted object leaves no key behind in a chat or an automation; a
   // repository was its project's, so only that project's rows are read
@@ -390,6 +404,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     activity: { personDays: (...args) => sessions.personDays(...args) },
     presence: { onlineUserIds: () => socket.onlineUserIds() },
     email,
+    dictation,
   });
   agents = agentsArea({
     db,
@@ -779,6 +794,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...email.routes,
     ...providers.routes,
     ...deciders.routes,
+    ...dictation.routes,
     ...mcp.routes,
     ...skills.routes,
     ...projects.routes,

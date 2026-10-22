@@ -7,7 +7,12 @@
 
 import type { DeciderUsage, ModelUsage } from "../../shared/api/admin.ts";
 import type { Db } from "../db/index.ts";
-import { type DecisionSlot, decisionSlots } from "../usage/index.ts";
+import {
+  type DecisionSlot,
+  type DictationSlot,
+  decisionSlots,
+  dictationSlots,
+} from "../usage/index.ts";
 import {
   type Bounds,
   byAgents,
@@ -57,6 +62,7 @@ export type DayReads = {
   sends: SendSlot[];
   usage: UsageSlot[];
   decisions: DecisionSlot[];
+  dictation: DictationSlot[];
 };
 
 export type RangeResult = DayReads & {
@@ -176,6 +182,7 @@ function dayReads(db: Db, input: RangeInput, days: Bounds): DayReads {
     sends: sendSlots(db, days),
     usage: usageSlots(db, days),
     decisions: decisionSlots(db, input.since, input.until, SLOT_MS),
+    dictation: dictationSlots(db, input.since, input.until, SLOT_MS),
   };
 }
 

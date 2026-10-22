@@ -81,7 +81,9 @@ export function parseCatalogQuery(url: URL): { q: string; kind: CatalogKind } {
   if (q.length > MAX_QUERY) throw new BadRequest("q is too long");
   const kind = get("kind") ?? "chat";
   if (!isCatalogKind(kind)) {
-    throw new BadRequest(`kind must be ${CATALOG_KINDS.join(" or ")}`);
+    throw new BadRequest(
+      `kind must be ${CATALOG_KINDS.slice(0, -1).join(", ")} or ${CATALOG_KINDS.at(-1)}`,
+    );
   }
   return { q: q.trim(), kind };
 }

@@ -242,6 +242,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Unclaim idle external tasks",
     text: "Hours without a report before a claimed external task opens again.",
   },
+  dictationClipsPerUser: {
+    label: "Clips per user",
+    text: "Dictation clips one user may turn into text in an hour.",
+  },
 };
 
 // thousands: typed in whole thousands as the agent's window is, a

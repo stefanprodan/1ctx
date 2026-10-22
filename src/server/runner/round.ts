@@ -6,12 +6,13 @@
 import type { Message } from "../../shared/contracts/session.ts";
 import { bytesWords } from "../lib/bytes.ts";
 import { type Clock, sleep, sleepUnless } from "../lib/clock.ts";
-import { errorFields, type Log, type LogFields } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import {
   type ChatEvent,
   type ChatRequest,
   costOf,
   mergeReasoningDetail,
+  ProviderRefusal,
   requestTokens,
   type Usage,
 } from "../providers/index.ts";
@@ -406,39 +407,10 @@ async function streamRound(
   }
 }
 
-// A provider's refusal keeps its words for the chat row; a log names
-// only its status, since the words are the response's body
-export class ProviderRefusal extends Error {
-  constructor(
-    message: string,
-    readonly status: number | null,
-  ) {
-    super(message);
-  }
-}
-
 function roundError(event: Extract<ChatEvent, { kind: "error" }>): Error {
   return event.remote
     ? new ProviderRefusal(event.message, event.status ?? null)
     : new Error(event.message);
-}
-
-export const REFUSED = "the provider answered with an error";
-
-// what a log says of a refusal: the fixed phrase and the status, beside
-// a status field that already names something else
-export function refusalFields(status: number | null): LogFields {
-  return {
-    error: REFUSED,
-    ...(status === null ? {} : { provider_status: status }),
-  };
-}
-
-// the fields a failed round logs
-export function failureFields(error: unknown): LogFields {
-  return error instanceof ProviderRefusal
-    ? refusalFields(error.status)
-    : errorFields(error, false);
 }
 
 export function spentTokens(

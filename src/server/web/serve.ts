@@ -108,6 +108,7 @@ export function serve(options: ServeOptions) {
               data: data as ConnData,
               headers: new Headers(headers),
             }),
+          (seconds) => server.timeout(req, seconds),
         ),
       "/*": options.page,
     },

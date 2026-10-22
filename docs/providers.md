@@ -17,8 +17,8 @@ with probabilities.
 - **A provider is added and deleted, never changed.** There is no
   PATCH. Its wire is `openrouter`, `openai-compatible`,
   `openai-strict`, `gemini`, `opencode`, `azure` or `anthropic`.
-  Deleting one a live agent or a decider uses is a 409; a send keeps
-  the provider's name as text.
+  Deleting one a live agent, a decider or Dictation uses is a 409; a send
+  keeps the provider's name as text.
 - **Everything that leaves the process goes through the fetcher.**
   The `fetcher` compose option is the one way out, so a test passes a
   fake and the suite never reaches a network. `compose.ts` wraps it
@@ -148,9 +148,10 @@ Completions shape, about one token a tool under the azure one.
   a round cut for an output loop, asked again once after it streamed
   (`docs/sessions.md`, stream bounds); its new attempt retries as any
   other.
-- **Only a send's rounds retry.** Deciders, catalogs and MCP calls are
-  never retried here. The exceptions are the refusals the azure and
-  anthropic wires adapt, inside the wire, never a 429 or 5xx.
+- **Only a send's rounds retry.** Deciders, catalogs, transcriptions
+  and MCP calls are never retried here. The exceptions are the
+  refusals the azure and anthropic wires adapt, inside the wire, never
+  a 429 or 5xx.
 - **A provider's words are kept but never logged.** A `remote` failure
   is a `ProviderRefusal`: the chat row keeps its words exactly, and
   the log carries a fixed phrase and `provider_status`.
@@ -234,6 +235,14 @@ Completions shape, about one token a tool under the azure one.
   answers are `decision_usage` and appear in the decider's and the
   decision's usage, which have no output tokens. Every usage route
   reads its range through `lastDays()`.
+- **A transcription model turns a clip into text** (`docs/dictation.md`).
+  Only `TRANSCRIPTION_WIRES` serve them. Its catalog is the
+  `kind=transcription` search,
+  `<base>/models?output_modalities=transcription`. OpenRouter filters
+  by the query and lists no capabilities, so its rows are kept as they
+  come; on `openai-compatible` a row must list `transcription` in its
+  `capabilities`, since mlx-serve and other servers ignore the query
+  and answer every model. No models.dev facts are added.
 - **The fake fetch answers recorded decisions.**
   `scripts/record/deciders.ts`, run by hand, records the bodies under
   `test/fixtures/providers/systemone/`.

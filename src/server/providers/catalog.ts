@@ -6,6 +6,7 @@ import {
   type CatalogKind,
   DECIDER_WIRES,
 } from "../../shared/contracts/decider.ts";
+import { servesTranscription } from "../../shared/contracts/dictation.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Wire } from "../../shared/words.ts";
 import { readStream } from "../lib/body.ts";
@@ -115,6 +116,27 @@ const DECISIONS_PATH = "/models?output_modalities=decisions";
 export const servesDecisions = (wire: string): boolean =>
   (DECIDER_WIRES as readonly string[]).includes(wire);
 
+// OpenRouter filters by the query and lists no capabilities; mlx-serve
+// and other OpenAI-compatible servers may ignore it and answer every
+// model, so there a row must list transcription
+const TRANSCRIPTION_PATH = "/models?output_modalities=transcription";
+
+export function parseTranscriptionCatalog(
+  body: unknown,
+  wire: Wire,
+): CatalogMatch[] {
+  const data = (body as { data?: unknown })?.data;
+  if (!Array.isArray(data)) return [];
+  return parseCatalog({
+    data: data.filter((m: { capabilities?: unknown } | null) => {
+      const list = m?.capabilities;
+      return Array.isArray(list)
+        ? list.includes("transcription")
+        : wire === "openrouter";
+    }),
+  });
+}
+
 // a catalog that does not answer is the 502 a route sends
 export async function gateway<T>(work: Promise<T>): Promise<T> {
   try {
@@ -175,23 +197,39 @@ const CATALOGS: Record<Wire, WireCatalog> = {
   },
 };
 
+// the URL and the parser of a kind's list; chat is the wire's own
+function kindCatalog(kind: CatalogKind, wire: Wire): WireCatalog {
+  if (kind === "decisions") {
+    if (!servesDecisions(wire)) {
+      throw new CatalogError("the provider serves no decision models");
+    }
+    return {
+      url: (base) => endpoint(base, DECISIONS_PATH),
+      parse: parseCatalog,
+    };
+  }
+  if (kind === "transcription") {
+    if (!servesTranscription(wire)) {
+      throw new CatalogError("the provider serves no transcription models");
+    }
+    return {
+      url: (base) => endpoint(base, TRANSCRIPTION_PATH),
+      parse: (body) => parseTranscriptionCatalog(body, wire),
+    };
+  }
+  return CATALOGS[wire];
+}
+
 export async function fetchCatalog(
   fetcher: Fetcher,
   provider: Pick<ProviderRow, "wire" | "baseUrl">,
   key: string | null,
   kind: CatalogKind = "chat",
 ): Promise<CatalogMatch[]> {
-  if (kind === "decisions" && !servesDecisions(provider.wire)) {
-    throw new CatalogError("the provider serves no decision models");
-  }
-  const catalog = CATALOGS[provider.wire];
-  const url =
-    kind === "decisions"
-      ? endpoint(provider.baseUrl, DECISIONS_PATH)
-      : catalog.url(provider.baseUrl);
+  const catalog = kindCatalog(kind, provider.wire);
   const body = await fetchJson(
     fetcher,
-    url,
+    catalog.url(provider.baseUrl),
     authHeaders(provider.wire, key, "catalog"),
   );
   const models = catalog.parse(body);

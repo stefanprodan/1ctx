@@ -67,7 +67,19 @@ reporting.
   in and editable (`LabelDrafts`), each input named as the server names
   its refusal (`labels.2.name`).
 - **A provider is never edited, only made and deleted.** Delete is off
-  while an agent or a decider runs on it, since the server refuses.
+  while an agent, a decider or Dictation runs on it, since the server
+  refuses; Used by lists Dictation too.
+- **Dictation is its own Config page, after Deciders.** Its Dictation
+  card is a switch as on Visuals: a flip only drafts, Save sends it,
+  and on with no model saved stops at "Pick a model first". The Model
+  card below picks as a decider's does: `ModelPicker` with the
+  `transcription` kind over `transcriptionProviders()`, editable on or
+  off, since off keeps the model. Both answers carry the whole setting,
+  so the two cards share one `saving` through `holding()`. With no model saved it opens on the
+  search with no Cancel; with no such provider and none saved it says
+  so and links Providers. Both saves move `dictationOn`, so the admin's
+  own composer follows at once. The aside reads `overviewTotals()`: clips, audio in minutes
+  and cost, "not priced" while no clip named one.
 - **The admin's own user page has no Reset password nor Disable.**
   `roleLock()` fixes their role and the last admin's.
 - **A user page lists the user's access keys from `userKeys`,** read

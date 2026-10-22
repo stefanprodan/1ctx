@@ -64,6 +64,7 @@ function build() {
     },
     presence: { onlineUserIds: () => [] },
     activity: { personDays: (_id, starts) => starts.map(() => 0) },
+    dictation: { enabled: () => false },
     email: {
       enabled: () => false,
       link: () => {

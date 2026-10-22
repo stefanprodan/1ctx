@@ -170,8 +170,11 @@ describe("the data", () => {
       await applyLink(TOKEN, {});
       expect(me.value).toEqual(maria);
       expect(link.value).toBeNull();
-      expect(calls.at(-1)?.url).toBe(`/api/links/${TOKEN}`);
-      expect(calls.at(-1)?.init?.method).toBe("POST");
+      // then whether Dictation is on, which the sign-in does not answer
+      expect(calls.slice(-2).map((c) => [c.init?.method, c.url])).toEqual([
+        ["POST", `/api/links/${TOKEN}`],
+        ["GET", "/api/me"],
+      ]);
     },
   );
 
