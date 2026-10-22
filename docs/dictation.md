@@ -29,6 +29,7 @@ sent on its own.
 - **Deleting the provider Dictation uses is a 409,** on or off, since
   off keeps the model: through a port in `providers/routes.ts`, as for
   agents and deciders. The row's foreign key holds it too.
+- **A `Dictation` provision object sets it** (`docs/provision.md`).
 
 ## The route
 

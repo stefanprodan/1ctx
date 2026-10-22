@@ -59,6 +59,7 @@ const inventory: Inventory = {
   Repository: [],
   Provider: [],
   Decider: [],
+  Dictation: [],
   Skill: [],
   McpServer: [],
   Agent: [],

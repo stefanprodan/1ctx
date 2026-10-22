@@ -36,6 +36,8 @@ export type ProvisionDeps = {
   bootstrap(): Promise<boolean>;
   secret: Secret;
   smtp(): SmtpLogin | null;
+  // a held provider's wire, for Dictation's offline check
+  providerWire(name: string): string | null;
 };
 
 export type Provision = ReturnType<typeof provisionArea>;
@@ -50,6 +52,7 @@ export function provisionArea(deps: ProvisionDeps) {
       deps.projectDocs,
       deps.credentials,
       deps.smtp(),
+      deps.providerWire,
     );
     const password = secret("user-", ADMIN_SECRET);
     if (password === null || passwordProblem(password) !== null) {

@@ -24,7 +24,9 @@ import { prefixesOverlap } from "../credentials/index.ts";
 import { checkFile, checkNames, checkTotals } from "../knowledge/index.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { isToolName, type ToolName } from "../tools/index.ts";
+import { checkDictation, dictationSpec } from "./dictation.ts";
 import { object } from "./fields.ts";
+import { checkHeldWire } from "./provider.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import {
   SMTP_REQUIRED,
@@ -42,6 +44,7 @@ export const KINDS = [
   "Repository",
   "Provider",
   "Decider",
+  "Dictation",
   "Skill",
   "McpServer",
   "Agent",
@@ -78,6 +81,7 @@ export type Document = {
 }[Kind];
 export type Of<K extends Kind> = Extract<Document, { kind: K }>;
 
+export type { DictationSpec } from "./dictation.ts";
 export type { RepositorySpec } from "./repository.ts";
 export type { SmtpLogin, SmtpServerSpec } from "./smtp.ts";
 export type {
@@ -117,6 +121,7 @@ function document(value: unknown, source: string): Document {
       Repository: isName,
       Provider: isName,
       Decider: isName,
+      Dictation: isName,
       Skill: isSkillName,
       McpServer: isServerName,
       Agent: isName,
@@ -145,6 +150,8 @@ function document(value: unknown, source: string): Document {
         return { ...base, kind, spec: spec.provider(b.spec) };
       case "Decider":
         return { ...base, kind, spec: spec.decider(b.spec) };
+      case "Dictation":
+        return { ...base, kind, spec: dictationSpec(b.spec) };
       case "Skill":
         return { ...base, kind, spec: spec.skill(b.spec) };
       case "McpServer":
@@ -171,12 +178,13 @@ function duplicate(documents: Document[]): void {
     }
     seen.set(key, doc.source);
   }
-  // the instance has one SMTP server
-  const servers = documents.filter((doc) => doc.kind === "SmtpServer");
-  if (servers.length > 1) {
-    throw new Error(
-      `${servers[1]!.source}: SmtpServer/${servers[1]!.name}: one SmtpServer object per instance (first SmtpServer/${servers[0]!.name})`,
-    );
+  for (const kind of ["SmtpServer", "Dictation"] as const) {
+    const [first, second] = documents.filter((doc) => doc.kind === kind);
+    if (second !== undefined) {
+      throw new Error(
+        `${second.source}: ${kind}/${second.name}: one ${kind} object per instance (first ${kind}/${first!.name})`,
+      );
+    }
   }
   // one default of a kind, since a second would take the mark from the
   // first
@@ -248,6 +256,7 @@ export function preflight(
   credentials: CredentialsView,
   // the held SMTP server's login, null when none is held
   smtp: SmtpLogin | null = null,
+  providerWire: (name: string) => string | null = () => null,
 ): void {
   duplicate(documents);
   const known = Object.fromEntries(
@@ -393,6 +402,7 @@ export function preflight(
       }
       case "Provider":
         if (!exists) required(["wire", "baseUrl"]);
+        checkHeldWire(doc, providerWire(doc.name));
         if (doc.spec.keyFrom)
           readSecret("keyFrom", "provider-", doc.spec.keyFrom);
         break;
@@ -400,6 +410,9 @@ export function preflight(
         if (!exists) required(["provider", "model"]);
         if (doc.spec.provider !== undefined)
           reference("provider", "Provider", doc.spec.provider);
+        break;
+      case "Dictation":
+        checkDictation(doc, documents, inventory, providerWire);
         break;
       case "Skill":
         if (!exists) required(["url"]);

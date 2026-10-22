@@ -27,6 +27,8 @@ export type InventorySources = {
   agents: Named;
   // the one SMTP server, when saved
   email: { settings(): unknown | null };
+  // the one Dictation setting, when saved
+  dictation: { settings(): unknown | null };
 };
 
 export function inventoryOf(sources: InventorySources): Inventory {
@@ -47,6 +49,7 @@ export function inventoryOf(sources: InventorySources): Inventory {
     }),
     Provider: sources.providers.list().map((row) => row.name),
     Decider: sources.deciders.list().map((row) => row.name),
+    Dictation: sources.dictation.settings() === null ? [] : ["dictation"],
     Skill: sources.skills.names(),
     McpServer: sources.mcp.list().map((row) => row.name),
     Agent: sources.agents.list().map((row) => row.name),

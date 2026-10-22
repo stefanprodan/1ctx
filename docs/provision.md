@@ -5,7 +5,7 @@ Governs `src/server/provision/`: `1ctx provision` and the server's
 
 Provisioning applies YAML documents, one object each (a `kind` from
 `KINDS`: users, the SMTP server, projects, credentials, repositories,
-providers, deciders, skills, MCP servers, agents, tools), to an
+providers, deciders, Dictation, skills, MCP servers, agents, tools), to an
 instance's database, creating or updating what they name.
 
 ## Running it
@@ -55,6 +55,17 @@ instance's database, creating or updating what they name.
   `publicAddress`; `keyFrom` names an `email-` key file, null takes it
   off, and must be present. Validation checks `username` and `keyFrom`
   over the held login: both set or both null.
+- **`Dictation` is the instance's one Dictation setting**
+  (`docs/dictation.md`). A second `Dictation` document is refused, and
+  any name updates the one held. A new one needs `provider` and
+  `model`. Validation checks that the provider is held or in the input
+  and on a `TRANSCRIPTION_WIRES` wire. The save checks the model
+  against the live transcription catalog, so it fails while the
+  provider's server is down; it is asked only when the provider or the
+  model changes, so an unchanged apply skips it. `enabled` left out on
+  an update stays; a new one without it is off. A model change and a
+  switch flip are two writes: a failure between them leaves the model
+  saved with the old switch, and applying again finishes it.
 
 - **An `Agent` is matched by name among live agents.** One naming a
   deleted agent creates a new agent. The automations the delete paused
@@ -65,6 +76,9 @@ instance's database, creating or updating what they name.
 - **`default: true` is the only value for an `Agent` or `Decider`.**
   A second default of one kind in an apply is refused. Leaving it out
   keeps the mark where it is.
+- **A `Provider`'s wire never changes.** Validation refuses a
+  document whose `wire` differs from the held provider's; leaving it
+  out or repeating it is fine.
 - **A `Decider`'s save checks the model against the live decisions
   catalog** (`docs/providers.md`). It fails while the provider's server
   is down.

@@ -111,7 +111,7 @@ describe("provision through the composed app", () => {
       expect(lines[0]).toBe("bootstrapped user/admin from user-admin.key");
       // the bootstrapped admin is not an object in the file, so it is
       // said on its own line and counted nowhere
-      expect(counts.created).toBe(10);
+      expect(counts.created).toBe(11);
       expect(counts.created + counts.updated + counts.unchanged).toBe(
         docs.length,
       );
@@ -126,6 +126,7 @@ describe("provision through the composed app", () => {
         "repository",
         "provider",
         "decider",
+        "dictation",
         "skill",
         "mcpserver",
         "agent",
@@ -203,6 +204,15 @@ describe("provision through the composed app", () => {
       expect(fake.calls).toContain(
         `${MODEL_URL}/models?output_modalities=decisions`,
       );
+      expect(
+        app.db
+          .query("select provider_id, model, enabled from dictation_settings")
+          .get(),
+      ).toEqual({
+        provider_id: app.providers.list()[0]!.id,
+        model: "mlx-community/Qwen3-ASR-1.7B-8bit",
+        enabled: 1,
+      });
       expect(fake.calls).toContain(SKILL_URL);
       expect(fake.calls).toContain(MCP_URL);
       expect(loginCount(app.db)).toBe(0);

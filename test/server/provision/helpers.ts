@@ -130,6 +130,13 @@ export function network() {
         })),
       });
     }
+    // mlx-serve's recorded list: one model says transcription
+    if (url === `${MODEL_URL}/models?output_modalities=transcription`) {
+      return new Response(
+        Bun.file("test/fixtures/providers/transcription/mlx-models.json"),
+        { headers: { "content-type": "application/json" } },
+      );
+    }
     if (url === `${MODEL_URL}/models?pageSize=1000`) {
       return Response.json({
         models: ["fake-model", "fake-model-next"].map((id) => ({
