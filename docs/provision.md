@@ -76,6 +76,9 @@ instance's database, creating or updating what they name.
 - **`default: true` is the only value for an `Agent` or `Decider`.**
   A second default of one kind in an apply is refused. Leaving it out
   keeps the mark where it is.
+- **A `Provider`'s wire never changes.** Validation refuses a
+  document whose `wire` differs from the held provider's; leaving it
+  out or repeating it is fine.
 - **A `Decider`'s save checks the model against the live decisions
   catalog** (`docs/providers.md`). It fails while the provider's server
   is down.

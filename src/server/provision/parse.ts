@@ -26,6 +26,7 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { isToolName, type ToolName } from "../tools/index.ts";
 import { checkDictation, dictationSpec } from "./dictation.ts";
 import { object } from "./fields.ts";
+import { checkHeldWire } from "./provider.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import {
   SMTP_REQUIRED,
@@ -177,7 +178,6 @@ function duplicate(documents: Document[]): void {
     }
     seen.set(key, doc.source);
   }
-  // the instance has one SMTP server and one Dictation setting
   for (const kind of ["SmtpServer", "Dictation"] as const) {
     const [first, second] = documents.filter((doc) => doc.kind === kind);
     if (second !== undefined) {
@@ -256,7 +256,6 @@ export function preflight(
   credentials: CredentialsView,
   // the held SMTP server's login, null when none is held
   smtp: SmtpLogin | null = null,
-  // a held provider's wire, null when none is held by that name
   providerWire: (name: string) => string | null = () => null,
 ): void {
   duplicate(documents);
@@ -403,6 +402,7 @@ export function preflight(
       }
       case "Provider":
         if (!exists) required(["wire", "baseUrl"]);
+        checkHeldWire(doc, providerWire(doc.name));
         if (doc.spec.keyFrom)
           readSecret("keyFrom", "provider-", doc.spec.keyFrom);
         break;
