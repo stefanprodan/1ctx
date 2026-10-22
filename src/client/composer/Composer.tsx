@@ -10,10 +10,11 @@
 // Enter and sends it as a message. A waiting message's Edit puts its
 // text here, and Send is Save until the edit is saved or let go. Two
 // modes: a chat, where the message goes into it, and a project, where
-// it starts one. Files come from the plus, a drop on the card or a
-// paste, are staged as they are picked, and go with the send. The
-// draft, text and staged files, survives a navigation; a refusal shows
-// under the box until the next keystroke. In a project channel the
+// it starts one. The mic beside Send dictates into the draft (Dictation.tsx).
+// Files come from the plus, a drop on the card or a paste, are staged as
+// they are picked, and go with the send. The draft, text and staged
+// files, survives a navigation; a refusal shows under the box until the
+// next keystroke. In a project channel the
 // message is a post: no agent chip, no switches, no chat commands, the
 // @ menu lists every agent and the meter is the stream's.
 
@@ -56,6 +57,7 @@ import {
   runCommand,
 } from "./commands.ts";
 import { meterReadout, readout } from "./context.ts";
+import { useDictation } from "./Dictation.tsx";
 import {
   draftKey,
   dropDraftUploads,
@@ -76,6 +78,7 @@ import { Files } from "./Files.tsx";
 import type { Editing } from "./handoff.ts";
 import { browserLocate, type Locate, locate } from "./location.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
+import { ContextReadout } from "./Readout.tsx";
 import { Summons } from "./Summons.tsx";
 import { bareSummon, nextPost, summonFill, summonMatches } from "./summons.ts";
 import { useSwitches } from "./switches.ts";
@@ -233,6 +236,7 @@ export function Composer({
   const edit = editOf(chat);
   const box = { key, text, failure };
   const saving = useHandoff(chat, box, input, queued);
+  const dictation = useDictation(box, input);
   const switches = useSwitches({
     chat,
     off,
@@ -276,6 +280,7 @@ export function Composer({
   const nameOnly = () =>
     channel !== undefined && bareSummon(text.value, agents, files.ids.length);
   const submit = async () => {
+    if (dictation.busy()) return;
     const content = text.value.trim();
     if (edit !== null)
       return saveEdit(edit, content, onEdit, { ...box, saving });
@@ -299,10 +304,11 @@ export function Composer({
         const message = await locate(to.question, reader).finally(() => {
           locating.value = false;
         });
-        // the box moved on while the browser asked: the stored draft
-        // still holds the text, so nothing is lost
+        // the box moved on or a clip started while the browser asked: the
+        // stored draft still holds the text, so nothing is lost
         const now = live.current;
         if (!now.mounted || now.key !== key || now.agent !== agent) return;
+        if (dictation.busy()) return;
         await onSend(message, agent, uploads);
       } else await onSend(content, agent, uploads);
       // this composer may be gone by now (a new chat navigates away), so
@@ -364,6 +370,7 @@ export function Composer({
         class="composer-text"
         name="message"
         rows={tall ? 2 : 1}
+        hidden={dictation.recording}
         placeholder={placeholder}
         aria-label="Message"
         disabled={!channel && agents !== null && list.length === 0}
@@ -416,6 +423,7 @@ export function Composer({
           }
         }}
       />
+      {dictation.strip}
       {matches.length > 0 && (
         <Commands
           matches={matches}
@@ -471,23 +479,15 @@ export function Composer({
             onPick={fixed ? undefined : (id) => void rememberAgent(id)}
           />
         )}
-        {context && (
-          <span class="composer-ctx" title={context.title}>
-            <span>{context.text}</span>
-            <span class="meter composer-ctx-meter">
-              <span
-                class="meter-fill"
-                style={{ width: `${context.percent}%` }}
-              />
-            </span>
-          </span>
-        )}
+        {context && <ContextReadout context={context} />}
+        {dictation.mic}
         <SendButtons
           save={edit !== null}
           onStop={running ? onStop : undefined}
           failure={failure}
           off={
             text.value.trim() === "" ||
+            dictation.busy() ||
             nameOnly() ||
             (edit !== null ? saving.value : !ready || !placed || files.busy)
           }

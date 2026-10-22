@@ -5,6 +5,7 @@
 // passes with its length, every other header is refused in words.
 
 import { describe, expect, test } from "bun:test";
+import { wavOf as clientWavOf } from "../../../src/client/composer/dictation.ts";
 import { parseWav } from "../../../src/server/dictation/index.ts";
 import { wavOf } from "../../helpers/dictation.ts";
 
@@ -67,5 +68,17 @@ describe("the WAV header", () => {
     );
     expect(refused(wavOf(0))).toBe("the clip holds no whole samples");
     expect(refused(wavOf(101))).toBe("the clip holds no whole samples");
+  });
+});
+
+describe("the composer's WAV", () => {
+  test("is the header the server takes", () => {
+    const samples = new Int16Array(16_000).map((_, i) => (i % 200) - 100);
+    expect(parseWav(clientWavOf([samples, samples.subarray(0, 8000)]))).toEqual(
+      {
+        ok: true,
+        value: { dataBytes: 48_000, seconds: 1.5 },
+      },
+    );
   });
 });

@@ -47,7 +47,8 @@ in `docs/ui.md`.
   started yet and the queue included. It sends the question with `My
   location: <lat>, <lng> (±<m> m)` on a line after it, or the line
   alone. The position is read once on Enter, never in the background,
-  and given up after 30 s; a failure sends nothing and keeps the draft.
+  and given up after 30 s; a failure sends nothing and keeps the draft,
+  as does a clip under way when the position lands.
 - **Each plus menu switch is `switchItem()` in `Add.model.ts`.** The
   automation editor reads the same function, so the two never differ
   on why a key is off.
@@ -79,3 +80,60 @@ in `docs/ui.md`.
 - **A menu row that leaves the page on its own click stops the click.**
   Otherwise the menu reads it as a click outside. A pane takes the
   focus and gives it back.
+
+## Dictation
+
+The mic beside Send (`Dictation.tsx`) records a clip, the server turns it
+into text (`docs/dictation.md`), and the text lands in the draft to edit.
+Nothing is sent on its own. There is no keyboard shortcut. Send and
+Enter wait while the mic starts or records, so the draft never goes out
+during a clip. The recorder (`recorder.ts`) is apart from the view, so
+a test drives it with a fake capture.
+
+- **The mic shows only where recording works:** `dictationOn` from `GET
+  /api/me`, a secure context, `getUserMedia` and `AudioWorkletNode`
+  (`canRecord()`). A 404 from the route hides it.
+- **The context runs at the device's rate.** Firefox refuses to join a
+  stream to a context of another rate. The worklet (`capture.ts`,
+  loaded from a Blob URL, since the page serves no script for it) hands
+  the frames over in chunks, and `Downsampler` averages each 16 kHz
+  window as they land. Window edges come from whole sample counts, so
+  chunking never changes a sample. Only the 16 kHz samples are kept.
+- **The context is made and resumed in the tap,** before any await:
+  iOS Safari starts audio only inside the gesture. A failed resume ends
+  the start at once, the prompt still up or not. The context and the
+  tracks are checked again after the last await: a context not running
+  fails as blocked and an ended track as no microphone, since a silent
+  clip would never reach its cap. A throw in the tap (no `AudioContext`)
+  is the same failure line, the recorder idle.
+- **A start can be let go at once.** `startCapture()` answers a cancel
+  at any step: the context closes then, and a grant that comes after
+  has its tracks stopped as they arrive. The composer drops the
+  recorder from a layout effect, so the drop is in place before a tap.
+  The worklet's last partial chunk (under 2,048 frames at the device's
+  rate: 43 ms at 48 kHz, 46 ms at 44.1 kHz, 128 ms at 16 kHz) is not
+  flushed on Stop: the tap comes after the speech, and a flush would
+  need the worklet to answer a context that may already be gone.
+- **The clip is the canonical WAV the route checks** (`wavOf()`): no
+  `MediaRecorder`, no container, no decode. It stops on its own at
+  `DICTATION_MAX_SECONDS`, and when the track ends or the context is
+  interrupted or suspended (a device unplugged, a call on iOS). A clip under
+  `MIN_SAMPLES` (half a second) is dropped without a request, since it
+  would cost a clip and count against the cap.
+- **The words land where the tap was.** The strip hides the box, so the
+  cursor is saved at the tap; a draft changed since takes them at its
+  end (`insertText()`), with a space before them unless the text there
+  is empty, ends in one or opens a bracket or quote, and after them
+  when a word follows. They go to whichever box shows the clip's draft
+  key when they come (`landing.ts`), a composer mounted again included,
+  since a box holding stale text writes over the stored draft on its
+  next keystroke; with none on screen, to the stored draft.
+- **Leaving the chat or the page while starting or recording drops the
+  clip** and
+  stops the tracks, so the browser's mic indicator goes off. A clip
+  already sent still lands.
+- **A failure keeps the draft** and shows in the failure line: the
+  browser's refusal by its name (`captureLine()`), the route's by its
+  status (`transcribeLine()`), an empty transcript as `NO_WORDS`. A
+  failure for a chat not on screen is dropped. Only the mic of the
+  clip's chat spins while the route runs; Send keeps its own rules.
