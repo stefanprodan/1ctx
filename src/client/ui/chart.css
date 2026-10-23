@@ -261,6 +261,7 @@
     .chart-bars-wide .chart-bar,
     .chart-bars-wide .chart-bar:has(.chart-share) {
       grid-template-columns: minmax(0, 1fr) auto;
+      /* biome-ignore lint/correctness/noInvalidGridAreas: 2.6.2 compares row lengths, not cells (biomejs/biome#12502) */
       grid-template-areas: "name value" "track track";
       row-gap: var(--space-1);
       padding-block: var(--space-1);
