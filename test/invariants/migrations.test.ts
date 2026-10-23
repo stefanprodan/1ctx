@@ -1783,10 +1783,10 @@ describe("the schema", () => {
       // an alert row goes with its automation, whose cap is gone with it
       db.exec(`
         insert into automations (id, project_id, owner_id, agent_id, name,
-            instructions, schedule, tz, retention_days, created_at,
+            instructions, schedule, tz, retention_days, next_at, created_at,
             updated_at)
           values ('au', 'p', 'u', 'a', 'daily', 'do', '0 9 * * *', 'UTC', 7,
-            0, 0);
+            0, 0, 0);
         insert into email_outbox (id, kind, user_id, project_id,
             automation_id, message_id, next_attempt_at, created_at,
             updated_at)
@@ -2712,7 +2712,7 @@ describe("the schema", () => {
             lines, digest, tokens, revision, author_kind, author_id,
             author_name, origin, created_at, updated_at)
           values ('f1', 'p', 'brief.md', 'md', 'Brief', 5, 1, 'd1', 1, 1,
-            'user', 'u', 'user', 'page', 0, 0);
+            'user', 'u', 'user', 'chat', 0, 0);
         insert into external_tasks (id, project_id, title, text, scope, state,
             created_by, created_at, brief_at, moved_at, attention_at)
           values ('t1', 'p', 'Held', 'Brief', 'part A', 'open', 'u', 0, 0, 0,
