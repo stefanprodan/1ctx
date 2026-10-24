@@ -93,6 +93,8 @@ export interface ShoptOptions {
   lastpipe: boolean;
   /** shopt -s xpg_echo: Make echo interpret backslash escapes by default (like echo -e) */
   xpg_echo: boolean;
+  /** shopt -s inherit_errexit: $( ) keeps set -e (1ctx subst-errexit) */
+  inherit_errexit: boolean;
 }
 
 // ============================================================================

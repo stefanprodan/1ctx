@@ -463,6 +463,7 @@ export class Bash {
         expand_aliases: false,
         lastpipe: false,
         xpg_echo: false,
+        inherit_errexit: false, // (1ctx subst-errexit)
       },
       inCondition: false,
       loopDepth: 0,
