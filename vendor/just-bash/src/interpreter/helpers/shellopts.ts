@@ -75,6 +75,7 @@ const BASHOPTS_OPTIONS: (keyof ShoptOptions)[] = [
   "failglob",
   "globskipdots",
   "globstar",
+  "inherit_errexit", // (1ctx subst-errexit)
   "lastpipe",
   "nocaseglob",
   "nocasematch",

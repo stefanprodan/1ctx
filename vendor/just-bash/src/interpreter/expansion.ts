@@ -825,6 +825,10 @@ async function expandPart(
       // bash only prints verbose output for the main script
       const savedSuppressVerbose = ctx.state.suppressVerbose;
       ctx.state.suppressVerbose = true;
+      // (1ctx subst-errexit) bash clears set -e inside $( ) outside posix mode
+      const savedErrexit = ctx.state.options.errexit;
+      if (!ctx.state.options.posix && !ctx.state.shoptOptions.inherit_errexit)
+        ctx.state.options.errexit = false;
       try {
         const result = await ctx.executeScript(part.body);
         // Restore environment but preserve exit code
@@ -833,6 +837,7 @@ async function expandPart(
         ctx.state.arrays = savedArrays;
         ctx.state.cwd = savedCwd;
         ctx.state.suppressVerbose = savedSuppressVerbose;
+        ctx.state.options.errexit = savedErrexit; // (1ctx subst-errexit)
         // Store the exit code for $?
         recordSubstitutionExit(ctx.state, exitCode);
         // Command substitution stderr should go to the shell's stderr at expansion time,
@@ -859,6 +864,7 @@ async function expandPart(
         ctx.state.bashPid = savedBashPid;
         ctx.substitutionDepth = savedDepth;
         ctx.state.suppressVerbose = savedSuppressVerbose;
+        ctx.state.options.errexit = savedErrexit; // (1ctx subst-errexit)
         // ExecutionLimitError must always propagate - these are safety limits
         if (error instanceof ExecutionLimitError) {
           throw error;

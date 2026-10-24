@@ -327,6 +327,42 @@ names it. It descends into no link and leaves dot entries out unless
 Before: the walk matched the empty name after `**` against nothing, so
 `echo a/**` and `echo **` under globstar printed the pattern itself.
 
+### arith-subst: a $( ) in arithmetic runs in the script's state
+Files: `src/interpreter/arithmetic.ts`
+Upstream: ported from #617
+Tests: `test/vendor/just-bash/arith-subst.test.ts`
+
+Now: a command substitution inside `$(( ))`, `(( ))`, a C-style `for`
+or a substring offset runs as any other command substitution: in an
+isolated copy of the current shell's state, so it sees the script's
+variables, functions and folder, and its changes, `set` options
+included, stay inside it. Its stderr goes out at expansion time and its
+exit status is recorded. Only the arithmetic part of #617 is taken; its
+brace range limit is not.
+
+Before: it ran in a fresh shell seeded from the first environment, so
+`x=3; echo $(( ($(echo $x) + 1) / 2 ))` printed 0 and a function was
+not found: a variable inside it expanded empty and the arithmetic went
+on with a wrong number.
+
+### subst-errexit: set -e is off inside $( ), as bash
+Files: `src/interpreter/expansion.ts`, `src/interpreter/types.ts`,
+  `src/Bash.ts`, `src/interpreter/builtins/shopt.ts`,
+  `src/interpreter/helpers/shellopts.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/subst-errexit.test.ts`
+
+Now: a command substitution runs with `set -e` off, as bash does,
+unless `set -o posix` or `shopt -s inherit_errexit` is on, and the
+caller's setting comes back after it. A `set -e` inside the
+substitution still applies there. `inherit_errexit` is a real shopt
+option, listed in `BASHOPTS` when set.
+
+Before: the substitution kept the caller's `set -e`, so under `set -e`
+`x=$(false; echo 1)` stopped at `false` and the script exited, where
+bash gives `x=1` and goes on; `inherit_errexit` was accepted and never
+stored.
+
 ## Filesystem
 
 ### fs-children: a directory keeps its children, paths resolve unwalked

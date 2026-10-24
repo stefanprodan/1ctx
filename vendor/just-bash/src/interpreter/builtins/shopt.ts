@@ -39,6 +39,7 @@ const SHOPT_OPTIONS = [
   "expand_aliases",
   "lastpipe",
   "xpg_echo",
+  "inherit_errexit", // (1ctx subst-errexit)
 ] as const;
 
 // Options that are recognized but not implemented (stubs that return current state)
@@ -71,7 +72,6 @@ const STUB_OPTIONS = [
   "histverify",
   "hostcomplete",
   "huponexit",
-  "inherit_errexit",
   "interactive_comments",
   "lithist",
   "localvar_inherit",
