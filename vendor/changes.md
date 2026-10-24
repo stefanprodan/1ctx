@@ -1872,6 +1872,24 @@ Before:
 - **Leftmost-longest.** `grep -oE 'foo|foobar'` printed `foo` where GNU
   prints `foobar`, and `-oF -e foo -e food` printed `foo`.
 
+## sed
+
+### sed-backslash: an escaped backslash in a replacement is kept
+Files: `src/commands/sed/lexer.ts`
+Upstream: ported from #550
+Tests: `test/vendor/just-bash/sed-replacement.test.ts`
+
+Now: the lexer keeps `\\` in an `s` replacement as two characters, as
+it already does in the pattern, and the executor turns it into one
+literal backslash, as GNU sed does: `s/a/\\n/` writes `\n`,
+`s/\(a\)/\\\1/` writes `\a` and `s/a/\\&/` writes `\a`. The BusyBox
+`\\<newline>` form still writes a newline, as in #550.
+
+Before: the lexer collapsed `\\` to one `\`, which the executor then
+read with the next character as a new escape, so `\\n` wrote a newline,
+`\\t` a tab, `x\\y` gave `xy`, `\\&` a literal `&` and `\\\1` a literal
+`\1`: an edit meant to write `\n` into a script wrote a line break.
+
 ## xargs
 
 ### xargs-gnu: xargs as GNU xargs 4.11

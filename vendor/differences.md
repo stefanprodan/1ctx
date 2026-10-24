@@ -496,6 +496,15 @@ POSIX shell. Where they part:
   near unexpected token ...`; a runtime error names `bash`, not the
   script and its line.
 
+## Where our sed still differs from GNU sed
+
+`test/vendor/just-bash/sed-replacement.test.ts` holds `s` replacements
+to GNU sed 4.10. Where they part:
+
+- `\\` followed by a newline in a replacement writes a newline, as
+  BusyBox sed does (`s/a/x\\<newline>y/` gives `x`, a newline, `yb`);
+  GNU sed refuses it with `unterminated 's' command`, exit 1.
+
 ## Where our read and mapfile still differ from bash
 
 `test/vendor/just-bash/read-utf8.test.ts` holds them to bash 5.3 in a
