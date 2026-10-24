@@ -327,6 +327,23 @@ names it. It descends into no link and leaves dot entries out unless
 Before: the walk matched the empty name after `**` against nothing, so
 `echo a/**` and `echo **` under globstar printed the pattern itself.
 
+### arith-subst: a $( ) in arithmetic runs in the script's state
+Files: `src/interpreter/arithmetic.ts`
+Upstream: ported from #617
+Tests: `test/vendor/just-bash/arith-subst.test.ts`
+
+Now: a command substitution inside `$(( ))`, `(( ))`, a C-style `for`
+or a substring offset runs as any other command substitution: in an
+isolated copy of the current shell's state, so it sees the script's
+variables, functions and folder, and its changes, `set` options
+included, stay inside it. Its stderr goes out at expansion time and its
+exit status is recorded. Only the arithmetic part of #617 is taken; its
+brace range limit is not.
+
+Before: it ran in a fresh shell seeded from the first environment, so
+`x=3; echo $(( ($(echo $x) + 1) / 2 ))` printed 0, a function was not
+found, and an empty result silently became a wrong number.
+
 ## Filesystem
 
 ### fs-children: a directory keeps its children, paths resolve unwalked
