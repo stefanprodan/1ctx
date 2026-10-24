@@ -10,6 +10,7 @@ import {
   parseName,
   textFromBytes,
 } from "../knowledge/rules.ts";
+import { INPUT_PASSES } from "./commands.ts";
 import { checkScratchNames, parseScratchName } from "./names.ts";
 import { mountPath, prefixes, underKnowledge } from "./open.ts";
 import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";
@@ -223,7 +224,7 @@ export function executionLimits(
   fs: InMemoryFs,
   remainingMs: number,
 ): NonNullable<BashOptions["executionLimits"]> {
-  // a whole repository fits one walk and one rg over it
+  // a whole repository fits one walk, and its bytes count as mounted
   const repoEntries = job.repos.reduce(
     (sum, repo) => sum + repo.files + repo.dirs,
     0,
@@ -241,7 +242,7 @@ export function executionLimits(
     maxSedIterations: job.iterations,
     maxJqIterations: job.iterations,
     maxLiveBytes: 4 * job.mountBytes,
-    maxInputBytes: job.ioBytes + repoBytes,
+    maxInputBytes: INPUT_PASSES * (job.mountBytes + repoBytes),
     maxArchiveBytes: 4 * job.mountBytes,
     maxArchiveCompressedBytes: 4 * job.mountBytes,
     maxArchiveEntryBytes: 4 * job.mountBytes,
