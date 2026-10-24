@@ -11,6 +11,10 @@ export const COMMAND_ITERATIONS = 100_000;
 // the interpreter stops at the call timeout and the worker is ended this
 // long after, so the interpreter's exit 124, words and output win
 export const BACKSTOP_MS = 1000;
+// a command reads at most this many passes over everything mounted, the
+// repositories included; small, since some commands hold their input
+// whole and the input cap is what bounds them
+export const INPUT_PASSES = 4;
 
 export const KNOWLEDGE_COMMANDS = [
   "ls",

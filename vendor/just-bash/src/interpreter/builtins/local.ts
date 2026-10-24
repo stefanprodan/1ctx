@@ -20,7 +20,11 @@ import { markNameref } from "../helpers/nameref.js";
 import { checkReadonlyError, markExported } from "../helpers/readonly.js";
 import { failure, result } from "../helpers/result.js";
 import type { InterpreterContext } from "../types.js";
-import { parseArrayElements } from "./declare-array-parsing.js";
+import {
+  parseArrayElements,
+  parseAssocArrayLiteral,
+  startsKeyed,
+} from "./declare-array-parsing.js";
 import { markLocalVarDepth, pushLocalVarStack } from "./variable-assignment.js";
 
 export async function handleLocal(
@@ -53,6 +57,16 @@ export async function handleLocal(
   let exitCode = 0;
   let declareNameref = false;
   let declareArray = false;
+  // (1ctx assoc-pairs) -A makes a fresh associative array, which the
+  // scope pop restores like any local array
+  let declareAssoc = false;
+  const freshAssoc = (name: string): void => {
+    ctx.state.arrays?.delete(name);
+    ctx.state.env.delete(name);
+    setArrayKind(ctx, name, "associative");
+    ctx.state.associativeArrays ??= new Set();
+    ctx.state.associativeArrays.add(name);
+  };
   let _printMode = false;
   let declareExport = false;
 
@@ -63,6 +77,8 @@ export async function handleLocal(
       declareNameref = true;
     } else if (arg === "-a") {
       declareArray = true;
+    } else if (arg === "-A") {
+      declareAssoc = true;
     } else if (arg === "-p") {
       _printMode = true;
     } else if (arg === "-x") {
@@ -72,6 +88,7 @@ export async function handleLocal(
       for (const flag of arg.slice(1)) {
         if (flag === "n") declareNameref = true;
         else if (flag === "a") declareArray = true;
+        else if (flag === "A") declareAssoc = true;
         else if (flag === "p") _printMode = true;
         else if (flag === "x") declareExport = true;
         // Other flags are ignored for now
@@ -117,6 +134,28 @@ export async function handleLocal(
       checkReadonlyError(ctx, name, "bash");
 
       // Parse and enforce limits before changing the existing local cell.
+      // (1ctx assoc-pairs) keyed entries, or plain words as pairs
+      if (declareAssoc) {
+        const entries: [string, string][] = startsKeyed(content)
+          ? parseAssocArrayLiteral(content, arrayParseLimits)
+          : [];
+        if (!startsKeyed(content)) {
+          const words = parseArrayElements(content, {
+            ...arrayParseLimits,
+            maxElements: arrayParseLimits.maxElements * 2,
+          });
+          for (let i = 0; i < words.length; i += 2)
+            entries.push([words[i], words[i + 1] ?? ""]);
+        }
+        ctx.executionScope.consumeWork(entries.length, "local array assignment");
+        saveArray(name);
+        freshAssoc(name);
+        for (const [key, v] of entries)
+          setArrayElement(ctx, name, key, v, "associative");
+        markLocalVarDepth(ctx, name);
+        continue;
+      }
+
       const elements = parseArrayElements(content, arrayParseLimits);
       ctx.executionScope.consumeWork(elements.length, "local array assignment");
 
@@ -291,6 +330,9 @@ export async function handleLocal(
 
     // Check if variable was already local BEFORE we potentially add it to scope
     const wasAlreadyLocal = currentScope.has(name);
+    // (1ctx assoc-pairs) an array this scope already saved, before the
+    // save below
+    const wasLocalArray = currentArrayScope?.has(name) ?? false;
 
     // For bash's localvar-nest behavior: always push the current value to the stack
     // This allows nested local declarations (e.g., in nested evals) to each have
@@ -338,13 +380,20 @@ export async function handleLocal(
       }
       currentScope.set(name, savedValue);
       // Also save array elements if -a flag is used
-      if (declareArray) {
+      if (declareArray || declareAssoc) {
         saveArray(name);
       }
     }
 
-    // If -a flag is used, create an empty local array
-    if (declareArray && value === undefined) {
+    // (1ctx assoc-pairs) -A makes an empty local associative array
+    if (declareAssoc && value === undefined) {
+      // this scope's own associative array keeps its elements; anything
+      // else is saved for the return and becomes a fresh one
+      if (!(wasLocalArray && ctx.state.associativeArrays?.has(name))) {
+        saveArray(name);
+        freshAssoc(name);
+      }
+    } else if (declareArray && value === undefined) {
       // Clear existing array elements
       clearArray(ctx, name);
       setArrayKind(ctx, name, "indexed");

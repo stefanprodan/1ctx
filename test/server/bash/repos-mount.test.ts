@@ -17,8 +17,10 @@ import {
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { InMemoryFs } from "just-bash";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
-import type { JobRepo } from "../../../src/server/bash/protocol.ts";
+import type { Job, JobRepo } from "../../../src/server/bash/protocol.ts";
+import { executionLimits } from "../../../src/server/bash/tree.ts";
 import { callCaps, run, type Setup, scratchState, setup } from "./helpers.ts";
 
 // every command starts a worker and walks a real tree: a loaded CI
@@ -32,10 +34,15 @@ const SMALL = `${"x".repeat(99)}\n`;
 
 // a folder per file, as many as the walk's floor and more
 const FOLDERS = 1500;
+// files one search reads past four passes over a small mount, each
+// small enough that holding a few at once stays under the live cap
+const LARGE = 160;
+const LARGE_BYTES = 64 * 1024;
 
 let base = "";
 let tree: JobRepo;
 let folders: JobRepo;
+let large: JobRepo;
 
 beforeAll(async () => {
   base = await mkdtemp(join(tmpdir(), "repos-mount-"));
@@ -68,6 +75,17 @@ beforeAll(async () => {
     files: FOLDERS,
     dirs: FOLDERS,
     bytes: 2 * FOLDERS,
+  };
+  const heavy = join(base, "large");
+  await mkdir(heavy, { recursive: true });
+  for (let f = 0; f < LARGE; f++)
+    await writeFile(join(heavy, `f${f}`), Buffer.alloc(LARGE_BYTES, 97));
+  large = {
+    name: "large",
+    folder: heavy,
+    files: LARGE,
+    dirs: 0,
+    bytes: LARGE * LARGE_BYTES,
   };
 });
 
@@ -250,13 +268,65 @@ describe("the caps grow with the mount", () => {
   });
 
   test("a search of the whole tree fits once its bytes count", async () => {
-    // reads of the base alone are capped at four results
-    const s = setup({ scratchBytes: 1000, knowledgeFileBytes: 1000 });
+    // a mount of about 2 MiB, so four passes over it are less than one
+    // search of the tree reads
+    const s = setup({
+      knowledgeProjectBytes: 1000,
+      scratchBytes: 1000,
+      uploadBytes: 1000,
+      knowledgeFileBytes: 1000,
+    });
+    const mount = (bytes: number): CommandCaps => ({
+      ...caps,
+      repos: {
+        mounts: [{ ...large, bytes }],
+        fileBytes: LARGE_BYTES,
+        notice: "",
+      },
+    });
     // no match, so every file is read
-    const search = "rg -q zzz /repos/widgets/many; echo $?";
-    expect((await run(s, search, withRepos({ bytes: 0 }))).content).toContain(
-      "input size limit exceeded",
+    const search = "echo x > /tmp/kept; rg -q zzz /repos/large; echo $?";
+    const refused = await run(s, search, mount(0));
+    expect(refused.content).toContain("input size limit exceeded");
+    expect(refused.content).toContain("nothing saved");
+    expect(refused.content).toEndWith("exit 126");
+    expect(scratchState(s).entries).toEqual([]);
+    expect((await run(s, search, mount(large.bytes))).content).toBe(
+      "1\n\nexit 0",
     );
-    expect(await output(s, search)).toBe("1\n\nexit 0");
+  });
+
+  test("searches of a repository may read past the old cap", async () => {
+    // the old cap was one read of the base plus one pass over the tree
+    const s = setup({ scratchBytes: 1000, knowledgeFileBytes: 1000 });
+    const search = "rg -q zzz /repos/widgets/many; echo $?";
+    expect(await output(s, [search, search, search].join("; "))).toBe(
+      "1\n1\n1\n\nexit 0",
+    );
+  });
+
+  test("searches of the knowledge base alone may read past the old cap", async () => {
+    const s = setup({ scratchBytes: 1000, knowledgeFileBytes: 1000 });
+    // each pass reads more than the old cap, one read of the base
+    for (let f = 0; f < 10; f++)
+      s.knowledge.create(s.projectId, s.author, `k${f}.md`, "x".repeat(900));
+    const search = "rg -q zzz /knowledge; echo $?";
+    expect(await output(s, [search, search, search].join("; "), caps)).toBe(
+      "1\n1\n1\n\nexit 0",
+    );
+  });
+});
+
+describe("the input cap", () => {
+  const job = (repos: JobRepo[]) =>
+    ({ ioBytes: 4000, mountBytes: 1_000_000, iterations: 10, repos }) as Job;
+
+  test("is four passes over everything mounted", () => {
+    const fs = new InMemoryFs();
+    expect(executionLimits(job([]), fs, 1000).maxInputBytes).toBe(4_000_000);
+    const repo = { ...tree, bytes: 250_000 };
+    expect(executionLimits(job([repo, repo]), fs, 1000).maxInputBytes).toBe(
+      6_000_000,
+    );
   });
 });

@@ -222,8 +222,15 @@ that shell that shows a file on the chat page.
   into scratch, which keeps no links; `mv` out leaves the copy and
   fails at the remove.
 - **The caps grow with the mount.** `maxTraversalEntries` adds the
-  kept files and folders (`dirs` in `tree.json`) and `maxInputBytes`
-  the kept bytes, so one `find` or `rg` covers a whole tree.
+  kept files and folders (`dirs` in `tree.json`), so one `find` or `rg`
+  covers a whole tree. `maxInputBytes`, counted across the whole
+  command, is `INPUT_PASSES` (4) passes over everything mounted:
+  `mountBytes` plus the repositories' bytes, so a few searches of
+  `/knowledge` and a repository fit. It is also a memory bound: some
+  commands (`paste`) hold their input without reserving it against
+  `maxLiveBytes`, the worker has no heap limit Bun enforces, and cheap
+  reads outrun the deadline. With a repository mounted it is above the
+  live cap, which counts `mountBytes` alone.
 - **A cwd or an opened path may be under `/repos`.** The next command
   starts there while the repository is mounted, else at home with the
   start notice. `open` sizes a file before reading it, a repository's

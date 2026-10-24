@@ -784,6 +784,12 @@ export class Parser {
     );
   }
 
+  // A NAME=value word in a for list, a case or an array literal is a plain
+  // word, not an assignment (1ctx assignment-words)
+  isListWord(): boolean {
+    return this.isWord() || this.check(TokenType.ASSIGNMENT_WORD);
+  }
+
   private isWordToken(context: WordParseContext): boolean {
     const t = this.current().type;
     return (

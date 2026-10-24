@@ -622,8 +622,9 @@ export class SedLexer {
               replacement += "\n";
               this.advance();
             } else {
-              // \\\\ = literal backslash
-              replacement += "\\";
+              // Keep \\ escaped; the executor maps it to a literal backslash
+              // (1ctx sed-backslash)
+              replacement += "\\\\";
             }
           } else if (next === "\n") {
             // \<newline> in replacement: include the newline as literal

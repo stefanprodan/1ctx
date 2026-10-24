@@ -496,6 +496,57 @@ POSIX shell. Where they part:
   near unexpected token ...`; a runtime error names `bash`, not the
   script and its line.
 
+`test/vendor/just-bash/assignment-words.test.ts` holds words with `=`
+in for lists, case and array literals to bash 5.3 and pins ours where
+they part:
+
+- A tilde after `=` in an array element expands: `arr=(x=~)` stores
+  `x=/home/user`, where bash keeps `x=~`. In a for list and a command's
+  arguments both expand it. A tilde after `:` in a for word
+  (`for x in c=x:~`) stays, where bash expands it.
+- `declare` and `local` rebuild an array's words from their parsed
+  parts and lose expansions: `declare -a d=(a $(echo b) $((1+2)))`
+  stores `CommandSubstitution` and `ArithmeticExpansion`, and a
+  `${u:-d}` default is lost. A plain `arr=(...)` keeps them.
+- A redirection target holding `=` (`echo hi > a=b`) is a parse error,
+  exit 2.
+- A `do` in a for list is a word only when a `;` or newline and another
+  `do` come right after it (past more `do` words and comments); any
+  other `do` ends the list. So `for i in a b do echo $i; done` loops,
+  where bash fails with a syntax error, and `for x in a do b; do` is a
+  parse error, where bash loops over `a`, `do` and `b`.
+- `select` is not implemented: `syntax error near unexpected token
+  'select'`, exit 2.
+
+`test/vendor/just-bash/assoc-pairs.test.ts` holds associative arrays
+assigned plain words to bash 5.3. Where they part:
+
+- A brace in a pair's key or value expands and joins: `m=(k{1,2} v)`
+  makes the key `k1 2` and `m=(k {a,b})` the value `a b`, where bash
+  keeps the braces.
+- `local` ignores `-r`: `local -r x=1; x=2` and `local -Ar r=(...);
+  r[b]=2` succeed, where bash says `readonly variable`.
+- `local -A` takes `=(...)` or no value; `local -A m+=(k v)` and
+  `local -A q[key]=v` make indexed elements, and `declare -A m+=(k v)`
+  drops the words on an existing associative array and makes indexed
+  elements otherwise, where bash makes the associative ones. `local -A` on
+  a local indexed array empties it into an associative one, where bash
+  refuses to convert it. `local` and `declare` read their list after
+  expansion, so a first word that only looks keyed once quoted or
+  expanded (`local -A m=("[a]"=1 b)`, `x='[a]=1'; local -A m=($x)`)
+  is read as a key and value, where bash takes the whole word as a key.
+- An empty key is stored: `m=("" v)`, `m[""]=v` and `m=([""]=v)` set
+  the key `''`, where bash says `bad array subscript` and skips it.
+
+## Where our sed still differs from GNU sed
+
+`test/vendor/just-bash/sed-replacement.test.ts` holds `s` replacements
+to GNU sed 4.10. Where they part:
+
+- `\\` followed by a newline in a replacement writes a newline, as
+  BusyBox sed does (`s/a/x\\<newline>y/` gives `x`, a newline, `yb`);
+  GNU sed refuses it with `unterminated 's' command`, exit 1.
+
 ## Where our read and mapfile still differ from bash
 
 `test/vendor/just-bash/read-utf8.test.ts` holds them to bash 5.3 in a
