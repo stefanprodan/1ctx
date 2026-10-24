@@ -363,6 +363,25 @@ Before: the substitution kept the caller's `set -e`, so under `set -e`
 bash gives `x=1` and goes on; `inherit_errexit` was accepted and never
 stored.
 
+### assignment-words: a word holding = is a word in lists and arrays
+Files: `src/parser/parser.ts`, `src/parser/compound-parser.ts`,
+  `src/parser/command-parser.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/assignment-words.test.ts`
+
+Now: the lexer still tags an unquoted `NAME=...` word as an assignment
+wherever it sits, since a command's prefix and `declare`'s operands
+need the tag, but the `for ... in` list, the case word and its patterns
+and an array literal's elements take it as a plain word, through one
+check (`isListWord()`), with its expansions: `for s in SPY CL=F`,
+`arr=(a=1 b=2)` and `case $x in CL=F)` answer as bash does.
+
+Before: those loops stopped at the tag, so `for s in SPY CL=F; do`
+was `Parse error: Expected DO, got ASSIGNMENT_WORD`, exit 2, a case
+word or pattern holding `=` was a parse error, and an array literal
+dropped every such element without a word, so `arr=(a=1 b=2)` left an
+empty array.
+
 ## Filesystem
 
 ### fs-children: a directory keeps its children, paths resolve unwalked

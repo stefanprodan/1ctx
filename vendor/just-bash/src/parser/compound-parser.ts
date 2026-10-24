@@ -126,7 +126,8 @@ export function parseFor(
         TokenType.EOF,
       )
     ) {
-      if (p.isWord()) {
+      // (1ctx assignment-words)
+      if (p.isListWord()) {
         words.push(p.parseWord());
       } else {
         break;
@@ -274,7 +275,8 @@ export function parseCase(
 ): CaseNode {
   p.expect(TokenType.CASE);
 
-  if (!p.isWord()) {
+  // (1ctx assignment-words)
+  if (!p.isListWord()) {
     p.error("Expected word after 'case'");
   }
   const word = p.parseWord();
@@ -319,8 +321,8 @@ function parseCaseItem(p: Parser): CaseItemNode | null {
 
   const patterns: WordNode[] = [];
 
-  // Parse patterns separated by |
-  while (p.isWord()) {
+  // Parse patterns separated by | (1ctx assignment-words)
+  while (p.isListWord()) {
     patterns.push(p.parseWord());
 
     if (p.check(TokenType.PIPE)) {

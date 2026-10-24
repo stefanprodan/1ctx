@@ -496,6 +496,23 @@ POSIX shell. Where they part:
   near unexpected token ...`; a runtime error names `bash`, not the
   script and its line.
 
+`test/vendor/just-bash/assignment-words.test.ts` holds words with `=`
+in for lists, case and array literals to bash 5.3 and pins ours where
+they part:
+
+- A tilde after `=` in an array element expands: `arr=(x=~)` stores
+  `x=/home/user`, where bash keeps `x=~`. In a for list and a command's
+  arguments both expand it. A tilde after `:` in a for word
+  (`for x in c=x:~`) stays, where bash expands it.
+- `declare` and `local` rebuild an array's words from their parsed
+  parts and lose expansions: `declare -a d=(a $(echo b) $((1+2)))`
+  stores `CommandSubstitution` and `ArithmeticExpansion`, and a
+  `${u:-d}` default is lost. A plain `arr=(...)` keeps them.
+- A redirection target holding `=` (`echo hi > a=b`) is a parse error,
+  exit 2.
+- `select` is not implemented: `syntax error near unexpected token
+  'select'`, exit 2.
+
 ## Where our sed still differs from GNU sed
 
 `test/vendor/just-bash/sed-replacement.test.ts` holds `s` replacements

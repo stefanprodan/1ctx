@@ -353,7 +353,8 @@ function parseArrayElements(p: Parser): WordNode[] {
 
   while (!p.check(TokenType.RPAREN, TokenType.EOF)) {
     p.checkIterationLimit();
-    if (p.isWord()) {
+    // (1ctx assignment-words)
+    if (p.isListWord()) {
       elements.push(p.parseWord());
     } else if (INVALID_ARRAY_TOKENS.has(p.current().type)) {
       // Invalid tokens inside array literals - throw syntax error
