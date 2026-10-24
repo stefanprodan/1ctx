@@ -374,13 +374,45 @@ wherever it sits, since a command's prefix and `declare`'s operands
 need the tag, but the `for ... in` list, the case word and its patterns
 and an array literal's elements take it as a plain word, through one
 check (`isListWord()`), with its expansions: `for s in SPY CL=F`,
-`arr=(a=1 b=2)` and `case $x in CL=F)` answer as bash does.
+`arr=(a=1 b=2)` and `case $x in CL=F)` answer as bash does. In the for
+list a `do` is a word when, past any more `do` words and comments, a
+`;` or newline and then (after blank lines and comments) another `do`
+follow it: `for x in a do; do` loops over `a` and `do`. A `do` with no
+separator before it still ends the list, as upstream allows.
 
 Before: those loops stopped at the tag, so `for s in SPY CL=F; do`
 was `Parse error: Expected DO, got ASSIGNMENT_WORD`, exit 2, a case
 word or pattern holding `=` was a parse error, and an array literal
 dropped every such element without a word, so `arr=(a=1 b=2)` left an
-empty array.
+empty array. The for list also stopped at `do`, so `for x in a do; do`
+was `Expected DONE, got SEMICOLON`.
+
+### assoc-pairs: an associative array takes plain words as pairs
+Files: `src/interpreter/simple-command-assignments.ts`,
+  `src/interpreter/builtins/local.ts`,
+  `src/interpreter/builtins/declare.ts`,
+  `src/interpreter/builtins/declare-array-parsing.ts`
+Upstream: not reported
+Tests: `test/vendor/just-bash/assoc-pairs.test.ts`
+
+Now: assigning an associative array a list with no `[key]=` element
+(`declare -A m; m=(k v x y)`, `m+=(c 3)`) takes the words as key and
+value pairs, as bash 5.1 and later do; an odd last key gets an empty
+value. Each word expands whole, without splitting or globbing, and
+`"$@"` joins into one word, as bash does in this list. The first word
+alone picks keys or pairs, as in bash: `m=(k v [x]=y)` stores `k` and the
+key `[x]=y`, and `declare -A` and `local -A` lists now decide the same
+way, where a `[` anywhere in the list sent it to the keyed parser, which
+dropped every plain word (`declare -A m=(k "[v]")` stored nothing).
+`local -A` makes a fresh associative array, empty or from its list,
+which the function's scope restores on return like any local array; an
+associative array the same function already made local keeps its
+elements.
+
+Before: the list went to the indexed path, so `m=(k v x y)` stored
+`[0]=k [1]=v [2]=x [3]=y` and `${m[k]}` was empty; any keyed word sent
+the whole list to the keyed path. `local` ignored `-A`, so in a
+function every string key of `local -A s` was index 0.
 
 ## Filesystem
 

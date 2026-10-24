@@ -510,8 +510,33 @@ they part:
   `${u:-d}` default is lost. A plain `arr=(...)` keeps them.
 - A redirection target holding `=` (`echo hi > a=b`) is a parse error,
   exit 2.
+- A `do` in a for list is a word only when a `;` or newline and another
+  `do` come right after it (past more `do` words and comments); any
+  other `do` ends the list. So `for i in a b do echo $i; done` loops,
+  where bash fails with a syntax error, and `for x in a do b; do` is a
+  parse error, where bash loops over `a`, `do` and `b`.
 - `select` is not implemented: `syntax error near unexpected token
   'select'`, exit 2.
+
+`test/vendor/just-bash/assoc-pairs.test.ts` holds associative arrays
+assigned plain words to bash 5.3. Where they part:
+
+- A brace in a pair's key or value expands and joins: `m=(k{1,2} v)`
+  makes the key `k1 2` and `m=(k {a,b})` the value `a b`, where bash
+  keeps the braces.
+- `local` ignores `-r`: `local -r x=1; x=2` and `local -Ar r=(...);
+  r[b]=2` succeed, where bash says `readonly variable`.
+- `local -A` takes `=(...)` or no value; `local -A m+=(k v)` and
+  `local -A q[key]=v` make indexed elements, and `declare -A m+=(k v)`
+  drops the words on an existing associative array and makes indexed
+  elements otherwise, where bash makes the associative ones. `local -A` on
+  a local indexed array empties it into an associative one, where bash
+  refuses to convert it. `local` and `declare` read their list after
+  expansion, so a first word that only looks keyed once quoted or
+  expanded (`local -A m=("[a]"=1 b)`, `x='[a]=1'; local -A m=($x)`)
+  is read as a key and value, where bash takes the whole word as a key.
+- An empty key is stored: `m=("" v)`, `m[""]=v` and `m=([""]=v)` set
+  the key `''`, where bash says `bad array subscript` and skips it.
 
 ## Where our sed still differs from GNU sed
 

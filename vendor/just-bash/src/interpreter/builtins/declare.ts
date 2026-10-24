@@ -51,6 +51,7 @@ import type { InterpreterContext } from "../types.js";
 import {
   parseArrayElements,
   parseAssocArrayLiteral,
+  startsKeyed,
 } from "./declare-array-parsing.js";
 import {
   listAllVariables,
@@ -461,7 +462,7 @@ export async function handleDeclare(
       // clearing the existing value. Associative bare syntax consumes two
       // tokens per retained entry.
       const parsedAssocEntries =
-        declareAssoc && content.includes("[")
+        declareAssoc && startsKeyed(content)
           ? parseAssocArrayLiteral(content, arrayParseLimits)
           : undefined;
       const parsedElements =
@@ -497,7 +498,7 @@ export async function handleDeclare(
       ctx.state.env.delete(name);
 
       // Check if this is associative array literal syntax: (['key']=value ...)
-      if (declareAssoc && content.includes("[")) {
+      if (declareAssoc && startsKeyed(content)) {
         for (const [key, rawValue] of parsedAssocEntries ?? []) {
           setArrayElement(
             ctx,

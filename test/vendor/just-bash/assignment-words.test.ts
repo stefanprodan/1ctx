@@ -47,6 +47,15 @@ const cases: [string, string, number][] = [
   ["case k=v in k=*|x=y) echo hit;; esac", "hit\n", 0],
   ["case $(echo a=b) in a=b) echo hit;; esac", "hit\n", 0],
   ["case a=b in (a=c) echo no;; (a=*) echo hit;; esac", "hit\n", 0],
+  // a `do` followed by a separator and another `do` is a word
+  ['for x in a do; do echo "[$x]"; done', "[a]\n[do]\n", 0],
+  ['for x in a=1 do; do echo "[$x]"; done', "[a=1]\n[do]\n", 0],
+  ['for x in do; do echo "[$x]"; done', "[do]\n", 0],
+  ['for x in a b do\ndo echo "[$x]"; done', "[a]\n[b]\n[do]\n", 0],
+  ['for x in a do;\ndo echo "[$x]"; done', "[a]\n[do]\n", 0],
+  ['for x in a do\n\ndo echo "[$x]"; done', "[a]\n[do]\n", 0],
+  ['for x in a do # c\ndo echo "[$x]"; done', "[a]\n[do]\n", 0],
+  ['for x in a do do; do echo "[$x]"; done', "[a]\n[do]\n[do]\n", 0],
 ];
 
 describe("words holding =", () => {
@@ -96,6 +105,14 @@ describe("words holding =, where we differ", () => {
     expect(await run("echo hi > a=b; cat a=b")).toEqual({
       stdout: "",
       exitCode: 2,
+    });
+  });
+
+  test("a do with no separator before it ends the list", async () => {
+    // bash: a syntax error, exit 2
+    expect(await run("for i in a b do echo $i; done")).toEqual({
+      stdout: "a\nb\n",
+      exitCode: 0,
     });
   });
 

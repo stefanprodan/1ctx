@@ -262,8 +262,12 @@ async function processArrayAssignment(
     ctx.state.env.delete(name);
   };
 
+  // (1ctx assoc-pairs) bash reads an associative list as keyed or as
+  // pairs by its first word alone
+  const assocKeyed = isAssoc && checkHasKeyedElements(array.slice(0, 1));
+
   try {
-    if (isAssoc && hasKeyedElements) {
+    if (assocKeyed) {
       await processAssociativeArrayAssignment(
         ctx,
         node,
@@ -275,8 +279,17 @@ async function processArrayAssignment(
           xtraceOutput += msg;
         },
       );
-    } else if (hasKeyedElements) {
+    } else if (hasKeyedElements && !isAssoc) {
       await processIndexedArrayWithKeysAssignment(
+        ctx,
+        name,
+        array,
+        append,
+        clearExistingElements,
+      );
+    } else if (isAssoc) {
+      // (1ctx assoc-pairs)
+      await processAssociativePairs(
         ctx,
         name,
         array,
@@ -549,6 +562,31 @@ async function processIndexedArrayWithKeysAssignment(
         setArrayElement(ctx, name, currentIndex++, val);
       }
     }
+  }
+}
+
+// (1ctx assoc-pairs) words with no [key]= alternate key and value, as in
+// bash 5.1+; each word expands whole, without splitting or globbing, and
+// an odd last key gets an empty value
+async function processAssociativePairs(
+  ctx: InterpreterContext,
+  name: string,
+  array: WordNode[],
+  append: boolean,
+  clearExistingElements: () => void,
+): Promise<void> {
+  if (array.length > ctx.limits.maxArrayElements) {
+    throw new ExecutionLimitError(
+      `array element limit exceeded (${ctx.limits.maxArrayElements})`,
+      "array_elements",
+    );
+  }
+  const words: string[] = [];
+  for (const element of array) words.push(await expandWord(ctx, element));
+  ctx.executionScope.consumeWork(words.length, "associative array assignment");
+  if (!append) clearExistingElements();
+  for (let i = 0; i < words.length; i += 2) {
+    setArrayElement(ctx, name, words[i], words[i + 1] ?? "", "associative");
   }
 }
 

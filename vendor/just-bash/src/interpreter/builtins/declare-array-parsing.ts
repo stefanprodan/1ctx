@@ -98,6 +98,12 @@ export function parseArrayElements(
   return elements;
 }
 
+// (1ctx assoc-pairs) bash reads an associative list as keyed or as pairs
+// by its first word alone; a [ later in a key or value does not count
+export function startsKeyed(content: string): boolean {
+  return content.trimStart().startsWith("[");
+}
+
 /**
  * Parse associative array literal content like "['foo']=bar ['spam']=42"
  * Returns array of [key, value] pairs

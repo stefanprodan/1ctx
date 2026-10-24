@@ -89,6 +89,27 @@ export function parseIf(
   return AST.ifNode(clauses, elseBody, redirections);
 }
 
+// (1ctx assignment-words) a `do` in a for list is a word when, past any
+// more `do` words, a separator and then (after blank lines and comments)
+// another `do` follow it
+function doIsListWord(p: Parser): boolean {
+  let i = 1;
+  while (
+    p.peek(i).type === TokenType.DO ||
+    p.peek(i).type === TokenType.COMMENT
+  )
+    i++;
+  const sep = p.peek(i).type;
+  if (sep !== TokenType.SEMICOLON && sep !== TokenType.NEWLINE) return false;
+  i++;
+  while (
+    p.peek(i).type === TokenType.NEWLINE ||
+    p.peek(i).type === TokenType.COMMENT
+  )
+    i++;
+  return p.peek(i).type === TokenType.DO;
+}
+
 export function parseFor(
   p: Parser,
   options?: { skipRedirections?: boolean },
@@ -117,16 +138,18 @@ export function parseFor(
     p.advance();
     words = [];
 
-    // Parse words until ; or newline
-    while (
-      !p.check(
-        TokenType.SEMICOLON,
-        TokenType.NEWLINE,
-        TokenType.DO,
-        TokenType.EOF,
-      )
-    ) {
-      // (1ctx assignment-words)
+    // Parse words until ; or newline. A `do` ends the list early, unless a
+    // separator and another `do` follow it: then it is a word, as in bash.
+    // A run of `do` words shares one answer, decided once
+    // (1ctx assignment-words)
+    let doWord: boolean | undefined;
+    while (!p.check(TokenType.SEMICOLON, TokenType.NEWLINE, TokenType.EOF)) {
+      if (p.check(TokenType.DO)) {
+        doWord ??= doIsListWord(p);
+        if (!doWord) break;
+      } else {
+        doWord = undefined;
+      }
       if (p.isListWord()) {
         words.push(p.parseWord());
       } else {
