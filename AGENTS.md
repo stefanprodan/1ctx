@@ -117,8 +117,9 @@ since a relative URL inside the binary resolves against `src/server`.
 with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `MLX_URL`,
-`AZURE_URL`, `ANTHROPIC_URL`) and fails every other, `checkHost()` for
-`CHECK_URL` as a test scripts it, and a fake email sender that
+`AZURE_URL`, `ANTHROPIC_URL`) and fails every other, a scripted
+`CHECK_URL` host (`checkHost()`), and a fake email sender that
+
 keeps every message; `sleeping`, `slept` and `commandPhase` await the
 fake clock and a command's phase. In `chat.ts`, `until`, `idle`,
 `freed`, `sessionSettled` and `ringing` await bus events, sends

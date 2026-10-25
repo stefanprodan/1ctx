@@ -3,8 +3,8 @@
 Governs the attention mark (`runner/marks.ts`, `runner/attention-step.ts`,
 `runner/attention.ts`, `tools/builtin/attention.ts`) and an automation's
 open alert (`automations/alerts.ts`, `automations/alert-email.ts`, the
-alert's columns in `sessions/alerts.ts`). Automations and runs are in
-`docs/automations.md`; a failed check's part of the alert is there too.
+alert's columns in `sessions/alerts.ts`). Automations, runs and the
+check are in `docs/automations.md`.
 
 ## The mark
 
@@ -119,14 +119,13 @@ none; `by` names who marked the latest.
   it is a no-op 200 with the row as it is. It leaves `check_alert_at`.
 - **A failed check opens or joins it once no check answered for
   `CHECK_SILENCE_MS`** (`checkFailed()` in `automations/check-rows.ts`),
-  measured from `last_answered_at`, so it means the same on any
-  schedule. Opening or joining sets `check_alert_at`; with none open and
-  `check_alert_at` set, a dismissed check alert stays closed. The check
-  holds the alert while `check_alert_at >= attention_since`
-  (`CHECK_HOLDS`), so a dismissed mark never claims a run's later alert.
-  While it holds, `alert.check` is true and the reason is
-  `CHECK_ALERT_LEAD` and `last_check_result` while no marked run ended
-  after it, `by` null.
+  counted from `last_answered_at` alike on any schedule. Opening or
+  joining sets `check_alert_at`; a dismissed check alert (none open,
+  `check_alert_at` set) stays closed. The check holds the alert while
+  `check_alert_at >= attention_since` (`CHECK_HOLDS`), so a dismissed
+  mark never claims a run's later alert. While it holds, `alert.check`
+  is true; while no marked run ended after it, the reason is
+  `CHECK_ALERT_LEAD` and `last_check_result`, `by` null.
 - **Only the check closes what the check opened.** An answer clears
   `check_alert_at` and closes the alert when no marked run belongs to it
   (`checkAnswered()`); a run's alert stays open. A clean run's close
@@ -138,11 +137,11 @@ none; `by` names who marked the latest.
   stays a hint: the owner's email is queued in the opening transaction
   itself (`docs/email.md`), at most `ALERT_EMAILS_PER_DAY` (3) per
   automation a day, counted on the outbox rows that name it, which
-  deleting runs keeps; a check's email has no session and links the
-  automation's page; over the cap the opening emails nobody and logs
+  deleting runs keeps; over the cap the opening emails nobody and logs
   `alert email capped`. The automation's Email switch off drops its
   `email_user` tool and its alert emails; the alert still opens in the
   app.
+
 - **The summary carries `alert`**: `since`, the count of its runs and
   the latest one's reason (`alertColumns()` in `sessions/alerts.ts`),
   read with the row, each feed row and each envelope. The feed's pick

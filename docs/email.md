@@ -114,8 +114,9 @@ profile pages show of email. The links themselves are in
   `users.email_from_agents` starts off; the user turns it on on their
   profile (`PUT /api/profile/email`). Each kind's `prepare` checks
   again at the send: `deleted` once the session is gone (its id set
-  null), but for a check's alert, whose row goes with its automation,
+  null; a check's alert has none and goes with its automation),
   `no-access` when the user can no longer open the project or
+
   must change their password, `opted-out` once they turned it off. The
   one check is `sessionPrepare()` in `frame.ts`.
 - **The email frames what the agent wrote** (`email/frame.ts`). The

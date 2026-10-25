@@ -314,9 +314,10 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
 - **The check URL sits under the schedule.** Empty saves null. The
   summary's line under the next run is `checkLine()`: "Not checked
   yet", "Checked 3m ago: nothing new" for a `CHECK_QUIET` word, "new
-  answer" for 200, or "Check failed 3m ago: " and the result, whose
-  skipped event it leaves unsaid; Setup shows the URL, broken after "/"
-  and "?" (`urlParts()`).
+  answer" for 200, or "Check failed 3m ago: " and the result, never
+  its skipped event. Setup shows the URL broken after "/" and "?"
+  (`urlParts()`).
+
 - **Edit and Delete show for every member.** On an automation someone
   else owns the save row says a save makes the user the owner
   (`ownerNote()`).

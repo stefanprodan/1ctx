@@ -24,7 +24,9 @@ errors and cuts every tool shares are in `docs/tools.md`.
   A shared send counter reserves before
   the first await and returns a refused call's place.
 - **Create takes name, instructions, schedule, optional tz, once, own
-  memory, both guidances and a Check URL** (`checkUrl`, empty for none). The zone defaults to the user's profile.
+  memory, both guidances and a Check URL** (`checkUrl`, empty for
+  none). The zone defaults to the user's profile.
+
   Update needs id and at least one of those fields; an omitted zone
   keeps the automation's. Suspend, resume and run take id alone.
   Defaults and checks are `docs/automations.md`'s. The description asks

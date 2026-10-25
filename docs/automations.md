@@ -208,9 +208,9 @@ sweep) is in `docs/sessions.md`.
 
 A Check URL (`checkUrl`) makes each scheduled fire ask before it runs
 (`automations/check.ts`, `check-fetch.ts`, `check-message.ts`,
-`check-rows.ts`). It is parsed as an MCP server's URL (`parseUrl()`),
-`""` or null for none. Setting or changing it clears the validators,
-`last_checked_at`, `last_check_result` and `check_alert_at`, closing an
+`check-rows.ts`). It is parsed as an MCP server's URL (`parseUrl()`);
+`""` or null is none. Setting or changing it clears the validators,
+`last_checked_at`, `last_check_result` and `check_alert_at`, closes an
 alert no marked run belongs to, and sets `last_answered_at` to now, so
 silence counts from the change.
 
@@ -219,64 +219,61 @@ silence counts from the change.
   out (`earliest(passAt)`) as for a cap wait, so a due row never spins
   the loop. The answer is held in memory and `wake()`s the scheduler,
   whose next fire takes it. One GET per automation at a time. A run of
-  it still going skips the fire with no GET, and so does an owner
-  `ownerFor()` refuses: the fire's attempt records its skipped event.
-  One `CHECK_TIMEOUT_MS` sleep on the clock port covers the whole
-  chain; `If-None-Match` and `If-Modified-Since` from the saved
-  validators go on every hop.
+  it still going, or an owner `ownerFor()` refuses, skips the fire with
+  no GET and records its skipped event. One `CHECK_TIMEOUT_MS` sleep on
+  the clock port covers the whole chain; every hop sends
+  `If-None-Match` and `If-Modified-Since` from the saved validators.
 - **Redirects are followed as curl follows them,** by hand
   (`redirect: "manual"`), at most `CHECK_REDIRECTS` hops, http and https
   only (`hop()`). A signed check stays inside its credential's prefix or
   its MCP server's origin, so no key reaches another origin; an
-  unsigned one meets the web rules on every hop and stays unsigned, a
-  prefix included. The final answer decides.
+  unsigned one meets the web rules on every hop and stays unsigned,
+  under a prefix too. The final answer decides.
 - **A held answer is dropped, never kept for later.** The fire's
   transaction reads the row again: a moved edit revision, URL or due
-  time, a suspend, a full cap or a run going drops it and writes
-  nothing but `last_answered_at` for a new answer (`noteAnswer()`,
-  which clears the check's part of the alert as any answer), so
-  the row stays due and the next try asks again. A stale quiet or
-  failed answer leaves a restart rerun listed. A pass
-  that skips a full project's row drops its answer too. A drain aborts
-  every GET; the rows are deferred as any due row. Run now never asks.
-  A restart rerun asks, since its answer's validators were never saved.
-- **Nothing new is a 204, a 304, a 200 that is white space, `[]`, `{}`
-  or `null` (any white space inside), or a 200 whose SHA-256 is
-  `check_body_hash`.** It moves `next_at` and the row's check columns
-  and `revision`, and writes no event.
+  time, a suspend, a full cap or a run going drops it. A new answer so
+  dropped writes only `last_answered_at` (`noteAnswer()`, which clears
+  the check's part of the alert as any answer does); the row stays due
+  and the next try asks again. A stale quiet or failed answer leaves a
+  restart rerun listed. A pass that skips a full project's row drops
+  its answer too. A drain aborts every GET and defers the rows as any
+  due row. Run now never asks; a restart rerun asks, since its answer's
+  validators were never saved.
+- **Nothing new is a 204, a 304, or a 200 whose body is white space,
+  `[]`, `{}` or `null` (white space allowed inside) or whose SHA-256 is
+  `check_body_hash`.** It moves `next_at`, the row's check columns and
+  `revision`, and writes no event.
 - **A new answer is a 200 of UTF-8 text with no NUL**, whatever its
-  type, read up to `MAX_CHECK_BYTES` or `mcpKeptBytes` if lower. Its run's
-  first message is the instructions, the answer's start fenced as data
-  and `wholeLine()`'s path line; the start is cut at a line to
+  type, read up to `MAX_CHECK_BYTES` or `mcpKeptBytes` if lower. Its
+  run's first message is the instructions, the answer's start fenced as
+  data and `wholeLine()`'s path line; the start is cut at a line to
   `resultCut` and an eighth of the agent's window in tokens. The whole
-  body is the first message's kept file, `/mcp/0001-check/answer.json`
-  (or `.txt`), written in the run's start transaction
-  (`prepareSend()`), whose kept counter then starts past it.
+  body is that message's kept file, `/mcp/0001-check/answer.json` (or
+  `.txt`), written in the run's start transaction (`prepareSend()`);
+  the kept counter starts past it.
 - **Its validators wait in memory, keyed by the run,** and are saved at
   the run's end (`onRunEnd()`) while the row's edit revision is the
-  answer's, unless a shutdown or a restart cut the run, its work after
-  the answer included (`runInterrupted()`): then the next check
-  repeats it. A Stop saves them. An ETag or Last-Modified holding the
-  signing key in any `escapedForms()` is dropped.
+  answer's. A Stop saves them; a shutdown or a restart that cut the
+  run, its work after the answer included (`runInterrupted()`), does
+  not, so the next check repeats it. An ETag or Last-Modified holding
+  the signing key in any `escapedForms()` is dropped.
 - **Every failure is a skipped event with a fixed reason**
-  (`checkReason()` over `HTTP <status>` or a `CHECK_FAILURES` phrase,
-  which the page shows after "Check failed 3m ago: "). Never a fetch error's
-  message, which may hold the URL. One `check failed` log line with the
-  id, result and duration, `check error` for an internal one; the URL
-  is never a field.
+  (`checkReason()` over `HTTP <status>` or a `CHECK_FAILURES` phrase),
+  never a fetch error's message, which may hold the URL. One `check
+  failed` log line with the id, result and duration, `check error` for
+  an internal one; the URL is never a field.
 - **The check reaches what the run's tools could** (`reach()`). An MCP
-  server linked to the agent and not turned off for the task, on the
-  URL's origin, gets its bearer from its `mcp-` file and ignores the web
-  row. Otherwise the web row and the task's `web` switch must allow it,
-  and in `listed` mode `originAllowed()`. An `https:` URL under a
-  project credential's prefix (`underPrefix()`) carries its header and,
-  as curl's credential fetch, needs no listed host. As curl refuses the
-  prefix, a credential the task turned off, whose key does not read or
-  whose methods leave out GET fails the check. The key the check sent
-  is scrubbed from a new answer (`escapedForms()`); the hash stays the
-  raw body's.
+  server linked to the agent, not turned off for the task and on the
+  URL's origin signs with its `mcp-` key and ignores the web row.
+  Otherwise the web row and the task's `web` switch must allow it, and
+  `originAllowed()` in `listed` mode. An `https:` URL under a project
+  credential's prefix (`underPrefix()`) carries its header and, as
+  curl's credential fetch, needs no listed host. As in curl, a
+  credential the task turned off, whose key does not read or whose
+  methods leave out GET fails the check. The key sent is scrubbed from a
+  new answer (`escapedForms()`); the hash stays the raw body's.
 - **A check silent past `CHECK_SILENCE_MS` opens the alert** on a
-  failure; see `docs/attention.md`.
+  failure (`docs/attention.md`).
 - **A quiet check moves `revision`, never the history.** The page shows
-  the last check alone: `lastCheckedAt`, `lastCheckResult` (`200`, a
+  only the last check: `lastCheckedAt`, `lastCheckResult` (`200`, a
   `CHECK_QUIET` word or a failure) and `lastAnsweredAt`.

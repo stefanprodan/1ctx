@@ -170,8 +170,8 @@ that shell that shows a file on the chat page.
 - **Kept files are rows owned by the tool row.** `mcp_kept_files`,
   written in `finishTool`'s transaction and cascading with the message.
   A run's check answer is the one kept file with no tool call: its
-  first user message owns it, written in the run's start transaction
-  (`prepareSend()`), and the send's folder counter starts past it.
+  first user message owns it (`docs/automations.md`).
+
 - **Only an ended session's files are packed, and no live read
   decodes.** The sessions job (`docs/archive.md`) walks sessions by id
   with `walkKept()`, reads with `pendingKept()` and `readKeptRaw()`,
