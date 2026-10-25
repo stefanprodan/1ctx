@@ -12,6 +12,7 @@ import {
   agoTickMs,
   changedFields,
   changedLines,
+  createFields,
   createTexts,
   INERT_WORDS,
   lineDetail,
@@ -285,6 +286,34 @@ describe("the line's words", () => {
     expect(changedFields({ ownMemory: false }, null)).toEqual([
       { label: "Own memory", value: "no", was: null },
     ]);
+  });
+
+  test("a check URL shows as a field, none when cleared", () => {
+    const url = "https://api.example.test/alerts";
+    expect(createFields({ checkUrl: url })).toEqual([
+      { label: "Check URL", value: url, was: null },
+    ]);
+    expect(createFields({ checkUrl: null })).toEqual([]);
+    expect(createFields({})).toEqual([]);
+    expect(changedFields({ checkUrl: url }, automation())).toEqual([
+      { label: "Check URL", value: url, was: "none" },
+    ]);
+    expect(
+      changedFields({ checkUrl: null }, automation({ checkUrl: url })),
+    ).toEqual([{ label: "Check URL", value: "none", was: url }]);
+    expect(changedFields({ checkUrl: "" }, null)).toEqual([
+      { label: "Check URL", value: "none", was: null },
+    ]);
+    expect(
+      changedFields({ checkUrl: url }, automation({ checkUrl: url })),
+    ).toEqual([{ label: "Check URL", value: url, was: null }]);
+    expect(
+      lineDetail(
+        automationDraft("update", {
+          fields: { checkUrl: url },
+        } as Partial<AutomationDraft>),
+      ),
+    ).toBe("check URL");
   });
 
   test("a create's guidance shows when set, an update's when changed", () => {
@@ -722,6 +751,23 @@ describe("an opened line", () => {
     const none = render(<Details draft={draft} before={null} />);
     expect(none).toContain('<p class="proposal-note">No memory</p>');
     expect(none).not.toContain("proposal-label");
+  });
+
+  test("a create's check URL shows over its instructions", () => {
+    const draft = createDraft();
+    if (draft.action === "create") {
+      draft.fields.checkUrl = "https://api.example.test/alerts";
+    }
+    const html = render(<Details draft={draft} before={null} />);
+    expect(html).toContain('<span class="proposal-label">Check URL</span>');
+    expect(html).toContain(
+      '<span class="proposal-value">https://api.example.test/alerts</span>',
+    );
+    expect(html.indexOf("Check URL")).toBeLessThan(
+      html.indexOf("Write a digest."),
+    );
+    const none = render(<Details draft={createDraft()} before={null} />);
+    expect(none).not.toContain("Check URL");
   });
 
   test("a long text is cut with Show all and opens whole", () => {

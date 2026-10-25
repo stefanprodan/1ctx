@@ -4,7 +4,7 @@
 // The automation editor, for a new automation and one that exists, in
 // steps: its name, the instructions (the composer's box with its agent chip),
 // memory, who marks a run, what it may use, a restart, when it runs and
-// its limits. Anyone in the project saves and deletes; a save names the
+// what it asks first, and its limits. Anyone in the project saves and deletes; a save names the
 // edit revision the form opened on, and when the row has moved on the
 // draft stays until Reload replaces it with the saved row. The deadline
 // starts at the server's limit, the value a run is held to when none is
@@ -66,7 +66,7 @@ import {
 } from "./Automations.model.ts";
 import { NameField } from "./ProjectFields.tsx";
 import { RestartSection } from "./RestartSection.tsx";
-import { ScheduleField } from "./ScheduleField.tsx";
+import { WhenSection } from "./WhenSection.tsx";
 import "./automations.css";
 
 function Editor({
@@ -309,21 +309,13 @@ function Editor({
         disabled={off}
       />
       <RestartSection on={d.rerunOnRestart} set={set} disabled={off} />
-      <Section title="When" text="In the time zone you pick">
-        <ScheduleField
-          projectId={projectId}
-          schedule={d.schedule}
-          tz={d.tz}
-          disabled={off}
-          invalidTz={invalid("tz")}
-          once={d.once}
-          onOnce={() => set({ once: !d.once })}
-          onSchedule={(schedule) => set({ schedule })}
-          onTz={(tz) => set({ tz })}
-        />
-        <FieldError save={save} field="schedule" />
-        <FieldError save={save} field="tz" />
-      </Section>
+      <WhenSection
+        projectId={projectId}
+        draft={d}
+        set={set}
+        save={save}
+        disabled={off}
+      />
       <Section
         title="Limits"
         text="When a run is stopped, and how long runs are kept"

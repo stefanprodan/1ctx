@@ -42,6 +42,7 @@ import {
 import {
   automationFieldOf,
   automationPageOf,
+  checkLine,
   type Draft,
   dirtyOf,
   draftOf,
@@ -73,6 +74,7 @@ import {
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import {
   type AutomationSummary,
+  CHECK_FAILURES,
   ranOnce,
   STALE_EDIT,
 } from "../../../src/shared/contracts/automation.ts";
@@ -448,6 +450,44 @@ describe("the row's words", () => {
     expect(eventNote(skipped, now)).toBe("Skipped 1m ago: still running");
   });
 
+  test("the check's line says when it asked and what it found", () => {
+    expect(checkLine(automation(), now)).toBeNull();
+    const url = "https://api.example.test/alerts";
+    const checked = (lastCheckResult: AutomationSummary["lastCheckResult"]) =>
+      checkLine(
+        automation({
+          checkUrl: url,
+          lastCheckedAt: now - 3 * 60_000,
+          lastCheckResult,
+        }),
+        now,
+      );
+    expect(checkLine(automation({ checkUrl: url }), now)).toEqual({
+      text: "Not checked yet",
+      failed: false,
+    });
+    for (const quiet of ["204", "304", "empty", "unchanged"] as const) {
+      expect(checked(quiet)).toEqual({
+        text: "Checked 3m ago: nothing new",
+        failed: false,
+      });
+    }
+    expect(checked("200")).toEqual({
+      text: "Checked 3m ago: new answer",
+      failed: false,
+    });
+    expect(checked("HTTP 503")).toEqual({
+      text: "Check failed: HTTP 503",
+      failed: true,
+    });
+    for (const phrase of CHECK_FAILURES) {
+      expect(checked(phrase)).toEqual({
+        text: `Check failed: ${phrase}`,
+        failed: true,
+      });
+    }
+  });
+
   test("a scheduled fire a minute or more late says how late", () => {
     const late = automation({
       lastEventAt: now - HOUR,
@@ -580,6 +620,7 @@ describe("the form", () => {
       rerunOnRestart: false,
       postToChannel: false,
       once: false,
+      checkUrl: "",
       web: true,
       visuals: true,
       knowledge: true,
@@ -610,6 +651,7 @@ describe("the form", () => {
         rerunOnRestart: false,
         postToChannel: false,
         once: false,
+        checkUrl: null,
         disabledCapabilities: [],
       },
     });
@@ -673,6 +715,33 @@ describe("the form", () => {
     expect(shown.once).toBe(true);
     expect(dirtyOf(shown, row, LIMIT)).toBe(false);
     expect(dirtyOf({ ...shown, once: false }, row, LIMIT)).toBe(true);
+  });
+
+  test("the check URL is none for a new automation and saved as drafted", () => {
+    const sent = (d: Draft) => {
+      const out = requestOf(d, LIMIT);
+      return "body" in out ? out.body.checkUrl : "refused";
+    };
+    expect(sent(filled())).toBeNull();
+    const url = "https://api.example.test/alerts?state=open";
+    expect(sent(filled({ checkUrl: ` ${url} ` }))).toBe(url);
+    // an edit that leaves it alone sends the row's own, which keeps it
+    const row = automation({ checkUrl: url });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.checkUrl).toBe(url);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(sent({ ...shown, name: "renamed" })).toBe(url);
+    const moved = { ...shown, checkUrl: `${url}&page=2` };
+    expect(dirtyOf(moved, row, LIMIT)).toBe(true);
+    expect(sent(moved)).toBe(`${url}&page=2`);
+    // cleared, it goes as none and the plain schedule comes back
+    const cleared = { ...shown, checkUrl: " " };
+    expect(dirtyOf(cleared, row, LIMIT)).toBe(true);
+    expect(sent(cleared)).toBeNull();
+    expect(automationFieldOf("checkUrl must be http or https")).toBe(
+      "checkUrl",
+    );
+    expect(automationFieldOf("checkUrl is too long")).toBe("checkUrl");
   });
 
   test("only emptiness and the numbers' shape are refused here", () => {

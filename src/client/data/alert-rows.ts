@@ -27,7 +27,8 @@ export const sameAlert = (
     b != null &&
     a.since === b.since &&
     a.runs === b.runs &&
-    a.reason === b.reason);
+    a.reason === b.reason &&
+    a.check === b.check);
 
 // the automation a line stands for
 const lineOf = (row: FeedRow) => row.automation?.id ?? row.session.automationId;

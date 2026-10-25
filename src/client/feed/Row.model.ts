@@ -70,9 +70,12 @@ export function sinceText(since: number, now: number): string {
   return sameDay ? clock(since) : `${dayMonth(since)} ${clock(since)}`;
 }
 
-// an open alert's span: "since 08:41, 3 runs"
-export const alertSpan = (alert: AutomationAlert, now: number): string =>
-  `since ${sinceText(alert.since, now)}, ${plural(alert.runs, "run")}`;
+// an open alert's span: "since 08:41, 3 runs"; one a failed check holds
+// alone has no runs to count
+export const alertSpan = (alert: AutomationAlert, now: number): string => {
+  const since = `since ${sinceText(alert.since, now)}`;
+  return alert.runs === 0 ? since : `${since}, ${plural(alert.runs, "run")}`;
+};
 
 // an automation's open alert on its line: "flagged since
 // 08:41, 3 runs", the latest reason drawn after it

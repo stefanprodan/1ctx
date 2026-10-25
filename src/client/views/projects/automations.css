@@ -101,12 +101,16 @@
     overflow-wrap: anywhere;
   }
 
-  /* the state line under the instructions */
+  /* the state line under the instructions, the check's line under it */
   .automations-summary-foot {
     display: flex;
-    align-items: center;
-    gap: var(--space-3);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
     min-height: 20px;
+  }
+  .automations-check-failed {
+    color: var(--failed);
   }
 
   /* a run's icon bare, in its state's colour, where an avatar would sit */
@@ -222,6 +226,7 @@
     align-items: center;
   }
 
+  .automations-when-fields,
   .automations-schedule {
     display: flex;
     flex-direction: column;

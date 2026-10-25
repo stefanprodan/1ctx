@@ -201,6 +201,7 @@ const FIELD_WORDS: [keyof ProposalFields, string][] = [
   ["ownMemory", "memory"],
   ["memoryGuidance", "memory"],
   ["attentionGuidance", "attention"],
+  ["checkUrl", "check URL"],
 ];
 
 // what the line says after the name while it waits: when a new automation
@@ -229,13 +230,23 @@ export type FieldRow = { label: string; value: string; was: string | null };
 
 const yes = (on: boolean) => (on ? "yes" : "no");
 
+// a check URL, or none: null and empty both clear it
+const checkOf = (url: string | null | undefined) =>
+  url === null || url === undefined || url === "" ? "none" : url;
+
+// a create's fields beside its texts, each only when set
+export function createFields(fields: { checkUrl?: string | null }): FieldRow[] {
+  const url = checkOf(fields.checkUrl);
+  return url === "none" ? [] : [{ label: "Check URL", value: url, was: null }];
+}
+
 // an update's changed fields beside the automation's values, struck when
 // they differ
 export function changedFields(
   fields: Partial<ProposalFields>,
   before: Pick<
     ProposalFields,
-    "name" | "schedule" | "tz" | "once" | "ownMemory"
+    "name" | "schedule" | "tz" | "once" | "ownMemory" | "checkUrl"
   > | null,
 ): FieldRow[] {
   const rows: FieldRow[] = [];
@@ -281,6 +292,14 @@ export function changedFields(
         yes(fields.ownMemory),
         before?.ownMemory === undefined ? undefined : yes(before.ownMemory),
       ),
+    });
+  }
+  if (fields.checkUrl !== undefined) {
+    const value = checkOf(fields.checkUrl);
+    rows.push({
+      label: "Check URL",
+      value,
+      was: was(value, before === null ? undefined : checkOf(before.checkUrl)),
     });
   }
   return rows;
