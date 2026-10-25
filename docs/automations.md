@@ -253,7 +253,7 @@ silence counts from the change.
   a shutdown or a restart cut the run: then the next check repeats it.
 - **Every failure is a skipped event with a fixed reason**
   (`checkReason()` over `HTTP <status>` or a `CHECK_FAILURES` phrase,
-  which the page shows after "Check failed: "). Never a fetch error's
+  which the page shows after "Check failed 3m ago: "). Never a fetch error's
   message, which may hold the URL. One `check failed` log line with the
   id, result and duration, `check error` for an internal one; the URL
   is never a field.

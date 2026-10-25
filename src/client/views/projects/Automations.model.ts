@@ -178,7 +178,7 @@ export function eventNote(a: AutomationSummary, now: number): string | null {
 }
 
 // The check's line under the schedule: "Checked 3m ago: nothing new",
-// "Check failed: HTTP 503"; null with no check URL
+// "Check failed 3m ago: HTTP 503"; null with no check URL
 export function checkLine(
   a: Pick<AutomationSummary, "checkUrl" | "lastCheckedAt" | "lastCheckResult">,
   now: number,
@@ -188,12 +188,13 @@ export function checkLine(
   if (a.lastCheckedAt === null || result === null) {
     return { text: "Not checked yet", failed: false };
   }
+  const when = ago(a.lastCheckedAt, now);
   if (isCheckFailure(result)) {
-    return { text: `Check failed: ${result}`, failed: true };
+    return { text: `Check failed ${when}: ${result}`, failed: true };
   }
   const found = result === "200" ? "new answer" : "nothing new";
   return {
-    text: `Checked ${ago(a.lastCheckedAt, now)}: ${found}`,
+    text: `Checked ${when}: ${found}`,
     failed: false,
   };
 }
@@ -393,7 +394,7 @@ export function automationFieldOf(
   if (message.startsWith("ownMemory")) return "memory";
   if (message.startsWith("attention guidance")) return "attentionGuidance";
   if (message.startsWith("attentionMode")) return "attention";
-  if (message.startsWith("checkUrl")) return "checkUrl";
+  if (message.startsWith("Check URL")) return "checkUrl";
   return undefined;
 }
 

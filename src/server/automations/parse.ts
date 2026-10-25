@@ -63,6 +63,15 @@ function guidance(value: unknown, field: string, label: string, max: number) {
   return cleaned;
 }
 
+// parseUrl()'s refusals in the words the form shows under the field
+const CHECK_URL_WORDS: Record<string, string> = {
+  "url must be a URL": "Check URL must be a URL",
+  "url is too long": "Check URL is too long",
+  "url must be http or https": "Check URL must be an http or https URL",
+  "url must not have user info or a fragment":
+    "Check URL must not hold a user or a fragment",
+};
+
 // an MCP server's URL rule; null or empty for the plain schedule
 function checkUrl(value: unknown): string | null {
   if (value === null || value === "") return null;
@@ -70,7 +79,9 @@ function checkUrl(value: unknown): string | null {
     return parseUrl(value);
   } catch (err) {
     if (!(err instanceof BadRequest)) throw err;
-    throw new BadRequest(err.message.replace(/^url\b/, "checkUrl"));
+    throw new BadRequest(
+      CHECK_URL_WORDS[err.message] ?? "Check URL must be a URL",
+    );
   }
 }
 

@@ -52,15 +52,15 @@ test("a check URL is an MCP server's URL, null or empty for none", () => {
   expect(patch(null)).toBeNull();
   expect(patch("")).toBeNull();
   expect(() => patch("ftp://api.test/")).toThrow(
-    "checkUrl must be http or https",
+    "Check URL must be an http or https URL",
   );
   expect(() => patch("https://user:pw@api.test/")).toThrow(
-    "checkUrl must not have user info or a fragment",
+    "Check URL must not hold a user or a fragment",
   );
   expect(() => patch(`https://api.test/${"x".repeat(2048)}`)).toThrow(
-    "checkUrl is too long",
+    "Check URL is too long",
   );
-  expect(() => patch(7)).toThrow("checkUrl must be a URL");
+  expect(() => patch(7)).toThrow("Check URL must be a URL");
   // a patch without it keeps it
   expect(
     Object.hasOwn(

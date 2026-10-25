@@ -115,7 +115,7 @@ export const CHECK_SILENCE_MS = 30 * 60_000;
 // nothing new: 204, 304, an empty 200 or the same body as the last run's
 export const CHECK_QUIET = ["204", "304", "empty", "unchanged"] as const;
 // a check that failed for no status of its own; the page says "Check
-// failed: " and the phrase
+// failed 3m ago: " and the phrase
 export const CHECK_FAILURES = [
   "redirected outside its credential's URL",
   "redirected away from its MCP server",

@@ -81,8 +81,8 @@ test.serial(
     expect(CHECK_HINT).toBe(
       "Asked at every scheduled time. Runs only when the answer is new.",
     );
-    const refused = when("CheckUrl must be http or https.");
-    expect(refused).toContain("CheckUrl must be http or https.");
+    const refused = when("Check URL must be an http or https URL.");
+    expect(refused).toContain("Check URL must be an http or https URL.");
     expect(refused).toContain('aria-invalid="true"');
     expect(refused).not.toContain(CHECK_HINT);
   },

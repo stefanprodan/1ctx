@@ -477,12 +477,12 @@ describe("the row's words", () => {
       failed: false,
     });
     expect(checked("HTTP 503")).toEqual({
-      text: "Check failed: HTTP 503",
+      text: "Check failed 3m ago: HTTP 503",
       failed: true,
     });
     for (const phrase of CHECK_FAILURES) {
       expect(checked(phrase)).toEqual({
-        text: `Check failed: ${phrase}`,
+        text: `Check failed 3m ago: ${phrase}`,
         failed: true,
       });
     }
@@ -738,10 +738,10 @@ describe("the form", () => {
     const cleared = { ...shown, checkUrl: " " };
     expect(dirtyOf(cleared, row, LIMIT)).toBe(true);
     expect(sent(cleared)).toBeNull();
-    expect(automationFieldOf("checkUrl must be http or https")).toBe(
+    expect(automationFieldOf("Check URL must be an http or https URL")).toBe(
       "checkUrl",
     );
-    expect(automationFieldOf("checkUrl is too long")).toBe("checkUrl");
+    expect(automationFieldOf("Check URL is too long")).toBe("checkUrl");
   });
 
   test("only emptiness and the numbers' shape are refused here", () => {
