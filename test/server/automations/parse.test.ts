@@ -42,3 +42,30 @@ test("the runs query refuses unknown and repeated names", () => {
     "filter must appear once",
   );
 });
+
+test("a check URL is an MCP server's URL, null or empty for none", () => {
+  const patch = (checkUrl: unknown) =>
+    parsePatchAutomation({ checkUrl, editRevision: 0 }).patch.checkUrl;
+  expect(patch("https://api.test/search?q=open")).toBe(
+    "https://api.test/search?q=open",
+  );
+  expect(patch(null)).toBeNull();
+  expect(patch("")).toBeNull();
+  expect(() => patch("ftp://api.test/")).toThrow(
+    "checkUrl must be http or https",
+  );
+  expect(() => patch("https://user:pw@api.test/")).toThrow(
+    "checkUrl must not have user info or a fragment",
+  );
+  expect(() => patch(`https://api.test/${"x".repeat(2048)}`)).toThrow(
+    "checkUrl is too long",
+  );
+  expect(() => patch(7)).toThrow("checkUrl must be a URL");
+  // a patch without it keeps it
+  expect(
+    Object.hasOwn(
+      parsePatchAutomation({ tz: "UTC", editRevision: 0 }).patch,
+      "checkUrl",
+    ),
+  ).toBe(false);
+});

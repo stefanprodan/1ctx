@@ -202,7 +202,7 @@ arrives.
   503).
 - **`runner.drain()` waits up to `--drain`** (0 in `compose()` by
   default) for the running sends, a run's memory phase included, and
-  their attention asks (`docs/automations.md`). The second signal cuts
+  their attention asks (`docs/attention.md`). The second signal cuts
   the wait. The listener keeps serving, so a watched turn streams to its
   end.
 - **`runner.shutdown(close)` then ends the rest with cause

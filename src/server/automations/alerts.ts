@@ -68,21 +68,27 @@ const touchSince = (db: Db, id: string, endedAt: number) =>
     )
     .run(id, endedAt).changes > 0;
 
-// a clean run or a dismiss: false when none was open
-const closeAlert = (db: Db, id: string) =>
+// a clean run or a dismiss: false when none was open. A clean run closes
+// the check's part too; a dismiss leaves the check's mark, so a check
+// still silent never opens it again before it answers
+const closeAlert = (db: Db, id: string, clean: boolean) =>
   db
     .query(
-      `update automations set attention_since = null, revision = revision + 1
+      `update automations set attention_since = null,
+         check_alert_at = iif(?, null, check_alert_at),
+         revision = revision + 1
        where id = ? and attention_since is not null`,
     )
-    .run(id).changes > 0;
+    .run(clean ? 1 : 0, id).changes > 0;
 
-// an open alert whose marked runs are all gone: one covering lookup
+// an open alert whose marked runs are all gone: one covering lookup.
+// One the check opened or joined is the check's to close
 const closeEmpty = (db: Db, id: string) =>
   db
     .query(
       `update automations set attention_since = null, revision = revision + 1
-       where id = ? and attention_since is not null and not exists (
+       where id = ? and attention_since is not null
+         and check_alert_at is null and not exists (
          select 1 ${openAlertRuns("automations")})`,
     )
     .run(id).changes > 0;
@@ -96,7 +102,7 @@ export function alerts(deps: AlertsDeps): Alerts {
       return [];
     }
     if (change === "close") {
-      if (!closeAlert(db, run.automationId)) return [];
+      if (!closeAlert(db, run.automationId, true)) return [];
       const row = store.byId(run.automationId);
       return row === null ? [] : [automationChanged(row)];
     }
@@ -155,7 +161,7 @@ export function alerts(deps: AlertsDeps): Alerts {
       return row === null ? [] : [automationChanged(row)];
     },
     dismiss(id) {
-      const closed = closeAlert(db, id);
+      const closed = closeAlert(db, id, false);
       const automation = store.byId(id)!;
       return {
         automation,

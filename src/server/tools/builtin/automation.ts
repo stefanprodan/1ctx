@@ -73,6 +73,7 @@ export const PROPOSAL_DESCRIPTION =
   "Set ownMemory false when every run reads its state from files. " +
   "memoryGuidance says what the note keeps. A step after the run writes it, so the instructions never say to update memory. " +
   "Offer a test run with run. Use once for a one-time ask. " +
+  "Give a checkUrl when the user wants runs only when an API or feed has something new; the instructions then say what to do with the answer. " +
   "On suspend, say a run already going keeps going. Check with show before saying an automation exists or changed.";
 
 type ShowArgs = {
@@ -237,6 +238,11 @@ export function makeAutomationTool(
               attentionGuidance: {
                 type: "string",
                 description: "When an answer needs a person. None by default.",
+              },
+              checkUrl: {
+                type: "string",
+                description:
+                  "A Check URL, http or https, asked with GET at every scheduled time: a run starts only when its answer is new, and the answer is in the run's first message. Empty for none, the default.",
               },
             }
           : {}),

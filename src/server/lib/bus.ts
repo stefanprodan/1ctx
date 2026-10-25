@@ -81,7 +81,8 @@ export type BusEvents = {
   "automation.attention": {
     projectId: string;
     automationId: string;
-    sessionId: string;
+    // the run that opened it, null for a failed check
+    sessionId: string | null;
     since: number;
   };
   // runs: its runs went with it

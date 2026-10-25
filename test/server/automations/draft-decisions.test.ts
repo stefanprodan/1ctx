@@ -57,6 +57,30 @@ describe("automation draft decisions", () => {
     }
   });
 
+  test("a proposed create carries its check URL to the automation", async () => {
+    const chat = await draftApp();
+    try {
+      const { drafts } = await proposals(chat, [
+        { ...createProposal(), checkUrl: "https://api.test/alerts?state=open" },
+      ]);
+      const draft = drafts[0]!;
+      expect(draft.fields).toMatchObject({
+        checkUrl: "https://api.test/alerts?state=open",
+      });
+      expect((await press(chat, draft.id)).status).toBe(200);
+      const created = chat.app.automationDrafts.byId(draft.id)!;
+      expect(
+        chat.app.automations.byId(created.createdAutomationId!),
+      ).toMatchObject({
+        checkUrl: "https://api.test/alerts?state=open",
+        lastCheckedAt: null,
+        lastAnsweredAt: chat.app.now.value,
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("update, suspend and resume use the form's actions, including no-ops", async () => {
     const chat = await draftApp();
     try {

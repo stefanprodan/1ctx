@@ -53,6 +53,11 @@ export function prefixesOverlap(a: string, b: string): boolean {
   return matchesAllowListEntry(a, b) || matchesAllowListEntry(b, a);
 }
 
+// a request to url is one curl would sign with the prefix
+export function underPrefix(url: string, prefix: string): boolean {
+  return matchesAllowListEntry(url, prefix);
+}
+
 // RFC 9110's token
 const TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 // what the transport owns, or what would reframe the request

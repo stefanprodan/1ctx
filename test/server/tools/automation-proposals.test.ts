@@ -99,6 +99,7 @@ test("draft fields use all the form parsers' value bounds", () => {
   expect(parseSaveAutomation(fields)).toEqual({
     ...fields,
     postToChannel: false,
+    checkUrl: null,
   });
 });
 

@@ -10,6 +10,7 @@ import {
   MAX_DISABLED_CAPABILITIES,
   parseSet,
 } from "../../shared/capabilities.ts";
+import { MAX_CHECK_URL } from "../../shared/contracts/automation.ts";
 import { sanitize } from "../../shared/memory.ts";
 import {
   isAttentionMode,
@@ -24,10 +25,12 @@ import {
 } from "../../shared/words.ts";
 import { fields, parseName, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { parseUrl } from "../mcp/index.ts";
 import { parseRunsCursor, type RunsCursor } from "../sessions/index.ts";
 
 export const MAX_AUTOMATION_BODY =
   MAX_MESSAGE_BYTES +
+  MAX_CHECK_URL +
   MAX_MEMORY_GUIDANCE +
   MAX_ATTENTION_GUIDANCE +
   MAX_DISABLED_CAPABILITIES * (MAX_CAPABILITY_KEY + 3) +
@@ -58,6 +61,17 @@ function guidance(value: unknown, field: string, label: string, max: number) {
     throw new BadRequest(`${label} must be at most ${max} bytes`);
   }
   return cleaned;
+}
+
+// an MCP server's URL rule; null or empty for the plain schedule
+function checkUrl(value: unknown): string | null {
+  if (value === null || value === "") return null;
+  try {
+    return parseUrl(value);
+  } catch (err) {
+    if (!(err instanceof BadRequest)) throw err;
+    throw new BadRequest(err.message.replace(/^url\b/, "checkUrl"));
+  }
 }
 
 type AutomationValues = Omit<PatchAutomationRequest, "editRevision">;
@@ -157,6 +171,9 @@ function parseValues(
       MAX_ATTENTION_GUIDANCE,
     );
   }
+  if (take("checkUrl")) {
+    out.checkUrl = checkUrl(given("checkUrl", null));
+  }
   if (take("disabledCapabilities")) {
     const parsed = parseSet(
       given("disabledCapabilities", []),
@@ -177,6 +194,7 @@ const OPTIONAL = [
   "once",
   "attentionMode",
   "attentionGuidance",
+  "checkUrl",
 ];
 
 export function parseSaveAutomation(

@@ -186,6 +186,7 @@ describe("an open alert on an automation's line", () => {
         runs: 2,
         reason: "flux is behind",
         by: null,
+        check: false,
       },
     },
     runs,
@@ -198,7 +199,13 @@ describe("an open alert on an automation's line", () => {
     );
     expect(
       alertWords(
-        { since: now - 90 * 60_000, runs: 1, reason: null, by: null },
+        {
+          since: now - 90 * 60_000,
+          runs: 1,
+          reason: null,
+          by: null,
+          check: false,
+        },
         now,
       ),
     ).toBe("flagged since 10:30, 1 run");
@@ -258,6 +265,7 @@ describe("an open alert on an automation's line", () => {
           runs: 2,
           reason: "flux is behind",
           by: null,
+          check: false,
         }}
         now={now}
       />,
@@ -271,7 +279,13 @@ describe("an open alert on an automation's line", () => {
     const html = render(
       <OpenAttention
         id="au1"
-        alert={{ since: now - 90 * 60_000, runs: 4, reason: null, by: "jev" }}
+        alert={{
+          since: now - 90 * 60_000,
+          runs: 4,
+          reason: null,
+          by: "jev",
+          check: false,
+        }}
         now={now}
       />,
     );

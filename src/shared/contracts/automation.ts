@@ -9,11 +9,12 @@
 // above the one it holds. The edit revision counts only the saves that
 // changed a field; an edit names the one it started from.
 
-import type {
-  AttentionMode,
-  EventOutcome,
-  EventSource,
-  SessionStatus,
+import {
+  type AttentionMode,
+  type EventOutcome,
+  type EventSource,
+  MAX_MCP_URL,
+  type SessionStatus,
 } from "../words.ts";
 
 export type AutomationSummary = {
@@ -47,6 +48,15 @@ export type AutomationSummary = {
   attentionGuidance: string;
   // the open alert, null while none is open
   alert: AutomationAlert | null;
+  // asked before each scheduled run, which starts only on a new answer;
+  // null for the plain schedule
+  checkUrl: string | null;
+  // the last check and what it found; null until the URL is checked
+  lastCheckedAt: number | null;
+  lastCheckResult: CheckResult | null;
+  // the last check that answered 200, 204 or 304, or when the URL was
+  // set: a check silent since CHECK_SILENCE_MS opens the alert
+  lastAnsweredAt: number | null;
   // a run a restart cut starts again at the next start
   rerunOnRestart: boolean;
   // a run that ends done with an answer posts it to the project's
@@ -92,7 +102,58 @@ export type AutomationAlert = {
   reason: string | null;
   // who marked its latest run
   by: string | null;
+  // a failed check opened or joined it; the reason is the check's while
+  // no marked run is newer
+  check: boolean;
 };
+
+// an MCP server's URL rule, its length included
+export const MAX_CHECK_URL = MAX_MCP_URL;
+// a failed check opens the alert once no check answered for this long
+export const CHECK_SILENCE_MS = 30 * 60_000;
+
+// nothing new: 204, 304, an empty 200 or the same body as the last run's
+export const CHECK_QUIET = ["204", "304", "empty", "unchanged"] as const;
+// a check that failed for no status of its own
+export const CHECK_FAILURES = [
+  "redirected",
+  "timed out",
+  "could not connect",
+  "answer too large",
+  "answer is not text",
+  "needs web access",
+  "host not listed",
+] as const;
+export type CheckQuiet = (typeof CHECK_QUIET)[number];
+export type CheckFailure = (typeof CHECK_FAILURES)[number] | `HTTP ${number}`;
+// "200" is a new answer, which started a run
+export type CheckResult = "200" | CheckQuiet | CheckFailure;
+
+export const isCheckQuiet = (result: string): result is CheckQuiet =>
+  (CHECK_QUIET as readonly string[]).includes(result);
+
+export const isCheckFailure = (result: string): result is CheckFailure =>
+  (CHECK_FAILURES as readonly string[]).includes(result) ||
+  /^HTTP \d{3}$/.test(result);
+
+// what the alert says of a failed check
+export const CHECK_ALERT_LEAD = "The check failed: ";
+
+// the skipped event's reason for a failed check
+export function checkReason(result: CheckFailure): string {
+  switch (result) {
+    case "timed out":
+    case "could not connect":
+    case "needs web access":
+    case "host not listed":
+      return `check ${result}`;
+    case "answer too large":
+    case "answer is not text":
+      return result;
+    default:
+      return `check failed: ${result}`;
+  }
+}
 
 // its own fire suspended it and its run is kept: what the page says
 // "Ran once" for and what a restart may rerun while suspended. Whether

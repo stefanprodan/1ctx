@@ -37,6 +37,7 @@ export {
   type AlertEmail,
   agentEmail,
   alertEmail,
+  automationPath,
   type Framed,
   packBody,
   SUBJECT_TAG,

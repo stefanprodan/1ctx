@@ -88,6 +88,10 @@ const automation = (
 ): AutomationSummary => ({
   agentName: "assistant",
   agentRetired: false,
+  checkUrl: null,
+  lastCheckedAt: null,
+  lastCheckResult: null,
+  lastAnsweredAt: null,
   id: "au1",
   projectId: "p1",
   ownerId: "u1",

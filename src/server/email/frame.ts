@@ -98,8 +98,15 @@ export type AlertEmail = {
   project: { name: string; kind: "personal" | "team" };
   // the run's reason, null for a decider's mark, which gives none
   reason: string | null;
-  sessionId: string;
+  // the run that opened it; a failed check names none, and the email
+  // opens the automation's page
+  sessionId: string | null;
+  automationId: string;
 };
+
+// where an automation's page opens in the app
+export const automationPath = (automationId: string): string =>
+  `/automations/${encodeURIComponent(automationId)}`;
 
 export function alertEmail(input: AlertEmail): Framed {
   // a name with a direction character would fail the subject check and
@@ -113,8 +120,15 @@ export function alertEmail(input: AlertEmail): Framed {
   return {
     subject: `${SUBJECT_TAG}${name} needs attention`,
     head,
-    open: "Open the run:",
-    path: sessionPath("automation", input.sessionId),
+    ...(input.sessionId === null
+      ? {
+          open: "Open the automation:",
+          path: automationPath(input.automationId),
+        }
+      : {
+          open: "Open the run:",
+          path: sessionPath("automation", input.sessionId),
+        }),
     text: why,
     html: `<p>${escapeHtml(why)}</p>`,
   };
@@ -140,13 +154,17 @@ export function sessionPrepare(
   link: (path: string) => string,
 ): Prepare {
   return (row, user) => {
-    if (row.sessionId === null) return "deleted";
+    const framed = unpackBody(row);
+    // a check's alert links its automation, whose delete takes the row
+    const page =
+      row.kind === "alert" &&
+      framed?.path.startsWith(automationPath("")) === true;
+    if (row.sessionId === null && !page) return "deleted";
     if (row.projectId === null || !canOpen(user.id, row.projectId)) {
       return "no-access";
     }
     if (user.mustChangePassword) return "no-access";
     if (!user.emailFromAgents) return "opted-out";
-    const framed = unpackBody(row);
     if (framed === null) throw new Error(`an ${row.kind} row has no text`);
     return withLink(framed, link(framed.path));
   };

@@ -28,6 +28,7 @@ export const automationBody = (
     attentionGuidance: string;
     once: boolean;
     rerunOnRestart: boolean;
+    checkUrl: string | null;
   }> = {},
 ) => ({
   name: fields.name ?? "daily-run",
@@ -52,6 +53,7 @@ export const automationBody = (
   ...(fields.rerunOnRestart === undefined
     ? {}
     : { rerunOnRestart: fields.rerunOnRestart }),
+  ...(fields.checkUrl === undefined ? {} : { checkUrl: fields.checkUrl }),
 });
 
 export async function createAutomation(

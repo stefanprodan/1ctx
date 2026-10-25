@@ -2894,6 +2894,7 @@ describe("the Flagged pick", () => {
     runs,
     reason: "pods down",
     by: "sre",
+    check: false,
   });
   // the line of automation au, its run, its alert open since a time or
   // closed

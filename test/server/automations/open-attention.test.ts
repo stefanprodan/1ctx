@@ -186,6 +186,7 @@ describe("an automation's open alert", () => {
           runs: 2,
           reason: "podinfo is not ready",
           by: "coder",
+          check: false,
         });
         expect(endOf(chat, second)).toBeGreaterThan(endOf(chat, first));
 
@@ -223,6 +224,7 @@ describe("an automation's open alert", () => {
           runs: 1,
           reason: "flux is behind",
           by: "coder",
+          check: false,
         });
       } finally {
         unsubscribe();
@@ -265,6 +267,7 @@ describe("the open alert's reason", () => {
         runs: 2,
         reason: "podinfo is not ready",
         by: "judge",
+        check: false,
       });
     } finally {
       await chat.app.shutdown();
@@ -397,6 +400,7 @@ describe("a decider's word", () => {
           runs: 1,
           reason: null,
           by: "judge",
+          check: false,
         });
 
         // a no on the older run leaves the newer run's alert
@@ -562,6 +566,7 @@ describe("a deleted marked run", () => {
                   runs: 1,
                   reason: "The run failed: stream ended early",
                   by: null,
+                  check: false,
                 },
               }),
             }),
@@ -648,6 +653,7 @@ describe("the open alert's lists", () => {
           runs: 2,
           reason: "The run failed: stream ended early",
           by: null,
+          check: false,
         },
       });
       expect(all.next).toBeNull();

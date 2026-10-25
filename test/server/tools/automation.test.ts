@@ -43,6 +43,10 @@ const automation = (
   ownerId: "u1",
   ownerName: "maria",
   agentId: "a1",
+  checkUrl: null,
+  lastCheckedAt: null,
+  lastCheckResult: null,
+  lastAnsweredAt: null,
   agentName: "sre",
   agentRetired: false,
   name: "Nightly check",
@@ -285,7 +289,7 @@ describe("list", () => {
         lastRunStatus: null,
         lastEventAt: null,
         lastEventOutcome: null,
-        alert: { since: NOW, runs: 1, reason: null, by: null },
+        alert: { since: NOW, runs: 1, reason: null, by: null, check: false },
       }),
     ];
     const text = await ok(port(automations), { action: "list" });
@@ -352,6 +356,7 @@ describe("show", () => {
         runs: 2,
         reason: "Pods crash looping",
         by: "sre",
+        check: false,
       },
     });
     const result = await call(port([full]), { action: "show", id: ID });

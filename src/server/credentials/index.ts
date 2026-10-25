@@ -12,7 +12,7 @@ import { type ProjectsPort, teamName } from "./projects.ts";
 import { type ReposPort, routes } from "./routes.ts";
 import { type CredentialRow, CredentialStore } from "./store.ts";
 
-export { headerValue, prefixesOverlap } from "./check.ts";
+export { headerValue, prefixesOverlap, underPrefix } from "./check.ts";
 export { httpKeys, type KeyRead, MAX_KEY_FILE_BYTES, readKey } from "./key.ts";
 export {
   parseHeader,

@@ -99,12 +99,14 @@ profile pages show of email. The links themselves are in
   anyway fails the try as `other`, which is retried.
   The send id is counting metadata, kept even if the send is deleted;
   pre-existing rows have none. It isolates simultaneous turns' email caps.
-- **An `alert` row is an automation's alert opening.** `alerts.runEnded()`
-  queues it for the automation's owner in the transaction that sets
-  `attention_since` (`automations/alert-email.ts`), only with email on,
+- **An `alert` row is an automation's alert opening.** `alerts.runEnded()`,
+  or a failed check (`automations/check.ts`), queues it for the
+  automation's owner in the transaction that sets `attention_since`
+  (`automations/alert-email.ts`), only with email on,
   the automation's Email switch on and the owner a recipient as below;
   a run that joins queues none, and past 3 a day per automation it
-  queues none (`docs/automations.md`).
+  queues none (`docs/attention.md`). A check's row names no session and
+  links the automation's page (`automationPath()`).
   The row names its automation (`automation_id`), so deleting runs keeps
   the cap. A failure to queue is logged `alert email failed` and never
   fails the run's end.
@@ -112,7 +114,8 @@ profile pages show of email. The links themselves are in
   `users.email_from_agents` starts off; the user turns it on on their
   profile (`PUT /api/profile/email`). Each kind's `prepare` checks
   again at the send: `deleted` once the session is gone (its id set
-  null), `no-access` when the user can no longer open the project or
+  null), but for a check's alert, whose row goes with its automation,
+  `no-access` when the user can no longer open the project or
   must change their password, `opted-out` once they turned it off. The
   one check is `sessionPrepare()` in `frame.ts`.
 - **The email frames what the agent wrote** (`email/frame.ts`). The
@@ -121,8 +124,8 @@ profile pages show of email. The links themselves are in
   ("your personal project" for the reader's own) and the one trusted
   link, built by `link()` to the chat or run (`sessionPath()`, the
   client's paths). Then a rule, and the agent's text in a plain block
-  with a left border. An alert carries the run's reason, or says a
-  decider marked it.
+  with a left border. An alert carries the run's reason or the check's,
+  or says a decider marked it.
 - **The agent's Markdown has its own renderer** (`renderEmailMarkdown()`
   in `render/email.ts`), HTML and plain text from one parse. A link is
   written as its full address, never its label, and only an `http(s)`

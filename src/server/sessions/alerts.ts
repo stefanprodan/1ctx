@@ -1,7 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AutomationAlert } from "../../shared/contracts/automation.ts";
+import {
+  type AutomationAlert,
+  CHECK_ALERT_LEAD,
+} from "../../shared/contracts/automation.ts";
 import { ATTENTION_AT } from "../../shared/contracts/decision.ts";
 import type { Db } from "../db/index.ts";
 
@@ -19,6 +22,13 @@ const alertRuns = (automations: string, pick: string, where = "") =>
   `(select ${pick} ${openAlertRuns(automations)}${where}
      order by marked.last_activity_at desc, marked.id limit 1)`;
 
+// the check's failure is the open alert's latest word: no marked run of
+// it ended after the check last opened or joined it
+const checkLatest = (automations: string) =>
+  `${automations}.check_alert_at is not null and not exists (select 1
+     ${openAlertRuns(automations)}
+       and marked.last_activity_at > ${automations}.check_alert_at)`;
+
 // the alert's columns of the automations row named, nothing read while
 // none is open
 export const alertColumns = (automations: string) =>
@@ -26,22 +36,28 @@ export const alertColumns = (automations: string) =>
    case when ${automations}.attention_since is null then 0 else
      (select count(*) ${openAlertRuns(automations)})
    end as alert_runs,
-   case when ${automations}.attention_since is null then null else
-     ${alertRuns(
+   case when ${automations}.attention_since is null then null
+     when ${checkLatest(automations)} then
+       '${CHECK_ALERT_LEAD}' || ${automations}.last_check_result
+     else ${alertRuns(
        automations,
        "marked.attention_reason",
        " and marked.attention_reason is not null",
      )}
    end as alert_reason,
-   case when ${automations}.attention_since is null then null else
-     ${alertRuns(automations, "marked.attention_by")}
-   end as alert_by`;
+   case when ${automations}.attention_since is null then null
+     when ${checkLatest(automations)} then null
+     else ${alertRuns(automations, "marked.attention_by")}
+   end as alert_by,
+   ${automations}.attention_since is not null
+     and ${automations}.check_alert_at is not null as alert_check`;
 
 export type RawAlert = {
   alert_since: number | null;
   alert_runs: number;
   alert_reason: string | null;
   alert_by: string | null;
+  alert_check: number;
 };
 
 export const alertOf = (raw: RawAlert): AutomationAlert | null =>
@@ -52,6 +68,7 @@ export const alertOf = (raw: RawAlert): AutomationAlert | null =>
         runs: raw.alert_runs,
         reason: raw.alert_reason,
         by: raw.alert_by,
+        check: raw.alert_check === 1,
       };
 
 // a run a stop, shutdown or restart ended said nothing; in a 1 ms tie a

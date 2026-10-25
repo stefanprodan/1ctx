@@ -1,7 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The mark a run ends with (docs/automations.md, Attention).
+// The mark a run ends with (docs/attention.md).
 
 import { cutText } from "../../shared/text.ts";
 import { MAX_ATTENTION_REASON, type SendCause } from "../../shared/words.ts";

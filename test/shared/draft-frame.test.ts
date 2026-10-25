@@ -151,10 +151,11 @@ test("draft frames validate every proposal field and reject foreign fields", () 
   for (const [key, value] of Object.entries(pendingDraft.fields)) {
     const fields = { ...pendingDraft.fields } as Record<string, unknown>;
     delete fields[key];
+    // a create drafted before the check URL holds none
     expect(isDraftFrame({ ...frame, draft: { ...pendingDraft, fields } })).toBe(
-      false,
+      key === "checkUrl",
     );
-    fields[key] = typeof value === "string" ? false : "wrong";
+    fields[key] = typeof value === "string" || value === null ? false : "wrong";
     expect(isDraftFrame({ ...frame, draft: { ...pendingDraft, fields } })).toBe(
       false,
     );

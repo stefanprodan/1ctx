@@ -41,7 +41,7 @@ import type { RoundDeps } from "./round.ts";
 import { routes } from "./routes.ts";
 import { type ActiveSend, claim, live, type SendOp } from "./send.ts";
 import { sendPolicy } from "./send-policy.ts";
-import { drainRunner, shutdownRunner } from "./shutdown.ts";
+import { drainRunner, SHUTDOWN_DRAIN_MS, shutdownRunner } from "./shutdown.ts";
 import { newUser, type QueuedClaim, type StartFields } from "./start.ts";
 import { refuseNewSummon, regeneratedAgent, turnAgent } from "./summon.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
@@ -58,9 +58,7 @@ export type { DrainResult, ShutdownResult } from "./shutdown.ts";
 export { MAX_TURN_MESSAGES, type TurnMessage } from "./turn.ts";
 export type { Runner } from "./types.ts";
 
-// how long shutdown waits for the streams to let go
-export const SHUTDOWN_DRAIN_MS = 5000;
-export { FINALIZE_RETRY_MS };
+export { FINALIZE_RETRY_MS, SHUTDOWN_DRAIN_MS };
 
 export function runnerArea(deps: RunnerDeps): Runner {
   const registry = new Registry();
@@ -251,6 +249,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       kind: event === null ? "chat" : "run",
       origin: event === null ? (session?.origin ?? "chat") : "automation",
       automationId: event?.automation.id ?? null,
+      kept: event?.kept ?? [],
       checkUploads: deps.uploads.checkUploads,
       startKept: (id, afterSeq) => deps.bash.startKept(id, afterSeq),
       now: deps.clock(),
