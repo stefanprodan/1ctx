@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The automation editor, for a new automation and one that exists, in
-// steps: its name, the instructions (the composer's box with its agent chip),
-// memory, who marks a run, what it may use, a restart, when it runs and
-// what it asks first, and its limits. Anyone in the project saves and deletes; a save names the
-// edit revision the form opened on, and when the row has moved on the
-// draft stays until Reload replaces it with the saved row. The deadline
-// starts at the server's limit, the value a run is held to when none is
-// set.
+// steps: its name, the instructions (the composer's box with its agent
+// chip), memory, who marks a run, what it may use, a restart, when it
+// runs and what it asks first, and its limits. Anyone in the project
+// saves and deletes; a save names the edit revision the form opened on,
+// and when the row has moved on the draft stays until Reload replaces it
+// with the saved row. The deadline starts at the server's limit, the
+// value a run is held to when none is set.
 
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";

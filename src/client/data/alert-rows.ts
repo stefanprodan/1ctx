@@ -159,8 +159,18 @@ export function reconcileAlert(
   return same(byAlert([...rows, line]));
 }
 
+// a check's open alert whose line is not held: only the first page
+// places it, since no run's envelope comes with it
+export const unplacedCheck = (
+  rows: FeedRow[],
+  automation: Pick<AutomationSummary, "id" | "alert">,
+): boolean =>
+  automation.alert?.check === true &&
+  !rows.some((row) => lineOf(row) === automation.id);
+
 // an automation frame over the lines: its alert closed drops its line,
-// a moved one moves it; a line not held comes with its run's envelope
+// a moved one moves it; a line not held comes with its run's envelope,
+// or for a check's alert from the first page (unplacedCheck())
 export function alertFrame(
   rows: FeedRow[],
   automation: Pick<AutomationSummary, "id" | "name" | "alert">,

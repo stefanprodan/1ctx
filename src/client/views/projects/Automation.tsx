@@ -4,8 +4,8 @@
 // An automation's page. The summary reads as one sentence: when, in which
 // zone, which agent is asked, then the instructions as the agent gets
 // them, cut to a few lines, and under them the next run and the last
-// check. An automation whose agent was deleted names
-// it with a tag and says it is paused until an edit picks another.
+// check. An automation whose agent was deleted names it with a tag and
+// says it is paused until an edit picks another.
 // Suspend or Resume, Run now, Edit and Delete, which anyone in the
 // project presses, sit over two tabs. Runs is a log of RunRow.tsx rows,
 // a page at a time, filtered to the manual or the flagged runs. An open
@@ -15,7 +15,7 @@
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 
 import { useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
+import { type ComponentChildren, Fragment } from "preact";
 import { useEffect } from "preact/hooks";
 import {
   type AutomationSummary,
@@ -73,6 +73,7 @@ import {
   nextLine,
   nextRunsOf,
   suspendedText,
+  urlParts,
 } from "./Automations.model.ts";
 import { OpenAttention } from "./OpenAttention.tsx";
 import { deadlineText } from "./Run.model.ts";
@@ -261,7 +262,14 @@ export function Automation({ params }: { params: Params }) {
                   {ATTENTION_LABELS[row.attentionMode]}
                 </AsideLine>
                 {row.checkUrl !== null && (
-                  <AsideLine label="Check URL">{row.checkUrl}</AsideLine>
+                  <AsideLine label="Check URL">
+                    {urlParts(row.checkUrl).map((part, i) => (
+                      <Fragment key={i}>
+                        {i > 0 && <wbr />}
+                        {part}
+                      </Fragment>
+                    ))}
+                  </AsideLine>
                 )}
                 <AccessLines row={row} />
                 {row.rerunOnRestart && (

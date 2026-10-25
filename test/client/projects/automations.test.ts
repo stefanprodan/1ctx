@@ -57,6 +57,7 @@ import {
   retiredPick,
   rowState,
   suspendedText,
+  urlParts,
   waitingSince,
 } from "../../../src/client/views/projects/Automations.model.ts";
 import {
@@ -486,6 +487,38 @@ describe("the row's words", () => {
         failed: true,
       });
     }
+  });
+
+  test("a failed check's skip is said once, by the check's line", () => {
+    const failed = automation({
+      checkUrl: "https://api.example.test/alerts",
+      lastCheckedAt: now - 14_000,
+      lastCheckResult: "HTTP 503",
+      lastEventAt: now - 14_000,
+      lastEventOutcome: "skipped",
+      lastEventReason: "check failed: HTTP 503",
+    });
+    expect(eventNote(failed, now)).toBeNull();
+    expect(checkLine(failed, now)?.text).toBe("Check failed 14s ago: HTTP 503");
+    // a skip of its own, after the check, still shows
+    const later = { ...failed, lastEventAt: now - 5_000 };
+    expect(eventNote(later, now)).toBe(
+      "Skipped 5s ago: check failed: HTTP 503",
+    );
+    // a quiet check's time matching a skip is not the check's skip
+    const quiet = { ...failed, lastCheckResult: "304" as const };
+    expect(eventNote(quiet, now)).toContain("Skipped");
+  });
+
+  test("a URL breaks after each slash and question mark", () => {
+    expect(urlParts("http://127.0.0.1:1240/fail?x=1/2")).toEqual([
+      "http://",
+      "127.0.0.1:1240/",
+      "fail?",
+      "x=1/",
+      "2",
+    ]);
+    expect(urlParts("https://a.test/").join("")).toBe("https://a.test/");
   });
 
   test("a scheduled fire a minute or more late says how late", () => {

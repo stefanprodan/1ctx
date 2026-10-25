@@ -64,9 +64,9 @@ function Text({ text }: { text: string }) {
   );
 }
 
-// a new automation's check URL, instructions and guidance; an update's changed fields
-// with their old values, then each text's changed lines, or the whole
-// text once nothing differs
+// a new automation's check URL, instructions and guidance; an update's
+// changed fields with their old values, then each text's changed lines,
+// or the whole text once nothing differs
 export function Details({
   draft,
   before,

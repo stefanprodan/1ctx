@@ -159,6 +159,15 @@ export function retiredPick(
 export function eventNote(a: AutomationSummary, now: number): string | null {
   if (a.lastEventAt === null) return null;
   if (a.lastEventOutcome === "skipped") {
+    // the check's own skip, which its line already says
+    if (
+      a.checkUrl !== null &&
+      a.lastEventAt === a.lastCheckedAt &&
+      a.lastCheckResult !== null &&
+      isCheckFailure(a.lastCheckResult)
+    ) {
+      return null;
+    }
     const why = a.lastEventReason ?? "no reason given";
     return `Skipped ${ago(a.lastEventAt, now)}: ${why}`;
   }
@@ -198,6 +207,11 @@ export function checkLine(
     failed: false,
   };
 }
+
+// a URL cut after each "/" and "?", a scheme's "//" kept whole, where
+// a line may break before overflow-wrap cuts a long part
+export const urlParts = (url: string): string[] =>
+  url.split(/(?<=[/?])(?!\/)/).filter((part) => part !== "");
 
 // The automation page and its editor: the row, the project it was found
 // in, and the failure, a deleted row once the list is in without it.
