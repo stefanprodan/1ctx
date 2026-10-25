@@ -74,7 +74,7 @@ export function checks(deps: CheckDeps) {
   // a new answer's validators, saved when its run ends
   const seen = new Map<
     string,
-    Validators & { automationId: string; url: string }
+    Validators & { automationId: string; editRevision: number; cut: boolean }
   >();
 
   const ask = (row: AutomationSummary, dueAt: number): void => {
@@ -148,19 +148,20 @@ export function checks(deps: CheckDeps) {
   };
 
   // a quiet or failed answer: the row's check recorded, next_at moved
-  // when the fire was the schedule's, and a failure's skipped event
+  // when the fire was the schedule's, and a failure's skipped event;
+  // false when the answer was stale
   const settle = (
     id: string,
     source: EventSource,
     held: Held,
     due: Due,
-  ): void => {
+  ): boolean => {
     const result = held.answer.result;
     const failed = isCheckFailure(result);
-    transact(deps.db, () => {
+    const applied = transact(deps.db, () => {
       const row = deps.store.byId(id);
       const dueAt = row === null ? null : due(row, held);
-      if (row === null || dueAt === null) return { result: undefined };
+      if (row === null || dueAt === null) return { result: false };
       const now = deps.clock();
       const nextAt =
         row.nextAt !== null && row.nextAt <= now
@@ -186,17 +187,18 @@ export function checks(deps: CheckDeps) {
       const events = failed ? silent(row, now) : [];
       const updated = deps.store.byId(row.id)!;
       return {
-        result: undefined,
+        result: true,
         events: [automationChanged(updated), ...events],
       };
     });
-    if (failed) {
+    if (applied && failed) {
       deps.log.info("check failed", {
         automation: id,
         result,
         duration: deps.clock() - held.startedAt,
       });
     }
+    return applied;
   };
 
   return {
@@ -254,11 +256,18 @@ export function checks(deps: CheckDeps) {
       const answer = held.answer as NewAnswer;
       seen.set(sessionId, {
         automationId,
-        url: held.url,
+        editRevision: held.editRevision,
+        cut: false,
         etag: answer.etag,
         lastModified: answer.lastModified,
         hash: answer.hash,
       });
+    },
+    // in the run's last transaction: a Stop or a shutdown reached its
+    // work after the answer, so the run counts as cut
+    interrupted(sessionId: string): void {
+      const kept = seen.get(sessionId);
+      if (kept !== undefined) kept.cut = true;
     },
     // a run's end saves what its answer said, but for a run a shutdown
     // or a restart cut, whose answer the next check repeats
@@ -266,8 +275,8 @@ export function checks(deps: CheckDeps) {
       const kept = seen.get(sessionId);
       if (kept === undefined) return;
       seen.delete(sessionId);
-      if (cut()) return;
-      saveValidators(deps.db, kept.automationId, kept.url, kept);
+      if (kept.cut || cut()) return;
+      saveValidators(deps.db, kept.automationId, kept.editRevision, kept);
     },
     abort() {
       for (const { abort } of flying.values()) abort.abort();

@@ -69,18 +69,31 @@ const touchSince = (db: Db, id: string, endedAt: number) =>
     )
     .run(id, endedAt).changes > 0;
 
-// a clean run or a dismiss: false when none was open. A clean run closes
-// the check's part too; a dismiss leaves the check's mark, so a check
-// still silent never opens it again before it answers
-const closeAlert = (db: Db, id: string, clean: boolean) =>
+// a dismiss: false when none was open. It leaves the check's mark, so
+// a check still silent never opens it again before it answers
+const closeAlert = (db: Db, id: string) =>
   db
     .query(
-      `update automations set attention_since = null,
-         check_alert_at = iif(?, null, check_alert_at),
-         revision = revision + 1
+      `update automations set attention_since = null, revision = revision + 1
        where id = ? and attention_since is not null`,
     )
-    .run(clean ? 1 : 0, id).changes > 0;
+    .run(id).changes > 0;
+
+// a clean run that ended at endedAt closes what runs opened. The check's
+// part goes too, unless the check held the alert after that run's end:
+// then the alert is the check's alone, from then
+const closeRuns = (db: Db, id: string, endedAt: number) =>
+  db
+    .query(
+      `update automations set
+         attention_since = iif(${CHECK_HOLDS} and check_alert_at > ?1,
+           check_alert_at, null),
+         check_alert_at = iif(${CHECK_HOLDS} and check_alert_at > ?1,
+           check_alert_at, null),
+         revision = revision + 1
+       where id = ?2 and attention_since is not null`,
+    )
+    .run(endedAt, id).changes > 0;
 
 // an open alert whose marked runs are all gone: one covering lookup.
 // One the check opened or joined is the check's to close
@@ -103,7 +116,7 @@ export function alerts(deps: AlertsDeps): Alerts {
       return [];
     }
     if (change === "close") {
-      if (!closeAlert(db, run.automationId, true)) return [];
+      if (!closeRuns(db, run.automationId, run.endedAt)) return [];
       const row = store.byId(run.automationId);
       return row === null ? [] : [automationChanged(row)];
     }
@@ -162,7 +175,7 @@ export function alerts(deps: AlertsDeps): Alerts {
       return row === null ? [] : [automationChanged(row)];
     },
     dismiss(id) {
-      const closed = closeAlert(db, id, false);
+      const closed = closeAlert(db, id);
       const automation = store.byId(id)!;
       return {
         automation,

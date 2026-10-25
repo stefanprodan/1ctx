@@ -74,6 +74,9 @@ export type AlertsPort = {
     run: { automationId: string; sessionId: string; endedAt: number },
     change: AlertChange,
   ): BusEvent[];
+  // in the caller's transaction: a Stop or a shutdown reached the run's
+  // work after its answer, so its check answer is not kept
+  runInterrupted(sessionId: string): void;
 };
 
 // what the alert reads of a run's end
@@ -113,7 +116,7 @@ export function alertChange(send: Ended, cause: SendCause): AlertChange | null {
 
 // the run's end over its automation's open alert, in its transaction
 export function alertEvents(
-  alerts: AlertsPort,
+  alerts: Pick<AlertsPort, "runEnded">,
   send: Ended & Pick<ActiveSend, "sessionId">,
   cause: SendCause,
   endedAt: number,

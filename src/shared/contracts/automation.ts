@@ -128,6 +128,7 @@ export const CHECK_FAILURES = [
   "host is not in Web access",
   "its credential is turned off",
   "its credential has no key",
+  "its credential does not allow GET",
 ] as const;
 export type CheckQuiet = (typeof CHECK_QUIET)[number];
 export type CheckFailure = (typeof CHECK_FAILURES)[number] | `HTTP ${number}`;

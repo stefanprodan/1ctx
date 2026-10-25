@@ -130,7 +130,8 @@ none; `by` names who marked the latest.
 - **Only the check closes what the check opened.** An answer clears
   `check_alert_at` and closes the alert when no marked run belongs to it
   (`checkAnswered()`); a run's alert stays open. A clean run's close
-  clears the check's part too. A deleted run never closes an alert the
+  clears the check's part too, unless `check_alert_at` is later than
+  that run's end: then the alert stays, the check's alone from then. A deleted run never closes an alert the
   check holds.
 - **Opening publishes `automation.attention`**, once per open alert,
   never for a run that joins; its `sessionId` is null for a check. It stays a hint: the owner's email is

@@ -100,12 +100,14 @@ export function scheduler(deps: Deps): Scheduler {
       ? held.dueAt
       : null;
 
-  // one try at a fire; actor is the user of a manual one, else null
+  // one try at a fire; actor is the user of a manual one, else null.
+  // Unasked, a checked fire goes on only to record why it cannot run
   const attempt = (
     id: string,
     source: EventSource,
     actor: UserRow | null,
     held?: Held,
+    unasked = false,
   ): Started | null => {
     const holder: { value: PreparedRun | null } = { value: null };
     const recorded: {
@@ -136,7 +138,7 @@ export function scheduler(deps: Deps): Scheduler {
         }
         // a checked fire starts only with its answer; one that cannot run
         // at once is dropped, and the row left due checks again
-        if (source !== "manual" && row.checkUrl !== null) {
+        if (source !== "manual" && row.checkUrl !== null && !unasked) {
           const running = deps.sessions.runningAutomation(row.id);
           if (held === undefined ? !running : running) return { result: null };
           if (held !== undefined && fresh(row, source, held) === null) {
@@ -153,6 +155,7 @@ export function scheduler(deps: Deps): Scheduler {
         try {
           const resolved =
             actor === null ? ownerFor(deps, row) : manualFor(deps, row, actor);
+          if (unasked && row.checkUrl !== null) return { result: null };
           if (deps.sessions.runningAutomation(row.id)) {
             throw new Conflict("still running");
           }
@@ -256,6 +259,15 @@ export function scheduler(deps: Deps): Scheduler {
     });
   };
 
+  const ownerCan = (row: AutomationSummary): boolean => {
+    try {
+      ownerFor(deps, row);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const fire = async (
     id: string,
     given?: AutomationSummary,
@@ -268,8 +280,11 @@ export function scheduler(deps: Deps): Scheduler {
     const source = cut.has(id) ? "restart" : "schedule";
     const row = given ?? deps.store.byId(id);
     let held: Held | undefined;
+    // an owner who cannot run the task is never asked for: no GET goes
+    // out in their name, and the attempt records why
+    const unasked = !!row?.checkUrl && !ownerCan(row);
     // a checked fire asks first, unless a run going skips it at once
-    if (row?.checkUrl && !deps.sessions.runningAutomation(id)) {
+    if (row?.checkUrl && !unasked && !deps.sessions.runningAutomation(id)) {
       if (deps.checks.busy(id)) return null;
       held = deps.checks.take(id);
       const dueAt = dueOf(row, source);
@@ -278,8 +293,9 @@ export function scheduler(deps: Deps): Scheduler {
         return null;
       }
       if (held !== undefined && held.answer.result !== "200") {
+        let applied = true;
         try {
-          deps.checks.settle(id, source, held, (current) =>
+          applied = deps.checks.settle(id, source, held, (current) =>
             fresh(current, source, held!),
           );
         } catch (err) {
@@ -288,13 +304,15 @@ export function scheduler(deps: Deps): Scheduler {
             ...errorFields(err),
           });
         }
-        // after settle, which reads the listing to tell a rerun is due
-        cut.delete(id);
+        // after settle, which reads the listing to tell a rerun is due;
+        // a stale answer leaves the rerun listed, to ask again
+        if (applied) cut.delete(id);
         return null;
       }
     }
+    if (unasked) deps.checks.drop(id);
     try {
-      const result = attempt(id, source, null, held);
+      const result = attempt(id, source, null, held, unasked);
       // a new answer that started nothing still answered
       if (held !== undefined && (result === null || "wait" in result)) {
         deps.checks.answered(id, held);

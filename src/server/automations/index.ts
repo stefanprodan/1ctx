@@ -79,6 +79,9 @@ export type Automations = {
   // open alert, and the revision when the row named the run, whose link
   // the foreign key cleared
   runDeleted(run: DeletedRun): BusEvent[];
+  // a run a Stop or a shutdown reached after its answer keeps no check
+  // answer
+  runInterrupted(sessionId: string): void;
   start(): number;
   drain(): void;
   stop(): void;
@@ -160,6 +163,7 @@ export function automationsArea(deps: AutomationsDeps): Automations {
       const row = store.touch(run.automationId);
       return row === null ? events : [automationChanged(row)];
     },
+    runInterrupted: checked.interrupted,
     start: scheduled.start,
     drain: scheduled.drain,
     stop: scheduled.stop,

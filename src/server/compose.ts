@@ -670,6 +670,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     alerts: {
       runEnded: (run, change) => automations.alerts.runEnded(run, change),
+      runInterrupted: (sessionId) => automations.runInterrupted(sessionId),
     },
   });
   automations = automationsArea({

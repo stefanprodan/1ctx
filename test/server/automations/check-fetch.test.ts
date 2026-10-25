@@ -399,3 +399,60 @@ describe("a check's redirects", () => {
     );
   });
 });
+
+describe("a check's edges", () => {
+  const signal = new AbortController().signal;
+
+  test("brackets holding only white space are empty, however wide", async () => {
+    for (const body of [`[${" ".repeat(20)}]`, `{\n${"\t".repeat(40)}\n}`]) {
+      expect((await answer(body)).result).toBe("empty");
+    }
+    for (const body of ["[0]", '{"a":1}', "nul", "[ ]]"]) {
+      expect((await answer(body)).result).toBe("200");
+    }
+  });
+
+  test("a credential without GET fails the check, as curl refuses it", () => {
+    const postOnly = { ...credential, methods: ["POST" as const] };
+    const keyed = { readKey: () => ({ ok: true as const, key: "k" }) };
+    expect(reach(ports({ ...keyed, credentials: () => [postOnly] }), ask)).toBe(
+      "its credential does not allow GET",
+    );
+    // and earns no listed-host exemption
+    expect(
+      reach(
+        ports({
+          ...keyed,
+          credentials: () => [postOnly],
+          web: () => ({ mode: "listed", domains: [] }),
+        }),
+        ask,
+      ),
+    ).toBe("host is not in Web access");
+  });
+
+  test("a validator echoing the key is dropped", async () => {
+    const fetch = (async () =>
+      new Response('{"a":1}', {
+        headers: {
+          etag: '"http-secret"',
+          "last-modified": "http\\u002dsecret",
+        },
+      })) as unknown as typeof globalThis.fetch;
+    const got = await check(
+      ports({
+        fetch,
+        credentials: () => [credential],
+        readKey: () => ({ ok: true, key: "http-secret" }),
+      }),
+      clock().fake,
+      ask,
+      signal,
+    );
+    expect(got).toMatchObject({
+      result: "200",
+      etag: null,
+      lastModified: null,
+    });
+  });
+});

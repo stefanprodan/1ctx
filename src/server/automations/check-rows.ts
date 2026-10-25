@@ -36,18 +36,19 @@ export function validators(db: Db, id: string): Validators {
   };
 }
 
-// at a run's end, while the row still asks the URL that answered: a new
-// URL cleared them and saw nothing yet
+// at a run's end, while the row is as its answer saw it: a new URL,
+// even one changed back, cleared them, and a missed save only repeats
+// a run
 export function saveValidators(
   db: Db,
   id: string,
-  url: string,
+  editRevision: number,
   seen: Validators,
 ): void {
   db.query(
     `update automations set check_etag = ?, check_last_modified = ?,
-       check_body_hash = ? where id = ? and check_url = ?`,
-  ).run(seen.etag, seen.lastModified, seen.hash, id, url);
+       check_body_hash = ? where id = ? and edit_revision = ?`,
+  ).run(seen.etag, seen.lastModified, seen.hash, id, editRevision);
 }
 
 // the last check; an answer moves the silence's start, a scheduled fire
@@ -78,22 +79,23 @@ export function recordCheck(
   );
 }
 
-// a URL that answered while its run could not start; false when the
-// URL changed since
+// a URL that answered while its run could not start, which clears the
+// check's part of the alert as any answer; false when the URL changed
 export function noteAnswer(
   db: Db,
   id: string,
   url: string,
   at: number,
 ): boolean {
-  return (
+  const noted =
     db
       .query(
         `update automations set last_answered_at = ?, revision = revision + 1
          where id = ? and check_url = ?`,
       )
-      .run(at, id, url).changes > 0
-  );
+      .run(at, id, url).changes > 0;
+  if (noted) checkAnswered(db, id);
+  return noted;
 }
 
 // an answer clears the check's mark, and closes an alert the check

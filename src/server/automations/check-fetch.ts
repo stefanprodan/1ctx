@@ -138,16 +138,16 @@ export function reach(
           .credentials(ask.projectId)
           .find((row) => underPrefix(ask.url, row.prefix))
       : undefined;
+  const signs = credential?.methods.includes("GET") === true;
   // curl's credential fetch allows its own prefix, listed or not
-  const refused = webRefusal(ports, ask, url, credential === undefined);
+  const refused = webRefusal(ports, ask, url, !signs);
   if (refused !== null) return refused;
   if (credential === undefined) return UNSIGNED;
-  // curl refuses a prefix whose credential is off or keyless
+  // curl refuses a prefix whose credential is off, keyless or not for GET
   if (ask.disabled.includes(credentialKey(credential.id))) {
     return "its credential is turned off";
   }
-  // one that signs no GET leaves it unsigned, as webfetch would send it
-  if (!credential.methods.includes("GET")) return UNSIGNED;
+  if (!signs) return "its credential does not allow GET";
   const read = ports.readKey(credential.keyName);
   if (!read.ok) return "its credential has no key";
   return {
@@ -222,21 +222,12 @@ function textOf(bytes: Uint8Array): string | null {
   }
 }
 
-// white space, [], {} or null: a list or a search with nothing in it
+// white space, [], {} or null: a list or a search with nothing in it.
+// A linear match, whatever white space the brackets hold
+const EMPTY = /^(?:\[[ \t\n\r]*\]|\{[ \t\n\r]*\}|null)?$/;
+
 function isEmpty(text: string): boolean {
-  const trimmed = text.trim();
-  if (trimmed === "") return true;
-  if (trimmed.length > 16) return false;
-  try {
-    const value = JSON.parse(trimmed);
-    return (
-      value === null ||
-      (Array.isArray(value) && value.length === 0) ||
-      (typeof value === "object" && Object.keys(value).length === 0)
-    );
-  } catch {
-    return false;
-  }
+  return EMPTY.test(text.trim());
 }
 
 export async function answerOf(
@@ -306,10 +297,18 @@ export async function check(
       if (!REDIRECTS.has(response.status) || location === null) {
         const answer = await answerOf(response, ask);
         if (answer.result !== "200" || signing.key === null) return answer;
+        const forms = escapedForms(signing.key);
+        // a validator echoing the key is never stored or sent again
+        const clean = (value: string | null) =>
+          value !== null && forms.some((form) => value.includes(form))
+            ? null
+            : value;
         // the hash stays the raw body's, so a scrub never hides a change
         return {
           ...answer,
-          body: scrubValues(answer.body, escapedForms(signing.key), KEY_MARK),
+          body: scrubValues(answer.body, forms, KEY_MARK),
+          etag: clean(answer.etag),
+          lastModified: clean(answer.lastModified),
         };
       }
       await response.body?.cancel().catch(() => {});
