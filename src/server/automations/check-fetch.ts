@@ -16,6 +16,7 @@ import type {
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import { originAllowed, type WebAccessMode } from "../../shared/web.ts";
+import { escapedForms } from "../bash/index.ts";
 import {
   headerValue,
   type KeyRead,
@@ -23,6 +24,7 @@ import {
 } from "../credentials/index.ts";
 import { type Clock, sleep } from "../lib/clock.ts";
 import { sha256 } from "../lib/ids.ts";
+import { scrubValues } from "../lib/log.ts";
 import type { Fetcher } from "../providers/index.ts";
 
 export const CHECK_TIMEOUT_MS = 10_000;
@@ -78,21 +80,26 @@ export type CheckAnswer =
 export type Signing = {
   headers: Record<string, string>;
   scope: { prefix: string } | { origin: string } | null;
+  // scrubbed from the answer, as curl and MCP scrub what a server echoes
+  key: string | null;
 };
 
-const UNSIGNED: Signing = { headers: {}, scope: null };
+const UNSIGNED: Signing = { headers: {}, scope: null, key: null };
+
+export const KEY_MARK = "[key]";
 
 // the web row and the task's web switch, as curl's sandbox has them
 function webRefusal(
   ports: Pick<CheckPorts, "web">,
   ask: Pick<CheckAsk, "disabled">,
   url: URL,
+  listed = true,
 ): CheckFailure | null {
   const web = ports.web();
   if (web.mode === "off" || ask.disabled.includes(WEB)) {
     return "web access is off";
   }
-  if (web.mode === "listed" && !originAllowed(url, web.domains)) {
+  if (listed && web.mode === "listed" && !originAllowed(url, web.domains)) {
     return "host is not in Web access";
   }
   return null;
@@ -122,14 +129,18 @@ export function reach(
       : {
           headers: { authorization: `Bearer ${key}` },
           scope: { origin: url.origin },
+          key,
         };
   }
-  const refused = webRefusal(ports, ask, url);
+  const credential =
+    url.protocol === "https:"
+      ? ports
+          .credentials(ask.projectId)
+          .find((row) => underPrefix(ask.url, row.prefix))
+      : undefined;
+  // curl's credential fetch allows its own prefix, listed or not
+  const refused = webRefusal(ports, ask, url, credential === undefined);
   if (refused !== null) return refused;
-  if (url.protocol !== "https:") return UNSIGNED;
-  const credential = ports
-    .credentials(ask.projectId)
-    .find((row) => underPrefix(ask.url, row.prefix));
   if (credential === undefined) return UNSIGNED;
   // curl refuses a prefix whose credential is off or keyless
   if (ask.disabled.includes(credentialKey(credential.id))) {
@@ -144,6 +155,7 @@ export function reach(
       [credential.header]: headerValue(credential.template, read.key),
     },
     scope: { prefix: credential.prefix },
+    key: read.key,
   };
 }
 
@@ -292,7 +304,13 @@ export async function check(
       });
       const location = response.headers.get("location");
       if (!REDIRECTS.has(response.status) || location === null) {
-        return await answerOf(response, ask);
+        const answer = await answerOf(response, ask);
+        if (answer.result !== "200" || signing.key === null) return answer;
+        // the hash stays the raw body's, so a scrub never hides a change
+        return {
+          ...answer,
+          body: scrubValues(answer.body, escapedForms(signing.key), KEY_MARK),
+        };
       }
       await response.body?.cancel().catch(() => {});
       if (hops === CHECK_REDIRECTS) return { result: "too many redirects" };

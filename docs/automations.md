@@ -262,9 +262,12 @@ silence counts from the change.
   URL's origin, gets its bearer from its `mcp-` file and ignores the web
   row. Otherwise the web row and the task's `web` switch must allow it,
   and in `listed` mode `originAllowed()`. An `https:` URL under a
-  project credential's prefix (`underPrefix()`) carries its header. As
-  curl refuses the prefix, a credential the task turned off or whose key
-  does not read fails the check; one without GET leaves it unsigned.
+  project credential's prefix (`underPrefix()`) carries its header and,
+  as curl's credential fetch, needs no listed host. As curl refuses the
+  prefix, a credential the task turned off or whose key does not read
+  fails the check; one without GET leaves it unsigned. The key the
+  check sent is scrubbed from a new answer (`escapedForms()`); the hash
+  stays the raw body's.
 - **A check silent past `CHECK_SILENCE_MS` opens the alert** on a
   failure; see `docs/attention.md`.
 - **A quiet check moves `revision`, never the history.** The page shows

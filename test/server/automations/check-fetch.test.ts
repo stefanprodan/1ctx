@@ -186,6 +186,7 @@ describe("what a check reaches", () => {
     expect(reach(off, linked)).toEqual({
       headers: { authorization: "Bearer mcp-secret" },
       scope: { origin: CHECK_URL },
+      key: "mcp-secret",
     });
     // the task turned the server off: the web row decides
     expect(reach(off, { ...linked, disabled: ["mcp:m1"] })).toBe(
@@ -201,7 +202,7 @@ describe("what a check reaches", () => {
     const listed = ports({
       web: () => ({ mode: "listed", domains: ["check.test"] }),
     });
-    expect(reach(listed, ask)).toEqual({ headers: {}, scope: null });
+    expect(reach(listed, ask)).toEqual({ headers: {}, scope: null, key: null });
     expect(reach(listed, { ...ask, url: "https://other.test/a" })).toBe(
       "host is not in Web access",
     );
@@ -215,7 +216,18 @@ describe("what a check reaches", () => {
     expect(reach(signed, ask)).toEqual({
       headers: { "X-Api-Key": "http-secret" },
       scope: { prefix: `${CHECK_URL}/` },
+      key: "http-secret",
     });
+    // curl's credential fetch reaches its prefix, listed or not
+    const unlisted = ports({
+      web: () => ({ mode: "listed", domains: [] }),
+      credentials: () => [credential],
+      readKey: () => ({ ok: true, key: "http-secret" }),
+    });
+    expect(reach(unlisted, ask)).toMatchObject({ key: "http-secret" });
+    expect(reach(unlisted, { ...ask, url: "https://other.test/a" })).toBe(
+      "host is not in Web access",
+    );
     // as curl refuses the prefix by name
     expect(reach(signed, { ...ask, disabled: ["credential:c1"] })).toBe(
       "its credential is turned off",
@@ -226,6 +238,7 @@ describe("what a check reaches", () => {
     expect(reach(signed, { ...ask, url: "http://check.test/alerts" })).toEqual({
       headers: {},
       scope: null,
+      key: null,
     });
   });
 });
@@ -303,6 +316,25 @@ describe("a check's redirects", () => {
       result: "too many redirects",
     });
     expect(seen).toHaveLength(6);
+  });
+
+  test("a key the server echoes is scrubbed, the hash kept raw", async () => {
+    const body = '{"token":"http-secret","escaped":"http\\u002dsecret"}';
+    const { fetch } = site({ [ask.url]: () => new Response(body) });
+    const got = await check(
+      ports({
+        fetch,
+        credentials: () => [credential],
+        readKey: () => ({ ok: true, key: "http-secret" }),
+      }),
+      clock().fake,
+      ask,
+      signal,
+    );
+    expect(got).toMatchObject({ result: "200", hash: sha256(body) });
+    if (got?.result !== "200") throw new Error("no answer");
+    expect(got.body).not.toContain("secret");
+    expect(got.body).toContain("[key]");
   });
 
   test("a key never reaches another origin, and an unsigned check stays unsigned", async () => {
