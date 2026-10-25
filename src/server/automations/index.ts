@@ -79,8 +79,7 @@ export type Automations = {
   // open alert, and the revision when the row named the run, whose link
   // the foreign key cleared
   runDeleted(run: DeletedRun): BusEvent[];
-  // a run a Stop or a shutdown reached after its answer keeps no check
-  // answer
+  // a run a shutdown reached after its answer keeps no check answer
   runInterrupted(sessionId: string): void;
   start(): number;
   drain(): void;

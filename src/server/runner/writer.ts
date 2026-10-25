@@ -410,7 +410,7 @@ export class Writer {
         mark: runMark(send, cause, error),
       })!;
       const alerted = alertEvents(this.deps.alerts, send, cause, now);
-      if (send.kind === "run" && send.interrupted) {
+      if (send.kind === "run" && send.shutdownCut) {
         this.deps.alerts.runInterrupted(send.sessionId);
       }
       // a run that ends done with an answer posts it to the channel when

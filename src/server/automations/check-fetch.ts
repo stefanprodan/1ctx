@@ -140,7 +140,7 @@ export function reach(
       : undefined;
   const signs = credential?.methods.includes("GET") === true;
   // curl's credential fetch allows its own prefix, listed or not
-  const refused = webRefusal(ports, ask, url, !signs);
+  const refused = webRefusal(ports, ask, url, credential === undefined);
   if (refused !== null) return refused;
   if (credential === undefined) return UNSIGNED;
   // curl refuses a prefix whose credential is off, keyless or not for GET

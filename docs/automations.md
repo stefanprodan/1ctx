@@ -220,9 +220,10 @@ silence counts from the change.
   the loop. The answer is held in memory and `wake()`s the scheduler,
   whose next fire takes it. One GET per automation at a time. A run of
   it still going skips the fire with no GET, and so does an owner
-  `ownerFor()` refuses: the fire's attempt records its skipped event. One `CHECK_TIMEOUT_MS`
-  sleep on the clock port covers the whole chain; `If-None-Match` and
-  `If-Modified-Since` from the saved validators go on every hop.
+  `ownerFor()` refuses: the fire's attempt records its skipped event.
+  One `CHECK_TIMEOUT_MS` sleep on the clock port covers the whole
+  chain; `If-None-Match` and `If-Modified-Since` from the saved
+  validators go on every hop.
 - **Redirects are followed as curl follows them,** by hand
   (`redirect: "manual"`), at most `CHECK_REDIRECTS` hops, http and https
   only (`hop()`). A signed check stays inside its credential's prefix or
@@ -240,9 +241,9 @@ silence counts from the change.
   every GET; the rows are deferred as any due row. Run now never asks.
   A restart rerun asks, since its answer's validators were never saved.
 - **Nothing new is a 204, a 304, a 200 that is white space, `[]`, `{}`
-  or `null` (any white space inside), or a 200 whose SHA-256 is `check_body_hash`.** It moves
-  `next_at` and the row's check columns and `revision`, and writes no
-  event.
+  or `null` (any white space inside), or a 200 whose SHA-256 is
+  `check_body_hash`.** It moves `next_at` and the row's check columns
+  and `revision`, and writes no event.
 - **A new answer is a 200 of UTF-8 text with no NUL**, whatever its
   type, read up to `MAX_CHECK_BYTES` or `mcpKeptBytes` if lower. Its run's
   first message is the instructions, the answer's start fenced as data
@@ -253,9 +254,9 @@ silence counts from the change.
   (`prepareSend()`), whose kept counter then starts past it.
 - **Its validators wait in memory, keyed by the run,** and are saved at
   the run's end (`onRunEnd()`) while the row's edit revision is the
-  answer's, unless a shutdown or a restart cut the run, or a Stop or a
-  shutdown reached its work after the answer (`runInterrupted()`):
-  then the next check repeats it. An ETag or Last-Modified holding the
+  answer's, unless a shutdown or a restart cut the run, its work after
+  the answer included (`runInterrupted()`): then the next check
+  repeats it. A Stop saves them. An ETag or Last-Modified holding the
   signing key in any `escapedForms()` is dropped.
 - **Every failure is a skipped event with a fixed reason**
   (`checkReason()` over `HTTP <status>` or a `CHECK_FAILURES` phrase,
@@ -269,12 +270,11 @@ silence counts from the change.
   row. Otherwise the web row and the task's `web` switch must allow it,
   and in `listed` mode `originAllowed()`. An `https:` URL under a
   project credential's prefix (`underPrefix()`) carries its header and,
-  as curl's credential fetch, needs no listed host when it signs the
-  GET. As curl refuses the prefix, a credential the task turned off,
-  whose key does not read or whose methods leave out GET fails the
-  check. The key the
-  check sent is scrubbed from a new answer (`escapedForms()`); the hash
-  stays the raw body's.
+  as curl's credential fetch, needs no listed host. As curl refuses the
+  prefix, a credential the task turned off, whose key does not read or
+  whose methods leave out GET fails the check. The key the check sent
+  is scrubbed from a new answer (`escapedForms()`); the hash stays the
+  raw body's.
 - **A check silent past `CHECK_SILENCE_MS` opens the alert** on a
   failure; see `docs/attention.md`.
 - **A quiet check moves `revision`, never the history.** The page shows

@@ -263,8 +263,8 @@ export function checks(deps: CheckDeps) {
         hash: answer.hash,
       });
     },
-    // in the run's last transaction: a Stop or a shutdown reached its
-    // work after the answer, so the run counts as cut
+    // in the run's last transaction: a shutdown reached its work after
+    // the answer, so the run counts as cut
     interrupted(sessionId: string): void {
       const kept = seen.get(sessionId);
       if (kept !== undefined) kept.cut = true;

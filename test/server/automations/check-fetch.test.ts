@@ -418,7 +418,7 @@ describe("a check's edges", () => {
     expect(reach(ports({ ...keyed, credentials: () => [postOnly] }), ask)).toBe(
       "its credential does not allow GET",
     );
-    // and earns no listed-host exemption
+    // curl matches the credential first, listed or not
     expect(
       reach(
         ports({
@@ -428,7 +428,7 @@ describe("a check's edges", () => {
         }),
         ask,
       ),
-    ).toBe("host is not in Web access");
+    ).toBe("its credential does not allow GET");
   });
 
   test("a validator echoing the key is dropped", async () => {

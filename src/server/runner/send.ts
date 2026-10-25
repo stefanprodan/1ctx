@@ -182,6 +182,8 @@ export type ActiveSend = {
   // a Stop or a shutdown came after another cause claimed the send, in
   // the work after its answer
   interrupted: boolean;
+  // that one was a shutdown, which a run's check answer does not outlive
+  shutdownCut: boolean;
   // what cut the current step or phase after the answer, when the send's
   // own cause is another: a Stop or shutdown during it, or its own
   // window. Reset as each starts; only the cut text of the rows it
@@ -363,6 +365,7 @@ export function newSend(fields: {
     memorySkipped: null,
     memoryStopped: false,
     interrupted: false,
+    shutdownCut: false,
     cutBy: null,
     terminal: null,
     ended,

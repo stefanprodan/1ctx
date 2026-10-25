@@ -131,17 +131,18 @@ none; `by` names who marked the latest.
   `check_alert_at` and closes the alert when no marked run belongs to it
   (`checkAnswered()`); a run's alert stays open. A clean run's close
   clears the check's part too, unless `check_alert_at` is later than
-  that run's end: then the alert stays, the check's alone from then. A deleted run never closes an alert the
-  check holds.
+  that run's end: then the alert stays, the check's alone from then. A
+  deleted run never closes an alert the check holds.
 - **Opening publishes `automation.attention`**, once per open alert,
-  never for a run that joins; its `sessionId` is null for a check. It stays a hint: the owner's email is
-  queued in the opening transaction itself (`docs/email.md`), at most
-  `ALERT_EMAILS_PER_DAY` (3) per automation a day, counted on the outbox
-  rows that name it, which deleting runs keeps; a check's email has no
-  session and links the automation's page; over the cap the opening
-  emails nobody and logs `alert email capped`. The automation's Email
-  switch off drops its `email_user` tool and its alert emails; the
-  alert still opens in the app.
+  never for a run that joins; its `sessionId` is null for a check. It
+  stays a hint: the owner's email is queued in the opening transaction
+  itself (`docs/email.md`), at most `ALERT_EMAILS_PER_DAY` (3) per
+  automation a day, counted on the outbox rows that name it, which
+  deleting runs keeps; a check's email has no session and links the
+  automation's page; over the cap the opening emails nobody and logs
+  `alert email capped`. The automation's Email switch off drops its
+  `email_user` tool and its alert emails; the alert still opens in the
+  app.
 - **The summary carries `alert`**: `since`, the count of its runs and
   the latest one's reason (`alertColumns()` in `sessions/alerts.ts`),
   read with the row, each feed row and each envelope. The feed's pick

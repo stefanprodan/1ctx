@@ -86,6 +86,29 @@ describe("a check's validators", () => {
     expect(etag(chat, automation.id)).toBeNull();
   });
 
+  test("a Stop in the memory phase saves them", async () => {
+    const { chat, host, automation } = await checkApp({ ownMemory: true });
+    try {
+      host.answer(() => json({ alerts: [1] }, { etag: '"v1"' }));
+      makeDue(chat, automation.id);
+      const pending = chat.scripted.next();
+      const detail = await fireChecked(chat, automation.id);
+      const sessionId = detail!.session.id;
+      (await pending).reply("The check passed.");
+      await waitScript(chat.scripted, 2);
+      const stopped = await chat.member.call(
+        "POST",
+        `/api/sessions/${sessionId}/stop`,
+      );
+      expect(stopped.status).toBe(200);
+      await sessionSettled(chat.app, sessionId);
+      expect(chat.app.sessions.lastSend(sessionId)?.cause).toBe("finish");
+      expect(etag(chat, automation.id)).toBe('"v1"');
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("a URL changed and changed back during the run saves none", async () => {
     const { chat, host, automation } = await checkApp();
     try {
