@@ -65,7 +65,6 @@ export function reconcileRuns(deps: UpkeepDeps): number {
   return count;
 }
 
-// a run's end: its row's last run, and its check answer's validators
 export function onRunEnd(deps: UpkeepDeps, event: BusEvent): void {
   if (event.type !== "session.changed") return;
   const session = event.data.session;

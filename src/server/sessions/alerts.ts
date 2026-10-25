@@ -22,15 +22,15 @@ const alertRuns = (automations: string, pick: string, where = "") =>
   `(select ${pick} ${openAlertRuns(automations)}${where}
      order by marked.last_activity_at desc, marked.id limit 1)`;
 
-// the check opened or joined the open alert: a mark older than it is a
-// dismissed check's, which a run's alert opened since never belonged to
+// the check opened or joined the open alert; an older mark is a
+// dismissed check's
 export const checkHolds = (automations: string) =>
   `${automations}.attention_since is not null
      and ${automations}.check_alert_at >= ${automations}.attention_since`;
 export const CHECK_HOLDS = checkHolds("automations");
 
-// the check's failure is the open alert's latest word: no marked run of
-// it ended after the check last opened or joined it
+// the check's failure is the alert's latest word: no marked run ended
+// after the check last held it
 const checkLatest = (automations: string) =>
   `${checkHolds(automations)} and not exists (select 1
      ${openAlertRuns(automations)}

@@ -74,8 +74,7 @@ export type AlertsPort = {
     run: { automationId: string; sessionId: string; endedAt: number },
     change: AlertChange,
   ): BusEvent[];
-  // in the caller's transaction: a shutdown reached the run's work after
-  // its answer, so its check answer is not kept
+  // in the caller's transaction
   runInterrupted(sessionId: string): void;
 };
 

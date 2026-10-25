@@ -1,9 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A new answer's run: its first message holds the instructions and the
-// answer's start, and the whole answer is a kept file under /mcp, as a
-// large MCP result is.
+// A new answer's first message: the instructions and the answer's
+// start, the whole answer kept under /mcp as a large MCP result is.
 
 import { type KeptFile, keptPath } from "../bash/index.ts";
 import { cutToTokens } from "../lib/tokens.ts";

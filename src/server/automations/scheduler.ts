@@ -40,7 +40,7 @@ type Deps = {
   sessions: SessionStore;
   runner: { startRun(event: Event): PreparedRun };
   checks: Checks;
-  // the limit a new answer's start in the first message is cut to
+  // how much of a new answer the first message holds
   resultCut(): number;
 };
 
@@ -52,7 +52,6 @@ export type Scheduler = {
   wake(): void;
   pass(): Promise<void>;
   fire(id: string): Promise<SessionDetail | null>;
-  // every check in flight answered or aborted
   checked(): Promise<void>;
   runNow(row: AutomationSummary, user: UserRow): SessionDetail;
   prepareNow(row: AutomationSummary, user: UserRow): PreparedRun;
@@ -79,7 +78,6 @@ export function scheduler(deps: Deps): Scheduler {
     resolve?.();
   };
 
-  // when the row's fire is due by its source, null when it is not
   const dueOf = (row: AutomationSummary, source: EventSource) => {
     if (source === "restart") {
       const listed = cut.get(row.id);
@@ -92,7 +90,6 @@ export function scheduler(deps: Deps): Scheduler {
       : null;
   };
 
-  // the held answer still meets its row: not edited, the same fire due
   const fresh = (row: AutomationSummary, source: EventSource, held: Held) =>
     row.editRevision === held.editRevision &&
     row.checkUrl === held.url &&
@@ -137,7 +134,7 @@ export function scheduler(deps: Deps): Scheduler {
           return { result: null };
         }
         // a checked fire starts only with its answer; one that cannot run
-        // at once is dropped, and the row left due checks again
+        // at once is dropped, and the row still due asks again
         if (source !== "manual" && row.checkUrl !== null && !unasked) {
           const running = deps.sessions.runningAutomation(row.id);
           if (held === undefined ? !running : running) return { result: null };
@@ -283,7 +280,7 @@ export function scheduler(deps: Deps): Scheduler {
     // an owner who cannot run the task is never asked for: no GET goes
     // out in their name, and the attempt records why
     const unasked = !!row?.checkUrl && !ownerCan(row);
-    // a checked fire asks first, unless a run going skips it at once
+    // a run going skips the fire at once, so it is not asked
     if (row?.checkUrl && !unasked && !deps.sessions.runningAutomation(id)) {
       if (deps.checks.busy(id)) return null;
       held = deps.checks.take(id);
@@ -304,8 +301,8 @@ export function scheduler(deps: Deps): Scheduler {
             ...errorFields(err),
           });
         }
-        // after settle, which reads the listing to tell a rerun is due;
-        // a stale answer leaves the rerun listed, to ask again
+        // after settle, which reads the listing to tell a rerun is due.
+        // A stale answer leaves the rerun listed, to ask again
         if (applied) cut.delete(id);
         return null;
       }

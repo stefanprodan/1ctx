@@ -69,8 +69,8 @@ const touchSince = (db: Db, id: string, endedAt: number) =>
     )
     .run(id, endedAt).changes > 0;
 
-// a dismiss: false when none was open. It leaves the check's mark, so
-// a check still silent never opens it again before it answers
+// a dismiss: false when none was open. It keeps the check's mark, so a
+// still silent check never reopens it before it answers
 const closeAlert = (db: Db, id: string) =>
   db
     .query(
@@ -79,9 +79,8 @@ const closeAlert = (db: Db, id: string) =>
     )
     .run(id).changes > 0;
 
-// a clean run that ended at endedAt closes what runs opened. The check's
-// part goes too, unless the check held the alert after that run's end:
-// then the alert is the check's alone, from then
+// a clean run closes the alert, unless the check held it after the
+// run's end: then it stays, the check's alone
 const closeRuns = (db: Db, id: string, endedAt: number) =>
   db
     .query(
@@ -96,7 +95,7 @@ const closeRuns = (db: Db, id: string, endedAt: number) =>
     .run(endedAt, id).changes > 0;
 
 // an open alert whose marked runs are all gone: one covering lookup.
-// One the check opened or joined is the check's to close
+// One the check holds is the check's to close
 const closeEmpty = (db: Db, id: string) =>
   db
     .query(

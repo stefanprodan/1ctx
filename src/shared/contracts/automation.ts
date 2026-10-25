@@ -48,14 +48,11 @@ export type AutomationSummary = {
   attentionGuidance: string;
   // the open alert, null while none is open
   alert: AutomationAlert | null;
-  // asked before each scheduled run, which starts only on a new answer;
-  // null for the plain schedule
+  // a scheduled run starts only on a new answer
   checkUrl: string | null;
-  // the last check and what it found; null until the URL is checked
   lastCheckedAt: number | null;
   lastCheckResult: CheckResult | null;
-  // the last check that answered 200, 204 or 304, or when the URL was
-  // set: a check silent since CHECK_SILENCE_MS opens the alert
+  // the last answer, or when the URL was set: silence counts from it
   lastAnsweredAt: number | null;
   // a run a restart cut starts again at the next start
   rerunOnRestart: boolean;
@@ -109,13 +106,12 @@ export type AutomationAlert = {
 
 // an MCP server's URL rule, its length included
 export const MAX_CHECK_URL = MAX_MCP_URL;
-// a failed check opens the alert once no check answered for this long
+// a failed check opens the alert only after this long unanswered
 export const CHECK_SILENCE_MS = 30 * 60_000;
 
 // nothing new: 204, 304, an empty 200 or the same body as the last run's
 export const CHECK_QUIET = ["204", "304", "empty", "unchanged"] as const;
-// a check that failed for no status of its own; the page says "Check
-// failed 3m ago: " and the phrase
+// shown after "Check failed 3m ago: "
 export const CHECK_FAILURES = [
   "redirected outside its credential's URL",
   "redirected away from its MCP server",
@@ -132,7 +128,7 @@ export const CHECK_FAILURES = [
 ] as const;
 export type CheckQuiet = (typeof CHECK_QUIET)[number];
 export type CheckFailure = (typeof CHECK_FAILURES)[number] | `HTTP ${number}`;
-// "200" is a new answer, which started a run
+// "200" is a new answer
 export type CheckResult = "200" | CheckQuiet | CheckFailure;
 
 export const isCheckQuiet = (result: string): result is CheckQuiet =>
@@ -142,7 +138,6 @@ export const isCheckFailure = (result: string): result is CheckFailure =>
   (CHECK_FAILURES as readonly string[]).includes(result) ||
   /^HTTP \d{3}$/.test(result);
 
-// what the alert says of a failed check
 export const CHECK_ALERT_LEAD = "The check failed: ";
 
 // the skipped event's reason for a failed check

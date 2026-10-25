@@ -72,7 +72,7 @@ const CHECK_URL_WORDS: Record<string, string> = {
     "Check URL must not hold a user or a fragment",
 };
 
-// an MCP server's URL rule; null or empty for the plain schedule
+// an MCP server's URL rule
 function checkUrl(value: unknown): string | null {
   if (value === null || value === "") return null;
   try {

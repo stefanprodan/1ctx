@@ -3,11 +3,8 @@
 
 import type { Migration } from "../migration.ts";
 
-// A scheduled task's check URL, asked before each scheduled run: the
-// validators and body hash of the answer that started its last run, the
-// last check and its result, the last check that answered, and when a
-// failed check opened or joined the open alert, kept while dismissed.
-// Added columns only, so no row is copied.
+// An automation's check URL and its state. check_alert_at outlives a
+// dismiss. Added columns only, so no row is copied.
 export const m0077: Migration = {
   id: "0077-automation-check",
   up(db) {

@@ -36,9 +36,8 @@ export function validators(db: Db, id: string): Validators {
   };
 }
 
-// at a run's end, while the row is as its answer saw it: a new URL,
-// even one changed back, cleared them, and a missed save only repeats
-// a run
+// only while the row is unedited: a new URL, even one changed back,
+// cleared them. A missed save only repeats a run
 export function saveValidators(
   db: Db,
   id: string,
@@ -79,8 +78,8 @@ export function recordCheck(
   );
 }
 
-// a URL that answered while its run could not start, which clears the
-// check's part of the alert as any answer; false when the URL changed
+// an answer whose run could not start still clears the check's alert;
+// false when the URL changed
 export function noteAnswer(
   db: Db,
   id: string,
@@ -98,8 +97,7 @@ export function noteAnswer(
   return noted;
 }
 
-// an answer clears the check's mark, and closes an alert the check
-// opened that no marked run belongs to; one a run opened stays
+// closes the check's alert unless a marked run belongs to it
 export function checkAnswered(db: Db, id: string): void {
   db.query(
     `update automations set check_alert_at = null,
@@ -109,8 +107,7 @@ export function checkAnswered(db: Db, id: string): void {
   ).run(id);
 }
 
-// a check silent too long: opened when none is open and no dismissed
-// mark is left, joined when one is open; null for a dismissed one
+// null while a dismissed check's mark is left
 export function checkFailed(
   db: Db,
   id: string,

@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A scheduled fire's check (docs/automations.md, The check): one GET in
-// flight per automation, never awaited by the pass, its answer held for
-// the pass its wake starts, and a new answer's validators kept by its
-// run until that run ends.
+// flight per automation, never awaited by the pass; its answer waits for
+// the pass its wake starts.
 
 import {
   type AutomationSummary,
@@ -39,8 +38,7 @@ import {
 import { nextFire } from "./schedule.ts";
 import { type AutomationStore, automationChanged } from "./store.ts";
 
-// an answer and the row it was asked for: an edit, a move of the due
-// time or a suspend since makes it stale
+// an edit, a move of the due time or a suspend makes it stale
 export type Held = {
   answer: CheckAnswer;
   url: string;
@@ -61,8 +59,7 @@ export type CheckDeps = {
   wake(): void;
 };
 
-// the row as the held answer saw it, and its due time now; null when
-// stale
+// the due time when the row is as the held answer saw it, else null
 export type Due = (row: AutomationSummary, held: Held) => number | null;
 
 export function checks(deps: CheckDeps) {
@@ -71,7 +68,7 @@ export function checks(deps: CheckDeps) {
     { abort: AbortController; done: Promise<void> }
   >();
   const ready = new Map<string, Held>();
-  // a new answer's validators, saved when its run ends
+  // saved only when the run ends, so a cut run asks the same again
   const seen = new Map<
     string,
     Validators & { automationId: string; editRevision: number; cut: boolean }
@@ -108,8 +105,8 @@ export function checks(deps: CheckDeps) {
         );
         if (answer !== null && !abort.signal.aborted) keep(answer);
       } catch (err) {
-        // the message may name the URL; a failed answer moves next_at, so
-        // the row never asks again at once
+        // the message may name the URL. A failed answer moves next_at,
+        // so the row never asks again at once
         const { error: _, ...fields } = errorFields(err);
         deps.log.error("check error", { automation: row.id, ...fields });
         if (!abort.signal.aborted) keep({ result: "could not connect" });
@@ -121,8 +118,8 @@ export function checks(deps: CheckDeps) {
     flying.set(row.id, { abort, done });
   };
 
-  // the alert's side of a failure: silent past CHECK_SILENCE_MS opens
-  // it, or joins one open; a dismissed one stays closed
+  // only a check silent past CHECK_SILENCE_MS opens or joins the alert;
+  // a dismissed one stays closed
   const silent = (row: AutomationSummary, now: number): BusEvent[] => {
     if (
       row.lastAnsweredAt !== null &&
@@ -147,9 +144,7 @@ export function checks(deps: CheckDeps) {
     ];
   };
 
-  // a quiet or failed answer: the row's check recorded, next_at moved
-  // when the fire was the schedule's, and a failure's skipped event;
-  // false when the answer was stale
+  // a quiet or failed answer; false when it was stale
   const settle = (
     id: string,
     source: EventSource,
@@ -216,8 +211,8 @@ export function checks(deps: CheckDeps) {
     drop(id: string) {
       ready.delete(id);
     },
-    // a new answer whose run did not start: the URL answered, so the
-    // silence restarts, though nothing it said is kept
+    // a new answer whose run did not start restarts the silence, though
+    // nothing it said is kept
     answered(id: string, held: Held) {
       try {
         transact(deps.db, () => {
@@ -237,12 +232,10 @@ export function checks(deps: CheckDeps) {
         });
       }
     },
-    // the answers of rows no longer due or listed go
     prune(due: Set<string>) {
       for (const id of ready.keys()) if (!due.has(id)) ready.delete(id);
     },
-    // in the fire's transaction, once its run started: the check
-    // recorded and the check's alert closed
+    // in the fire's transaction, once its run started
     started(id: string) {
       checkAnswered(deps.db, id);
       recordCheck(deps.db, id, {
@@ -251,7 +244,7 @@ export function checks(deps: CheckDeps) {
         answered: true,
       });
     },
-    // after the fire's commit: the run holds its answer's validators
+    // after the fire's commit
     hold(sessionId: string, automationId: string, held: Held) {
       const answer = held.answer as NewAnswer;
       seen.set(sessionId, {
@@ -264,13 +257,13 @@ export function checks(deps: CheckDeps) {
       });
     },
     // in the run's last transaction: a shutdown reached its work after
-    // the answer, so the run counts as cut
+    // the answer, so its validators are not saved
     interrupted(sessionId: string): void {
       const kept = seen.get(sessionId);
       if (kept !== undefined) kept.cut = true;
     },
-    // a run's end saves what its answer said, but for a run a shutdown
-    // or a restart cut, whose answer the next check repeats
+    // a run a shutdown or restart cut saves nothing, so the next check
+    // repeats its answer
     ended(sessionId: string, cut: () => boolean): void {
       const kept = seen.get(sessionId);
       if (kept === undefined) return;

@@ -78,7 +78,7 @@ export function size(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// the path line a kept whole ends with, a check's answer's too
+// shared with a check's answer
 export function wholeLine(
   what: string,
   path: string,

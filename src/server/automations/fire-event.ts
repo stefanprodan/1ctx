@@ -21,7 +21,7 @@ export type FireDeps = {
     isMember(projectId: string, userId: string): boolean;
   };
   agents: { byId(id: string): AgentRow | null };
-  // the limit a new answer's start in the first message is cut to
+  // how much of a new answer the first message holds
   resultCut(): number;
 };
 
@@ -60,8 +60,6 @@ export function manualFor(
   return { user: actor, project, agent };
 }
 
-// a new answer's run starts with it; any other run with the
-// instructions alone
 function firstMessage(
   deps: FireDeps,
   row: AutomationSummary,

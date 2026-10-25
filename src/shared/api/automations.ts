@@ -53,8 +53,7 @@ export type SaveAutomationRequest = {
   once?: boolean;
   attentionMode?: AttentionMode;
   attentionGuidance?: string;
-  // http or https, no user info or fragment, at most MAX_CHECK_URL;
-  // null when absent on create; null or empty for the plain schedule
+  // null or empty for none; absent on create is null
   checkUrl?: string | null;
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest> & {

@@ -98,13 +98,11 @@ export type AlertEmail = {
   project: { name: string; kind: "personal" | "team" };
   // the run's reason, null for a decider's mark, which gives none
   reason: string | null;
-  // the run that opened it; a failed check names none, and the email
-  // opens the automation's page
+  // null for a failed check, whose email opens the automation
   sessionId: string | null;
   automationId: string;
 };
 
-// where an automation's page opens in the app
 export const automationPath = (automationId: string): string =>
   `/automations/${encodeURIComponent(automationId)}`;
 

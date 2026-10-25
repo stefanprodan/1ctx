@@ -198,9 +198,8 @@ export class AutomationStore {
 
   // a save that changed a field: its editor owns the row from now on
   update(id: string, fields: AutomationEdit): AutomationSummary | null {
-    // a new URL starts afresh: nothing seen, not checked, its silence
-    // counted from now, and the old URL's part of the alert gone, closing
-    // it when no marked run belongs to it, as an answer would
+    // a new URL starts afresh, and the old URL's alert closes as an
+    // answer would close it
     this.db
       .query(
         `update automations set check_url = ?, check_etag = null,

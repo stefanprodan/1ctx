@@ -58,7 +58,6 @@ export type AutomationsDeps = {
   markAttention(sessionId: string, attention: number, by: string): boolean;
   // the owner's email when an alert opens; none emails nobody
   email?: Pick<AlertEmailDeps, "outbox" | "canOpen">;
-  // what a check URL is asked with
   check: CheckPorts;
 };
 
@@ -79,7 +78,6 @@ export type Automations = {
   // open alert, and the revision when the row named the run, whose link
   // the foreign key cleared
   runDeleted(run: DeletedRun): BusEvent[];
-  // a run a shutdown reached after its answer keeps no check answer
   runInterrupted(sessionId: string): void;
   start(): number;
   drain(): void;

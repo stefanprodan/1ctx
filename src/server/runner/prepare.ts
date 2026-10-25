@@ -129,7 +129,7 @@ export function prepareSend(fields: {
   kind: Exclude<SendKind, "post">;
   origin: SessionOrigin;
   automationId: string | null;
-  // the first message's files, a run's check answer; a fresh session's
+  // a fresh session's first message files, as a check's answer
   kept?: readonly KeptFile[];
   now: number;
 }): PreparedRun {

@@ -1,12 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A check's GET and what its answer says (docs/automations.md, The
-// check). It reaches what the run's own tools could: an MCP server's
-// origin with its bearer, else the web as curl would, signed by the
-// project credential the URL is under, redirects followed under the
-// same rules. No error's message is kept, since one may name the URL
-// and its query.
+// A check's GET and its answer (docs/automations.md, The check). It
+// reaches only what the run's tools could: a linked MCP server with its
+// bearer, else the web as curl would, signed by the matching project
+// credential. No error message is kept: one may name the URL's query.
 
 import { credentialKey, mcpKey, WEB } from "../../shared/capabilities.ts";
 import type {
@@ -28,7 +26,7 @@ import { scrubValues } from "../lib/log.ts";
 import type { Fetcher } from "../providers/index.ts";
 
 export const CHECK_TIMEOUT_MS = 10_000;
-// the hops a check follows, as curl's redirects
+// as many hops as curl follows
 export const CHECK_REDIRECTS = 5;
 export const MAX_CHECK_BYTES = 4 * 1024 * 1024;
 
@@ -75,8 +73,7 @@ export type CheckAnswer =
   | { result: CheckFailure }
   | NewAnswer;
 
-// what signs the GET, and where its key may go: a credential's prefix,
-// an MCP server's origin, or nowhere for an unsigned check
+// scope is where the key may go; null for an unsigned check
 export type Signing = {
   headers: Record<string, string>;
   scope: { prefix: string } | { origin: string } | null;
@@ -185,7 +182,6 @@ export function hop(
   return webRefusal(ports, ask, next);
 }
 
-// the body up to max bytes, or null past it
 async function readUpTo(
   response: Response,
   max: number,
@@ -222,8 +218,8 @@ function textOf(bytes: Uint8Array): string | null {
   }
 }
 
-// white space, [], {} or null: a list or a search with nothing in it.
-// A linear match, whatever white space the brackets hold
+// a list or a search with nothing in it. Linear, whatever white space
+// the brackets hold
 const EMPTY = /^(?:\[[ \t\n\r]*\]|\{[ \t\n\r]*\}|null)?$/;
 
 function isEmpty(text: string): boolean {
@@ -258,8 +254,7 @@ export async function answerOf(
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 
-// the GET and its answer, redirects followed as curl follows them; null
-// when the signal, a drain, ended it
+// null when the signal, a drain, ended it
 export async function check(
   ports: CheckPorts,
   clock: Clock,

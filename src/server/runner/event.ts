@@ -20,7 +20,7 @@ export type Event = {
     disabledCapabilities: string[];
   };
   instructions: string;
-  // kept files of the first message, as a check's answer
+  // the first message's kept files, as a check's answer
   kept?: readonly KeptFile[];
   dueAt: number;
   deadlineMs: number | null;
