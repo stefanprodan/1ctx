@@ -68,7 +68,7 @@ async function endRun(chat: ChatApp, sessionId: string) {
   await sessionSettled(chat.app, sessionId);
 }
 
-// a done run of the automation its agent marked, ended at at
+// a done run its agent marked
 const markedRun = (chat: ChatApp, id: string, sessionId: string, at: number) =>
   chat.app.db
     .query(
@@ -916,7 +916,7 @@ describe("a silent check's alert", () => {
     }
   });
 
-  test("a dismissed one stays closed while failing, and opens after an answer and a new silence", async () => {
+  test("a dismissed one stays closed until an answer and a new silence", async () => {
     const { chat, host, automation } = await checkApp();
     try {
       host.answer(() => new Response("down", { status: 503 }));

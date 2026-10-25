@@ -469,7 +469,6 @@ function alertMoved(
   const held = list.value;
   if (held === null) return;
   const rows = alertFrame(held.rows, ev.automation);
-  // a failed check's alert has no run envelope to place its line
   if (unplacedCheck(held.rows, ev.automation)) flight.ask();
   else if (rows !== held.rows) list.value = { ...held, rows };
 }
