@@ -278,7 +278,6 @@ export function scheduler(deps: Deps): Scheduler {
         return null;
       }
       if (held !== undefined && held.answer.result !== "200") {
-        cut.delete(id);
         try {
           deps.checks.settle(id, source, held, (current) =>
             fresh(current, source, held!),
@@ -289,11 +288,17 @@ export function scheduler(deps: Deps): Scheduler {
             ...errorFields(err),
           });
         }
+        // after settle, which reads the listing to tell a rerun is due
+        cut.delete(id);
         return null;
       }
     }
     try {
       const result = attempt(id, source, null, held);
+      // a new answer that started nothing still answered
+      if (held !== undefined && (result === null || "wait" in result)) {
+        deps.checks.answered(id, held);
+      }
       if (result !== null && "wait" in result) {
         waits.block(id, result, seen, deps.clock());
         return null;

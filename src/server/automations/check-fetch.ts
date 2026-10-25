@@ -1,11 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A check's one GET and what its answer says (docs/automations.md, The
+// A check's GET and what its answer says (docs/automations.md, The
 // check). It reaches what the run's own tools could: an MCP server's
 // origin with its bearer, else the web as curl would, signed by the
-// project credential the URL is under. No error's message is kept,
-// since one may name the URL and its query.
+// project credential the URL is under, redirects followed under the
+// same rules. No error's message is kept, since one may name the URL
+// and its query.
 
 import { credentialKey, mcpKey, WEB } from "../../shared/capabilities.ts";
 import type {
@@ -25,6 +26,8 @@ import { sha256 } from "../lib/ids.ts";
 import type { Fetcher } from "../providers/index.ts";
 
 export const CHECK_TIMEOUT_MS = 10_000;
+// the hops a check follows, as curl's redirects
+export const CHECK_REDIRECTS = 5;
 export const MAX_CHECK_BYTES = 4 * 1024 * 1024;
 
 export type CheckPorts = {
@@ -70,11 +73,36 @@ export type CheckAnswer =
   | { result: CheckFailure }
   | NewAnswer;
 
-// the headers that sign the GET, or why it may not go
+// what signs the GET, and where its key may go: a credential's prefix,
+// an MCP server's origin, or nowhere for an unsigned check
+export type Signing = {
+  headers: Record<string, string>;
+  scope: { prefix: string } | { origin: string } | null;
+};
+
+const UNSIGNED: Signing = { headers: {}, scope: null };
+
+// the web row and the task's web switch, as curl's sandbox has them
+function webRefusal(
+  ports: Pick<CheckPorts, "web">,
+  ask: Pick<CheckAsk, "disabled">,
+  url: URL,
+): CheckFailure | null {
+  const web = ports.web();
+  if (web.mode === "off" || ask.disabled.includes(WEB)) {
+    return "web access is off";
+  }
+  if (web.mode === "listed" && !originAllowed(url, web.domains)) {
+    return "host is not in Web access";
+  }
+  return null;
+}
+
+// what signs the GET to the check URL, or why it may not go
 export function reach(
   ports: Omit<CheckPorts, "fetch">,
   ask: CheckAsk,
-): Record<string, string> | CheckFailure {
+): Signing | CheckFailure {
   const url = new URL(ask.url);
   const linked = new Set(
     ask.servers
@@ -89,32 +117,60 @@ export function reach(
     );
   if (server !== undefined) {
     const key = server.keyName === null ? null : ports.mcpKey(server.keyName);
-    return key === null ? {} : { authorization: `Bearer ${key}` };
+    return key === null
+      ? UNSIGNED
+      : {
+          headers: { authorization: `Bearer ${key}` },
+          scope: { origin: url.origin },
+        };
   }
-  const web = ports.web();
-  if (web.mode === "off" || ask.disabled.includes(WEB)) {
-    return "needs web access";
-  }
-  if (web.mode === "listed" && !originAllowed(url, web.domains)) {
-    return "host not listed";
-  }
-  if (url.protocol !== "https:") return {};
+  const refused = webRefusal(ports, ask, url);
+  if (refused !== null) return refused;
+  if (url.protocol !== "https:") return UNSIGNED;
   const credential = ports
     .credentials(ask.projectId)
     .find((row) => underPrefix(ask.url, row.prefix));
-  // one turned off, keyless or without GET goes unsigned, as webfetch
-  // would send it
-  if (
-    credential === undefined ||
-    ask.disabled.includes(credentialKey(credential.id)) ||
-    !credential.methods.includes("GET")
-  ) {
-    return {};
+  if (credential === undefined) return UNSIGNED;
+  // curl refuses a prefix whose credential is off or keyless
+  if (ask.disabled.includes(credentialKey(credential.id))) {
+    return "its credential is turned off";
   }
+  // one that signs no GET leaves it unsigned, as webfetch would send it
+  if (!credential.methods.includes("GET")) return UNSIGNED;
   const read = ports.readKey(credential.keyName);
-  return read.ok
-    ? { [credential.header]: headerValue(credential.template, read.key) }
-    : {};
+  if (!read.ok) return "its credential has no key";
+  return {
+    headers: {
+      [credential.header]: headerValue(credential.template, read.key),
+    },
+    scope: { prefix: credential.prefix },
+  };
+}
+
+// a redirect's next hop, or why the check stops there. A signed check
+// stays inside its key's scope; an unsigned one meets the web rules on
+// every hop and stays unsigned, a credential's prefix included
+export function hop(
+  ports: Pick<CheckPorts, "web">,
+  ask: Pick<CheckAsk, "disabled">,
+  signing: Signing,
+  next: URL,
+): CheckFailure | null {
+  if (next.protocol !== "http:" && next.protocol !== "https:") {
+    return "could not connect";
+  }
+  const scope = signing.scope;
+  if (scope !== null && "prefix" in scope) {
+    return underPrefix(next.href, scope.prefix)
+      ? null
+      : "redirected outside its credential's URL";
+  }
+  if (scope !== null) {
+    return next.origin === scope.origin
+      ? null
+      : "redirected away from its MCP server";
+  }
+  return webRefusal(ports, ask, next);
 }
 
 // the body up to max bytes, or null past it
@@ -179,7 +235,6 @@ export async function answerOf(
   if (status !== 200) {
     await response.body?.cancel().catch(() => {});
     if (status === 204 || status === 304) return { result: `${status}` };
-    if (status >= 300 && status < 400) return { result: "redirected" };
     return { result: `HTTP ${status}` };
   }
   const bytes = await readUpTo(response, ask.maxBytes);
@@ -198,7 +253,10 @@ export async function answerOf(
   };
 }
 
-// the GET and its answer; null when the signal, a drain, ended it
+const REDIRECTS = new Set([301, 302, 303, 307, 308]);
+
+// the GET and its answer, redirects followed as curl follows them; null
+// when the signal, a drain, ended it
 export async function check(
   ports: CheckPorts,
   clock: Clock,
@@ -207,7 +265,8 @@ export async function check(
 ): Promise<CheckAnswer | null> {
   const signing = reach(ports, ask);
   if (typeof signing === "string") return { result: signing };
-  const headers: Record<string, string> = { ...signing };
+  // the validators belong to the check URL's answer, wherever it ends
+  const headers: Record<string, string> = { ...signing.headers };
   if (ask.etag !== null) headers["if-none-match"] = ask.etag;
   if (ask.lastModified !== null) {
     headers["if-modified-since"] = ask.lastModified;
@@ -216,26 +275,36 @@ export async function check(
   const stop = () => controller.abort();
   signal.addEventListener("abort", stop, { once: true });
   let timedOut = false;
+  // one timeout for the whole chain
   const timer = sleep(clock, CHECK_TIMEOUT_MS);
   void timer.promise.then(() => {
     timedOut = true;
     controller.abort();
   });
   try {
-    // a 3xx is never followed, so a key never goes elsewhere
-    const response = await ports.fetch(ask.url, {
-      method: "GET",
-      headers,
-      redirect: "error",
-      signal: controller.signal,
-    });
-    return await answerOf(response, ask);
-  } catch (err) {
+    let url = new URL(ask.url);
+    for (let hops = 0; ; hops++) {
+      const response = await ports.fetch(url.href, {
+        method: "GET",
+        headers,
+        redirect: "manual",
+        signal: controller.signal,
+      });
+      const location = response.headers.get("location");
+      if (!REDIRECTS.has(response.status) || location === null) {
+        return await answerOf(response, ask);
+      }
+      await response.body?.cancel().catch(() => {});
+      if (hops === CHECK_REDIRECTS) return { result: "too many redirects" };
+      const next = URL.parse(location, url);
+      if (next === null) return { result: "could not connect" };
+      const refused = hop(ports, ask, signing, next);
+      if (refused !== null) return { result: refused };
+      url = next;
+    }
+  } catch {
     if (signal.aborted) return null;
     if (timedOut) return { result: "timed out" };
-    if ((err as { code?: unknown }).code === "UnexpectedRedirect") {
-      return { result: "redirected" };
-    }
     return { result: "could not connect" };
   } finally {
     timer.cancel();

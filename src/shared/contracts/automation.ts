@@ -114,15 +114,20 @@ export const CHECK_SILENCE_MS = 30 * 60_000;
 
 // nothing new: 204, 304, an empty 200 or the same body as the last run's
 export const CHECK_QUIET = ["204", "304", "empty", "unchanged"] as const;
-// a check that failed for no status of its own
+// a check that failed for no status of its own; the page says "Check
+// failed: " and the phrase
 export const CHECK_FAILURES = [
-  "redirected",
+  "redirected outside its credential's URL",
+  "redirected away from its MCP server",
+  "too many redirects",
   "timed out",
   "could not connect",
   "answer too large",
   "answer is not text",
-  "needs web access",
-  "host not listed",
+  "web access is off",
+  "host is not in Web access",
+  "its credential is turned off",
+  "its credential has no key",
 ] as const;
 export type CheckQuiet = (typeof CHECK_QUIET)[number];
 export type CheckFailure = (typeof CHECK_FAILURES)[number] | `HTTP ${number}`;
@@ -144,8 +149,6 @@ export function checkReason(result: CheckFailure): string {
   switch (result) {
     case "timed out":
     case "could not connect":
-    case "needs web access":
-    case "host not listed":
       return `check ${result}`;
     case "answer too large":
     case "answer is not text":

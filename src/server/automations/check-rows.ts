@@ -6,7 +6,7 @@
 
 import type { CheckResult } from "../../shared/contracts/automation.ts";
 import type { Db } from "../db/index.ts";
-import { openAlertRuns } from "../sessions/index.ts";
+import { CHECK_HOLDS, openAlertRuns } from "../sessions/index.ts";
 
 // what the answer that started the last run said
 export type Validators = {
@@ -78,12 +78,30 @@ export function recordCheck(
   );
 }
 
+// a URL that answered while its run could not start; false when the
+// URL changed since
+export function noteAnswer(
+  db: Db,
+  id: string,
+  url: string,
+  at: number,
+): boolean {
+  return (
+    db
+      .query(
+        `update automations set last_answered_at = ?, revision = revision + 1
+         where id = ? and check_url = ?`,
+      )
+      .run(at, id, url).changes > 0
+  );
+}
+
 // an answer clears the check's mark, and closes an alert the check
 // opened that no marked run belongs to; one a run opened stays
 export function checkAnswered(db: Db, id: string): void {
   db.query(
     `update automations set check_alert_at = null,
-       attention_since = iif(attention_since is not null and not exists (
+       attention_since = iif(${CHECK_HOLDS} and not exists (
          select 1 ${openAlertRuns("automations")}), null, attention_since)
      where id = ? and check_alert_at is not null`,
   ).run(id);

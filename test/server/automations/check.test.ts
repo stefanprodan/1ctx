@@ -21,6 +21,7 @@ import {
   chatApp,
   sessionSettled,
   setLimits,
+  until,
   waitScript,
 } from "../../helpers/chat.ts";
 import { SMTP } from "../../helpers/links.ts";
@@ -66,6 +67,17 @@ async function endRun(chat: ChatApp, sessionId: string) {
   script.reply("done");
   await sessionSettled(chat.app, sessionId);
 }
+
+// a done run of the automation its agent marked, ended at at
+const markedRun = (chat: ChatApp, id: string, sessionId: string, at: number) =>
+  chat.app.db
+    .query(
+      `insert into sessions (id, project_id, owner_id, agent_id, origin,
+         automation_id, title, status, attention, attention_reason,
+         created_at, last_activity_at)
+       values (?, ?, ?, ?, 'automation', ?, 't', 'done', 1, 'pods down', ?, ?)`,
+    )
+    .run(sessionId, chat.projectId, chat.memberId, chat.agentId, id, at, at);
 
 const checkLogs = (logs: ReturnType<typeof collectLogs>) =>
   logs.events.filter((event) => event.msg === "check failed");
@@ -189,8 +201,8 @@ describe("a check URL", () => {
         [
           () =>
             new Response(null, { status: 301, headers: { location: "/x" } }),
-          "redirected",
-          "check failed: redirected",
+          "too many redirects",
+          "check failed: too many redirects",
         ],
         [
           () => {
@@ -525,6 +537,41 @@ describe("what a check saw", () => {
       await next.shutdown();
     }
   });
+  test("a restart rerun's failed check is recorded", async () => {
+    const host = checkHost();
+    const chat = await chatApp({ fetcher: host.fetcher });
+    chat.app.automationScheduler.stop();
+    const automation = await createAutomation(chat, {
+      checkUrl: URL_,
+      rerunOnRestart: true,
+    });
+    host.answer(() => json({ alerts: [1] }));
+    makeDue(chat, automation.id);
+    const pending = chat.scripted.next();
+    await fireChecked(chat, automation.id);
+    await pending;
+    await chat.app.shutdown();
+    host.answer(() => new Response("down", { status: 503 }));
+    const next = await testApp({
+      db: chat.app.db,
+      fetcher: chat.scripted.fetcher,
+      activate: true,
+    });
+    try {
+      await until(
+        () =>
+          next.automations.byId(automation.id)?.lastCheckResult === "HTTP 503",
+      );
+      expect(next.automations.byId(automation.id)).toMatchObject({
+        lastEventSource: "restart",
+        lastEventOutcome: "skipped",
+        lastEventReason: "check failed: HTTP 503",
+      });
+      expect(chat.scripted.scripts).toHaveLength(1);
+    } finally {
+      await next.shutdown();
+    }
+  });
 });
 
 describe("the reach of a check", () => {
@@ -585,11 +632,40 @@ describe("the reach of a check", () => {
       await fireChecked(chat, automation.id);
       expect(host.calls).toHaveLength(1);
       expect(row(chat, automation.id).lastEventReason).toBe(
-        "check needs web access",
+        "check failed: web access is off",
       );
       expect(JSON.stringify(row(chat, automation.id))).not.toContain(
         "mcp-secret-value",
       );
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("follows a 301 then a 302 and the last answer decides", async () => {
+    const { chat, host, automation } = await checkApp();
+    try {
+      host.answer((call) =>
+        call.url === URL_
+          ? new Response(null, { status: 301, headers: { location: "/v2" } })
+          : call.url === `${CHECK_URL}/v2`
+            ? new Response(null, {
+                status: 302,
+                headers: { location: `${CHECK_URL}/v3` },
+              })
+            : new Response(null, { status: 204 }),
+      );
+      await chat.admin.call("PATCH", "/api/tools/web", {
+        body: { mode: "listed", domains: ["check.test"] },
+      });
+      makeDue(chat, automation.id);
+      await fireChecked(chat, automation.id);
+      expect(host.calls.map((call) => call.url)).toEqual([
+        URL_,
+        `${CHECK_URL}/v2`,
+        `${CHECK_URL}/v3`,
+      ]);
+      expect(row(chat, automation.id).lastCheckResult).toBe("204");
     } finally {
       await chat.app.shutdown();
     }
@@ -622,13 +698,13 @@ describe("the reach of a check", () => {
       makeDue(chat, automation.id);
       await fireChecked(chat, automation.id);
       expect(row(chat, automation.id).lastEventReason).toBe(
-        "check host not listed",
+        "check failed: host is not in Web access",
       );
       await edit({ checkUrl: URL_, disabledCapabilities: ["web"] });
       makeDue(chat, automation.id);
       await fireChecked(chat, automation.id);
       expect(row(chat, automation.id).lastEventReason).toBe(
-        "check needs web access",
+        "check failed: web access is off",
       );
       expect(host.calls).toHaveLength(1);
     } finally {
@@ -864,6 +940,92 @@ describe("a silent check's alert", () => {
       chat.app.now.value += 30 * 60_000;
       await fail(chat, automation.id);
       expect(row(chat, automation.id).alert?.check).toBe(true);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a new URL takes the old one's part of the alert with it", async () => {
+    const { chat, host, automation } = await checkApp();
+    try {
+      host.answer(() => new Response("down", { status: 503 }));
+      chat.app.now.value += 3_600_000;
+      await fail(chat, automation.id);
+      expect(row(chat, automation.id).alert?.check).toBe(true);
+      const patch = (checkUrl: string | null) =>
+        chat.member.call("PATCH", `/api/automations/${automation.id}`, {
+          body: {
+            editRevision: row(chat, automation.id).editRevision,
+            checkUrl,
+          },
+        });
+      expect((await patch(`${CHECK_URL}/other`)).status).toBe(200);
+      expect(row(chat, automation.id).alert).toBeNull();
+
+      // with a marked run the run's alert stays, the check's part gone
+      chat.app.now.value += 3_600_000;
+      await fail(chat, automation.id);
+      const at = chat.app.now.value;
+      markedRun(chat, automation.id, "marked2", at);
+      expect((await patch(null)).status).toBe(200);
+      expect(row(chat, automation.id).alert).toMatchObject({
+        runs: 1,
+        reason: "pods down",
+        check: false,
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a dismissed check's mark never claims a run's later alert", async () => {
+    const { chat, host, automation } = await checkApp();
+    try {
+      host.answer(() => new Response("down", { status: 503 }));
+      chat.app.now.value += 3_600_000;
+      await fail(chat, automation.id);
+      await chat.member.call(
+        "POST",
+        `/api/automations/${automation.id}/dismiss`,
+      );
+      chat.app.now.value += 60_000;
+      const at = chat.app.now.value;
+      chat.app.db
+        .query("update automations set attention_since = ? where id = ?")
+        .run(at, automation.id);
+      markedRun(chat, automation.id, "marked3", at);
+      expect(row(chat, automation.id).alert).toMatchObject({
+        runs: 1,
+        reason: "pods down",
+        check: false,
+      });
+      const gone = await chat.member.call("DELETE", "/api/sessions/marked3");
+      expect(gone.status).toBe(200);
+      expect(row(chat, automation.id).alert).toBeNull();
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a new answer that could not run still ends the silence", async () => {
+    const { chat, host, automation } = await checkApp();
+    try {
+      chat.app.now.value += 3_600_000;
+      const start = chat.app.runner.startRun;
+      chat.app.runner.startRun = () => {
+        throw new RunCapacity("process", "full");
+      };
+      host.answer(() => json({ alerts: [1] }));
+      await fail(chat, automation.id);
+      chat.app.runner.startRun = start;
+      expect(row(chat, automation.id)).toMatchObject({
+        lastAnsweredAt: chat.app.now.value,
+        lastCheckedAt: null,
+      });
+      host.answer(() => new Response("down", { status: 503 }));
+      chat.app.now.value += 60_000;
+      await fail(chat, automation.id);
+      expect(row(chat, automation.id).alert).toBeNull();
     } finally {
       await chat.app.shutdown();
     }

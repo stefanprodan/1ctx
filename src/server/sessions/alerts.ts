@@ -22,10 +22,17 @@ const alertRuns = (automations: string, pick: string, where = "") =>
   `(select ${pick} ${openAlertRuns(automations)}${where}
      order by marked.last_activity_at desc, marked.id limit 1)`;
 
+// the check opened or joined the open alert: a mark older than it is a
+// dismissed check's, which a run's alert opened since never belonged to
+export const checkHolds = (automations: string) =>
+  `${automations}.attention_since is not null
+     and ${automations}.check_alert_at >= ${automations}.attention_since`;
+export const CHECK_HOLDS = checkHolds("automations");
+
 // the check's failure is the open alert's latest word: no marked run of
 // it ended after the check last opened or joined it
 const checkLatest = (automations: string) =>
-  `${automations}.check_alert_at is not null and not exists (select 1
+  `${checkHolds(automations)} and not exists (select 1
      ${openAlertRuns(automations)}
        and marked.last_activity_at > ${automations}.check_alert_at)`;
 
@@ -49,8 +56,7 @@ export const alertColumns = (automations: string) =>
      when ${checkLatest(automations)} then null
      else ${alertRuns(automations, "marked.attention_by")}
    end as alert_by,
-   ${automations}.attention_since is not null
-     and ${automations}.check_alert_at is not null as alert_check`;
+   coalesce(${checkHolds(automations)}, 0) as alert_check`;
 
 export type RawAlert = {
   alert_since: number | null;

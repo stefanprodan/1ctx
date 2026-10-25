@@ -7,6 +7,7 @@ import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { AlertChange } from "../runner/index.ts";
 import {
+  CHECK_HOLDS,
   endedAfter,
   openAlertRuns,
   type SessionStore,
@@ -88,7 +89,7 @@ const closeEmpty = (db: Db, id: string) =>
     .query(
       `update automations set attention_since = null, revision = revision + 1
        where id = ? and attention_since is not null
-         and check_alert_at is null and not exists (
+         and not coalesce(${CHECK_HOLDS}, 0) and not exists (
          select 1 ${openAlertRuns("automations")})`,
     )
     .run(id).changes > 0;

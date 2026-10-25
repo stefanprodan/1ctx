@@ -30,6 +30,7 @@ import {
 import {
   checkAnswered,
   checkFailed,
+  noteAnswer,
   recordCheck,
   saveValidators,
   type Validators,
@@ -110,7 +111,7 @@ export function checks(deps: CheckDeps) {
         // the message may name the URL; a failed answer moves next_at, so
         // the row never asks again at once
         const { error: _, ...fields } = errorFields(err);
-        deps.log.error("check failed", { automation: row.id, ...fields });
+        deps.log.error("check error", { automation: row.id, ...fields });
         if (!abort.signal.aborted) keep({ result: "could not connect" });
       } finally {
         flying.delete(row.id);
@@ -212,6 +213,27 @@ export function checks(deps: CheckDeps) {
     },
     drop(id: string) {
       ready.delete(id);
+    },
+    // a new answer whose run did not start: the URL answered, so the
+    // silence restarts, though nothing it said is kept
+    answered(id: string, held: Held) {
+      try {
+        transact(deps.db, () => {
+          if (!noteAnswer(deps.db, id, held.url, deps.clock())) {
+            return { result: undefined };
+          }
+          const row = deps.store.byId(id);
+          return {
+            result: undefined,
+            events: row === null ? [] : [automationChanged(row)],
+          };
+        });
+      } catch (err) {
+        deps.log.error("check record failed", {
+          automation: id,
+          ...errorFields(err),
+        });
+      }
     },
     // the answers of rows no longer due or listed go
     prune(due: Set<string>) {

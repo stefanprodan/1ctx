@@ -62,6 +62,7 @@ import { type ChatSweep, type SweepScratch, sweepChats } from "./sweep.ts";
 export {
   alertColumns,
   alertOf,
+  CHECK_HOLDS,
   type DeletedRun,
   endedAfter,
   MARKED,

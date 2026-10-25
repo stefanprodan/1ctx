@@ -9,7 +9,11 @@ import type {
 } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
-import { forgetCapabilityIn } from "../sessions/index.ts";
+import {
+  CHECK_HOLDS,
+  forgetCapabilityIn,
+  openAlertRuns,
+} from "../sessions/index.ts";
 import { type Raw, row, SELECT } from "./row.ts";
 
 export const MAX_AUTOMATIONS_PER_PROJECT = 20;
@@ -195,14 +199,17 @@ export class AutomationStore {
   // a save that changed a field: its editor owns the row from now on
   update(id: string, fields: AutomationEdit): AutomationSummary | null {
     // a new URL starts afresh: nothing seen, not checked, its silence
-    // counted from now, and a dismissed check's mark dropped
+    // counted from now, and the old URL's part of the alert gone, closing
+    // it when no marked run belongs to it, as an answer would
     this.db
       .query(
         `update automations set check_url = ?, check_etag = null,
            check_last_modified = null, check_body_hash = null,
            last_checked_at = null, last_check_result = null,
            last_answered_at = iif(? is null, null, ?),
-           check_alert_at = iif(attention_since is null, null, check_alert_at)
+           check_alert_at = null,
+           attention_since = iif(${CHECK_HOLDS} and not exists (
+             select 1 ${openAlertRuns("automations")}), null, attention_since)
          where id = ? and check_url is not ?`,
       )
       .run(fields.checkUrl, fields.checkUrl, fields.now, id, fields.checkUrl);

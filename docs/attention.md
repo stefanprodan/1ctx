@@ -121,8 +121,10 @@ none; `by` names who marked the latest.
   `CHECK_SILENCE_MS`** (`checkFailed()` in `automations/check-rows.ts`),
   measured from `last_answered_at`, so it means the same on any
   schedule. Opening or joining sets `check_alert_at`; with none open and
-  `check_alert_at` set, a dismissed check alert stays closed. The
-  summary's `alert.check` is true while it is set, and the reason is
+  `check_alert_at` set, a dismissed check alert stays closed. The check
+  holds the alert while `check_alert_at >= attention_since`
+  (`CHECK_HOLDS`), so a dismissed mark never claims a run's later alert.
+  While it holds, `alert.check` is true and the reason is
   `CHECK_ALERT_LEAD` and `last_check_result` while no marked run ended
   after it, `by` null.
 - **Only the check closes what the check opened.** An answer clears

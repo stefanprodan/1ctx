@@ -210,21 +210,29 @@ A Check URL (`checkUrl`) makes each scheduled fire ask before it runs
 (`automations/check.ts`, `check-fetch.ts`, `check-message.ts`,
 `check-rows.ts`). It is parsed as an MCP server's URL (`parseUrl()`),
 `""` or null for none. Setting or changing it clears the validators,
-`last_checked_at`, `last_check_result` and a dismissed check's mark, and
-sets `last_answered_at` to now, so silence counts from the change.
+`last_checked_at`, `last_check_result` and `check_alert_at`, closing an
+alert no marked run belongs to, and sets `last_answered_at` to now, so
+silence counts from the change.
 
 - **One GET per fire, never awaited by the pass.** The pass starts it
   and skips the row while it is in flight; the sleep leaves due rows
   out (`earliest(passAt)`) as for a cap wait, so a due row never spins
   the loop. The answer is held in memory and `wake()`s the scheduler,
   whose next fire takes it. One GET per automation at a time. A run of
-  it still going skips the fire with no GET. `redirect: "error"`, a
-  `CHECK_TIMEOUT_MS` sleep on the clock port, `If-None-Match` and
-  `If-Modified-Since` from the saved validators.
+  it still going skips the fire with no GET. One `CHECK_TIMEOUT_MS`
+  sleep on the clock port covers the whole chain; `If-None-Match` and
+  `If-Modified-Since` from the saved validators go on every hop.
+- **Redirects are followed as curl follows them,** by hand
+  (`redirect: "manual"`), at most `CHECK_REDIRECTS` hops, http and https
+  only (`hop()`). A signed check stays inside its credential's prefix or
+  its MCP server's origin, so no key reaches another origin; an
+  unsigned one meets the web rules on every hop and stays unsigned, a
+  prefix included. The final answer decides.
 - **A held answer is dropped, never kept for later.** The fire's
   transaction reads the row again: a moved edit revision, URL or due
   time, a suspend, a full cap or a run going drops it and writes
-  nothing, so the row stays due and the next try asks again. A pass
+  nothing but `last_answered_at` for a new answer (`noteAnswer()`), so
+  the row stays due and the next try asks again. A pass
   that skips a full project's row drops its answer too. A drain aborts
   every GET; the rows are deferred as any due row. Run now never asks.
   A restart rerun asks, since its answer's validators were never saved.
@@ -244,19 +252,19 @@ sets `last_answered_at` to now, so silence counts from the change.
   the run's end (`onRunEnd()`) while the row still asks that URL, unless
   a shutdown or a restart cut the run: then the next check repeats it.
 - **Every failure is a skipped event with a fixed reason**
-  (`checkReason()`): `HTTP <status>`, `redirected`, `timed out`, `could
-  not connect`, `answer too large`, `answer is not text`, `needs web
-  access`, `host not listed` (`CHECK_FAILURES`). Never a fetch error's
+  (`checkReason()` over `HTTP <status>` or a `CHECK_FAILURES` phrase,
+  which the page shows after "Check failed: "). Never a fetch error's
   message, which may hold the URL. One `check failed` log line with the
-  id, result and duration; the URL is never a field.
+  id, result and duration, `check error` for an internal one; the URL
+  is never a field.
 - **The check reaches what the run's tools could** (`reach()`). An MCP
   server linked to the agent and not turned off for the task, on the
   URL's origin, gets its bearer from its `mcp-` file and ignores the web
   row. Otherwise the web row and the task's `web` switch must allow it,
   and in `listed` mode `originAllowed()`. An `https:` URL under a
-  project credential's prefix (`underPrefix()`) carries its header when
-  the credential is on for the task, allows GET and its key reads;
-  otherwise the GET goes unsigned, as webfetch would send it.
+  project credential's prefix (`underPrefix()`) carries its header. As
+  curl refuses the prefix, a credential the task turned off or whose key
+  does not read fails the check; one without GET leaves it unsigned.
 - **A check silent past `CHECK_SILENCE_MS` opens the alert** on a
   failure; see `docs/attention.md`.
 - **A quiet check moves `revision`, never the history.** The page shows

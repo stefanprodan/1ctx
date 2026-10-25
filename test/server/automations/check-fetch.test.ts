@@ -81,37 +81,36 @@ describe("a check's answer", () => {
     });
     expect((await answer(streamed)).result).toBe("answer too large");
     expect((await answer("down", { status: 503 })).result).toBe("HTTP 503");
-    expect(
-      (await answer(null, { status: 302, headers: { location: "/x" } })).result,
-    ).toBe("redirected");
+    // a redirect with nowhere to go is its status
+    expect((await answer(null, { status: 302 })).result).toBe("HTTP 302");
   });
 });
 
-describe("a check's GET", () => {
-  const clock = () => {
-    let now = 0;
-    const sleepers: { at: number; resolve: () => void }[] = [];
-    const fake = Object.assign(() => now, {
-      sleep: (ms: number, signal?: AbortSignal) =>
-        new Promise<void>((resolve) => {
-          const sleeper = { at: now + ms, resolve };
-          sleepers.push(sleeper);
-          signal?.addEventListener("abort", () => {
-            sleepers.splice(sleepers.indexOf(sleeper), 1);
-          });
-        }),
-    }) as Clock;
-    return {
-      fake,
-      sleepers,
-      ring() {
-        now += 10_000;
-        for (const sleeper of sleepers.splice(0)) sleeper.resolve();
-      },
-    };
+const clock = () => {
+  let now = 0;
+  const sleepers: { at: number; resolve: () => void }[] = [];
+  const fake = Object.assign(() => now, {
+    sleep: (ms: number, signal?: AbortSignal) =>
+      new Promise<void>((resolve) => {
+        const sleeper = { at: now + ms, resolve };
+        sleepers.push(sleeper);
+        signal?.addEventListener("abort", () => {
+          sleepers.splice(sleepers.indexOf(sleeper), 1);
+        });
+      }),
+  }) as Clock;
+  return {
+    fake,
+    sleepers,
+    ring() {
+      now += 10_000;
+      for (const sleeper of sleepers.splice(0)) sleeper.resolve();
+    },
   };
+};
 
-  test("sends the validators, never follows a redirect and times out on the clock", async () => {
+describe("a check's GET", () => {
+  test("sends the validators and times out on the clock", async () => {
     const seen: RequestInit[] = [];
     const time = clock();
     const hung = check(
@@ -134,7 +133,7 @@ describe("a check's GET", () => {
     expect(await hung).toEqual({ result: "timed out" });
     expect(seen[0]).toMatchObject({
       method: "GET",
-      redirect: "error",
+      redirect: "manual",
       headers: {
         "if-none-match": '"e1"',
         "if-modified-since": "Mon, 26 Oct 2026 06:00:00 GMT",
@@ -142,20 +141,14 @@ describe("a check's GET", () => {
     });
   });
 
-  test("a redirect refused, a refused connection and a drain", async () => {
+  test("a refused connection and a drain", async () => {
     const failing = (err: Error) =>
       ports({
         fetch: (async () => {
           throw err;
         }) as unknown as typeof fetch,
       });
-    const redirect = Object.assign(new TypeError("UnexpectedRedirect"), {
-      code: "UnexpectedRedirect",
-    });
     const signal = new AbortController().signal;
-    expect(await check(failing(redirect), clock().fake, ask, signal)).toEqual({
-      result: "redirected",
-    });
     expect(
       await check(failing(new TypeError(ask.url)), clock().fake, ask, signal),
     ).toEqual({ result: "could not connect" });
@@ -166,6 +159,15 @@ describe("a check's GET", () => {
     ).toBeNull();
   });
 });
+
+const credential = {
+  id: "c1",
+  prefix: `${CHECK_URL}/`,
+  header: "X-Api-Key",
+  template: "{key}",
+  keyName: "http-check",
+  methods: ["GET" as const],
+};
 
 describe("what a check reaches", () => {
   const mcp = {
@@ -181,45 +183,187 @@ describe("what a check reaches", () => {
 
   test("an MCP server's origin carries its bearer, the web row off", () => {
     const off = ports({ ...mcp, web: () => ({ mode: "off", domains: [] }) });
-    expect(reach(off, linked)).toEqual({ authorization: "Bearer mcp-secret" });
+    expect(reach(off, linked)).toEqual({
+      headers: { authorization: "Bearer mcp-secret" },
+      scope: { origin: CHECK_URL },
+    });
     // the task turned the server off: the web row decides
     expect(reach(off, { ...linked, disabled: ["mcp:m1"] })).toBe(
-      "needs web access",
+      "web access is off",
     );
-    expect(reach(off, ask)).toBe("needs web access");
+    expect(reach(off, ask)).toBe("web access is off");
   });
 
   test("the web as curl: off, listed hosts on default ports, credentials", () => {
     expect(reach(ports(), { ...ask, disabled: ["web"] })).toBe(
-      "needs web access",
+      "web access is off",
     );
     const listed = ports({
       web: () => ({ mode: "listed", domains: ["check.test"] }),
     });
-    expect(reach(listed, ask)).toEqual({});
+    expect(reach(listed, ask)).toEqual({ headers: {}, scope: null });
     expect(reach(listed, { ...ask, url: "https://other.test/a" })).toBe(
-      "host not listed",
+      "host is not in Web access",
     );
     expect(reach(listed, { ...ask, url: "https://check.test:8443/a" })).toBe(
-      "host not listed",
+      "host is not in Web access",
     );
     const signed = ports({
-      credentials: () => [
-        {
-          id: "c1",
-          prefix: `${CHECK_URL}/`,
-          header: "X-Api-Key",
-          template: "{key}",
-          keyName: "http-check",
-          methods: ["GET"],
-        },
-      ],
+      credentials: () => [credential],
       readKey: () => ({ ok: true, key: "http-secret" }),
     });
-    expect(reach(signed, ask)).toEqual({ "X-Api-Key": "http-secret" });
-    expect(reach(signed, { ...ask, disabled: ["credential:c1"] })).toEqual({});
-    expect(reach(signed, { ...ask, url: "http://check.test/alerts" })).toEqual(
-      {},
+    expect(reach(signed, ask)).toEqual({
+      headers: { "X-Api-Key": "http-secret" },
+      scope: { prefix: `${CHECK_URL}/` },
+    });
+    // as curl refuses the prefix by name
+    expect(reach(signed, { ...ask, disabled: ["credential:c1"] })).toBe(
+      "its credential is turned off",
+    );
+    expect(reach(ports({ credentials: () => [credential] }), ask)).toBe(
+      "its credential has no key",
+    );
+    expect(reach(signed, { ...ask, url: "http://check.test/alerts" })).toEqual({
+      headers: {},
+      scope: null,
+    });
+  });
+});
+
+describe("a check's redirects", () => {
+  // each URL's answer; a request to another is a refused connection
+  const site = (answers: Record<string, () => Response>) => {
+    const seen: { url: string; headers: Record<string, string> }[] = [];
+    const fetcher = (async (url: string, init: RequestInit) => {
+      seen.push({
+        url,
+        headers: { ...(init.headers as Record<string, string>) },
+      });
+      const answer = answers[url];
+      if (answer === undefined) throw new TypeError("unable to connect");
+      return answer();
+    }) as unknown as typeof globalThis.fetch;
+    return { seen, fetch: fetcher };
+  };
+  const moved = (status: number, location: string) => () =>
+    new Response(null, { status, headers: { location } });
+  const signal = new AbortController().signal;
+  const listed = {
+    web: () => ({
+      mode: "listed" as const,
+      domains: ["check.test", "cdn.test"],
+    }),
+  };
+
+  test("a 301 then a 302 to a listed host is followed and its answer decides", async () => {
+    const { seen, fetch } = site({
+      [ask.url]: moved(301, "/v2/alerts"),
+      [`${CHECK_URL}/v2/alerts`]: moved(302, "https://cdn.test/alerts.json"),
+      "https://cdn.test/alerts.json": () => new Response('{"alerts":[1]}'),
+    });
+    const got = await check(
+      ports({ ...listed, fetch }),
+      clock().fake,
+      { ...ask, etag: '"e1"' },
+      signal,
+    );
+    expect(got).toMatchObject({ result: "200", body: '{"alerts":[1]}' });
+    expect(seen.map((call) => call.url)).toEqual([
+      ask.url,
+      `${CHECK_URL}/v2/alerts`,
+      "https://cdn.test/alerts.json",
+    ]);
+    // the validators belong to the check URL's answer
+    expect(seen.every((call) => call.headers["if-none-match"] === '"e1"')).toBe(
+      true,
+    );
+  });
+
+  test("a hop off the listed hosts, a custom port or a sixth hop fails", async () => {
+    for (const [to, result] of [
+      ["https://other.test/a", "host is not in Web access"],
+      ["https://check.test:8443/a", "host is not in Web access"],
+      ["ftp://check.test/a", "could not connect"],
+    ] as const) {
+      const { seen, fetch } = site({ [ask.url]: moved(302, to) });
+      expect(
+        await check(ports({ ...listed, fetch }), clock().fake, ask, signal),
+      ).toEqual({ result });
+      expect(seen).toHaveLength(1);
+    }
+    const loop: Record<string, () => Response> = {};
+    for (let i = 0; i < 7; i++) {
+      loop[i === 0 ? ask.url : `${CHECK_URL}/${i}`] = moved(
+        307,
+        `${CHECK_URL}/${i + 1}`,
+      );
+    }
+    const { seen, fetch } = site(loop);
+    expect(await check(ports({ fetch }), clock().fake, ask, signal)).toEqual({
+      result: "too many redirects",
+    });
+    expect(seen).toHaveLength(6);
+  });
+
+  test("a key never reaches another origin, and an unsigned check stays unsigned", async () => {
+    const signedPorts = (fetch: typeof globalThis.fetch) =>
+      ports({
+        fetch,
+        credentials: () => [credential],
+        readKey: () => ({ ok: true, key: "http-secret" }),
+      });
+    const within = site({
+      [ask.url]: moved(302, `${CHECK_URL}/b`),
+      [`${CHECK_URL}/b`]: () => new Response(null, { status: 204 }),
+    });
+    expect(
+      await check(signedPorts(within.fetch), clock().fake, ask, signal),
+    ).toEqual({ result: "204" });
+    expect(within.seen[1]!.headers["X-Api-Key"]).toBe("http-secret");
+    const away = site({ [ask.url]: moved(302, "https://cdn.test/x") });
+    expect(
+      await check(signedPorts(away.fetch), clock().fake, ask, signal),
+    ).toEqual({ result: "redirected outside its credential's URL" });
+    expect(away.seen.map((call) => call.url)).toEqual([ask.url]);
+
+    const server = site({
+      [`${CHECK_URL}/feed`]: moved(301, "https://cdn.test/feed"),
+    });
+    expect(
+      await check(
+        ports({
+          fetch: server.fetch,
+          mcpServers: () => [
+            { id: "m1", url: `${CHECK_URL}/mcp`, keyName: "mcp-k" },
+          ],
+          mcpKey: () => "mcp-secret",
+        }),
+        clock().fake,
+        {
+          ...ask,
+          url: `${CHECK_URL}/feed`,
+          servers: [{ serverId: "m1", read: true, write: false }],
+        },
+        signal,
+      ),
+    ).toEqual({ result: "redirected away from its MCP server" });
+    expect(server.seen).toHaveLength(1);
+
+    // from outside a prefix into it: no key goes
+    const into = site({
+      "https://cdn.test/a": moved(302, `${CHECK_URL}/b`),
+      [`${CHECK_URL}/b`]: () => new Response(null, { status: 304 }),
+    });
+    expect(
+      await check(
+        signedPorts(into.fetch),
+        clock().fake,
+        { ...ask, url: "https://cdn.test/a" },
+        signal,
+      ),
+    ).toEqual({ result: "304" });
+    expect(into.seen.every((call) => !("X-Api-Key" in call.headers))).toBe(
+      true,
     );
   });
 });
