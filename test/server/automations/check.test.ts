@@ -26,7 +26,7 @@ import {
 } from "../../helpers/chat.ts";
 import { SMTP } from "../../helpers/links.ts";
 
-const URL_ = `${CHECK_URL}/alerts?token=q1`;
+const URL_ = `${CHECK_URL}/alerts?token=query-secret`;
 
 async function checkApp(window?: number) {
   const host = checkHost();
@@ -227,7 +227,7 @@ describe("a check URL", () => {
         cases.map(([, result]) => result),
       );
       expect(JSON.stringify(logs.events)).not.toContain("check.test");
-      expect(JSON.stringify(logs.events)).not.toContain("q1");
+      expect(JSON.stringify(logs.events)).not.toContain("query-secret");
     } finally {
       await chat.app.shutdown();
     }

@@ -16,7 +16,7 @@ import {
   waitScript,
 } from "../../helpers/chat.ts";
 
-const URL_ = `${CHECK_URL}/alerts?token=q1`;
+const URL_ = `${CHECK_URL}/alerts?token=query-secret`;
 
 async function checkApp() {
   const host = checkHost();
@@ -178,7 +178,7 @@ describe("Run now with a check URL", () => {
         result: "HTTP 503",
         duration: 0,
       });
-      expect(JSON.stringify(logs.events)).not.toContain("q1");
+      expect(JSON.stringify(logs.events)).not.toContain("query-secret");
     } finally {
       await chat.app.shutdown();
     }
