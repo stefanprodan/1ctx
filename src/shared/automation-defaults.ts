@@ -16,4 +16,5 @@ export const AUTOMATION_DEFAULTS = {
   rerunOnRestart: false,
   once: false,
   checkUrl: null,
+  checkCompare: null,
 } satisfies Partial<AutomationSummary>;

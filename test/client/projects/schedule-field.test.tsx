@@ -3,7 +3,7 @@
 //
 // The schedule's shape: a segmented switch where its six options fit
 // one line, a select on a phone, the same pick either way; the check URL
-// under it.
+// under it, and its compare with a URL.
 
 import { afterEach, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -11,6 +11,7 @@ import { narrow } from "../../../src/client/app/shell.ts";
 import { ScheduleField } from "../../../src/client/views/projects/ScheduleField.tsx";
 import {
   CHECK_HINT,
+  COMPARE_HINT,
   WhenSection,
 } from "../../../src/client/views/projects/WhenSection.tsx";
 
@@ -63,6 +64,7 @@ test.serial(
             tz: "UTC",
             once: false,
             checkUrl: "https://api.example.test/alerts",
+            checkCompare: "",
           }}
           set={() => {}}
           save={{
@@ -87,3 +89,29 @@ test.serial(
     expect(refused).not.toContain(CHECK_HINT);
   },
 );
+
+test("the compare shows under a check URL only, with its hint", () => {
+  const when = (checkUrl: string) =>
+    render(
+      <WhenSection
+        projectId="p1"
+        draft={{
+          schedule: "0 9 * * *",
+          tz: "UTC",
+          once: false,
+          checkUrl,
+          checkCompare: "tag_name",
+        }}
+        set={() => {}}
+        save={{ fieldError: () => null }}
+        disabled={false}
+      />,
+    );
+  expect(when(" ")).not.toContain('name="checkCompare"');
+  const html = when("https://api.example.test/releases/latest");
+  expect(html.indexOf('name="checkUrl"')).toBeLessThan(
+    html.indexOf('name="checkCompare"'),
+  );
+  expect(html).toContain('value="tag_name"');
+  expect(html).toContain(`<span class="hint">${COMPARE_HINT}</span>`);
+});

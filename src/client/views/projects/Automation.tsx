@@ -271,6 +271,16 @@ export function Automation({ params }: { params: Params }) {
                     ))}
                   </AsideLine>
                 )}
+                {row.checkUrl !== null && row.checkCompare !== null && (
+                  <AsideLine label="Compare">
+                    {row.checkCompare.split(/(?<=\.)/).map((part, i) => (
+                      <Fragment key={i}>
+                        {i > 0 && <wbr />}
+                        {part}
+                      </Fragment>
+                    ))}
+                  </AsideLine>
+                )}
                 <AccessLines row={row} />
                 {row.rerunOnRestart && (
                   <AsideNote>Restarts a run the server stopped</AsideNote>

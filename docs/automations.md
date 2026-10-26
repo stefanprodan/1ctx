@@ -214,6 +214,12 @@ validators, `last_checked_at`, `last_check_result` and `check_alert_at`,
 closes an alert no marked run belongs to, and sets `last_answered_at` to
 now, so silence counts from the change.
 
+A Compare (`checkCompare`, `shared/check-compare.ts`) is a dotted path
+into a JSON answer, `tag_name`, `data.items[0].id` or `[0].id`, a
+leading `.` ignored; then only that value decides what is new. It is
+refused without a Check URL, a patch clearing the URL clears it, and
+setting or changing it clears the validators.
+
 - **One GET per fire, never awaited by the pass.** The pass starts it
   and skips the row while it is in flight; the sleep leaves due rows
   out (`earliest(passAt)`) as for a cap wait, so a due row never spins
@@ -254,6 +260,12 @@ now, so silence counts from the change.
   `[]`, `{}` or `null` (white space allowed inside) or whose SHA-256 is
   `check_body_hash`.** It moves `next_at`, the row's check columns and
   `revision`, and writes no event.
+- **With a Compare, a non-empty body hashes only the value at the
+  path,** as JSON with sorted keys, so a reordered object is unchanged,
+  and Run now saves that hash too. A `null`, `""`, `[]` or `{}` value
+  is empty. A body that is not JSON fails as `answer is not JSON`, a
+  missing path as `compare path not found`. The run still gets the
+  whole body.
 - **A new answer is a 200 of UTF-8 text with no NUL**, whatever its
   type, read up to `MAX_CHECK_BYTES` or `mcpKeptBytes` if lower. Its
   run's first message is the instructions, the answer's start fenced as

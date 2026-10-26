@@ -15,6 +15,7 @@ import {
   makeAutomationTool,
   parseAutomationArgs,
 } from "../../../src/server/tools/builtin/automation.ts";
+import { checkText } from "../../../src/server/tools/builtin/automation-check.ts";
 import {
   FIELD_BYTES,
   type LastRun,
@@ -44,6 +45,7 @@ const automation = (
   ownerName: "maria",
   agentId: "a1",
   checkUrl: null,
+  checkCompare: null,
   lastCheckedAt: null,
   lastCheckResult: null,
   lastAnsweredAt: null,
@@ -1062,4 +1064,17 @@ describe("its names elsewhere", () => {
     ).toBe("automation");
     expect(cutKind("automation", null)).toBe("read");
   });
+});
+
+test("show's check line names the compare, never the query", () => {
+  const text = checkText(
+    automation({
+      checkUrl: "https://api.test/releases/latest?token=k",
+      checkCompare: "tag_name",
+    }),
+    () => "now",
+  );
+  expect(text).toBe(
+    "https://api.test/releases/latest (query not shown), asked at every scheduled time, runs only on a new answer, compares only tag_name; not checked yet",
+  );
 });

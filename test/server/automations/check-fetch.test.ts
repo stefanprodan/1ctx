@@ -21,6 +21,7 @@ const ask: CheckAsk = {
   etag: null,
   lastModified: null,
   hash: null,
+  compare: null,
   maxBytes: 1024,
 };
 

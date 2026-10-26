@@ -55,6 +55,9 @@ export type SaveAutomationRequest = {
   attentionGuidance?: string;
   // null or empty for none; absent on create is null
   checkUrl?: string | null;
+  // a dotted path into the answer's JSON; null or empty for none, and
+  // refused without a check URL
+  checkCompare?: string | null;
 };
 export type PatchAutomationRequest = Partial<SaveAutomationRequest> & {
   editRevision: number;

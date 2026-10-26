@@ -100,6 +100,7 @@ export function checks(deps: CheckDeps) {
         servers: deps.agents.byId(row.agentId)?.servers ?? [],
         disabled: row.disabledCapabilities,
         ...saved,
+        compare: row.checkCompare,
         maxBytes: Math.min(MAX_CHECK_BYTES, deps.limits().mcpKeptBytes),
       },
       signal,

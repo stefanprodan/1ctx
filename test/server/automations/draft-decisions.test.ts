@@ -61,11 +61,16 @@ describe("automation draft decisions", () => {
     const chat = await draftApp();
     try {
       const { drafts } = await proposals(chat, [
-        { ...createProposal(), checkUrl: "https://api.test/alerts?state=open" },
+        {
+          ...createProposal(),
+          checkUrl: "https://api.test/alerts?state=open",
+          checkCompare: "items[0].id",
+        },
       ]);
       const draft = drafts[0]!;
       expect(draft.fields).toMatchObject({
         checkUrl: "https://api.test/alerts?state=open",
+        checkCompare: "items[0].id",
       });
       expect((await press(chat, draft.id)).status).toBe(200);
       const created = chat.app.automationDrafts.byId(draft.id)!;
@@ -73,6 +78,7 @@ describe("automation draft decisions", () => {
         chat.app.automations.byId(created.createdAutomationId!),
       ).toMatchObject({
         checkUrl: "https://api.test/alerts?state=open",
+        checkCompare: "items[0].id",
         lastCheckedAt: null,
         lastAnsweredAt: chat.app.now.value,
       });

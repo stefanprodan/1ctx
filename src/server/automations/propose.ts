@@ -7,7 +7,11 @@ import { type Db, transact } from "../db/index.ts";
 import { BadRequest, ToolError } from "../lib/errors.ts";
 import { draftChanged } from "./draft-events.ts";
 import type { AutomationDraftStore } from "./draft-store.ts";
-import { parsePatchAutomation, parseSaveAutomation } from "./parse.ts";
+import {
+  compareAfter,
+  parsePatchAutomation,
+  parseSaveAutomation,
+} from "./parse.ts";
 import { checkSchedule } from "./schedule.ts";
 import type { AutomationStore } from "./store.ts";
 
@@ -67,6 +71,8 @@ export function proposeTask(
         editRevision: current!.editRevision,
       });
       const next = { ...current!, ...patch };
+      // refuses a compare left without a URL
+      compareAfter(current!, patch);
       if (!next.ownMemory && (patch.memoryGuidance ?? "") !== "") {
         throw new BadRequest(UNREAD_MEMORY);
       }

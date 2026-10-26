@@ -30,5 +30,7 @@ export function checkText(
               ? "nothing new"
               : `failed, ${result}`
         }`;
-  return `${shown}, asked at every scheduled time, runs only on a new answer; ${last}`;
+  const compare =
+    a.checkCompare === null ? "" : `, compares only ${a.checkCompare}`;
+  return `${shown}, asked at every scheduled time, runs only on a new answer${compare}; ${last}`;
 }

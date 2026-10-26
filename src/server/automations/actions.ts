@@ -16,7 +16,7 @@ import type { ProjectRow } from "../projects/index.ts";
 import type { PreparedRun } from "../runner/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { Held } from "./check.ts";
-import type { parsePatchAutomation } from "./parse.ts";
+import { compareAfter, type parsePatchAutomation } from "./parse.ts";
 import { checkSchedule, nextFire } from "./schedule.ts";
 import type { Scheduler } from "./scheduler.ts";
 import {
@@ -140,7 +140,11 @@ export function automationActions(deps: ActionsDeps): AutomationActions {
         // a fire, a run's end or an alert moves revision, never this
         if (current.editRevision !== editRevision)
           throw new Conflict(STALE_EDIT);
-        const next = { ...current, ...patch };
+        const next = {
+          ...current,
+          ...patch,
+          checkCompare: compareAfter(current, patch),
+        };
         if (
           next.postToChannel &&
           deps.access.project(principal, current.projectId).kind !== "team"

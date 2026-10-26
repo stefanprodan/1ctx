@@ -316,6 +316,30 @@ describe("the line's words", () => {
     ).toBe("check URL");
   });
 
+  test("a check's compare shows as a field beside its URL", () => {
+    const url = "https://api.example.test/releases/latest";
+    expect(createFields({ checkUrl: url, checkCompare: "tag_name" })).toEqual([
+      { label: "Check URL", value: url, was: null },
+      { label: "Compare", value: "tag_name", was: null },
+    ]);
+    expect(
+      changedFields(
+        { checkCompare: "tag_name" },
+        automation({ checkUrl: url, checkCompare: "name" }),
+      ),
+    ).toEqual([{ label: "Compare", value: "tag_name", was: "name" }]);
+    expect(
+      changedFields({ checkCompare: null }, automation({ checkCompare: "a" })),
+    ).toEqual([{ label: "Compare", value: "none", was: "a" }]);
+    expect(
+      lineDetail(
+        automationDraft("update", {
+          fields: { checkCompare: "tag_name" },
+        } as Partial<AutomationDraft>),
+      ),
+    ).toBe("compare");
+  });
+
   test("a create's guidance shows when set, an update's when changed", () => {
     const fields = {
       instructions: "Read the feed.",

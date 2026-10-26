@@ -47,8 +47,7 @@ export function waitingSince(
     : null;
 }
 
-// a once automation's fire with its year: "today 09:00", "on Sun Oct 11 2026
-// 09:00"
+// a once automation's fire with its year: "on Sun Oct 11 2026 09:00"
 const onceAt = (fire: number, now: number, tz: string) => {
   const label = fireLabel(fire, now, tz, true, true);
   return /^to(day|morrow) /.test(label) ? label : `on ${label}`;
@@ -291,8 +290,9 @@ export type Draft = {
   // its runs post their answers to the project's channel
   postToChannel: boolean;
   once: boolean;
-  // as typed, empty for none
+  // as typed, empty for none; the compare is sent only with a URL
   checkUrl: string;
+  checkCompare: string;
 } & AccessDraft;
 
 const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -324,6 +324,7 @@ export function draftOf(
       postToChannel: false,
       once: AUTOMATION_DEFAULTS.once,
       checkUrl: AUTOMATION_DEFAULTS.checkUrl ?? "",
+      checkCompare: AUTOMATION_DEFAULTS.checkCompare ?? "",
       web: true,
       visuals: true,
       knowledge: true,
@@ -350,6 +351,7 @@ export function draftOf(
     postToChannel: a.postToChannel,
     once: a.once,
     checkUrl: a.checkUrl ?? "",
+    checkCompare: a.checkCompare ?? "",
     web: !a.disabledCapabilities.includes(WEB),
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
     knowledge: !a.disabledCapabilities.includes(KNOWLEDGE),
@@ -389,7 +391,8 @@ type AutomationField =
   | "memoryGuidance"
   | "attention"
   | "attentionGuidance"
-  | "checkUrl";
+  | "checkUrl"
+  | "checkCompare";
 
 // which field a server refusal of the automation routes names; a cap on
 // the project or a run still going is the form's
@@ -409,6 +412,7 @@ export function automationFieldOf(
   if (message.startsWith("attention guidance")) return "attentionGuidance";
   if (message.startsWith("attentionMode")) return "attention";
   if (message.startsWith("Check URL")) return "checkUrl";
+  if (message.startsWith("Compare")) return "checkCompare";
   return undefined;
 }
 
@@ -467,12 +471,13 @@ export function requestOf(
       postToChannel: d.postToChannel,
       once: d.once,
       checkUrl: checkUrl === "" ? null : checkUrl,
+      checkCompare: (checkUrl && d.checkCompare.trim()) || null,
       disabledCapabilities: disabledOf(d, shown),
     },
   };
 }
 
-// whether the draft differs from the row
+// whether the draft differs from the row, a hidden Compare aside
 export function dirtyOf(
   d: Draft,
   a: AutomationSummary | null,
@@ -481,6 +486,7 @@ export function dirtyOf(
   if (a === null) return true;
   const base = draftOf(a, a.agentId, a.tz, limitMs);
   return (Object.keys(base) as (keyof Draft)[]).some((k) => {
+    if (k === "checkCompare" && d.checkUrl.trim() === "") return false;
     const left = d[k];
     const right = base[k];
     if (Array.isArray(left) && Array.isArray(right)) {

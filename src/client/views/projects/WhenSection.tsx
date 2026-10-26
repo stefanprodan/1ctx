@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The automation editor's When step: the schedule, then the check URL a
-// scheduled run asks first, empty for none.
+// scheduled run asks first, empty for none, and with a URL the JSON
+// value it compares.
 
 import type { Save } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
@@ -12,6 +13,8 @@ import { ScheduleField } from "./ScheduleField.tsx";
 
 export const CHECK_HINT =
   "Asked at every scheduled time. Runs only when the answer is new.";
+export const COMPARE_HINT =
+  "Only a change in this JSON value starts a run. Empty compares the whole answer.";
 
 export function WhenSection({
   projectId,
@@ -21,7 +24,7 @@ export function WhenSection({
   disabled,
 }: {
   projectId: string;
-  draft: Pick<Draft, "schedule" | "tz" | "once" | "checkUrl">;
+  draft: Pick<Draft, "schedule" | "tz" | "once" | "checkUrl" | "checkCompare">;
   set: (patch: Partial<Draft>) => void;
   save: Pick<Save, "fieldError">;
   disabled: boolean;
@@ -65,6 +68,31 @@ export function WhenSection({
             <span class="hint">{CHECK_HINT}</span>
           )}
         </label>
+        {d.checkUrl.trim() !== "" && (
+          <label class="field">
+            <span class="label">Compare</span>
+            <input
+              name="checkCompare"
+              class="automations-mono"
+              autocomplete="off"
+              spellcheck={false}
+              placeholder="tag_name"
+              aria-invalid={invalid("checkCompare") || undefined}
+              disabled={disabled}
+              value={d.checkCompare}
+              onInput={(e) =>
+                set({
+                  checkCompare: (e.currentTarget as HTMLInputElement).value,
+                })
+              }
+            />
+            {invalid("checkCompare") ? (
+              <FieldError save={save} field="checkCompare" />
+            ) : (
+              <span class="hint">{COMPARE_HINT}</span>
+            )}
+          </label>
+        )}
       </div>
     </Section>
   );

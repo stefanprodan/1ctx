@@ -41,6 +41,7 @@ export type AutomationFields = Pick<
   | "postToChannel"
   | "once"
   | "checkUrl"
+  | "checkCompare"
 >;
 
 export type AutomationEdit = Omit<AutomationFields, "projectId"> & {
@@ -164,9 +165,10 @@ export class AutomationStore {
            tz, deadline_ms, retention_days, own_memory,
            memory_guidance, attention_mode, attention_guidance,
            disabled_capabilities, rerun_on_restart, post_to_channel, once,
-           check_url, last_answered_at, next_at, created_at, updated_at)
+           check_url, check_compare, last_answered_at, next_at, created_at,
+           updated_at)
          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-           ?, ?)`,
+           ?, ?, ?)`,
       )
       .run(
         id,
@@ -188,6 +190,7 @@ export class AutomationStore {
         fields.postToChannel ? 1 : 0,
         fields.once ? 1 : 0,
         fields.checkUrl,
+        fields.checkCompare,
         fields.checkUrl === null ? null : fields.now,
         fields.nextAt,
         fields.now,
@@ -212,6 +215,14 @@ export class AutomationStore {
          where id = ? and check_url is not ?`,
       )
       .run(fields.checkUrl, fields.checkUrl, fields.now, id, fields.checkUrl);
+    // a new compare hashes another value, so the saved one is stale
+    this.db
+      .query(
+        `update automations set check_compare = ?, check_etag = null,
+           check_last_modified = null, check_body_hash = null
+         where id = ? and check_compare is not ?`,
+      )
+      .run(fields.checkCompare, id, fields.checkCompare);
     this.db
       .query(
         `update automations set owner_id = ?, agent_id = ?, name = ?,

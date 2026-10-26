@@ -92,6 +92,7 @@ const automation = (
   agentName: "assistant",
   agentRetired: false,
   checkUrl: null,
+  checkCompare: null,
   lastCheckedAt: null,
   lastCheckResult: null,
   lastAnsweredAt: null,
@@ -654,6 +655,7 @@ describe("the form", () => {
       postToChannel: false,
       once: false,
       checkUrl: "",
+      checkCompare: "",
       web: true,
       visuals: true,
       knowledge: true,
@@ -685,6 +687,7 @@ describe("the form", () => {
         postToChannel: false,
         once: false,
         checkUrl: null,
+        checkCompare: null,
         disabledCapabilities: [],
       },
     });
@@ -727,6 +730,14 @@ describe("the form", () => {
     expect(shown.rerunOnRestart).toBe(true);
     expect(dirtyOf(shown, row, LIMIT)).toBe(false);
     expect(dirtyOf({ ...shown, rerunOnRestart: false }, row, LIMIT)).toBe(true);
+  });
+
+  test("a Compare hidden by an empty Check URL leaves the form clean", () => {
+    const row = automation({ checkUrl: null, checkCompare: null });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(dirtyOf({ ...shown, checkCompare: "tag_name" }, row, LIMIT)).toBe(
+      false,
+    );
   });
 
   test("posting to the channel is off for a new automation and saved as drafted", () => {
@@ -775,6 +786,31 @@ describe("the form", () => {
       "checkUrl",
     );
     expect(automationFieldOf("Check URL is too long")).toBe("checkUrl");
+  });
+
+  test("the compare is saved as drafted, and goes with a cleared URL", () => {
+    const sent = (d: Draft) => {
+      const out = requestOf(d, LIMIT);
+      return "body" in out ? out.body.checkCompare : "refused";
+    };
+    const url = "https://api.example.test/releases/latest";
+    expect(sent(filled({ checkUrl: url }))).toBeNull();
+    expect(sent(filled({ checkUrl: url, checkCompare: " tag_name " }))).toBe(
+      "tag_name",
+    );
+    const row = automation({ checkUrl: url, checkCompare: "tag_name" });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.checkCompare).toBe("tag_name");
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, checkCompare: "name" }, row, LIMIT)).toBe(true);
+    // hidden without a URL, so it is never sent alone
+    expect(sent({ ...shown, checkUrl: "" })).toBeNull();
+    expect(
+      automationFieldOf(
+        "Compare must be a dotted path like tag_name or items[0].id",
+      ),
+    ).toBe("checkCompare");
+    expect(automationFieldOf("Compare needs a Check URL")).toBe("checkCompare");
   });
 
   test("only emptiness and the numbers' shape are refused here", () => {

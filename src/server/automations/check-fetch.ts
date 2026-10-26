@@ -7,6 +7,12 @@
 // credential. No error message is kept: one may name the URL's query.
 
 import { credentialKey, mcpKey, WEB } from "../../shared/capabilities.ts";
+import {
+  canonical,
+  isEmptyValue,
+  parseCompare,
+  valueAt,
+} from "../../shared/check-compare.ts";
 import type {
   CheckFailure,
   CheckQuiet,
@@ -57,6 +63,8 @@ export type CheckAsk = {
   etag: string | null;
   lastModified: string | null;
   hash: string | null;
+  // a path whose value alone is hashed; null hashes the whole body
+  compare: string | null;
   maxBytes: number;
 };
 
@@ -226,9 +234,35 @@ function isEmpty(text: string): boolean {
   return EMPTY.test(text.trim());
 }
 
+// the compared value's hash, a quiet word or why it failed
+function compared(
+  body: string,
+  compare: string,
+):
+  | string
+  | { result: "empty" | "answer is not JSON" | "compare path not found" } {
+  // the path was parsed when it was saved
+  const path = parseCompare(compare) ?? [];
+  let json: unknown;
+  try {
+    json = JSON.parse(body);
+  } catch {
+    return { result: "answer is not JSON" };
+  }
+  const value = valueAt(json, path);
+  if (value === undefined) return { result: "compare path not found" };
+  if (isEmptyValue(value)) return { result: "empty" };
+  try {
+    return sha256(canonical(value));
+  } catch {
+    // nesting deep enough to overflow the stack
+    return { result: "answer is not JSON" };
+  }
+}
+
 export async function answerOf(
   response: Response,
-  ask: Pick<CheckAsk, "hash" | "maxBytes">,
+  ask: Pick<CheckAsk, "hash" | "maxBytes" | "compare">,
 ): Promise<CheckAnswer> {
   const status = response.status;
   if (status !== 200) {
@@ -241,7 +275,9 @@ export async function answerOf(
   const body = textOf(bytes);
   if (body === null) return { result: "answer is not text" };
   if (isEmpty(body)) return { result: "empty" };
-  const hash = sha256(bytes);
+  const hash =
+    ask.compare === null ? sha256(bytes) : compared(body, ask.compare);
+  if (typeof hash !== "string") return hash;
   if (hash === ask.hash) return { result: "unchanged" };
   return {
     result: "200",
@@ -298,7 +334,7 @@ export async function check(
           value !== null && forms.some((form) => value.includes(form))
             ? null
             : value;
-        // the hash stays the raw body's, so a scrub never hides a change
+        // the hash is of the raw answer, so a scrub never hides a change
         return {
           ...answer,
           body: scrubValues(answer.body, forms, KEY_MARK),

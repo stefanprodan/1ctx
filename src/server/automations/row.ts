@@ -31,6 +31,7 @@ export type Raw = RawAlert & {
   attention_mode: AttentionMode;
   attention_guidance: string;
   check_url: string | null;
+  check_compare: string | null;
   last_checked_at: number | null;
   last_check_result: CheckResult | null;
   last_answered_at: number | null;
@@ -92,6 +93,7 @@ export const row = (raw: Raw): AutomationSummary => ({
   attentionGuidance: raw.attention_guidance,
   alert: alertOf(raw),
   checkUrl: raw.check_url,
+  checkCompare: raw.check_compare,
   lastCheckedAt: raw.last_checked_at,
   lastCheckResult: raw.last_check_result,
   lastAnsweredAt: raw.last_answered_at,

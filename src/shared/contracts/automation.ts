@@ -50,6 +50,9 @@ export type AutomationSummary = {
   alert: AutomationAlert | null;
   // a scheduled run starts only on a new answer
   checkUrl: string | null;
+  // a path into its JSON answer whose value alone decides what is new;
+  // null compares the whole answer
+  checkCompare: string | null;
   lastCheckedAt: number | null;
   lastCheckResult: CheckResult | null;
   // the last answer, or when the URL was set: silence counts from it
@@ -109,7 +112,8 @@ export const MAX_CHECK_URL = MAX_MCP_URL;
 // a failed check opens the alert only after this long unanswered
 export const CHECK_SILENCE_MS = 30 * 60_000;
 
-// nothing new: 204, 304, an empty 200 or the same body as the last run's
+// nothing new: 204, 304, an empty 200 or the same body, or compared
+// value, as the last run's
 export const CHECK_QUIET = ["204", "304", "empty", "unchanged"] as const;
 // shown after "Check failed 3m ago: "
 export const CHECK_FAILURES = [
@@ -120,6 +124,8 @@ export const CHECK_FAILURES = [
   "could not connect",
   "answer too large",
   "answer is not text",
+  "answer is not JSON",
+  "compare path not found",
   "web access is off",
   "host is not in Web access",
   "its credential is turned off",
@@ -148,6 +154,8 @@ export function checkReason(result: CheckFailure): string {
       return `check ${result}`;
     case "answer too large":
     case "answer is not text":
+    case "answer is not JSON":
+    case "compare path not found":
       return result;
     default:
       return `check failed: ${result}`;

@@ -217,3 +217,45 @@ test("a valid name is never reshaped", () => {
     ),
   ).toMatchObject({ fields: { name: "weekly-cve" } });
 });
+
+test("a proposal carries a check's compare, which needs its URL", async () => {
+  for (const call of [{ action: "create" }, { action: "update", id: "task" }]) {
+    expect(
+      parseAutomationArgs({ ...call, checkCompare: "tag_name" }, true),
+    ).toMatchObject({ fields: { checkCompare: "tag_name" } });
+  }
+  const tool = makeAutomationTool(null, true);
+  expect(tool.description).toContain(
+    "Add checkCompare when its JSON answer carries counters or timestamps.",
+  );
+  const app = await testApp();
+  try {
+    const propose = (extra: Record<string, unknown>) =>
+      proposeTask(
+        {
+          db: app.db,
+          store: app.automations,
+          drafts: app.automationDrafts,
+          runDeadlineMs: () => 3_600_000,
+        },
+        {
+          projectId: "project",
+          sessionId: "chat",
+          sendId: "send",
+          messageId: "tool",
+          userId: "user",
+          agentId: "agent",
+          action: "create",
+          automationId: null,
+          fields: { ...fields, ...extra },
+          now: app.now.value,
+        },
+      );
+    expect(() => propose({ checkCompare: "tag_name" })).toThrow(
+      "Compare needs a Check URL",
+    );
+    expect(app.automationDrafts.bySession("chat")).toEqual([]);
+  } finally {
+    await app.shutdown();
+  }
+});
