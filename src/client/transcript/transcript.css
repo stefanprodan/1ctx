@@ -68,6 +68,24 @@
     overflow-wrap: anywhere;
   }
 
+  /* a user message with a fenced block: the runs and blocks stack with
+     the card's gap, and a long line scrolls inside its block */
+  .transcript-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+  }
+  .transcript-fence {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background-color: var(--inset);
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+
   /* the files a message carried, under its words; the card keeps the
      text's line breaks, the chips wrap on their own */
   .transcript-files {

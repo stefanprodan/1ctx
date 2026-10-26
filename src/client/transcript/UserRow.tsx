@@ -9,6 +9,7 @@ import type { Message } from "../../shared/contracts/session.ts";
 import { clock, initials, stamp, uploadNote } from "../lib/format.ts";
 import { userHref } from "../lib/hrefs.ts";
 import { FileChip } from "../ui/FileChip.tsx";
+import { UserText } from "./UserText.tsx";
 
 export function UserRow({
   message: m,
@@ -40,7 +41,7 @@ export function UserRow({
         </span>
       </div>
       <div class="card transcript-card">
-        {m.content}
+        <UserText text={m.content} />
         {m.uploads !== null && m.uploads.length > 0 && (
           <div class="transcript-files">
             {m.uploads.map((item, index) => (
