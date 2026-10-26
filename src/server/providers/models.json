@@ -237,16 +237,6 @@
           "cacheWrite": 12.5
         }
       },
-      "claude-opus-4-1": {
-        "window": 200000,
-        "tools": true,
-        "price": {
-          "input": 15,
-          "output": 75,
-          "cacheRead": 1.5,
-          "cacheWrite": 18.75
-        }
-      },
       "claude-opus-4-5": {
         "window": 200000,
         "tools": true,
@@ -390,11 +380,6 @@
         "tools": false,
         "price": { "input": 0.1, "output": 0 }
       },
-      "deepseek-r1": {
-        "window": 163840,
-        "tools": false,
-        "price": { "input": 1.35, "output": 5.4 }
-      },
       "deepseek-v3.2": {
         "window": 128000,
         "tools": true,
@@ -407,15 +392,19 @@
       },
       "deepseek-v4-flash": {
         "window": 1000000,
-        "tools": false,
+        "tools": true,
         "price": { "input": 0.19, "output": 0.51 }
       },
       "deepseek-v4-pro": {
         "window": 1000000,
-        "tools": false,
+        "tools": true,
         "price": { "input": 1.74, "output": 3.48 }
       },
-      "deepseek-v4.1-flash": { "window": 1000000, "tools": true },
+      "deepseek-v4.1-flash": {
+        "window": 1000000,
+        "tools": true,
+        "price": { "input": 0.3, "output": 1.2, "cacheRead": 0.006 }
+      },
       "gpt-3.5-turbo-0125": {
         "window": 16384,
         "tools": false,
@@ -469,22 +458,22 @@
       "gpt-5": {
         "window": 272000,
         "tools": true,
-        "price": { "input": 1.25, "output": 10, "cacheRead": 0.13 }
+        "price": { "input": 1.25, "output": 10, "cacheRead": 0.125 }
       },
       "gpt-5-codex": {
         "window": 272000,
         "tools": true,
-        "price": { "input": 1.25, "output": 10, "cacheRead": 0.13 }
+        "price": { "input": 1.25, "output": 10, "cacheRead": 0.125 }
       },
       "gpt-5-mini": {
         "window": 272000,
         "tools": true,
-        "price": { "input": 0.25, "output": 2, "cacheRead": 0.03 }
+        "price": { "input": 0.25, "output": 2, "cacheRead": 0.025 }
       },
       "gpt-5-nano": {
         "window": 272000,
         "tools": true,
-        "price": { "input": 0.05, "output": 0.4, "cacheRead": 0.01 }
+        "price": { "input": 0.05, "output": 0.4, "cacheRead": 0.005 }
       },
       "gpt-5-pro": {
         "window": 272000,
@@ -514,7 +503,7 @@
       "gpt-5.2": {
         "window": 272000,
         "tools": true,
-        "price": { "input": 1.75, "output": 14, "cacheRead": 0.125 }
+        "price": { "input": 1.75, "output": 14, "cacheRead": 0.175 }
       },
       "gpt-5.2-codex": {
         "window": 272000,
@@ -594,15 +583,15 @@
         "price": {
           "input": 4,
           "output": 20,
-          "cacheRead": 0.5,
-          "cacheWrite": 6.25,
+          "cacheRead": 0.4,
+          "cacheWrite": 5,
           "tiers": [
             {
               "above": 272000,
-              "input": 10,
-              "output": 45,
-              "cacheRead": 1,
-              "cacheWrite": 12.5
+              "input": 8,
+              "output": 30,
+              "cacheRead": 0.8,
+              "cacheWrite": 10
             }
           ]
         }
@@ -1045,6 +1034,11 @@
         "tools": true,
         "price": { "input": 0.75, "output": 3.75, "cacheRead": 0.075 }
       },
+      "gemini-4-argon": {
+        "window": 1048576,
+        "tools": true,
+        "price": { "input": 2, "output": 10, "cacheRead": 0.1 }
+      },
       "gemini-embedding-001": {
         "window": 2048,
         "tools": false,
@@ -1070,6 +1064,19 @@
         "tools": false,
         "price": { "input": 1.5, "output": 17.5 }
       },
+      "gemini-pro-latest": {
+        "window": 1048576,
+        "tools": true,
+        "canonical": "gemini-3.1-pro-preview",
+        "price": {
+          "input": 2,
+          "output": 12,
+          "cacheRead": 0.2,
+          "tiers": [
+            { "above": 200000, "input": 4, "output": 18, "cacheRead": 0.4 }
+          ]
+        }
+      },
       "gemma-4-26b-a4b-it": { "window": 262144, "tools": true },
       "gemma-4-31b-it": { "window": 262144, "tools": true },
       "lyria-3-clip-preview": {
@@ -1081,34 +1088,36 @@
         "window": 1048576,
         "tools": false,
         "price": { "input": 0, "output": 0 }
-      },
-      "veo-3.1-fast-generate-preview": { "window": 480, "tools": false },
-      "veo-3.1-generate-preview": { "window": 480, "tools": false },
-      "veo-3.1-lite-generate-preview": { "window": 480, "tools": false }
+      }
     },
     "opencode-go": {
-      "claude-haiku-5-5": { "window": 1000000, "tools": true },
-      "deepseek-v4-flash": {
-        "window": 1000000,
+      "beam-free": {
+        "window": 1048576,
         "tools": true,
-        "canonical": "deepseek-v4-flash-0731"
+        "canonical": "beam-1.0-501b-a23b"
       },
-      "deepseek-v4-flash-vision-exp": { "window": 1000000, "tools": true },
+      "cat-jam-free": { "window": 1048576, "tools": true },
+      "claude-haiku-5-5": { "window": 1000000, "tools": true },
       "deepseek-v4-pro": { "window": 1000000, "tools": true },
       "deepseek-v4.1-flash": { "window": 1000000, "tools": true },
+      "gemini-4-argon": { "window": 1048576, "tools": true },
+      "gemini-4-argon-contributor": {
+        "window": 1048576,
+        "tools": true,
+        "canonical": "gemini-4-argon"
+      },
       "glm-5.2": { "window": 1000000, "tools": true },
       "glm-5.3": { "window": 1000000, "tools": true },
       "glm-5.3-flash": { "window": 1000000, "tools": true },
       "gpt-5.6-luna": { "window": 922000, "tools": true },
       "gpt-6-luna": { "window": 922000, "tools": true },
-      "grok-4.5": { "window": 500000, "tools": true },
-      "grok-4.6": { "window": 500000, "tools": true },
       "grok-4.7": { "window": 500000, "tools": true },
       "hy3": { "window": 192000, "tools": true },
       "hy4-preview": { "window": 1024000, "tools": true },
-      "kimi-k2.6": { "window": 262144, "tools": true },
+      "iceman-contributor-free": { "window": 262144, "tools": true },
       "kimi-k2.7-code": { "window": 262144, "tools": true },
       "kimi-k3": { "window": 1048576, "tools": true },
+      "kimi-k3.1-pro": { "window": 1048576, "tools": true },
       "longcat-2.0": { "window": 1000000, "tools": true },
       "longcat-2.5-preview-free": {
         "window": 1000000,
@@ -1121,19 +1130,27 @@
       "mimo-v2.6-pro": { "window": 1048576, "tools": true },
       "minimax-m2.7": { "window": 204800, "tools": true },
       "minimax-m3": { "window": 1000000, "tools": true },
+      "minimax-m3.1-flash": { "window": 1000000, "tools": true },
+      "minimax-m3.1-flash-free": {
+        "window": 1000000,
+        "tools": true,
+        "canonical": "minimax-m3.1-flash"
+      },
       "muse-spark-1.2-contributor": {
         "window": 1048576,
         "tools": true,
         "canonical": "muse-spark-1.2"
       },
-      "muse-spark-1.3-contributor": { "window": 1048576, "tools": true },
-      "qwen3.6-plus": { "window": 1000000, "tools": true },
-      "qwen3.7-max": { "window": 1000000, "tools": true },
+      "muse-spark-1.3-contributor": {
+        "window": 1048576,
+        "tools": true,
+        "canonical": "muse-spark-1.3"
+      },
       "qwen3.7-plus": { "window": 1000000, "tools": true },
       "qwen3.8-flash": { "window": 1000000, "tools": true },
       "qwen3.8-max": { "window": 1000000, "tools": true },
       "space-bunny": { "window": 524288, "tools": true },
-      "space-bunny-free": { "window": 524288, "tools": true },
+      "step-5-preview": { "window": 1000000, "tools": true },
       "step-5-preview-free": {
         "window": 1000000,
         "tools": true,
