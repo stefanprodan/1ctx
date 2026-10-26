@@ -15,7 +15,7 @@ import {
   collectLogs,
   testApp,
 } from "../../helpers/app.ts";
-import { createAutomation, startRun } from "../../helpers/automations.ts";
+import { createAutomation } from "../../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
@@ -252,22 +252,6 @@ describe("a check URL", () => {
         lastEventReason: "check timed out",
         lastCheckResult: "timed out",
       });
-    } finally {
-      await chat.app.shutdown();
-    }
-  });
-
-  test("Run now makes no GET and leaves the check line", async () => {
-    const { chat, host, automation } = await checkApp();
-    try {
-      const run = await startRun(chat, automation.id);
-      expect(host.calls).toHaveLength(0);
-      expect(row(chat, automation.id)).toMatchObject({
-        lastCheckedAt: null,
-        lastCheckResult: null,
-      });
-      run.main.reply("done");
-      await sessionSettled(chat.app, run.sessionId);
     } finally {
       await chat.app.shutdown();
     }

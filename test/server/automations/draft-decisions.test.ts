@@ -134,6 +134,34 @@ describe("automation draft decisions", () => {
     }
   });
 
+  test("a proposed run of a checked automation asks as Run now does", async () => {
+    const chat = await draftApp();
+    try {
+      const automation = await createAutomation(chat, {
+        checkUrl: "https://api.test/alerts",
+      });
+      const { drafts } = await proposals(chat, [
+        { action: "run", id: automation.id },
+      ]);
+      const next = chat.scripted.next();
+      expect((await press(chat, drafts[0]!.id)).status).toBe(200);
+      const draft = chat.app.automationDrafts.byId(drafts[0]!.id)!;
+      expect(draft.state).toBe("confirmed");
+      expect(chat.app.automations.byId(automation.id)).toMatchObject({
+        lastCheckedAt: chat.app.now.value,
+        lastCheckResult: "could not connect",
+      });
+      const script = await next;
+      expect(JSON.stringify(script.body.messages)).toContain(
+        "The check URL failed: could not connect.",
+      );
+      script.reply("Done.");
+      await settleRun(chat, draft.runSessionId!);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("a proposed run uses the same manual fire as the page and records its link", async () => {
     const chat = await draftApp();
     try {

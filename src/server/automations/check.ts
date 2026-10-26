@@ -9,6 +9,7 @@ import {
   type AutomationSummary,
   CHECK_SILENCE_MS,
   type CheckFailure,
+  type CheckResult,
   checkReason,
   isCheckFailure,
 } from "../../shared/contracts/automation.ts";
@@ -38,13 +39,20 @@ import {
 import { nextFire } from "./schedule.ts";
 import { type AutomationStore, automationChanged } from "./store.ts";
 
-// an edit, a move of the due time or a suspend makes it stale
+// an edit, a move of the due time or a suspend makes a scheduled one
+// stale; Run now's dueAt is unread
 export type Held = {
   answer: CheckAnswer;
   url: string;
   editRevision: number;
   dueAt: number;
   startedAt: number;
+};
+
+const NO_VALIDATORS: Validators = {
+  etag: null,
+  lastModified: null,
+  hash: null,
 };
 
 export type CheckDeps = {
@@ -74,12 +82,40 @@ export function checks(deps: CheckDeps) {
     Validators & { automationId: string; editRevision: number; cut: boolean }
   >();
 
+  // a manual ask's GETs, which a drain aborts too
+  const manual = new Set<AbortController>();
+
+  const get = (
+    row: AutomationSummary,
+    url: string,
+    saved: Validators,
+    signal: AbortSignal,
+  ) =>
+    check(
+      deps.ports,
+      deps.clock,
+      {
+        url,
+        projectId: row.projectId,
+        servers: deps.agents.byId(row.agentId)?.servers ?? [],
+        disabled: row.disabledCapabilities,
+        ...saved,
+        maxBytes: Math.min(MAX_CHECK_BYTES, deps.limits().mcpKeptBytes),
+      },
+      signal,
+    );
+
+  // the message may name the URL
+  const logError = (id: string, err: unknown) => {
+    const { error: _, ...fields } = errorFields(err);
+    deps.log.error("check error", { automation: id, ...fields });
+  };
+
   const ask = (row: AutomationSummary, dueAt: number): void => {
     if (flying.has(row.id) || row.checkUrl === null) return;
     const url = row.checkUrl;
     const abort = new AbortController();
     const startedAt = deps.clock();
-    const agent = deps.agents.byId(row.agentId);
     const keep = (answer: CheckAnswer) =>
       ready.set(row.id, {
         answer,
@@ -90,25 +126,16 @@ export function checks(deps: CheckDeps) {
       });
     const done = (async () => {
       try {
-        const answer = await check(
-          deps.ports,
-          deps.clock,
-          {
-            url,
-            projectId: row.projectId,
-            servers: agent?.servers ?? [],
-            disabled: row.disabledCapabilities,
-            ...validators(deps.db, row.id),
-            maxBytes: Math.min(MAX_CHECK_BYTES, deps.limits().mcpKeptBytes),
-          },
+        const answer = await get(
+          row,
+          url,
+          validators(deps.db, row.id),
           abort.signal,
         );
         if (answer !== null && !abort.signal.aborted) keep(answer);
       } catch (err) {
-        // the message may name the URL. A failed answer moves next_at,
-        // so the row never asks again at once
-        const { error: _, ...fields } = errorFields(err);
-        deps.log.error("check error", { automation: row.id, ...fields });
+        // a failed answer moves next_at, so the row never asks again at once
+        logError(row.id, err);
         if (!abort.signal.aborted) keep({ result: "could not connect" });
       } finally {
         flying.delete(row.id);
@@ -196,8 +223,44 @@ export function checks(deps: CheckDeps) {
     return applied;
   };
 
+  // Run now's GET: no validators, so the whole answer comes back and an
+  // unchanged body still reads as an answer. Null when a drain ended it
+  const now = async (row: AutomationSummary): Promise<Held | null> => {
+    const url = row.checkUrl!;
+    const abort = new AbortController();
+    manual.add(abort);
+    const startedAt = deps.clock();
+    try {
+      let answer: CheckAnswer | null;
+      try {
+        answer = await get(row, url, NO_VALIDATORS, abort.signal);
+      } catch (err) {
+        logError(row.id, err);
+        answer = { result: "could not connect" };
+      }
+      if (answer === null || abort.signal.aborted) return null;
+      if (isCheckFailure(answer.result)) {
+        deps.log.info("check failed", {
+          automation: row.id,
+          result: answer.result,
+          duration: deps.clock() - startedAt,
+        });
+      }
+      return {
+        answer,
+        url,
+        editRevision: row.editRevision,
+        dueAt: startedAt,
+        startedAt,
+      };
+    } finally {
+      manual.delete(abort);
+    }
+  };
+
   return {
     ask,
+    now,
     settle,
     busy: (id: string) => flying.has(id),
     get flying() {
@@ -235,13 +298,15 @@ export function checks(deps: CheckDeps) {
     prune(due: Set<string>) {
       for (const id of ready.keys()) if (!due.has(id)) ready.delete(id);
     },
-    // in the fire's transaction, once its run started
-    started(id: string) {
-      checkAnswered(deps.db, id);
+    // in the fire's transaction, once its run started; a manual run
+    // starts on any answer, and a failure never touches the alert
+    started(id: string, result: CheckResult) {
+      const failed = isCheckFailure(result);
+      if (!failed) checkAnswered(deps.db, id);
       recordCheck(deps.db, id, {
         at: deps.clock(),
-        result: "200",
-        answered: true,
+        result,
+        answered: !failed,
       });
     },
     // after the fire's commit
@@ -273,6 +338,7 @@ export function checks(deps: CheckDeps) {
     },
     abort() {
       for (const { abort } of flying.values()) abort.abort();
+      for (const abort of manual) abort.abort();
       ready.clear();
     },
     async settled(): Promise<void> {

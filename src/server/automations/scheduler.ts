@@ -18,6 +18,7 @@ import type { Checks, Held } from "./check.ts";
 import { recordOn } from "./events.ts";
 import { eventFor, manualFor, ownerFor } from "./fire-event.ts";
 import { type Cut, cutRuns, deferDue, stillCut, withCut } from "./refire.ts";
+import { askNow, changedSince, holding } from "./run-now.ts";
 import { nextFire } from "./schedule.ts";
 import { type AutomationStore, automationChanged } from "./store.ts";
 import { onRunEnd, reconcileRuns, sweepRuns } from "./upkeep.ts";
@@ -53,8 +54,9 @@ export type Scheduler = {
   pass(): Promise<void>;
   fire(id: string): Promise<SessionDetail | null>;
   checked(): Promise<void>;
-  runNow(row: AutomationSummary, user: UserRow): SessionDetail;
-  prepareNow(row: AutomationSummary, user: UserRow): PreparedRun;
+  // Run now's check, after its cheap refusals; undefined with no check URL
+  askNow(row: AutomationSummary, user: UserRow): Promise<Held | undefined>;
+  prepareNow(row: AutomationSummary, user: UserRow, held?: Held): PreparedRun;
   sweep(): number;
   reconcile(): number;
   dispose(): void;
@@ -120,6 +122,7 @@ export function scheduler(deps: Deps): Scheduler {
           if (source === "manual") throw new Conflict("no such automation");
           return { result: null };
         }
+        if (source === "manual") changedSince(row, held);
         const now = deps.clock();
         const listed = source === "restart" ? cut.get(id) : undefined;
         const dueAt =
@@ -160,7 +163,9 @@ export function scheduler(deps: Deps): Scheduler {
             eventFor(deps, row, source, dueAt!, resolved, held),
           );
           const prepared = holder.value;
-          if (held !== undefined) deps.checks.started(row.id);
+          if (held !== undefined) {
+            deps.checks.started(row.id, held.answer.result);
+          }
           const recordedRun = deps.store.recordEvent(row.id, {
             at: now,
             dueAt: dueAt!,
@@ -413,12 +418,16 @@ export function scheduler(deps: Deps): Scheduler {
     }
   };
 
-  const prepareNow = (row: AutomationSummary, user: UserRow): PreparedRun => {
-    const result = attempt(row.id, "manual", user);
+  const prepareNow = (
+    row: AutomationSummary,
+    user: UserRow,
+    held?: Held,
+  ): PreparedRun => {
+    const result = attempt(row.id, "manual", user, held);
     if (result === null || "wait" in result) {
       throw new Conflict("no such automation");
     }
-    return result;
+    return holding(deps.checks, result, row.id, held);
   };
 
   return {
@@ -449,11 +458,7 @@ export function scheduler(deps: Deps): Scheduler {
     pass,
     fire: (id) => fire(id),
     checked: () => deps.checks.settled(),
-    runNow(row, user) {
-      const result = prepareNow(row, user);
-      result.launch();
-      return result.detail;
-    },
+    askNow: (row, user) => askNow(deps, row, user, draining),
     prepareNow,
     sweep,
     reconcile,

@@ -15,6 +15,7 @@ import type { Limits } from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { PreparedRun } from "../runner/index.ts";
 import type { UserRow } from "../users/index.ts";
+import type { Held } from "./check.ts";
 import type { parsePatchAutomation } from "./parse.ts";
 import { checkSchedule, nextFire } from "./schedule.ts";
 import type { Scheduler } from "./scheduler.ts";
@@ -54,7 +55,9 @@ export type AutomationActions = {
   ): AutomationSummary;
   suspend(principal: Principal, id: string): AutomationSummary;
   resume(principal: Principal, id: string): AutomationSummary;
-  run(principal: Principal, id: string): PreparedRun;
+  run(principal: Principal, id: string): PreparedRun | Promise<PreparedRun>;
+  ask(principal: Principal, id: string): Promise<Held | undefined>;
+  start(principal: Principal, id: string, held?: Held): PreparedRun;
 };
 
 // the personal project has no channel to post to
@@ -89,6 +92,16 @@ export function automationActions(deps: ActionsDeps): AutomationActions {
       throw new BadRequest("deadline is above the run limit");
     }
   };
+  const actor = (principal: Principal): UserRow => {
+    const user = deps.users.byId(principal.userId);
+    if (user === null) throw new BadRequest("the user is gone");
+    return user;
+  };
+  const ask = (principal: Principal, id: string) =>
+    deps.scheduler.askNow(visible(principal, id), actor(principal));
+  // read again: the check's GET may have taken a while
+  const start = (principal: Principal, id: string, held?: Held) =>
+    deps.scheduler.prepareNow(visible(principal, id), actor(principal), held);
   return {
     visible,
     create(principal, projectId, body) {
@@ -192,11 +205,12 @@ export function automationActions(deps: ActionsDeps): AutomationActions {
         return { result: updated, events: [automationChanged(updated)] };
       });
     },
+    ask: (principal, id) => ask(principal, id),
+    start: (principal, id, held) => start(principal, id, held),
+    // without a check it starts in the same tick
     run(principal, id) {
-      const row = visible(principal, id);
-      const user = deps.users.byId(principal.userId);
-      if (user === null) throw new BadRequest("the user is gone");
-      return deps.scheduler.prepareNow(row, user);
+      if (visible(principal, id).checkUrl === null) return start(principal, id);
+      return ask(principal, id).then((held) => start(principal, id, held));
     },
   };
 }

@@ -208,11 +208,11 @@ sweep) is in `docs/sessions.md`.
 
 A Check URL (`checkUrl`) makes each scheduled fire ask before it runs
 (`automations/check.ts`, `check-fetch.ts`, `check-message.ts`,
-`check-rows.ts`). It is parsed as an MCP server's URL (`parseUrl()`);
-`""` or null is none. Setting or changing it clears the validators,
-`last_checked_at`, `last_check_result` and `check_alert_at`, closes an
-alert no marked run belongs to, and sets `last_answered_at` to now, so
-silence counts from the change.
+`check-rows.ts`, `run-now.ts`). It is parsed as an MCP server's URL
+(`parseUrl()`); `""` or null is none. Setting or changing it clears the
+validators, `last_checked_at`, `last_check_result` and `check_alert_at`,
+closes an alert no marked run belongs to, and sets `last_answered_at` to
+now, so silence counts from the change.
 
 - **One GET per fire, never awaited by the pass.** The pass starts it
   and skips the row while it is in flight; the sleep leaves due rows
@@ -237,8 +237,19 @@ silence counts from the change.
   and the next try asks again. A stale quiet or failed answer leaves a
   restart rerun listed. A pass that skips a full project's row drops
   its answer too. A drain aborts every GET and defers the rows as any
-  due row. Run now never asks; a restart rerun asks, since its answer's
-  validators were never saved.
+  due row. A restart rerun asks, since its answer's validators were
+  never saved.
+- **Run now asks and always runs** (`askNow()`, `checks.now()`). Its
+  refusals (`manualFor()`, a run going, a drain) come before the GET,
+  which sends no validators, so an unchanged body is an answer. A 200
+  starts the run as a new answer does, its line saying only that the
+  URL answered, and its validators wait as a scheduled run's. A quiet
+  or failed answer starts it with the instructions and one line saying
+  so, and no kept file. It writes the check columns as a fire does and
+  takes a waiting fire as any Run now does, but writes no skipped event
+  and never opens the alert; a failure logs `check failed`. A row whose
+  URL or edit revision moved during the GET is a 409, and a drain's
+  abort a 503. A run proposal a chat confirms asks the same way.
 - **Nothing new is a 204, a 304, or a 200 whose body is white space,
   `[]`, `{}` or `null` (white space allowed inside) or whose SHA-256 is
   `check_body_hash`.** It moves `next_at`, the row's check columns and

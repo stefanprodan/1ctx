@@ -242,7 +242,7 @@ export function makeAutomationTool(
               checkUrl: {
                 type: "string",
                 description:
-                  "A Check URL, http or https, asked with GET at every scheduled time: a run starts only when its answer is new, and the answer is in the run's first message. Empty for none, the default.",
+                  "A Check URL, http or https, asked with GET at every scheduled time: a run starts only when its answer is new, and the answer is in the run's first message. Run now always runs and says in the first message if the check failed or answered nothing. Empty for none, the default.",
               },
             }
           : {}),

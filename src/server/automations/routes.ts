@@ -221,8 +221,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       method: "POST",
       path: "/api/automations/:id/run",
       policy: "authenticated",
-      handle(_req, ctx) {
-        const prepared = deps.actions.run(ctx.principal!, ctx.params.id);
+      async handle(_req, ctx) {
+        const prepared = await deps.actions.run(ctx.principal!, ctx.params.id);
         prepared.launch();
         return json(prepared.detail, 201);
       },

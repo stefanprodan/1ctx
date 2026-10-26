@@ -11,7 +11,7 @@ import { type ProjectRow, visible } from "../projects/index.ts";
 import type { Event } from "../runner/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { Held } from "./check.ts";
-import { checkMessage } from "./check-message.ts";
+import { checkLine, checkMessage } from "./check-message.ts";
 import { RETIRED } from "./store.ts";
 
 export type FireDeps = {
@@ -65,14 +65,22 @@ function firstMessage(
   row: AutomationSummary,
   agent: AgentRow,
   held: Held | undefined,
+  manual: boolean,
 ): Pick<Event, "instructions" | "kept"> {
-  if (held === undefined || held.answer.result !== "200") {
-    return { instructions: row.instructions };
+  if (held === undefined) return { instructions: row.instructions };
+  if (held.answer.result !== "200") {
+    return {
+      instructions: manual
+        ? checkLine(row.instructions, held.answer.result)
+        : row.instructions,
+    };
   }
-  const start = checkMessage(row.instructions, held.answer.body, {
-    resultCut: deps.resultCut(),
-    window: agent.model.contextLength,
-  });
+  const start = checkMessage(
+    row.instructions,
+    held.answer.body,
+    { resultCut: deps.resultCut(), window: agent.model.contextLength },
+    manual,
+  );
   return { instructions: start.text, kept: [start.kept] };
 }
 
@@ -85,7 +93,7 @@ export function eventFor(
   held?: Held,
 ): Event {
   return {
-    ...firstMessage(deps, row, resolved.agent, held),
+    ...firstMessage(deps, row, resolved.agent, held, source === "manual"),
     source,
     automation: {
       id: row.id,
