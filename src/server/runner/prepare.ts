@@ -5,7 +5,12 @@ import type { CapabilityChange } from "../../shared/capabilities.ts";
 import type { SessionDetail } from "../../shared/contracts/session.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { SendKind, SessionOrigin } from "../../shared/words.ts";
-import { type Workspace, workspaceOf } from "../bash/index.ts";
+import {
+  type KeptFile,
+  type Workspace,
+  workspaceOf,
+  writeKeptFiles,
+} from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
@@ -124,6 +129,8 @@ export function prepareSend(fields: {
   kind: Exclude<SendKind, "post">;
   origin: SessionOrigin;
   automationId: string | null;
+  // a fresh session's first message files, as a check's answer
+  kept?: readonly KeptFile[];
   now: number;
 }): PreparedRun {
   const now = fields.now;
@@ -202,34 +209,38 @@ export function prepareSend(fields: {
           workspace,
           "existing" in turn ? turn.existing.at(-1)!.seq : null,
         );
-        let next = kept.next;
+        // the first message's files take their folders and count, so
+        // the send's own calls number past them
+        const first = fields.kept ?? [];
+        let next = Math.max(kept.next, ...first.map((file) => file.folder + 1));
         send.keep = {
           take: () => next++,
           maxBytes: kept.maxBytes,
-          used: kept.used,
+          used: kept.used + first.reduce((sum, file) => sum + file.bytes, 0),
           maxFiles: kept.maxFiles,
-          files: kept.files,
+          files: kept.files + first.length,
         };
       }
-      return {
-        result: fields.writer.startSend({
-          sendId,
-          replyId,
-          sessionId: fields.sessionId,
-          session: fields.session,
-          turn,
-          origin: fields.origin,
-          automationId: fields.automationId,
-          kind: fields.kind,
-          title: fields.title,
-          policy: fields.policy,
-          changes: fields.changes,
-          mcpDigest: fields.policy.offered.mcpPrompt.digest,
-          ...(previousMcpDigest === undefined ? {} : { previousMcpDigest }),
-          ...(fields.claim === undefined ? {} : { claim: fields.claim }),
-        }),
-        events: [],
-      };
+      const result = fields.writer.startSend({
+        sendId,
+        replyId,
+        sessionId: fields.sessionId,
+        session: fields.session,
+        turn,
+        origin: fields.origin,
+        automationId: fields.automationId,
+        kind: fields.kind,
+        title: fields.title,
+        policy: fields.policy,
+        changes: fields.changes,
+        mcpDigest: fields.policy.offered.mcpPrompt.digest,
+        ...(previousMcpDigest === undefined ? {} : { previousMcpDigest }),
+        ...(fields.claim === undefined ? {} : { claim: fields.claim }),
+      });
+      if (fields.kept?.length) {
+        writeKeptFiles(fields.db, firstMessageId(turn), fields.kept);
+      }
+      return { result, events: [] };
     });
     if (send.channel === null) {
       send.mcpNote = changeNote(

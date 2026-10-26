@@ -72,6 +72,55 @@ export const ANTHROPIC_URL = "https://claude.test/v1";
 export const ANTHROPIC_CHAT = `${ANTHROPIC_URL}/messages`;
 export const ANTHROPIC_MODELS = `${ANTHROPIC_URL}/models?limit=1000`;
 
+// a scheduled task's check URL: a test scripts each answer with
+// checkHost(), and an unscripted request fails to connect
+export const CHECK_URL = "https://check.test";
+
+export type CheckHost = {
+  // pass as chatApp's fetcher: the scripted provider hands it the rest
+  fetcher: typeof fetch;
+  calls: FakeCall[];
+  // what the next requests get, by url and headers, until replaced
+  answer(
+    reply: (
+      call: FakeCall,
+      signal?: AbortSignal,
+    ) => Response | Promise<Response>,
+  ): void;
+};
+
+export function checkHost(): CheckHost {
+  const calls: FakeCall[] = [];
+  let reply:
+    | ((call: FakeCall, signal?: AbortSignal) => Response | Promise<Response>)
+    | null = null;
+  const fetcher = (async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = String(input instanceof Request ? input.url : input);
+    const headers: Record<string, string> = {};
+    new Headers(init?.headers).forEach((v, k) => {
+      headers[k] = v;
+    });
+    const call = { url, headers, body: null };
+    calls.push(call);
+    if (reply === null || !url.startsWith(CHECK_URL)) {
+      throw new TypeError("unable to connect");
+    }
+    const signal = init?.signal ?? undefined;
+    signal?.throwIfAborted();
+    return await reply(call, signal);
+  }) as unknown as typeof fetch;
+  return {
+    fetcher,
+    calls,
+    answer(next) {
+      reply = next;
+    },
+  };
+}
+
 const fixture = (...parts: string[]) =>
   readFileSync(join(import.meta.dir, "..", "fixtures", ...parts), "utf8");
 const catalogBody = () => fixture("providers", "models.json");

@@ -117,7 +117,9 @@ since a relative URL inside the binary resolves against `src/server`.
 with a fake clock, the least argon2id cost, a cookie jar and a fake
 fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `MLX_URL`,
-`AZURE_URL`, `ANTHROPIC_URL`) and fails every other, and a fake email sender that
+`AZURE_URL`, `ANTHROPIC_URL`) and fails every other, a scripted
+`CHECK_URL` host (`checkHost()`), and a fake email sender that
+
 keeps every message; `sleeping`, `slept` and `commandPhase` await the
 fake clock and a command's phase. In `chat.ts`, `until`, `idle`,
 `freed`, `sessionSettled` and `ringing` await bus events, sends
@@ -150,7 +152,8 @@ change it in the same commit as the code that changes a rule.
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
-| `docs/automations.md` | `automations/`, the scheduler, what only runs do, the attention mark (agent, runner, decider backup) |
+| `docs/automations.md` | `automations/`, the scheduler, the check URL, what only runs do |
+| `docs/attention.md` | the attention mark (agent, runner, decider backup), the open alert and its email |
 | `docs/external-tasks.md` | `external-tasks/`: member routes, task delivery and maintenance |
 | `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user` |
 | `docs/project-tools.md` | the `automation` and `external_task` tools |

@@ -15,4 +15,6 @@ export const AUTOMATION_DEFAULTS = {
   attentionGuidance: "",
   rerunOnRestart: false,
   once: false,
+  checkUrl: null,
+  checkCompare: null,
 } satisfies Partial<AutomationSummary>;

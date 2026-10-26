@@ -42,6 +42,7 @@ import {
 import {
   automationFieldOf,
   automationPageOf,
+  checkLine,
   type Draft,
   dirtyOf,
   draftOf,
@@ -56,6 +57,7 @@ import {
   retiredPick,
   rowState,
   suspendedText,
+  urlParts,
   waitingSince,
 } from "../../../src/client/views/projects/Automations.model.ts";
 import {
@@ -73,6 +75,7 @@ import {
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import {
   type AutomationSummary,
+  CHECK_FAILURES,
   ranOnce,
   STALE_EDIT,
 } from "../../../src/shared/contracts/automation.ts";
@@ -88,6 +91,11 @@ const automation = (
 ): AutomationSummary => ({
   agentName: "assistant",
   agentRetired: false,
+  checkUrl: null,
+  checkCompare: null,
+  lastCheckedAt: null,
+  lastCheckResult: null,
+  lastAnsweredAt: null,
   id: "au1",
   projectId: "p1",
   ownerId: "u1",
@@ -444,6 +452,76 @@ describe("the row's words", () => {
     expect(eventNote(skipped, now)).toBe("Skipped 1m ago: still running");
   });
 
+  test("the check's line says when it asked and what it found", () => {
+    expect(checkLine(automation(), now)).toBeNull();
+    const url = "https://api.example.test/alerts";
+    const checked = (lastCheckResult: AutomationSummary["lastCheckResult"]) =>
+      checkLine(
+        automation({
+          checkUrl: url,
+          lastCheckedAt: now - 3 * 60_000,
+          lastCheckResult,
+        }),
+        now,
+      );
+    expect(checkLine(automation({ checkUrl: url }), now)).toEqual({
+      text: "Not checked yet",
+      failed: false,
+    });
+    for (const quiet of ["204", "304", "empty", "unchanged"] as const) {
+      expect(checked(quiet)).toEqual({
+        text: "Checked 3m ago: nothing new",
+        failed: false,
+      });
+    }
+    expect(checked("200")).toEqual({
+      text: "Checked 3m ago: new answer",
+      failed: false,
+    });
+    expect(checked("HTTP 503")).toEqual({
+      text: "Check failed 3m ago: HTTP 503",
+      failed: true,
+    });
+    for (const phrase of CHECK_FAILURES) {
+      expect(checked(phrase)).toEqual({
+        text: `Check failed 3m ago: ${phrase}`,
+        failed: true,
+      });
+    }
+  });
+
+  test("a failed check's skip is said once, by the check's line", () => {
+    const failed = automation({
+      checkUrl: "https://api.example.test/alerts",
+      lastCheckedAt: now - 14_000,
+      lastCheckResult: "HTTP 503",
+      lastEventAt: now - 14_000,
+      lastEventOutcome: "skipped",
+      lastEventReason: "check failed: HTTP 503",
+    });
+    expect(eventNote(failed, now)).toBeNull();
+    expect(checkLine(failed, now)?.text).toBe("Check failed 14s ago: HTTP 503");
+    // a skip of its own, after the check, still shows
+    const later = { ...failed, lastEventAt: now - 5_000 };
+    expect(eventNote(later, now)).toBe(
+      "Skipped 5s ago: check failed: HTTP 503",
+    );
+    // a quiet check's time matching a skip is not the check's skip
+    const quiet = { ...failed, lastCheckResult: "304" as const };
+    expect(eventNote(quiet, now)).toContain("Skipped");
+  });
+
+  test("a URL breaks after each slash and question mark", () => {
+    expect(urlParts("http://127.0.0.1:1240/fail?x=1/2")).toEqual([
+      "http://",
+      "127.0.0.1:1240/",
+      "fail?",
+      "x=1/",
+      "2",
+    ]);
+    expect(urlParts("https://a.test/").join("")).toBe("https://a.test/");
+  });
+
   test("a scheduled fire a minute or more late says how late", () => {
     const late = automation({
       lastEventAt: now - HOUR,
@@ -576,6 +654,8 @@ describe("the form", () => {
       rerunOnRestart: false,
       postToChannel: false,
       once: false,
+      checkUrl: "",
+      checkCompare: "",
       web: true,
       visuals: true,
       knowledge: true,
@@ -606,6 +686,8 @@ describe("the form", () => {
         rerunOnRestart: false,
         postToChannel: false,
         once: false,
+        checkUrl: null,
+        checkCompare: null,
         disabledCapabilities: [],
       },
     });
@@ -650,6 +732,14 @@ describe("the form", () => {
     expect(dirtyOf({ ...shown, rerunOnRestart: false }, row, LIMIT)).toBe(true);
   });
 
+  test("a Compare hidden by an empty Check URL leaves the form clean", () => {
+    const row = automation({ checkUrl: null, checkCompare: null });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(dirtyOf({ ...shown, checkCompare: "tag_name" }, row, LIMIT)).toBe(
+      false,
+    );
+  });
+
   test("posting to the channel is off for a new automation and saved as drafted", () => {
     expect(draftOf(null, "a1", "UTC", LIMIT).postToChannel).toBe(false);
     const on = requestOf(filled({ postToChannel: true }), LIMIT);
@@ -669,6 +759,58 @@ describe("the form", () => {
     expect(shown.once).toBe(true);
     expect(dirtyOf(shown, row, LIMIT)).toBe(false);
     expect(dirtyOf({ ...shown, once: false }, row, LIMIT)).toBe(true);
+  });
+
+  test("the check URL is none for a new automation and saved as drafted", () => {
+    const sent = (d: Draft) => {
+      const out = requestOf(d, LIMIT);
+      return "body" in out ? out.body.checkUrl : "refused";
+    };
+    expect(sent(filled())).toBeNull();
+    const url = "https://api.example.test/alerts?state=open";
+    expect(sent(filled({ checkUrl: ` ${url} ` }))).toBe(url);
+    // an edit that leaves it alone sends the row's own, which keeps it
+    const row = automation({ checkUrl: url });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.checkUrl).toBe(url);
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(sent({ ...shown, name: "renamed" })).toBe(url);
+    const moved = { ...shown, checkUrl: `${url}&page=2` };
+    expect(dirtyOf(moved, row, LIMIT)).toBe(true);
+    expect(sent(moved)).toBe(`${url}&page=2`);
+    // cleared, it goes as none and the plain schedule comes back
+    const cleared = { ...shown, checkUrl: " " };
+    expect(dirtyOf(cleared, row, LIMIT)).toBe(true);
+    expect(sent(cleared)).toBeNull();
+    expect(automationFieldOf("Check URL must be an http or https URL")).toBe(
+      "checkUrl",
+    );
+    expect(automationFieldOf("Check URL is too long")).toBe("checkUrl");
+  });
+
+  test("the compare is saved as drafted, and goes with a cleared URL", () => {
+    const sent = (d: Draft) => {
+      const out = requestOf(d, LIMIT);
+      return "body" in out ? out.body.checkCompare : "refused";
+    };
+    const url = "https://api.example.test/releases/latest";
+    expect(sent(filled({ checkUrl: url }))).toBeNull();
+    expect(sent(filled({ checkUrl: url, checkCompare: " tag_name " }))).toBe(
+      "tag_name",
+    );
+    const row = automation({ checkUrl: url, checkCompare: "tag_name" });
+    const shown = draftOf(row, "ignored", "ignored", LIMIT);
+    expect(shown.checkCompare).toBe("tag_name");
+    expect(dirtyOf(shown, row, LIMIT)).toBe(false);
+    expect(dirtyOf({ ...shown, checkCompare: "name" }, row, LIMIT)).toBe(true);
+    // hidden without a URL, so it is never sent alone
+    expect(sent({ ...shown, checkUrl: "" })).toBeNull();
+    expect(
+      automationFieldOf(
+        "Compare must be a dotted path like tag_name or items[0].id",
+      ),
+    ).toBe("checkCompare");
+    expect(automationFieldOf("Compare needs a Check URL")).toBe("checkCompare");
   });
 
   test("only emptiness and the numbers' shape are refused here", () => {

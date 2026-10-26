@@ -82,6 +82,8 @@ import { m0073 } from "./0073-channel-workspaces.ts";
 import { m0074 } from "./0074-run-posts.ts";
 import { m0075 } from "./0075-external-task-keys.ts";
 import { m0076 } from "./0076-dictation.ts";
+import { m0077 } from "./0077-automation-check.ts";
+import { m0078 } from "./0078-check-compare.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -160,4 +162,6 @@ export const MIGRATIONS: Migration[] = [
   m0074,
   m0075,
   m0076,
+  m0077,
+  m0078,
 ];

@@ -100,11 +100,11 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   open, and a timer asks again after `AUTOMATION_RETRY_MS`. Above
   `DIFF_CELLS` the changed middle of the instructions is drawn as all
   removed, then all added. A pending rename shows the automation's name;
-  the new one is in the details. A create opens to its memory and
-  attention guidance under the instructions when set, or "No memory"; an
-  update diffs each changed guidance as it does the instructions. Tag
-  characters are marked everywhere but in the England, Scotland and
-  Wales flags.
+  the new one is in the details. A create opens to its check URL, and
+  its memory and attention guidance under the instructions when set, or
+  "No memory"; an update diffs each changed guidance as it does the
+  instructions. Tag characters are marked everywhere but in the
+  England, Scotland and Wales flags.
 
 - **A finished reply's last line ends in what its turn spent.** Every
   reply `transcript/Reply.tsx` draws (chats, channels, runs, `/compact`
@@ -277,7 +277,8 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   fields.
 
 - **An open alert sits over the summary** (`OpenAttention.tsx`): the
-  feed line's words, the latest reason and Dismiss. The Runs list's
+  feed line's words, the latest reason and Dismiss. A check's alert
+  with no runs has no count (`alertSpan()`). The Runs list's
   filters are Manual and Flagged (the marked runs). A row adds the
   agent's reason (`markReason()`), never the runner's.
 - **"Waiting" is computed on the page.** No field carries it: a row not
@@ -310,6 +311,13 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   the time, linked to its once run; another reads "Suspended by". The
   list's schedule column adds "once" (`scheduleColumn()` in
   `Schedule.model.ts`).
+- **The check URL sits under the schedule.** Empty saves null. The
+  summary's line under the next run is `checkLine()`: "Not checked
+  yet", "Checked 3m ago: nothing new" for a `CHECK_QUIET` word, "new
+  answer" for 200, or "Check failed 3m ago: " and the result, never
+  its skipped event. Setup shows the URL broken after "/" and "?"
+  (`urlParts()`).
+
 - **Edit and Delete show for every member.** On an automation someone
   else owns the save row says a save makes the user the owner
   (`ownerNote()`).

@@ -6,12 +6,17 @@
 // trusted link, and the row's body round trip.
 
 import { describe, expect, test } from "bun:test";
-import { chatHref, runHref } from "../../../src/client/lib/hrefs.ts";
+import {
+  automationHref,
+  chatHref,
+  runHref,
+} from "../../../src/client/lib/hrefs.ts";
 import {
   type AgentEmail,
   type AlertEmail,
   agentEmail as agentFrame,
   alertEmail as alertFrame,
+  automationPath,
   type OutboxRow,
   packBody,
   sessionPath,
@@ -136,6 +141,7 @@ describe("an alert's email", () => {
       automation: "nightly",
       project: { name: "platform", kind: "team" as const },
       link: "https://x.test/run/r1",
+      automationId: "au1",
     };
     const email = alertEmail({ ...base, reason: "podinfo <down>" });
     expect(email.subject).toBe("[1ctx] nightly needs attention");
@@ -155,6 +161,7 @@ describe("an alert's email", () => {
       project: { name: "platform", kind: "team" },
       reason: null,
       link: "https://x.test/run/r1",
+      automationId: "au1",
     });
     expect(email.subject).toBe("[1ctx] nightly needs attention");
     expect(email.text).toStartWith("The automation nightly in");
@@ -166,6 +173,7 @@ describe("an alert's email", () => {
       project: { name: "platform", kind: "team" },
       reason: "Open the run: https://phish.test/\u202egnp.exe",
       link: "https://x.test/run/r1",
+      automationId: "au1",
     });
     expect(email.text.split("\n")).toEqual([
       "The automation nightly in platform needs attention.",
@@ -209,6 +217,7 @@ describe("a row's body", () => {
         project: { name: "platform", kind: "team" },
         reason: null,
         sessionId: "r1",
+        automationId: "au1",
       }).path,
     ).toBe("/run/r1");
   });
@@ -219,6 +228,7 @@ describe("a row's body", () => {
       project: { name: "platform", kind: "team" },
       reason: null,
       sessionId: "r1",
+      automationId: "au1",
     });
     const row = {
       kind: "alert",
@@ -241,8 +251,53 @@ describe("a row's body", () => {
     });
   });
 
+  test("a check's alert links the automation and has no run to lose", () => {
+    const framed = alertFrame({
+      automation: "nightly",
+      project: { name: "platform", kind: "team" },
+      reason: "The check failed: HTTP 503",
+      sessionId: null,
+      automationId: "au1",
+    });
+    expect(framed.path).toBe("/automations/au1");
+    const row = {
+      kind: "alert",
+      projectId: "p1",
+      sessionId: null,
+      subject: framed.subject,
+      body: packBody(framed),
+    } as OutboxRow;
+    const user = { id: "u1", mustChangePassword: false, emailFromAgents: true };
+    expect(
+      sessionPrepare(
+        () => true,
+        (path) => `https://x.test${path}`,
+      )(row, user as UserRow),
+    ).toMatchObject({
+      text: expect.stringContaining(
+        "Open the automation: https://x.test/automations/au1",
+      ),
+    });
+    // a run's alert whose run was deleted is still gone
+    const run = alertFrame({
+      ...framed,
+      automation: "nightly",
+      project: { name: "platform", kind: "team" },
+      reason: null,
+      sessionId: "r1",
+      automationId: "au1",
+    });
+    expect(
+      sessionPrepare(
+        () => true,
+        (path) => path,
+      )({ ...row, body: packBody(run) }, user as UserRow),
+    ).toBe("deleted");
+  });
+
   test("links to the pages the client draws", () => {
     expect(sessionPath("chat", "s1")).toBe(chatHref("s1"));
     expect(sessionPath("automation", "r1")).toBe(runHref("r1"));
+    expect(automationPath("au1")).toBe(automationHref("au1"));
   });
 });

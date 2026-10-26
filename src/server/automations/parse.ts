@@ -10,6 +10,17 @@ import {
   MAX_DISABLED_CAPABILITIES,
   parseSet,
 } from "../../shared/capabilities.ts";
+import {
+  COMPARE_NEEDS_URL,
+  COMPARE_REFUSAL,
+  formatCompare,
+  MAX_CHECK_COMPARE,
+  parseCompare,
+} from "../../shared/check-compare.ts";
+import {
+  type AutomationSummary,
+  MAX_CHECK_URL,
+} from "../../shared/contracts/automation.ts";
 import { sanitize } from "../../shared/memory.ts";
 import {
   isAttentionMode,
@@ -24,10 +35,13 @@ import {
 } from "../../shared/words.ts";
 import { fields, parseName, queryParams } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { parseUrl } from "../mcp/index.ts";
 import { parseRunsCursor, type RunsCursor } from "../sessions/index.ts";
 
 export const MAX_AUTOMATION_BODY =
   MAX_MESSAGE_BYTES +
+  MAX_CHECK_URL +
+  MAX_CHECK_COMPARE +
   MAX_MEMORY_GUIDANCE +
   MAX_ATTENTION_GUIDANCE +
   MAX_DISABLED_CAPABILITIES * (MAX_CAPABILITY_KEY + 3) +
@@ -60,7 +74,59 @@ function guidance(value: unknown, field: string, label: string, max: number) {
   return cleaned;
 }
 
+// parseUrl()'s refusals in the words the form shows under the field
+const CHECK_URL_WORDS: Record<string, string> = {
+  "url must be a URL": "Check URL must be a URL",
+  "url is too long": "Check URL is too long",
+  "url must be http or https": "Check URL must be an http or https URL",
+  "url must not have user info or a fragment":
+    "Check URL must not hold a user or a fragment",
+};
+
+// an MCP server's URL rule
+function checkUrl(value: unknown): string | null {
+  if (value === null || value === "") return null;
+  try {
+    return parseUrl(value);
+  } catch (err) {
+    if (!(err instanceof BadRequest)) throw err;
+    throw new BadRequest(
+      CHECK_URL_WORDS[err.message] ?? "Check URL must be a URL",
+    );
+  }
+}
+
+// a dotted path into the answer's JSON, kept in one spelling
+function checkCompare(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string") throw new BadRequest(COMPARE_REFUSAL);
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  const path = parseCompare(trimmed);
+  if (path === null) throw new BadRequest(COMPARE_REFUSAL);
+  return formatCompare(path);
+}
+
 type AutomationValues = Omit<PatchAutomationRequest, "editRevision">;
+
+// the compare a patch leaves: a cleared URL takes it along, and one
+// without a URL is refused
+export function compareAfter(
+  current: Pick<AutomationSummary, "checkUrl" | "checkCompare">,
+  patch: AutomationValues,
+): string | null {
+  const url = patch.checkUrl === undefined ? current.checkUrl : patch.checkUrl;
+  const compare =
+    patch.checkCompare !== undefined
+      ? patch.checkCompare
+      : patch.checkUrl === null
+        ? null
+        : current.checkCompare;
+  if (url === null && compare !== null) {
+    throw new BadRequest(COMPARE_NEEDS_URL);
+  }
+  return compare;
+}
 
 function parseValues(
   body: Record<string, unknown>,
@@ -157,6 +223,15 @@ function parseValues(
       MAX_ATTENTION_GUIDANCE,
     );
   }
+  if (take("checkUrl")) {
+    out.checkUrl = checkUrl(given("checkUrl", null));
+  }
+  if (take("checkCompare")) {
+    out.checkCompare = checkCompare(given("checkCompare", null));
+  }
+  if (required && out.checkUrl === null && out.checkCompare !== null) {
+    throw new BadRequest(COMPARE_NEEDS_URL);
+  }
   if (take("disabledCapabilities")) {
     const parsed = parseSet(
       given("disabledCapabilities", []),
@@ -177,6 +252,8 @@ const OPTIONAL = [
   "once",
   "attentionMode",
   "attentionGuidance",
+  "checkUrl",
+  "checkCompare",
 ];
 
 export function parseSaveAutomation(

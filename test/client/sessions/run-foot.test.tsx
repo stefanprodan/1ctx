@@ -345,6 +345,7 @@ describe("Dismiss in the strip", () => {
     runs: 2,
     reason: null,
     by: "jev",
+    check: false,
   });
 
   test("only for a marked run that ended at or after the alert opened", () => {

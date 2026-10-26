@@ -57,6 +57,36 @@ describe("automation draft decisions", () => {
     }
   });
 
+  test("a proposed create carries its check URL to the automation", async () => {
+    const chat = await draftApp();
+    try {
+      const { drafts } = await proposals(chat, [
+        {
+          ...createProposal(),
+          checkUrl: "https://api.test/alerts?state=open",
+          checkCompare: "items[0].id",
+        },
+      ]);
+      const draft = drafts[0]!;
+      expect(draft.fields).toMatchObject({
+        checkUrl: "https://api.test/alerts?state=open",
+        checkCompare: "items[0].id",
+      });
+      expect((await press(chat, draft.id)).status).toBe(200);
+      const created = chat.app.automationDrafts.byId(draft.id)!;
+      expect(
+        chat.app.automations.byId(created.createdAutomationId!),
+      ).toMatchObject({
+        checkUrl: "https://api.test/alerts?state=open",
+        checkCompare: "items[0].id",
+        lastCheckedAt: null,
+        lastAnsweredAt: chat.app.now.value,
+      });
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
   test("update, suspend and resume use the form's actions, including no-ops", async () => {
     const chat = await draftApp();
     try {
@@ -105,6 +135,34 @@ describe("automation draft decisions", () => {
       ]);
       expect((await press(chat, drafts[0]!.id)).status).toBe(200);
       expect(chat.app.automations.byId(automation.id)).toEqual(before);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a proposed run of a checked automation asks as Run now does", async () => {
+    const chat = await draftApp();
+    try {
+      const automation = await createAutomation(chat, {
+        checkUrl: "https://api.test/alerts",
+      });
+      const { drafts } = await proposals(chat, [
+        { action: "run", id: automation.id },
+      ]);
+      const next = chat.scripted.next();
+      expect((await press(chat, drafts[0]!.id)).status).toBe(200);
+      const draft = chat.app.automationDrafts.byId(drafts[0]!.id)!;
+      expect(draft.state).toBe("confirmed");
+      expect(chat.app.automations.byId(automation.id)).toMatchObject({
+        lastCheckedAt: chat.app.now.value,
+        lastCheckResult: "could not connect",
+      });
+      const script = await next;
+      expect(JSON.stringify(script.body.messages)).toContain(
+        "The check URL failed: could not connect.",
+      );
+      script.reply("Done.");
+      await settleRun(chat, draft.runSessionId!);
     } finally {
       await chat.app.shutdown();
     }

@@ -7,6 +7,7 @@ import { type Db, transact } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { AlertChange } from "../runner/index.ts";
 import {
+  CHECK_HOLDS,
   endedAfter,
   openAlertRuns,
   type SessionStore,
@@ -68,7 +69,8 @@ const touchSince = (db: Db, id: string, endedAt: number) =>
     )
     .run(id, endedAt).changes > 0;
 
-// a clean run or a dismiss: false when none was open
+// a dismiss: false when none was open. It keeps the check's mark, so a
+// still silent check never reopens it before it answers
 const closeAlert = (db: Db, id: string) =>
   db
     .query(
@@ -77,12 +79,29 @@ const closeAlert = (db: Db, id: string) =>
     )
     .run(id).changes > 0;
 
-// an open alert whose marked runs are all gone: one covering lookup
+// a clean run closes the alert, unless the check held it after the
+// run's end: then it stays, the check's alone
+const closeRuns = (db: Db, id: string, endedAt: number) =>
+  db
+    .query(
+      `update automations set
+         attention_since = iif(${CHECK_HOLDS} and check_alert_at > ?1,
+           check_alert_at, null),
+         check_alert_at = iif(${CHECK_HOLDS} and check_alert_at > ?1,
+           check_alert_at, null),
+         revision = revision + 1
+       where id = ?2 and attention_since is not null`,
+    )
+    .run(endedAt, id).changes > 0;
+
+// an open alert whose marked runs are all gone: one covering lookup.
+// One the check holds is the check's to close
 const closeEmpty = (db: Db, id: string) =>
   db
     .query(
       `update automations set attention_since = null, revision = revision + 1
-       where id = ? and attention_since is not null and not exists (
+       where id = ? and attention_since is not null
+         and not coalesce(${CHECK_HOLDS}, 0) and not exists (
          select 1 ${openAlertRuns("automations")})`,
     )
     .run(id).changes > 0;
@@ -96,7 +115,7 @@ export function alerts(deps: AlertsDeps): Alerts {
       return [];
     }
     if (change === "close") {
-      if (!closeAlert(db, run.automationId)) return [];
+      if (!closeRuns(db, run.automationId, run.endedAt)) return [];
       const row = store.byId(run.automationId);
       return row === null ? [] : [automationChanged(row)];
     }

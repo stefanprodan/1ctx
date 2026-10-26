@@ -201,6 +201,8 @@ const FIELD_WORDS: [keyof ProposalFields, string][] = [
   ["ownMemory", "memory"],
   ["memoryGuidance", "memory"],
   ["attentionGuidance", "attention"],
+  ["checkUrl", "check URL"],
+  ["checkCompare", "compare"],
 ];
 
 // what the line says after the name while it waits: when a new automation
@@ -229,14 +231,31 @@ export type FieldRow = { label: string; value: string; was: string | null };
 
 const yes = (on: boolean) => (on ? "yes" : "no");
 
+// a check URL or compare, or none: null and empty both clear it
+const checkOf = (url: string | null | undefined) =>
+  url === null || url === undefined || url === "" ? "none" : url;
+
+const CHECK_FIELDS = [
+  ["checkUrl", "Check URL"],
+  ["checkCompare", "Compare"],
+] as const;
+
+// a create's fields beside its texts, each only when set
+export function createFields(
+  fields: Partial<Record<"checkUrl" | "checkCompare", string | null>>,
+): FieldRow[] {
+  return CHECK_FIELDS.map(([key, label]) => ({
+    label,
+    value: checkOf(fields[key]),
+    was: null,
+  })).filter((row) => row.value !== "none");
+}
+
 // an update's changed fields beside the automation's values, struck when
 // they differ
 export function changedFields(
   fields: Partial<ProposalFields>,
-  before: Pick<
-    ProposalFields,
-    "name" | "schedule" | "tz" | "once" | "ownMemory"
-  > | null,
+  before: ProposalFields | null,
 ): FieldRow[] {
   const rows: FieldRow[] = [];
   const was = (now: string, then: string | undefined) =>
@@ -282,6 +301,12 @@ export function changedFields(
         before?.ownMemory === undefined ? undefined : yes(before.ownMemory),
       ),
     });
+  }
+  for (const [key, label] of CHECK_FIELDS) {
+    if (fields[key] === undefined) continue;
+    const value = checkOf(fields[key]);
+    const then = before === null ? undefined : checkOf(before[key]);
+    rows.push({ label, value, was: was(value, then) });
   }
   return rows;
 }

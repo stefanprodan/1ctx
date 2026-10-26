@@ -670,6 +670,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     alerts: {
       runEnded: (run, change) => automations.alerts.runEnded(run, change),
+      runInterrupted: (sessionId) => automations.runInterrupted(sessionId),
     },
   });
   automations = automationsArea({
@@ -687,6 +688,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     runner,
     markAttention: (sessionId, attention, by) =>
       sessions.markAttention(sessionId, attention, by),
+    check: {
+      fetch: fetcher,
+      web: () => configuredTools.webAccess(),
+      mcpServers: () => mcp.store.list(),
+      mcpKey: (name) => secret(MCP_KEY_PREFIX, name),
+      credentials: (projectId) => credentials.forProject(projectId),
+      readKey: (keyName) => credentials.readKey(keyName),
+    },
     email: {
       outbox: {
         ...outbox,

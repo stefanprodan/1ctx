@@ -3,6 +3,7 @@
 
 import type { AttentionMode, EventSource } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
+import type { KeptFile } from "../bash/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import type { UserRow } from "../users/index.ts";
 
@@ -19,6 +20,8 @@ export type Event = {
     disabledCapabilities: string[];
   };
   instructions: string;
+  // the first message's kept files, as a check's answer
+  kept?: readonly KeptFile[];
   dueAt: number;
   deadlineMs: number | null;
   user: UserRow;

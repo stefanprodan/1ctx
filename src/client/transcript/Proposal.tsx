@@ -30,7 +30,9 @@ import {
   agoTickMs,
   changedFields,
   changedLines,
+  createFields,
   createTexts,
+  type FieldRow,
   GONE_NAME,
   HEADS,
   INERT_WORDS,
@@ -62,9 +64,9 @@ function Text({ text }: { text: string }) {
   );
 }
 
-// a new automation's instructions and guidance; an update's changed fields
-// with their old values, then each text's changed lines, or the whole
-// text once nothing differs
+// a new automation's check URL, instructions and guidance; an update's
+// changed fields with their old values, then each text's changed lines,
+// or the whole text once nothing differs
 export function Details({
   draft,
   before,
@@ -75,6 +77,7 @@ export function Details({
   if (draft.action === "create") {
     return (
       <div class="proposal-details">
+        <Fields rows={createFields(draft.fields)} />
         {createTexts(draft.fields).map((block) => (
           <TextBox key={block.label ?? ""} block={block} />
         ))}
@@ -164,6 +167,20 @@ export function TextFold({
   );
 }
 
+function Fields({ rows }: { rows: FieldRow[] }) {
+  return (
+    <>
+      {rows.map((row) => (
+        <div key={row.label} class="proposal-field">
+          <span class="proposal-label">{row.label}</span>
+          {row.was !== null && <span class="proposal-was">{row.was}</span>}
+          <span class="proposal-value">{row.value}</span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function UpdateDetails({
   fields: f,
   before,
@@ -173,13 +190,7 @@ function UpdateDetails({
 }) {
   return (
     <div class="proposal-details">
-      {changedFields(f, before).map((row) => (
-        <div key={row.label} class="proposal-field">
-          <span class="proposal-label">{row.label}</span>
-          {row.was !== null && <span class="proposal-was">{row.was}</span>}
-          <span class="proposal-value">{row.value}</span>
-        </div>
-      ))}
+      <Fields rows={changedFields(f, before)} />
       {updateTexts(f, before).map((block) => (
         <TextBox key={block.label ?? ""} block={block} />
       ))}

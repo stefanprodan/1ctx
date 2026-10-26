@@ -12,6 +12,9 @@ import type { Log } from "../lib/log.ts";
 import type { Registry } from "./registry.ts";
 import type { ActiveSend } from "./send.ts";
 
+// how long shutdown waits for the streams to let go
+export const SHUTDOWN_DRAIN_MS = 5000;
+
 export type ShutdownResult = { ended: number; timedOut: boolean };
 export type DrainResult = { drained: number };
 

@@ -3,8 +3,9 @@
 //
 // An automation's page. The summary reads as one sentence: when, in which
 // zone, which agent is asked, then the instructions as the agent gets
-// them, cut to a few lines. An automation whose agent was deleted names
-// it with a tag and says it is paused until an edit picks another.
+// them, cut to a few lines, and under them the next run and the last
+// check. An automation whose agent was deleted names it with a tag and
+// says it is paused until an edit picks another.
 // Suspend or Resume, Run now, Edit and Delete, which anyone in the
 // project presses, sit over two tabs. Runs is a log of RunRow.tsx rows,
 // a page at a time, filtered to the manual or the flagged runs. An open
@@ -14,7 +15,7 @@
 // setup. The words are Automations.model.ts and Schedule.model.ts.
 
 import { useSignal } from "@preact/signals";
-import type { ComponentChildren } from "preact";
+import { type ComponentChildren, Fragment } from "preact";
 import { useEffect } from "preact/hooks";
 import {
   type AutomationSummary,
@@ -67,10 +68,12 @@ import { AccessLines } from "./AutomationAccess.tsx";
 import { AutomationActions } from "./AutomationActions.tsx";
 import {
   automationPageOf,
+  checkLine,
   eventNote,
   nextLine,
   nextRunsOf,
   suspendedText,
+  urlParts,
 } from "./Automations.model.ts";
 import { OpenAttention } from "./OpenAttention.tsx";
 import { deadlineText } from "./Run.model.ts";
@@ -210,6 +213,7 @@ export function Automation({ params }: { params: Params }) {
       ? 0
       : tally.done + tally.failed + tally.stopped + tally.running;
   const note = row === null ? null : eventNote(row, now);
+  const check = row === null ? null : checkLine(row, now);
   return (
     <Page
       crumb={shown?.name ?? "Project"}
@@ -257,6 +261,26 @@ export function Automation({ params }: { params: Params }) {
                 <AsideLine label="Needs attention">
                   {ATTENTION_LABELS[row.attentionMode]}
                 </AsideLine>
+                {row.checkUrl !== null && (
+                  <AsideLine label="Check URL">
+                    {urlParts(row.checkUrl).map((part, i) => (
+                      <Fragment key={i}>
+                        {i > 0 && <wbr />}
+                        {part}
+                      </Fragment>
+                    ))}
+                  </AsideLine>
+                )}
+                {row.checkUrl !== null && row.checkCompare !== null && (
+                  <AsideLine label="Compare">
+                    {row.checkCompare.split(/(?<=\.)/).map((part, i) => (
+                      <Fragment key={i}>
+                        {i > 0 && <wbr />}
+                        {part}
+                      </Fragment>
+                    ))}
+                  </AsideLine>
+                )}
                 <AccessLines row={row} />
                 {row.rerunOnRestart && (
                   <AsideNote>Restarts a run the server stopped</AsideNote>
@@ -299,26 +323,40 @@ export function Automation({ params }: { params: Params }) {
             <Instructions
               text={row.instructions}
               foot={
-                row.agentRetired || row.suspendedAt !== null ? (
-                  <p class="automations-summary-next">
-                    <Icon name="pause" size={14} />
-                    {/* the run that spent it says how it went */}
-                    {!row.agentRetired &&
-                    ranOnce(row) &&
-                    row.onceRunSessionId !== null ? (
-                      <a href={runHref(row.onceRunSessionId)}>
-                        {suspendedText(row, now)}
-                      </a>
-                    ) : (
-                      suspendedText(row, now)
-                    )}
-                  </p>
-                ) : row.nextAt !== null ? (
-                  <p class="automations-summary-next">
-                    <Icon name="arrow-right" size={14} />
-                    {nextLine(row, now)}
-                  </p>
-                ) : null
+                <>
+                  {row.agentRetired || row.suspendedAt !== null ? (
+                    <p class="automations-summary-next">
+                      <Icon name="pause" size={14} />
+                      {/* the run that spent it says how it went */}
+                      {!row.agentRetired &&
+                      ranOnce(row) &&
+                      row.onceRunSessionId !== null ? (
+                        <a href={runHref(row.onceRunSessionId)}>
+                          {suspendedText(row, now)}
+                        </a>
+                      ) : (
+                        suspendedText(row, now)
+                      )}
+                    </p>
+                  ) : row.nextAt !== null ? (
+                    <p class="automations-summary-next">
+                      <Icon name="arrow-right" size={14} />
+                      {nextLine(row, now)}
+                    </p>
+                  ) : null}
+                  {check !== null && (
+                    <p class="automations-summary-next">
+                      <Icon
+                        name={check.failed ? "alert" : "globe"}
+                        size={14}
+                        class={
+                          check.failed ? "automations-check-failed" : undefined
+                        }
+                      />
+                      {check.text}
+                    </p>
+                  )}
+                </>
               }
             />
           </section>

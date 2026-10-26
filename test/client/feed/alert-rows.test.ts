@@ -75,7 +75,7 @@ const line = (
     alert:
       since === null
         ? null
-        : { since, runs: 1, reason: "pods down", by: "sre" },
+        : { since, runs: 1, reason: "pods down", by: "sre", check: false },
   },
   runBy: null,
   runs: 3,
@@ -176,7 +176,13 @@ describe("an envelope over the pick", () => {
     expect(ids(newer.rows)).toEqual(["b1", "a2"]);
     expect(newer.rows[1]!.runs).toBe(4);
     const older = line("aa", "a0", 5, 20);
-    older.automation!.alert = { since: 20, runs: 2, reason: "late", by: null };
+    older.automation!.alert = {
+      since: 20,
+      runs: 2,
+      reason: "late",
+      by: null,
+      check: false,
+    };
     const out = reconcileAlert(held(), null, "", envelope(older));
     expect(ids(out.rows)).toEqual(["b1", "a1"]);
     expect(out.rows[1]!.automation!.alert?.reason).toBe("late");
@@ -252,7 +258,7 @@ describe("an automation frame over the pick", () => {
     const moved = alertFrame(rows, {
       id: "aa",
       name: "aa",
-      alert: { since: 20, runs: 5, reason: "worse", by: null },
+      alert: { since: 20, runs: 5, reason: "worse", by: null, check: false },
     });
     expect(moved[1]!.automation!.alert?.runs).toBe(5);
     expect(alertFrame(rows, { id: "zz", name: "zz", alert: null })).toBe(rows);

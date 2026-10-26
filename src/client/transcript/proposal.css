@@ -119,6 +119,12 @@
     min-width: 80px;
     color: var(--faint);
   }
+  /* a long URL breaks anywhere rather than widen the line */
+  .proposal-value,
+  .proposal-was {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
   .proposal-value {
     color: var(--fg);
   }

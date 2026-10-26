@@ -186,6 +186,7 @@ describe("an open alert on an automation's line", () => {
         runs: 2,
         reason: "flux is behind",
         by: null,
+        check: false,
       },
     },
     runs,
@@ -198,7 +199,13 @@ describe("an open alert on an automation's line", () => {
     );
     expect(
       alertWords(
-        { since: now - 90 * 60_000, runs: 1, reason: null, by: null },
+        {
+          since: now - 90 * 60_000,
+          runs: 1,
+          reason: null,
+          by: null,
+          check: false,
+        },
         now,
       ),
     ).toBe("flagged since 10:30, 1 run");
@@ -258,6 +265,7 @@ describe("an open alert on an automation's line", () => {
           runs: 2,
           reason: "flux is behind",
           by: null,
+          check: false,
         }}
         now={now}
       />,
@@ -271,11 +279,42 @@ describe("an open alert on an automation's line", () => {
     const html = render(
       <OpenAttention
         id="au1"
-        alert={{ since: now - 90 * 60_000, runs: 4, reason: null, by: "jev" }}
+        alert={{
+          since: now - 90 * 60_000,
+          runs: 4,
+          reason: null,
+          by: "jev",
+          check: false,
+        }}
         now={now}
       />,
     );
     expect(html).toContain("Flagged by the @jev decider");
+  });
+
+  test("an alert a failed check holds alone says why and counts no runs", () => {
+    const alert = {
+      since: now - 90 * 60_000,
+      runs: 0,
+      reason: "The check failed: HTTP 503",
+      by: null,
+      check: true,
+    };
+    expect(alertWords(alert, now)).toBe("flagged since 10:30");
+    const top = render(<OpenAttention id="au1" alert={alert} now={now} />);
+    expect(top).toContain("Needs attention since 10:30<");
+    expect(top).toContain("The check failed: HTTP 503");
+    expect(top).not.toContain("0 runs");
+    const line = render(
+      <Row
+        row={{ ...opened(7), automation: { ...opened(7).automation!, alert } }}
+        projectName="platform"
+        now={now}
+      />,
+    );
+    expect(line).toMatch(
+      /<span class="feed-attention">flagged since 10:30<\/span> · The check failed: HTTP 503/,
+    );
   });
 
   test("the Runs list's filter holds the marked runs", () => {

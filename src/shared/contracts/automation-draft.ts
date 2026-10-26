@@ -14,6 +14,8 @@ export type ProposalFields = Pick<
   | "ownMemory"
   | "memoryGuidance"
   | "attentionGuidance"
+  | "checkUrl"
+  | "checkCompare"
 >;
 
 // what an update may change
@@ -26,10 +28,18 @@ export const PROPOSAL_FIELDS = [
   "ownMemory",
   "memoryGuidance",
   "attentionGuidance",
+  "checkUrl",
+  "checkCompare",
 ] as const satisfies readonly (keyof ProposalFields)[];
 
-export type CreateTaskFields = ProposalFields &
-  Pick<
+// a draft written before the check URL or its compare holds none
+export type CreateTaskFields = Omit<
+  ProposalFields,
+  "checkUrl" | "checkCompare"
+> & {
+  checkUrl?: string | null;
+  checkCompare?: string | null;
+} & Pick<
     AutomationSummary,
     | "agentId"
     | "deadlineMs"
@@ -94,6 +104,8 @@ const fieldGuards = {
   attentionMode: (value: unknown) =>
     text(value) && isAttentionMode(value as string),
   attentionGuidance: text,
+  checkUrl: (value: unknown) => value === null || text(value),
+  checkCompare: (value: unknown) => value === null || text(value),
   rerunOnRestart: boolean,
   disabledCapabilities: (value: unknown) =>
     Array.isArray(value) && value.every(text),
@@ -104,9 +116,14 @@ function proposal(value: Record<string, unknown>): boolean {
   const fields = value.fields;
   const keys = Object.keys(fields);
   if (value.action === "create") {
+    const guards = Object.entries(fieldGuards).filter(
+      ([key]) =>
+        (key !== "checkUrl" && key !== "checkCompare") ||
+        Object.hasOwn(fields, key),
+    );
     return (
-      keys.length === Object.keys(fieldGuards).length &&
-      Object.entries(fieldGuards).every(([key, guard]) => guard(fields[key]))
+      keys.length === guards.length &&
+      guards.every(([key, guard]) => guard(fields[key]))
     );
   }
   if (value.action === "update") {

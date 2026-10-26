@@ -2894,6 +2894,7 @@ describe("the Flagged pick", () => {
     runs,
     reason: "pods down",
     by: "sre",
+    check: false,
   });
   // the line of automation au, its run, its alert open since a time or
   // closed
@@ -2985,6 +2986,48 @@ describe("the Flagged pick", () => {
       envelope({ ...row({ id: "x1" }), automation: null });
       expect(ids(list.value)).toEqual(["a2"]);
       await settle();
+    },
+  );
+
+  test.serial(
+    "an alert a check opened, with no line held, asks for the first page",
+    async () => {
+      answer = () =>
+        Response.json({ rows: [line("aa", "a1", 30, 30)], next: null });
+      await loadList({ project: null, q: "", attention: true });
+      const urls: string[] = [];
+      answer = (url) => {
+        urls.push(url);
+        return Response.json({
+          rows: [line("cc", "c1", 10, 50), line("aa", "a1", 30, 30)],
+          next: null,
+        });
+      };
+      const checked = (au: string, check: boolean) =>
+        applyAutomationFrame({
+          type: "automation",
+          projectId: "p1",
+          automation: {
+            id: au,
+            name: au,
+            alert: { ...alert(50), runs: 0, check },
+            agentRetired: false,
+            agentId: "a1",
+            revision: 9,
+          },
+        } as Parameters<typeof applyAutomationFrame>[0]);
+      // a run's alert comes with its envelope, so its frame asks nothing
+      checked("bb", false);
+      await settle();
+      expect(urls).toEqual([]);
+      checked("cc", true);
+      await settle();
+      expect(urls).toEqual(["/api/sessions?attention=1"]);
+      expect(ids(list.value)).toEqual(["c1", "a1"]);
+      // a held line moves in place
+      checked("aa", true);
+      await settle();
+      expect(urls).toEqual(["/api/sessions?attention=1"]);
     },
   );
 

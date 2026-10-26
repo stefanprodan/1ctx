@@ -88,6 +88,8 @@ const EXPECTED_IDS = [
   "0074-run-posts",
   "0075-external-task-keys",
   "0076-dictation",
+  "0077-automation-check",
+  "0078-check-compare",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2012,6 +2014,56 @@ describe("the schema", () => {
       expect(() =>
         db.exec("update automations set once_run_session_id = 'none'"),
       ).toThrow(/FOREIGN KEY/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0077 adds the check's columns, null on every automation", () => {
+    const db = seed(MIGRATIONS.slice(0, 76));
+    try {
+      db.exec(`
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, next_at, created_at, updated_at)
+          values ('auto', 'p', 'u', 'a', 'daily', 'check', '0 9 * * *',
+            'UTC', 30, 1000, 0, 0);
+      `);
+      const before = db.query("select * from automations").get();
+      expect(migrate(db)).toEqual(expectedFrom("0077-automation-check"));
+      expect(db.query("select * from automations").get()).toEqual({
+        ...(before as object),
+        check_url: null,
+        check_etag: null,
+        check_last_modified: null,
+        check_body_hash: null,
+        last_checked_at: null,
+        last_check_result: null,
+        last_answered_at: null,
+        check_alert_at: null,
+        check_compare: null,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0078 adds the check's compare, null on every automation", () => {
+    const db = seed(MIGRATIONS.slice(0, 77));
+    try {
+      db.exec(`
+        insert into automations
+          (id, project_id, owner_id, agent_id, name, instructions, schedule,
+           tz, retention_days, check_url, next_at, created_at, updated_at)
+          values ('auto', 'p', 'u', 'a', 'daily', 'check', '0 9 * * *',
+            'UTC', 30, 'https://api.test/x', 1000, 0, 0);
+      `);
+      const before = db.query("select * from automations").get();
+      expect(migrate(db)).toEqual(expectedFrom("0078-check-compare"));
+      expect(db.query("select * from automations").get()).toEqual({
+        ...(before as object),
+        check_compare: null,
+      });
     } finally {
       db.close();
     }
@@ -4100,6 +4152,8 @@ describe("project channel migrations", () => {
       "0074-run-posts",
       "0075-external-task-keys",
       "0076-dictation",
+      "0077-automation-check",
+      "0078-check-compare",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4313,6 +4367,8 @@ describe("project channel migrations", () => {
           "0074-run-posts",
           "0075-external-task-keys",
           "0076-dictation",
+          "0077-automation-check",
+          "0078-check-compare",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4475,6 +4531,8 @@ describe("project channel migrations", () => {
       expect(migrate(db)).toEqual([
         "0075-external-task-keys",
         "0076-dictation",
+        "0077-automation-check",
+        "0078-check-compare",
       ]);
       expect(
         db

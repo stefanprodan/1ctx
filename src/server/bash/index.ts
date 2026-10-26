@@ -139,6 +139,7 @@ export function bashArea(deps: BashDeps): BashArea {
 export { BACKSTOP_MS } from "./commands.ts";
 export {
   type CommandCredential,
+  escapedForms,
   type Refusal,
   scrubKeys,
 } from "./credentials.ts";

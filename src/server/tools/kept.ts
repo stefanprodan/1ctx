@@ -78,6 +78,16 @@ export function size(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// shared with a check's answer
+export function wholeLine(
+  what: string,
+  path: string,
+  text: string,
+  json: boolean,
+): string {
+  return `whole ${what}: ${path}, ${lines(text)}, ${size(Buffer.byteLength(text))}: query it with ${json ? "jq" : "yq, rg or sed"}`;
+}
+
 function lines(text: string): string {
   const count = lineCount(text);
   return `${count.toLocaleString("en-US")} ${count === 1 ? "line" : "lines"}`;
@@ -229,9 +239,7 @@ export function shapeMcpResult(
   if (text.length > cut) {
     const json = isJson(text);
     const path = keepFile(json ? "result.json" : "result.txt", text, null);
-    tail.push(
-      `whole result: ${path}, ${lines(text)}, ${size(Buffer.byteLength(text))}: query it with ${json ? "jq" : "yq, rg or sed"}`,
-    );
+    tail.push(wholeLine("result", path, text, json));
   }
   // saved lines past half the cut become one line naming the folder, so
   // no later cut clips the tail

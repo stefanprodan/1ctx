@@ -11,6 +11,7 @@ import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import type { PreparedRun } from "../runner/index.ts";
 import type { SessionRow } from "../sessions/index.ts";
 import type { AutomationActions } from "./actions.ts";
+import type { Held } from "./check.ts";
 import { draftChanged } from "./draft-events.ts";
 import type { AutomationDraftStore, DraftRow } from "./draft-store.ts";
 import { parsePatchAutomation, parseSaveAutomation } from "./parse.ts";
@@ -54,7 +55,59 @@ export function draftDecisions(deps: Deps) {
       events: [draftChanged(deps.db, draft.id)],
     };
   };
-  const confirm = (principal: Principal, id: string): Decision => {
+  // a run proposal's checked automation, asked before the transaction
+  // it cannot wait in
+  const checked = (principal: Principal, id: string) => {
+    const { draft, session } = visible(principal, id);
+    if (
+      draft.state !== "pending" ||
+      draft.action !== "run" ||
+      draft.automationId === null ||
+      draft.expiresAt <= deps.clock() ||
+      session.archived !== null
+    ) {
+      return undefined;
+    }
+    const row = deps.store.byId(draft.automationId);
+    if (
+      row === null ||
+      row.projectId !== session.projectId ||
+      row.editRevision !== draft.editRevision ||
+      row.checkUrl === null
+    ) {
+      return undefined;
+    }
+    return row;
+  };
+  const refused = (id: string, error: unknown): Decision => {
+    // Unlike the page, a capacity refusal leaves a confirmable line.
+    if (error instanceof HttpError && error.status === 429) {
+      return { state: "pending", error: error.message };
+    }
+    if (error instanceof HttpError && error.status === 409) {
+      return { state: deps.drafts.byId(id)!.state, error: error.message };
+    }
+    throw error;
+  };
+  // without a check it decides in the same tick, so racing presses
+  // keep their order
+  const confirm = (
+    principal: Principal,
+    id: string,
+  ): Decision | Promise<Decision> => {
+    let row: ReturnType<typeof checked>;
+    try {
+      row = checked(principal, id);
+    } catch (error) {
+      return refused(id, error);
+    }
+    if (row === undefined) return decide(principal, id);
+    return deps.actions.ask(principal, row.id).then(
+      (held) => decide(principal, id, held),
+      (error) => refused(id, error),
+    );
+  };
+  const decide = (principal: Principal, id: string, held?: Held): Decision => {
     const holder: { run: PreparedRun | null } = { run: null };
     let result: Decision;
     try {
@@ -112,7 +165,7 @@ export function draftDecisions(deps: Deps) {
             deps.actions.resume(principal, current!.id);
             break;
           case "run":
-            holder.run = deps.actions.run(principal, current!.id);
+            holder.run = deps.actions.start(principal, current!.id, held);
             break;
         }
         return finish(draft, "confirmed", principal.userId, undefined, {
@@ -122,14 +175,7 @@ export function draftDecisions(deps: Deps) {
       });
     } catch (error) {
       holder.run?.abandon();
-      // Unlike the page, a capacity refusal leaves a confirmable line.
-      if (error instanceof HttpError && error.status === 429) {
-        return { state: "pending", error: error.message };
-      }
-      if (error instanceof HttpError && error.status === 409) {
-        return { state: deps.drafts.byId(id)!.state, error: error.message };
-      }
-      throw error;
+      return refused(id, error);
     }
     holder.run?.launch();
     if (result.error === undefined) deps.wake();
@@ -152,8 +198,8 @@ export function draftRoutes(
     method: "POST",
     path: `/api/automation-drafts/:id/${action}`,
     policy: "authenticated",
-    handle(_req, ctx) {
-      const result = decisions[action](ctx.principal!, ctx.params.id);
+    async handle(_req, ctx) {
+      const result = await decisions[action](ctx.principal!, ctx.params.id);
       return json(result, result.error === undefined ? 200 : 409);
     },
   }));

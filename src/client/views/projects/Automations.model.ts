@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What the automation pages say and check without a DOM: the list
-// row's state, the next run and the editor's fields to a request; a
-// run's words are in Run.model.ts, a schedule's in Schedule.model.ts
-// and what a save says in AutomationEdit.model.ts.
+// row's state, the next run, the check's line and the editor's fields
+// to a request; a run's words are in Run.model.ts, a schedule's in
+// Schedule.model.ts and what a save says in AutomationEdit.model.ts.
 
 import type { SaveAutomationRequest } from "../../../shared/api/automations.ts";
 import {
@@ -23,6 +23,7 @@ import {
 } from "../../../shared/capabilities.ts";
 import {
   type AutomationSummary,
+  isCheckFailure,
   ranOnce,
   WAIT_GRACE_MS,
 } from "../../../shared/contracts/automation.ts";
@@ -46,8 +47,7 @@ export function waitingSince(
     : null;
 }
 
-// a once automation's fire with its year: "today 09:00", "on Sun Oct 11 2026
-// 09:00"
+// a once automation's fire with its year: "on Sun Oct 11 2026 09:00"
 const onceAt = (fire: number, now: number, tz: string) => {
   const label = fireLabel(fire, now, tz, true, true);
   return /^to(day|morrow) /.test(label) ? label : `on ${label}`;
@@ -158,6 +158,15 @@ export function retiredPick(
 export function eventNote(a: AutomationSummary, now: number): string | null {
   if (a.lastEventAt === null) return null;
   if (a.lastEventOutcome === "skipped") {
+    // the check's own skip, which its line already says
+    if (
+      a.checkUrl !== null &&
+      a.lastEventAt === a.lastCheckedAt &&
+      a.lastCheckResult !== null &&
+      isCheckFailure(a.lastCheckResult)
+    ) {
+      return null;
+    }
     const why = a.lastEventReason ?? "no reason given";
     return `Skipped ${ago(a.lastEventAt, now)}: ${why}`;
   }
@@ -175,6 +184,33 @@ export function eventNote(a: AutomationSummary, now: number): string | null {
   }
   return deferred ? `The last run was ${DEFERRED_BY_RESTART}` : null;
 }
+
+// The check's line under the schedule: "Checked 3m ago: nothing new",
+// "Check failed 3m ago: HTTP 503"; null with no check URL
+export function checkLine(
+  a: Pick<AutomationSummary, "checkUrl" | "lastCheckedAt" | "lastCheckResult">,
+  now: number,
+): { text: string; failed: boolean } | null {
+  if (a.checkUrl === null) return null;
+  const result = a.lastCheckResult;
+  if (a.lastCheckedAt === null || result === null) {
+    return { text: "Not checked yet", failed: false };
+  }
+  const when = ago(a.lastCheckedAt, now);
+  if (isCheckFailure(result)) {
+    return { text: `Check failed ${when}: ${result}`, failed: true };
+  }
+  const found = result === "200" ? "new answer" : "nothing new";
+  return {
+    text: `Checked ${when}: ${found}`,
+    failed: false,
+  };
+}
+
+// a URL cut after each "/" and "?", a scheme's "//" kept whole, where
+// a line may break before overflow-wrap cuts a long part
+export const urlParts = (url: string): string[] =>
+  url.split(/(?<=[/?])(?!\/)/).filter((part) => part !== "");
 
 // The automation page and its editor: the row, the project it was found
 // in, and the failure, a deleted row once the list is in without it.
@@ -254,6 +290,9 @@ export type Draft = {
   // its runs post their answers to the project's channel
   postToChannel: boolean;
   once: boolean;
+  // as typed, empty for none; the compare is sent only with a URL
+  checkUrl: string;
+  checkCompare: string;
 } & AccessDraft;
 
 const DEFAULT_SCHEDULE = "0 9 * * MON-FRI";
@@ -284,6 +323,8 @@ export function draftOf(
       // off until asked, and never in a proposal's defaults
       postToChannel: false,
       once: AUTOMATION_DEFAULTS.once,
+      checkUrl: AUTOMATION_DEFAULTS.checkUrl ?? "",
+      checkCompare: AUTOMATION_DEFAULTS.checkCompare ?? "",
       web: true,
       visuals: true,
       knowledge: true,
@@ -309,6 +350,8 @@ export function draftOf(
     rerunOnRestart: a.rerunOnRestart,
     postToChannel: a.postToChannel,
     once: a.once,
+    checkUrl: a.checkUrl ?? "",
+    checkCompare: a.checkCompare ?? "",
     web: !a.disabledCapabilities.includes(WEB),
     visuals: !a.disabledCapabilities.includes(VISUALIZE),
     knowledge: !a.disabledCapabilities.includes(KNOWLEDGE),
@@ -347,7 +390,9 @@ type AutomationField =
   | "memory"
   | "memoryGuidance"
   | "attention"
-  | "attentionGuidance";
+  | "attentionGuidance"
+  | "checkUrl"
+  | "checkCompare";
 
 // which field a server refusal of the automation routes names; a cap on
 // the project or a run still going is the form's
@@ -366,6 +411,8 @@ export function automationFieldOf(
   if (message.startsWith("ownMemory")) return "memory";
   if (message.startsWith("attention guidance")) return "attentionGuidance";
   if (message.startsWith("attentionMode")) return "attention";
+  if (message.startsWith("Check URL")) return "checkUrl";
+  if (message.startsWith("Compare")) return "checkCompare";
   return undefined;
 }
 
@@ -384,6 +431,7 @@ export function requestOf(
   const instructions = d.instructions.trim();
   const schedule = d.schedule.trim();
   const tz = d.tz.trim();
+  const checkUrl = d.checkUrl.trim();
   if (name === "") return { problem: "Name is empty", field: "name" };
   if (d.agentId === "") return { problem: "Pick an agent", field: "agent" };
   if (instructions === "")
@@ -422,12 +470,14 @@ export function requestOf(
       rerunOnRestart: d.rerunOnRestart,
       postToChannel: d.postToChannel,
       once: d.once,
+      checkUrl: checkUrl === "" ? null : checkUrl,
+      checkCompare: (checkUrl && d.checkCompare.trim()) || null,
       disabledCapabilities: disabledOf(d, shown),
     },
   };
 }
 
-// whether the draft differs from the row
+// whether the draft differs from the row, a hidden Compare aside
 export function dirtyOf(
   d: Draft,
   a: AutomationSummary | null,
@@ -436,6 +486,7 @@ export function dirtyOf(
   if (a === null) return true;
   const base = draftOf(a, a.agentId, a.tz, limitMs);
   return (Object.keys(base) as (keyof Draft)[]).some((k) => {
+    if (k === "checkCompare" && d.checkUrl.trim() === "") return false;
     const left = d[k];
     const right = base[k];
     if (Array.isArray(left) && Array.isArray(right)) {

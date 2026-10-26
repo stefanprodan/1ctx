@@ -1,13 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An alert's email: when a run opens its automation's alert, the
-// automation's owner is emailed the reason and a link to the run, in
-// the transaction that opened it, under the same opt-in as an agent's
-// email and only while the automation's Email switch is on. A run that
-// joins an open alert emails nobody, and an automation that flaps
-// between flagged and clean emails its owner at most
-// ALERT_EMAILS_PER_DAY times a day.
+// An alert's email: when a run or a failed check opens its automation's
+// alert, the owner is emailed the reason and a link to the run, or to the
+// automation for a check, in the transaction that opened it, under the
+// same opt-in as an agent's email and only while the automation's Email
+// switch is on. A run that joins an open alert emails nobody, and an
+// automation that flaps emails its owner at most ALERT_EMAILS_PER_DAY
+// times a day.
 
 import { EMAIL } from "../../shared/capabilities.ts";
 import type { AutomationSummary } from "../../shared/contracts/automation.ts";
@@ -51,10 +51,9 @@ export type AlertEmailDeps = {
 };
 
 export type AlertEmails = {
-  // in the caller's transaction, when the run opened the alert; the
-  // events to return, none while email or the automation's Email switch
-  // is off or the owner is not in
-  opened(automation: AutomationSummary, sessionId: string): BusEvent[];
+  // in the caller's transaction; sessionId is null for a failed check.
+  // None while email or the Email switch is off or the owner is not in
+  opened(automation: AutomationSummary, sessionId: string | null): BusEvent[];
 };
 
 // what made the owner a recipient: enabled, able to open the project,
@@ -73,7 +72,7 @@ export function alertEmails(deps: AlertEmailDeps): AlertEmails {
   );
   const queue = (
     automation: AutomationSummary,
-    sessionId: string,
+    sessionId: string | null,
   ): BusEvent[] => {
     if (!deps.outbox.enabled()) return [];
     if (automation.disabledCapabilities.includes(EMAIL)) return [];
@@ -91,8 +90,13 @@ export function alertEmails(deps: AlertEmailDeps): AlertEmails {
     const content = alertEmail({
       automation: automation.name,
       project,
-      reason: deps.reason(sessionId),
+      // a check's reason is on the summary, read after it opened
+      reason:
+        sessionId === null
+          ? (automation.alert?.reason ?? null)
+          : deps.reason(sessionId),
       sessionId,
+      automationId: automation.id,
     });
     return deps.outbox.enqueue({
       kind: "alert",

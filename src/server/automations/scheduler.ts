@@ -8,16 +8,20 @@ import type { AgentRow } from "../agents/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type BusEvent, subscribe } from "../lib/bus.ts";
 import { type Clock, HOUR_MS, MINUTE_MS, sleep } from "../lib/clock.ts";
-import { BadRequest, Conflict, HttpError, messageOf } from "../lib/errors.ts";
+import { Conflict, HttpError, messageOf } from "../lib/errors.ts";
 import { errorFields, type Log } from "../lib/log.ts";
-import { type ProjectRow, visible } from "../projects/index.ts";
+import type { ProjectRow } from "../projects/index.ts";
 import { type Event, type PreparedRun, RunCapacity } from "../runner/index.ts";
 import type { SessionStore } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import type { Checks, Held } from "./check.ts";
 import { recordOn } from "./events.ts";
+import { eventFor, manualFor, ownerFor } from "./fire-event.ts";
 import { type Cut, cutRuns, deferDue, stillCut, withCut } from "./refire.ts";
+import { askNow, changedSince, holding } from "./run-now.ts";
 import { nextFire } from "./schedule.ts";
-import { type AutomationStore, automationChanged, RETIRED } from "./store.ts";
+import { type AutomationStore, automationChanged } from "./store.ts";
+import { onRunEnd, reconcileRuns, sweepRuns } from "./upkeep.ts";
 import { replaceMissed, type Waiting, Waits } from "./waits.ts";
 
 const PASS_MS = MINUTE_MS;
@@ -36,6 +40,9 @@ type Deps = {
   agents: { byId(id: string): AgentRow | null };
   sessions: SessionStore;
   runner: { startRun(event: Event): PreparedRun };
+  checks: Checks;
+  // how much of a new answer the first message holds
+  resultCut(): number;
 };
 
 export type Scheduler = {
@@ -46,8 +53,10 @@ export type Scheduler = {
   wake(): void;
   pass(): Promise<void>;
   fire(id: string): Promise<SessionDetail | null>;
-  runNow(row: AutomationSummary, user: UserRow): SessionDetail;
-  prepareNow(row: AutomationSummary, user: UserRow): PreparedRun;
+  checked(): Promise<void>;
+  // Run now's check, after its cheap refusals; undefined with no check URL
+  askNow(row: AutomationSummary, user: UserRow): Promise<Held | undefined>;
+  prepareNow(row: AutomationSummary, user: UserRow, held?: Held): PreparedRun;
   sweep(): number;
   reconcile(): number;
   dispose(): void;
@@ -71,71 +80,33 @@ export function scheduler(deps: Deps): Scheduler {
     resolve?.();
   };
 
-  const ownerFor = (
-    row: AutomationSummary,
-  ): {
-    user: UserRow;
-    project: ProjectRow;
-    agent: AgentRow;
-  } => {
-    const user = deps.users.byId(row.ownerId);
-    if (user === null || user.disabled) throw new Conflict("owner unavailable");
-    const project = deps.projects.byId(row.projectId);
-    if (
-      project === null ||
-      !visible(
-        project,
-        { userId: user.id, role: user.role },
-        deps.projects.isMember(project.id, user.id),
-      )
-    ) {
-      throw new Conflict("owner cannot see project");
+  const dueOf = (row: AutomationSummary, source: EventSource) => {
+    if (source === "restart") {
+      const listed = cut.get(row.id);
+      return stillCut(row, listed) ? listed!.listedAt : null;
     }
-    const agent = deps.agents.byId(row.agentId);
-    if (agent === null) throw new Conflict("no such agent");
-    return { user, project, agent };
+    return row.suspendedAt === null &&
+      row.nextAt !== null &&
+      row.nextAt <= deps.clock()
+      ? row.nextAt
+      : null;
   };
 
-  const manualFor = (
-    row: AutomationSummary,
-    actor: UserRow,
-  ): { user: UserRow; project: ProjectRow; agent: AgentRow } => {
-    const project = deps.projects.byId(row.projectId);
-    if (project === null) throw new Conflict("no such automation");
-    if (row.agentRetired) throw new Conflict(RETIRED);
-    const agent = deps.agents.byId(row.agentId);
-    if (agent === null) throw new BadRequest("no such agent");
-    return { user: actor, project, agent };
-  };
+  const fresh = (row: AutomationSummary, source: EventSource, held: Held) =>
+    row.editRevision === held.editRevision &&
+    row.checkUrl === held.url &&
+    dueOf(row, source) === held.dueAt
+      ? held.dueAt
+      : null;
 
-  const eventFor = (
-    row: AutomationSummary,
-    source: EventSource,
-    dueAt: number,
-    resolved: Pick<Event, "user" | "project" | "agent">,
-  ): Event => ({
-    source,
-    automation: {
-      id: row.id,
-      name: row.name,
-      tz: row.tz,
-      ownMemory: row.ownMemory,
-      memoryGuidance: row.memoryGuidance,
-      attentionMode: row.attentionMode,
-      attentionGuidance: row.attentionGuidance,
-      disabledCapabilities: row.disabledCapabilities,
-    },
-    instructions: row.instructions,
-    dueAt,
-    deadlineMs: row.deadlineMs,
-    ...resolved,
-  });
-
-  // one try at a fire; actor is the user of a manual one, else null
+  // one try at a fire; actor is the user of a manual one, else null.
+  // Unasked, a checked fire goes on only to record why it cannot run
   const attempt = (
     id: string,
     source: EventSource,
     actor: UserRow | null,
+    held?: Held,
+    unasked = false,
   ): Started | null => {
     const holder: { value: PreparedRun | null } = { value: null };
     const recorded: {
@@ -151,6 +122,7 @@ export function scheduler(deps: Deps): Scheduler {
           if (source === "manual") throw new Conflict("no such automation");
           return { result: null };
         }
+        if (source === "manual") changedSince(row, held);
         const now = deps.clock();
         const listed = source === "restart" ? cut.get(id) : undefined;
         const dueAt =
@@ -164,6 +136,15 @@ export function scheduler(deps: Deps): Scheduler {
         if (source === "restart" && !stillCut(row, listed)) {
           return { result: null };
         }
+        // a checked fire starts only with its answer; one that cannot run
+        // at once is dropped, and the row still due asks again
+        if (source !== "manual" && row.checkUrl !== null && !unasked) {
+          const running = deps.sessions.runningAutomation(row.id);
+          if (held === undefined ? !running : running) return { result: null };
+          if (held !== undefined && fresh(row, source, held) === null) {
+            return { result: null };
+          }
+        }
         // a manual start takes a fire left waiting for a place
         const waiting =
           row.suspendedAt === null && row.nextAt !== null && row.nextAt <= now;
@@ -173,14 +154,18 @@ export function scheduler(deps: Deps): Scheduler {
             : undefined;
         try {
           const resolved =
-            actor === null ? ownerFor(row) : manualFor(row, actor);
+            actor === null ? ownerFor(deps, row) : manualFor(deps, row, actor);
+          if (unasked && row.checkUrl !== null) return { result: null };
           if (deps.sessions.runningAutomation(row.id)) {
             throw new Conflict("still running");
           }
           holder.value = deps.runner.startRun(
-            eventFor(row, source, dueAt!, resolved),
+            eventFor(deps, row, source, dueAt!, resolved, held),
           );
           const prepared = holder.value;
+          if (held !== undefined) {
+            deps.checks.started(row.id, held.answer.result);
+          }
           const recordedRun = deps.store.recordEvent(row.id, {
             at: now,
             dueAt: dueAt!,
@@ -276,22 +261,75 @@ export function scheduler(deps: Deps): Scheduler {
     });
   };
 
-  const fire = async (id: string): Promise<SessionDetail | null> => {
+  const ownerCan = (row: AutomationSummary): boolean => {
+    try {
+      ownerFor(deps, row);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const fire = async (
+    id: string,
+    given?: AutomationSummary,
+  ): Promise<SessionDetail | null> => {
     if (draining) {
       deferDue(deps, id, deps.clock());
       return null;
     }
     const seen = waits.generation;
     const source = cut.has(id) ? "restart" : "schedule";
+    const row = given ?? deps.store.byId(id);
+    let held: Held | undefined;
+    // an owner who cannot run the task is never asked for: no GET goes
+    // out in their name, and the attempt records why
+    const unasked = !!row?.checkUrl && !ownerCan(row);
+    // a run going skips the fire at once, so it is not asked
+    if (row?.checkUrl && !unasked && !deps.sessions.runningAutomation(id)) {
+      if (deps.checks.busy(id)) return null;
+      held = deps.checks.take(id);
+      const dueAt = dueOf(row, source);
+      if (held === undefined && dueAt !== null) {
+        deps.checks.ask(row, dueAt);
+        return null;
+      }
+      if (held !== undefined && held.answer.result !== "200") {
+        let applied = true;
+        try {
+          applied = deps.checks.settle(id, source, held, (current) =>
+            fresh(current, source, held!),
+          );
+        } catch (err) {
+          deps.log.error("check record failed", {
+            automation: id,
+            ...errorFields(err),
+          });
+        }
+        // after settle, which reads the listing to tell a rerun is due.
+        // A stale answer leaves the rerun listed, to ask again
+        if (applied) cut.delete(id);
+        return null;
+      }
+    }
+    if (unasked) deps.checks.drop(id);
     try {
-      const result = attempt(id, source, null);
+      const result = attempt(id, source, null, held, unasked);
+      // a new answer that started nothing still answered
+      if (held !== undefined && (result === null || "wait" in result)) {
+        deps.checks.answered(id, held);
+      }
       if (result !== null && "wait" in result) {
         waits.block(id, result, seen, deps.clock());
         return null;
       }
-      cut.delete(id);
+      // a dropped answer leaves a restart rerun listed, to ask again
+      if (result !== null || held === undefined) cut.delete(id);
       if (result === null) return null;
       waits.started(id);
+      if (held !== undefined) {
+        deps.checks.hold(result.detail.session.id, id, held);
+      }
       result.launch();
       return result.detail;
     } catch (err) {
@@ -305,74 +343,9 @@ export function scheduler(deps: Deps): Scheduler {
     }
   };
 
-  const sweep = (): number => {
-    let count = 0;
-    for (const session of deps.sessions.expiredRuns(deps.clock())) {
-      try {
-        transact(deps.db, () => {
-          const deleted = deps.sessions.remove(session.id);
-          if (deleted === null || deleted === "running") {
-            return { result: undefined };
-          }
-          count++;
-          return { result: undefined, events: [deleted] };
-        });
-      } catch (err) {
-        deps.log.warn("retention delete failed", {
-          chat: session.id,
-          ...errorFields(err, false),
-        });
-      }
-    }
-    if (count > 0) deps.log.info("retention", { removed: count });
-    return count;
-  };
-
-  const reconcile = (): number => {
-    let count = 0;
-    for (const row of deps.store.all()) {
-      if (row.lastRunSessionId === null) continue;
-      const session = deps.sessions.byId(row.lastRunSessionId);
-      if (session === null || session.status === "running") continue;
-      transact(deps.db, () => {
-        const updated = deps.store.recordRunEnd(
-          row.id,
-          session.id,
-          session.status,
-          deps.clock(),
-        );
-        if (updated === null) return { result: undefined };
-        count++;
-        return { result: undefined, events: [automationChanged(updated)] };
-      });
-    }
-    return count;
-  };
-
-  const onSession = (event: BusEvent) => {
-    if (event.type !== "session.changed") return;
-    const session = event.data.session;
-    if (session.automationId === null || session.status === "running") return;
-    try {
-      transact(deps.db, () => {
-        const updated = deps.store.recordRunEnd(
-          session.automationId!,
-          session.id,
-          session.status,
-          deps.clock(),
-        );
-        return {
-          result: undefined,
-          events: updated === null ? [] : [automationChanged(updated)],
-        };
-      });
-    } catch (err) {
-      deps.log.error("run record failed", {
-        automation: session.automationId,
-        ...errorFields(err),
-      });
-    }
-  };
+  const sweep = () => sweepRuns(deps);
+  const reconcile = () => reconcileRuns(deps);
+  const onSession = (event: BusEvent) => onRunEnd(deps, event);
 
   const pass = async (keepGoing: () => boolean = () => true): Promise<void> => {
     const now = deps.clock();
@@ -385,7 +358,9 @@ export function scheduler(deps: Deps): Scheduler {
       }
       return;
     }
-    waits.prune(new Set([...due.map((row) => row.id), ...cut.keys()]));
+    const listed = new Set([...due.map((row) => row.id), ...cut.keys()]);
+    waits.prune(listed);
+    deps.checks.prune(listed);
     for (const row of due) {
       if (!keepGoing()) return;
       replaceMissed(deps, row.id, now);
@@ -393,9 +368,13 @@ export function scheduler(deps: Deps): Scheduler {
     // oldest first, due and waiting alike, then the cut runs; a full
     // project passes over its rows, a full process ends the fires
     for (const row of withCut(deps.store.due(now), cut, deps.store)) {
-      if (!keepGoing() || waits.processFull) break;
-      if (waits.projectFull(row.projectId)) continue;
-      await fire(row.id);
+      if (!keepGoing()) break;
+      // an answer that cannot run at once is dropped, never held
+      if (waits.processFull || waits.projectFull(row.projectId)) {
+        deps.checks.drop(row.id);
+        continue;
+      }
+      await fire(row.id, row);
       // a fire is synchronous, so a burst must not hold every request
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
@@ -413,8 +392,11 @@ export function scheduler(deps: Deps): Scheduler {
   const wait = async (seen: number): Promise<void> => {
     if (waits.generation !== seen) return;
     const now = deps.clock();
-    // while a cap is full the rows left due are waits, not wakes
-    const earliest = deps.store.earliest(waits.any || draining ? passAt : null);
+    // while a cap is full or a check is out the rows left due are
+    // waits, not wakes: the answer wakes the loop
+    const earliest = deps.store.earliest(
+      waits.any || draining || deps.checks.flying ? passAt : null,
+    );
     const ms = earliest === null ? PASS_MS : Math.min(PASS_MS, earliest - now);
     if (ms <= 0) return;
     const sleeper = sleep(deps.clock, ms).promise;
@@ -436,12 +418,16 @@ export function scheduler(deps: Deps): Scheduler {
     }
   };
 
-  const prepareNow = (row: AutomationSummary, user: UserRow): PreparedRun => {
-    const result = attempt(row.id, "manual", user);
+  const prepareNow = (
+    row: AutomationSummary,
+    user: UserRow,
+    held?: Held,
+  ): PreparedRun => {
+    const result = attempt(row.id, "manual", user, held);
     if (result === null || "wait" in result) {
       throw new Conflict("no such automation");
     }
-    return result;
+    return holding(deps.checks, result, row.id, held);
   };
 
   return {
@@ -460,20 +446,19 @@ export function scheduler(deps: Deps): Scheduler {
       draining = true;
       // the cap waits go: a waiting row is deferred like a due one
       waits.retry();
+      deps.checks.abort();
       wake();
     },
     stop() {
       running = false;
+      deps.checks.abort();
       wake();
     },
     wake,
     pass,
-    fire,
-    runNow(row, user) {
-      const result = prepareNow(row, user);
-      result.launch();
-      return result.detail;
-    },
+    fire: (id) => fire(id),
+    checked: () => deps.checks.settled(),
+    askNow: (row, user) => askNow(deps, row, user, draining),
     prepareNow,
     sweep,
     reconcile,

@@ -31,6 +31,7 @@ import {
   refreshAlertHead,
   replayAlerts,
   sameAlert,
+  unplacedCheck,
 } from "./alert-rows.ts";
 import { api } from "./api.ts";
 import { address, keyOf, type ListFilter, sameFilter } from "./feed-filter.ts";
@@ -48,6 +49,7 @@ import {
   refreshHead,
   replay,
   type Shown,
+  without,
 } from "./sessions-rows.ts";
 
 // a later page's own state: the rows stay whatever it does
@@ -309,11 +311,6 @@ export async function loadMore(): Promise<void> {
   }
 }
 
-const without = (rows: FeedRow[], keep: (row: FeedRow) => boolean) => {
-  const out = rows.filter(keep);
-  return out.length === rows.length ? rows : out;
-};
-
 type Gone = (row: FeedRow) => boolean;
 // rows went: from every held list, from the rows on screen unless kept
 // there, and from the answer of a first page out, which may hold them
@@ -472,7 +469,8 @@ function alertMoved(
   const held = list.value;
   if (held === null) return;
   const rows = alertFrame(held.rows, ev.automation);
-  if (rows !== held.rows) list.value = { ...held, rows };
+  if (unplacedCheck(held.rows, ev.automation)) flight.ask();
+  else if (rows !== held.rows) list.value = { ...held, rows };
 }
 
 // the envelope over the rows on screen (sessions-rows.ts reconcile):

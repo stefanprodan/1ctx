@@ -280,6 +280,7 @@ describe("a finished run", () => {
       runs: 1,
       reason: null,
       by: "judge",
+      check: false,
     });
     await chat.app.shutdown();
   });

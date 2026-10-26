@@ -2,12 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The schedule's shape: a segmented switch where its six options fit
-// one line, a select on a phone, the same pick either way.
+// one line, a select on a phone, the same pick either way; the check URL
+// under it, and its compare with a URL.
 
 import { afterEach, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { narrow } from "../../../src/client/app/shell.ts";
 import { ScheduleField } from "../../../src/client/views/projects/ScheduleField.tsx";
+import {
+  CHECK_HINT,
+  COMPARE_HINT,
+  WhenSection,
+} from "../../../src/client/views/projects/WhenSection.tsx";
 
 const drawn = (disabled = false) =>
   render(
@@ -44,4 +50,68 @@ test.serial("a phone picks it from a select showing the same shape", () => {
 test.serial("the select waits while the form does", () => {
   narrow.value = true;
   expect(drawn(true)).toMatch(/<button[^>]*aria-label="Repeats"[^>]*disabled/);
+});
+
+test.serial(
+  "the check URL sits under the schedule with its hint, or the refusal",
+  () => {
+    const when = (error: string | null) =>
+      render(
+        <WhenSection
+          projectId="p1"
+          draft={{
+            schedule: "0 9 * * *",
+            tz: "UTC",
+            once: false,
+            checkUrl: "https://api.example.test/alerts",
+            checkCompare: "",
+          }}
+          set={() => {}}
+          save={{
+            fieldError: (field) => (field === "checkUrl" ? error : null),
+          }}
+          disabled={false}
+        />,
+      );
+    const html = when(null);
+    expect(html.indexOf('aria-label="Repeats"')).toBeLessThan(
+      html.indexOf("Check URL"),
+    );
+    expect(html).toContain('name="checkUrl"');
+    expect(html).toContain('value="https://api.example.test/alerts"');
+    expect(html).toContain(`<span class="hint">${CHECK_HINT}</span>`);
+    expect(CHECK_HINT).toBe(
+      "Asked at every scheduled time. Runs only when the answer is new.",
+    );
+    const refused = when("Check URL must be an http or https URL.");
+    expect(refused).toContain("Check URL must be an http or https URL.");
+    expect(refused).toContain('aria-invalid="true"');
+    expect(refused).not.toContain(CHECK_HINT);
+  },
+);
+
+test("the compare shows under a check URL only, with its hint", () => {
+  const when = (checkUrl: string) =>
+    render(
+      <WhenSection
+        projectId="p1"
+        draft={{
+          schedule: "0 9 * * *",
+          tz: "UTC",
+          once: false,
+          checkUrl,
+          checkCompare: "tag_name",
+        }}
+        set={() => {}}
+        save={{ fieldError: () => null }}
+        disabled={false}
+      />,
+    );
+  expect(when(" ")).not.toContain('name="checkCompare"');
+  const html = when("https://api.example.test/releases/latest");
+  expect(html.indexOf('name="checkUrl"')).toBeLessThan(
+    html.indexOf('name="checkCompare"'),
+  );
+  expect(html).toContain('value="tag_name"');
+  expect(html).toContain(`<span class="hint">${COMPARE_HINT}</span>`);
 });

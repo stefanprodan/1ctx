@@ -15,6 +15,7 @@ import {
   makeAutomationTool,
   parseAutomationArgs,
 } from "../../../src/server/tools/builtin/automation.ts";
+import { checkText } from "../../../src/server/tools/builtin/automation-check.ts";
 import {
   FIELD_BYTES,
   type LastRun,
@@ -43,6 +44,11 @@ const automation = (
   ownerId: "u1",
   ownerName: "maria",
   agentId: "a1",
+  checkUrl: null,
+  checkCompare: null,
+  lastCheckedAt: null,
+  lastCheckResult: null,
+  lastAnsweredAt: null,
   agentName: "sre",
   agentRetired: false,
   name: "Nightly check",
@@ -285,7 +291,7 @@ describe("list", () => {
         lastRunStatus: null,
         lastEventAt: null,
         lastEventOutcome: null,
-        alert: { since: NOW, runs: 1, reason: null, by: null },
+        alert: { since: NOW, runs: 1, reason: null, by: null, check: false },
       }),
     ];
     const text = await ok(port(automations), { action: "list" });
@@ -352,6 +358,7 @@ describe("show", () => {
         runs: 2,
         reason: "Pods crash looping",
         by: "sre",
+        check: false,
       },
     });
     const result = await call(port([full]), { action: "show", id: ID });
@@ -1057,4 +1064,17 @@ describe("its names elsewhere", () => {
     ).toBe("automation");
     expect(cutKind("automation", null)).toBe("read");
   });
+});
+
+test("show's check line names the compare, never the query", () => {
+  const text = checkText(
+    automation({
+      checkUrl: "https://api.test/releases/latest?token=k",
+      checkCompare: "tag_name",
+    }),
+    () => "now",
+  );
+  expect(text).toBe(
+    "https://api.test/releases/latest (query not shown), asked at every scheduled time, runs only on a new answer, compares only tag_name; not checked yet",
+  );
 });

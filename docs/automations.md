@@ -1,9 +1,8 @@
 # Automations and runs
 
 Governs `src/server/automations/` (the rows, the schedule, the
-scheduler), runs in `src/server/runner/` and the attention mark
-(`runner/marks.ts`, `runner/attention-step.ts`, `runner/attention.ts`,
-`tools/builtin/attention.ts`, see Attention).
+scheduler, the check) and runs in `src/server/runner/`. The attention
+mark and the open alert are in `docs/attention.md`.
 
 An automation is a project's saved instructions that one agent carries
 out on a cron schedule or by Run now. Each time it starts, a run is
@@ -22,7 +21,8 @@ sweep) is in `docs/sessions.md`.
 - **A deadline may only tighten the `runDeadlineMs` limit.**
 - **Omitted fields: a create defaults, a PATCH keeps.**
   `disabledCapabilities` is a whole sorted set, empty on create;
-  `rerunOnRestart`, `postToChannel` and `once` are false on create.
+  `rerunOnRestart`, `postToChannel` and `once` are false on create, and
+  `checkUrl` null.
   Each run snapshots the set onto its session.
 - **`postToChannel` is a team project's.** Turning it on in a personal
   project, which has no channel, is a 400. A proposal never sets it.
@@ -204,126 +204,99 @@ sweep) is in `docs/sessions.md`.
   the sessions area's one delete. A run whose automation is gone is
   deleted `archivedDeleteDays` after its last activity.
 
-## Attention
+## The check
 
-A run that needs a user to look at it carries the attention mark on its
-session: `attention` (1, or a decider's chance), `attention_by`,
-`attention_reason` and `attention_source` (`agent`, `runner` or
-`decider`). The feed shows the mark, a run's row and page its reason;
-an automation's marks make its open alert (see The open alert).
-Each automation picks who marks its runs, `attention_mode`
-(`ATTENTION_MODES`): `off`, `agent` (the default) or `decider`, with
-optional words on when, `attention_guidance` (`MAX_ATTENTION_GUIDANCE`).
+A Check URL (`checkUrl`) makes each scheduled fire ask before it runs
+(`automations/check.ts`, `check-fetch.ts`, `check-message.ts`,
+`check-rows.ts`, `run-now.ts`). It is parsed as an MCP server's URL
+(`parseUrl()`); `""` or null is none. Setting or changing it clears the
+validators, `last_checked_at`, `last_check_result` and `check_alert_at`,
+closes an alert no marked run belongs to, and sets `last_answered_at` to
+now, so silence counts from the change.
 
-- **Off marks nothing.** No step, no runner mark, no decider.
-- **The agent marks in the attention step** (`runner/attention-step.ts`),
-  never in its main rounds, where it missed most runs that needed it.
-  `endSend()` runs it before the memory phase for a run that ended
-  `finish` with no runner mark, mode not off, on a model that takes
-  tools, `ownMemory` or not. One request on the run's agent and model:
-  its own system prompt and the run's record (`runner/run-record.ts`,
-  no note), the ask and the automation's words
-  (`runner/attention-packet.ts`), the `attention` verdict alone
-  (`docs/tools.md`), with thinking off, or the least effort for a model
-  that must think, as compaction asks (`leastThinking()`): thinking, a
-  model wrote the call out as text. Only a `needed: true` call marks;
-  `needed: false` answers no, and text is never read for either.
-  At most `ATTENTION_ROUNDS` (2): a valid verdict ends the step, while
-  text or a round with no valid verdict is asked again once
-  (`asksAgain()`, the text with `ATTENTION_AGAIN` as a request-local
-  message). Two rounds with no valid verdict mark nothing.
-- **The step is part of the run.** Its rows are work from
-  `attentionRound`, which is also `memoryRound`, the first round after
-  the answer, up to `memoryFrom`, the memory phase's own start; its
-  usage counts on the send. A restart sets `memory_error` only once the
-  memory phase began (`sessions/repair.ts`). It runs past the deadline
-  within `ATTENTION_STEP_MS` and never fails the run: a failure logs
-  `attention step failed`, a Stop `attention step stopped`, and either
-  marks nothing. Its reason is written by `finalizeSend` through
-  `runMark()` (`runner/marks.ts`), in the transaction and envelope that
-  end the run, with `attention_by` the agent's name.
-- **The runner marks with no model when the agent did not.** Cause
-  `failure` is "The run failed: " and the error's first line, cut to
-  `MAX_ATTENTION_REASON` ("The run failed." with none), `deadline`
-  "The run hit its deadline.", and a `finish` whose answer round a
-  budget forced (`tool_limit`, `token_limit`, `context_limit`) "The
-  run hit a limit.". `attention_by` is null. `stop`, `shutdown`, `restart` and the
-  loop check (`tool_loop`) mark nothing.
-- **The decider is the backup in the `decider` mode.**
-  `runner/attention.ts` asks the `run-attention` decision
-  (`docs/providers.md`) from `endSend()` after `finalizeSend` committed,
-  only for a run that ended `finish` with no mark of the step or the
-  runner (`asksDecider()`), after a `needed: false` too, never a
-  chat. It reads the last done
-  `answer` (`sessions.runAnswer()`) when the ask starts; none means no
-  ask. The
-  automation's words, when set, replace the needs-attention option's
-  text for that ask. It never clears a mark.
-- **The decision is read at each ask.** Off, no decider or no room skips
-  quietly. The answer is cut to 80% of the decider's window less 256
-  tokens, or 4,000 with no window. The list route's `deciderOn` tells
-  members whether this mode can ask, and nothing else of the decision.
-- **A decider's mark never moves the run's activity.** `markAttention()`
-  stores the chance and the decider's name, source `decider` and no
-  reason, in one transaction that bumps `revision` alone, never
-  `last_activity_at`, with one rows-free envelope. A gone session is a
-  no-op.
-- **A failed ask stores nothing and is never retried.** It logs `run
-  attention failed`, never the answer. There is no repair at start.
-- **Asks are bounded.** `ASKS_AT_ONCE` run, at most `MAX_QUEUED` wait
-  and the oldest is dropped past it. Shutdown aborts those in flight;
-  `runner.settled()` waits for all.
-- **A fork copies no mark.**
+A Compare (`checkCompare`, `shared/check-compare.ts`) is a dotted path
+into a JSON answer, `tag_name`, `data.items[0].id` or `[0].id`, a
+leading `.` ignored; then only that value decides what is new. It is
+refused without a Check URL, a patch clearing the URL clears it, and
+setting or changing it clears the validators.
 
-## The open alert
-
-`automations.attention_since` is the automation's one open alert, null
-while none is open (`automations/alerts.ts`). Its runs are the marked
-runs (`attention >= ATTENTION_AT`) that ended at or after it, read
-through the partial index `sessions_marked`; no table holds them. Its
-reason is the latest any of them gave, past a decider's mark, which has
-none; `by` names who marked the latest.
-
-- **Each transition is in the transaction of its cause.** A run's end
-  (`alertChange()` in `runner/marks.ts`, through the runner's `alerts`
-  port in `finalizeSend`): a mark opens it at the run's end when null,
-  else the run joins it (the summary's revision moves); a `finish`
-  with no mark closes it; `stop`, `shutdown` and `restart` leave it,
-  even with the agent's mark; a failure in the off mode changes
-  nothing.
-- **A Stop or a shutdown after the answer is a stop for the alert.**
-  `terminate()` sets `send.interrupted` when one comes after another
-  cause claimed the send, in the attention step or the memory phase. A
-  `finish` so cut never asks the decider. Its mark, the step's (made
-  before the cut) or the runner's (a limit), opens or joins as usual;
-  with no mark it leaves the alert as it is. The step's own
-  window running out is not a cut: the run is a clean finish.
-- **In the decider mode a clean finish leaves it to the decider**
-  (`decidesLater()`). Its chance opens (at `ATTENTION_AT` or over) or
-  closes it in `markAttention`'s transaction; a decision off, no
-  answer, a failure or a dropped ask closes it (`undecided`); a
-  shutdown leaves it. A word on a run applies only while no other run
-  of the automation ended after it (`endedAfter()`), so a late answer
-  never undoes a newer run's. A run whose send a stop, a shutdown or a
-  restart ended is passed over, and in a tie of one millisecond a
-  mark wins: a close yields to a run that ended at the same time.
-- **Deleting a marked run** (`removeSession()`, the one delete of the
-  route and both sweeps) closes the open alert in its transaction when
-  none of its marked runs is left, else bumps the automation's revision
-  when the run was one of the alert's, and either way publishes the
-  automation.
-- **Dismiss** (`POST /api/automations/:id/dismiss`, anyone who sees
-  the automation) closes it and answers the automation; with none open
-  it is a no-op 200 with the row as it is.
-- **Opening publishes `automation.attention`**, once per open alert,
-  never for a run that joins. It stays a hint: the owner's email is
-  queued in the opening transaction itself (`docs/email.md`), at most
-  `ALERT_EMAILS_PER_DAY` (3) per automation a day, counted on the outbox
-  rows that name it, which deleting runs keeps; over the cap the opening
-  emails nobody and logs `alert email capped`. The automation's Email
-  switch off drops its `email_user` tool and its alert emails; the
-  alert still opens in the app.
-- **The summary carries `alert`**: `since`, the count of its runs and
-  the latest one's reason (`alertColumns()` in `sessions/alerts.ts`),
-  read with the row, each feed row and each envelope. The feed's pick
-  reads `automations` through the partial index `automations_attention`.
+- **One GET per fire, never awaited by the pass.** The pass starts it
+  and skips the row while it is in flight; the sleep leaves due rows
+  out (`earliest(passAt)`) as for a cap wait, so a due row never spins
+  the loop. The answer is held in memory and `wake()`s the scheduler,
+  whose next fire takes it. One GET per automation at a time. A run of
+  it still going, or an owner `ownerFor()` refuses, skips the fire with
+  no GET and records its skipped event. One `CHECK_TIMEOUT_MS` sleep on
+  the clock port covers the whole chain; every hop sends
+  `If-None-Match` and `If-Modified-Since` from the saved validators.
+- **Redirects are followed as curl follows them,** by hand
+  (`redirect: "manual"`), at most `CHECK_REDIRECTS` hops, http and https
+  only (`hop()`). A signed check stays inside its credential's prefix or
+  its MCP server's origin, so no key reaches another origin; an
+  unsigned one meets the web rules on every hop and stays unsigned,
+  under a prefix too. The final answer decides.
+- **A held answer is dropped, never kept for later.** The fire's
+  transaction reads the row again: a moved edit revision, URL or due
+  time, a suspend, a full cap or a run going drops it. A new answer so
+  dropped writes only `last_answered_at` (`noteAnswer()`, which clears
+  the check's part of the alert as any answer does); the row stays due
+  and the next try asks again. A stale quiet or failed answer leaves a
+  restart rerun listed. A pass that skips a full project's row drops
+  its answer too. A drain aborts every GET and defers the rows as any
+  due row. A restart rerun asks, since its answer's validators were
+  never saved.
+- **Run now asks and always runs** (`askNow()`, `checks.now()`). Its
+  refusals (`manualFor()`, a run going, a drain) come before the GET,
+  which sends no validators, so an unchanged body is an answer. A 200
+  starts the run as a new answer does, its line saying only that the
+  URL answered, and its validators wait as a scheduled run's. A quiet
+  or failed answer starts it with the instructions and one line saying
+  so, and no kept file. It writes the check columns as a fire does and
+  takes a waiting fire as any Run now does, but writes no skipped event
+  and never opens the alert; a failure logs `check failed`. A row whose
+  URL or edit revision moved during the GET is a 409, and a drain's
+  abort a 503. A run proposal a chat confirms asks the same way.
+- **Nothing new is a 204, a 304, or a 200 whose body is white space,
+  `[]`, `{}` or `null` (white space allowed inside) or whose SHA-256 is
+  `check_body_hash`.** It moves `next_at`, the row's check columns and
+  `revision`, and writes no event.
+- **With a Compare, a non-empty body hashes only the value at the
+  path,** as JSON with sorted keys, so a reordered object is unchanged,
+  and Run now saves that hash too. A `null`, `""`, `[]` or `{}` value
+  is empty. A body that is not JSON fails as `answer is not JSON`, a
+  missing path as `compare path not found`. The run still gets the
+  whole body.
+- **A new answer is a 200 of UTF-8 text with no NUL**, whatever its
+  type, read up to `MAX_CHECK_BYTES` or `mcpKeptBytes` if lower. Its
+  run's first message is the instructions, the answer's start fenced as
+  data and `wholeLine()`'s path line; the start is cut at a line to
+  `resultCut` and an eighth of the agent's window in tokens. The whole
+  body is that message's kept file, `/mcp/0001-check/answer.json` (or
+  `.txt`), written in the run's start transaction (`prepareSend()`);
+  the kept counter starts past it.
+- **Its validators wait in memory, keyed by the run,** and are saved at
+  the run's end (`onRunEnd()`) while the row's edit revision is the
+  answer's. A Stop saves them; a shutdown or a restart that cut the
+  run, its work after the answer included (`runInterrupted()`), does
+  not, so the next check repeats it. An ETag or Last-Modified holding
+  the signing key in any `escapedForms()` is dropped.
+- **Every failure is a skipped event with a fixed reason**
+  (`checkReason()` over `HTTP <status>` or a `CHECK_FAILURES` phrase),
+  never a fetch error's message, which may hold the URL. One `check
+  failed` log line with the id, result and duration, `check error` for
+  an internal one; the URL is never a field.
+- **The check reaches what the run's tools could** (`reach()`). An MCP
+  server linked to the agent, not turned off for the task and on the
+  URL's origin signs with its `mcp-` key and ignores the web row.
+  Otherwise the web row and the task's `web` switch must allow it, and
+  `originAllowed()` in `listed` mode. An `https:` URL under a project
+  credential's prefix (`underPrefix()`) carries its header and, as
+  curl's credential fetch, needs no listed host. As in curl, a
+  credential the task turned off, whose key does not read or whose
+  methods leave out GET fails the check. The key sent is scrubbed from a
+  new answer (`escapedForms()`); the hash stays the raw body's.
+- **A check silent past `CHECK_SILENCE_MS` opens the alert** on a
+  failure (`docs/attention.md`).
+- **A quiet check moves `revision`, never the history.** The page shows
+  only the last check: `lastCheckedAt`, `lastCheckResult` (`200`, a
+  `CHECK_QUIET` word or a failure) and `lastAnsweredAt`.

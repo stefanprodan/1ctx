@@ -24,7 +24,10 @@ errors and cuts every tool shares are in `docs/tools.md`.
   A shared send counter reserves before
   the first await and returns a refused call's place.
 - **Create takes name, instructions, schedule, optional tz, once, own
-  memory and both guidances.** The zone defaults to the user's profile.
+  memory, both guidances and a Check URL** (`checkUrl`, empty for
+  none) with its Compare (`checkCompare`). The zone defaults to the
+  user's profile.
+
   Update needs id and at least one of those fields; an omitted zone
   keeps the automation's. Suspend, resume and run take id alone.
   Defaults and checks are `docs/automations.md`'s. The description asks
@@ -36,7 +39,8 @@ errors and cuts every tool shares are in `docs/tools.md`.
   dispatch takes only its own list; each action names the fields it
   takes and refuses the rest. `list` is one line per automation, never
   the instructions; `show` is every setting the automation's page shows,
-  then the instructions, the open alert and the last run's result.
+  then the instructions, the open alert and the last run's result. Its
+  Check URL line never shows the query, which may hold a key.
 - **It reads through `AutomationsPort`,** wired in `compose.ts`. An id
   of another project is not found. A switch is named only from the
   automation's agent's servers and skills and its project's credentials

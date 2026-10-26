@@ -109,6 +109,7 @@ export {
   isMemoryTool,
   MEMORY_WRITE_RULES,
 } from "./builtin/memory.ts";
+export { wholeLine } from "./kept.ts";
 export { toolLogName } from "./log-name.ts";
 export type { SkillsPort } from "./offer.ts";
 export {

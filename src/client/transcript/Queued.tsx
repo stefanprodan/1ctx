@@ -14,6 +14,7 @@ import { userHref } from "../lib/hrefs.ts";
 import { Icon } from "../lib/icons.tsx";
 import { useAction } from "../lib/save.ts";
 import { queuedLine } from "./Queued.words.ts";
+import { UserText } from "./UserText.tsx";
 
 export type QueueProps = {
   rows: readonly QueuedMessage[];
@@ -74,7 +75,7 @@ function QueuedRow({
       </div>
       <div class="card transcript-card transcript-queued-card">
         {/* a frame carries a long text cut; Edit reads it whole */}
-        {row.cut ? `${row.text}…` : row.text}
+        <UserText text={row.text} cut={row.cut} />
         {row.uploads > 0 && (
           <span class="transcript-queued-files">
             <Icon name="clip" size={12} />

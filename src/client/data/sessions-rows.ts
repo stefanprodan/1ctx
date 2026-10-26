@@ -18,6 +18,15 @@ import type { SessionOrigin } from "../../shared/words.ts";
 import { searched } from "../lib/search.ts";
 import { type Live, liveOf, liveOfSnapshot } from "../transcript/stream.ts";
 
+// the rows kept, the same array when none went
+export const without = (
+  rows: FeedRow[],
+  keep: (row: FeedRow) => boolean,
+): FeedRow[] => {
+  const out = rows.filter(keep);
+  return out.length === rows.length ? rows : out;
+};
+
 // what the order reads of a row, and all a cursor names
 export type Place = Pick<SessionSummary, "status" | "lastActivityAt" | "id">;
 

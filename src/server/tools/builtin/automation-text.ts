@@ -15,6 +15,7 @@ import { sanitize } from "../../../shared/memory.ts";
 import { scheduleWords } from "../../../shared/schedule.ts";
 import type { SendCause, SessionStatus } from "../../../shared/words.ts";
 import { localMinute } from "../../lib/clock.ts";
+import { checkText } from "./automation-check.ts";
 import { type SwitchNames, switchedOff } from "./automation-switches.ts";
 
 // a page of the instructions or of a run's answer
@@ -298,6 +299,7 @@ export function showText(input: ShowInput): { body: string; tail: string } {
     `Owner: @${a.ownerName}`,
     `Agent: ${a.agentName}${a.agentRetired ? " (retired, the automation stays suspended until another agent is picked)" : ""}`,
     `Schedule: ${scheduleText(a.schedule)} (${a.schedule}), zone ${a.tz}`,
+    `Check URL: ${checkText(a, time)}`,
     `Runs once: ${a.once ? "yes, the fire that starts its run suspends it" : "no"}`,
     `Suspended: ${suspendedText(a)}`,
     `When it fires: ${firesText(a, now)}`,

@@ -24,6 +24,8 @@ import {
 } from "./actions.ts";
 import { type AlertEmailDeps, alertEmails } from "./alert-email.ts";
 import { type Alerts, alerts } from "./alerts.ts";
+import { checks } from "./check.ts";
+import type { CheckPorts } from "./check-fetch.ts";
 import { draftDecisions, draftRoutes } from "./draft-decisions.ts";
 import { draftLifecycle } from "./draft-lifecycle.ts";
 import { AutomationDraftStore } from "./draft-store.ts";
@@ -56,6 +58,7 @@ export type AutomationsDeps = {
   markAttention(sessionId: string, attention: number, by: string): boolean;
   // the owner's email when an alert opens; none emails nobody
   email?: Pick<AlertEmailDeps, "outbox" | "canOpen">;
+  check: CheckPorts;
 };
 
 export type Automations = {
@@ -75,6 +78,7 @@ export type Automations = {
   // open alert, and the revision when the row named the run, whose link
   // the foreign key cleared
   runDeleted(run: DeletedRun): BusEvent[];
+  runInterrupted(sessionId: string): void;
   start(): number;
   drain(): void;
   stop(): void;
@@ -85,7 +89,32 @@ export type Automations = {
 export function automationsArea(deps: AutomationsDeps): Automations {
   const store = new AutomationStore(deps.db);
   const drafts = new AutomationDraftStore(deps.db);
-  const scheduled = scheduler({ ...deps, store });
+  const emails =
+    deps.email &&
+    alertEmails({
+      ...deps.email,
+      clock: deps.clock,
+      log: deps.log,
+      users: deps.users,
+      projects: deps.projects,
+      reason: (sessionId) =>
+        deps.sessions.byId(sessionId)?.attentionReason ?? null,
+    });
+  const checked = checks({
+    ...deps,
+    store,
+    ports: deps.check,
+    limits: () => deps.limits.current(),
+    emails,
+    // a closure: the scheduler is built next, on these checks
+    wake: () => scheduled.wake(),
+  });
+  const scheduled = scheduler({
+    ...deps,
+    store,
+    checks: checked,
+    resultCut: () => deps.limits.current().resultCut,
+  });
   const actions = automationActions({ ...deps, store, scheduler: scheduled });
   const decisions = draftDecisions({
     ...deps,
@@ -100,17 +129,7 @@ export function automationsArea(deps: AutomationsDeps): Automations {
     store,
     sessions: deps.sessions,
     markAttention: deps.markAttention,
-    emails:
-      deps.email &&
-      alertEmails({
-        ...deps.email,
-        clock: deps.clock,
-        log: deps.log,
-        users: deps.users,
-        projects: deps.projects,
-        reason: (sessionId) =>
-          deps.sessions.byId(sessionId)?.attentionReason ?? null,
-      }),
+    emails,
   });
   return {
     store,
@@ -141,6 +160,7 @@ export function automationsArea(deps: AutomationsDeps): Automations {
       const row = store.touch(run.automationId);
       return row === null ? events : [automationChanged(row)];
     },
+    runInterrupted: checked.interrupted,
     start: scheduled.start,
     drain: scheduled.drain,
     stop: scheduled.stop,
