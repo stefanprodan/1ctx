@@ -3,9 +3,9 @@
 //
 // A send's repositories: looked up when it starts, the commits stored
 // on its first message, the trees held until it ends. The model is told
-// each mounted one in the bash description, a branch that moved since
-// the chat's last turn in one line, and the ones turned off after a turn
-// read them.
+// each mounted one in the bash description, its commit and a branch
+// that moved since the chat's last turn in the turn's own text, and the
+// ones turned off after a turn read them.
 
 import { repoOf } from "../../shared/capabilities.ts";
 import {
@@ -15,6 +15,7 @@ import {
   type RepoMount,
 } from "../repos/index.ts";
 import type { MountedRepos } from "../sessions/index.ts";
+import { reposBlock } from "./prompt.ts";
 import type { ActiveSend } from "./send.ts";
 
 export type ReposPort = {
@@ -26,7 +27,9 @@ export type ReposPort = {
 export type MountedPort = {
   mountedRepos(messageId: string): MountedRepos | null;
   setMountedRepos(messageId: string, mounted: MountedRepos): void;
-  mountedBefore(sessionId: string, sendId: string): MountedRepos[];
+  // kept where none is stored yet, unless replaced
+  setReposBlock(messageId: string, block: string, replace?: boolean): void;
+  mountedBefore(sessionId: string, firstMessageId: string): MountedRepos[];
 };
 
 const short = (commit: string) => commit.slice(0, 7);
@@ -38,13 +41,18 @@ const REPOS_HEAD = "Repositories, read-only files with no git history:";
 const refWords = (ref: string) =>
   ref === "" ? "default branch" : isCommit(ref) ? short(ref) : ref;
 
+// /repos/podinfo: github.com/stefanprodan/podinfo at master, the bash
+// description's line, which a new commit never changes
+export function mountLine(mount: RepoMount): string {
+  const where = mount.url.replace(/^https:\/\//, "");
+  return `/repos/${mount.name}: ${where} at ${refWords(mount.ref)}`;
+}
+
 // /repos/podinfo: github.com/stefanprodan/podinfo at master (8d01e44)
 export function repoLine(mount: RepoMount): string {
-  const where = mount.url.replace(/^https:\/\//, "");
-  const at = isCommit(mount.ref)
-    ? short(mount.commit)
-    : `${refWords(mount.ref)} (${short(mount.commit)})`;
-  return `/repos/${mount.name}: ${where} at ${at}`;
+  return isCommit(mount.ref)
+    ? mountLine(mount)
+    : `${mountLine(mount)} (${short(mount.commit)})`;
 }
 
 // what the first command says of the repositories left out
@@ -110,6 +118,7 @@ export async function mountRepos(
       },
     },
     off: [],
+    mounted: prepared.mounts.map(repoLine),
     moved: [],
     release: prepared.release,
   };
@@ -125,7 +134,10 @@ export async function mountRepos(
   // a line may need them
   let earlier: MountedRepos[] | undefined;
   const before = () =>
-    (earlier ??= deps.sessions.mountedBefore(send.sessionId, send.id));
+    (earlier ??= deps.sessions.mountedBefore(
+      send.sessionId,
+      send.firstMessageId,
+    ));
   if (prepared.mounts.length > 0) {
     // the newest commit each repository was mounted at, though the last
     // turn may have left it out
@@ -149,11 +161,21 @@ export async function mountRepos(
             description: [
               bash.description,
               REPOS_HEAD,
-              ...prepared.mounts.map(repoLine),
+              ...prepared.mounts.map(mountLine),
             ].join("\n"),
           }
         : tool,
     );
+  }
+  // a channel says it in its request-local message instead. A
+  // regenerate says what it mounted: the cached prefix of earlier turns
+  // ends before its message, so replacing the block costs no cache
+  if (send.channel === null) {
+    const block = reposBlock(send.repos);
+    const replace = send.op === "regenerate";
+    if (block !== "" || replace) {
+      deps.sessions.setReposBlock(send.firstMessageId, block, replace);
+    }
   }
   if (off.size > 0) {
     const names = deps.repos

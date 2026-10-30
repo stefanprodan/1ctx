@@ -310,6 +310,45 @@ describe("costOf", () => {
     expect(costOf(usage({ promptTokens: 9 }), "opencode", null)).toBe(0);
   });
 
+  test("prices an hour's writes at twice the input, the rest at the listed write", () => {
+    // Opus 5.5's rates: models.dev lists only the five-minute write
+    const OPUS: ModelPrice = {
+      input: 4,
+      output: 20,
+      cacheRead: 0.2,
+      cacheWrite: 5,
+      tiers: [],
+    };
+    // 10 fresh, 1,000 read, 300 written of which 200 for an hour, 50 out
+    const cost = costOf(
+      usage({
+        promptTokens: 10 + 1_000 + 300,
+        completionTokens: 50,
+        cachedTokens: 1_000,
+        cacheWriteTokens: 300,
+        cacheWrite1hTokens: 200,
+      }),
+      "anthropic",
+      OPUS,
+    );
+    expect(cost).toBeCloseTo(
+      (10 * 4 + 1_000 * 0.2 + 100 * 5 + 200 * 8 + 50 * 20) / 1_000_000,
+      12,
+    );
+    // an hour's part never passes the writes
+    expect(
+      costOf(
+        usage({
+          promptTokens: 100,
+          cacheWriteTokens: 100,
+          cacheWrite1hTokens: 500,
+        }),
+        "anthropic",
+        OPUS,
+      ),
+    ).toBeCloseTo((100 * 8) / 1_000_000, 12);
+  });
+
   test("never counts cache tokens past the prompt", () => {
     const cost = costOf(
       usage({ promptTokens: 10, cachedTokens: 50, cacheWriteTokens: 50 }),

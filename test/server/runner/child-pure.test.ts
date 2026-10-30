@@ -98,6 +98,7 @@ describe("a subagent's prompt", () => {
   test("is what systemPrompt answers for a subagent, notes and lines left out", () => {
     const prompt = systemPrompt(policy, NOW, "the MCP tools changed", {
       off: ["infra"],
+      mounted: [],
       moved: ["repo infra moved"],
     });
     expect(prompt).toBe(subagentPrompt(policy, NOW));

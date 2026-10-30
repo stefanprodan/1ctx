@@ -104,10 +104,27 @@ it behind another base URL. The page names the preset Claude API.
   and a record with no signature left out, and count by their text,
   never the signature. After a summary the tail goes without its
   thinking (`docs/compaction.md`).
-- **Caching:** `cache_control: {type: "ephemeral"}` on the system block
-  and on the last text, call or result block of each of the last two
-  turns, never on thinking: three of the four marks. The system mark
-  caches the tools before it. No 1-hour cache.
+- **Caching:** `cache_control` on the system block, which caches the
+  tools before it, and on the last text, call or result block of each
+  of the last two turns, never on thinking. The request's `cacheLife`
+  sets the lifetime: `short` (or none) is `{type: "ephemeral"}`, five
+  minutes, everywhere; `long` is `{type: "ephemeral", ttl: "1h"}`
+  everywhere, since the tail of a chat's last round is the next turn's
+  prefix; `channel` puts the hour on the system block and on the block
+  that ends each message flagged `streamMark` (two at most, the later
+  ones), the tail at five minutes, and with two flags only the last
+  turn's tail mark: four marks at most. Marks are placed after roles
+  merge, one per block (the longer wins), and a five-minute mark
+  before an hour's is promoted, as the API refuses a shorter lifetime
+  first. Other wires ignore both fields.
+- **The runner sets the cache life per round** (`cacheLife()` in
+  `runner/round.ts`), never a setting, first match wins: `short` for a
+  subagent, a summary round, a memory or attention step and a run;
+  `channel` for a channel turn; `long` for any other chat turn,
+  regenerated, queued and summoned ones included. An hour's write
+  costs 2x input against 1.25x and one reuse repays it, which only a
+  turn answered over minutes gets. `send.kind` alone cannot say it: a
+  child inherits its parent's kind and a summary round stays `chat`.
 - **A refused replay is adapted once:** a 400 `invalid_request_error`
   on a body with thinking, before any event, goes again without it.
   Only an answered resend yields `reasoningRefused`, and the runner
@@ -118,7 +135,9 @@ it behind another base URL. The page names the preset Claude API.
   while a thinking block is open, which lifts the quiet check and the
   silence limit. `input_json_delta` streams the call, whole at its
   block's end. Usage is one event, at `message_delta`: the prompt is
-  `input_tokens` plus the cache read and write. `message_stop` ends the
+  `input_tokens` plus the cache read and write. The hour's writes,
+  `cache_creation.ephemeral_1h_input_tokens` from either `message_start`
+  or `message_delta`, are `cacheWrite1hTokens`. `message_stop` ends the
   read. `end_turn` and `stop_sequence` are `stop`, `tool_use`
   `tool_calls`, `max_tokens` and `model_context_window_exceeded`
   `length`, `refusal` `content_filter` with its explanation as the

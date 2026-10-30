@@ -90,6 +90,7 @@ const EXPECTED_IDS = [
   "0076-dictation",
   "0077-automation-check",
   "0078-check-compare",
+  "0079-repos-block",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2064,6 +2065,20 @@ describe("the schema", () => {
         ...(before as object),
         check_compare: null,
       });
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0079 adds the repository block, null on every message", () => {
+    const db = seed(MIGRATIONS.slice(0, 78));
+    try {
+      const before = db.query("select * from messages order by rowid").all();
+      expect(before.length).toBeGreaterThan(0);
+      expect(migrate(db)).toEqual(expectedFrom("0079-repos-block"));
+      expect(db.query("select * from messages order by rowid").all()).toEqual(
+        before.map((row) => ({ ...(row as object), repos_block: null })),
+      );
     } finally {
       db.close();
     }
@@ -4154,6 +4169,7 @@ describe("project channel migrations", () => {
       "0076-dictation",
       "0077-automation-check",
       "0078-check-compare",
+      "0079-repos-block",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4369,6 +4385,7 @@ describe("project channel migrations", () => {
           "0076-dictation",
           "0077-automation-check",
           "0078-check-compare",
+          "0079-repos-block",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4533,6 +4550,7 @@ describe("project channel migrations", () => {
         "0076-dictation",
         "0077-automation-check",
         "0078-check-compare",
+        "0079-repos-block",
       ]);
       expect(
         db

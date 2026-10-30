@@ -135,12 +135,12 @@ export function copyRows(
        user_id, agent_id, content, reasoning, html, status, error,
        finish_reason, reasoning_details, tool_calls, tool_call_id, tool_name,
        model, ttft_ms, thinking_ms, upstream, served_model, native_finish,
-       created_at, finished_at, uploads, saved, mounted_repos)
+       created_at, finished_at, uploads, saved, mounted_repos, repos_block)
      select ?, ?, seq, kind, ?, round, slot, user_id, agent_id,
        coalesce(?, content), reasoning, html, status, error, finish_reason, reasoning_details,
        tool_calls, tool_call_id, tool_name, model, ttft_ms, thinking_ms,
        upstream, served_model, native_finish,
-       created_at, finished_at, uploads, saved, mounted_repos
+       created_at, finished_at, uploads, saved, mounted_repos, repos_block
      from messages where id = ?`,
   );
   const insertOpened = db.query(

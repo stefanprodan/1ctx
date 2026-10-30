@@ -105,6 +105,7 @@ export {
   tidyTranscript,
 } from "./transcription.ts";
 export type {
+  CacheLife,
   ChatEvent,
   ChatMessageIn,
   ChatRequest,

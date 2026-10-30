@@ -147,7 +147,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
   };
   const reposDeps = {
     repos: deps.repos,
-    sessions: deps.sessions,
+    sessions: deps.sessions.mounts,
     fileBytes: () => deps.limits.current().repoFileBytes,
   };
   const phaseDeps = {

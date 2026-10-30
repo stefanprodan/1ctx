@@ -20,6 +20,7 @@ import {
 import {
   channelLookups,
   ownsChannelTurn,
+  type StreamTurn,
   streamTurns,
   tracedTurn,
   trimStream,
@@ -145,21 +146,24 @@ export function channelContext(fields: {
     const parts = trimmed.kept.filter(
       (part) => !part.rows.some((row) => row.id === posted.id),
     );
-    const last = parts.findLast((part) => ownsChannelTurn(part, policy));
-    let whole: ChatMessageIn[] | null = null;
-    let surplus = 0;
-    if (
-      last !== undefined &&
-      !last.turn!.swept &&
-      channelTurnChars(db, last.id, last.rows) <=
-        TAIL_MAX_TOKENS * CHARS_PER_TOKEN
-    ) {
+    const owns = (part: StreamTurn) => ownsChannelTurn(part, policy);
+    const last = parts.findLast(owns);
+    // a whole replay of an own turn, as the latest retained own turn
+    const replay = (part: StreamTurn | undefined) => {
+      if (
+        part === undefined ||
+        part.turn!.swept ||
+        channelTurnChars(db, part.id, part.rows) >
+          TAIL_MAX_TOKENS * CHARS_PER_TOKEN
+      ) {
+        return null;
+      }
       const rows = [
-        ...last.rows.filter((row) => row.kind === "user"),
-        ...channelOwnRows(db, last.id),
+        ...part.rows.filter((row) => row.kind === "user"),
+        ...channelOwnRows(db, part.id),
       ];
       // The post's stored send id differs: put it in the same tail unit.
-      const unit = rows.map((row) => ({ ...row, sendId: last.id }));
+      const unit = rows.map((row) => ({ ...row, sendId: part.id }));
       const tail = tailOf(
         unit,
         unit.length,
@@ -169,18 +173,38 @@ export function channelContext(fields: {
         snapshot.turns,
         policy.wire,
       );
-      if (tail.start === 0) {
-        whole = tail.messages;
-        surplus = Math.max(0, tail.tokens - last.tokens);
-      }
+      return tail.start === 0 ? tail : null;
+    };
+    const lastWhole = replay(last);
+    const whole = lastWhole?.messages ?? null;
+    const surplus =
+      lastWhole === null ? 0 : Math.max(0, lastWhole.tokens - last!.tokens);
+    const stream: ChatMessageIn[] = [];
+    const starts = new Map<StreamTurn, number>();
+    for (const part of parts) {
+      starts.set(part, stream.length);
+      stream.push(
+        ...(part === last && whole !== null
+          ? whole
+          : tracedTurn(part, lookups, yours, owns(part))),
+      );
+    }
+    // The agent's next turn traces its whole last turn, so it repeats
+    // the stream only up to there. The agent's last turn cached up to
+    // the start of the own turn it replayed whole, else its stream's
+    // end: marked again, it stays within the lookback of a long stream.
+    const end = (whole !== null ? starts.get(last!)! : stream.length) - 1;
+    const previous = parts.slice(0, parts.indexOf(last!)).findLast(owns);
+    const cached =
+      last === undefined
+        ? -1
+        : starts.get(replay(previous) === null ? last : previous!)! - 1;
+    for (const at of [cached, end]) {
+      if (at >= 0) stream[at] = { ...stream[at]!, streamMark: true };
     }
     const prefix: ChatMessageIn[] = [
       { role: "system", content: channelSystem(policy) },
-      ...parts.flatMap((part) =>
-        part === last && whole !== null
-          ? whole
-          : tracedTurn(part, lookups, yours, ownsChannelTurn(part, policy)),
-      ),
+      ...stream,
     ];
     const question: ChannelRow = {
       ...posted,

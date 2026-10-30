@@ -77,14 +77,25 @@ export function userLine(
   return `You talk to @${policy.username} (${policy.fullName}), in the ${policy.tz} time zone${said === "" ? "." : `: ${said}`}`;
 }
 
-// what a send's repositories add: the ones off that a turn read, and a
-// line per branch that moved since the chat's last turn
+// what a send's repositories add: the ones off that a turn read, a
+// line per mount with its commit, and a line per branch that moved
+// since the chat's last turn
 export type RepoLines = {
   off: readonly string[];
+  mounted: readonly string[];
   moved: readonly string[];
 };
 
-export const NO_REPO_LINES: RepoLines = { off: [], moved: [] };
+export const NO_REPO_LINES: RepoLines = { off: [], mounted: [], moved: [] };
+
+const REPOS_TURN_HEAD = "Repositories mounted for this turn:";
+
+// the commits and moves of one turn, in the turn's own text: in the
+// prefix they would change the tools or system bytes every move
+export function reposBlock(repos: Pick<RepoLines, "mounted" | "moved">) {
+  if (repos.mounted.length === 0 && repos.moved.length === 0) return "";
+  return [REPOS_TURN_HEAD, ...repos.mounted, ...repos.moved].join("\n");
+}
 
 export type PromptPolicy = Pick<
   SendPolicy,
@@ -211,7 +222,6 @@ export function systemPrompt(
     parts.push(skillsOffLine(policy.skillsOff));
   }
   if (repos.off.length > 0) parts.push(reposOffLine(repos.off));
-  if (repos.moved.length > 0) parts.push(repos.moved.join("\n"));
   if (mcpNote !== "") parts.push(mcpNote);
   return parts.join("\n\n");
 }

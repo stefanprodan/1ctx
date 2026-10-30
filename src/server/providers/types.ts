@@ -26,7 +26,7 @@ export type ReasoningDetail = {
   [field: string]: unknown;
 };
 
-export type ChatMessageIn =
+export type ChatMessageIn = (
   | { role: "system"; content: string }
   // the author's name rides on a user message, so a model in a session
   // with more than one author knows who wrote what
@@ -40,7 +40,18 @@ export type ChatMessageIn =
       toolCalls?: ToolCall[];
     }
   // failed: the tool did not finish, which anthropic marks as an error
-  | { role: "tool"; toolCallId: string; content: string; failed?: boolean };
+  | { role: "tool"; toolCallId: string; content: string; failed?: boolean }
+) & {
+  // a channel stream message that ends a prefix the agent's next turn
+  // repeats, or one its last turn cached; anthropic alone reads it
+  streamMark?: true;
+};
+
+// how long a request's cached prefix is worth keeping, by its kind of
+// send: short for one that is not read again past its own rounds, long
+// for a chat answered over minutes, channel for a stream another turn
+// of the agent reads. Anthropic alone reads it
+export type CacheLife = "short" | "long" | "channel";
 
 export type ChatRequest = {
   model: string;
@@ -66,6 +77,8 @@ export type ChatRequest = {
   upstream?: string | null;
   // OpenRouter alone: leave out the hosts serving the model at 4 bits
   skip4Bit?: boolean;
+  // short when not set
+  cacheLife?: CacheLife;
 };
 
 // the tokens and cost of one round, as the provider reported them: null
@@ -77,6 +90,9 @@ export type Usage = {
   // the prompt tokens written to the cache, which some models bill
   // apart; Azure, Anthropic and OpenRouter report them
   cacheWriteTokens: number | null;
+  // the part of those written for an hour, which bills at twice the
+  // input rate; only Anthropic reports it
+  cacheWrite1hTokens?: number | null;
   reasoningTokens: number | null;
   // USD
   cost: number | null;

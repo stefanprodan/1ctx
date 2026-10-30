@@ -59,6 +59,7 @@ function usageEvent(usage: any): ChatEvent {
   const read = usage.cache_read_input_tokens;
   const written = usage.cache_creation_input_tokens;
   const thinking = usage.output_tokens_details?.thinking_tokens;
+  const hour = usage.cache_creation?.ephemeral_1h_input_tokens;
   return {
     kind: "usage",
     usage: {
@@ -66,6 +67,7 @@ function usageEvent(usage: any): ChatEvent {
       completionTokens: num(usage.output_tokens),
       cachedTokens: typeof read === "number" ? read : null,
       cacheWriteTokens: typeof written === "number" ? written : null,
+      ...(typeof hour === "number" ? { cacheWrite1hTokens: hour } : {}),
       reasoningTokens: typeof thinking === "number" ? thinking : null,
       cost: null,
     },
@@ -107,6 +109,8 @@ export function anthropicEvents(): AnthropicStream {
   let contentShown = false;
   // message_start's input counts: a server may report them only there
   let started: Record<string, number> = {};
+  // and its one-hour cache writes, which sit in a nested object
+  let startedHour: number | undefined;
 
   const start = (index: number, block: any): ChatEvent[] => {
     const type = text(block?.type) ?? "";
@@ -224,6 +228,11 @@ export function anthropicEvents(): AnthropicStream {
       for (const [field, value] of Object.entries(body.usage)) {
         if (value !== null && value !== undefined) usage[field] = value;
       }
+      const hour = body.usage.cache_creation?.ephemeral_1h_input_tokens;
+      usage.cache_creation = {
+        ephemeral_1h_input_tokens:
+          typeof hour === "number" ? hour : startedHour,
+      };
       events.push(usageEvent(usage));
     }
     if (reason !== undefined) events.push(finishOf(reason));
@@ -249,6 +258,8 @@ export function anthropicEvents(): AnthropicStream {
           for (const field of INPUT_FIELDS) {
             if (typeof usage[field] === "number") started[field] = usage[field];
           }
+          const hour = usage.cache_creation?.ephemeral_1h_input_tokens;
+          startedHour = typeof hour === "number" ? hour : undefined;
         }
         return [];
       }

@@ -165,8 +165,9 @@ is its root.
   never continued.
 - **Its bash description is the parent's after `mountRepos()`,** less
   the `open` text and with its own credential words (`asSubagent()`),
-  so it names the same repositories. Its repos handle shares the
-  parent's trees and never takes the parent's mount notices.
+  so it names the same repositories. Their commits go before its task
+  (`docs/repos.md`). Its repos handle shares the parent's trees and
+  never takes the parent's mount notices.
 
 ## The parent's work fold
 

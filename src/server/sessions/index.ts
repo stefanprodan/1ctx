@@ -92,7 +92,7 @@ export {
   markdownFilename,
 } from "./markdown.ts";
 export type { RunMark } from "./marks.ts";
-export type { MountedRepos } from "./messages.ts";
+export type { MountedRepos, MountsStore } from "./mounts.ts";
 export type { KeptPass } from "./pack-kept.ts";
 export {
   lineFrom,

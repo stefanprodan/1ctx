@@ -402,6 +402,8 @@ describe("the anthropic wire", () => {
       completionTokens: file.usage.output_tokens,
       cachedTokens: file.usage.cache_read_input_tokens,
       cacheWriteTokens: file.usage.cache_creation_input_tokens,
+      // every recording's message_start wrote nothing for an hour
+      cacheWrite1hTokens: 0,
       reasoningTokens: file.usage.output_tokens_details.thinking_tokens,
       cost: null,
     });
@@ -513,6 +515,53 @@ describe("the anthropic wire", () => {
           },
         },
       ]);
+    });
+
+    test("an hour's cache writes come from whichever frame says them", async () => {
+      const hourOf = async (
+        start: Record<string, unknown>,
+        end: Record<string, unknown>,
+      ) => {
+        const { events } = await run([
+          frames(
+            { type: "message_start", message: { usage: start } },
+            {
+              type: "content_block_start",
+              index: 0,
+              content_block: { type: "text", text: "ok" },
+            },
+            { type: "content_block_stop", index: 0 },
+            {
+              type: "message_delta",
+              delta: { stop_reason: "end_turn" },
+              usage: end,
+            },
+            { type: "message_stop" },
+          ),
+        ]);
+        return of(events, "usage")[0]!.usage;
+      };
+      const written = {
+        input_tokens: 3,
+        cache_creation_input_tokens: 900,
+        cache_read_input_tokens: 0,
+      };
+      const nested = (hour: number) => ({
+        cache_creation: {
+          ephemeral_5m_input_tokens: 900 - hour,
+          ephemeral_1h_input_tokens: hour,
+        },
+      });
+      expect(
+        await hourOf({ ...written, ...nested(600) }, { output_tokens: 5 }),
+      ).toMatchObject({ cacheWriteTokens: 900, cacheWrite1hTokens: 600 });
+      expect(
+        await hourOf(written, { ...written, ...nested(700), output_tokens: 5 }),
+      ).toMatchObject({ cacheWriteTokens: 900, cacheWrite1hTokens: 700 });
+      // a server that never says leaves the field out
+      expect(await hourOf(written, { output_tokens: 5 })).not.toHaveProperty(
+        "cacheWrite1hTokens",
+      );
     });
 
     test("thinking off answers with text alone", async () => {

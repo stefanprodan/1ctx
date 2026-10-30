@@ -239,12 +239,26 @@ start answers `{ mounts, notices, release }`:
 - **The model is told.** The bash description ends with a line saying
   the repositories are read-only files with no git history, since a
   named repository reads as a checkout and models ran git in one, then
-  a line per mounted repository (`repoLine()`): its URL, ref and
-  commit. A repository at another commit than the newest earlier turn
-  of the chat that mounted it gets `repo <name>: <ref> moved from <a>
-  to <b>` in the system prompt, that send only. A repository off that
-  an earlier turn of the chat mounted gets `reposOffLine()`; one never
-  mounted is not named.
+  a line per mounted repository (`mountLine()`): its URL and ref,
+  never the commit, since tools lead the cached prefix. The turn's own
+  text holds `reposBlock()`: a head line, a line per mount with its
+  commit (`repoLine()`), and for a repository at another commit than
+  the newest earlier turn of the chat that mounted it `repo <name>:
+  <ref> moved from <a> to <b>`. A repository off that an earlier turn
+  of the chat mounted gets `reposOffLine()` in the system prompt; one
+  never mounted is not named.
+- **Earlier turns are the sends of other first messages**
+  (`mountedBefore()`): a channel's post send and a regenerate share the
+  turn's message and its commits, and would hide the move.
+- **A plain chat keeps the block on the turn's first message**
+  (`repos_block`, first write wins) and every later request replays it
+  before that message, byte for byte, so a renamed or deleted repository
+  never changes an old turn. A regenerate replaces it with what it
+  mounts, since the earlier turns' cached prefix ends before that
+  message and a missed pin mounts another commit. A subagent's task gets
+  its parent's commit lines, no move. A channel puts the block in its
+  request-local message (`docs/channel-context.md`) and stores none. A
+  fork copies the column.
 - **A project with no repositories costs one indexed query a send** and
   writes nothing.
 

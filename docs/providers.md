@@ -57,8 +57,10 @@ with probabilities.
   `anthropic`, `azure` and `gemini`, the sum at the rates of the agent's
   `listedAs` (`costOf`): uncached input, cache reads and writes at their
   rates (the input rate where models.dev lists none), the highest tier
-  the prompt passes. Null when nothing prices it, as on the OpenAI
-  wires.
+  the prompt passes. Anthropic's hour writes add the difference up to
+  twice the input rate, since models.dev lists only the five-minute
+  write; no column keeps them apart. Null when nothing prices it, as on
+  the OpenAI wires.
 - **A chat failure is an error event, never a throw.** The runner
   finishes a round on one channel. A stop by the caller's signal ends
   the stream with no event. The key is read at each request, so a
