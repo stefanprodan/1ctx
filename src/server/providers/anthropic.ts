@@ -6,6 +6,7 @@ import type { Log } from "../lib/log.ts";
 import { errorEvent } from "./anthropic-stream.ts";
 import { markOf } from "./author.ts";
 import {
+  type CacheLife,
   CatalogError,
   type ChatEvent,
   type ChatMessageIn,
@@ -23,7 +24,12 @@ export const THINKING_MIN_TOKENS = 1024;
 type Block = Record<string, unknown>;
 type Turn = { role: "user" | "assistant"; content: Block[] };
 
+type Ttl = "5m" | "1h";
+// a block's place in the turns
+type At = { turn: number; block: number };
+
 const EPHEMERAL = { type: "ephemeral" } as const;
+const HOUR = { type: "ephemeral", ttl: "1h" } as const;
 
 export function anthropicTools(tools: readonly ChatTool[]) {
   return tools.map((tool) => ({
@@ -133,13 +139,32 @@ type BuildOptions = {
   counting?: boolean;
 };
 
+// text, a call or a result, never thinking
+const markable = (block: Block) =>
+  block.type === "tool_use" ||
+  block.type === "tool_result" ||
+  (block.type === "text" && block.text !== "");
+
+// the last block a mark may sit on, at or before the end of the turns
+function lastMarkable(turns: Turn[]): At | null {
+  for (let t = turns.length - 1; t >= 0; t--) {
+    const content = turns[t]!.content;
+    for (let b = content.length - 1; b >= 0; b--) {
+      if (markable(content[b]!)) return { turn: t, block: b };
+    }
+  }
+  return null;
+}
+
 function turnsOf(
   messages: readonly ChatMessageIn[],
   options: BuildOptions,
-): { system: string; turns: Turn[] } {
+): { system: string; turns: Turn[]; streamAt: At | null } {
   const ids = idRewriter();
   const system: string[] = [];
   const turns: Turn[] = [];
+  // blocks are only appended, so a place found here stays valid
+  let streamAt: At | null = null;
   // consecutive messages of one role are one turn, as the API merges them
   const push = (role: Turn["role"], content: Block[]) => {
     if (content.length === 0) return;
@@ -186,27 +211,50 @@ function turnsOf(
         ]);
       }
     }
+    if (message.streamEnd) streamAt = lastMarkable(turns);
   }
-  return { system: system.join("\n\n"), turns };
+  return { system: system.join("\n\n"), turns, streamAt };
 }
 
-// the last block of each of the last two turns that a mark may sit on:
-// text, a call or a result, never thinking. With the system mark, which
-// caches the tools before it, three of the four the API allows
-function markTail(turns: Turn[]): void {
-  for (const turn of turns.slice(-2)) {
-    for (let i = turn.content.length - 1; i >= 0; i--) {
-      const block = turn.content[i]!;
-      if (
-        block.type === "tool_use" ||
-        block.type === "tool_result" ||
-        (block.type === "text" && block.text !== "")
-      ) {
-        turn.content[i] = { ...block, cache_control: EPHEMERAL };
+// after roles merge, which can put a tail mark before the stream mark:
+// the API refuses a shorter life before a longer one, so it is promoted
+function placeMarks(
+  system: Block | null,
+  turns: Turn[],
+  life: CacheLife,
+  streamAt: At | null,
+): void {
+  const tail: Ttl = life === "long" ? "1h" : "5m";
+  const marks: (At & { ttl: Ttl })[] = [];
+  const add = (at: At, ttl: Ttl) => {
+    const same = marks.find(
+      (mark) => mark.turn === at.turn && mark.block === at.block,
+    );
+    if (same === undefined) marks.push({ ...at, ttl });
+    else if (ttl === "1h") same.ttl = ttl;
+  };
+  for (let t = Math.max(0, turns.length - 2); t < turns.length; t++) {
+    const content = turns[t]!.content;
+    for (let b = content.length - 1; b >= 0; b--) {
+      if (markable(content[b]!)) {
+        add({ turn: t, block: b }, tail);
         break;
       }
     }
   }
+  if (life === "channel" && streamAt !== null) add(streamAt, "1h");
+  marks.sort((a, b) => a.turn - b.turn || a.block - b.block);
+  const lastHour = marks.findLastIndex((mark) => mark.ttl === "1h");
+  if (system !== null) {
+    system.cache_control = life === "short" && lastHour < 0 ? EPHEMERAL : HOUR;
+  }
+  marks.forEach((mark, i) => {
+    const content = turns[mark.turn]!.content;
+    content[mark.block] = {
+      ...content[mark.block]!,
+      cache_control: i <= lastHour ? HOUR : EPHEMERAL,
+    };
+  });
 }
 
 // an effort, or the model's own level with none; Off and the least
@@ -226,21 +274,17 @@ export function buildChatBody(
   req: ChatRequest,
   options: BuildOptions = {},
 ): Record<string, unknown> {
-  const { system, turns } = turnsOf(req.messages, options);
-  if (!options.counting) markTail(turns);
+  const { system, turns, streamAt } = turnsOf(req.messages, options);
+  const systemBlock: Block | null =
+    system === "" ? null : { type: "text", text: system };
+  if (!options.counting) {
+    placeMarks(systemBlock, turns, req.cacheLife ?? "short", streamAt);
+  }
   const body: Record<string, unknown> = {
     model: req.model,
     max_tokens: maxTokensOf(req),
   };
-  if (system !== "") {
-    body.system = [
-      {
-        type: "text",
-        text: system,
-        ...(options.counting ? {} : { cache_control: EPHEMERAL }),
-      },
-    ];
-  }
+  if (systemBlock !== null) body.system = [systemBlock];
   body.messages = turns;
   if (req.tools && req.tools.length > 0) body.tools = anthropicTools(req.tools);
   Object.assign(body, thinking(req));

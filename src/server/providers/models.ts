@@ -155,6 +155,7 @@ export function costOf(
     | "completionTokens"
     | "cachedTokens"
     | "cacheWriteTokens"
+    | "cacheWrite1hTokens"
     | "cost"
   >,
   wire: Wire | null,
@@ -166,12 +167,16 @@ export function costOf(
   const prompt = usage.promptTokens;
   const read = Math.min(usage.cachedTokens ?? 0, prompt);
   const write = Math.min(usage.cacheWriteTokens ?? 0, prompt - read);
+  const hour = Math.min(usage.cacheWrite1hTokens ?? 0, write);
   let rates: Rates = price;
   for (const tier of price.tiers) if (prompt > tier.above) rates = tier;
+  // models.dev lists only the five-minute write; an hour's is twice input
+  const hourExtra = Math.max(0, 2 * rates.input - rates.cacheWrite);
   return (
     ((prompt - read - write) * rates.input +
       read * rates.cacheRead +
       write * rates.cacheWrite +
+      hour * hourExtra +
       usage.completionTokens * rates.output) /
     1_000_000
   );

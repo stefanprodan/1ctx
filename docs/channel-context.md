@@ -54,11 +54,18 @@ Posting and parallel turns are in `docs/sessions.md`, pending turns in
   other agents' answer marks and asks for sources, paths and key figures.
 - **One request-local user message follows the frozen stream.** It holds
   the summoner's name, zone and about, the current project memory note,
-  the start's date, moved repositories and the MCP change note. The turn's
+  the start's date, the repositories' commits and moves
+  (`reposBlock()`, `docs/repos.md`) and the MCP change note. The turn's
   own question and rows follow it. The message is fixed before the first
   request and reused each round, never moved to the end like the exhaustion
   ask. Memory is read at start, not when the repositories finish mounting.
   The cache key stays `<session>:<agent>`.
+- **The stream mark ends what the agent's next turn repeats.** The
+  message flagged `streamEnd` is the stream's last, or the one before
+  the agent's own whole last turn, which its next turn traces. An empty
+  stream, or a whole turn first, flags none. On `anthropic` it is an
+  hour's mark beside the system's (`docs/wires.md`); a moved
+  `dropped_seq` changes the stream and misses by design.
 - **A channel never compacts.** `channelContextFloor` defaults to 262,144
   tokens; a smaller or unknown window is refused before posting, and
   checked again when a pending turn starts.

@@ -146,8 +146,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     messages: (sessionId: string) => deps.sessions.messages(sessionId),
   };
   const reposDeps = {
-    repos: deps.repos,
-    sessions: deps.sessions,
+    ...deps,
     fileBytes: () => deps.limits.current().repoFileBytes,
   };
   const phaseDeps = {

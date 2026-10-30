@@ -174,13 +174,25 @@ export function channelContext(fields: {
         surplus = Math.max(0, tail.tokens - last.tokens);
       }
     }
+    const stream: ChatMessageIn[] = [];
+    // the agent's next turn traces its whole last turn, so it repeats
+    // the stream only up to there
+    let fixed: number | null = null;
+    for (const part of parts) {
+      if (part === last && whole !== null) {
+        fixed = stream.length;
+        stream.push(...whole);
+      } else {
+        stream.push(
+          ...tracedTurn(part, lookups, yours, ownsChannelTurn(part, policy)),
+        );
+      }
+    }
+    const end = (fixed ?? stream.length) - 1;
+    if (end >= 0) stream[end] = { ...stream[end]!, streamEnd: true };
     const prefix: ChatMessageIn[] = [
       { role: "system", content: channelSystem(policy) },
-      ...parts.flatMap((part) =>
-        part === last && whole !== null
-          ? whole
-          : tracedTurn(part, lookups, yours, ownsChannelTurn(part, policy)),
-      ),
+      ...stream,
     ];
     const question: ChannelRow = {
       ...posted,

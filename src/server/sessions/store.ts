@@ -313,9 +313,9 @@ export class SessionStore {
     return readMountedRepos(this.db, messageId);
   }
 
-  // what the chat's turns before this send mounted, newest first
-  mountedBefore(sessionId: string, sendId: string): MountedRepos[] {
-    return mountedBefore(this.db, sessionId, sendId);
+  // what the chat's turns before this one mounted, newest first
+  mountedBefore(sessionId: string, firstMessageId: string): MountedRepos[] {
+    return mountedBefore(this.db, sessionId, firstMessageId);
   }
 
   // a run's end may carry its mark, written in the same transaction

@@ -117,7 +117,11 @@ describe("the anthropic wire in a chat", () => {
         thinking: { type: "adaptive", display: "summarized" },
         stream: true,
       });
-      expect(first!.system[0].cache_control).toEqual({ type: "ephemeral" });
+      // a chat is answered over minutes: every mark lives an hour
+      expect(first!.system[0].cache_control).toEqual({
+        type: "ephemeral",
+        ttl: "1h",
+      });
       expect(first!.messages).toEqual([
         {
           role: "user",
@@ -125,7 +129,7 @@ describe("the anthropic wire in a chat", () => {
             {
               type: "text",
               text: "[casey] add them",
-              cache_control: { type: "ephemeral" },
+              cache_control: { type: "ephemeral", ttl: "1h" },
             },
           ],
         },

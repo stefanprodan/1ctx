@@ -230,9 +230,8 @@ arrives.
   the MCP catalog, `<mcp_instructions>`, project memory, automation
   memory, knowledge, the date, the off lines (web, visualize, knowledge,
   memory, email, automations, external tasks, MCP, skills,
-  repositories), the moved
-  branches (`docs/repos.md`), and last the MCP change note
-  (`docs/mcp.md`). What is fixed per agent and project leads; the user's
+  repositories), and last the MCP change note (`docs/mcp.md`).
+  Commits and moved branches are in the turn's text (`docs/repos.md`). What is fixed per agent and project leads; the user's
   line follows, as a team chat's author changes it. A subagent's
   is `subagentPrompt()` (`docs/subagents.md`).
   A channel has its own stable head and one request-local message between

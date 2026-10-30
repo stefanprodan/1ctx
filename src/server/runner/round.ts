@@ -8,6 +8,7 @@ import { bytesWords } from "../lib/bytes.ts";
 import { type Clock, sleep, sleepUnless } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import {
+  type CacheLife,
   type ChatEvent,
   type ChatRequest,
   costOf,
@@ -158,6 +159,22 @@ export function buildRequest(
   return req;
 }
 
+// an hour's write (2x input) repays on one reuse, which only a turn
+// answered over minutes gets; first match wins
+export function cacheLife(
+  send: Pick<ActiveSend, "child" | "summarizing" | "kind" | "phase"> & {
+    channel: unknown;
+    policy: Pick<ActiveSend["policy"], "subagent">;
+  },
+): CacheLife {
+  if (send.child !== null || send.policy.subagent) return "short";
+  if (send.summarizing || send.kind === "compact") return "short";
+  if (send.phase === "memory" || send.phase === "attention") return "short";
+  if (send.kind === "run") return "short";
+  if (send.channel !== null) return "channel";
+  return "long";
+}
+
 type RoundOptions = {
   request?: ChatRequest;
   signal?: AbortSignal;
@@ -198,8 +215,11 @@ async function streamRound(
       : send.policy.deadlineMs === null
         ? null
         : send.startedAt + send.policy.deadlineMs;
-  const req =
-    options.request ?? buildRequest(send, rows, deps.lookups, deps.clock());
+  const req: ChatRequest = {
+    ...(options.request ??
+      buildRequest(send, rows, deps.lookups, deps.clock())),
+    cacheLife: cacheLife(send),
+  };
   const open = () =>
     deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
   let iterator = open();

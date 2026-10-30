@@ -34,8 +34,8 @@ import {
 const URL = "https://github.com/acme/widgets";
 const ARCHIVE = adapter(URL, "github").archiveUrl("");
 const HEAD = "Repositories, read-only files with no git history:";
-const LINE =
-  "/repos/widgets: github.com/acme/widgets at default branch (3e0ff8a)";
+const LINE = "/repos/widgets: github.com/acme/widgets at default branch";
+const BLOCK = `Repositories mounted for this turn:\n${LINE} (3e0ff8a)`;
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -89,6 +89,12 @@ describe("a subagent's repositories", () => {
       const child = await waitScript(chat.scripted, 2);
       expect(isChild(child)).toBe(true);
       expect(bashOf(child)).toContain(`${HEAD}\n${LINE}`);
+      // the commit the parent mounted, before the task, never a move
+      const messages = child.body.messages as { content: string }[];
+      expect(messages.slice(1, 3).map((m) => m.content)).toEqual([
+        BLOCK,
+        "Read the README.",
+      ]);
       expect(bashOf(child)).not.toContain("open <file>");
       child.toolRound([bashCall("c1", "cat /repos/widgets/README.md")]);
       child.end();

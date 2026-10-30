@@ -43,8 +43,9 @@ import {
 const URL = "https://github.com/acme/widgets";
 const ARCHIVE = adapter(URL, "github").archiveUrl("");
 const HEAD = "Repositories, read-only files with no git history:";
-const LINE =
-  "/repos/widgets: github.com/acme/widgets at default branch (3e0ff8a)";
+const LINE = "/repos/widgets: github.com/acme/widgets at default branch";
+const TURN_HEAD = "Repositories mounted for this turn:";
+const BLOCK = `${TURN_HEAD}\n${LINE} (3e0ff8a)`;
 
 const dirs: string[] = [];
 afterAll(() => {
@@ -128,6 +129,17 @@ const bashOf = (script: Script) =>
 const systemOf = (script: Script) =>
   (script.body.messages as { content: string }[])[0]!.content;
 
+// the repository blocks of the request, one per turn that mounted, oldest
+// first, each right before its turn's first message
+const blocksOf = (script: Script) =>
+  (script.body.messages as { role: string; content: string }[]).flatMap(
+    (row, i, all) =>
+      row.role === "user" && row.content.startsWith(TURN_HEAD)
+        ? [{ block: row.content, next: all[i + 1]?.content }]
+        : [],
+  );
+const blockOf = (script: Script) => blocksOf(script).at(-1)?.block;
+
 const toolOf = (script: Script) =>
   (script.body.messages as { role: string; content: string }[]).findLast(
     (row) => row.role === "tool",
@@ -193,6 +205,7 @@ describe("a send's repositories", () => {
     try {
       const { script, sessionId } = await startChat(chat);
       expect(bashOf(script)).toEndWith(`\n${HEAD}\n${LINE}`);
+      expect(blocksOf(script)).toEqual([{ block: BLOCK, next: "hello" }]);
       expect(firstMounted(chat, sessionId)).toEqual({
         [counted.repoId]: COMMIT,
       });
@@ -213,6 +226,7 @@ describe("a send's repositories", () => {
       const automation = await createAutomation(chat);
       const run = await startRun(chat, automation.id);
       expect(bashOf(run.main)).toEndWith(`\n${HEAD}\n${LINE}`);
+      expect(blockOf(run.main)).toBe(BLOCK);
       run.main.reply("done");
       await settleRun(chat, run.sessionId);
       expect(firstMounted(chat, run.sessionId)).toEqual({
@@ -234,14 +248,22 @@ describe("a send's repositories", () => {
       chat.app.now.value += 61_000;
       answers[ARCHIVE] = tarResponse(tree(NEXT_COMMIT), '"e2"');
       const second = await message(chat, sessionId, "again");
-      expect(systemOf(second)).toContain(
-        "repo widgets: default branch moved from 3e0ff8a to 8d01e44",
-      );
-      expect(bashOf(second)).toContain("at default branch (8d01e44)");
+      const moved = `${TURN_HEAD}\n${LINE} (8d01e44)\nrepo widgets: default branch moved from 3e0ff8a to 8d01e44`;
+      expect(blocksOf(second)).toEqual([
+        { block: BLOCK, next: "hello" },
+        { block: moved, next: "again" },
+      ]);
+      expect(systemOf(second)).not.toContain("moved");
+      expect(bashOf(second)).toEndWith(`\n${LINE}`);
       second.reply("second");
       await settled(chat, sessionId);
       const third = await message(chat, sessionId, "once more");
-      expect(systemOf(third)).not.toContain("moved");
+      // each turn keeps the block it was told, the new one has no move
+      expect(blocksOf(third)).toEqual([
+        { block: BLOCK, next: "hello" },
+        { block: moved, next: "again" },
+        { block: `${TURN_HEAD}\n${LINE} (8d01e44)`, next: "once more" },
+      ]);
       third.reply("third");
       await settled(chat, sessionId);
       expect(counted.released).toBe(3);
@@ -283,10 +305,10 @@ describe("a send's repositories", () => {
       const third = await message(chat, sessionId, "once more", {
         enable: [repoKey(gadgets)],
       });
-      expect(systemOf(third)).toContain(
+      expect(blockOf(third)).toContain(
         "repo gadgets: default branch moved from 3e0ff8a to 8d01e44",
       );
-      expect(systemOf(third)).not.toContain("repo widgets:");
+      expect(blockOf(third)).not.toContain("repo widgets:");
       third.reply("third");
       await settled(chat, sessionId);
     } finally {
@@ -386,7 +408,8 @@ describe("a send's repositories", () => {
         return waitScript(chat.scripted, count);
       };
       const again = await regenerate();
-      expect(bashOf(again)).toContain("at default branch (3e0ff8a)");
+      expect(bashOf(again)).toEndWith(`\n${LINE}`);
+      expect(blocksOf(again)).toEqual([{ block: BLOCK, next: "hello" }]);
       expect(systemOf(again)).not.toContain("moved");
       again.reply("again");
       await settled(chat, sessionId);
@@ -402,7 +425,8 @@ describe("a send's repositories", () => {
         [counted.repoId]: "a".repeat(40),
       });
       const missed = await regenerate();
-      expect(bashOf(missed)).toContain("at default branch (8d01e44)");
+      // the turn replays what it was first told; the command says the rest
+      expect(blocksOf(missed)).toEqual([{ block: BLOCK, next: "hello" }]);
       const read = await bash(chat, missed, "echo ok");
       expect(toolOf(read)).toStartWith(
         "repo widgets: aaaaaaa is no longer cached, mounted 8d01e44\nok\n",

@@ -19,7 +19,7 @@ import { messageOf } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
-import { childChanged } from "../sessions/index.ts";
+import { childChanged, setReposBlock } from "../sessions/index.ts";
 import {
   asSubagent,
   type DelegateInput,
@@ -29,6 +29,7 @@ import { childResult } from "./child-result.ts";
 import { freeSlot, type SlotPort, takeSlot } from "./child-slots.ts";
 import { type EndingDeps, finalize } from "./ending.ts";
 import { offers, type SendPolicy, type ToolResult } from "./policy.ts";
+import { reposBlock } from "./prompt.ts";
 import type { Registry } from "./registry.ts";
 import { type ActiveSend, type ChildLink, claim, newSend } from "./send.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
@@ -193,6 +194,13 @@ function startChild(
       content: input.task,
       now,
     });
+    // the commits of the parent's mounts, which its bash description
+    // names no more
+    const block = reposBlock({
+      mounted: parent.repos?.mounted ?? [],
+      moved: [],
+    });
+    if (block !== "") setReposBlock(deps.db, taskId, block);
     const reply = deps.sessions.addReply({
       id: replyId,
       sessionId,
@@ -230,6 +238,7 @@ function startChild(
       ? null
       : {
           off: [],
+          mounted: parent.repos.mounted,
           moved: [],
           tool: { ...parent.repos.tool, notice: () => "" },
           release() {},

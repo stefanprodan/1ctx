@@ -28,6 +28,10 @@ export type Turn = {
   agentName: string;
   summoned: boolean;
   providerId?: string;
+  // the turn's repository block, said before its first message as the
+  // model first read it (runner/repos.ts)
+  firstMessageId?: string;
+  repos?: string | null;
 };
 
 export type ContextLookups = {
@@ -198,6 +202,10 @@ export function renderRows(
       continue;
     }
     if (row.kind === "user") {
+      const turn = turns.get(row.sendId);
+      if (turn?.repos && turn.firstMessageId === row.id) {
+        out.push({ role: "user", content: turn.repos });
+      }
       out.push(userMessage(row, policy, lookups));
       continue;
     }

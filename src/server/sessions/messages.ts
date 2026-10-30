@@ -319,21 +319,31 @@ export function readMountedRepos(
     : null;
 }
 
-// each earlier send's mounted commits, newest first, from its first
-// message: the sends of a chat are few where its messages are many
+// the first write wins: a regenerate replays what the turn it replaces
+// read, and a second summon of one message keeps the first one's
+export function setReposBlock(db: Db, messageId: string, block: string) {
+  db.query(
+    "update messages set repos_block = ? where id = ? and repos_block is null",
+  ).run(block, messageId);
+}
+
+// each earlier turn's mounted commits, newest first, from its first
+// message: the sends of a chat are few where its messages are many.
+// Every send that shares the turn's first message is the turn itself,
+// as a channel's post send and a regenerated send are
 export function mountedBefore(
   db: Db,
   sessionId: string,
-  sendId: string,
+  firstMessageId: string,
 ): MountedRepos[] {
   return db
     .query<{ mounted_repos: string }, [string, string]>(
       `select messages.mounted_repos from sends
        join messages on messages.id = sends.first_message_id
-       where sends.session_id = ? and sends.id != ?
+       where sends.session_id = ? and sends.first_message_id != ?
          and messages.mounted_repos is not null
        order by sends.started_at desc, sends.rowid desc`,
     )
-    .all(sessionId, sendId)
+    .all(sessionId, firstMessageId)
     .map((row) => JSON.parse(row.mounted_repos) as MountedRepos);
 }
