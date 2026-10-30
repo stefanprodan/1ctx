@@ -30,11 +30,13 @@ import {
   watchRepos,
 } from "../../../src/client/data/repos.ts";
 import { Save } from "../../../src/client/lib/save.ts";
+import { refreshAll } from "../../../src/client/views/projects/RefreshAll.tsx";
 import {
   asksKind,
   CAP_LINE,
   createBody,
   draftOf,
+  fetchedWords,
   IGNORE_PLACEHOLDER,
   nameOf,
   openOf,
@@ -168,6 +170,20 @@ describe("the words", () => {
         }),
       ).text,
     ).toBe("Failed: over the size cap at 51,203 files, 300 MB");
+  });
+
+  test("a settled row says when its tree was fetched", () => {
+    const now = 3 * 3_600_000 + 1;
+    expect(fetchedWords(repo(), now)).toBe("fetched 3h ago");
+    // a failed row mounts nothing, so it names no time
+    expect(
+      fetchedWords(repo({ state: "failed", error: "no access" }), now),
+    ).toBeNull();
+    expect(fetchedWords(repo({ fetchedAt: now - 59_000 }), now)).toBe(
+      "fetched now",
+    );
+    expect(fetchedWords(repo({ state: "fetching" }), now)).toBeNull();
+    expect(fetchedWords(repo({ fetchedAt: null }), now)).toBeNull();
   });
 
   test("the kind is asked only of a team project on another host", () => {
@@ -469,7 +485,7 @@ describe("the entity", () => {
 describe("the list", () => {
   test.serial("a team project's card lists each row's state", () => {
     held("p2", [
-      repo(),
+      repo({ fetchedAt: Date.now() - 3 * 3_600_000 - 60_000 }),
       repo({
         id: "r2",
         name: "flux2",
@@ -477,12 +493,14 @@ describe("the list", () => {
         ref: "v2.4.0",
         state: "failed",
         error: "not found",
+        fetchedAt: null,
       }),
       repo({ id: "r3", name: "charts", state: "fetching" }),
     ]);
     const html = render(<Repos projectId="p2" personal={false} />);
     expect(html).toContain(">Repositories<");
     expect(html).toContain("Add repository");
+    expect(html).toContain('class="btn btn-small">Refresh all<');
     // the URL, the ref and the state each take a line, never cut
     const line = (text: string, bad = false) =>
       `<span class="rows-sub rows-sub-wrap${bad ? " rows-bad" : ""}">${text}</span>`;
@@ -491,7 +509,7 @@ describe("the list", () => {
       parts.map((p) => `<span class="repos-fact">${p}</span>`).join(", ");
     expect(html).toContain(
       line("github.com/stefanprodan/podinfo") +
-        line("default branch") +
+        line("default branch, fetched 3h ago") +
         line(facts("Ready at 3f2a1c9", "364 files")),
     );
     expect(html).toContain(
@@ -526,6 +544,7 @@ describe("the list", () => {
     expect(html).toContain(PUBLIC_HINT);
     expect(html).toContain("No repositories yet.");
     expect(html).toContain("Add repository");
+    expect(html).toContain('class="btn btn-small" disabled>Refresh all<');
   });
 
   test.serial("Add and a row open the form in place", () => {
@@ -651,6 +670,34 @@ describe("the form", () => {
     expect(html).toContain(
       '<button type="button" class="btn" disabled>Refresh<',
     );
+  });
+
+  test.serial("Refresh all asks a fetch of each settled row", async () => {
+    const rows = [
+      repo(),
+      repo({ id: "r2", state: "failed", error: "no access" }),
+      repo({ id: "r3", state: "pending" }),
+      repo({ id: "r4", state: "fetching" }),
+      repo({ id: "r5" }),
+    ];
+    held("p2", rows);
+    answer = (url) =>
+      url.includes("/r5/")
+        ? Response.json({ error: "not found" }, { status: 404 })
+        : Response.json({ repo: repo({ state: "pending" }) });
+    // a row another tab deleted is no failure
+    expect(await refreshAll(team, rows)).toBeNull();
+    const posts = calls
+      .map((_, i) => sent(i))
+      .filter((c) => c.method === "POST")
+      .map((c) => c.url);
+    expect(posts).toEqual([
+      "/api/projects/p2/repos/r1/refresh",
+      "/api/projects/p2/repos/r2/refresh",
+      "/api/projects/p2/repos/r5/refresh",
+    ]);
+    answer = () => Response.json({ error: "boom" }, { status: 500 });
+    expect(await refreshAll(team, [repo()])).not.toBeNull();
   });
 
   test.serial("a row deleted elsewhere closes its form", () => {

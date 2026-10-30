@@ -20,6 +20,7 @@ import {
   reposOf,
   watchRepos,
 } from "../../data/repos.ts";
+import { useNow } from "../../lib/now.ts";
 import {
   type Save,
   useArrivalFocus,
@@ -45,6 +46,7 @@ import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { TextField } from "../admin/CredentialFields.tsx";
+import { RefreshAll } from "./RefreshAll.tsx";
 import { StateFacts } from "./RepoFacts.tsx";
 import {
   asksKind,
@@ -53,6 +55,7 @@ import {
   createBody,
   DELETE_ASK,
   draftOf,
+  fetchedWords,
   IGNORE_HINT,
   IGNORE_PLACEHOLDER,
   ignoreRows,
@@ -97,6 +100,15 @@ export function Repos({
       }}
     />
   );
+  const all = edit && list !== null && (
+    <RefreshAll target={{ projectId, personal }} list={list} />
+  );
+  const head = (all || add) && (
+    <div class="repos-actions">
+      {all}
+      {add}
+    </div>
+  );
   const rows = (
     <RepoRows
       target={{ projectId, personal }}
@@ -109,7 +121,7 @@ export function Repos({
     return (
       <Section title="Repositories" text={reposHint(personal)}>
         <div class="field">
-          {add && <div class="repos-head">{add}</div>}
+          {head && <div class="repos-head">{head}</div>}
           {list !== null || repoErrorOf(projectId) !== null ? (
             <RowsList>{rows}</RowsList>
           ) : null}
@@ -124,7 +136,7 @@ export function Repos({
       count={list === null ? undefined : countOf(list.length, list.length)}
       line={full ? CAP_LINE : undefined}
       list
-      action={add || undefined}
+      action={head || undefined}
     >
       {rows}
     </Setting>
@@ -143,6 +155,7 @@ export function RepoRows({
   edit?: boolean;
 }) {
   const error = repoErrorOf(target.projectId);
+  const now = useNow(60_000);
   if (list === null) {
     return error === null ? null : <RowsFailed failure={error} />;
   }
@@ -176,6 +189,7 @@ export function RepoRows({
           <RepoLine
             key={repo.id}
             repo={repo}
+            now={now}
             edit={edit}
             locked={opened !== null}
             onOpen={() => {
@@ -191,16 +205,19 @@ export function RepoRows({
 // for an editor the whole row opens its form, where Refresh sits
 function RepoLine({
   repo,
+  now,
   edit,
   locked,
   onOpen,
 }: {
   repo: RepoView;
+  now: number;
   edit: boolean;
   locked: boolean;
   onOpen: () => void;
 }) {
   const state = stateWords(repo);
+  const fetched = fetchedWords(repo, now);
   const title = (
     <RowsTitle
       name={repo.name}
@@ -208,7 +225,12 @@ function RepoLine({
       wrap
       sub={urlText(repo.url)}
       lines={[
-        { text: refWords(repo.ref) },
+        {
+          text:
+            fetched === null
+              ? refWords(repo.ref)
+              : `${refWords(repo.ref)}, ${fetched}`,
+        },
         { text: <StateFacts text={state.text} />, bad: state.bad },
       ]}
     />

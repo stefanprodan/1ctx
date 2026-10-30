@@ -854,7 +854,7 @@ describe("the pages", () => {
       state: "ready",
       error: null,
       commit: "3f2a1c9d8e7b6a5f4e3d2c1b0a9f8e7d6c5b4a39",
-      fetchedAt: 1,
+      fetchedAt: null,
       files: 364,
       bytes: 1_000,
       ignored: 0,
@@ -907,6 +907,7 @@ describe("the pages", () => {
         );
         expect(html).not.toContain("Add repository");
         expect(html).not.toContain(">Refresh<");
+        expect(html).not.toContain("Refresh all");
         repoLists.value = new Map([["p2", []]]);
         html = render(<Settings params={{ id: "p2" }} />);
         expect(html).toContain("No repositories yet.");
