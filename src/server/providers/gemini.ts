@@ -107,7 +107,9 @@ export function buildChatBody(req: ChatRequest): Record<string, unknown> {
     });
   });
   const model = req.model.toLowerCase();
-  const level = model.includes("gemini-3");
+  // Gemini 1 and 2 and Gemma refuse a thinking level and take a token
+  // budget; the rest, aliases and later versions included, take a level
+  const level = !/gemini-[12][.-]|gemma-/.test(model);
   if (!req.thinking && canStopThinking("gemini", req.model)) {
     body.reasoning_effort = "none";
     return body;

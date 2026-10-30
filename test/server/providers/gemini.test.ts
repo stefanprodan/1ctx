@@ -245,7 +245,12 @@ describe("Gemini chat body", () => {
     (effort, budget) => {
       for (const [model, config] of [
         ["gemini-3.8-flash", { thinking_level: effort }],
+        ["gemini-4-argon", { thinking_level: effort }],
+        ["gemini-12-flash", { thinking_level: effort }],
+        ["gemini-flash-latest", { thinking_level: effort }],
         ["gemini-2.5-flash", { thinking_budget: budget }],
+        ["gemini-2.0-flash", { thinking_budget: budget }],
+        ["gemma-4-31b-it", { thinking_budget: budget }],
       ] as const) {
         const body = buildChatBody({
           ...request,
@@ -277,6 +282,7 @@ describe("Gemini chat body", () => {
 
   test.each([
     ["gemini-3.1-pro-preview", { thinking_level: "low" }],
+    ["gemini-pro-latest", { thinking_level: "low" }],
     ["gemini-2.5-pro", { thinking_budget: 128 }],
   ])(
     "uses the lowest thinking without thoughts on %s when off",
