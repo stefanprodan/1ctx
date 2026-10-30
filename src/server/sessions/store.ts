@@ -54,18 +54,15 @@ import {
   capWork,
   finishReply,
   finishToolRow,
-  type MountedRepos,
   markRoundWork,
   markSlot,
-  mountedBefore,
   readMessage,
   readMessages,
-  readMountedRepos,
   restartReply,
-  setMountedRepos,
   type ToolFinish,
   writeReply,
 } from "./messages.ts";
+import { MountsStore } from "./mounts.ts";
 import { readOpenedFile } from "./opened-store.ts";
 import { packRows, resultText } from "./pack.ts";
 import { type ChannelPage, channelPage } from "./page.ts";
@@ -111,6 +108,7 @@ export class SessionStore {
   readonly pending: PendingStore;
   // a run's answers in its channel, and an automation's runs deleted
   readonly runPosts: RunPostStore;
+  readonly mounts: MountsStore;
   constructor(
     private readonly db: Db,
     private readonly usage: UsagePort,
@@ -122,6 +120,7 @@ export class SessionStore {
     this.queue = new QueueStore(db);
     this.pending = new PendingStore(db);
     this.runPosts = new RunPostStore(db, usage);
+    this.mounts = new MountsStore(db);
   }
 
   byId(id: string): SessionRow | null {
@@ -302,20 +301,6 @@ export class SessionStore {
 
   forgetCapability(key: string, projectId?: string): void {
     forgetCapabilityIn(this.db, "sessions", key, projectId);
-  }
-
-  // the commits a turn mounted, on its first message
-  setMountedRepos(messageId: string, mounted: MountedRepos): void {
-    setMountedRepos(this.db, messageId, mounted);
-  }
-
-  mountedRepos(messageId: string): MountedRepos | null {
-    return readMountedRepos(this.db, messageId);
-  }
-
-  // what the chat's turns before this one mounted, newest first
-  mountedBefore(sessionId: string, firstMessageId: string): MountedRepos[] {
-    return mountedBefore(this.db, sessionId, firstMessageId);
   }
 
   // a run's end may carry its mark, written in the same transaction

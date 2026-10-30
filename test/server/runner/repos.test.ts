@@ -146,7 +146,7 @@ const toolOf = (script: Script) =>
   )!.content;
 
 const firstMounted = (chat: ChatApp, sessionId: string) =>
-  chat.app.sessions.mountedRepos(
+  chat.app.sessions.mounts.mountedRepos(
     chat.app.sessions.messages(sessionId).find((row) => row.kind === "user")!
       .id,
   );
@@ -421,12 +421,14 @@ describe("a send's repositories", () => {
       const user = chat.app.sessions
         .messages(sessionId)
         .find((row) => row.kind === "user")!;
-      chat.app.sessions.setMountedRepos(user.id, {
+      chat.app.sessions.mounts.setMountedRepos(user.id, {
         [counted.repoId]: "a".repeat(40),
       });
       const missed = await regenerate();
-      // the turn replays what it was first told; the command says the rest
-      expect(blocksOf(missed)).toEqual([{ block: BLOCK, next: "hello" }]);
+      // the regenerated turn is told what it mounts, never the old pin
+      expect(blocksOf(missed)).toEqual([
+        { block: `${TURN_HEAD}\n${LINE} (8d01e44)`, next: "hello" },
+      ]);
       const read = await bash(chat, missed, "echo ok");
       expect(toolOf(read)).toStartWith(
         "repo widgets: aaaaaaa is no longer cached, mounted 8d01e44\nok\n",

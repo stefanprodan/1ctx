@@ -159,12 +159,12 @@ function lastMarkable(turns: Turn[]): At | null {
 function turnsOf(
   messages: readonly ChatMessageIn[],
   options: BuildOptions,
-): { system: string; turns: Turn[]; streamAt: At | null } {
+): { system: string; turns: Turn[]; streamAts: At[] } {
   const ids = idRewriter();
   const system: string[] = [];
   const turns: Turn[] = [];
   // blocks are only appended, so a place found here stays valid
-  let streamAt: At | null = null;
+  const streamAts: At[] = [];
   // consecutive messages of one role are one turn, as the API merges them
   const push = (role: Turn["role"], content: Block[]) => {
     if (content.length === 0) return;
@@ -211,19 +211,25 @@ function turnsOf(
         ]);
       }
     }
-    if (message.streamEnd) streamAt = lastMarkable(turns);
+    const at = message.streamMark ? lastMarkable(turns) : null;
+    const prev = streamAts.at(-1);
+    if (at !== null && (at.turn !== prev?.turn || at.block !== prev.block)) {
+      streamAts.push(at);
+    }
   }
-  return { system: system.join("\n\n"), turns, streamAt };
+  return { system: system.join("\n\n"), turns, streamAts };
 }
 
 // after roles merge, which can put a tail mark before the stream mark:
-// the API refuses a shorter life before a longer one, so it is promoted
+// the API refuses a shorter life before a longer one, so it is promoted.
+// A second stream mark takes the earlier tail mark's place, four at most
 function placeMarks(
   system: Block | null,
   turns: Turn[],
   life: CacheLife,
-  streamAt: At | null,
+  streamAts: At[],
 ): void {
+  const streams = life === "channel" ? streamAts.slice(-2) : [];
   const tail: Ttl = life === "long" ? "1h" : "5m";
   const marks: (At & { ttl: Ttl })[] = [];
   const add = (at: At, ttl: Ttl) => {
@@ -233,7 +239,8 @@ function placeMarks(
     if (same === undefined) marks.push({ ...at, ttl });
     else if (ttl === "1h") same.ttl = ttl;
   };
-  for (let t = Math.max(0, turns.length - 2); t < turns.length; t++) {
+  const tails = streams.length > 1 ? 1 : 2;
+  for (let t = Math.max(0, turns.length - tails); t < turns.length; t++) {
     const content = turns[t]!.content;
     for (let b = content.length - 1; b >= 0; b--) {
       if (markable(content[b]!)) {
@@ -242,7 +249,7 @@ function placeMarks(
       }
     }
   }
-  if (life === "channel" && streamAt !== null) add(streamAt, "1h");
+  for (const at of streams) add(at, "1h");
   marks.sort((a, b) => a.turn - b.turn || a.block - b.block);
   const lastHour = marks.findLastIndex((mark) => mark.ttl === "1h");
   if (system !== null) {
@@ -274,11 +281,11 @@ export function buildChatBody(
   req: ChatRequest,
   options: BuildOptions = {},
 ): Record<string, unknown> {
-  const { system, turns, streamAt } = turnsOf(req.messages, options);
+  const { system, turns, streamAts } = turnsOf(req.messages, options);
   const systemBlock: Block | null =
     system === "" ? null : { type: "text", text: system };
   if (!options.counting) {
-    placeMarks(systemBlock, turns, req.cacheLife ?? "short", streamAt);
+    placeMarks(systemBlock, turns, req.cacheLife ?? "short", streamAts);
   }
   const body: Record<string, unknown> = {
     model: req.model,

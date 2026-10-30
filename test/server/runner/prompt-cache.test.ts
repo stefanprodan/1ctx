@@ -245,6 +245,69 @@ describe("a plain chat on claude", () => {
   });
 });
 
+describe("a plain chat's next request on claude", () => {
+  const send = async (chat: ChatApp, sessionId: string, path: string) => {
+    const count = chat.scripted.scripts.length + 1;
+    const response = await chat.member.call(
+      "POST",
+      `/api/sessions/${sessionId}/${path}`,
+      { body: path === "messages" ? { message: "again" } : {} },
+    );
+    expect(response.status).toBe(201);
+    return waitScript(chat.scripted, count);
+  };
+
+  test("repeats a turn whose round thought, its signed thinking included", async () => {
+    const chat = await chatApp({ wire: "anthropic" });
+    try {
+      const { script, sessionId } = await startChat(chat);
+      script.reasoning("first thought");
+      script.sse(
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"first-signature"}}\n\n',
+      );
+      script.toolRound([
+        {
+          id: "call-1",
+          name: "bash",
+          arguments: JSON.stringify({ command: "echo hi" }),
+        },
+      ]);
+      script.end();
+      const last = await waitScript(chat.scripted, 2);
+      expect(JSON.stringify(last.body.messages)).toContain("first-signature");
+      last.reply("first");
+      await sessionSettled(chat.app, sessionId);
+      const next = await send(chat, sessionId, "messages");
+      expect(JSON.stringify(next.body.messages)).toContain("first-signature");
+      expectPrefix(body(next), body(last), lastMarkAt(body(last)));
+      expectMarkRules(body(next));
+      next.reply("second");
+      await sessionSettled(chat.app, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a regenerate repeats the request of the turn it replaces", async () => {
+    const chat = await chatApp({ wire: "anthropic" });
+    try {
+      const { script, sessionId } = await startChat(chat);
+      script.reply("first");
+      await sessionSettled(chat.app, sessionId);
+      const second = await send(chat, sessionId, "messages");
+      second.reply("second");
+      await sessionSettled(chat.app, sessionId);
+      const again = await send(chat, sessionId, "regenerate");
+      expectPrefix(body(again), body(second), lastMarkAt(body(second)));
+      expect(body(again)).toEqual(body(second));
+      again.reply("second again");
+      await sessionSettled(chat.app, sessionId);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+});
+
 describe("a channel on claude", () => {
   const claudeChannel = (options: Parameters<typeof chatApp>[0] = {}) =>
     channelApp({ wire: "anthropic", model: ANTHROPIC_MODEL, ...options });
@@ -306,7 +369,7 @@ describe("a channel on claude", () => {
     }
   });
 
-  test("a traced own turn merges into the stream's end, its tail mark promoted", async () => {
+  test("a traced own turn marks its stream's end and the turn's own entry, one tail mark", async () => {
     const { chat, post, summon } = await claudeChannel();
     try {
       expect((await post("hello")).status).toBe(201);
@@ -324,18 +387,65 @@ describe("a channel on claude", () => {
         "assistant",
         "user",
       ]);
+      // turn one cached up to its stream's end, before its own post
       expect(marksOf(body(second.script))).toEqual([
         { at: "system", mark: HOUR },
-        { at: "answer one", mark: HOUR },
+        { at: expect.stringContaining("hello"), mark: HOUR },
         { at: expect.stringContaining("more"), mark: HOUR },
         { at: expect.stringContaining("two"), mark: FIVE },
       ]);
-      expectPrefix(
-        body(second.script),
-        body(first.script),
-        lastHourAt(body(first.script)),
-      );
+      const at = lastHourAt(body(first.script));
+      expectPrefix(body(second.script), body(first.script), at);
+      expect(flatBlocks(body(second.script))[at]!.cache_control).toEqual(HOUR);
       second.script.reply("answer two");
+      await idle(chat.app);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a long stream between two turns keeps a mark where the last turn wrote", async () => {
+    const { chat, post, summon } = await claudeChannel();
+    try {
+      const between = async (tag: string) => {
+        for (let i = 0; i < 30; i++) {
+          expect((await post(`${tag} post ${i}`)).status).toBe(201);
+        }
+        for (let i = 0; i < 3; i++) {
+          const other = await summon("reviewer", `${tag} review ${i}`);
+          other.script.reply(`${tag} reviewed ${i}`);
+          await idle(chat.app);
+        }
+      };
+      expect((await post("hello")).status).toBe(201);
+      const first = await summon("coder", "one");
+      first.script.reply("answer one");
+      await idle(chat.app);
+      await between("a");
+      const second = await summon("coder", "two");
+      second.script.reply("answer two");
+      await idle(chat.app);
+      await between("b");
+      const third = await summon("coder", "three");
+      // the second turn wrote at its one stream mark, before turn one
+      const wrote = lastHourAt(body(second.script));
+      expect(textAt(second.script, wrote)).toContain("hello");
+      expectPrefix(body(third.script), body(second.script), wrote);
+      expect(flatBlocks(body(third.script))[wrote]!.cache_control).toEqual(
+        HOUR,
+      );
+      // its own stream mark is past the lookback from there
+      expect(lastHourAt(body(third.script)) - wrote).toBeGreaterThan(20);
+      expect(marksOf(body(third.script)).map((m) => m.mark)).toEqual([
+        HOUR,
+        HOUR,
+        HOUR,
+        FIVE,
+      ]);
+      for (const script of [first, second, third]) {
+        expectMarkRules(body(script.script));
+      }
+      third.script.reply("answer three");
       await idle(chat.app);
     } finally {
       await chat.app.shutdown();

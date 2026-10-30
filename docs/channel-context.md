@@ -61,11 +61,21 @@ Posting and parallel turns are in `docs/sessions.md`, pending turns in
   ask. Memory is read at start, not when the repositories finish mounting.
   The cache key stays `<session>:<agent>`.
 - **The stream mark ends what the agent's next turn repeats.** The
-  message flagged `streamEnd` is the stream's last, or the one before
+  message flagged `streamMark` is the stream's last, or the one before
   the agent's own whole last turn, which its next turn traces. An empty
   stream, or a whole turn first, flags none. On `anthropic` it is an
-  hour's mark beside the system's (`docs/wires.md`); a moved
-  `dropped_seq` changes the stream and misses by design.
+  hour's mark beside the system's (`docs/wires.md`).
+- **A second flag repeats where the agent's last turn wrote,** since
+  Anthropic looks back only about 20 blocks from a mark, which a few
+  posts or other agents' turns pass. That is the message before the
+  own turn before the last one when it replays whole now (the last
+  turn replayed it whole too), else the one before the last own turn
+  (that turn's stream end). The same message twice is one flag.
+- **Some turns still miss.** A moved `dropped_seq` changes the stream
+  from its start. A turn that was running at the last turn's start and
+  ended since, or an own turn swept or grown past whole replay between
+  the two turns, moves what the last turn wrote; a third own turn back
+  is never marked.
 - **A channel never compacts.** `channelContextFloor` defaults to 262,144
   tokens; a smaller or unknown window is refused before posting, and
   checked again when a pending turn starts.

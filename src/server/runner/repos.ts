@@ -8,14 +8,13 @@
 // ones turned off after a turn read them.
 
 import { repoOf } from "../../shared/capabilities.ts";
-import type { Db } from "../db/index.ts";
 import {
   isCommit,
   type Prepared,
   type PrepareOptions,
   type RepoMount,
 } from "../repos/index.ts";
-import { type MountedRepos, setReposBlock } from "../sessions/index.ts";
+import type { MountedRepos } from "../sessions/index.ts";
 import { reposBlock } from "./prompt.ts";
 import type { ActiveSend } from "./send.ts";
 
@@ -28,6 +27,8 @@ export type ReposPort = {
 export type MountedPort = {
   mountedRepos(messageId: string): MountedRepos | null;
   setMountedRepos(messageId: string, mounted: MountedRepos): void;
+  // kept where none is stored yet, unless replaced
+  setReposBlock(messageId: string, block: string, replace?: boolean): void;
   mountedBefore(sessionId: string, firstMessageId: string): MountedRepos[];
 };
 
@@ -76,7 +77,6 @@ export async function mountRepos(
   deps: {
     repos: ReposPort;
     sessions: MountedPort;
-    db: Db;
     // repoFileBytes, read once there is a tree to read
     fileBytes(): number;
   },
@@ -167,11 +167,15 @@ export async function mountRepos(
         : tool,
     );
   }
-  // a channel says it in its request-local message instead; a stored
-  // block is the replaced turn's, which a regenerate replays
+  // a channel says it in its request-local message instead. A
+  // regenerate says what it mounted: the cached prefix of earlier turns
+  // ends before its message, so replacing the block costs no cache
   if (send.channel === null) {
     const block = reposBlock(send.repos);
-    if (block !== "") setReposBlock(deps.db, send.firstMessageId, block);
+    const replace = send.op === "regenerate";
+    if (block !== "" || replace) {
+      deps.sessions.setReposBlock(send.firstMessageId, block, replace);
+    }
   }
   if (off.size > 0) {
     const names = deps.repos

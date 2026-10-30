@@ -19,7 +19,7 @@ import { messageOf } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { ToolCall } from "../providers/index.ts";
-import { childChanged, setReposBlock } from "../sessions/index.ts";
+import { childChanged } from "../sessions/index.ts";
 import {
   asSubagent,
   type DelegateInput,
@@ -200,7 +200,7 @@ function startChild(
       mounted: parent.repos?.mounted ?? [],
       moved: [],
     });
-    if (block !== "") setReposBlock(deps.db, taskId, block);
+    if (block !== "") deps.sessions.mounts.setReposBlock(taskId, block);
     const reply = deps.sessions.addReply({
       id: replyId,
       sessionId,

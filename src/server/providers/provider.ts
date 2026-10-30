@@ -76,7 +76,8 @@ function sentMessages(
   messages: ChatMessageIn[],
 ): ChatMessageIn[] {
   const sends = wire === "opencode" ? sendsReasoning({ model }) : () => false;
-  return messages.map((message) => {
+  // the channel's cache flag is no wire's field
+  return messages.map(({ streamMark: _mark, ...message }) => {
     if (message.role === "tool" && message.failed !== undefined) {
       const { failed: _, ...rest } = message;
       return rest;

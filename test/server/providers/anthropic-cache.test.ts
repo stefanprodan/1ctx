@@ -11,6 +11,7 @@ import {
   buildAnthropicChatBody as buildChatBody,
   type ChatMessageIn,
   type ChatRequest,
+  requestText,
 } from "../../../src/server/providers/index.ts";
 import { marksOf, stripMarks } from "../../helpers/cache-marks.ts";
 
@@ -42,7 +43,7 @@ const channel = (end: number | null): ChatMessageIn[] => {
     { role: "assistant", content: "own answer" },
     { role: "user", content: "[reviewer] their answer" },
   ];
-  if (end !== null) stream[end] = { ...stream[end]!, streamEnd: true };
+  if (end !== null) stream[end] = { ...stream[end]!, streamMark: true };
   return [
     ...stream,
     { role: "user", content: "You talk to @casey" },
@@ -95,7 +96,7 @@ describe("the anthropic cache marks", () => {
   test("a stream mark on a tail block keeps the hour, once", () => {
     const messages: ChatMessageIn[] = [
       { role: "user", content: "a post" },
-      { role: "assistant", content: "own answer", streamEnd: true },
+      { role: "assistant", content: "own answer", streamMark: true },
       { role: "user", content: "the question" },
     ];
     expect(marksOf(buildChatBody(request(messages, "channel")))).toEqual([
@@ -103,6 +104,19 @@ describe("the anthropic cache marks", () => {
       { at: "own answer", mark: HOUR },
       { at: "the question", mark: FIVE },
     ]);
+  });
+
+  test("a second stream mark takes the earlier tail mark's place", () => {
+    const messages = channel(2);
+    messages[0] = { ...messages[0]!, streamMark: true };
+    expect(marksOf(buildChatBody(request(messages, "channel")))).toEqual([
+      { at: "system", mark: HOUR },
+      { at: "a post", mark: HOUR },
+      { at: "[reviewer] their answer", mark: HOUR },
+      { at: "the question", mark: FIVE },
+    ]);
+    // a chat ignores both and keeps its two tail marks
+    expect(marksOf(buildChatBody(request(messages, "long")))).toHaveLength(3);
   });
 
   test("an empty stream leaves the system mark the only hour", () => {
@@ -122,7 +136,7 @@ describe("the anthropic cache marks", () => {
         reasoningDetails: [
           { type: "thinking", thinking: "hm", signature: "sig" },
         ],
-        streamEnd: true,
+        streamMark: true,
       },
       { role: "user", content: "the question" },
       { role: "assistant", content: "x" },
@@ -139,7 +153,8 @@ describe("the anthropic cache marks", () => {
       channel(1),
       channel(2),
       channel(null),
-      [{ role: "user", content: "only", streamEnd: true }],
+      [{ role: "user", content: "only", streamMark: true }],
+      channel(1).map((m, i) => (i === 0 ? { ...m, streamMark: true } : m)),
     ];
     for (const messages of shapes) {
       for (const life of ["short", "long", "channel"] as const) {
@@ -157,5 +172,13 @@ describe("the anthropic cache marks", () => {
     const short = buildChatBody(request(channel(2), "short"));
     const hour = buildChatBody(request(channel(2), "channel"));
     expect(stripMarks(hour)).toEqual(stripMarks(short));
+  });
+
+  test("the stream flag is never counted as another wire's field", () => {
+    for (const wire of ["openai-compatible", "openrouter", "azure"] as const) {
+      expect(requestText(wire, request(channel(2), "channel"))).not.toContain(
+        "streamMark",
+      );
+    }
   });
 });

@@ -20,7 +20,12 @@ import type {
   SessionStatus,
 } from "../../shared/words.ts";
 import type { OpenedRecord } from "../bash/index.ts";
-import type { ReplyFinish, RunMark, SessionRow } from "../sessions/index.ts";
+import type {
+  MountsStore,
+  ReplyFinish,
+  RunMark,
+  SessionRow,
+} from "../sessions/index.ts";
 import type { RoundState } from "./send.ts";
 
 export type UploadsPort = {
@@ -50,6 +55,7 @@ export type SessionsPort = {
     claim(id: string, sessionId: string, messageId: string): boolean;
   };
   setDisabledCapabilities(id: string, keys: readonly string[]): void;
+  mounts: Pick<MountsStore, "setReposBlock">;
   create(fields: {
     id?: string;
     projectId: string;

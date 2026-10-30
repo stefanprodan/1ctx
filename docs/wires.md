@@ -111,11 +111,12 @@ it behind another base URL. The page names the preset Claude API.
   minutes, everywhere; `long` is `{type: "ephemeral", ttl: "1h"}`
   everywhere, since the tail of a chat's last round is the next turn's
   prefix; `channel` puts the hour on the system block and on the block
-  that ends the message flagged `streamEnd`, the tail at five minutes:
-  four marks at most. Marks are placed after roles merge, one per block
-  (the longer wins), and a five-minute mark before an hour's is
-  promoted, as the API refuses a shorter lifetime first. Other wires
-  ignore both fields.
+  that ends each message flagged `streamMark` (two at most, the later
+  ones), the tail at five minutes, and with two flags only the last
+  turn's tail mark: four marks at most. Marks are placed after roles
+  merge, one per block (the longer wins), and a five-minute mark
+  before an hour's is promoted, as the API refuses a shorter lifetime
+  first. Other wires ignore both fields.
 - **The runner sets the cache life per round** (`cacheLife()` in
   `runner/round.ts`), never a setting, first match wins: `short` for a
   subagent, a summary round, a memory or attention step and a run;
@@ -135,8 +136,8 @@ it behind another base URL. The page names the preset Claude API.
   silence limit. `input_json_delta` streams the call, whole at its
   block's end. Usage is one event, at `message_delta`: the prompt is
   `input_tokens` plus the cache read and write. The hour's writes,
-  `cache_creation.ephemeral_1h_input_tokens` from either
-  `message_start` or `message_delta`, are `cacheWrite1hTokens`. `message_stop` ends the
+  `cache_creation.ephemeral_1h_input_tokens` from either `message_start`
+  or `message_delta`, are `cacheWrite1hTokens`. `message_stop` ends the
   read. `end_turn` and `stop_sequence` are `stop`, `tool_use`
   `tool_calls`, `max_tokens` and `model_context_window_exceeded`
   `length`, `refusal` `content_filter` with its explanation as the

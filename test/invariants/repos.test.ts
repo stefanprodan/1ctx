@@ -463,11 +463,11 @@ test("a turn's first message keeps the commits it mounted", async () => {
       content: "read the repository",
       now: chat.app.now.value,
     });
-    expect(store.mountedRepos("first")).toBeNull();
+    expect(store.mounts.mountedRepos("first")).toBeNull();
     const mounted = { r1: "a".repeat(40), r2: "b".repeat(64) };
-    store.setMountedRepos("first", mounted);
-    expect(store.mountedRepos("first")).toEqual(mounted);
-    expect(store.mountedRepos("missing")).toBeNull();
+    store.mounts.setMountedRepos("first", mounted);
+    expect(store.mounts.mountedRepos("first")).toEqual(mounted);
+    expect(store.mounts.mountedRepos("missing")).toBeNull();
   } finally {
     await closed(chat);
   }

@@ -252,12 +252,13 @@ start answers `{ mounts, notices, release }`:
   turn's message and its commits, and would hide the move.
 - **A plain chat keeps the block on the turn's first message**
   (`repos_block`, first write wins) and every later request replays it
-  before that message, byte for byte, so a renamed or deleted
-  repository never changes an old turn. A regenerate replays the
-  replaced turn's. A subagent's task gets its parent's commit lines,
-  no move. A channel puts the block in its request-local message
-  (`docs/channel-context.md`) and stores none. A fork copies the
-  column.
+  before that message, byte for byte, so a renamed or deleted repository
+  never changes an old turn. A regenerate replaces it with what it
+  mounts, since the earlier turns' cached prefix ends before that
+  message and a missed pin mounts another commit. A subagent's task gets
+  its parent's commit lines, no move. A channel puts the block in its
+  request-local message (`docs/channel-context.md`) and stores none. A
+  fork copies the column.
 - **A project with no repositories costs one indexed query a send** and
   writes nothing.
 

@@ -42,9 +42,9 @@ export type ChatMessageIn = (
   // failed: the tool did not finish, which anthropic marks as an error
   | { role: "tool"; toolCallId: string; content: string; failed?: boolean }
 ) & {
-  // the last message of a channel's frozen stream that the agent's next
-  // turn renders the same; anthropic alone reads it
-  streamEnd?: true;
+  // a channel stream message that ends a prefix the agent's next turn
+  // repeats, or one its last turn cached; anthropic alone reads it
+  streamMark?: true;
 };
 
 // how long a request's cached prefix is worth keeping, by its kind of
