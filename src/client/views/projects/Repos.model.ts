@@ -13,7 +13,7 @@ import {
   type RepoKind,
 } from "../../../shared/contracts/repo.ts";
 import { isName } from "../../../shared/words.ts";
-import { commas, pluralCommas, sizeWords } from "../../lib/format.ts";
+import { ago, commas, pluralCommas, sizeWords } from "../../lib/format.ts";
 import type { Option } from "../../ui/Select.model.ts";
 import { keyOptions } from "../admin/Credentials.model.ts";
 
@@ -163,6 +163,15 @@ export const shortCommit = (commit: string) => commit.slice(0, 7);
 export const urlText = (url: string) => url.replace(/^https:\/\//, "");
 
 export type StateWords = { text: string; bad: boolean };
+
+// when a ready row's tree was fetched, for the ref's line; a failed
+// row mounts nothing, so its old time would read as the failure's. The
+// list moves its clock each minute, so seconds would sit still
+export function fetchedWords(repo: RepoView, now: number): string | null {
+  if (repo.fetchedAt === null || repo.state !== "ready") return null;
+  const delta = now - repo.fetchedAt;
+  return `fetched ${delta < 60_000 ? "now" : ago(repo.fetchedAt, now)}`;
+}
 
 export function stateWords(repo: RepoView): StateWords {
   switch (repo.state) {
