@@ -62,19 +62,67 @@ export function asMcpCall(servers: OfferedServer[], call: ToolCall): ToolCall {
   };
 }
 
-// both call paths refuse before anything goes out, in the same words
+// a schema property that takes no string, so JSON text in it is
+// never what the tool wants
+function takesNoString(property: unknown): boolean {
+  if (!isRecord(property)) return false;
+  const type = property.type;
+  if (type === "array" || type === "object") return true;
+  // null may share the list: parsed text is never null
+  return (
+    Array.isArray(type) &&
+    type.some((item) => item === "array" || item === "object") &&
+    type.every(
+      (item) => item === "array" || item === "object" || item === "null",
+    )
+  );
+}
+
+// a model may write a list or object as JSON text; parsed only where
+// the schema takes no string, null when nothing changed
+function parsedJsonText(
+  schema: Record<string, unknown>,
+  input: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const properties = isRecord(schema.properties) ? schema.properties : {};
+  let out: Record<string, unknown> | null = null;
+  for (const [name, value] of Object.entries(input)) {
+    if (typeof value !== "string") continue;
+    if (!Object.hasOwn(properties, name)) continue;
+    if (!takesNoString(properties[name])) continue;
+    const text = value.trim();
+    if (!text.startsWith("[") && !text.startsWith("{")) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      continue;
+    }
+    if (typeof parsed !== "object" || parsed === null) continue;
+    out ??= { ...input };
+    out[name] = parsed;
+  }
+  return out;
+}
+
+// both call paths refuse before anything goes out, in the same words.
+// Only a call that fails is repaired, and only if it then passes, so a
+// valid call is sent as written
 export function checkMcpArguments(
   tool: OfferedMcpTool,
   input: Record<string, unknown>,
   validate: Mcp["validateArguments"],
-): void {
+): Record<string, unknown> {
   const error = validate(tool.inputSchema, input);
-  if (error !== null) {
-    throw new ToolError(
-      `arguments for ${tool.wireName} are invalid: ${error}`,
-      "MCP arguments invalid",
-    );
+  if (error === null) return input;
+  const repaired = parsedJsonText(tool.inputSchema, input);
+  if (repaired !== null && validate(tool.inputSchema, repaired) === null) {
+    return repaired;
   }
+  throw new ToolError(
+    `arguments for ${tool.wireName} are invalid: ${error}`,
+    "MCP arguments invalid",
+  );
 }
 
 export function resolveMcpCall(
@@ -84,8 +132,7 @@ export function resolveMcpCall(
 ): ToolCall {
   const args = outer(call);
   const tool = named(servers, args.name);
-  const input = object(args.arguments);
-  checkMcpArguments(tool, input, validate);
+  const input = checkMcpArguments(tool, object(args.arguments), validate);
   return { ...call, name: tool.wireName, arguments: JSON.stringify(input) };
 }
 

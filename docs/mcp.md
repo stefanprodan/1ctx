@@ -90,9 +90,13 @@ reach the model in the sends of agents linked to it.
 - **Arguments are checked before anything goes out.**
   `validateArguments` checks them against the stored schema in both
   modes (`mcp/validate.ts`). A schema the validator cannot compile lets
-  the call through. Validators are kept by the schema's text, at most
-  `MAX_VALIDATORS`, since Ajv keeps every schema object it compiles and
-  each send parses its schemas afresh.
+  the call through. A failing call is repaired once: a top-level string
+  holding JSON text for a property typed only array or object, null
+  allowed beside them, is parsed, and the call goes out only if it
+  then passes; else the first error stands. A valid call is never
+  changed, and its row keeps what the model sent. Validators are kept
+  by the schema's text, at most `MAX_VALIDATORS`, since Ajv keeps every
+  schema object it compiles and each send parses its schemas afresh.
 - **A call runs under the snapshot.** One client per call over the
   snapshot's URL and key name, under the server's `timeoutMs` or the
   call timeout.
