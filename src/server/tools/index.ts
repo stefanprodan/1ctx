@@ -285,9 +285,13 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           parameters: tool.wireInputSchema,
           timeoutMs,
           run: async (args: Record<string, unknown>, runCtx: ToolContext) => {
-            checkMcpArguments(tool, args, mcpService.validateArguments);
+            const input = checkMcpArguments(
+              tool,
+              args,
+              mcpService.validateArguments,
+            );
             return shapeMcpResult(
-              await mcpService.call(server, tool, args, {
+              await mcpService.call(server, tool, input, {
                 signal: runCtx.signal,
                 timeoutMs: timeoutMs + MCP_BACKSTOP_MS,
                 bodyBytes: runCtx.caps.fetchBodyBytes,
