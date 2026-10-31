@@ -231,6 +231,11 @@ words.
   Otherwise, with no background of its own, it gets the
   `VISUAL_BACKDROPS` entry its text reads on and a browser's 8px body
   spacing, since the frame is see-through.
+- **The frame is never narrower than 680 px,** so a narrow column
+  scrolls it rather than shrinking its text, unless the page carries
+  `<meta name="viewport" content="width=device-width">`
+  (`deviceWidth()`). As in a mobile browser, that tag says the page fits
+  any width, and the frame takes the column's.
 - **`skills/visualize/` follows the frame.** Change it in the same
   commit as the frame's names or the tool's contract.
 

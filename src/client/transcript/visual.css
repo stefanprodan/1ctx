@@ -2,7 +2,8 @@
 
 @layer owners {
   /* the frame takes the column's width, never under 680 px: a
-     narrower column scrolls it rather than shrinking its text */
+     narrower column scrolls it rather than shrinking its text, unless
+     the page asks for the device's width (.visual-fluid) */
   .visual-card {
     width: 100%;
     min-width: 0;
@@ -39,6 +40,10 @@
     width: 100%;
     min-width: 680px;
     border: 0;
+  }
+  /* a page with the device-width viewport meta fits any width */
+  .visual-fluid .visual-frame {
+    min-width: 0;
   }
   .visual-unloaded {
     visibility: hidden;

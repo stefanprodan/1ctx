@@ -100,10 +100,13 @@ There are no preloaded libraries or bare module specifiers. Read
 The frame takes the chat column's width and is never narrower than 680
 CSS pixels: on a phone the card scrolls horizontally instead of
 shrinking text. Size HTML and canvas to the frame's width, never a fixed
-one. Use `viewBox="0 0 680 H"` and `width="100%"` for SVG, computing H
-from the content; it scales with the frame. Leave generous
-margins. Content taller than 2,000 pixels scrolls inside the card;
-prefer a shorter explanation. Avoid viewport-relative heights.
+one. A page with `<meta name="viewport" content="width=device-width">`
+gets the column's real width instead, down to about 320 pixels on a
+phone. Add that tag only when the layout itself fits 320 pixels, never
+with a 680 viewBox. Use `viewBox="0 0 680 H"` and `width="100%"` for
+SVG, computing H from the content; it scales with the frame. Leave
+generous margins. Content taller than 2,000 pixels scrolls inside the
+card; prefer a shorter explanation. Avoid viewport-relative heights.
 
 Keep the fragment small. `visualBytes` caps each fragment in UTF-8 bytes
 and `visualSendBytes` caps the total accepted in a send. The defaults are
