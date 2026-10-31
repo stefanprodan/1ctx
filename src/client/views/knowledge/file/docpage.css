@@ -110,7 +110,8 @@
   }
 
   /* an HTML file drawn as a chat's visual: the frame takes the page's
-     width, at least 680 px, and scrolls on a narrow screen */
+     width, at least 680 px unless the file asks for the device's, and
+     scrolls on a narrow screen */
   .docpage-visual {
     display: flex;
     justify-content: center;

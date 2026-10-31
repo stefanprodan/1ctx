@@ -12,7 +12,12 @@ import {
   toolResults,
   toolVisuals,
 } from "../data/session-values.ts";
-import { readTheme, VisualPlayer, type VisualStatus } from "./Visual.model.ts";
+import {
+  deviceWidth,
+  readTheme,
+  VisualPlayer,
+  type VisualStatus,
+} from "./Visual.model.ts";
 import type { VisualCard } from "./visuals.ts";
 import "./visual.css";
 
@@ -151,10 +156,17 @@ export function Visual({
   }, [card.preview, stored, failed, error]);
 
   const current = status.value;
+  // latched: the draft's html empties while the final loads, and a
+  // flip back to 680 px would jump the frame and measure it twice
+  const fluid = useRef(false);
+  if (!fluid.current)
+    fluid.current = deviceWidth(
+      stored?.status === "done" ? stored.html : card.preview?.html,
+    );
   const drawing = !["finalized", "failed", "navigated"].includes(current.state);
   return (
     <div
-      class={`visual-card${current.state === "failed" ? " visual-failed" : ""}`}
+      class={`visual-card${current.state === "failed" ? " visual-failed" : ""}${fluid.current ? " visual-fluid" : ""}`}
       data-visual={card.key}
       data-state={current.state}
     >
