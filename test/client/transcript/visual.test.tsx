@@ -9,6 +9,7 @@ import {
   type ReplyNode,
 } from "../../../src/client/transcript/rows.ts";
 import {
+  deviceWidth,
   PAINT_MS,
   readTheme,
   THEME_TOKENS,
@@ -302,4 +303,23 @@ test("stored cards follow call order, never a failed whole call or memory row", 
   expect(
     visualCards({ ...node, work: null, memory: node.work }, new Map()),
   ).toEqual([]);
+});
+
+test("only a page asking for the device's width leaves the 680 px floor", () => {
+  for (const html of [
+    '<meta name="viewport" content="width=device-width">',
+    '<meta charset="utf-8"><meta name=viewport content="width=device-width, initial-scale=1"><div></div>',
+    "<META NAME='viewport' CONTENT='initial-scale=1, width=device-width'>",
+    '<meta content="width=device-width, initial-scale=1" name="viewport">',
+  ])
+    expect(deviceWidth(html)).toBe(true);
+  for (const html of [
+    undefined,
+    "",
+    '<svg viewBox="0 0 680 300" width="100%"></svg>',
+    '<meta name="viewport" content="width=680">',
+    '<meta name="description" content="width=device-width">',
+    "<p>add width=device-width to a viewport meta</p>",
+  ])
+    expect(deviceWidth(html)).toBe(false);
 });

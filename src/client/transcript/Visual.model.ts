@@ -78,6 +78,20 @@ const fits = (html: string): boolean =>
 const visualHeight = (height: number): number =>
   Math.min(2000, Math.max(80, Math.ceil(height)));
 
+// A page that asks for the device's width, as a mobile browser reads
+// the viewport meta, leaves the frame's 680 px floor: it is drawn at the
+// column's width, so it fits a phone instead of scrolling sideways.
+const META = /<meta\s[^>]*>/gi;
+const VIEWPORT = /\bname\s*=\s*["']?viewport\b/i;
+const DEVICE_WIDTH = /\bwidth\s*=\s*device-width\b/i;
+
+export function deviceWidth(html: string | undefined): boolean {
+  if (html === undefined) return false;
+  for (const [tag] of html.matchAll(META))
+    if (VIEWPORT.test(tag) && DEVICE_WIDTH.test(tag)) return true;
+  return false;
+}
+
 export function readTheme(
   scheme: string,
   read: (name: string) => string,
