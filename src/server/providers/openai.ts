@@ -5,6 +5,7 @@ import { type Clock, MINUTE_MS, sleep, wallClock } from "../lib/clock.ts";
 import { messageOf } from "../lib/errors.ts";
 import { tokens } from "../lib/tokens.ts";
 import { chatEvents } from "./frames.ts";
+import { chatUserContent, type ImageData, NO_IMAGE_DATA } from "./images.ts";
 import type {
   ChatEvent,
   ChatRequest,
@@ -44,15 +45,21 @@ export type ChatBodyOptions = {
   // thinks refuses the field, so a default that resolved to off sends
   // nothing
   offAsNone?: boolean;
+  // the images port; without one an image goes as its removed line
+  images?: ImageData;
 };
 
 // the openai-compatible body (mlx-serve, llama-server)
-export function buildChatBody(req: ChatRequest): Record<string, unknown> {
+export function buildChatBody(
+  req: ChatRequest,
+  images: ImageData = NO_IMAGE_DATA,
+): Record<string, unknown> {
   return baseChatBody(req, {
     thinkingFlag: true,
     usageOption: true,
     effort: true,
     cacheKey: true,
+    images,
   });
 }
 
@@ -72,7 +79,11 @@ export function baseChatBody(
       const name = message.name ? wireName(message.name) : null;
       return {
         role: "user",
-        content: message.content,
+        content: chatUserContent(
+          message.content,
+          message.images,
+          options.images ?? NO_IMAGE_DATA,
+        ),
         ...(name === null ? {} : { name }),
       };
     }

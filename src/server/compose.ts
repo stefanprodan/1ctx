@@ -268,6 +268,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     secret: (name) => secret("provider-", name),
     keys: () => options.secretNames?.("provider-") ?? [],
     fetcher,
+    images: (id) => images.store.data(id),
     log: log("providers"),
     agents: { usesProvider: (providerId) => agents.usesProvider(providerId) },
     deciders: {

@@ -21,6 +21,12 @@ import {
 } from "./azure.ts";
 import { azureEvents } from "./azure-stream.ts";
 import {
+  type ImageData,
+  NO_IMAGE_DATA,
+  requestImageTokens,
+  withoutImages,
+} from "./images.ts";
+import {
   wireTokens as chatToolTokens,
   type StreamOptions,
   streamChat,
@@ -41,6 +47,8 @@ import { authHeaders, CHAT_WIRES, endpoint } from "./wires.ts";
 
 export type ProviderDeps = {
   fetcher: Fetcher;
+  // the images port: a sent image's bytes, read as a body is built
+  images?: ImageData;
   // the secrets port: the bare value or null
   secret: (name: string) => string | null;
   // the headers wait, shorter in a test
@@ -76,8 +84,8 @@ function sentMessages(
   messages: ChatMessageIn[],
 ): ChatMessageIn[] {
   const sends = wire === "opencode" ? sendsReasoning({ model }) : () => false;
-  // the channel's cache flag is no wire's field
-  return messages.map(({ streamMark: _mark, ...message }) => {
+  // the channel's cache flag is no wire's field; images are counted apart
+  return withoutImages(messages).map(({ streamMark: _mark, ...message }) => {
     if (message.role === "tool" && message.failed !== undefined) {
       const { failed: _, ...rest } = message;
       return rest;
@@ -100,8 +108,9 @@ export function requestText(wire: Wire | null, req: ChatRequest): string {
   });
 }
 
+// the text's tokens and each image's estimate (images.ts)
 export function requestTokens(wire: Wire | null, req: ChatRequest): number {
-  return tokens(requestText(wire, req));
+  return tokens(requestText(wire, req)) + requestImageTokens(wire, req);
 }
 
 // the tokens tool schemas cost on the wire; with none named, the Chat
@@ -119,6 +128,7 @@ export function wireTokens(
 
 export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
   const noneRefused = deps.noneRefused ?? new Set<string>();
+  const read = deps.images ?? NO_IMAGE_DATA;
   return {
     id: row.id,
     wire: row.wire,
@@ -153,6 +163,7 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
             noneRefused,
             providerId: row.id,
             providerName: row.name,
+            images: read,
             ...(deps.log === undefined ? {} : { log: deps.log }),
           });
         }
@@ -171,12 +182,13 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
               });
             },
             providerName: row.name,
+            images: read,
             ...(deps.log === undefined ? {} : { log: deps.log }),
           });
         }
         const wire = CHAT_WIRES[row.wire];
         const url = endpoint(row.baseUrl, wire.path);
-        return streamChat(deps.fetcher, url, wire.body(req), signal, {
+        return streamChat(deps.fetcher, url, wire.body(req, read), signal, {
           ...options,
           mapEvents: wire.events(),
           ...(wire.refusal === undefined ? {} : { refusal: wire.refusal }),

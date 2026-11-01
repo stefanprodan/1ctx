@@ -6,6 +6,12 @@ import type { Log } from "../lib/log.ts";
 import { markOf } from "./author.ts";
 import { errorEvent } from "./azure-stream.ts";
 import {
+  dataUrl,
+  type ImageData,
+  loadImages,
+  NO_IMAGE_DATA,
+} from "./images.ts";
+import {
   CatalogError,
   type ChatEvent,
   type ChatMessageIn,
@@ -63,6 +69,8 @@ export type AzureBodyOptions = {
   noneAsLow?: boolean;
   // the provider refused a blob sent back: no reasoning goes this time
   dropReasoning?: boolean;
+  // the images port; without one an image goes as its removed line
+  images?: ImageData;
 };
 
 function assistantItems(
@@ -107,20 +115,39 @@ function assistantItems(
   return items;
 }
 
+// the text first, then each image as input_image with its data URL a
+// plain string; counting leaves the images out, as the estimate adds them
+function userParts(
+  message: Extract<ChatMessageIn, { role: "user" }>,
+  read: ImageData | null,
+): Record<string, unknown>[] {
+  const own = message.name
+    ? `${markOf(message.name)}${message.content}`
+    : message.content;
+  if (read === null || !message.images?.length) {
+    return [{ type: "input_text", text: own }];
+  }
+  const { text, loaded } = loadImages(own, message.images, read);
+  return [
+    ...(text === "" ? [] : [{ type: "input_text", text }]),
+    ...loaded.map((image) => ({
+      type: "input_image",
+      image_url: dataUrl(image),
+    })),
+  ];
+}
+
 function input(
   messages: readonly ChatMessageIn[],
   dropReasoning: boolean,
+  read: ImageData | null,
 ): Record<string, unknown>[] {
   return messages.flatMap((message): Record<string, unknown>[] => {
     switch (message.role) {
       case "system":
         return [{ role: "system", content: message.content }];
-      case "user": {
-        const text = message.name
-          ? `${markOf(message.name)}${message.content}`
-          : message.content;
-        return [{ role: "user", content: [{ type: "input_text", text }] }];
-      }
+      case "user":
+        return [{ role: "user", content: userParts(message, read) }];
       case "tool":
         return [
           {
@@ -153,7 +180,11 @@ export function buildChatBody(
 ): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model: req.model,
-    input: input(req.messages, options.dropReasoning ?? false),
+    input: input(
+      req.messages,
+      options.dropReasoning ?? false,
+      options.images ?? NO_IMAGE_DATA,
+    ),
     stream: true,
     store: false,
     include: ["reasoning.encrypted_content"],
@@ -173,7 +204,7 @@ export function buildChatBody(
 // a reasoning item by its summary alone, since Azure bills the blob as
 // far less than its text
 export function countedText(req: ChatRequest): string {
-  const items = input(req.messages, false).map((item) => {
+  const items = input(req.messages, false, null).map((item) => {
     if (item.type !== "reasoning") return item;
     const { encrypted_content: _, ...rest } = item;
     return rest;
@@ -202,6 +233,7 @@ export function azureError(
 export type AzureChatDeps = {
   // one request with this body, as the wire streams it
   open(body: Record<string, unknown>): AsyncIterable<ChatEvent>;
+  images?: ImageData;
   // the provider and model pairs that refused none, kept until a restart
   noneRefused: Set<string>;
   providerId: string;
@@ -225,7 +257,11 @@ export async function* azureChat(
   let raised = false;
   let dropReasoning = false;
   while (true) {
-    const body = buildChatBody(req, { noneAsLow, dropReasoning });
+    const body = buildChatBody(req, {
+      noneAsLow,
+      dropReasoning,
+      ...(deps.images === undefined ? {} : { images: deps.images }),
+    });
     let again = false;
     let yielded = false;
     for await (const event of deps.open(body)) {

@@ -3,6 +3,7 @@
 
 import { NOT_FOUR_BIT } from "../../shared/quantization.ts";
 import { frameEvents, parseFrame } from "./frames.ts";
+import { type ImageData, NO_IMAGE_DATA } from "./images.ts";
 import { baseChatBody } from "./openai.ts";
 import type { ChatEvent, ChatRequest, ReasoningDetail } from "./types.ts";
 
@@ -12,8 +13,10 @@ export const OPENROUTER_HEADERS = {
 };
 
 // only Claude models take breakpoints: the system prompt and the last
-// two turns
+// two turns, each on its last part, so a message's images sit before
+// the mark
 const CACHE_BREAKPOINTS = 2;
+const EPHEMERAL = { type: "ephemeral" } as const;
 export function takesCacheBreakpoints(model: string): boolean {
   const id = model.toLowerCase();
   return id.includes("claude") || id.includes("anthropic");
@@ -28,24 +31,28 @@ export function withCacheBreakpoints(
   let tail = CACHE_BREAKPOINTS;
   for (let i = messages.length - 1; i >= 0 && tail > 0; i--) {
     if (messages[i]!.role === "system") continue;
-    if (typeof messages[i]!.content !== "string") continue;
+    const content = messages[i]!.content;
+    if (typeof content !== "string" && !Array.isArray(content)) continue;
     marked.add(i);
     tail--;
   }
-  return messages.map((m, i) =>
-    marked.has(i) && typeof m.content === "string"
-      ? {
-          ...m,
-          content: [
-            {
-              type: "text",
-              text: m.content,
-              cache_control: { type: "ephemeral" },
-            },
-          ],
-        }
-      : m,
-  );
+  return messages.map((m, i) => {
+    if (!marked.has(i)) return m;
+    if (typeof m.content === "string") {
+      return {
+        ...m,
+        content: [{ type: "text", text: m.content, cache_control: EPHEMERAL }],
+      };
+    }
+    if (!Array.isArray(m.content) || m.content.length === 0) return m;
+    const parts = m.content as Record<string, unknown>[];
+    return {
+      ...m,
+      content: parts.map((part, at) =>
+        at === parts.length - 1 ? { ...part, cache_control: EPHEMERAL } : part,
+      ),
+    };
+  });
 }
 
 // DeepSeek refuses a history where an assistant message has no reasoning
@@ -90,8 +97,11 @@ export function mergeReasoningDetail(
   return items.map((item, i) => (i === at ? merged : item));
 }
 
-export function buildChatBody(req: ChatRequest): Record<string, unknown> {
-  const body = baseChatBody(req, { reasoningDetails: true });
+export function buildChatBody(
+  req: ChatRequest,
+  images: ImageData = NO_IMAGE_DATA,
+): Record<string, unknown> {
+  const body = baseChatBody(req, { reasoningDetails: true, images });
   if (req.cacheKey) body.session_id = req.cacheKey;
   // order, never only: a tag that stopped serving is skipped, so the
   // preference costs a discount and never the turn

@@ -8,6 +8,7 @@ import {
   geminiError,
   geminiEvents,
 } from "./gemini.ts";
+import type { ImageData } from "./images.ts";
 import {
   buildChatBody as buildOpenAiChatBody,
   type StreamOptions,
@@ -57,7 +58,8 @@ export function authHeaders(
 type ChatWire = {
   path: string;
   headers(req: ChatRequest): Record<string, string>;
-  body(req: ChatRequest): Record<string, unknown>;
+  // the images port reads each image part's bytes as the body is built
+  body(req: ChatRequest, images: ImageData): Record<string, unknown>;
   events(): (json: string) => ChatEvent[];
   refusal?: StreamOptions["refusal"];
 };
