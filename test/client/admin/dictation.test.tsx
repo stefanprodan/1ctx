@@ -84,6 +84,7 @@ const voxtral: CatalogMatch = {
   thinkingRequired: false,
   reasoningKnown: true,
   described: true,
+  images: null,
 };
 const whisper: CatalogMatch = {
   ...voxtral,

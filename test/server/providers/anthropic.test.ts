@@ -831,6 +831,7 @@ describe("the anthropic wire", () => {
         thinkingRequired: false,
         reasoningKnown: true,
         described: true,
+        images: true,
         listedAs: "claude-haiku-5-5",
         outputLimit: 128_000,
       });

@@ -297,6 +297,8 @@ export function parseDeployments(body: unknown): CatalogMatch[] {
       thinkingRequired: false,
       reasoningKnown: false,
       described: false,
+      // a deployment says nothing of it; models.dev fills it
+      images: null,
       listedAs: model,
     });
   }

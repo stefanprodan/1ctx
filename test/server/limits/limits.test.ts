@@ -233,12 +233,57 @@ describe("limits area", () => {
     },
   );
 
+  test("defines the image limits, a message's images held under a request's", () => {
+    const MiB = 1024 * 1024;
+    const of = (name: keyof typeof LIMIT_DEFINITIONS) => {
+      const { default: value, min, max, unit } = LIMIT_DEFINITIONS[name];
+      expect(LIMIT_DEFINITIONS[name].scope).toBe("images");
+      return [value, min, max, unit];
+    };
+    expect(of("imageUploadBytes")).toEqual([20 * MiB, MiB, 32 * MiB, "bytes"]);
+    expect(of("imageMaxPixels")).toEqual([
+      50_000_000,
+      1_000_000,
+      100_000_000,
+      "pixels",
+    ]);
+    expect(of("imageLongSide")).toEqual([2048, 512, 2048, "pixels"]);
+    expect(of("imagesPerMessage")).toEqual([8, 1, 12, "count"]);
+    expect(of("imagesPerRequest")).toEqual([20, 1, 100, "count"]);
+    expect(of("imageProjectBytes")).toEqual([
+      1024 * MiB,
+      256 * MiB,
+      50 * 1024 * MiB,
+      "bytes",
+    ]);
+    expect(of("imagesPerHour")).toEqual([60, 10, 1000, "count"]);
+    // the most a message holds, each a 2048 RGBA PNG of noise at about
+    // 16 MiB, stays under the budget's floor
+    expect(LIMIT_DEFINITIONS.imagesPerMessage.max * 16.1 * MiB).toBeLessThan(
+      LIMIT_DEFINITIONS.imageProjectBytes.min,
+    );
+    const db = memoryDb();
+    try {
+      const area = limitsArea({ db, clock: () => 100, cores: 1 });
+      expect(() =>
+        area.set({ imagesPerMessage: 12, imagesPerRequest: 10 }, 100),
+      ).toThrow("imagesPerMessage must not be above imagesPerRequest");
+      area.set({ imagesPerMessage: 10, imagesPerRequest: 10 }, 100);
+      expect(area.current()).toMatchObject({
+        imagesPerMessage: 10,
+        imagesPerRequest: 10,
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   test("lists every limit once in its scope with the runtime defaults", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100, cores: 1 }).rows();
-      expect(rows).toHaveLength(60);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(60);
+      expect(rows).toHaveLength(67);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(67);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(19);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
@@ -248,6 +293,7 @@ describe("limits area", () => {
       expect(rows.filter((row) => row.scope === "chats")).toHaveLength(2);
       expect(rows.filter((row) => row.scope === "repos")).toHaveLength(4);
       expect(rows.filter((row) => row.scope === "dictation")).toHaveLength(1);
+      expect(rows.filter((row) => row.scope === "images")).toHaveLength(7);
       expect(LIMIT_DEFINITIONS.dictationClipsPerUser).toEqual({
         default: 30,
         min: 1,
@@ -465,7 +511,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(60);
+      expect(body.limits).toHaveLength(67);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),

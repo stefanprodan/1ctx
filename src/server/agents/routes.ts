@@ -141,6 +141,21 @@ function stated(
   return { ...model, contextLength, tools };
 }
 
+// the catalog's word on images wins; only where it is silent does the
+// admin's count, described or not, since a catalog that describes the
+// window may still say nothing of images
+export function imagesOf(model: CatalogMatch, stated: boolean | null): boolean {
+  if (model.images !== null) {
+    if (stated !== null) {
+      throw new BadRequest(
+        "images is only for a model whose catalog does not say whether it reads them",
+      );
+    }
+    return model.images;
+  }
+  return stated ?? false;
+}
+
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   // the rows the body names are checked before the catalog fetch and
   // again in the transaction, since the world may move while it waits
@@ -249,6 +264,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         upstream: body.upstream,
         skip4Bit: body.skip4Bit,
         subagents: body.subagents,
+        images: imagesOf(resolved, body.images),
         mark: body.mark,
       };
     };

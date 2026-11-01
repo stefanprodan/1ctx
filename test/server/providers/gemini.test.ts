@@ -102,6 +102,7 @@ describe("Gemini catalog", () => {
       thinkingRequired: false,
       reasoningKnown: true,
       described: true,
+      images: null,
     });
     expect(models[2]).toMatchObject({
       name: "Gemma 4 31B IT",
@@ -177,6 +178,7 @@ describe("Gemini catalog", () => {
         thinkingRequired: false,
         reasoningKnown: true,
         described: true,
+        images: null,
       },
     ]);
     expect(parseCatalog(null)).toEqual([]);

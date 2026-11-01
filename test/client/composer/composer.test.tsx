@@ -67,6 +67,7 @@ const agent = (id: string, name: string): AgentSummary => ({
     thinkingRequired: false,
     reasoningKnown: true,
     described: true,
+    images: null,
   },
   thinking: null,
   effort: null,
@@ -77,6 +78,7 @@ const agent = (id: string, name: string): AgentSummary => ({
   upstream: null,
   skip4Bit: false,
   subagents: false,
+  images: false,
   default: id === "a1",
   createdAt: 0,
 });

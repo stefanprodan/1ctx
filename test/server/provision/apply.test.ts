@@ -325,6 +325,7 @@ describe("provision through the composed app", () => {
         thinkingRequired: false,
         reasoningKnown: false,
         described: false,
+        images: null,
       };
       expect(app.agents.byName("bare-guide")!.model).toEqual(stated);
       // omitted, they stay as an omitted field does
@@ -349,6 +350,47 @@ describe("provision through the composed app", () => {
       expect(() =>
         documents(bare({ model: "bare-model", contextLength: "big" })),
       ).toThrow("spec.contextLength");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("keeps the stated image flag while the model stays and its catalog is silent", async () => {
+    const { app } = await instance();
+    try {
+      const strict = object("Provider", "bare", {
+        wire: "openai-strict",
+        baseUrl: BARE_URL,
+        keyFrom: null,
+      });
+      const bare = (spec: Record<string, unknown>) =>
+        object("Agent", "bare-guide", { provider: "bare", ...spec });
+      expect(
+        await app.provision.apply(
+          documents(strict, bare({ model: "bare-model", images: true })),
+          ignore,
+        ),
+      ).toEqual({ created: 2, updated: 0, unchanged: 0 });
+      expect(app.agents.byName("bare-guide")).toMatchObject({
+        model: { images: null },
+        images: true,
+      });
+      expect(
+        await app.provision.apply(documents(bare({ prompt: "" })), ignore),
+      ).toEqual({ created: 0, updated: 0, unchanged: 1 });
+      expect(app.agents.byName("bare-guide")!.images).toBe(true);
+      expect(
+        await app.provision.apply(documents(bare({ images: false })), ignore),
+      ).toEqual({ created: 0, updated: 1, unchanged: 0 });
+      expect(app.agents.byName("bare-guide")!.images).toBe(false);
+      await app.provision.apply(documents(bare({ images: true })), ignore);
+      // another model drops it, as it drops the window
+      await app.provision.apply(
+        documents(bare({ model: "bare-model-next" })),
+        ignore,
+      );
+      expect(app.agents.byName("bare-guide")!.images).toBe(false);
+      expect(() => documents(bare({ images: "yes" }))).toThrow(/images/);
     } finally {
       await app.shutdown();
     }

@@ -99,6 +99,7 @@ describe("the opencode wire", () => {
         thinkingRequired: false,
         reasoningKnown: false,
         described: false,
+        images: null,
       },
     ]);
   });

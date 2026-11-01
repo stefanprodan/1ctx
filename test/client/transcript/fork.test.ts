@@ -25,6 +25,7 @@ function agent(id: string): AgentSummary {
       thinkingRequired: false,
       reasoningKnown: true,
       described: true,
+      images: null,
     },
     thinking: null,
     effort: null,
@@ -35,6 +36,7 @@ function agent(id: string): AgentSummary {
     upstream: null,
     skip4Bit: false,
     subagents: false,
+    images: false,
     default: false,
     createdAt: 0,
   };

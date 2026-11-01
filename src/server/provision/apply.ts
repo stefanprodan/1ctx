@@ -35,6 +35,7 @@ import {
 } from "./client.ts";
 import { decider } from "./decider.ts";
 import { applyDictation } from "./dictation.ts";
+import { keptStated } from "./fields.ts";
 import { type Document, KINDS, type LabelSpec, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
 import { applySmtpServer } from "./smtp.ts";
@@ -365,14 +366,7 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
       write,
     }));
   }
-  // what an admin stated for a model its catalog does not describe
-  // stays while the model does, as an omitted field stays
-  const keep = (row: typeof before) =>
-    row &&
-    !row.model.described &&
-    (fields.model ?? row.model.id) === row.model.id
-      ? { contextLength: row.model.contextLength, tools: row.model.tools }
-      : {};
+  const keep = (row: typeof before) => keptStated(row, fields.model);
   const desired = {
     name: doc.name,
     providerId,

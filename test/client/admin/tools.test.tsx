@@ -666,6 +666,7 @@ describe("the Config board", () => {
       "Knowledge",
       "Scratch",
       "Chats",
+      "Images",
       "MCP results",
       "Repositories",
     ]);
@@ -887,7 +888,7 @@ describe("the Config board", () => {
     expect(html).toContain(">Automations<");
     expect(html).toContain(">Knowledge<");
     // the tool cards stay mounted, hidden, so their drafts are kept
-    expect(html.match(/<form/g)).toHaveLength(13);
+    expect(html.match(/<form/g)).toHaveLength(14);
     expect(html).toMatch(
       /config-board-cards config-board-away"><form[\s\S]*?Agents manage automations/,
     );

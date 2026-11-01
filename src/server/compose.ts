@@ -33,10 +33,12 @@ import {
   type ExternalTasks,
   externalTasksArea,
 } from "./external-tasks/index.ts";
+import { type ImagesArea, imagesArea } from "./images/index.ts";
 import {
   acquireProcess,
   type KnowledgeArea,
   knowledgeArea,
+  withUpload,
 } from "./knowledge/index.ts";
 import type { Clock } from "./lib/clock.ts";
 import { userAgent, withUserAgent } from "./lib/fetcher.ts";
@@ -144,6 +146,7 @@ export type App = {
   deciders: Deciders;
   memory: MemoryStore;
   knowledge: KnowledgeArea;
+  images: ImagesArea;
   // the one search queue, which a test may hold
   searches: SearchQueue;
   repos: Repos;
@@ -440,6 +443,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // one scan at a time across knowledge and session search
   const searches = searchQueue();
   const knowledge = knowledgeArea({ db, clock, limits, access, searches });
+  const images = imagesArea({
+    db,
+    clock,
+    limits,
+    access,
+    sessions: { visible: (principal, id) => sessions.visible(principal, id) },
+    withUpload,
+  });
   repos = reposArea({
     db,
     clock,
@@ -812,6 +823,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...agents.routes,
     ...memory.routes,
     ...knowledge.routes,
+    ...images.routes,
     ...repos.routes,
     ...sessions.routes,
     ...externalTasks.routes,
@@ -871,6 +883,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     deciders,
     memory: memory.store,
     knowledge,
+    images,
     searches,
     repos,
     repoCache,
@@ -899,6 +912,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
         const visits = access.sweepVisits();
         const now = clock();
         const knowledgeRows = knowledge.sweep(now);
+        const imageRows = images.sweep(now);
         const scratchRows = bash.sweep(now);
         const digests = sessions.store.sweepDigests();
         const chats = sessions.sweep(now, limits.current());
@@ -919,6 +933,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
           links +
           visits +
           knowledgeRows +
+          imageRows +
           scratchRows +
           digests +
           notSent +
@@ -935,6 +950,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
             links,
             visits,
             knowledge: knowledgeRows,
+            images: imageRows,
             bash: scratchRows,
             digests,
             not_sent: notSent,

@@ -82,9 +82,9 @@ bash. An upload adds files to it, or attaches them to a chat message.
   `knowledge/queue.ts`; bash takes a slot through `acquireProcess()`,
   and there is never a second queue. An upload takes its slot before
   reading the body.
-- **A user runs one upload at a time.** The uploader and chat staging
-  share that admission (`withUpload()`), with one deadline over
-  waiting, reading and judging.
+- **A user runs one upload at a time.** The uploader, chat staging and
+  images (`docs/images.md`) share that admission (`withUpload()`), with
+  one deadline over waiting, reading and judging.
 - **An archive is capped before it expands.** 32 MiB uploaded, the
   project byte ceiling expanded, 2,000 members; only selected members
   are read.

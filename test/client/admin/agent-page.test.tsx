@@ -42,6 +42,7 @@ const described: CatalogMatch = {
   thinkingRequired: false,
   reasoningKnown: true,
   described: true,
+  images: null,
 };
 // a model a catalog of ids alone lists: its window and tools are stated
 const stated: CatalogMatch = {
@@ -55,6 +56,7 @@ const stated: CatalogMatch = {
   thinkingRequired: false,
   reasoningKnown: false,
   described: false,
+  images: null,
 };
 const agent: AgentSummary = {
   id: "ag1",
@@ -71,6 +73,7 @@ const agent: AgentSummary = {
   upstream: "vendor/fp8",
   skip4Bit: false,
   subagents: false,
+  images: false,
   default: false,
   createdAt: 0,
 };

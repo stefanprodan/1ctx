@@ -69,6 +69,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
       thinkingRequired: false,
       reasoningKnown: true,
       described: true,
+      images: null,
     },
     thinking: null,
     effort: null,
@@ -79,6 +80,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     upstream: null,
     skip4Bit: false,
     subagents: false,
+    images: false,
     now: now.value,
   });
   const sessions = new SessionStore(

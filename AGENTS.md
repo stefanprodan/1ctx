@@ -160,6 +160,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/mcp-server.md` | `mcp-server/`, the inbound `/mcp` endpoint and its tools |
 | `docs/knowledge.md` | `knowledge/`, uploads |
+| `docs/images.md` | `images/`: the image store, ingest, its limits, serving, access, the lease, the agent's image flag |
 | `docs/search.md` | `shared/search.ts`, knowledge search, session search and list |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |

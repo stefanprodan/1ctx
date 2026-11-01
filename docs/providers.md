@@ -35,7 +35,8 @@ with probabilities.
   Only for
   such a model does the agents API take `contextLength` and `tools` (a
   400 otherwise), and a window is required with tools on, since the
-  tool loop weighs it.
+  tool loop weighs it. Image input is apart from this rule
+  (`docs/images.md`).
 - **models.dev is embedded, never fetched.** `models.json` holds the
   window, tools flag and canonical name of the Anthropic, Azure, Google
   and OpenCode Go models, and prices (USD per million tokens, `tiers`

@@ -9,6 +9,7 @@ import { BadRequest } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import {
   defaultLimits,
+  type ImageCaps,
   type LimitDefinition,
   type Limits,
   limitDefinitions,
@@ -23,6 +24,7 @@ export {
   DEFAULT_LIMITS,
   type DictationCaps,
   type ExternalCaps,
+  type ImageCaps,
   type KnowledgeCaps,
   LIMIT_DEFINITIONS,
   type Limits,
@@ -52,8 +54,11 @@ export type LimitsArea = {
 };
 
 // a user's cap never reads larger than the project's, nor the
-// project's than the process's
-function ordered(caps: SendCaps): void {
+// project's than the process's; a message's images always fit a request
+function ordered(caps: SendCaps & ImageCaps): void {
+  if (caps.imagesPerMessage > caps.imagesPerRequest) {
+    throw new BadRequest("imagesPerMessage must not be above imagesPerRequest");
+  }
   if (caps.sendsPerUser > caps.sendsPerProject) {
     throw new BadRequest("sendsPerUser must not be above sendsPerProject");
   }

@@ -25,6 +25,8 @@ type Raw = {
   thinking_required: number;
   reasoning_known: number;
   model_described: number;
+  model_images: number | null;
+  images: number;
   listed_as: string | null;
   output_limit: number | null;
   thinking: "on" | "off" | null;
@@ -58,6 +60,7 @@ const row = (
     thinkingRequired: raw.thinking_required === 1,
     reasoningKnown: raw.reasoning_known === 1,
     described: raw.model_described === 1,
+    images: raw.model_images === null ? null : raw.model_images === 1,
     ...(raw.listed_as !== null && { listedAs: raw.listed_as }),
     ...(raw.output_limit !== null && { outputLimit: raw.output_limit }),
   },
@@ -70,6 +73,7 @@ const row = (
   upstream: raw.upstream,
   skip4Bit: raw.skip_4bit === 1,
   subagents: raw.subagents === 1,
+  images: raw.images === 1,
   default: raw.id === defaultId,
   createdAt: raw.created_at,
 });
@@ -89,7 +93,11 @@ export type AgentFields = {
   upstream: string | null;
   skip4Bit: boolean;
   subagents: boolean;
+  // the catalog's model.images where it said, else the admin's
+  images: boolean;
 };
+
+const bit = (value: boolean | null) => (value === null ? null : value ? 1 : 0);
 
 export class AgentStore {
   constructor(
@@ -181,11 +189,11 @@ export class AgentStore {
       .query(
         `insert into agents (id, name, avatar, provider_id, model, model_name,
            context_length, prompt_price, completion_price, tools, reasoning,
-           thinking_required, reasoning_known, model_described, listed_as,
-           output_limit, thinking, effort, prompt, mcp_mode, upstream,
-           skip_4bit, subagents, created_at)
+           thinking_required, reasoning_known, model_described, model_images,
+           listed_as, output_limit, thinking, effort, prompt, mcp_mode,
+           upstream, skip_4bit, subagents, images, created_at)
          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-           ?, ?)`,
+           ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -202,6 +210,7 @@ export class AgentStore {
         m.thinkingRequired ? 1 : 0,
         m.reasoningKnown ? 1 : 0,
         m.described ? 1 : 0,
+        bit(m.images),
         m.listedAs ?? null,
         m.outputLimit ?? null,
         fields.thinking,
@@ -211,6 +220,7 @@ export class AgentStore {
         fields.upstream,
         fields.skip4Bit ? 1 : 0,
         fields.subagents ? 1 : 0,
+        fields.images ? 1 : 0,
         fields.now,
       );
     return this.byId(id)!;
@@ -223,10 +233,10 @@ export class AgentStore {
         `update agents set name = ?, avatar = ?, provider_id = ?, model = ?, model_name = ?,
            context_length = ?, prompt_price = ?, completion_price = ?,
            tools = ?, reasoning = ?, thinking_required = ?,
-           reasoning_known = ?, model_described = ?, listed_as = ?,
-           output_limit = ?, thinking = ?,
+           reasoning_known = ?, model_described = ?, model_images = ?,
+           listed_as = ?, output_limit = ?, thinking = ?,
            effort = ?, prompt = ?, mcp_mode = ?, upstream = ?, skip_4bit = ?,
-           subagents = ?
+           subagents = ?, images = ?
          where id = ? and deleted_at is null`,
       )
       .run(
@@ -243,6 +253,7 @@ export class AgentStore {
         m.thinkingRequired ? 1 : 0,
         m.reasoningKnown ? 1 : 0,
         m.described ? 1 : 0,
+        bit(m.images),
         m.listedAs ?? null,
         m.outputLimit ?? null,
         fields.thinking,
@@ -252,6 +263,7 @@ export class AgentStore {
         fields.upstream,
         fields.skip4Bit ? 1 : 0,
         fields.subagents ? 1 : 0,
+        fields.images ? 1 : 0,
         id,
       );
     return this.byId(id);

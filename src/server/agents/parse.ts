@@ -31,6 +31,7 @@ export type ParsedAgent = Omit<
   | "upstream"
   | "skip4Bit"
   | "subagents"
+  | "images"
   | "default"
 > & {
   upstream: string | null;
@@ -41,6 +42,8 @@ export type ParsedAgent = Omit<
   mcpMode: NonNullable<SaveAgentRequest["mcpMode"]>;
   // null when the body did not state them
   stated: { contextLength: number | null; tools: boolean } | null;
+  // null when the body did not state it
+  images: boolean | null;
   // null leaves the default mark as it is
   mark: boolean | null;
 };
@@ -130,6 +133,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     "upstream",
     "skip4Bit",
     "subagents",
+    "images",
     "default",
   ]);
   const name = parseName(b.name);
@@ -193,6 +197,9 @@ export function parseAgent(body: unknown): ParsedAgent {
   if (b.subagents !== undefined && typeof b.subagents !== "boolean") {
     throw new BadRequest("subagents must be true or false");
   }
+  if (b.images !== undefined && typeof b.images !== "boolean") {
+    throw new BadRequest("images must be true or false");
+  }
   if (b.default !== undefined && typeof b.default !== "boolean") {
     throw new BadRequest("default must be true or false");
   }
@@ -215,6 +222,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     skip4Bit: b.skip4Bit ?? false,
     subagents: b.subagents ?? false,
     stated,
+    images: b.images ?? null,
     mark: b.default ?? null,
   };
 }

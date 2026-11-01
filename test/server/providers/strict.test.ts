@@ -177,6 +177,7 @@ describe("strict catalog", () => {
         thinkingRequired: false,
         reasoningKnown: false,
         described: false,
+        images: null,
       });
     }
   });
@@ -195,6 +196,7 @@ describe("strict catalog", () => {
       thinkingRequired: false,
       reasoningKnown: false,
       described: true,
+      images: false,
     });
     expect(byId.get("whisper-large-v3")).toMatchObject({
       contextLength: 448,

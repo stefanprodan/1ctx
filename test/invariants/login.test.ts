@@ -286,6 +286,7 @@ describe("sweep", () => {
         links: 0,
         visits: 0,
         knowledge: 0,
+        images: 0,
         bash: 0,
         digests: 0,
         not_sent: 0,

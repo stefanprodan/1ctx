@@ -741,6 +741,7 @@ describe("the composer while a turn runs", () => {
       thinkingRequired: false,
       reasoningKnown: true,
       described: true,
+      images: null,
     },
     thinking: null,
     effort: null,
@@ -751,6 +752,7 @@ describe("the composer while a turn runs", () => {
     upstream: null,
     skip4Bit: false,
     subagents: false,
+    images: false,
     default: true,
     createdAt: 0,
   };

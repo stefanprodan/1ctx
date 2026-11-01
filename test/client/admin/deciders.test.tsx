@@ -417,6 +417,7 @@ describe("a decider's drafts", () => {
     thinkingRequired: false,
     reasoningKnown: true,
     described: true,
+    images: null,
   };
 
   test.serial("Change, Cancel and a pick", () => {

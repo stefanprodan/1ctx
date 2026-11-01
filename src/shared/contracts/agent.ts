@@ -36,6 +36,9 @@ export type AgentSummary = {
   // whether a turn may hand work to a fresh copy of it; off until an
   // admin turns it on
   subagents: boolean;
+  // whether a chat may send it images: model.images where the catalog
+  // said, else what the admin stated
+  images: boolean;
   // the agent a new chat starts on for anyone who has not picked one:
   // the one an admin marked, else the first created
   default: boolean;

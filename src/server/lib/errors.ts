@@ -64,6 +64,13 @@ export class Conflict extends HttpError {
   }
 }
 
+// the row is there and its bytes are not, for good
+export class Gone extends HttpError {
+  constructor(message = "gone") {
+    super(410, message);
+  }
+}
+
 // the upstream this request needed did not answer
 export class BadGateway extends HttpError {
   constructor(message = "upstream did not answer") {

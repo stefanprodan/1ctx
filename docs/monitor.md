@@ -89,7 +89,7 @@ admin's attention, the server's load), Usage by month and Storage.
   first, since a sorting `group by` carries the raw value into the
   sorter.
 - **A new table needs an entry in `STORAGE_TABLES`.** A test checks
-  the map against the schema both ways.
+  the map against the schema both ways. `images` is under `uploads`.
 - **External task tables form the `external` area.** Retention counts
   closed task text under `externalTasks`, with `externalTaskDays`;
   unfinished task text stays in kept storage. Both include entries

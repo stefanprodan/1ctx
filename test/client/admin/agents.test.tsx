@@ -101,6 +101,7 @@ const flash: CatalogMatch = {
   thinkingRequired: false,
   reasoningKnown: true,
   described: true,
+  images: null,
 };
 const coder: AgentSummary = {
   id: "ag1",
@@ -117,6 +118,7 @@ const coder: AgentSummary = {
   upstream: null,
   skip4Bit: false,
   subagents: false,
+  images: false,
   default: false,
   createdAt: 0,
 };
@@ -301,6 +303,7 @@ describe("the words", () => {
         ...flash,
         reasoning: false,
         described: false,
+        images: null,
         reasoningKnown: false,
       })[0],
     ).toEqual({ value: null, label: "Default" });
@@ -357,6 +360,7 @@ describe("the words", () => {
           ...flash,
           reasoning: false,
           described: false,
+          images: null,
           reasoningKnown: false,
         },
         "on",
@@ -420,6 +424,7 @@ describe("a model its catalog does not describe", () => {
     thinkingRequired: false,
     reasoningKnown: false,
     described: false,
+    images: null,
   };
 
   test.serial(
