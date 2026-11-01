@@ -7,7 +7,6 @@
 import { describe, expect, test } from "bun:test";
 import { CANNOT_READ_IMAGES } from "../../../src/server/images/index.ts";
 import { MAX_STAGED_IMAGES } from "../../../src/server/images/limits.ts";
-import { TOO_MANY_STAGED } from "../../../src/server/images/stage.ts";
 import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { CHANNEL_NO_IMAGES } from "../../../src/server/runner/channel.ts";
 import type {
@@ -16,7 +15,6 @@ import type {
   QueuedRowResponse,
 } from "../../../src/shared/api/sessions.ts";
 import { FLASH, sessionSettled } from "../../helpers/chat.ts";
-import { png } from "../../helpers/images.ts";
 import { imageApp, userTexts } from "./helpers.ts";
 
 describe("a queued message's images", () => {
@@ -72,41 +70,7 @@ describe("a queued message's images", () => {
     await s.app.shutdown();
   });
 
-  test("go back to staging under a fresh lease when it is removed", async () => {
-    const s = await imageApp();
-    const started = await s.start("first", []);
-    const a = await s.stage(s.chat.projectId);
-    const res = await s.send(started.sessionId, {
-      message: "look",
-      images: [a.id],
-    });
-    const { queued } = (await res.json()) as QueuedResponse;
-    s.app.now.value += 60_000;
-    const removed = await s.chat.member.call(
-      "DELETE",
-      `/api/sessions/${started.sessionId}/queued/${queued.id}`,
-      { body: { revision: queued.revision } },
-    );
-    expect(removed.status).toBe(200);
-    expect(s.image(a.id)).toMatchObject({
-      queued_id: null,
-      message_id: null,
-      expires_at: s.app.now.value + DAY_MS,
-    });
-    // staged again, so a later message may name it
-    const again = await s.send(started.sessionId, {
-      message: "look",
-      images: [a.id],
-    });
-    expect(again.status).toBe(202);
-    started.script.reply("hi");
-    (await s.chat.scripted.reached(2)).reply("seen");
-    await sessionSettled(s.app, started.sessionId);
-    expect(s.image(a.id)?.session_id).toBe(started.sessionId);
-    await s.app.shutdown();
-  });
-
-  test("count toward the staged cap once released, however old, and may pass it", async () => {
+  test("go with it when it is removed, freeing their place under the staged cap", async () => {
     const s = await imageApp();
     const started = await s.start("first", []);
     const held = await s.stage(s.chat.projectId);
@@ -132,19 +96,16 @@ describe("a queued message's images", () => {
       { body: { revision: row.revision } },
     );
     expect(removed.status).toBe(200);
+    expect(s.image(held.id)).toBeNull();
     expect(
       s.app.images.store.stagedCount(s.chat.memberId, s.app.now.value),
-    ).toBe(MAX_STAGED_IMAGES + 1);
-    const refused = await s.chat.member.call(
-      "POST",
-      `/api/projects/${s.chat.projectId}/images`,
-      {
-        bytes: png(2, 2, () => [0, 0, 0, 255]),
-        headers: { "content-type": "application/octet-stream" },
-      },
-    );
-    expect(refused.status).toBe(400);
-    expect(await refused.json()).toEqual({ error: TOO_MANY_STAGED });
+    ).toBe(MAX_STAGED_IMAGES);
+    // a later message cannot name it
+    const again = await s.send(started.sessionId, {
+      message: "look",
+      images: [held.id],
+    });
+    expect(again.status).toBe(400);
     started.script.reply("hi");
     await sessionSettled(s.app, started.sessionId);
     await s.app.shutdown();

@@ -18,7 +18,8 @@ import type { ImageItem, ImagePorts } from "./Images.model.ts";
 export type { ImageItem, ImagePorts } from "./Images.model.ts";
 
 const BUSY = new Set<ImageItem["phase"]>(["waiting", "sending", "checking"]);
-// the uploads' admission, shared with files: the next try waits
+// the uploads share one line in the tab (data/upload-line.ts); a 409
+// is an upload from elsewhere, another tab's, and the next try waits
 const ADMISSION_TRIES = 20;
 const ADMISSION_WAIT_MS = 500;
 
@@ -126,19 +127,20 @@ export class ImageState {
     );
   }
 
-  // a send found one gone: each staged image is asked about again, and
-  // the gone ones drop
-  recheck(): void {
+  // the claim found one gone: sent by an answer that never came back,
+  // from another tab, or past its lease. Its bytes route may still
+  // answer, so none is asked about: all go, the ones still staged
+  // deleted, and the failure's words say to add them again
+  gone(): void {
     if (!this.alive()) return;
-    const staged = this.shown.filter(
-      (item) => item.phase === "staged" && item.id !== null,
-    );
+    const projectId = this.projectId.value;
+    const dropped = this.shown.filter((item) => item.id !== null);
     this.put(
-      this.items.value.map((item) =>
-        staged.includes(item) ? { ...item, phase: "checking" as const } : item,
+      this.items.value.filter(
+        (item) => item.projectId !== projectId || item.id === null,
       ),
     );
-    for (const item of staged) void this.check(item);
+    for (const item of dropped) void this.ports.remove(projectId!, item.id!);
   }
 
   dispose(): void {

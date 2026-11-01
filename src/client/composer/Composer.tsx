@@ -67,7 +67,7 @@ import {
 import { Files, useFiles } from "./Files.tsx";
 import type { Editing } from "./handoff.ts";
 import { routeFiles } from "./Images.model.ts";
-import { StagedImages, useImages } from "./Images.tsx";
+import { StagedImages, useImages, useUnread } from "./Images.tsx";
 import { browserLocate, type Locate, locate } from "./location.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import { ContextReadout } from "./Readout.tsx";
@@ -75,8 +75,10 @@ import { Summons } from "./Summons.tsx";
 import { bareSummon, nextPost, summonFill, summonMatches } from "./summons.ts";
 import { useSwitches } from "./switches.ts";
 import "./composer.css";
-import { says } from "../lib/format.ts";
+import { IMAGE_GONE } from "../../shared/images.ts";
+import { reason, says, sentence } from "../lib/format.ts";
 import { touch } from "../lib/touch.ts";
+import { outgoing } from "./outgoing.ts";
 
 const MAX_HEIGHT = 160;
 
@@ -161,10 +163,10 @@ export function Composer({
   const over = useSignal(0);
   const files = useFiles(key, filesProjectId);
   const images = useImages(key, filesProjectId);
+  const failure = useSignal<string | null>(null);
   const placed =
     files.projectId.value === filesProjectId &&
     images.projectId.value === filesProjectId;
-  const failure = useSignal<string | null>(null);
   // /location waits on the browser before the send is out
   const locating = useSignal(false);
   // what the box is now, for a read that ends after a move or an unmount
@@ -187,6 +189,8 @@ export function Composer({
   const agent = channel ? "" : fixed ? agentId : startingAgent(list);
   live.current.key = key;
   live.current.agent = agent;
+  // the agent reads no images: a hint, until the claim's refusal says it
+  const unread = useUnread(failure, list, agent);
 
   const grow = () => {
     const el = input.current;
@@ -222,7 +226,7 @@ export function Composer({
   // asImages: the Add images picker, whose every file goes as an image
   const attach = (picked: File[], asImages = false) => {
     const routed = routeFiles(picked, { channel: !!channel, images: asImages });
-    failure.value = routed.refusal;
+    failure.value = routed.refusal && sentence(routed.refusal);
     if (routed.uploads.length > 0) void files.add(routed.uploads, readable);
     images.add(routed.images);
   };
@@ -255,6 +259,7 @@ export function Composer({
     writeDraftText(key, fill);
     input.current?.focus();
   };
+  const draft = () => ({ text: text.value, files, images, ready, placed });
   const nameOnly = () =>
     channel !== undefined &&
     bareSummon(text.value, agents, files.ids.length + images.ids.length);
@@ -264,14 +269,13 @@ export function Composer({
     if (edit !== null)
       return saveEdit(edit, content, onEdit, { ...box, saving });
     // the signal itself, since a second Enter may beat the render
-    if (content === "" && images.ids.length === 0) return;
-    if (agent === null || !ready || locating.value || nameOnly()) return;
+    if (agent === null || locating.value || nameOnly()) return;
     const to = dispatchOf(content);
-    if (to.files && (!placed || files.busy || images.busy)) return;
+    const out = outgoing({ ...draft(), carries: to.files });
+    if (out === null) return;
     failure.value = null;
     const sent = text.value;
-    const uploads = to.files ? files.ids : [];
-    const shots = to.files ? images.ids : [];
+    const { uploads, images: shots } = out;
     try {
       if (to.kind === "command") {
         await runCommand(to.named, block(to.named.command), {
@@ -310,7 +314,7 @@ export function Composer({
       failure.value = says(err);
       // a file the send found gone moves to the log with the next list
       if (uploads.length > 0) void loadUploads(filesProjectId);
-      if (shots.length > 0) images.recheck();
+      if (shots.length > 0 && reason(err) === IMAGE_GONE) images.gone();
     }
   };
   const context = channel ? meterReadout(channel.meter) : readout(usage);
@@ -417,7 +421,8 @@ export function Composer({
       />
       <StagedImages
         items={images.shown}
-        unread={!channel && list.find((a) => a.id === agent)?.images === false}
+        unread={!channel && unread}
+        locked={busy}
         onRemove={(item) => images.remove(item)}
       />
       {refusal && <p class="composer-failure error">{refusal}</p>}
@@ -457,13 +462,11 @@ export function Composer({
           onStop={running ? onStop : undefined}
           failure={failure}
           off={
-            (text.value.trim() === "" &&
-              (edit !== null || images.ids.length === 0)) ||
             dictation.busy() ||
             nameOnly() ||
             (edit !== null
-              ? saving.value
-              : !ready || !placed || files.busy || images.busy)
+              ? text.value.trim() === "" || saving.value
+              : outgoing({ ...draft(), carries: true }) === null)
           }
           onSend={() => void submit()}
         />

@@ -7,15 +7,18 @@
 // leaves them staged.
 
 import type { StagedImage } from "../../shared/api/images.ts";
-import type { MessageImage } from "../../shared/images.ts";
+import {
+  CANNOT_READ_IMAGES,
+  IMAGE_GONE,
+  type MessageImage,
+} from "../../shared/images.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { ImageCaps } from "../limits/index.ts";
 import { FREE_BATCH, MAX_STAGED_IMAGES } from "./limits.ts";
 import { type ImageStore, staged, type Taken } from "./store.ts";
 
 // at send, enqueue and a queued message's edit alike
-export const CANNOT_READ_IMAGES = "this agent cannot read images";
-export const IMAGE_GONE = "an image is gone, add it again";
+export { CANNOT_READ_IMAGES, IMAGE_GONE };
 export const IMAGE_REPEATED = "each image can be added to one message";
 export const tooManyImages = (limit: number) =>
   `a message may carry at most ${limit} images`;

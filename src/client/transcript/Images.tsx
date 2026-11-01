@@ -19,7 +19,9 @@ export function MessageImages({
   projectId: string;
   images: readonly MessageImage[];
 }) {
-  const open = useSignal<MessageImage | null>(null);
+  const open = useSignal<{ image: MessageImage; from: HTMLElement } | null>(
+    null,
+  );
   if (images.length === 0) return null;
   const shown = open.value;
   return (
@@ -39,8 +41,8 @@ export function MessageImages({
             type="button"
             class="images-open"
             aria-label={`Open ${image.name}`}
-            onClick={() => {
-              open.value = image;
+            onClick={(ev) => {
+              open.value = { image, from: ev.currentTarget };
             }}
           >
             <img
@@ -49,6 +51,12 @@ export function MessageImages({
               alt={image.name}
               width={size.width}
               height={size.height}
+              // its size before the bytes, so a lazy load moves nothing:
+              // a fixed ratio, never the bytes' own (aspect-ratio auto)
+              style={{
+                width: `${size.width}px`,
+                aspectRatio: `${size.width} / ${size.height}`,
+              }}
               loading="lazy"
               decoding="async"
             />
@@ -57,8 +65,9 @@ export function MessageImages({
       })}
       {shown !== null && (
         <Viewer
-          src={imageSrc(projectId, shown.id)}
-          alt={shown.name}
+          src={imageSrc(projectId, shown.image.id)}
+          alt={shown.image.name}
+          from={shown.from}
           onClose={() => {
             open.value = null;
           }}

@@ -94,29 +94,36 @@ The server's rules for an image are in `docs/images.md`.
   HEIC) sends every file it gives as an image, so the server says why
   one is not. Images need no `bash`, so Add images is never off.
 - **A channel refuses images before an upload,** with the server's
-  words "a channel post cannot carry images" in the failure slot; its
-  files still go.
-- **`Images.state.ts` stages them one at a time** beside the files,
-  which share the server's one upload per user: a 409 "an upload is
-  running" waits and tries again. Each shows its progress, then a
-  square thumbnail of the staged image's route with an X that deletes
-  it. A refusal is a log line with the server's words and status; it
-  blocks nothing.
+  words as a sentence ("A channel post cannot carry images.") in the
+  failure slot; its files still go.
+- **Files and images share one upload line** (`data/upload-line.ts`),
+  since the server runs one upload per user: in a mixed pick each waits
+  for the one before it to settle. A 409 "an upload is running" is then
+  another tab's, and waits and tries again. One let go while it waits
+  leaves the line and never starts.
+- **`Images.state.ts` stages them one at a time.** Each shows its
+  progress, then a square thumbnail of the staged image's route with
+  an X that deletes it, off while a send is out. A refusal is a log
+  line with the server's words and status; it blocks nothing.
 - **An image let go while its bytes still go is aborted;** one whose
   bytes all went is let finish and its answer deleted, since the
   server may stage it anyway. An unmount does the same.
 - **The server lists no staged images,** so a draft's ids are each
   asked about once (`checkImage()`, the bytes route's status alone)
   while Send waits. A 404 or 410 drops it without a word; any other
-  answer keeps it, and the claim's refusal tells. A refused send asks
-  about each again.
+  answer keeps it. A sent image's bytes still answer, so a send refused
+  with "an image is gone, add it again" drops every image of the
+  draft, deleting the ones still staged, and its words ask for them
+  again.
 - **A message of images alone is sent,** its text empty; Send waits
-  while an image uploads or is checked. A fork's `draftImages` land in
-  the new chat's draft.
+  while an image uploads or is checked (`outgoing()`, which Enter and
+  Send share). A fork's `draftImages` land in the new chat's draft.
 - **"This agent cannot read images" is a hint, never a block.** It
   shows under the images while the agent picked has `images` false;
   the server refuses at the claim and its words show in the failure
-  slot, since the agent may change before the send.
+  slot, since the agent may change before the send. While they show,
+  the hint hides, and another agent picked clears them (`useUnread()`),
+  never another failure.
 
 ## Dictation
 

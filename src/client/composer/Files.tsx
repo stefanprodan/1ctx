@@ -10,6 +10,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo } from "preact/hooks";
 import { me } from "../data/me.ts";
+import { inUploadLine } from "../data/upload-line.ts";
 import {
   askedOf,
   deleteUpload,
@@ -42,7 +43,11 @@ export function useFiles(key: string, projectId: string): AttachState {
     () =>
       new AttachState(
         {
-          stage: stageUpload,
+          stage: (projectId, file, attempt, options) =>
+            inUploadLine(
+              () => stageUpload(projectId, file, attempt, options),
+              options.signal,
+            ),
           remove: deleteUpload,
           forget: (_projectId, attempt) => forgetUpload(attempt),
           reload: loadUploads,

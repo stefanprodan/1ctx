@@ -24,7 +24,6 @@ import {
   parseRemoveQueued,
 } from "./parse.ts";
 import { chatQueue, onWire, type QueuedRow, queueChanged } from "./queued.ts";
-import type { ImagesPort } from "./routes.ts";
 import type { SessionRow } from "./rows.ts";
 import type { SessionStore } from "./store.ts";
 import { type SummonAgents, summonOf } from "./summon.ts";
@@ -39,7 +38,6 @@ export type QueuedRoutesDeps = {
   store: SessionStore;
   visibleProjectIds(userId: string): string[] | null;
   visible(principal: Principal, id: string): SessionRow;
-  images: Pick<ImagesPort, "release">;
 };
 
 // in a transaction: the row when it is in the chat and the caller's
@@ -164,8 +162,8 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
         );
         const body: QueueState = transact(deps.db, () => {
           const row = own(store, principal, session.id, id);
-          // its images go back to staging, as its uploads stay staged
-          if (row.images.length > 0) deps.images.release(row.id);
+          // its held images go with it (queued_id cascades): staged
+          // again they would sit unseen against the staged cap
           if (!store.queue.remove(row.id, revision)) {
             throw new Conflict(CHANGED);
           }

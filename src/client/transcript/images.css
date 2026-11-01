@@ -25,6 +25,8 @@
     outline-offset: 2px;
   }
 
+  /* the width and ratio are inline (Images.tsx), so a narrow column
+     shrinks it at its shape */
   .images-pic {
     display: block;
     max-width: 100%;

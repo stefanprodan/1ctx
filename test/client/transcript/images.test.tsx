@@ -147,6 +147,18 @@ describe("staged images in the draft", () => {
     expect(html).toContain('aria-label="Remove shot.png"');
   });
 
+  test("a thumbnail's X is off while a send is out", () => {
+    const html = render(
+      <StagedImages
+        items={[item({})]}
+        unread={false}
+        locked
+        onRemove={() => {}}
+      />,
+    );
+    expect(html).toMatch(/aria-label="Remove shot.png"[^>]*disabled/);
+  });
+
   test("a refusal shows its words and status, and an agent without images a hint", () => {
     const html = render(
       <StagedImages
@@ -176,6 +188,7 @@ describe("the viewer", () => {
       <Viewer
         src="/api/projects/p1/images/im1"
         alt="a.png"
+        from={null}
         onClose={() => {}}
       />,
     );

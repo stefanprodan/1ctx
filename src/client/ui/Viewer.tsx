@@ -8,28 +8,27 @@
 
 import { useEffect, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
-import { ViewerFocus } from "./Viewer.model.ts";
+import { type Focusable, ViewerFocus } from "./Viewer.model.ts";
 import "./viewer.css";
 
 export function Viewer({
   src,
   alt,
+  from,
   onClose,
 }: {
   src: string;
   alt: string;
+  // what opened it, given back the focus on close: Safari never focuses
+  // a button on a click, so the page's focus cannot tell
+  from: Focusable | null;
   onClose: () => void;
 }) {
   const button = useRef<HTMLButtonElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
-    const focus = new ViewerFocus(
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null,
-      () => close.current(),
-    );
+    const focus = new ViewerFocus(from, () => close.current());
     button.current?.focus();
     const keys = (ev: KeyboardEvent) => {
       if (focus.key(ev.key, button.current)) ev.preventDefault();

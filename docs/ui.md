@@ -164,7 +164,7 @@ open row's body or a meta. The shared shapes are below.
 - **An image opened full size is `ui/Viewer.tsx`:** a modal over a
   dimmed `--backdrop`, closed by Escape, a click on the ground or its
   close button, which takes the focus and keeps Tab; the focus returns
-  to what opened it (`ViewerFocus`).
+  to the opener the caller passes (`ViewerFocus`).
 - **Shared shapes are `base.css` primitives:** `.menu`, `.seg`,
   `.choice`, `.avatar`, `.switch`, `.tag`, `.textbox`, `.clamp`,
   `.cut`, `.meter`, `.code-tag`, `.notice-failed`, `.hint`, the

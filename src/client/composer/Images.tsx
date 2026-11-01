@@ -7,7 +7,10 @@
 // stops Send: the agent may change before it goes, and the server
 // refuses at the claim.
 
+import type { Signal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo } from "preact/hooks";
+import type { AgentSummary } from "../../shared/contracts/agent.ts";
+import { CANNOT_READ_IMAGES } from "../../shared/images.ts";
 import {
   checkImage,
   deleteImage,
@@ -15,6 +18,8 @@ import {
   stageImage,
 } from "../data/images.ts";
 import { me } from "../data/me.ts";
+import { inUploadLine } from "../data/upload-line.ts";
+import { sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { RowsLog, RowsLogLine } from "../ui/Rows.tsx";
 import { readDraft, writeDraftImages } from "./draft.ts";
@@ -30,7 +35,11 @@ export function useImages(key: string, projectId: string): ImageState {
     () =>
       new ImageState(
         {
-          stage: stageImage,
+          stage: (projectId, file, options) =>
+            inUploadLine(
+              () => stageImage(projectId, file, options),
+              options.signal,
+            ),
           remove: deleteImage,
           check: checkImage,
           wait: (ms) => new Promise((done) => setTimeout(done, ms)),
@@ -47,7 +56,34 @@ export function useImages(key: string, projectId: string): ImageState {
   return state;
 }
 
-function Thumb({ item, onRemove }: { item: ImageItem; onRemove: () => void }) {
+const REFUSED = sentence(CANNOT_READ_IMAGES);
+
+// whether the picked agent reads no images, for the hint; false while
+// the failure slot shows the claim's refusal of them, which goes when
+// the agent changes, since it was that agent's
+export function useUnread(
+  failure: Signal<string | null>,
+  agents: readonly AgentSummary[],
+  agent: string | null,
+): boolean {
+  useEffect(() => {
+    if (failure.value === REFUSED) failure.value = null;
+  }, [agent, failure]);
+  return (
+    failure.value !== REFUSED &&
+    agents.find((a) => a.id === agent)?.images === false
+  );
+}
+
+function Thumb({
+  item,
+  locked,
+  onRemove,
+}: {
+  item: ImageItem;
+  locked: boolean;
+  onRemove: () => void;
+}) {
   return (
     <div class="staged-item" title={item.name}>
       {item.phase === "staged" && item.id !== null ? (
@@ -71,6 +107,7 @@ function Thumb({ item, onRemove }: { item: ImageItem; onRemove: () => void }) {
         class="btn-icon staged-x"
         aria-label={`Remove ${item.name}`}
         title={`Remove ${item.name}`}
+        disabled={locked}
         onClick={onRemove}
       >
         <Icon name="close" size={10} />
@@ -82,11 +119,14 @@ function Thumb({ item, onRemove }: { item: ImageItem; onRemove: () => void }) {
 export function StagedImages({
   items,
   unread,
+  locked = false,
   onRemove,
 }: {
   items: readonly ImageItem[];
   // the agent picked reads no images
   unread: boolean;
+  // a send is on its way: what it names stays
+  locked?: boolean;
   onRemove: (key: number) => void;
 }) {
   if (items.length === 0) return null;
@@ -100,6 +140,7 @@ export function StagedImages({
             <Thumb
               key={item.key}
               item={item}
+              locked={locked}
               onRemove={() => onRemove(item.key)}
             />
           ))}

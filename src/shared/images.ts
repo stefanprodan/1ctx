@@ -6,6 +6,11 @@
 // frees it, so a replayed history and its tail read the same bytes
 // between frees.
 
+// the claim's refusals the composer acts on, and the channel's
+export const CANNOT_READ_IMAGES = "this agent cannot read images";
+export const IMAGE_GONE = "an image is gone, add it again";
+export const CHANNEL_NO_IMAGES = "a channel post cannot carry images";
+
 // the most images one message may name, imagesPerMessage's ceiling; the
 // limit itself is checked at the claim
 export const MAX_IMAGES_PER_MESSAGE = 12;

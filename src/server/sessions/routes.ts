@@ -60,8 +60,6 @@ export type UploadsPort = {
 };
 
 export type ImagesPort = {
-  // a queued message's images staged again, before its row goes
-  release(queuedId: string): void;
   // in the fork's transaction: the copied user messages' images, then
   // the budget; a fork at a user turn stages its images for the draft
   fork(fields: {

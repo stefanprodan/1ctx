@@ -212,12 +212,11 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
 - **An edit keeps them** and checks the agent again, the one its new
   text takes the turn with, a summoned one included: "this agent cannot
   read images".
-- **A removal stages them again** under a fresh lease, as a removed
-  message's uploads stay staged. It releases even past
-  `MAX_STAGED_IMAGES`, since they are the user's own and their message
-  is gone; they count, so the next upload waits for room. A not-sent row
-  keeps them until it is discarded, swept or dropped, and they go with
-  it.
+- **A removal deletes them with the row** (`queued_id` cascades),
+  unlike its uploads, which stay staged: the message is discarded, and
+  staged copies would sit unseen against `MAX_STAGED_IMAGES`. A
+  not-sent row keeps them until it is discarded, swept or dropped, and
+  they go with it.
 
 ## Fork and regenerate
 
@@ -251,11 +250,12 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
 
 - **A user message's images sit under its card,** each at its own
   shape fitted in 320 px on its long side (`fitBox()`), less on a
-  phone, with `width` and `height` set so nothing jumps, `loading`
-  lazy and its name as the alt. A message of images alone has no card.
+  phone, with `width` and `height` set and the width and ratio inline,
+  so a lazy load moves nothing, and its name as the alt. A message of images alone has no card.
   A freed one is the line "Image removed to free space" in its place.
 - **A queued message counts its images,** as it counts its files: the
   wire carries the count alone.
 - **A click opens the image in `ui/Viewer.tsx`,** the route's bytes
-  fitted to the window. No Download button: the browser saves it as
+  fitted to the window. The opener is passed in, never read from the
+  page's focus: Safari does not focus a button on a click. No Download button: the browser saves it as
   any image.

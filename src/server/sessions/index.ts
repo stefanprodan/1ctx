@@ -431,7 +431,6 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         store,
         visibleProjectIds: (userId) => deps.access.visibleProjectIds(userId),
         visible,
-        images: deps.images,
       }),
     ],
   };

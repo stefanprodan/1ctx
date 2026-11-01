@@ -4,7 +4,6 @@
 import { describe, expect, test } from "bun:test";
 import type { DraftImage } from "../../../src/client/composer/draft.ts";
 import {
-  CHANNEL_IMAGES,
   IMAGE_ACCEPT,
   routeFiles,
 } from "../../../src/client/composer/Images.model.ts";
@@ -13,6 +12,7 @@ import {
   ImageState,
 } from "../../../src/client/composer/Images.state.ts";
 import type { StagedImage } from "../../../src/shared/api/images.ts";
+import { CHANNEL_NO_IMAGES } from "../../../src/shared/images.ts";
 import { UPLOAD_RUNNING } from "../../../src/shared/uploads.ts";
 
 function deferred<T>() {
@@ -156,8 +156,7 @@ describe("where a file goes", () => {
     );
     expect(routed.images).toHaveLength(0);
     expect(routed.uploads.map((f) => f.name)).toEqual(["notes.md"]);
-    expect(routed.refusal).toBe(CHANNEL_IMAGES);
-    expect(CHANNEL_IMAGES).toBe("a channel post cannot carry images");
+    expect(routed.refusal).toBe(CHANNEL_NO_IMAGES);
   });
 });
 
@@ -325,16 +324,20 @@ describe("a draft's images", () => {
     expect(h.saves.at(-1)?.map((s) => s.id)).toEqual(["im1", "im3"]);
   });
 
-  test("a failed send asks about each again", async () => {
-    const h = harness([saved[0]!]);
+  test("a send refused for a gone image drops them all, the staged ones deleted", async () => {
+    const h = harness(saved.slice(0, 2));
     h.state.show("p1");
+    // a sent image's bytes still answer, so the check keeps it
     h.checks[0]![1].resolve(true);
+    h.checks[1]![1].resolve(true);
     await settle();
-    h.state.recheck();
-    expect(h.state.busy).toBe(true);
-    h.checks[1]![1].resolve(false);
+    h.state.add([file("new.png")]);
     await settle();
-    expect(h.state.shown).toHaveLength(0);
+    h.state.gone();
+    expect(h.state.ids).toEqual([]);
+    expect(phases(h.state)).toEqual([["new.png", "sending"]]);
+    expect(h.removed).toEqual(["im1", "im2"]);
+    expect(h.saves.at(-1)).toEqual([]);
   });
 
   test("a check that lands after a sign-out changes nothing", async () => {

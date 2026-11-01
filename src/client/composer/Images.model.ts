@@ -6,6 +6,7 @@
 // and the draft through.
 
 import type { StagedImage } from "../../shared/api/images.ts";
+import { CHANNEL_NO_IMAGES } from "../../shared/images.ts";
 import type { DraftImage } from "./draft.ts";
 
 // what the server's sniff takes, by the type the browser gives
@@ -18,9 +19,6 @@ export const IMAGE_TYPES: readonly string[] = [
 
 // the Add images picker's accept: iOS then hands a JPEG for a HEIC photo
 export const IMAGE_ACCEPT = IMAGE_TYPES.join(",");
-
-// the server's words for a post with images
-export const CHANNEL_IMAGES = "a channel post cannot carry images";
 
 export const NO_IMAGES = "This agent cannot read images";
 
@@ -37,7 +35,7 @@ export function routeFiles(
   const picked = files.filter((file) => images || isImage(file));
   const uploads = files.filter((file) => !picked.includes(file));
   if (channel && picked.length > 0) {
-    return { uploads, images: [], refusal: CHANNEL_IMAGES };
+    return { uploads, images: [], refusal: CHANNEL_NO_IMAGES };
   }
   return { uploads, images: picked, refusal: null };
 }
