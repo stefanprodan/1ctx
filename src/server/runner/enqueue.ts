@@ -8,6 +8,7 @@ import type {
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
 import { type Db, transact } from "../db/index.ts";
+import { CANNOT_READ_IMAGES } from "../images/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest, Conflict, TooManyRequests } from "../lib/errors.ts";
 import type { Log } from "../lib/log.ts";
@@ -22,7 +23,6 @@ import {
   summonOf,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
-import { CANNOT_READ_IMAGES } from "./images.ts";
 
 export type EnqueueDeps = {
   db: Db;

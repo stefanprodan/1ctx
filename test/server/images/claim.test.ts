@@ -6,14 +6,15 @@
 
 import { describe, expect, spyOn, test } from "bun:test";
 import { enforceBudget } from "../../../src/server/images/claim.ts";
-import { IMAGE_GONE, tooManyImages } from "../../../src/server/images/index.ts";
+import {
+  CANNOT_READ_IMAGES,
+  IMAGE_GONE,
+  tooManyImages,
+} from "../../../src/server/images/index.ts";
 import { FREE_BATCH } from "../../../src/server/images/limits.ts";
 import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import {
-  CANNOT_READ_IMAGES,
-  IMAGE_TITLE,
-} from "../../../src/server/runner/images.ts";
+import { IMAGE_TITLE } from "../../../src/server/runner/images.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 import {
   FLASH,

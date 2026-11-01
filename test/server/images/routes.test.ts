@@ -3,7 +3,10 @@
 
 import { expect, test } from "bun:test";
 import { FREED } from "../../../src/server/images/index.ts";
-import { MAX_STAGED_IMAGES } from "../../../src/server/images/limits.ts";
+import {
+  MAX_STAGED_IMAGES,
+  SWEEP_BATCH,
+} from "../../../src/server/images/limits.ts";
 import { HEIC_REFUSED, SVG_REFUSED } from "../../../src/server/images/sniff.ts";
 import {
   TOO_MANY_STAGED,
@@ -326,6 +329,24 @@ test("a delete never frees a place in the hourly rate", async () => {
   s.app.now.value += HOUR_MS;
   expect(s.app.images.sweep(s.app.now.value)).toBe(10);
   expect((await s.post(s.chat.member, s.team.id, tiny())).status).toBe(201);
+});
+
+test("one sweep pass clears a rate log larger than a batch", async () => {
+  const s = await setup();
+  const backlog = 2 * SWEEP_BATCH + 5;
+  s.app.db
+    .query(
+      `with recursive n(i) as (select 1 union all select i + 1 from n where i < ?)
+       insert into image_uploads (user_id, created_at) select ?, ? from n`,
+    )
+    .run(backlog, s.chat.memberId, s.app.now.value - 2 * HOUR_MS);
+  const count = () =>
+    s.app.db
+      .query<{ n: number }, []>("select count(*) as n from image_uploads")
+      .get()!.n;
+  expect(count()).toBe(backlog);
+  expect(s.app.images.sweep(s.app.now.value)).toBe(backlog);
+  expect(count()).toBe(0);
 });
 
 test("a user may hold a bounded number of staged images", async () => {

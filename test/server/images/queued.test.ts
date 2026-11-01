@@ -5,14 +5,18 @@
 // channel takes none.
 
 import { describe, expect, test } from "bun:test";
+import { CANNOT_READ_IMAGES } from "../../../src/server/images/index.ts";
+import { MAX_STAGED_IMAGES } from "../../../src/server/images/limits.ts";
+import { TOO_MANY_STAGED } from "../../../src/server/images/stage.ts";
 import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { CHANNEL_NO_IMAGES } from "../../../src/server/runner/channel.ts";
-import { CANNOT_READ_IMAGES } from "../../../src/server/runner/images.ts";
 import type {
   NotSentResponse,
   QueuedResponse,
+  QueuedRowResponse,
 } from "../../../src/shared/api/sessions.ts";
-import { sessionSettled } from "../../helpers/chat.ts";
+import { FLASH, sessionSettled } from "../../helpers/chat.ts";
+import { png } from "../../helpers/images.ts";
 import { imageApp, userTexts } from "./helpers.ts";
 
 describe("a queued message's images", () => {
@@ -102,6 +106,50 @@ describe("a queued message's images", () => {
     await s.app.shutdown();
   });
 
+  test("count toward the staged cap once released, however old, and may pass it", async () => {
+    const s = await imageApp();
+    const started = await s.start("first", []);
+    const held = await s.stage(s.chat.projectId);
+    const res = await s.send(started.sessionId, {
+      message: "look",
+      images: [held.id],
+    });
+    const { queued } = (await res.json()) as QueuedResponse;
+    // the row outlives a lease, kept as not sent with its images
+    s.app.now.value += 2 * DAY_MS;
+    for (let i = 0; i < MAX_STAGED_IMAGES; i++) {
+      await s.stage(s.chat.projectId);
+    }
+    const shown = await s.chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/queued/${queued.id}`,
+    );
+    const row = ((await shown.json()) as QueuedRowResponse).queued;
+    expect(row).toMatchObject({ state: "not-sent", images: 1 });
+    const removed = await s.chat.member.call(
+      "DELETE",
+      `/api/sessions/${started.sessionId}/queued/${queued.id}`,
+      { body: { revision: row.revision } },
+    );
+    expect(removed.status).toBe(200);
+    expect(
+      s.app.images.store.stagedCount(s.chat.memberId, s.app.now.value),
+    ).toBe(MAX_STAGED_IMAGES + 1);
+    const refused = await s.chat.member.call(
+      "POST",
+      `/api/projects/${s.chat.projectId}/images`,
+      {
+        bytes: png(2, 2, () => [0, 0, 0, 255]),
+        headers: { "content-type": "application/octet-stream" },
+      },
+    );
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({ error: TOO_MANY_STAGED });
+    started.script.reply("hi");
+    await sessionSettled(s.app, started.sessionId);
+    await s.app.shutdown();
+  });
+
   test("are refused when it is queued for an agent that cannot read them", async () => {
     const s = await imageApp();
     const started = await s.start("first", []);
@@ -116,6 +164,42 @@ describe("a queued message's images", () => {
     expect(s.image(a.id)).toMatchObject({ queued_id: null });
     started.script.reply("hi");
     await sessionSettled(s.app, started.sessionId);
+    await s.app.shutdown();
+  });
+
+  test("are refused when an edit summons an agent that cannot read them", async () => {
+    const s = await imageApp();
+    const blind = await s.chat.makeAgent({ name: "blind", model: FLASH });
+    s.reads(blind, false);
+    const started = await s.start("first", []);
+    const a = await s.stage(s.chat.projectId);
+    const res = await s.send(started.sessionId, {
+      message: "look",
+      images: [a.id],
+    });
+    expect(res.status).toBe(202);
+    const { queued } = (await res.json()) as QueuedResponse;
+    const edited = await s.chat.member.call(
+      "PATCH",
+      `/api/sessions/${started.sessionId}/queued/${queued.id}`,
+      { body: { message: "@blind look", revision: queued.revision } },
+    );
+    expect(edited.status).toBe(400);
+    expect(await edited.json()).toEqual({ error: CANNOT_READ_IMAGES });
+    // the row and its images are as they were
+    const row = await s.chat.member.call(
+      "GET",
+      `/api/sessions/${started.sessionId}/queued/${queued.id}`,
+    );
+    expect(await row.json()).toMatchObject({
+      queued: { text: "look", revision: queued.revision },
+    });
+    expect(s.image(a.id)?.queued_id).toBe(queued.id);
+    const next = s.chat.scripted.reached(2);
+    started.script.reply("hi");
+    (await next).reply("seen");
+    await sessionSettled(s.app, started.sessionId);
+    expect(s.image(a.id)?.session_id).toBe(started.sessionId);
     await s.app.shutdown();
   });
 });

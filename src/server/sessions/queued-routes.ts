@@ -9,10 +9,11 @@ import type {
   QueueState,
 } from "../../shared/api/sessions.ts";
 import { type Db, transact } from "../db/index.ts";
+import { CANNOT_READ_IMAGES } from "../images/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
-import { Conflict, Forbidden } from "../lib/errors.ts";
+import { BadRequest, Conflict, Forbidden } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import {
   MAX_SESSION_BODY,
@@ -119,8 +120,13 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
             throw new Conflict("a channel has no editable messages");
           }
           const chatAgent = deps.agents.byId(session.agentId);
-          if (chatAgent !== null) {
-            summonOf(deps.agents, chatAgent.name, fields.message);
+          const summoned =
+            chatAgent === null
+              ? null
+              : summonOf(deps.agents, chatAgent.name, fields.message);
+          // the enqueue's check, against the agent the new text takes
+          if (row.images.length > 0 && !(summoned ?? chatAgent)?.images) {
+            throw new BadRequest(CANNOT_READ_IMAGES);
           }
           const next = store.queue.edit(
             row.id,

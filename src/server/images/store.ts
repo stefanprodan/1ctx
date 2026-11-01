@@ -177,16 +177,16 @@ export class ImageStore {
       .map((r) => r.createdAt);
   }
 
-  // live staged images of the user in every project; a lease outlives
-  // no day, so only the last day's rows are read
+  // live staged images of the user in every project, by their lease:
+  // only a staged row has one, and a released one's is fresh however old
+  // the row
   stagedCount(userId: string, now: number): number {
     return this.db
-      .query<{ n: number }, [string, number, number]>(
-        `select count(*) as n from images
-         where user_id = ? and created_at > ? and message_id is null
-           and queued_id is null and expires_at > ?`,
+      .query<{ n: number }, [string, number]>(
+        `select count(*) as n from images indexed by images_user
+         where user_id = ? and message_id is null and expires_at > ?`,
       )
-      .get(userId, now - IMAGE_LEASE_MS, now)!.n;
+      .get(userId, now)!.n;
   }
 
   // the expired staged rows, at most limit a pass; a sent or queued
@@ -203,7 +203,7 @@ export class ImageStore {
       .all(now, limit).length;
   }
 
-  // the rate's log past the hour, at most limit rows a pass
+  // the rate's log past the hour, at most limit rows a statement
   sweepLog(before: number, limit: number): number {
     return this.db
       .query(

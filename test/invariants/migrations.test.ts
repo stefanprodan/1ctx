@@ -2105,9 +2105,11 @@ describe("the schema", () => {
         ", 'sess', 'm1', x'010203'",
       );
       insert("freed", ", session_id, message_id", ", 'sess', 'm1'");
-      // staged with no bytes, sent with a lease, a message without its chat
+      // staged with no bytes, staged with no lease, sent with a lease, a
+      // message without its chat
       for (const [extra, values] of [
         [", expires_at", ", 10"],
+        [", data", ", x'01'"],
         [
           ", session_id, message_id, expires_at, data",
           ", 'sess', 'm1', 10, x'01'",
@@ -2182,6 +2184,13 @@ describe("the schema", () => {
       expect(
         db.query("select images from queued_messages where id = 'q'").get(),
       ).toEqual({ images: '["held"]' });
+      // a held row has no lease, and drops its queued id only for one
+      expect(() =>
+        db.exec("update images set expires_at = 10 where id = 'held'"),
+      ).toThrow(/CHECK constraint failed/);
+      expect(() =>
+        db.exec("update images set queued_id = null where id = 'held'"),
+      ).toThrow(/CHECK constraint failed/);
       expect(() =>
         db.exec(
           "update images set session_id = 'sess', message_id = 'm1' where id = 'held'",
@@ -2217,6 +2226,33 @@ describe("the schema", () => {
           "SEARCH images USING COVERING INDEX images_budget (project_id=?)",
         ]);
       }
+      // the staged count by lease and the monitor's sums, as the code names
+      // their indexes, read them alone
+      const plan = (sql: string) =>
+        db
+          .query<{ detail: string }, []>(`explain query plan ${sql}`)
+          .all()
+          .map((row) => row.detail);
+      expect(
+        plan(
+          "select count(*) from images indexed by images_user where user_id = 'u' and message_id is null and expires_at > 0",
+        ),
+      ).toEqual([
+        "SEARCH images USING COVERING INDEX images_user (user_id=? AND expires_at>?)",
+      ]);
+      expect(
+        plan(
+          "select session_id, sum(bytes) from images indexed by images_budget where message_id is not null and data is not null group by session_id",
+        ),
+      ).toEqual([
+        "SCAN images USING COVERING INDEX images_budget",
+        "USE TEMP B-TREE FOR GROUP BY",
+      ]);
+      expect(
+        plan(
+          "select sum(bytes) from images indexed by images_user where message_id is null",
+        ),
+      ).toEqual(["SCAN images USING COVERING INDEX images_user"]);
     } finally {
       db.close();
     }

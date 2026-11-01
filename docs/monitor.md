@@ -90,6 +90,10 @@ admin's attention, the server's load), Usage by month and Storage.
   sorter.
 - **A new table needs an entry in `STORAGE_TABLES`.** A test checks
   the map against the schema both ways. `images` is under `uploads`.
+- **A chat's sent images count with its uploads**: their bytes join
+  its upload bytes, its daily additions and its largest objects, from
+  `images_budget`, while they still have bytes. Staged and held images
+  count as staging and in the additions, from `images_user`.
 - **External task tables form the `external` area.** Retention counts
   closed task text under `externalTasks`, with `externalTaskDays`;
   unfinished task text stays in kept storage. Both include entries

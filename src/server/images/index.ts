@@ -26,6 +26,7 @@ import { stageImage, type WithUpload } from "./stage.ts";
 import { ImageStore } from "./store.ts";
 
 export {
+  CANNOT_READ_IMAGES,
   IMAGE_GONE,
   IMAGE_REPEATED,
   type ImageClaim,
@@ -49,7 +50,8 @@ export type ImagesDeps = {
   access: AccessPort;
   sessions: SessionsPort;
   // the uploads' admission and process slot, so a user runs one upload
-  // or image at a time and decodes share the commands' bound
+  // or image at a time and an image takes a slot as a command does;
+  // decodes have their own, smaller bound besides
   withUpload: WithUpload;
 };
 
@@ -74,8 +76,8 @@ export type ImagesArea = ImagesPort & {
   release(queuedId: string): void;
   fork: (fields: Parameters<typeof forkImages>[1]) => StagedImage[];
   routes: RouteDescriptor[];
-  // the expired staged rows and the rate's rows past the hour removed,
-  // at most a batch of each
+  // at most a batch of the expired staged rows, and every rate row
+  // past the hour
   sweep(now: number): number;
 };
 
@@ -145,9 +147,16 @@ export function imagesArea(deps: ImagesDeps): ImagesArea {
       store.release(queuedId, deps.clock());
     },
     fork: (fields) => forkImages(claims, fields),
-    sweep: (now) =>
-      store.sweep(now, SWEEP_BATCH) +
-      store.sweepLog(now - HOUR_MS, SWEEP_BATCH),
+    sweep(now) {
+      let removed = store.sweep(now, SWEEP_BATCH);
+      // every rate row past the hour, a batch a statement: one user at
+      // the ceiling adds as many an hour as a batch
+      for (;;) {
+        const batch = store.sweepLog(now - HOUR_MS, SWEEP_BATCH);
+        removed += batch;
+        if (batch < SWEEP_BATCH) return removed;
+      }
+    },
     routes: routes({ access: deps.access, images: port }),
   };
 }

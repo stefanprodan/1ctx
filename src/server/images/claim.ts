@@ -13,6 +13,8 @@ import type { ImageCaps } from "../limits/index.ts";
 import { FREE_BATCH, MAX_STAGED_IMAGES } from "./limits.ts";
 import { type ImageStore, staged, type Taken } from "./store.ts";
 
+// at send, enqueue and a queued message's edit alike
+export const CANNOT_READ_IMAGES = "this agent cannot read images";
 export const IMAGE_GONE = "an image is gone, add it again";
 export const IMAGE_REPEATED = "each image can be added to one message";
 export const tooManyImages = (limit: number) =>
@@ -144,8 +146,8 @@ export function forkImages(
   if (kept.size > 0) enforceBudget(deps, fields.projectId, kept);
   const draft: StagedImage[] = [];
   if (fields.draft === null) return draft;
-  // the forker's staged images stay within MAX_STAGED_IMAGES, so a fork
-  // never blocks their next upload; the rest are left out
+  // the forker's staged images stay within MAX_STAGED_IMAGES, which a
+  // fork may fill; the rest are left out
   let room =
     MAX_STAGED_IMAGES - deps.store.stagedCount(fields.draft.userId, now);
   for (const id of fields.draft.images) {

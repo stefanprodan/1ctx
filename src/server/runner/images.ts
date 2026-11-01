@@ -7,10 +7,10 @@
 // area, so a send without images runs no statement more.
 
 import type { Message } from "../../shared/contracts/session.ts";
+import { CANNOT_READ_IMAGES } from "../images/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { ImagesPort } from "./writer-port.ts";
 
-export const CANNOT_READ_IMAGES = "this agent cannot read images";
 export const IMAGES_NEED_A_MESSAGE = "images require a new chat message";
 // a new chat opened by images alone
 export const IMAGE_TITLE = "Image";

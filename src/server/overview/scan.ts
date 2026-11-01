@@ -31,7 +31,7 @@ export type PageRow = {
 };
 
 // what a session holds, stored: its rows' text, and the files kept
-// with it
+// with it; its sent images count with its uploads
 export type SessionSum = {
   id: string;
   projectId: string;
@@ -100,6 +100,10 @@ export const MESSAGE_BYTES =
 // column, walks a refused row's blobs to its -1. A group by that sorts
 // takes it from a materialized CTE, never data itself
 const KEPT_BYTES = "coalesce(length(k.data), k.bytes)";
+
+// a sent image that still has its bytes, the budget's covering index's
+// terms; one not sent (staged or held) is under images_user
+const SENT_IMAGES = "message_id is not null and data is not null";
 
 const AUTO_VACUUM = ["none", "full", "incremental"] as const;
 
@@ -199,6 +203,12 @@ function sessions(db: Db): SessionSum[] {
     db,
     "select session_id as id, bytes from session_uploads",
   );
+  const images = sums(
+    db,
+    `select session_id as id, sum(bytes) as bytes
+       from images indexed by images_budget
+       where ${SENT_IMAGES} group by session_id`,
+  );
   const scratch = sums(
     db,
     `select session_id as id, sum(bytes) as bytes
@@ -235,7 +245,7 @@ function sessions(db: Db): SessionSum[] {
         messages: byMessage.get(row.id)?.count ?? 0,
         messageBytes: byMessage.get(row.id)?.bytes ?? 0,
         openedBytes: opened.get(row.id) ?? 0,
-        uploadBytes: uploads.get(row.id) ?? 0,
+        uploadBytes: (uploads.get(row.id) ?? 0) + (images.get(row.id) ?? 0),
         scratchBytes: scratch.get(row.id) ?? 0,
         mcpBytes: mcp.get(row.id) ?? 0,
       },
@@ -335,6 +345,14 @@ const SLOT_SOURCES = [
   `select created_at / ${SLOT_MS} as q, sum(bytes) as bytes,
        count(*) as rows
      from upload_staged where created_at >= ? group by q`,
+  `select created_at / ${SLOT_MS} as q, sum(bytes) as bytes,
+       count(*) as rows
+     from images indexed by images_budget
+     where ${SENT_IMAGES} and created_at >= ? group by q`,
+  `select created_at / ${SLOT_MS} as q, sum(bytes) as bytes,
+       count(*) as rows
+     from images indexed by images_user
+     where message_id is null and created_at >= ? group by q`,
   `select used_at / ${SLOT_MS} as q, sum(bytes) as bytes,
        count(*) as rows
      from session_scratch where used_at >= ? group by q`,
@@ -402,7 +420,13 @@ function read(db: Db, input: ScanInput): ScanResult {
     knowledge: knowledge(db),
     externalTasks: externalTasks(db),
     slots: slots(db, input.since),
-    staging: total(db, "select sum(bytes) as bytes from upload_staged_files"),
+    staging:
+      total(db, "select sum(bytes) as bytes from upload_staged_files") +
+      total(
+        db,
+        `select sum(bytes) as bytes from images indexed by images_user
+         where message_id is null`,
+      ),
     digests: total(
       db,
       "select sum(octet_length(body)) as bytes from mcp_digests",

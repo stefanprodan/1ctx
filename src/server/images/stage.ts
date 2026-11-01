@@ -3,7 +3,8 @@
 //
 // An upload staged as an image: under the uploads' admission and process
 // slot, the rate and the staged count checked before the body is read
-// and again in the write, the body cut past its cap, then ingest.
+// and again in the write, the body cut past its cap, then ingest under
+// the decode bound.
 
 import type { StagedImageResponse } from "../../shared/api/images.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -11,6 +12,7 @@ import { readBytes } from "../lib/body.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { BadRequest, PayloadTooLarge, TooManyRequests } from "../lib/errors.ts";
 import type { ImageCaps } from "../limits/index.ts";
+import { decoding } from "./decode.ts";
 import { ingest } from "./ingest.ts";
 import { MAX_STAGED_IMAGES } from "./limits.ts";
 import { imageName } from "./names.ts";
@@ -85,9 +87,13 @@ export function stageImage(
         throw error;
       }
       running();
-      const image = await ingest(bytes, {
-        maxPixels: caps.imageMaxPixels,
-        longSide: caps.imageLongSide,
+      // the header read, both encodes and the transparency check
+      const image = await decoding(signal, () => {
+        running();
+        return ingest(bytes, {
+          maxPixels: caps.imageMaxPixels,
+          longSide: caps.imageLongSide,
+        });
       });
       running();
       return transact(deps.db, () => {

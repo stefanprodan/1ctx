@@ -25,8 +25,8 @@ what ingest keeps is stored, in the main database.
 - **Staged, held or sent, one at a time.** A staged image has a lease
   (`expires_at`) and no session or message; a held one a `queued_id`
   and no lease; a sent one a session and message and no lease; a staged
-  image always has bytes. The checks hold it, and two triggers refuse a
-  row both held and sent.
+  image always has bytes. The checks hold it: a row has a lease exactly
+  when it has neither a message nor a `queued_id`, and never both.
 - **A freed image keeps its row.** The budget sets `data` null; name,
   type, width and height stay, and its route answers 410.
 - **Rows go with their message, chat or project** (foreign key
@@ -38,23 +38,36 @@ what ingest keeps is stored, in the main database.
   sent images that still have bytes, oldest first, with their sizes,
   `message_id` and `(data is not null)`: a partial index's own terms
   are checked against the table unless the index holds them, so
-  without those two every budget read touched each row's record.
-  `images_user` serves the staged count.
+  without those two every budget read touched each row's record. Its
+  `session_id` gives the Storage monitor a chat's sent bytes.
+  `images_user` covers the rows not sent: a user's leases for the
+  staged count, and the monitor's staged bytes and additions.
 - **The rate has its own log.** `image_uploads` keeps one row (user,
   time) per accepted upload, written in the stage's transaction, so a
-  delete of the image never frees a place. The hourly sweep drops rows
-  past the hour, at most `SWEEP_BATCH` a pass.
+  delete of the image never frees a place. The hourly sweep drops every
+  row past the hour, `SWEEP_BATCH` a statement until none is left, since
+  one user at the ceiling adds a batch an hour.
 
 ## Ingest
 
 - **Under the uploads' admission.** `stageImage()` runs inside
   `withUpload()` from `knowledge/`: one upload or image at a time per
   user, a process slot taken before the body is read, one deadline.
+- **At most `MAX_DECODES` (2) ingests decode at once**, process-wide
+  and apart from the process slots (`decode.ts`). The bound covers the
+  whole ingest, the header read, both encodes and the transparency
+  check; a third waits in arrival order under the upload's deadline,
+  never refused for the wait. A decode holds up to 4 bytes a pixel, so
+  the decoded pixels stay under 2 x 4 x `imageMaxPixels`: 400 MB at the
+  default 50 MP, 800 MB at the 100 MP ceiling, where the slots alone
+  would let 4 to 16 run.
 - **The rate and the staged count are checked before the body is
   read and again in the write.** `imagesPerHour` counts the user's
   `image_uploads` rows of the last hour, and answers 429 with
   `Retry-After` until the oldest leaves the hour. At most
-  `MAX_STAGED_IMAGES` (32) live staged images per user.
+  `MAX_STAGED_IMAGES` (32) live staged images per user, counted by a
+  live lease, never by `created_at`, so an image released from a queued
+  message counts however old its row.
 - **The body is a stream cut past `imageUploadBytes`** with a 413. Its
   ceiling is the request backstop (`MAX_REQUEST_BYTES`).
 - **The type comes from the bytes, never the client.** `sniff()` admits
@@ -191,8 +204,13 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
 - **A start releases them before it takes the row**, since `queued_id`
   cascades: staged again under a fresh lease, then claimed in the same
   transaction.
-- **An edit keeps them; a removal stages them again** under a fresh
-  lease, as a removed message's uploads stay staged. A not-sent row
+- **An edit keeps them** and checks the agent again, the one its new
+  text takes the turn with, a summoned one included: "this agent cannot
+  read images".
+- **A removal stages them again** under a fresh lease, as a removed
+  message's uploads stay staged. It releases even past
+  `MAX_STAGED_IMAGES`, since they are the user's own and their message
+  is gone; they count, so the next upload waits for room. A not-sent row
   keeps them until it is discarded, swept or dropped, and they go with
   it.
 
@@ -205,7 +223,8 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
 - **A fork at a user turn stages that message's images** for the user
   forking, under a fresh lease, answered as `draftImages`; a freed one
   is left out, and so is any past the user's room under
-  `MAX_STAGED_IMAGES`, so a fork never blocks their next upload.
+  `MAX_STAGED_IMAGES`, so a fork stays within the cap, though it may
+  fill it.
 - **Regenerate reuses the message's images**: its user rows stay.
 
 ## Image lines
