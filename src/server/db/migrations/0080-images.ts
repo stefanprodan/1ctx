@@ -14,9 +14,12 @@ import type { Migration } from "../migration.ts";
 //
 // The project, session, message and queued indexes serve the cascades;
 // the message's serves its images in order too. The user's counts the
-// hourly rate and the staged images, the expiry's the lease sweep. The
-// budget's covers a project's sent images that still have bytes,
-// oldest first, with their sizes.
+// staged images, the expiry's the lease sweep. The budget's covers a
+// project's sent images that still have bytes, oldest first, with their
+// sizes.
+//
+// image_uploads logs each accepted upload for the hourly rate, which a
+// delete of the image cannot reset; the sweep drops rows past the hour.
 export const m0080: Migration = {
   id: "0080-images",
   up(db) {
@@ -53,6 +56,13 @@ export const m0080: Migration = {
         where expires_at is not null;
       create index images_budget on images(project_id, created_at, bytes)
         where message_id is not null and data is not null;
+
+      create table image_uploads (
+        user_id text not null references users(id),
+        created_at integer not null
+      );
+      create index image_uploads_user on image_uploads(user_id, created_at);
+      create index image_uploads_created on image_uploads(created_at);
     `);
   },
 };

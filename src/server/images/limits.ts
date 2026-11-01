@@ -9,5 +9,6 @@ import { DAY_MS } from "../lib/clock.ts";
 export const IMAGE_LEASE_MS = DAY_MS;
 // the staged images one user may hold at once, past a full message
 export const MAX_STAGED_IMAGES = 32;
-// the expired staged rows one sweep pass removes; the rest go next hour
+// the expired staged rows, and the rate's old rows, one sweep pass
+// removes; the rest go next hour
 export const SWEEP_BATCH = 1000;

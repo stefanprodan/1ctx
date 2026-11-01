@@ -58,7 +58,9 @@ test("the catalog's word wins, and the admin's counts only where it is silent", 
   const model = (images: boolean | null) => ({ images }) as CatalogMatch;
   expect(imagesOf(model(true), null)).toBe(true);
   expect(imagesOf(model(false), null)).toBe(false);
-  expect(() => imagesOf(model(true), false)).toThrow(/only for a model/);
+  // a stated word the catalog answers is dropped
+  expect(imagesOf(model(true), false)).toBe(true);
+  expect(imagesOf(model(false), true)).toBe(false);
   expect(imagesOf(model(null), null)).toBe(false);
   expect(imagesOf(model(null), true)).toBe(true);
 });
@@ -92,7 +94,7 @@ test("an undescribed model takes it beside its window", async () => {
   expect(agent.images).toBe(true);
 });
 
-test("a catalog that says refuses the admin's word, yes or no", async () => {
+test("a catalog that says drops the admin's word, yes or no", async () => {
   const s = await setup();
   const claude = await s.provider("claude", "anthropic", ANTHROPIC_URL);
   const made = await s.save(claude, "claude-haiku-5-5");
@@ -103,24 +105,23 @@ test("a catalog that says refuses the admin's word, yes or no", async () => {
   const stated = await s.save(
     claude,
     "claude-haiku-5-5",
-    { images: true },
+    { images: false },
     agent.id,
   );
-  expect(stated.status).toBe(400);
+  expect(stated.status).toBe(200);
+  expect((await stated.json()).agent.images).toBe(true);
   const groq = await s.provider("groq", "openai-strict", GROQ_URL);
-  const text = await s.save(groq, "openai/gpt-oss-120b", {}, agent.id);
-  expect(text.status).toBe(200);
   // Groq lists text as its only input
-  expect((await text.json()).agent).toMatchObject({
-    model: { images: false },
-    images: false,
-  });
-  const refused = await s.save(
+  const text = await s.save(
     groq,
     "openai/gpt-oss-120b",
     { images: true },
     agent.id,
   );
-  expect(refused.status).toBe(400);
+  expect(text.status).toBe(200);
+  expect((await text.json()).agent).toMatchObject({
+    model: { images: false },
+    images: false,
+  });
   expect(s.app.agents.byId(agent.id)!.images).toBe(false);
 });

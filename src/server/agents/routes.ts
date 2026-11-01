@@ -141,19 +141,13 @@ function stated(
   return { ...model, contextLength, tools };
 }
 
-// the catalog's word on images wins; only where it is silent does the
-// admin's count, described or not, since a catalog that describes the
-// window may still say nothing of images
+// the catalog's word on images wins, and a stated flag it answers is
+// dropped, as a stale thinking word is: one saved while the catalog was
+// silent, or sent by provisioning, must not refuse the save. Only where
+// it is silent does the admin's count, described or not, since a
+// catalog that describes the window may still say nothing of images
 export function imagesOf(model: CatalogMatch, stated: boolean | null): boolean {
-  if (model.images !== null) {
-    if (stated !== null) {
-      throw new BadRequest(
-        "images is only for a model whose catalog does not say whether it reads them",
-      );
-    }
-    return model.images;
-  }
-  return stated ?? false;
+  return model.images ?? stated ?? false;
 }
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {

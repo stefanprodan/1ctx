@@ -44,6 +44,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "upload_staged",
     "upload_staged_files",
     "images",
+    "image_uploads",
   ],
   scratch: ["session_scratch", "session_scratch_files", "session_workspaces"],
   mcp: ["mcp_kept_files", "mcp_digests"],

@@ -7,7 +7,7 @@
 
 export type Sniffed = {
   format: "jpeg" | "png" | "webp" | "gif";
-  // the header allows transparent pixels: kept as PNG
+  // the header allows transparent pixels, which ingest then looks for
   alpha: boolean;
 };
 

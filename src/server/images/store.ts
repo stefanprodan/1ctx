@@ -121,11 +121,19 @@ export class ImageStore {
     );
   }
 
-  // the user's images added since, sent ones included, oldest first
+  // an accepted upload, for the rate; in the stage's transaction
+  logUpload(userId: string, now: number): void {
+    this.db
+      .query("insert into image_uploads (user_id, created_at) values (?, ?)")
+      .run(userId, now);
+  }
+
+  // the user's uploads accepted since, oldest first, deleted images
+  // included, so a delete never frees a place
   addedSince(userId: string, since: number): number[] {
     return this.db
       .query<{ createdAt: number }, [string, number]>(
-        `select created_at as createdAt from images
+        `select created_at as createdAt from image_uploads
          where user_id = ? and created_at > ? order by created_at`,
       )
       .all(userId, since)
@@ -156,5 +164,15 @@ export class ImageStore {
          returning id`,
       )
       .all(now, limit).length;
+  }
+
+  // the rate's log past the hour, at most limit rows a pass
+  sweepLog(before: number, limit: number): number {
+    return this.db
+      .query(
+        `delete from image_uploads where rowid in (
+           select rowid from image_uploads where created_at <= ? limit ?)`,
+      )
+      .run(before, limit).changes;
   }
 }

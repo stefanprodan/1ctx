@@ -68,7 +68,7 @@ export type SaveAgentRequest = {
   tools?: boolean;
   // whether the model reads images, for a model whose catalog does not
   // say (model.images null), whether or not it describes the model;
-  // refused where it says. Absent is false
+  // dropped where it says. Absent is false
   images?: boolean;
   // true makes it the default; false on the default takes the mark off,
   // so the first created is the default again; absent leaves the mark

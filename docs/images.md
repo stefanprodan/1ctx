@@ -31,7 +31,11 @@ what ingest keeps is stored, in the main database.
   widened check would rebuild a table of bytes.
 - **The budget's index is ready for the claim.** `images_budget` covers
   a project's sent images that still have bytes, oldest first, with
-  their sizes; `images_user` the hourly rate and the staged count.
+  their sizes; `images_user` the staged count.
+- **The rate has its own log.** `image_uploads` keeps one row (user,
+  time) per accepted upload, written in the stage's transaction, so a
+  delete of the image never frees a place. The hourly sweep drops rows
+  past the hour, at most `SWEEP_BATCH` a pass.
 
 ## Ingest
 
@@ -39,8 +43,8 @@ what ingest keeps is stored, in the main database.
   `withUpload()` from `knowledge/`: one upload or image at a time per
   user, a process slot taken before the body is read, one deadline.
 - **The rate and the staged count are checked before the body is
-  read and again in the write.** `imagesPerHour` counts the user's rows
-  added in the last hour, sent ones included, and answers 429 with
+  read and again in the write.** `imagesPerHour` counts the user's
+  `image_uploads` rows of the last hour, and answers 429 with
   `Retry-After` until the oldest leaves the hour. At most
   `MAX_STAGED_IMAGES` (32) live staged images per user.
 - **The body is a stream cut past `imageUploadBytes`** with a 413. Its
@@ -53,10 +57,15 @@ what ingest keeps is stored, in the main database.
   header, so a small file declaring huge dimensions is a 400.
 - **One kept image.** Oriented (`autoOrient`), fitted inside
   `imageLongSide` without enlarging, re-encoded, which drops Exif and
-  its GPS. A JPEG stays JPEG at quality 85; an image whose header
-  allows transparency becomes PNG; any other is PNG when that PNG is at
-  most `PNG_RATIO` (1.5) times its JPEG, else JPEG. A screenshot's PNG
+  its GPS. A JPEG stays JPEG at quality 85; an image with a pixel that
+  is not opaque becomes PNG; any other is PNG when that PNG is at most
+  `PNG_RATIO` (1.5) times its JPEG, else JPEG. A screenshot's PNG
   measured a fraction of its JPEG, a photo's five to eleven times.
+- **Transparency is read from the pixels.** Bun.Image gives neither
+  pixels nor an alpha flag, so when the header allows alpha,
+  `transparent()` inflates the PNG ingest wrote and stops at the first
+  alpha below 255 (about 35 ms at 2048). An opaque RGBA photo is then
+  JPEG.
 - **The name is the client's, shown only.** The last path part without
   controls, at most 120 characters, its extension the kept type's.
 
@@ -117,9 +126,13 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
   the catalog left null; another host's model of the same name never
   does, since its copy may not read images.
 - **`images` is the agent's flag.** The catalog's where it said;
-  otherwise what the admin states, false when left out. Stating it
-  where the catalog said is a 400. This is apart from `described`: a
-  catalog that describes the window may say nothing of images.
+  otherwise what the admin states, false when left out. A stated flag
+  the catalog answers is dropped, never refused, as a stale thinking
+  word is, so an agent saved while its catalog was silent saves again.
+  This is apart from `described`: a catalog that describes the window
+  may say nothing of images.
+- **The agent page re-sends a stated flag** where `model.images` is
+  null, and drops it with a model change, as it does the window.
 - **An agent saved before the flag reads none** until it is saved
   again.
 - **Provisioning takes `images`** as the API does, and keeps a stated

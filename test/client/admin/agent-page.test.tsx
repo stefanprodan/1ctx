@@ -42,7 +42,7 @@ const described: CatalogMatch = {
   thinkingRequired: false,
   reasoningKnown: true,
   described: true,
-  images: null,
+  images: true,
 };
 // a model a catalog of ids alone lists: its window and tools are stated
 const stated: CatalogMatch = {
@@ -116,6 +116,22 @@ const rows = {
 };
 
 describe("a card's body", () => {
+  test("re-sends a stated image flag where the catalog is silent, never past the model", () => {
+    const silent = {
+      ...agent,
+      model: { ...described, images: null },
+      images: true,
+    };
+    expect(cardBody(silent, { prompt: "x" }, rows).images).toBe(true);
+    expect(cardBody(agent, { prompt: "x" }, rows)).not.toHaveProperty("images");
+    expect(
+      cardBody(silent, { model: "vendor/other" }, rows),
+    ).not.toHaveProperty("images");
+    expect(
+      cardBody(silent, { model: "vendor/other", images: false }, rows).images,
+    ).toBe(false);
+  });
+
   test("is the saved agent with only the card's fields changed", () => {
     const body = cardBody(agent, { name: "writer" }, rows);
     expect(body).toEqual({

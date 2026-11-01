@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { transparent } from "../../../src/server/images/alpha.ts";
 import {
   ingest,
   keepsPng,
@@ -23,6 +24,7 @@ import { BadRequest } from "../../../src/server/lib/errors.ts";
 import {
   gif,
   jpegSegments,
+  noise,
   photo,
   pixelAt,
   png,
@@ -141,6 +143,52 @@ describe("the JPEG or PNG choice", () => {
       width: 1200,
       height: 800,
     });
+  });
+});
+
+describe("transparency", () => {
+  test("an opaque RGBA photo becomes JPEG, a transparent one stays PNG", async () => {
+    const random = noise(3);
+    const grain = (alpha: (x: number) => number) =>
+      png(
+        600,
+        400,
+        (x, y) => [
+          (x / 3 + random() * 60) & 255,
+          (y / 2 + random() * 60) & 255,
+          (random() * 255) | 0,
+          alpha(x),
+        ],
+        { alpha: true },
+      );
+    const opaque = grain(() => 255);
+    expect(sniff(opaque)).toMatchObject({ image: { alpha: true } });
+    expect((await ingest(opaque, CAPS)).mediaType).toBe("image/jpeg");
+    // one column fades out
+    const fading = grain((x) => (x === 599 ? 128 : 255));
+    const kept = await ingest(fading, CAPS);
+    expect(kept.mediaType).toBe("image/png");
+    expect(pixelAt(kept.data, 599, 10)[3]).toBe(128);
+  });
+
+  test("reads alpha through every PNG filter, and opaque layouts need no read", async () => {
+    const shot = new Uint8Array(
+      await new Bun.Image(screenshot()).png().bytes(),
+    );
+    expect(transparent(shot)).toBe(false);
+    const hole = png(
+      40,
+      30,
+      (x, y) => [x * 6, y * 8, 90, x === 5 && y === 29 ? 0 : 255],
+      {
+        alpha: true,
+      },
+    );
+    expect(
+      transparent(new Uint8Array(await new Bun.Image(hole).png().bytes())),
+    ).toBe(true);
+    // a raw RGB PNG has no alpha to read
+    expect(transparent(halves())).toBe(false);
   });
 });
 

@@ -3,11 +3,13 @@
 //
 // One image in, the one kept out: sniffed, refused past its pixels
 // before a decode, oriented, fitted to the long side and re-encoded,
-// which drops its metadata. A JPEG stays JPEG; an image that may be
-// transparent becomes PNG; any other is PNG when that loses nothing at
-// little cost, as a screenshot or line art does, else JPEG.
+// which drops its metadata. A JPEG stays JPEG; an image with a pixel
+// that is not opaque becomes PNG; any other, an opaque RGBA one too, is
+// PNG when that loses nothing at little cost, as a screenshot or line
+// art does, else JPEG.
 
 import { BadRequest } from "../lib/errors.ts";
+import { transparent } from "./alpha.ts";
 import { type Sniffed, sniff } from "./sniff.ts";
 
 export type StoredType = "image/jpeg" | "image/png";
@@ -33,7 +35,8 @@ export const UNREADABLE = "the image could not be read";
 export const tooManyPixels = (max: number) =>
   `the image is larger than ${Math.floor(max / 1_000_000)} megapixels`;
 
-// the choice between two encodings of one image; null is not encoded
+// the choice between two encodings of one image, alpha true when a
+// pixel is not opaque; null is not encoded
 export function keepsPng(
   source: Sniffed,
   png: number | null,
@@ -86,10 +89,12 @@ export async function ingest(
       const data = await image.bytes();
       return { data, width: image.width, height: image.height };
     };
-    const jpeg = source.alpha ? null : await encode("image/jpeg");
     const png = source.format === "jpeg" ? null : await encode("image/png");
+    // only a header that allows alpha needs its pixels read
+    const clear = png !== null && source.alpha && transparent(png.data);
+    const jpeg = clear ? null : await encode("image/jpeg");
     const pick = keepsPng(
-      source,
+      { format: source.format, alpha: clear },
       png?.data.length ?? null,
       jpeg?.data.length ?? null,
     );

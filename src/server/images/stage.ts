@@ -93,12 +93,14 @@ export function stageImage(
       return transact(deps.db, () => {
         running();
         checkAdmission(deps, userId, deps.caps());
+        const now = deps.clock();
+        deps.store.logUpload(userId, now);
         const row = deps.store.stage(
           userId,
           projectId,
           imageName(rawName, image.mediaType),
           image,
-          deps.clock(),
+          now,
         );
         return { result: { image: staged(row) } };
       });

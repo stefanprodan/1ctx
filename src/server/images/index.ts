@@ -5,7 +5,7 @@
 // lease, and the one answer for their bytes.
 
 import { type Db, transact } from "../db/index.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { Gone, HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { ImageCaps } from "../limits/index.ts";
@@ -38,7 +38,8 @@ export type ImagesDeps = {
 export type ImagesArea = ImagesPort & {
   store: ImageStore;
   routes: RouteDescriptor[];
-  // the expired staged rows removed, at most a batch
+  // the expired staged rows and the rate's rows past the hour removed,
+  // at most a batch of each
   sweep(now: number): number;
 };
 
@@ -95,7 +96,9 @@ export function imagesArea(deps: ImagesDeps): ImagesArea {
   return {
     ...port,
     store,
-    sweep: (now) => store.sweep(now, SWEEP_BATCH),
+    sweep: (now) =>
+      store.sweep(now, SWEEP_BATCH) +
+      store.sweepLog(now - HOUR_MS, SWEEP_BATCH),
     routes: routes({ access: deps.access, images: port }),
   };
 }

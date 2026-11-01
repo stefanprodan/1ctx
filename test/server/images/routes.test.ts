@@ -273,7 +273,8 @@ test("the lease sweep removes expired staged images and never a sent one", async
   s.app.now.value += DAY_MS;
   // expired is gone to its uploader before the sweep removes it
   expect((await s.get(s.chat.member, s.team.id, staged.id)).status).toBe(404);
-  expect(s.app.images.sweep(s.app.now.value)).toBe(1);
+  // the expired staged row and both uploads' rate rows, a day old
+  expect(s.app.images.sweep(s.app.now.value)).toBe(3);
   expect(s.app.images.store.byId(staged.id)).toBeNull();
   expect(s.app.images.store.byId(sent.id)).not.toBeNull();
   expect(s.app.images.sweep(s.app.now.value + DAY_MS)).toBe(0);
@@ -304,6 +305,26 @@ test("the hourly rate refuses past its limit and frees an hour later", async () 
   // the rate is the user's own, not the project's
   expect((await s.post(s.other, s.team.id, tiny())).status).toBe(201);
   s.app.now.value += HOUR_MS - 10_000;
+  expect((await s.post(s.chat.member, s.team.id, tiny())).status).toBe(201);
+});
+
+test("a delete never frees a place in the hourly rate", async () => {
+  const s = await setup();
+  await setLimits(s.chat, { imagesPerHour: 10 });
+  for (let i = 0; i < 10; i++) {
+    const image = await s.stage();
+    const removed = await s.chat.member.call(
+      "DELETE",
+      `/api/projects/${s.team.id}/images/${image.id}`,
+    );
+    expect(removed.status).toBe(204);
+  }
+  const refused = await s.post(s.chat.member, s.team.id, tiny());
+  expect(refused.status).toBe(429);
+  // the sweep drops the log only past the hour
+  expect(s.app.images.sweep(s.app.now.value)).toBe(0);
+  s.app.now.value += HOUR_MS;
+  expect(s.app.images.sweep(s.app.now.value)).toBe(10);
   expect((await s.post(s.chat.member, s.team.id, tiny())).status).toBe(201);
 });
 
