@@ -148,18 +148,21 @@ describe("the anthropic wire", () => {
 describe("the token estimate", () => {
   test.each([
     // https://platform.claude.com/docs/en/build-with-claude/vision tables
-    ["anthropic", "claude-haiku-4-5-20251001", 1000, 1000, 1296],
-    ["anthropic", "claude-sonnet-4-5", 1920, 1080, 1568],
-    ["anthropic", "claude-opus-4-7", 1920, 1080, 2691],
-    ["openrouter", "anthropic/claude-opus-5", 2048, 2048, 4784],
-    ["openrouter", "anthropic/claude-3.5-sonnet", 2048, 2048, 1568],
+    ["anthropic", "claude-haiku-4-5-20251001", 1000, 1000, 1312],
+    ["anthropic", "claude-sonnet-4-5", 1920, 1080, 1584],
+    ["anthropic", "claude-opus-4-7", 1920, 1080, 2707],
+    ["openrouter", "anthropic/claude-opus-5", 2048, 2048, 4800],
+    ["openrouter", "anthropic/claude-3.5-sonnet", 2048, 2048, 1584],
+    // the doc figures plus the 16 allowance
+    ["anthropic", "claude-haiku-5-5", 1536, 2048, 4086],
+    ["azure", "gpt-6.1-terra", 1536, 2048, 3703],
     // tile models: fit 2048, short side 768, base + tile per 512
-    ["azure", "gpt-4o", 1024, 1024, 765],
-    ["opencode", "gpt-5.1", 2048, 2048, 630],
+    ["azure", "gpt-4o", 1024, 1024, 781],
+    ["opencode", "gpt-5.1", 2048, 2048, 646],
     // patch models: ceil(multiplier * 32 px patches)
-    ["azure", "gpt-5.6-luna", 1024, 1024, 1229],
-    ["openrouter", "openai/gpt-4.1-mini", 1024, 1024, 1659],
-    ["azure", "my-deployment", 64, 64, 5],
+    ["azure", "gpt-5.6-luna", 1024, 1024, 1245],
+    ["openrouter", "openai/gpt-4.1-mini", 1024, 1024, 1675],
+    ["azure", "my-deployment", 64, 64, 21],
     // Gemini 2: 258 within 384, else per 768 tile; 3 and later 1,120
     ["gemini", "gemini-2.5-flash", 384, 384, 258],
     ["gemini", "gemini-2.5-flash", 1000, 1000, 1032],

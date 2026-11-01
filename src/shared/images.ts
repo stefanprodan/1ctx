@@ -11,8 +11,9 @@ export const CANNOT_READ_IMAGES = "this agent cannot read images";
 export const IMAGE_GONE = "an image is gone, add it again";
 export const CHANNEL_NO_IMAGES = "a channel post cannot carry images";
 
-// a request whose images pass the window or imagesPerRequest: how many
-// of the new message's images fit, none when the history's are the cause
+// a request whose images pass the window, imagesPerRequest or
+// IMAGE_REQUEST_BYTES: how many of the new message's images fit, none
+// when the history's are the cause
 export const NO_IMAGE_ROOM =
   "no more images fit in this chat: compact it or start a new one";
 export const imagesFit = (fit: number, of: number): string =>
@@ -23,17 +24,19 @@ export const imagesFit = (fit: number, of: number): string =>
 // the most stored image bytes one request carries, base64 a third more
 // on the wire: under Gemini's 20 MB for a whole request with inline data
 // (https://ai.google.dev/gemini-api/docs/image-understanding), the
-// smallest whole-request limit of the wires served, with room for a long
-// history's text; Anthropic's Messages API takes 128 MB
+// smallest whole-request limit of the wires served. 10 MiB is about 14 MB
+// of base64, leaving 6 MB for a 1M window's history text near compaction
+// (about 4 MB); Anthropic's Messages API takes 128 MB
 // (https://platform.claude.com/docs/en/api/overview) and OpenAI's 512 MB
 // (https://developers.openai.com/api/docs/guides/images-vision). It
 // also bounds a request's memory
-export const IMAGE_REQUEST_BYTES = 12 * 1024 * 1024;
-// a request past this makes the summary due, and a tail holds at most
-// the half, so the next message has room and a summary is never due at
-// once
-export const IMAGE_DUE_BYTES = (IMAGE_REQUEST_BYTES * 3) / 4;
-export const IMAGE_TAIL_BYTES = IMAGE_REQUEST_BYTES / 2;
+export const IMAGE_REQUEST_BYTES = 10 * 1024 * 1024;
+// a request past half the bound makes the summary due, so a chat never
+// sits below due while refusing a large screenshot (a window capture with
+// a transparent shadow stays PNG, several MiB); a tail holds a quarter,
+// so a summary is never due at once
+export const IMAGE_DUE_BYTES = IMAGE_REQUEST_BYTES / 2;
+export const IMAGE_TAIL_BYTES = IMAGE_REQUEST_BYTES / 4;
 
 // the most images one message may name, imagesPerMessage's ceiling; the
 // limit itself is checked at the claim

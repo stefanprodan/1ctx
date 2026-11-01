@@ -71,6 +71,10 @@ export function chatUserContent(
   ];
 }
 
+// added to the Anthropic and OpenAI figures, which matched reported
+// prompt tokens within a few either way (2026-11-01), so they err high
+const ALLOWANCE = 16;
+
 export type ImageFamily = "anthropic" | "openai" | "gemini" | "other";
 
 // the model's own name, past a router's or a host's prefix
@@ -108,7 +112,7 @@ function anthropicTokens(model: string, w: number, h: number): number {
     id.replace(/^claude-/, "").replace(/^(\d)-(\d)-/, "$1.$2-"),
   );
   const cap = v !== null && v < 4.7 ? 1568 : 4784;
-  return Math.min(cap, Math.ceil(w / 28) * Math.ceil(h / 28));
+  return Math.min(cap, Math.ceil(w / 28) * Math.ceil(h / 28)) + ALLOWANCE;
 }
 
 // https://developers.openai.com/api/docs/guides/images-vision
@@ -145,11 +149,13 @@ function openAiTokens(model: string, w: number, h: number): number {
       height = Math.floor((height * 768) / short);
     }
     const squares = Math.ceil(width / 512) * Math.ceil(height / 512);
-    return tile[1] + tile[2] * squares;
+    return tile[1] + tile[2] * squares + ALLOWANCE;
   }
   const multiplier =
     MULTIPLIERS.find(([pattern]) => pattern.test(id))?.[1] ?? 1.2;
-  return Math.ceil(multiplier * Math.ceil(w / 32) * Math.ceil(h / 32));
+  return (
+    Math.ceil(multiplier * Math.ceil(w / 32) * Math.ceil(h / 32)) + ALLOWANCE
+  );
 }
 
 // https://ai.google.dev/gemini-api/docs/image-understanding: 258 for an

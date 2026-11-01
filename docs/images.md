@@ -254,7 +254,7 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
 ## The wires
 
 - **A user message holds its images as ids** (`ImagePart`: id, name,
-  type, width, height) beside its text (`userMessage()`). The bytes are
+  type, width, height, stored bytes) beside its text (`userMessage()`). The bytes are
   read through the providers' images port (`ImageData`, a closure over
   the image store in `compose.ts`, since images is built after
   providers) only as a body is built, so a request in memory or retried
@@ -287,6 +287,8 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
     `ceil(multiplier * 32 px patches)`, 1.2 unless listed, with no patch
     budget, since auto keeps the original size on the newest; an Azure
     deployment's own name is a patch model;
+  - both plus 16 an image, since they matched reported prompt tokens
+    within a few either way, so the estimate errs high;
   - Gemini: 258 within 384, else 258 a tile of the crop unit
     `floor(min(w, h) / 1.5)`, each side rounded up (960x540 is 6 tiles),
     before Gemini 3; 1,120 from 3; the larger for a name without a
@@ -297,7 +299,7 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
 
 - **Before a request that carries an image,** never one without:
   `unfitImages()` refuses past `imagesPerRequest` parts, past
-  `IMAGE_REQUEST_BYTES` (12 MiB) of their stored `bytes`, or past the
+  `IMAGE_REQUEST_BYTES` (10 MiB) of their stored `bytes`, or past the
   window less the round's own `maxTokens` (none on a chat round; the
   summary's cap) and 256. The byte bound is a constant under Gemini's
   20 MB for a whole request with inline data, the smallest of the wires
@@ -324,13 +326,13 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
   tail, sent as it was. The set moves only at a summary, so the cache
   holds between turns.
 - **A request that carried `imagesPerRequest` images, or past
-  `IMAGE_DUE_BYTES` (three quarters of the bound), makes the summary
+  `IMAGE_DUE_BYTES` (half the bound), makes the summary
   due** after its answer, as the threshold does, so the next has room.
 - **The summary round reads the images in its history,** so the summary
   can describe them; after it, an image before the cut is gone with its
   turn and one in the tail is replayed.
 - **The tail replays at most half of `imagesPerRequest`** (`tailImages()`)
-  and `IMAGE_TAIL_BYTES` (half the bound), stopping at the turn that
+  and `IMAGE_TAIL_BYTES` (a quarter of it), stopping at the turn that
   would pass either, so a summary never leaves a
   history due again at once. At 32K the tail's budget (about 3,200
   tokens) takes no 2048 image; at 200K and 1M the count and the request

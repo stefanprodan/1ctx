@@ -236,17 +236,17 @@ describe("the check before a request", () => {
   test("a request past the byte bound is refused, the words saying how many fit", () => {
     const p = at(200_000, "anthropic", "claude-opus-5");
     const rows = [
-      ...turn("a", pictures("a", 1, 640, false, 7 * MiB)),
+      ...turn("a", pictures("a", 1, 640, false, 6 * MiB)),
       row({
         id: "u",
         kind: "user",
         images: pictures("b", 2, 640, false, 3 * MiB),
       }),
     ];
-    expect(IMAGE_REQUEST_BYTES).toBe(12 * MiB);
+    expect(IMAGE_REQUEST_BYTES).toBe(10 * MiB);
     expect(unfitImages(requestOf(rows, p), p, 2)).toBe(imagesFit(1, 2));
     const fits = [
-      ...turn("a", pictures("a", 1, 640, false, 6 * MiB)),
+      ...turn("a", pictures("a", 1, 640, false, 4 * MiB)),
       row({
         id: "u",
         kind: "user",
@@ -341,10 +341,10 @@ describe("images in history", () => {
     ).toHaveLength(0);
   });
 
-  test("the tail holds at most half the request bound's bytes", () => {
+  test("the tail holds at most a quarter of the request bound's bytes", () => {
     const rows = [
-      ...turn("a", pictures("a", 1, 640, false, 4 * MiB)),
-      ...turn("b", pictures("b", 1, 640, false, 4 * MiB)),
+      ...turn("a", pictures("a", 1, 640, false, 2 * MiB)),
+      ...turn("b", pictures("b", 1, 640, false, 2 * MiB)),
       row({ id: "sum", kind: "summary", userId: null, content: "so far" }),
       row({ id: "n", kind: "user", content: "next" }),
     ];
@@ -352,7 +352,7 @@ describe("images in history", () => {
     expect(
       imagePartsOf(history(rows, p, lookups, NOW)).map((image) => image.id),
     ).toEqual(["b0"]);
-    expect(IMAGE_TAIL_BYTES).toBe(6 * MiB);
+    expect(IMAGE_TAIL_BYTES).toBe(2.5 * MiB);
   });
 
   test("the images sent from history do not change between turns without a summary", () => {

@@ -79,14 +79,14 @@ describe("a request's images", () => {
   test("a message past the byte bound is refused with how many fit", async () => {
     const s = await imageApp();
     const a = await s.stage(s.chat.projectId);
-    s.size(a.id, 8 * MiB);
+    s.size(a.id, 4 * MiB);
     const started = await s.start("look", [a.id]);
     started.script.reply("seen");
     await sessionSettled(s.app, started.sessionId);
     const b = await s.stage(s.chat.projectId);
     const c = await s.stage(s.chat.projectId);
-    s.size(b.id, 3 * MiB);
-    s.size(c.id, 3 * MiB);
+    s.size(b.id, 3.5 * MiB);
+    s.size(c.id, 3.5 * MiB);
     const refused = await s.send(started.sessionId, {
       message: "and these",
       images: [b.id, c.id],
@@ -101,9 +101,9 @@ describe("a request's images", () => {
     const s = await imageApp();
     const a = await s.stage(s.chat.projectId);
     const b = await s.stage(s.chat.projectId);
-    s.size(a.id, 5 * MiB);
-    s.size(b.id, 5 * MiB);
-    expect(10 * MiB).toBeGreaterThan(IMAGE_DUE_BYTES);
+    s.size(a.id, 3 * MiB);
+    s.size(b.id, 3 * MiB);
+    expect(6 * MiB).toBeGreaterThan(IMAGE_DUE_BYTES);
     const started = await s.start("look", [a.id, b.id]);
     const summary = s.chat.scripted.reached(2);
     started.script.reply("seen");
@@ -114,9 +114,9 @@ describe("a request's images", () => {
     expect(userTexts(round)[0]).toBe("look\n<image/png>\n<image/png>");
     round.reply("a summary");
     await sessionSettled(s.app, started.sessionId);
-    // the turn's 10 MiB pass the tail's half, so the next has room
+    // the turn's 6 MiB pass the tail's quarter, so the next has room
     const c = await s.stage(s.chat.projectId);
-    s.size(c.id, 6 * MiB);
+    s.size(c.id, 4 * MiB);
     const next = s.chat.scripted.next();
     const sent = await s.send(started.sessionId, {
       message: "one more",
