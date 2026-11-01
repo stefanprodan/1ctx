@@ -30,7 +30,7 @@ export function forkPoint(
   rows: Message[],
   sends: ForkSend[],
   messageId: string,
-): { rows: Message[]; draft: string | null } {
+): { rows: Message[]; draft: string | null; draftImages: string[] } {
   const ordered = [...rows].sort((a, b) => a.seq - b.seq);
   const index = ordered.findIndex((row) => row.id === messageId);
   const point = ordered[index];
@@ -45,6 +45,7 @@ export function forkPoint(
     return {
       rows: ordered.filter((row) => row.seq < point.seq && !memory(row)),
       draft: point.content,
+      draftImages: (point.images ?? []).map((image) => image.id),
     };
   }
   if (
@@ -70,6 +71,7 @@ export function forkPoint(
   return {
     rows: ordered.slice(0, end).filter((row) => !memory(row)),
     draft: null,
+    draftImages: [],
   };
 }
 

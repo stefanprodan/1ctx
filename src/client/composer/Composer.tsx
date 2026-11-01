@@ -11,15 +11,15 @@
 // text here, and Send is Save until the edit is saved or let go. Two
 // modes: a chat, where the message goes into it, and a project, where
 // it starts one. The mic beside Send dictates into the draft (Dictation.tsx).
-// Files come from the plus, a drop on the card or a paste, are staged as
-// they are picked, and go with the send. The draft, text and staged
-// files, survives a navigation; a refusal shows under the box until the
-// next keystroke. In a project channel the
+// Files and images come from the plus, a drop on the card or a paste,
+// are staged as they are picked, and go with the send (Images.tsx). The
+// draft, text and staged items, survives a navigation; a refusal shows
+// under the box until the next keystroke. In a project channel the
 // message is a post: no agent chip, no switches, no chat commands, the
 // @ menu lists every agent and the meter is the stream's.
 
 import { useSignal } from "@preact/signals";
-import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import type {
@@ -30,22 +30,11 @@ import type {
 import { flip } from "../data/capabilities.ts";
 import { me } from "../data/me.ts";
 import { rememberAgent, startingAgent } from "../data/project-agents.ts";
-import {
-  askedOf,
-  claimed,
-  deleteUpload,
-  forgetUpload,
-  loadUploads,
-  staged,
-  stagedOf,
-  stageUpload,
-  takeStamp,
-} from "../data/uploads.ts";
+import { claimed, loadUploads } from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
 import { stepHighlight } from "../ui/Select.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
-import { AttachState } from "./Attach.state.ts";
 import { Commands } from "./Commands.tsx";
 import {
   type Command,
@@ -60,12 +49,13 @@ import { meterReadout, readout } from "./context.ts";
 import { useDictation } from "./Dictation.tsx";
 import {
   draftKey,
+  dropDraftImages,
   dropDraftUploads,
   readDraft,
   type Scope,
   writeDraftText,
-  writeDraftUploads,
 } from "./draft.ts";
+import { dropTarget } from "./drop.ts";
 import {
   EditLine,
   editOf,
@@ -74,8 +64,10 @@ import {
   saveEdit,
   useHandoff,
 } from "./Edit.tsx";
-import { Files } from "./Files.tsx";
+import { Files, useFiles } from "./Files.tsx";
 import type { Editing } from "./handoff.ts";
+import { routeFiles } from "./Images.model.ts";
+import { StagedImages, useImages, useUnread } from "./Images.tsx";
 import { browserLocate, type Locate, locate } from "./location.ts";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import { ContextReadout } from "./Readout.tsx";
@@ -83,8 +75,10 @@ import { Summons } from "./Summons.tsx";
 import { bareSummon, nextPost, summonFill, summonMatches } from "./summons.ts";
 import { useSwitches } from "./switches.ts";
 import "./composer.css";
-import { says } from "../lib/format.ts";
+import { IMAGE_GONE } from "../../shared/images.ts";
+import { reason, says, sentence } from "../lib/format.ts";
 import { touch } from "../lib/touch.ts";
+import { outgoing } from "./outgoing.ts";
 
 const MAX_HEIGHT = 160;
 
@@ -129,8 +123,13 @@ export function Composer({
   usage?: RoundUsage | null;
   // what the chat has turned off, empty for one not started yet
   off?: readonly string[];
-  // uploads are the staged ids the send claims
-  onSend: (text: string, agentId: string, uploads: string[]) => Promise<void>;
+  // uploads and images are the staged ids the send claims
+  onSend: (
+    text: string,
+    agentId: string,
+    uploads: string[],
+    images: string[],
+  ) => Promise<void>;
   onStop: () => Promise<void>;
   // /compact runs a summary round on the chat; a chat not started yet
   // has nothing to fold, so the command is refused without a call
@@ -162,34 +161,12 @@ export function Composer({
   const text = useSignal(readDraft(key).text);
   // files held over the card, by how deep the pointer is in its children
   const over = useSignal(0);
-  const files = useMemo(
-    () =>
-      new AttachState(
-        {
-          stage: stageUpload,
-          remove: deleteUpload,
-          forget: (_projectId, attempt) => forgetUpload(attempt),
-          reload: loadUploads,
-          list: stagedOf,
-          stamp: takeStamp,
-          asked: askedOf,
-          wait: (ms) => new Promise((done) => setTimeout(done, ms)),
-          currentUser: () => me.value?.id ?? null,
-          mint: () => crypto.randomUUID(),
-          save: (uploads) => writeDraftUploads(key, uploads),
-        },
-        readDraft(key).uploads,
-      ),
-    [key],
-  );
-  useEffect(() => () => files.dispose(), [files]);
-  // before the paint, so Send is never drawn on for a draft whose files
-  // are not yet known to the state
-  useLayoutEffect(() => files.show(filesProjectId), [files, filesProjectId]);
-  const placed = files.projectId.value === filesProjectId;
-  const held = staged.value.get(filesProjectId) ?? null;
-  useEffect(() => files.reconcile(held), [files, held]);
+  const files = useFiles(key, filesProjectId);
+  const images = useImages(key, filesProjectId);
   const failure = useSignal<string | null>(null);
+  const placed =
+    files.projectId.value === filesProjectId &&
+    images.projectId.value === filesProjectId;
   // /location waits on the browser before the send is out
   const locating = useSignal(false);
   // what the box is now, for a read that ends after a move or an unmount
@@ -212,6 +189,8 @@ export function Composer({
   const agent = channel ? "" : fixed ? agentId : startingAgent(list);
   live.current.key = key;
   live.current.agent = agent;
+  // the agent reads no images: a hint, until the claim's refusal says it
+  const unread = useUnread(failure, list, agent);
 
   const grow = () => {
     const el = input.current;
@@ -244,9 +223,12 @@ export function Composer({
     readable,
     projectId: filesProjectId,
   });
-  const attach = (picked: File[]) => {
-    failure.value = null;
-    void files.add(picked, readable);
+  // asImages: the Add images picker, whose every file goes as an image
+  const attach = (picked: File[], asImages = false) => {
+    const routed = routeFiles(picked, { channel: !!channel, images: asImages });
+    failure.value = routed.refusal && sentence(routed.refusal);
+    if (routed.uploads.length > 0) void files.add(routed.uploads, readable);
+    images.add(routed.images);
   };
   const started = onCompact !== undefined && onFork !== undefined;
   const block = (command: Command) =>
@@ -277,21 +259,23 @@ export function Composer({
     writeDraftText(key, fill);
     input.current?.focus();
   };
+  const draft = () => ({ text: text.value, files, images, ready, placed });
   const nameOnly = () =>
-    channel !== undefined && bareSummon(text.value, agents, files.ids.length);
+    channel !== undefined &&
+    bareSummon(text.value, agents, files.ids.length + images.ids.length);
   const submit = async () => {
     if (dictation.busy()) return;
     const content = text.value.trim();
     if (edit !== null)
       return saveEdit(edit, content, onEdit, { ...box, saving });
     // the signal itself, since a second Enter may beat the render
-    if (content === "" || agent === null || !ready || locating.value) return;
-    if (nameOnly()) return;
+    if (agent === null || locating.value || nameOnly()) return;
     const to = dispatchOf(content);
-    if (to.files && (!placed || files.busy)) return;
+    const out = outgoing({ ...draft(), carries: to.files });
+    if (out === null) return;
     failure.value = null;
     const sent = text.value;
-    const uploads = to.files ? files.ids : [];
+    const { uploads, images: shots } = out;
     try {
       if (to.kind === "command") {
         await runCommand(to.named, block(to.named.command), {
@@ -309,13 +293,15 @@ export function Composer({
         const now = live.current;
         if (!now.mounted || now.key !== key || now.agent !== agent) return;
         if (dictation.busy()) return;
-        await onSend(message, agent, uploads);
-      } else await onSend(content, agent, uploads);
+        await onSend(message, agent, uploads, shots);
+      } else await onSend(content, agent, uploads, shots);
       // this composer may be gone by now (a new chat navigates away), so
       // the stored draft is what loses them
       if (to.files) {
         files.sent(uploads);
+        images.sent(shots);
         dropDraftUploads(key, uploads);
+        dropDraftImages(key, shots);
         claimed(filesProjectId, uploads);
       }
       // what was typed while the send was on its way stays, here and in
@@ -328,6 +314,7 @@ export function Composer({
       failure.value = says(err);
       // a file the send found gone moves to the log with the next list
       if (uploads.length > 0) void loadUploads(filesProjectId);
+      if (shots.length > 0 && reason(err) === IMAGE_GONE) images.gone();
     }
   };
   const context = channel ? meterReadout(channel.meter) : readout(usage);
@@ -342,27 +329,9 @@ export function Composer({
   );
   const refusal = failure.value ?? files.refusal.value;
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: a drop target has no role, and the plus does the same by keyboard
     <div
       class={`composer${tall ? " composer-tall" : ""}${over.value > 0 ? " composer-drop" : ""} card`}
-      onDragEnter={(ev) => {
-        if (!ev.dataTransfer?.types.includes("Files")) return;
-        ev.preventDefault();
-        over.value += 1;
-      }}
-      onDragOver={(ev) => {
-        if (ev.dataTransfer?.types.includes("Files")) ev.preventDefault();
-      }}
-      onDragLeave={() => {
-        over.value = Math.max(0, over.value - 1);
-      }}
-      onDrop={(ev) => {
-        const dropped = [...(ev.dataTransfer?.files ?? [])];
-        if (dropped.length === 0) return;
-        ev.preventDefault();
-        over.value = 0;
-        attach(dropped);
-      }}
+      {...dropTarget(over, attach)}
     >
       {edit !== null && <EditLine open={edit} box={box} />}
       <textarea
@@ -450,6 +419,12 @@ export function Composer({
         onRemove={(item) => files.remove(item)}
         onClear={() => files.clear()}
       />
+      <StagedImages
+        items={images.shown}
+        unread={!channel && unread}
+        locked={busy}
+        onRemove={(item) => images.remove(item)}
+      />
       {refusal && <p class="composer-failure error">{refusal}</p>}
       {over.value > 0 && (
         <div class="composer-drop-words">
@@ -462,6 +437,7 @@ export function Composer({
           readable={readable}
           filesOnly={channel !== undefined}
           onFiles={attach}
+          onImages={(picked) => attach(picked, true)}
           {...switches}
           onFlip={(key) => flip(chat, off, key)}
         />
@@ -486,10 +462,11 @@ export function Composer({
           onStop={running ? onStop : undefined}
           failure={failure}
           off={
-            text.value.trim() === "" ||
             dictation.busy() ||
             nameOnly() ||
-            (edit !== null ? saving.value : !ready || !placed || files.busy)
+            (edit !== null
+              ? text.value.trim() === "" || saving.value
+              : outgoing({ ...draft(), carries: true }) === null)
           }
           onSend={() => void submit()}
         />

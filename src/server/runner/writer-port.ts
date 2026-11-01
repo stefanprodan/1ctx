@@ -10,6 +10,7 @@ import type {
   SendSummary,
   TraceCall,
 } from "../../shared/contracts/session.ts";
+import type { MessageImage } from "../../shared/images.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
@@ -39,6 +40,22 @@ export type UploadsPort = {
       ids: readonly string[];
     }[],
   ): MessageUpload[][];
+};
+
+export type ImagesPort = {
+  // each message's staged images, in the start's transaction, then the
+  // project's budget
+  claim(
+    projectId: string,
+    sessionId: string,
+    claims: readonly {
+      userId: string;
+      messageId: string;
+      ids: readonly string[];
+    }[],
+  ): MessageImage[][];
+  // a queued message's images staged again, before its row is taken
+  release(queuedId: string): void;
 };
 
 export type SessionsPort = {

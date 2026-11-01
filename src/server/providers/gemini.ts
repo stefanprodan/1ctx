@@ -67,6 +67,8 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
       thinkingRequired: false,
       reasoningKnown: true,
       described: true,
+      // the catalog lists no input; models.dev fills it
+      images: null,
     });
   }
   // Google lists oldest first; the search keeps catalog order within a

@@ -70,6 +70,13 @@ export const LIMIT_NAMES = [
   "externalTaskDays",
   "externalTaskIdleHours",
   "dictationClipsPerUser",
+  "imageUploadBytes",
+  "imageMaxPixels",
+  "imageLongSide",
+  "imagesPerMessage",
+  "imagesPerRequest",
+  "imageProjectBytes",
+  "imagesPerHour",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 
@@ -82,6 +89,7 @@ export const LIMIT_UNITS = [
   "days",
   "minutes",
   "hours",
+  "pixels",
 ] as const;
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
@@ -96,6 +104,7 @@ export const LIMIT_SCOPES = [
   "repos",
   "external",
   "dictation",
+  "images",
 ] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 

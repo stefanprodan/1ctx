@@ -30,6 +30,7 @@ type ModelDraft = {
   windowText: string;
   windowSaved: number | null;
   takesTools: boolean;
+  readsImages: boolean;
   suggested: boolean;
 };
 
@@ -50,6 +51,8 @@ export class AgentDrafts {
   // the stored window the text was shown from, sent back when untouched
   windowSaved: number | null = null;
   readonly takesTools = signal(false);
+  // what the admin states for a model whose catalog is silent on images
+  readonly readsImages = signal(false);
   // the window and tools are models.dev's for the model picked, not yet
   // changed; the hint says so
   readonly suggested = signal(false);
@@ -104,6 +107,7 @@ export class AgentDrafts {
     this.windowText.value = windowText(agent.model.contextLength);
     this.windowSaved = agent.model.contextLength;
     this.takesTools.value = agent.model.tools;
+    this.readsImages.value = agent.images;
     this.suggested.value = false;
     this.changing.value = false;
     this.before = null;
@@ -153,7 +157,8 @@ export class AgentDrafts {
       this.upstream.value === before.upstream &&
       this.skip4Bit.value === before.skip4Bit &&
       this.windowText.value === windowText(before.model.contextLength) &&
-      this.takesTools.value === before.model.tools;
+      this.takesTools.value === before.model.tools &&
+      this.readsImages.value === before.images;
     if (untouched) this.resetModel(after);
   }
 
@@ -170,6 +175,7 @@ export class AgentDrafts {
       windowText: this.windowText.value,
       windowSaved: this.windowSaved,
       takesTools: this.takesTools.value,
+      readsImages: this.readsImages.value,
       suggested: this.suggested.value,
     };
     this.changing.value = true;
@@ -191,6 +197,7 @@ export class AgentDrafts {
       this.windowText.value = b.windowText;
       this.windowSaved = b.windowSaved;
       this.takesTools.value = b.takesTools;
+      this.readsImages.value = b.readsImages;
       this.suggested.value = b.suggested;
     }
     this.before = null;
@@ -208,6 +215,8 @@ export class AgentDrafts {
     this.windowText.value = suggested ? windowText(model.contextLength) : "";
     this.windowSaved = suggested ? model.contextLength : null;
     this.takesTools.value = suggested && model.tools;
+    // a stated flag goes only with the model it was stated for
+    this.readsImages.value = false;
     this.suggested.value = suggested;
     this.before = null;
     this.changing.value = false;
@@ -246,6 +255,7 @@ export class AgentDrafts {
         this.takesTools.value,
         this.windowSaved,
       ),
+      ...(m.images === null && { images: this.readsImages.value }),
     };
   }
 
@@ -291,6 +301,9 @@ export class AgentDrafts {
       this.skip4Bit.value !== agent.skip4Bit ||
       picked?.contextLength !== agent.model.contextLength ||
       picked?.tools !== agent.model.tools ||
+      // the catalog's word moved, or the stated one changed
+      model?.images !== agent.model.images ||
+      (model?.images === null && this.readsImages.value !== agent.images) ||
       // a window it cannot take reads as none, yet is an edit to refuse
       statedProblem(model, window, tools, saved) !== null
     );

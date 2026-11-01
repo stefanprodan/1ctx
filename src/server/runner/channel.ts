@@ -5,6 +5,7 @@ import type {
   ChannelPostResponse,
   SendMessageRequest,
 } from "../../shared/api/sessions.ts";
+import { CHANNEL_NO_IMAGES } from "../../shared/images.ts";
 import { summonName } from "../../shared/summon.ts";
 import { transact } from "../db/index.ts";
 import {
@@ -68,6 +69,8 @@ export function pendingFields(deps: RunnerDeps, row: PendingRow) {
   };
 }
 
+export { CHANNEL_NO_IMAGES };
+
 function postChannel(
   deps: ChannelDeps,
   channel: SessionRow,
@@ -77,6 +80,9 @@ function postChannel(
   const { registry, queue } = deps;
   if (fields.capabilities !== undefined) {
     throw new BadRequest("a channel has no capability switches");
+  }
+  if (fields.images !== undefined) {
+    throw new BadRequest(CHANNEL_NO_IMAGES);
   }
   const agent =
     channelFirstWord(fields.message, channel.projectId, {

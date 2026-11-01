@@ -4,6 +4,7 @@
 // Grouped by send as the transcript is; summaries stay out.
 
 import { finishWords } from "../../shared/finish.ts";
+import { imageLine, type MessageImage } from "../../shared/images.ts";
 import { attachedLine, type MessageUpload } from "../../shared/uploads.ts";
 import type { MessageKind, MessageStatus } from "../../shared/words.ts";
 import { localMinute } from "../lib/clock.ts";
@@ -23,6 +24,7 @@ export type ExportRow = {
   author: string | null;
   content: string;
   uploads: MessageUpload[] | null;
+  images?: MessageImage[];
   createdAt: number;
   finishedAt: number | null;
 };
@@ -40,10 +42,12 @@ export function chatMarkdownParts(
   ];
   for (const turn of sends(rows)) {
     for (const user of turn.filter((row) => row.kind === "user")) {
-      const text = [
-        heading(user.author ?? "someone", user.createdAt, stamp),
-        body(user.content),
-      ];
+      const text = [heading(user.author ?? "someone", user.createdAt, stamp)];
+      // a message of images alone has no text
+      if (user.content !== "") text.push(body(user.content));
+      for (const image of user.images ?? []) {
+        text.push(escapeInline(imageLine(image)));
+      }
       if (user.uploads?.length)
         text.push(escapeInline(attachedLine(user.uploads)));
       parts.push({

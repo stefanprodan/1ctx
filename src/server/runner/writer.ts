@@ -55,7 +55,7 @@ import {
   startCompact as startCompactRows,
 } from "./summary.ts";
 import { traceCalls } from "./trace.ts";
-import type { SessionsPort, UploadsPort } from "./writer-port.ts";
+import type { ImagesPort, SessionsPort, UploadsPort } from "./writer-port.ts";
 
 export type { Started } from "./start.ts";
 export type { SessionsPort } from "./writer-port.ts";
@@ -66,6 +66,7 @@ export type WriterDeps = {
   log: Log;
   sessions: SessionsPort;
   uploads: UploadsPort;
+  images: ImagesPort;
   usage: { record(fields: UsageFields): unknown };
   commitMemory(send: ActiveSend): number | null;
   // a chat's snapshot of the project's note, started with its first send

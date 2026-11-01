@@ -6,6 +6,7 @@
 // The revision counts the session's transactions; a client applies an
 // event only when its revision is above the one it holds.
 
+import type { MessageImage } from "../images.ts";
 import type { MessageUpload } from "../uploads.ts";
 import type {
   ArchiveReason,
@@ -144,6 +145,9 @@ export type Message = {
   // the files a user message carried, as they were at the send; null on
   // every other row and on a message without files
   uploads: MessageUpload[] | null;
+  // the images a user message carried, in order; absent on every other
+  // row and on a message without images
+  images?: MessageImage[];
   // the files a bash command opened onto the page with open, in open
   // order, without their text; null on every other row and on a bash
   // row that opened nothing
@@ -385,6 +389,8 @@ export type QueuedMessage = {
   text: string;
   cut: boolean;
   uploads: number;
+  // the images it holds, absent when none
+  images?: number;
   state: QueuedState;
   reason: NotSentReason | null;
   revision: number;

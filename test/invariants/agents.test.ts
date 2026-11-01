@@ -45,6 +45,7 @@ const flash = {
   thinkingRequired: false,
   reasoningKnown: true,
   described: true,
+  images: true,
 };
 
 const defaults = {
@@ -260,6 +261,8 @@ describe("the agents", () => {
       upstream: null,
       skip4Bit: false,
       subagents: false,
+      // the catalog lists image input
+      images: true,
       // the first agent is the default until an admin marks another
       default: true,
       createdAt: app.now.value,
@@ -670,6 +673,7 @@ describe("a model its catalog does not describe", () => {
       thinkingRequired: false,
       reasoningKnown: false,
       described: false,
+      images: null,
     });
   });
 

@@ -37,8 +37,9 @@ in `docs/ui.md`.
   it, and a pick wins over an answer asked before it.
 - **The draft is keyed by user and chat,** or by project for a chat
   not made yet (Home is one key). Its shape is `{text, uploads:
-  {projectId, id, name}[]}`, so Home keeps each project's files apart.
-  There is no reader for another shape. A slash command carries no
+  {projectId, id, name}[], images?: {projectId, id, name}[]}`, so Home
+  keeps each project's files and images apart; `images` is left out
+  when empty. There is no reader for another shape. A slash command carries no
   files and clears none, but for `/location`.
 - **`/location` is a message, not an action.** It is in the menu only
   where the browser can share a position (a secure context with
@@ -80,6 +81,49 @@ in `docs/ui.md`.
 - **A menu row that leaves the page on its own click stops the click.**
   Otherwise the menu reads it as a click outside. A pane takes the
   focus and gives it back.
+
+## Images
+
+The server's rules for an image are in `docs/images.md`.
+
+- **A file's type picks its route** (`routeFiles()` in
+  `Images.model.ts`): a pasted, dropped or Add files pick of type JPEG,
+  PNG, WebP or GIF goes to the image route, any other file (an SVG, a
+  HEIC) to the uploads route. The plus menu's Add images picker
+  (`accept` the four types, `multiple`; iOS then hands a JPEG for a
+  HEIC) sends every file it gives as an image, so the server says why
+  one is not. Images need no `bash`, so Add images is never off.
+- **A channel refuses images before an upload,** with the server's
+  words as a sentence ("A channel post cannot carry images.") in the
+  failure slot; its files still go.
+- **Files and images share one upload line** (`data/upload-line.ts`),
+  since the server runs one upload per user: in a mixed pick each waits
+  for the one before it to settle. A 409 "an upload is running" is then
+  another tab's, and waits and tries again. One let go while it waits
+  leaves the line and never starts.
+- **`Images.state.ts` stages them one at a time.** Each shows its
+  progress, then a square thumbnail of the staged image's route with
+  an X that deletes it, off while a send is out. A refusal is a log
+  line with the server's words and status; it blocks nothing.
+- **An image let go while its bytes still go is aborted;** one whose
+  bytes all went is let finish and its answer deleted, since the
+  server may stage it anyway. An unmount does the same.
+- **The server lists no staged images,** so a draft's ids are each
+  asked about once (`checkImage()`, the bytes route's status alone)
+  while Send waits. A 404 or 410 drops it without a word; any other
+  answer keeps it. A sent image's bytes still answer, so a send refused
+  with "an image is gone, add it again" drops every image of the
+  draft, deleting the ones still staged, and its words ask for them
+  again.
+- **A message of images alone is sent,** its text empty; Send waits
+  while an image uploads or is checked (`outgoing()`, which Enter and
+  Send share). A fork's `draftImages` land in the new chat's draft.
+- **"This agent cannot read images" is a hint, never a block.** It
+  shows under the images while the agent picked has `images` false;
+  the server refuses at the claim and its words show in the failure
+  slot, since the agent may change before the send. While they show,
+  the hint hides, and another agent picked clears them (`useUnread()`),
+  never another failure.
 
 ## Dictation
 

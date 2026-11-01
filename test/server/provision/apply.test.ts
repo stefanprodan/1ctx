@@ -325,6 +325,7 @@ describe("provision through the composed app", () => {
         thinkingRequired: false,
         reasoningKnown: false,
         described: false,
+        images: null,
       };
       expect(app.agents.byName("bare-guide")!.model).toEqual(stated);
       // omitted, they stay as an omitted field does
@@ -349,6 +350,47 @@ describe("provision through the composed app", () => {
       expect(() =>
         documents(bare({ model: "bare-model", contextLength: "big" })),
       ).toThrow("spec.contextLength");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("keeps the stated image flag while the model stays and its catalog is silent", async () => {
+    const { app } = await instance();
+    try {
+      const strict = object("Provider", "bare", {
+        wire: "openai-strict",
+        baseUrl: BARE_URL,
+        keyFrom: null,
+      });
+      const bare = (spec: Record<string, unknown>) =>
+        object("Agent", "bare-guide", { provider: "bare", ...spec });
+      expect(
+        await app.provision.apply(
+          documents(strict, bare({ model: "bare-model", images: true })),
+          ignore,
+        ),
+      ).toEqual({ created: 2, updated: 0, unchanged: 0 });
+      expect(app.agents.byName("bare-guide")).toMatchObject({
+        model: { images: null },
+        images: true,
+      });
+      expect(
+        await app.provision.apply(documents(bare({ prompt: "" })), ignore),
+      ).toEqual({ created: 0, updated: 0, unchanged: 1 });
+      expect(app.agents.byName("bare-guide")!.images).toBe(true);
+      expect(
+        await app.provision.apply(documents(bare({ images: false })), ignore),
+      ).toEqual({ created: 0, updated: 1, unchanged: 0 });
+      expect(app.agents.byName("bare-guide")!.images).toBe(false);
+      await app.provision.apply(documents(bare({ images: true })), ignore);
+      // another model drops it, as it drops the window
+      await app.provision.apply(
+        documents(bare({ model: "bare-model-next" })),
+        ignore,
+      );
+      expect(app.agents.byName("bare-guide")!.images).toBe(false);
+      expect(() => documents(bare({ images: "yes" }))).toThrow(/images/);
     } finally {
       await app.shutdown();
     }
@@ -828,6 +870,44 @@ describe("provision through the composed app", () => {
           listedAs: "claude-sonnet-5-5",
         },
       });
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("an agent saved while its catalog was silent takes the catalog's image word", async () => {
+    const { app } = await instance();
+    try {
+      const claude = object("Provider", "anthropic", {
+        wire: "anthropic",
+        baseUrl: ANTHROPIC_URL,
+        keyFrom: null,
+      });
+      const sonnet = (spec: Record<string, unknown>) =>
+        object("Agent", "sonnet", {
+          provider: "anthropic",
+          model: "claude-sonnet-5-5",
+          ...spec,
+        });
+      await app.provision.apply(documents(claude, sonnet({})), ignore);
+      // as an agent saved before the flag, or while the catalog said nothing
+      const id = app.agents.byName("sonnet")!.id;
+      app.db
+        .query("update agents set model_images = null, images = 0 where id = ?")
+        .run(id);
+      expect(
+        await app.provision.apply(documents(sonnet({ prompt: "Hi." })), ignore),
+      ).toEqual({ created: 0, updated: 1, unchanged: 0 });
+      expect(app.agents.byName("sonnet")).toMatchObject({
+        prompt: "Hi.",
+        model: { images: true },
+        images: true,
+      });
+      // a stated word the catalog answers is dropped, never refused
+      expect(
+        await app.provision.apply(documents(sonnet({ images: false })), ignore),
+      ).toEqual({ created: 0, updated: 1, unchanged: 0 });
+      expect(app.agents.byName("sonnet")!.images).toBe(true);
     } finally {
       await app.shutdown();
     }

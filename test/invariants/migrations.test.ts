@@ -91,6 +91,8 @@ const EXPECTED_IDS = [
   "0077-automation-check",
   "0078-check-compare",
   "0079-repos-block",
+  "0080-images",
+  "0081-agent-images",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -118,6 +120,8 @@ const LATER_COLUMNS = [
   "post_to_channel",
   "run_calls",
   "run_session_id",
+  "model_images",
+  "images",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -2084,6 +2088,176 @@ describe("the schema", () => {
     }
   });
 
+  test("0080 adds images, staged or sent, cascading with their owners", () => {
+    const db = seed(MIGRATIONS.slice(0, 79));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0080-images"));
+      const insert = (id: string, extra: string, values: string) =>
+        db.exec(`
+          insert into images (id, project_id, user_id, name, media_type,
+            bytes, width, height, digest, created_at${extra})
+          values ('${id}', 'p', 'u', 'a.png', 'image/png', 3, 1, 1, 'd', 0${values})
+        `);
+      insert("staged", ", expires_at, data", ", 10, x'010203'");
+      insert(
+        "sent",
+        ", session_id, message_id, data",
+        ", 'sess', 'm1', x'010203'",
+      );
+      insert("freed", ", session_id, message_id", ", 'sess', 'm1'");
+      // staged with no bytes, staged with no lease, sent with a lease, a
+      // message without its chat
+      for (const [extra, values] of [
+        [", expires_at", ", 10"],
+        [", data", ", x'01'"],
+        [
+          ", session_id, message_id, expires_at, data",
+          ", 'sess', 'm1', 10, x'01'",
+        ],
+        [", message_id, data", ", 'm1', x'01'"],
+      ] as const) {
+        expect(() => insert("bad", extra, values)).toThrow(/constraint/i);
+      }
+      const ids = () =>
+        db
+          .query<{ id: string }, []>("select id from images order by id")
+          .all()
+          .map((row) => row.id);
+      expect(ids()).toEqual(["freed", "sent", "staged"]);
+      db.exec("delete from messages where id = 'm1'");
+      expect(ids()).toEqual(["staged"]);
+      db.exec("delete from projects where id = 'p'");
+      expect(ids()).toEqual([]);
+      expect(
+        db
+          .query<{ name: string }, []>(
+            "select name from sqlite_schema where type = 'index' and tbl_name = 'images' order by name",
+          )
+          .all()
+          .map((row) => row.name),
+      ).toEqual([
+        "images_budget",
+        "images_expiry",
+        "images_message",
+        "images_project",
+        "images_queued",
+        "images_session",
+        "images_user",
+        "sqlite_autoindex_images_1",
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0081 leaves every agent's image input unknown and off", () => {
+    const db = seed(MIGRATIONS.slice(0, 80));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0081-agent-images"));
+      expect(
+        db.query("select id, model_images, images from agents").all(),
+      ).toEqual([{ id: "a", model_images: null, images: 0 }]);
+      expect(() =>
+        db.exec("update agents set model_images = 2 where id = 'a'"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec("update agents set images = null where id = 'a'"),
+      ).toThrow(/NOT NULL/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0080 names a queued message's images, never held and sent at once", () => {
+    const db = seed(MIGRATIONS.slice(0, 79));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0080-images"));
+      db.exec(`
+        insert into queued_messages (id, session_id, author_id, content,
+          images, queued_at, changed_at)
+          values ('q', 'sess', 'u', 'look', '["held"]', 0, 0);
+        insert into images (id, project_id, user_id, queued_id, name,
+          media_type, bytes, width, height, digest, created_at, data)
+          values ('held', 'p', 'u', 'q', 'a.png', 'image/png', 3, 1, 1, 'd',
+            0, x'010203');
+      `);
+      expect(
+        db.query("select images from queued_messages where id = 'q'").get(),
+      ).toEqual({ images: '["held"]' });
+      // a held row has no lease, and drops its queued id only for one
+      expect(() =>
+        db.exec("update images set expires_at = 10 where id = 'held'"),
+      ).toThrow(/CHECK constraint failed/);
+      expect(() =>
+        db.exec("update images set queued_id = null where id = 'held'"),
+      ).toThrow(/CHECK constraint failed/);
+      expect(() =>
+        db.exec(
+          "update images set session_id = 'sess', message_id = 'm1' where id = 'held'",
+        ),
+      ).toThrow(/CHECK constraint failed/);
+      expect(() =>
+        db.exec(`
+          insert into images (id, project_id, user_id, session_id, message_id,
+            queued_id, name, media_type, bytes, width, height, digest,
+            created_at, data)
+          values ('both', 'p', 'u', 'sess', 'm1', 'q', 'a.png', 'image/png',
+            3, 1, 1, 'd', 0, x'01')
+        `),
+      ).toThrow(/CHECK constraint failed/);
+      db.exec(`
+        update images set queued_id = null, session_id = 'sess',
+          message_id = 'm1' where id = 'held'
+      `);
+      expect(
+        db.query("select queued_id, message_id from images").get(),
+      ).toEqual({ queued_id: null, message_id: "m1" });
+      // the budget reads the index alone, never a row of bytes
+      for (const sql of [
+        "select sum(bytes) from images where project_id = ? and message_id is not null and data is not null",
+        "select rowid, bytes from images where project_id = ? and message_id is not null and data is not null order by created_at limit 9",
+      ]) {
+        expect(
+          db
+            .query<{ detail: string }, [string]>(`explain query plan ${sql}`)
+            .all("p")
+            .map((row) => row.detail),
+        ).toEqual([
+          "SEARCH images USING COVERING INDEX images_budget (project_id=?)",
+        ]);
+      }
+      // the staged count by lease and the monitor's sums, as the code names
+      // their indexes, read them alone
+      const plan = (sql: string) =>
+        db
+          .query<{ detail: string }, []>(`explain query plan ${sql}`)
+          .all()
+          .map((row) => row.detail);
+      expect(
+        plan(
+          "select count(*) from images indexed by images_user where user_id = 'u' and message_id is null and expires_at > 0",
+        ),
+      ).toEqual([
+        "SEARCH images USING COVERING INDEX images_user (user_id=? AND expires_at>?)",
+      ]);
+      expect(
+        plan(
+          "select session_id, sum(bytes) from images indexed by images_budget where message_id is not null and data is not null group by session_id",
+        ),
+      ).toEqual([
+        "SCAN images USING COVERING INDEX images_budget",
+        "USE TEMP B-TREE FOR GROUP BY",
+      ]);
+      expect(
+        plan(
+          "select sum(bytes) from images indexed by images_user where message_id is null",
+        ),
+      ).toEqual(["SCAN images USING COVERING INDEX images_user"]);
+    } finally {
+      db.close();
+    }
+  });
+
   test("0057 adds the automation row on and keeps every tool row", () => {
     const db = seed(MIGRATIONS.slice(0, 56));
     try {
@@ -3055,6 +3229,8 @@ describe("the schema", () => {
               mcp_folders: _____________,
               swept: ______________,
               output_limit: _______________,
+              model_images: ________________,
+              images: _________________,
               ...rest
             }) => rest,
           ),
@@ -4036,6 +4212,8 @@ describe("0008 search tavily migration", () => {
             listed_as: null,
             subagents: 0,
             output_limit: null,
+            model_images: null,
+            images: 0,
           })),
         );
         db.exec(`
@@ -4170,6 +4348,8 @@ describe("project channel migrations", () => {
       "0077-automation-check",
       "0078-check-compare",
       "0079-repos-block",
+      "0080-images",
+      "0081-agent-images",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4386,6 +4566,8 @@ describe("project channel migrations", () => {
           "0077-automation-check",
           "0078-check-compare",
           "0079-repos-block",
+          "0080-images",
+          "0081-agent-images",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4551,6 +4733,8 @@ describe("project channel migrations", () => {
         "0077-automation-check",
         "0078-check-compare",
         "0079-repos-block",
+        "0080-images",
+        "0081-agent-images",
       ]);
       expect(
         db

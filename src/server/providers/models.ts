@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What models.dev says of the models of the dedicated wires, embedded
-// in the binary: the window, the tools flag and, for the per-token
-// wires, the prices. scripts/models.ts (make models) writes models.json.
+// in the binary: the window, the tools flag, whether it reads images
+// and, for the per-token wires, the prices. scripts/models.ts (make models) writes models.json.
 // A window and a tools flag belong to the model, so an OpenAI server's
 // model is found by name among these; it never gets a price.
 
@@ -50,6 +50,8 @@ type ListedRates = {
 type Listed = {
   window?: number;
   tools: boolean;
+  // absent where models.dev lists no input modalities
+  images?: boolean;
   canonical?: string;
   price?: ListedRates & { tiers?: (ListedRates & { above: number })[] };
 };
@@ -117,6 +119,15 @@ export function modelFacts(
 ): ModelFacts | null {
   const m = listed(source, model);
   return m ? facts(m) : null;
+}
+
+// whether the model in its own provider reads images; null when
+// models.dev does not list the model or its input
+export function modelImages(
+  source: ModelSource,
+  model: string,
+): boolean | null {
+  return listed(source, model)?.images ?? null;
 }
 
 // a model of any host, by the last part of its id (z-ai/glm-5.2 is

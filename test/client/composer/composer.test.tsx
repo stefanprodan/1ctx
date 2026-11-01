@@ -67,6 +67,7 @@ const agent = (id: string, name: string): AgentSummary => ({
     thinkingRequired: false,
     reasoningKnown: true,
     described: true,
+    images: null,
   },
   thinking: null,
   effort: null,
@@ -77,6 +78,7 @@ const agent = (id: string, name: string): AgentSummary => ({
   upstream: null,
   skip4Bit: false,
   subagents: false,
+  images: false,
   default: id === "a1",
   createdAt: 0,
 });
@@ -330,5 +332,32 @@ describe("the composer in a channel", () => {
     expect(
       keysOver("", AGENTS, null, null, { name: "#finops" }).html,
     ).not.toContain("composer-ctx");
+  });
+});
+
+describe("the images picker", () => {
+  const draw = (channel?: { name: string }) =>
+    render(
+      <Composer
+        scope={SCOPE}
+        filesProjectId="p1"
+        agents={[agent("a1", "coder")]}
+        agentId="a1"
+        running={false}
+        busy={false}
+        onSend={async () => {}}
+        onStop={async () => {}}
+        channel={channel}
+      />,
+    );
+
+  test("takes JPEG, PNG, WebP and GIF, many at once, in a chat", () => {
+    expect(draw()).toMatch(
+      /accept="image\/jpeg,image\/png,image\/webp,image\/gif" multiple/,
+    );
+  });
+
+  test("is not offered in a channel, whose plus picks files alone", () => {
+    expect(draw({ name: "#ops" })).not.toContain("accept=");
   });
 });

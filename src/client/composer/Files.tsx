@@ -8,6 +8,19 @@
 // what was skipped. The words are Attach.words.ts.
 
 import { useSignal } from "@preact/signals";
+import { useEffect, useLayoutEffect, useMemo } from "preact/hooks";
+import { me } from "../data/me.ts";
+import { inUploadLine } from "../data/upload-line.ts";
+import {
+  askedOf,
+  deleteUpload,
+  forgetUpload,
+  loadUploads,
+  staged,
+  stagedOf,
+  stageUpload,
+  takeStamp,
+} from "../data/uploads.ts";
 import { Icon } from "../lib/icons.tsx";
 import {
   RowsLog,
@@ -15,13 +28,49 @@ import {
   RowsLogLine,
   RowsLogMore,
 } from "../ui/Rows.tsx";
-import type { AttachItem } from "./Attach.state.ts";
+import { type AttachItem, AttachState } from "./Attach.state.ts";
 import {
   attachedLines,
   LOG_FOLD,
   skippedLines,
   summaryOf,
 } from "./Attach.words.ts";
+import { readDraft, writeDraftUploads } from "./draft.ts";
+
+// the draft's files for a scope, shown for the project a send goes to
+export function useFiles(key: string, projectId: string): AttachState {
+  const files = useMemo(
+    () =>
+      new AttachState(
+        {
+          stage: (projectId, file, attempt, options) =>
+            inUploadLine(
+              () => stageUpload(projectId, file, attempt, options),
+              options.signal,
+            ),
+          remove: deleteUpload,
+          forget: (_projectId, attempt) => forgetUpload(attempt),
+          reload: loadUploads,
+          list: stagedOf,
+          stamp: takeStamp,
+          asked: askedOf,
+          wait: (ms) => new Promise((done) => setTimeout(done, ms)),
+          currentUser: () => me.value?.id ?? null,
+          mint: () => crypto.randomUUID(),
+          save: (uploads) => writeDraftUploads(key, uploads),
+        },
+        readDraft(key).uploads,
+      ),
+    [key],
+  );
+  useEffect(() => () => files.dispose(), [files]);
+  // before the paint, so Send is never drawn on for a draft whose files
+  // are not yet known to the state
+  useLayoutEffect(() => files.show(projectId), [files, projectId]);
+  const held = staged.value.get(projectId) ?? null;
+  useEffect(() => files.reconcile(held), [files, held]);
+  return files;
+}
 
 export function Files({
   items,

@@ -68,6 +68,7 @@ const boxOf = (el: HTMLElement): Box => ({
 
 export function Transcript({
   sessionId,
+  projectId,
   nodes,
   live,
   agentOf,
@@ -82,6 +83,8 @@ export function Transcript({
   channel,
 }: {
   sessionId: string;
+  // the chat's project, which a message's images are read from
+  projectId: string;
   nodes: Node[];
   live: ReadonlyMap<string, Live>;
   // each send's round waiting to ask its provider again, by send id
@@ -298,6 +301,7 @@ export function Transcript({
                 ...before,
                 <UserRow
                   key={node.message.id}
+                  projectId={projectId}
                   message={node.message}
                   author={authorOf(node.message.userId)}
                   channel={channel !== undefined}

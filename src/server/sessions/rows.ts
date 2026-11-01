@@ -11,6 +11,7 @@ import type {
   TraceCall,
 } from "../../shared/contracts/session.ts";
 import type { ToolCall } from "../../shared/contracts/tool.ts";
+import type { MessageImage } from "../../shared/images.ts";
 import { cutAt } from "../../shared/text.ts";
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type {
@@ -24,6 +25,7 @@ import type {
   SessionOrigin,
   SessionStatus,
 } from "../../shared/words.ts";
+import { messageImagesSql } from "../images/index.ts";
 import type { ReasoningDetail } from "../providers/index.ts";
 import { offWireCall } from "./visual.ts";
 
@@ -133,6 +135,7 @@ export type RawMessage = {
   content: string;
   packed_bytes: number | null;
   uploads: string | null;
+  images: string | null;
   files: string | null;
   saved: string | null;
   reasoning: string;
@@ -163,6 +166,8 @@ export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, 
    messages.send_id, messages.round, messages.slot, messages.user_id,
    messages.agent_id, messages.content, messages.packed_bytes,
    messages.uploads,
+   case when messages.kind = 'user' then ${messageImagesSql("messages")} end
+     as images,
    (select json_group_array(json_object(
       'path', path, 'kind', kind, 'language', language,
       'bytes', bytes, 'lines', lines, 'title', title) order by position)
@@ -184,6 +189,12 @@ export const MESSAGE_COLUMNS = `messages.id, messages.session_id, messages.seq, 
         join automations on automations.id = runs.automation_id
        where runs.id = messages.run_session_id) end as run_automation,
    messages.created_at, messages.finished_at`;
+
+// a user message's images, absent when it has none
+export function imagesOf(raw: string | null): { images?: MessageImage[] } {
+  const images = listOrNull<MessageImage>(raw);
+  return images === null ? {} : { images };
+}
 
 // a JSON list column: null when absent or empty
 export function listOrNull<T>(raw: string | null): T[] | null {
@@ -223,6 +234,7 @@ export const message = (raw: RawMessage): Message => ({
   // a packed tool row's content is empty; its size is kept beside it
   resultBytes: raw.kind === "tool" ? raw.packed_bytes : null,
   uploads: raw.kind === "user" ? listOrNull<MessageUpload>(raw.uploads) : null,
+  ...imagesOf(raw.images),
   files: raw.kind === "tool" ? listOrNull<OpenedFile>(raw.files) : null,
   saved: raw.kind === "tool" ? parseSavedDocs(raw.saved) : null,
   promptTokens:

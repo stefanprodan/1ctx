@@ -4,6 +4,7 @@
 // Rows to wire messages; an incomplete work round goes as plain text.
 
 import type { Message } from "../../shared/contracts/session.ts";
+import { withImageLines } from "../../shared/images.ts";
 import { uploadsBlock } from "../../shared/uploads.ts";
 import {
   type ChatMessageIn,
@@ -132,11 +133,13 @@ export function userMessage(
       : row.userId === null
         ? null
         : lookups.usernameOf(row.userId);
+  // the wire sends no image bytes yet, so the model reads their lines
+  const text = withImageLines(row.content, row.images);
   return {
     role: "user",
     content: row.uploads?.length
-      ? `${row.content}\n\n${uploadsBlock(row.uploads)}`
-      : row.content,
+      ? `${text}\n\n${uploadsBlock(row.uploads)}`
+      : text,
     ...(name === null ? {} : { name }),
   };
 }

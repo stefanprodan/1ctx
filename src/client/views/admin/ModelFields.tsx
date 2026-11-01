@@ -18,7 +18,7 @@ import {
 } from "./Agents.model.ts";
 import { CatalogSearch } from "./Agents.state.ts";
 import { EffortField } from "./EffortField.tsx";
-import { ModelFacts } from "./ModelFacts.tsx";
+import { ImagesFact, ModelFacts } from "./ModelFacts.tsx";
 import { ModelPicker } from "./ModelPicker.tsx";
 import { UpstreamField } from "./UpstreamField.tsx";
 import "./agent-page.css";
@@ -89,6 +89,16 @@ export function ModelFields({
               }}
               onTools={(value) => {
                 d.takesTools.value = value;
+                save.touch();
+              }}
+            />
+          )}
+          {picked.images === null && (
+            <ImagesFact
+              images={d.readsImages.value}
+              busy={busy}
+              onImages={(value) => {
+                d.readsImages.value = value;
                 save.touch();
               }}
             />

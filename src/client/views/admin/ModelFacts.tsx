@@ -65,3 +65,29 @@ export function ModelFacts({
     </>
   );
 }
+
+// whether the model reads images, where its catalog does not say
+export function ImagesFact({
+  images,
+  busy,
+  onImages,
+}: {
+  images: boolean;
+  busy: boolean;
+  onImages: (value: boolean) => void;
+}) {
+  return (
+    <div class="field">
+      <span class="label">Reads images</span>
+      <Seg
+        label="Reads images"
+        options={TOOLS_CHOICES.map((c) => ({ ...c, disabled: busy }))}
+        value={images ? "on" : "off"}
+        onPick={(value) => onImages(value === "on")}
+      />
+      <span class="hint">
+        The catalog does not say whether it reads images.
+      </span>
+    </div>
+  );
+}

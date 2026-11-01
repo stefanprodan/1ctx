@@ -56,10 +56,12 @@ export async function sendMessage(
   id: string,
   message: string,
   uploads: string[],
+  images: string[] = [],
 ): Promise<void> {
   const body: SendMessageRequest = {
     message,
     ...(uploads.length === 0 ? {} : { uploads }),
+    ...(images.length === 0 ? {} : { images }),
     ...changeOf(id),
   };
   sending.value = true;

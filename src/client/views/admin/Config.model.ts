@@ -130,6 +130,19 @@ export const STORAGE_CARDS: readonly LimitsGroup[] = [
     ],
   },
   {
+    title: "Images",
+    line: "Images added to chats, and what a project keeps.",
+    names: [
+      "imageUploadBytes",
+      "imageMaxPixels",
+      "imageLongSide",
+      "imagesPerMessage",
+      "imagesPerRequest",
+      "imageProjectBytes",
+      "imagesPerHour",
+    ],
+  },
+  {
     title: "MCP results",
     line: "Large results kept as files for a chat.",
     names: ["mcpKeptBytes", "mcpKeptFiles"],

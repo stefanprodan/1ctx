@@ -41,6 +41,10 @@ export type CatalogMatch = {
   // false means it never does; OpenRouter, Gemini and Anthropic do
   reasoningKnown: boolean;
   described: boolean;
+  // whether the model reads images: true or false where the catalog or
+  // models.dev lists its input, null where neither says, which leaves
+  // it to the admin; apart from described, which says nothing of it
+  images: boolean | null;
   listedAs?: string;
   outputLimit?: number;
 };

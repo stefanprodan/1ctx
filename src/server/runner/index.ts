@@ -30,6 +30,7 @@ import { childRowsTo, delegate } from "./child.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
+import { IMAGE_TITLE } from "./images.ts";
 import { roundLookups } from "./lookups.ts";
 import { commitMemory } from "./memory-phase.ts";
 import { type PreparedRun, prepareSend } from "./prepare.ts";
@@ -65,12 +66,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
   const asks = attention(deps.attention, deps.log);
   const childRows = childRowsTo(deps.db);
   const writer = new Writer({
-    db: deps.db,
-    clock: deps.clock,
-    log: deps.log,
-    sessions: deps.sessions,
-    uploads: deps.uploads,
-    usage: deps.usage,
+    ...deps,
     commitMemory: (send) => commitMemory({ memory: deps.memory }, send),
     views: {
       start: (sessionId, snapshot, sendId) =>
@@ -78,9 +74,6 @@ export function runnerArea(deps: RunnerDeps): Runner {
       end: (sessionId) => deps.memory.endView(sessionId),
       resetSeen: (sessionId) => deps.memory.resetSeen(sessionId),
     },
-    render: deps.render,
-    stream: deps.stream,
-    alerts: deps.alerts,
     childRows,
   });
   const roundDeps: RoundDeps = {
@@ -303,9 +296,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       ),
       title: first.title,
       turn: {
-        users: messages.map((fields, i) =>
-          newUser(authors[i]!, fields.message, fields.uploads),
-        ),
+        users: messages.map((fields, i) => newUser(authors[i]!, fields)),
       },
       changes: messages.map((fields) => fields.capabilities),
       ...(claim === undefined ? {} : { claim }),
@@ -352,8 +343,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
         project,
         user,
         agent,
-        title: titleFrom(fields.message),
-        turn: { users: [newUser(user, fields.message, fields.uploads)] },
+        title: titleFrom(fields.message) || IMAGE_TITLE,
+        turn: { users: [newUser(user, fields)] },
         changes: [fields.capabilities],
       });
     },
@@ -439,7 +430,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
         agent: event.agent,
         title: event.automation.name,
         event,
-        turn: { users: [newUser(event.user, event.instructions)] },
+        turn: { users: [newUser(event.user, { message: event.instructions })] },
         changes: [],
       });
     },

@@ -16,7 +16,13 @@ import { errorFields, type Log } from "../lib/log.ts";
 import { parseModels as parseAnthropicModels } from "./anthropic.ts";
 import { azureUrls, parseDeployments } from "./azure.ts";
 import { parseCatalog as parseGeminiCatalog } from "./gemini.ts";
-import { factsByName, modelFacts, modelPrice, modelSource } from "./models.ts";
+import {
+  factsByName,
+  modelFacts,
+  modelImages,
+  modelPrice,
+  modelSource,
+} from "./models.ts";
 import { keyOf } from "./provider.ts";
 import type { ProviderRow } from "./store.ts";
 import { CatalogError, type Fetcher } from "./types.ts";
@@ -59,6 +65,7 @@ function parseNamed(models: unknown[]): CatalogMatch[] {
       thinkingRequired: false,
       reasoningKnown: false,
       described: false,
+      images: null,
     });
   }
   return out;
@@ -83,6 +90,13 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
       m.supported_features,
     ].filter((list): list is unknown[] => Array.isArray(list));
     const params = lists.flat();
+    // OpenRouter lists architecture.input_modalities, mlx-serve and Groq
+    // input_modalities; mlx-serve's capabilities name vision too
+    const inputs = [
+      (m.architecture as { input_modalities?: unknown } | undefined)
+        ?.input_modalities,
+      m.input_modalities,
+    ].find((list): list is unknown[] => Array.isArray(list));
     const pricing = (m.pricing ?? {}) as Record<string, unknown>;
     const contextLength =
       typeof m.context_length === "number" && m.context_length > 0
@@ -104,6 +118,12 @@ export function parseCatalog(body: unknown): CatalogMatch[] {
       // thinks; mlx-serve leaves it out of a thinking model's capabilities
       reasoningKnown: Array.isArray(m.supported_parameters),
       described: contextLength !== null || lists.length > 0,
+      images:
+        inputs !== undefined
+          ? inputs.includes("image")
+          : params.includes("vision")
+            ? true
+            : null,
     });
   }
   return out;
@@ -239,7 +259,9 @@ export async function fetchCatalog(
     : models;
 }
 
-// models.dev's window, tools and price for a chat row (docs/providers.md)
+// models.dev's window, tools, images and price for a chat row
+// (docs/providers.md); images only from the wire's own provider, since
+// another host's copy of a name may not read them
 export function withModelsDev(m: CatalogMatch, wire: Wire): CatalogMatch {
   const { listedAs: _, ...row } = m;
   const source = modelSource(wire);
@@ -252,6 +274,7 @@ export function withModelsDev(m: CatalogMatch, wire: Wire): CatalogMatch {
   const price = modelPrice(source, id);
   const out: CatalogMatch = { ...row, listedAs: id };
   if (!m.described && facts !== null) Object.assign(out, facts);
+  if (out.images === null) out.images = modelImages(source, id);
   if (price !== null && m.promptPrice === null) {
     out.promptPrice = price.input;
     out.completionPrice = price.output;

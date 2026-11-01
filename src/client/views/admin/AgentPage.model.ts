@@ -37,8 +37,9 @@ export const cardFieldOf =
 type Rows = { id: string }[] | null;
 
 // the route takes the whole agent: the saved one with the card's fields
-// over it. An undescribed model re-sends its stated window and tools, which
-// go only with the model they were stated for; a deleted skill or server
+// over it. An undescribed model re-sends its stated window and tools, and
+// a model whose catalog is silent on images its stated flag, which go
+// only with the model they were stated for; a deleted skill or server
 // drops, or the server refuses its id
 export function cardBody(
   agent: AgentSummary,
@@ -65,11 +66,15 @@ export function cardBody(
       agent.model.tools,
       agent.model.contextLength,
     ),
+    ...(agent.model.images === null && { images: agent.images }),
     ...change,
   };
   if (change.model !== undefined && change.contextLength === undefined) {
     delete body.contextLength;
     delete body.tools;
+  }
+  if (change.model !== undefined && change.images === undefined) {
+    delete body.images;
   }
   return body;
 }

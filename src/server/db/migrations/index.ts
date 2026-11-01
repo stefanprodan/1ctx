@@ -85,6 +85,8 @@ import { m0076 } from "./0076-dictation.ts";
 import { m0077 } from "./0077-automation-check.ts";
 import { m0078 } from "./0078-check-compare.ts";
 import { m0079 } from "./0079-repos-block.ts";
+import { m0080 } from "./0080-images.ts";
+import { m0081 } from "./0081-agent-images.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -166,4 +168,6 @@ export const MIGRATIONS: Migration[] = [
   m0077,
   m0078,
   m0079,
+  m0080,
+  m0081,
 ];

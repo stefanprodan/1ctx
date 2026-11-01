@@ -174,6 +174,7 @@ describe("ModelPicker", () => {
     thinkingRequired: false,
     reasoningKnown: false,
     described: true,
+    images: null,
   });
   const picker = (
     over: Partial<Parameters<typeof ModelPicker>[0]> = {},

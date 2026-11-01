@@ -24,9 +24,10 @@ import {
   type SessionRow,
 } from "../sessions/index.ts";
 import { lastLine } from "./envelope.ts";
+import { claimTurnImages, releaseHeld } from "./images.ts";
 import type { SendPolicy } from "./policy.ts";
 import { applyChanges } from "./turn.ts";
-import type { SessionsPort, UploadsPort } from "./writer-port.ts";
+import type { ImagesPort, SessionsPort, UploadsPort } from "./writer-port.ts";
 
 export type Started = {
   session: SessionSummary;
@@ -43,18 +44,27 @@ export type StartUser = {
   username: string;
   text: string;
   uploads?: readonly string[];
+  images?: readonly string[];
+  // the queued message that holds its images
+  queuedId?: string;
 };
 
 export const newUser = (
   user: { id: string; username: string },
-  text: string,
-  uploads?: readonly string[],
+  fields: {
+    message: string;
+    uploads?: readonly string[];
+    images?: readonly string[];
+    queuedId?: string;
+  },
 ): StartUser => ({
   id: newId(),
   userId: user.id,
   username: user.username,
-  text,
-  ...(uploads === undefined ? {} : { uploads }),
+  text: fields.message,
+  ...(fields.uploads === undefined ? {} : { uploads: fields.uploads }),
+  ...(fields.images?.length ? { images: fields.images } : {}),
+  ...(fields.queuedId === undefined ? {} : { queuedId: fields.queuedId }),
 });
 
 export type StartFields = {
@@ -107,6 +117,7 @@ export type StartDeps = {
   clock: Clock;
   sessions: SessionsPort;
   uploads: UploadsPort;
+  images: ImagesPort;
   views: {
     start(
       sessionId: string,
@@ -137,6 +148,8 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
         });
     if (base === null) throw new NotFound("no such chat");
     refuseArchived(base);
+    // a queued message's images leave it before its row goes
+    releaseHeld(deps.images, "users" in fields.turn ? fields.turn.users : []);
     if (fields.claim && !deps.sessions.queue.claim(base.id, fields.claim)) {
       throw new ClaimLost();
     }
@@ -191,16 +204,22 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       const records = new Map(
         attaching.map((user, index) => [user.id, claimed[index]!]),
       );
-      users = turn.users.map((user) =>
-        deps.sessions.addUserMessage({
-          id: user.id,
-          sessionId: base.id,
-          sendId: send.id,
-          userId: user.userId,
-          content: user.text,
-          uploads: records.get(user.id) ?? null,
-          now,
-        }),
+      users = claimTurnImages(
+        deps.images,
+        policy.projectId,
+        base.id,
+        turn.users,
+        turn.users.map((user) =>
+          deps.sessions.addUserMessage({
+            id: user.id,
+            sessionId: base.id,
+            sendId: send.id,
+            userId: user.userId,
+            content: user.text,
+            uploads: records.get(user.id) ?? null,
+            now,
+          }),
+        ),
       );
       lastAuthor = turn.users.at(-1)!.username;
     } else if ("posted" in turn) {

@@ -28,7 +28,7 @@ import type { UserRow } from "../users/index.ts";
 import { principalOf } from "./authors.ts";
 import { pendingTurns } from "./channel-queue.ts";
 import { chatFor } from "./chat-guard.ts";
-import { queueMessage } from "./enqueue.ts";
+import { type EnqueueDeps, queueMessage } from "./enqueue.ts";
 import type { PreparedRun } from "./prepare.ts";
 import {
   CapFull,
@@ -59,13 +59,8 @@ export type DispatcherDeps = {
   agents: SummonAgents;
   access: { project(principal: Principal, id: string): ProjectRow };
   visible(principal: Principal, id: string): SessionRow;
-  uploads: {
-    checkUploads(
-      userId: string,
-      projectId: string,
-      ids: readonly string[],
-    ): void;
-  };
+  uploads: EnqueueDeps["uploads"];
+  images: EnqueueDeps["images"];
   // the turn prepared and not launched; a probe is not admitted, since
   // it only asks whether the rows start
   prepareTurn(

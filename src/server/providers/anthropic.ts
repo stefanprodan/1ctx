@@ -392,8 +392,13 @@ type Model = {
     thinking?: {
       types?: Record<string, { supported?: unknown } | undefined>;
     };
+    image_input?: { supported?: unknown };
   };
 };
+
+// the catalog's image_input flag; null where it is not listed
+const imageInput = (flag: { supported?: unknown } | undefined) =>
+  typeof flag?.supported === "boolean" ? flag.supported : null;
 
 const positive = (value: unknown) =>
   typeof value === "number" && Number.isInteger(value) && value > 0
@@ -434,6 +439,7 @@ export function parseModels(body: unknown): CatalogMatch[] {
       thinkingRequired: known && types.disabled?.supported === false,
       reasoningKnown: known,
       described: contextLength !== null || known,
+      images: imageInput(row.capabilities?.image_input),
       listedAs: id,
       ...(outputLimit === null ? {} : { outputLimit }),
     });

@@ -104,6 +104,7 @@ const policy: SendPolicy = {
   providerName: "local",
   wire: "openai-compatible",
   model: "org/model",
+  images: false,
   contextLength: 1000,
   price: null,
   prompt: "You write Go.",

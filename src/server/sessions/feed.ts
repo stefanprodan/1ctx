@@ -5,7 +5,9 @@
 
 import type { EnvelopeRow, FeedRow } from "../../shared/api/sessions.ts";
 import type { LastLine, RoundUsage } from "../../shared/contracts/session.ts";
+import { imageLine } from "../../shared/images.ts";
 import type { Db } from "../db/index.ts";
+import { firstImageSql, hasImagesSql } from "../images/index.ts";
 import { alertColumns, alertOf, type RawAlert } from "./alerts.ts";
 import { lineFrom } from "./parse.ts";
 import {
@@ -21,7 +23,14 @@ type RawLastLine = {
   seq: number;
   author: string;
   content: string;
+  image: string | null;
 };
+
+// a line's text: a message of images alone says its first image
+const lineText = (content: string, image: string | null): string =>
+  content === "" && image !== null
+    ? lineFrom(imageLine(JSON.parse(image)))
+    : lineFrom(content);
 
 type RawLastSend = RawSend & {
   agent_name: string | null;
@@ -65,15 +74,21 @@ function lastSends(db: Db, sessionIds: string[]) {
 // a user message or a finished answer reply, never a work reply, a
 // summary or a tool row: what the feed calls the last line. Kind and
 // slot are tested first: status sits past content in the row, so a
-// large tool row tested on status first has its overflow pages read
+// large tool row tested on status first has its overflow pages read.
+// A user message of images alone is a line; only an empty user row
+// probes its images
 const lineRow = (table: string) =>
   `(${table}.kind = 'user'
      or (${table}.kind = 'reply' and ${table}.slot = 'answer'))
-   and ${table}.status != 'streaming' and ${table}.content != ''`;
+   and ${table}.status != 'streaming'
+   and (${table}.content != ''
+     or (${table}.kind = 'user' and ${hasImagesSql(table)}))`;
 
 export const lastLinesSql = (count: number) =>
   `select current.session_id, current.seq,
      substr(current.content, 1, 600) as content,
+     case when current.content = '' then ${firstImageSql("current")} end
+       as image,
      coalesce(users.username, agents.name) as author
    from messages current
    left join users on users.id = current.user_id
@@ -93,7 +108,7 @@ function lastLines(db: Db, sessionIds: string[]) {
     .all(...sessionIds);
   const out = new Map<string, LastLine>();
   for (const raw of rows) {
-    const text = lineFrom(raw.content);
+    const text = lineText(raw.content, raw.image);
     // a row of markers alone says nothing; the feed shows no line
     if (text !== "") {
       out.set(raw.session_id, { seq: raw.seq, author: raw.author, text });
@@ -248,6 +263,7 @@ type RawEnvelopeRow = {
   line_seq: number | null;
   line_author: string;
   line_content: string | null;
+  line_image: string | null;
   tokens: number;
   cost: number | null;
 } & RawAlert & { [K in SendColumn as `send_${K}`]: RawSend[K] | null };
@@ -261,6 +277,8 @@ export const ENVELOPE_ROW = `select agents.name as agent,
     ${alertColumns("automations")},
     sessions.owner_id, runner.username as run_by,
     line.seq as line_seq, substr(line.content, 1, 600) as line_content,
+    case when line.content = '' then ${firstImageSql("line")} end
+      as line_image,
     coalesce(author.username, speaker.name) as line_author,
     ${SEND_COLUMNS.map((column) => `last.${column} as send_${column}`).join(", ")},
     ${sendUsage("last")},
@@ -286,7 +304,8 @@ export const ENVELOPE_ROW = `select agents.name as agent,
 export function envelopeRow(db: Db, sessionId: string): EnvelopeRow | null {
   const raw = db.query<RawEnvelopeRow, [string]>(ENVELOPE_ROW).get(sessionId);
   if (raw === null) return null;
-  const text = raw.line_content === null ? "" : lineFrom(raw.line_content);
+  const text =
+    raw.line_content === null ? "" : lineText(raw.line_content, raw.line_image);
   const sent =
     raw.send_id === null
       ? null

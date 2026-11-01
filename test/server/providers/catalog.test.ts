@@ -49,6 +49,7 @@ describe("parseCatalog", () => {
       thinkingRequired: false,
       reasoningKnown: true,
       described: true,
+      images: true,
     });
     const free = models.find(
       (m) => m.id === "nvidia/nemotron-3-super-120b-a12b:free",
@@ -74,6 +75,7 @@ describe("parseCatalog", () => {
         thinkingRequired: false,
         reasoningKnown: false,
         described: false,
+        images: null,
       },
     ]);
   });
@@ -354,6 +356,7 @@ describe("the decisions catalog", () => {
         thinkingRequired: false,
         reasoningKnown: false,
         described: false,
+        images: null,
       })),
     );
     expect(parseCatalog({ models: [{ name: "" }, { id: "x" }] })).toEqual([]);

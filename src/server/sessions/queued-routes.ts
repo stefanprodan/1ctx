@@ -9,10 +9,11 @@ import type {
   QueueState,
 } from "../../shared/api/sessions.ts";
 import { type Db, transact } from "../db/index.ts";
+import { CANNOT_READ_IMAGES } from "../images/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
-import { Conflict, Forbidden } from "../lib/errors.ts";
+import { BadRequest, Conflict, Forbidden } from "../lib/errors.ts";
 import { json, type Principal, type RouteDescriptor } from "../lib/http.ts";
 import {
   MAX_SESSION_BODY,
@@ -117,9 +118,10 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
             throw new Conflict("a channel has no editable messages");
           }
           const chatAgent = deps.agents.byId(session.agentId);
-          if (chatAgent !== null) {
-            summonOf(deps.agents, chatAgent.name, fields.message);
-          }
+          const summoned =
+            chatAgent === null
+              ? null
+              : summonOf(deps.agents, chatAgent.name, fields.message);
           const next = store.queue.edit(
             row.id,
             fields.revision,
@@ -127,6 +129,11 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
             deps.clock(),
           );
           if (next === null) throw new Conflict(CHANGED);
+          // the enqueue's check, against the agent the new text takes,
+          // after the revision's as at send; the throw undoes the edit
+          if (row.images.length > 0 && !(summoned ?? chatAgent)?.images) {
+            throw new BadRequest(CANNOT_READ_IMAGES);
+          }
           const { state, events } = queueAnswer(
             deps.db,
             store,
@@ -155,6 +162,8 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
         );
         const body: QueueState = transact(deps.db, () => {
           const row = own(store, principal, session.id, id);
+          // its held images go with it (queued_id cascades): staged
+          // again they would sit unseen against the staged cap
           if (!store.queue.remove(row.id, revision)) {
             throw new Conflict(CHANGED);
           }

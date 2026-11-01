@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The plus at the start of the composer's row and its menu, placed as
-// the agent list is. Add files opens the file picker. Web access,
+// the agent list is. Add files opens the file picker, Add images one
+// for photos and screenshots alone, as phone apps offer them. Web access,
 // Visuals, Knowledge, Memory, Email, Automations and External tasks
 // are switches, drawn as the rail's theme switch is, and flipping one
 // leaves the menu open. MCP servers,
@@ -34,6 +35,7 @@ import {
   type WebItem,
 } from "./Add.model.ts";
 import { AddPane } from "./AddPane.tsx";
+import { IMAGE_ACCEPT } from "./Images.model.ts";
 
 type Pane = "web" | "servers" | "skills" | "repos";
 const PANES: Record<Pane, { title: string; icon: IconName }> = {
@@ -124,6 +126,7 @@ export function Add({
   readable,
   filesOnly = false,
   onFiles,
+  onImages,
   web,
   webPane,
   visuals,
@@ -142,6 +145,8 @@ export function Add({
   // the plus is Add files alone: the session takes no switch
   filesOnly?: boolean;
   onFiles: (files: File[]) => void;
+  // what the Add images picker gave, each sent the image route
+  onImages: (files: File[]) => void;
   web: WebItem;
   // Web access with the project's credentials, null without any
   webPane: PaneItem | null;
@@ -178,6 +183,7 @@ export function Add({
     if (paneless) pane.value = "menu";
   }, [paneless, pane]);
   const picker = useRef<HTMLInputElement>(null);
+  const photos = useRef<HTMLInputElement>(null);
   // back from a pane, the focus returns to the row that led there
   const rows = {
     web: useRef<HTMLButtonElement>(null),
@@ -223,6 +229,20 @@ export function Add({
           if (files.length > 0) onFiles(files);
         }}
       />
+      {!filesOnly && (
+        <input
+          ref={photos}
+          type="file"
+          accept={IMAGE_ACCEPT}
+          multiple
+          hidden
+          onChange={(ev) => {
+            const files = [...(ev.currentTarget.files ?? [])];
+            ev.currentTarget.value = "";
+            if (files.length > 0) onImages(files);
+          }}
+        />
+      )}
       {open.value && pane.value !== "menu" && shown !== null && (
         <div class="menu composer-menu composer-add-menu" role="menu">
           <AddPane
@@ -254,6 +274,20 @@ export function Add({
               {!readable && (
                 <span class="composer-add-block">Agent cannot read files</span>
               )}
+            </span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            class="menu-item composer-add-item"
+            onClick={() => {
+              open.value = false;
+              photos.current?.click();
+            }}
+          >
+            <Icon name="image" size={14} class="composer-add-icon" />
+            <span class="composer-add-words">
+              <span>Add images</span>
             </span>
           </button>
           {webPane === null ? (

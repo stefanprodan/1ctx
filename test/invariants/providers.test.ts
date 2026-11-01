@@ -289,6 +289,7 @@ describe("GET /api/providers/:id/catalog", () => {
         thinkingRequired: false,
         reasoningKnown: true,
         described: true,
+        images: true,
         listedAs: "gemini-3.8-flash",
       });
       const agent = await client.call("POST", "/api/agents", {
@@ -481,6 +482,7 @@ describe("GET /api/providers/:id/catalog", () => {
       thinkingRequired: expect.any(Boolean),
       reasoningKnown: true,
       described: true,
+      images: true,
     });
     await client.call("GET", `/api/providers/${provider.id}/catalog?q=chat`);
     expect(app.fetched.length).toBe(1);

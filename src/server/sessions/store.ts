@@ -211,6 +211,10 @@ export class SessionStore {
     messages: Message[];
     messageIds: ReadonlyMap<string, string>;
     draft: string | null;
+    // the copied user messages that carry images, by their new id, and
+    // the images of the user turn forked at
+    imageCopies: { messageId: string; images: string[] }[];
+    draftImages: string[];
   } {
     const { source, messageId } = fields;
     const point = readForkPoint(this.db, source.id, messageId);
@@ -235,6 +239,13 @@ export class SessionStore {
       messages: this.messages(session.id),
       messageIds,
       draft: point.draft,
+      imageCopies: point.rows
+        .filter((row) => row.images?.length)
+        .map((row) => ({
+          messageId: messageIds.get(row.id)!,
+          images: row.images!.map((image) => image.id),
+        })),
+      draftImages: point.draftImages,
     };
   }
 

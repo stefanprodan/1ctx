@@ -1,7 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Process slots and the one-upload-per-user admission, process-wide.
+// Process slots and the one-upload-per-user admission, process-wide. A
+// caller's own bound is taken before the slot, never inside one, so a
+// wait for it never idles a slot that commands share.
 
 import { UPLOAD_RUNNING } from "../../shared/uploads.ts";
 import { after, type Clock } from "../lib/clock.ts";
@@ -36,6 +38,8 @@ export async function withUpload<Input, Result>(
     signal: AbortSignal,
     running: () => void,
   ) => Promise<Result>,
+  // a narrower bound of the caller's, waited on under the same deadline
+  gate?: (signal: AbortSignal) => Promise<() => void>,
 ): Promise<Result> {
   const releaseUser = acquireUpload(userId);
   const deadline = new AbortController();
@@ -45,6 +49,7 @@ export async function withUpload<Input, Result>(
   let finished = false;
   let stopTimer = () => {};
   let release: (() => void) | undefined;
+  let releaseGate: (() => void) | undefined;
   const expire = () => {
     if (!finished) deadline.abort(busy);
   };
@@ -55,6 +60,10 @@ export async function withUpload<Input, Result>(
   try {
     stopTimer = after(clock, ARCHIVE_DEADLINE_MS, expire);
     const input = parse();
+    if (gate !== undefined) {
+      releaseGate = await gate(signal);
+      running();
+    }
     release = await acquireProcess(signal);
     running();
     return await work(input, signal, running);
@@ -66,6 +75,7 @@ export async function withUpload<Input, Result>(
     finished = true;
     stopTimer();
     release?.();
+    releaseGate?.();
     releaseUser();
   }
 }

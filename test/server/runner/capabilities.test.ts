@@ -401,6 +401,7 @@ describe("a send's disabled capabilities", () => {
           clock: () => chat.app.now.value,
           sessions: chat.app.sessions,
           uploads: chat.app.knowledge,
+          images: chat.app.images,
           views: { start: () => {}, resetSeen: () => {} },
         },
         {

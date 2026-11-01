@@ -3,8 +3,9 @@
 
 import type { MessageUpload } from "../../shared/uploads.ts";
 import type { Db } from "../db/index.ts";
+import { messageImagesSql } from "../images/index.ts";
 import type { ExportRow } from "./markdown.ts";
-import { listOrNull } from "./rows.ts";
+import { imagesOf, listOrNull } from "./rows.ts";
 
 // the rows whose text a transcript shows, over messages joined to their
 // send: user messages and each send's answer before its memory phase.
@@ -17,10 +18,18 @@ export const SHOWN = `(messages.kind = 'user'
 
 export function exportRows(db: Db, sessionId: string): ExportRow[] {
   return db
-    .query<Omit<ExportRow, "uploads"> & { uploads: string | null }, [string]>(
+    .query<
+      Omit<ExportRow, "uploads" | "images"> & {
+        uploads: string | null;
+        images: string | null;
+      },
+      [string]
+    >(
       `select messages.id, messages.send_id as sendId, messages.round,
          sends.memory_round as memoryRound, messages.kind, messages.slot,
          messages.status, messages.error, messages.uploads,
+         case when messages.kind = 'user'
+           then ${messageImagesSql("messages")} end as images,
          messages.finish_reason as finishReason,
          messages.native_finish as nativeFinish,
          coalesce(users.username, agents.name) as author,
@@ -35,9 +44,10 @@ export function exportRows(db: Db, sessionId: string): ExportRow[] {
        order by messages.seq`,
     )
     .all(sessionId)
-    .map((row) => ({
+    .map(({ images, ...row }) => ({
       ...row,
       uploads:
         row.kind === "user" ? listOrNull<MessageUpload>(row.uploads) : null,
+      ...imagesOf(images),
     }));
 }

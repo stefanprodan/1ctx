@@ -141,6 +141,15 @@ function stated(
   return { ...model, contextLength, tools };
 }
 
+// the catalog's word on images wins, and a stated flag it answers is
+// dropped, as a stale thinking word is: one saved while the catalog was
+// silent, or sent by provisioning, must not refuse the save. Only where
+// it is silent does the admin's count, described or not, since a
+// catalog that describes the window may still say nothing of images
+export function imagesOf(model: CatalogMatch, stated: boolean | null): boolean {
+  return model.images ?? stated ?? false;
+}
+
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
   // the rows the body names are checked before the catalog fetch and
   // again in the transaction, since the world may move while it waits
@@ -249,6 +258,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         upstream: body.upstream,
         skip4Bit: body.skip4Bit,
         subagents: body.subagents,
+        images: imagesOf(resolved, body.images),
         mark: body.mark,
       };
     };

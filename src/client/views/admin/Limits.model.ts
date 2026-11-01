@@ -246,6 +246,34 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
     label: "Clips per user",
     text: "Dictation clips one user may turn into text in an hour.",
   },
+  imageUploadBytes: {
+    label: "Upload size",
+    text: "The largest image file a user may add.",
+  },
+  imageMaxPixels: {
+    label: "Pixels",
+    text: "The most pixels an added image may have.",
+  },
+  imageLongSide: {
+    label: "Long side",
+    text: "An image is made this small on its long side when added.",
+  },
+  imagesPerMessage: {
+    label: "Images per message",
+    text: "Images one message may carry.",
+  },
+  imagesPerRequest: {
+    label: "Images per request",
+    text: "Images the model is sent at once.",
+  },
+  imageProjectBytes: {
+    label: "Project images",
+    text: "What a project's sent images may total. The oldest are removed past it.",
+  },
+  imagesPerHour: {
+    label: "Images per user",
+    text: "Images one user may add in an hour.",
+  },
 };
 
 // thousands: typed in whole thousands as the agent's window is, a
@@ -273,6 +301,8 @@ export function displayOf(row: LimitRow): Display {
       return { word: "min", factor: 1 };
     case "hours":
       return { word: "h", factor: 1 };
+    case "pixels":
+      return { word: "px", factor: 1 };
     default:
       return { word: "", factor: 1 };
   }

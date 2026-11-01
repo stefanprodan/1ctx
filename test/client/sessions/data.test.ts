@@ -987,7 +987,11 @@ describe("the sessions entity", () => {
           hit = `${init.method} ${url}`;
           sent = JSON.parse(String(init.body));
           busy = forking.value;
-          return Response.json({ ...detail("s9"), draftUploads: ["up9"] });
+          return Response.json({
+            ...detail("s9"),
+            draftUploads: ["up9"],
+            draftImages: [],
+          });
         };
         await forkSession("s1", "m1", "a2");
         expect(hit).toBe("POST /api/sessions/s1/fork");
@@ -1002,6 +1006,61 @@ describe("the sessions entity", () => {
           uploads: [{ projectId: "p1", id: "up9", name: "notes.md" }],
         });
         expect(listed).toBe(`/api/projects/p1/uploads`);
+      } finally {
+        if (realStorage === undefined) {
+          Reflect.deleteProperty(globalThis, "localStorage");
+        } else {
+          Object.defineProperty(globalThis, "localStorage", realStorage);
+        }
+      }
+    },
+  );
+
+  test.serial(
+    "a fork's draft images land in the new chat's draft",
+    async () => {
+      session.value = detail("s1", {
+        messages: [message({ id: "m1", kind: "user", content: "" })],
+      });
+      path.value = "/chat/s1";
+      const rows = new Map<string, string>();
+      const realStorage = Object.getOwnPropertyDescriptor(
+        globalThis,
+        "localStorage",
+      );
+      Object.defineProperty(globalThis, "localStorage", {
+        configurable: true,
+        value: {
+          getItem: (key: string) => rows.get(key) ?? null,
+          setItem: (key: string, value: string) => rows.set(key, value),
+          removeItem: (key: string) => rows.delete(key),
+        },
+      });
+      try {
+        const staged = (id: string, name: string) => ({
+          id,
+          name,
+          mediaType: "image/png",
+          bytes: 10,
+          width: 4,
+          height: 3,
+          expiresAt: 1000,
+        });
+        answer = () =>
+          Response.json({
+            ...detail("s9"),
+            draftUploads: [],
+            draftImages: [staged("im2", "b.png"), staged("im1", "a.png")],
+          });
+        await forkSession("s1", "m1", "a2");
+        expect(JSON.parse(rows.get(`draft:u${user}:chat:s9`) ?? "{}")).toEqual({
+          text: "",
+          uploads: [],
+          images: [
+            { projectId: "p1", id: "im2", name: "b.png" },
+            { projectId: "p1", id: "im1", name: "a.png" },
+          ],
+        });
       } finally {
         if (realStorage === undefined) {
           Reflect.deleteProperty(globalThis, "localStorage");
@@ -1039,7 +1098,11 @@ describe("the sessions entity", () => {
             ? new Promise<Response>((resolve) => {
                 release = () =>
                   resolve(
-                    Response.json({ ...detail("s9"), draftUploads: ["up9"] }),
+                    Response.json({
+                      ...detail("s9"),
+                      draftUploads: ["up9"],
+                      draftImages: [],
+                    }),
                   );
               })
             : Response.json({ items: [], limits: {} });
@@ -1905,6 +1968,20 @@ describe("capability flips on a send", () => {
       ]);
       await sendMessage("s1", "again", []);
       expect(bodies[1]).toEqual({ message: "again" });
+    },
+  );
+
+  test.serial(
+    "a message names its images in order, and none when it has none",
+    async () => {
+      take();
+      await loadSession("s1");
+      await sendMessage("s1", "", ["up1"], ["im2", "im1"]);
+      await sendMessage("s1", "plain", []);
+      expect(bodies).toEqual([
+        { message: "", uploads: ["up1"], images: ["im2", "im1"] },
+        { message: "plain" },
+      ]);
     },
   );
 

@@ -98,7 +98,9 @@ describe("a message's files", () => {
       ],
     } as unknown as Message;
     const author = { name: "Casey", username: "casey" };
-    const html = render(<UserRow message={message} author={author} />);
+    const html = render(
+      <UserRow projectId="p1" message={message} author={author} />,
+    );
     const card = html.slice(html.indexOf("transcript-card"));
     expect(card).toContain("look at these");
     expect(card).toContain('class="transcript-files"');
@@ -106,7 +108,11 @@ describe("a message's files", () => {
     expect(card).toContain("2 KB");
     expect(
       render(
-        <UserRow message={{ ...message, uploads: null }} author={author} />,
+        <UserRow
+          projectId="p1"
+          message={{ ...message, uploads: null }}
+          author={author}
+        />,
       ),
     ).not.toContain("transcript-files");
   });

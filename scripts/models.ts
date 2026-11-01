@@ -3,7 +3,8 @@
 //
 // Writes src/server/providers/models.json from the models.dev catalog
 // for the providers of the dedicated wires: each model's window, tools
-// flag and canonical name, and for the per-token ones its prices in USD
+// flag, whether it reads images (where its input modalities are listed)
+// and canonical name, and for the per-token ones its prices in USD
 // per million tokens. OpenRouter describes and prices its own; OpenCode
 // Go is a flat plan, so it carries no prices. Run by hand (make
 // models) or by the weekly models workflow; the file is committed and
@@ -69,6 +70,7 @@ export type Model = {
   tool_call?: unknown;
   limit?: { context?: unknown; input?: unknown };
   canonical_model_id?: unknown;
+  modalities?: { input?: unknown };
 };
 
 // the input cap where one is listed: Azure takes 922K of Sol's 1.05M
@@ -97,9 +99,11 @@ export function extract(
         typeof m.canonical_model_id === "string"
           ? m.canonical_model_id.split("/").pop()?.toLowerCase()
           : undefined;
+      const input = m.modalities?.input;
       listed[name] = {
         ...(window !== undefined && { window }),
         tools: m.tool_call === true,
+        ...(Array.isArray(input) && { images: input.includes("image") }),
         ...(canonical && canonical !== name.toLowerCase() && { canonical }),
         ...(base && {
           price: above.length > 0 ? { ...base, tiers: above } : base,
@@ -114,6 +118,7 @@ export function extract(
 type Listed = {
   window?: number;
   tools?: boolean;
+  images?: boolean;
   canonical?: string;
   price?: Rates & { tiers?: (Rates & { above: number })[] };
 };
@@ -128,6 +133,7 @@ function facts(m: Listed): Map<string, string> {
   if (m.window !== undefined)
     out.set("window", m.window.toLocaleString("en-US"));
   out.set("tools", m.tools ? "yes" : "no");
+  if (m.images !== undefined) out.set("images", m.images ? "yes" : "no");
   if (m.canonical) out.set("canonical", m.canonical);
   const sets = [
     ["", m.price],

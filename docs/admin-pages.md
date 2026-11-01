@@ -89,6 +89,11 @@ reporting.
 - **The MCP tab's prompt preview is `promptPreview()`** over
   `offeredServers()` and `promptSnapshot()` from `shared/mcp.ts`, the
   bytes a send would carry. Never compute it apart.
+- **Reads images is asked only where `model.images` is null,** on
+  the Model card beside Context window and Tools, the same On and Off
+  `Seg`, saved with its Save; a pick of another model starts it off.
+  Where the catalog says yes, the model's line reads "images" as it
+  reads "tools", and nothing is asked.
 - **An agent's MCP link is Read or Read and write.** Write alone is
   refused by the server. "Default for new users" is sent only when
   flipped.

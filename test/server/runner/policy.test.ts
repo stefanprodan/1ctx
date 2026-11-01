@@ -51,6 +51,7 @@ const agent: AgentRow = {
     thinkingRequired: false,
     reasoningKnown: true,
     described: true,
+    images: null,
   },
   thinking: null,
   effort: "high",
@@ -61,6 +62,7 @@ const agent: AgentRow = {
   upstream: null,
   skip4Bit: false,
   subagents: false,
+  images: false,
   default: false,
   createdAt: 1,
 };

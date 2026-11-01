@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { isRecord } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -88,4 +89,24 @@ export function names(
     seen.add(name);
   }
   return [...seen];
+}
+
+// what an admin stated for a model its catalog does not describe, or
+// says nothing of images for, stays while the model does, as an
+// omitted field stays
+export function keptStated(
+  row: AgentSummary | undefined,
+  model: string | undefined,
+): Partial<Pick<AgentSummary, "images">> & {
+  contextLength?: number | null;
+  tools?: boolean;
+} {
+  if (!row || (model ?? row.model.id) !== row.model.id) return {};
+  return {
+    ...(!row.model.described && {
+      contextLength: row.model.contextLength,
+      tools: row.model.tools,
+    }),
+    ...(row.model.images === null && { images: row.images }),
+  };
 }

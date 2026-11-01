@@ -66,6 +66,11 @@ export async function forkSession(
           id: uploadId,
           name: row?.uploads?.[index]?.name ?? "a file",
         })),
+        images: detail.draftImages.map((image) => ({
+          projectId,
+          id: image.id,
+          name: image.name,
+        })),
       });
       if (detail.draftUploads.length > 0) void loadUploads(projectId);
     }

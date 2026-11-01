@@ -6,9 +6,11 @@
 // answered it.
 
 import type { NotSentRow } from "../../shared/api/sessions.ts";
+import { imageLine } from "../../shared/images.ts";
 import { summonName } from "../../shared/summon.ts";
 import type { NotSentReason } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
+import { firstImageSql } from "../images/index.ts";
 import { lineFrom } from "./parse.ts";
 
 type RawNotSent = {
@@ -18,6 +20,7 @@ type RawNotSent = {
   project: string;
   agent: string;
   content: string;
+  image: string | null;
   reason: NotSentReason;
   changed_at: number;
 };
@@ -30,7 +33,10 @@ export function notSentOf(
   const raws = db
     .query<RawNotSent, [string, string]>(
       `select q.id, q.session_id, s.title, p.name as project,
-         a.name as agent, q.content, q.reason, q.changed_at
+         a.name as agent, q.content,
+         case when q.content = '' then ${firstImageSql("q", "queued_id")} end
+           as image,
+         q.reason, q.changed_at
        from queued_messages q
        join sessions s on s.id = q.session_id
        join projects p on p.id = s.project_id
@@ -61,7 +67,12 @@ export function notSentOf(
       title: raw.title,
       project: raw.project,
       agent: word !== undefined && named.has(word) ? word : raw.agent,
-      line: lineFrom(raw.content),
+      // a message of images alone says its first image
+      line: lineFrom(
+        raw.content === "" && raw.image !== null
+          ? imageLine(JSON.parse(raw.image))
+          : raw.content,
+      ),
       reason: raw.reason,
       changedAt: raw.changed_at,
     };

@@ -72,7 +72,8 @@ instance's database, creating or updating what they name.
   stay on the retired one, and there is no `Automation` kind to move
   them (`docs/automations.md`).
 - **An `Agent`'s `subagents` is a boolean.** A new agent without it is
-  off; left out on an update it stays.
+  off; left out on an update it stays. `images` is in
+  `docs/images.md`.
 - **`default: true` is the only value for an `Agent` or `Decider`.**
   A second default of one kind in an apply is refused. Leaving it out
   keeps the mark where it is.

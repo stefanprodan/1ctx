@@ -289,7 +289,7 @@ arrives.
   file in it. A later throw rolls back the tree, staging and rows.
 - **History appends `uploadsBlock()` from that record alone.** Runs
   have no uploads; regenerate and compaction keep the tree. Staging is
-  in `docs/knowledge.md`.
+  in `docs/knowledge.md`, images in `docs/images.md`.
 
 ## Regenerate, fork, rename, delete
 

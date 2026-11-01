@@ -25,6 +25,7 @@ import { MIN_CONTEXT_LENGTH, WIRES } from "../../../src/shared/words.ts";
 type Listed = {
   window?: number;
   tools: boolean;
+  images?: boolean;
   canonical?: string;
   price?: { input: number; output: number; tiers?: { above: number }[] };
 };
@@ -42,6 +43,7 @@ const row = (over: Partial<CatalogMatch>): CatalogMatch => ({
   thinkingRequired: false,
   reasoningKnown: false,
   described: false,
+  images: null,
   ...over,
 });
 
@@ -216,6 +218,8 @@ describe("withModelsDev", () => {
     });
     expect(withModelsDev(described, "gemini")).toEqual({
       ...described,
+      // where the row says nothing of images, its own provider's word
+      images: m.images ?? null,
       promptPrice: m.price!.input,
       completionPrice: m.price!.output,
       listedAs: id,

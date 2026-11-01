@@ -14,12 +14,18 @@ import { emptyLine, pickOf, searchHref, searchOf } from "./Home.model.ts";
 
 export const startChat =
   (projectId: string) =>
-  async (message: string, agentId: string, uploads: string[]) => {
+  async (
+    message: string,
+    agentId: string,
+    uploads: string[],
+    images: string[],
+  ) => {
     await createSession({
       projectId,
       agentId,
       message,
       ...(uploads.length === 0 ? {} : { uploads }),
+      ...(images.length === 0 ? {} : { images }),
     });
   };
 

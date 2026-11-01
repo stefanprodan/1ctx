@@ -8,6 +8,7 @@ import type {
   LimitScope,
   LimitUnit,
 } from "../../shared/contracts/limit.ts";
+import { MAX_REQUEST_BYTES } from "../lib/body.ts";
 
 export type LoopLimits = {
   rounds: number;
@@ -127,6 +128,20 @@ export type ExternalCaps = {
 // rows at each clip
 export type DictationCaps = { dictationClipsPerUser: number };
 
+// an image's ingest, read at each upload: the body's bytes, the pixels
+// decoded, the long side kept; what a message and a request carry; a
+// project's sent bytes before the oldest are freed; one user's uploads
+// in an hour
+export type ImageCaps = {
+  imageUploadBytes: number;
+  imageMaxPixels: number;
+  imageLongSide: number;
+  imagesPerMessage: number;
+  imagesPerRequest: number;
+  imageProjectBytes: number;
+  imagesPerHour: number;
+};
+
 export type Limits = LoopLimits &
   ChannelCaps &
   ToolCaps &
@@ -136,7 +151,8 @@ export type Limits = LoopLimits &
   ChatCaps &
   RepoCaps &
   ExternalCaps &
-  DictationCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  DictationCaps &
+  ImageCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -224,6 +240,18 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   // the floor is the hourly sweep's own lateness
   externalTaskIdleHours: limit(24, 1, 168, "hours", "external"),
   dictationClipsPerUser: limit(30, 1, 120, "count", "dictation"),
+  // the request backstop is the ceiling, so a body past it is never read
+  imageUploadBytes: limit(20 * MiB, MiB, MAX_REQUEST_BYTES, "bytes", "images"),
+  // a decode holds 4 bytes a pixel in a process slot
+  imageMaxPixels: limit(50_000_000, 1_000_000, 100_000_000, "pixels", "images"),
+  // at 2048 the largest output, an RGBA PNG of noise, is about 16 MiB, so
+  // the most a message holds stays under the budget's floor
+  imageLongSide: limit(2048, 512, 2048, "pixels", "images"),
+  imagesPerMessage: limit(8, 1, 12, "count", "images"),
+  // Anthropic's API takes at most 100 images in a request
+  imagesPerRequest: limit(20, 1, 100, "count", "images"),
+  imageProjectBytes: limit(GiB, 256 * MiB, 50 * GiB, "bytes", "images"),
+  imagesPerHour: limit(60, 10, 1000, "count", "images"),
 };
 
 // the table on the given cores; only the process cap's default moves

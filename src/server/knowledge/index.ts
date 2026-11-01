@@ -379,6 +379,6 @@ export {
   parseSearch,
   parseText,
 } from "./parse.ts";
-export { acquireProcess } from "./queue.ts";
+export { acquireProcess, withUpload } from "./queue.ts";
 export type { MountedDoc } from "./store.ts";
 export type { MountedUploads } from "./uploads.ts";
