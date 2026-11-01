@@ -10,6 +10,7 @@ import { providers } from "../../../src/client/data/providers.ts";
 import { skills } from "../../../src/client/data/skills.ts";
 import { AgentGeneral } from "../../../src/client/views/admin/AgentGeneral.tsx";
 import { AgentMcp } from "../../../src/client/views/admin/AgentMcp.tsx";
+import { AgentModel } from "../../../src/client/views/admin/AgentModel.tsx";
 import {
   cardBody,
   cardFieldOf,
@@ -327,6 +328,59 @@ describe("the model draft", () => {
     d.follow(agent, { ...agent, subagents: true });
     expect(d.subagents.value).toBe(true);
   });
+
+  test("Reads images is stated only where the catalog is silent, sent and saved with the model", () => {
+    const silent = {
+      ...agent,
+      model: { ...described, images: null },
+      images: false,
+    };
+    const d = AgentDrafts.of(silent);
+    expect(d.modelBody("openrouter").images).toBe(false);
+    expect(d.modelDirty(silent, "openrouter")).toBe(false);
+    d.readsImages.value = true;
+    expect(d.modelDirty(silent, "openrouter")).toBe(true);
+    expect(cardBody(silent, d.modelBody("openrouter"), rows).images).toBe(true);
+    // Cancel puts it back, a pick of another model starts it off
+    d.change();
+    d.readsImages.value = false;
+    d.cancel();
+    expect(d.readsImages.value).toBe(true);
+    d.pick({ ...stated }, false);
+    expect(d.readsImages.value).toBe(false);
+    // where the catalog says, nothing is stated
+    const told = AgentDrafts.of(agent);
+    told.readsImages.value = true;
+    expect(told.modelBody("openrouter")).not.toHaveProperty("images");
+    expect(
+      cardBody(agent, told.modelBody("openrouter"), rows),
+    ).not.toHaveProperty("images");
+  });
+
+  test.serial(
+    "the model card asks Reads images inside its form only where the catalog is silent",
+    () => {
+      providers.value = [provider];
+      const silent = {
+        ...agent,
+        model: { ...described, images: null },
+        images: true,
+      };
+      const html = render(
+        <AgentModel agent={silent} drafts={AgentDrafts.of(silent)} />,
+      );
+      const form = html.slice(html.indexOf("<form"), html.indexOf("</form>"));
+      expect(form).toContain("Reads images");
+      expect(form).toContain('type="submit"');
+      expect(html.split("<form").length).toBe(2);
+      const told = render(
+        <AgentModel agent={agent} drafts={AgentDrafts.of(agent)} />,
+      );
+      expect(told).not.toContain("Reads images");
+      expect(told).toContain("reasoning · images");
+      providers.value = null;
+    },
+  );
 
   test("a new agent's body carries the host filter", () => {
     const d = AgentDrafts.blank("pr1");

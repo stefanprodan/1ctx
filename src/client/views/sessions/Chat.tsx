@@ -274,6 +274,7 @@ function SessionPage({
           )}
           <Transcript
             sessionId={shown.session.id}
+            projectId={shown.session.projectId}
             nodes={groupRows(shown.messages, shown.send, shown.sends)}
             live={live.value}
             retries={retries.value}
@@ -374,8 +375,8 @@ function SessionPage({
                   busy={sending.value}
                   usage={shown.session.usage}
                   off={shown.session.disabledCapabilities}
-                  onSend={(text, _agentId, uploads) =>
-                    sendMessage(shown.session.id, text, uploads)
+                  onSend={(text, _agentId, uploads, images) =>
+                    sendMessage(shown.session.id, text, uploads, images)
                   }
                   queued={shown.queued}
                   onEdit={(row, text) =>

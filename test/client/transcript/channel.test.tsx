@@ -139,6 +139,7 @@ function draw(
   return render(
     <Transcript
       sessionId="c1"
+      projectId="p1"
       nodes={groupRows(messages, null, sends)}
       live={new Map()}
       retries={retries}
@@ -513,6 +514,7 @@ describe("a run's post", () => {
     render(
       <Transcript
         sessionId="c1"
+        projectId="p1"
         nodes={groupRows([post], null, [])}
         live={new Map()}
         agentOf={(id) =>
@@ -571,6 +573,7 @@ describe("a run's post", () => {
     const html = render(
       <Transcript
         sessionId="c1"
+        projectId="p1"
         nodes={groupRows([runPost(), post(100, "newest")], null, [])}
         live={new Map()}
         agentOf={() => ({ name: "reviewer", avatar: "bot" })}

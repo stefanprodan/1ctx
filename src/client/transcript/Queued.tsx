@@ -82,6 +82,12 @@ function QueuedRow({
             {plural(row.uploads, "file")}
           </span>
         )}
+        {(row.images ?? 0) > 0 && (
+          <span class="transcript-queued-files">
+            <Icon name="image" size={12} />
+            {plural(row.images ?? 0, "image")}
+          </span>
+        )}
       </div>
       <div class="transcript-queued-foot">
         <span

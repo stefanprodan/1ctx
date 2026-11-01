@@ -3,8 +3,9 @@
 Governs `src/server/images/` (the image store, ingest, the image
 routes and their lease, the claim and the budget), `runner/images.ts`,
 the agent's image flag and where the catalogs say it,
-`shared/images.ts` and `shared/api/images.ts`. Uploads of text files
-are in `docs/knowledge.md`.
+`shared/images.ts` and `shared/api/images.ts`, and a message's images
+on the page (`transcript/Images.tsx`). Uploads of text files are in
+`docs/knowledge.md`; the composer's side is in `docs/composer.md`.
 
 An image is a photo or screenshot a user adds to a chat message. Only
 what ingest keeps is stored, in the main database.
@@ -245,3 +246,16 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
   alone.
 - **The channel refuses images** in a post, "a channel post cannot
   carry images".
+
+## On the page
+
+- **A user message's images sit under its card,** each at its own
+  shape fitted in 320 px on its long side (`fitBox()`), less on a
+  phone, with `width` and `height` set so nothing jumps, `loading`
+  lazy and its name as the alt. A message of images alone has no card.
+  A freed one is the line "Image removed to free space" in its place.
+- **A queued message counts its images,** as it counts its files: the
+  wire carries the count alone.
+- **A click opens the image in `ui/Viewer.tsx`,** the route's bytes
+  fitted to the window. No Download button: the browser saves it as
+  any image.

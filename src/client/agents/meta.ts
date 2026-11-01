@@ -32,14 +32,15 @@ export function priceLine(
   return `${money(promptPrice)} / ${money(completionPrice)}`;
 }
 
-// "1M · $0.15 / $0.6 · tools · reasoning": what a row says about a
-// model, only the parts the catalog gave
+// "1M · $0.15 / $0.6 · tools · reasoning · images": what a row says
+// about a model, only the parts the catalog gave
 export function modelMeta(m: CatalogMatch, wire: Wire | null = null): string {
   return [
     windowLine(m.contextLength),
     priceLine(m.promptPrice, m.completionPrice, wire),
     m.tools ? "tools" : "",
     m.reasoning ? "reasoning" : "",
+    m.images === true ? "images" : "",
   ]
     .filter((s) => s !== "")
     .join(" · ");

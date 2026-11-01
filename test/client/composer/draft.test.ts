@@ -4,10 +4,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   draftKey,
+  dropDraftImages,
   dropDraftUploads,
   EMPTY_DRAFT,
   readDraft,
   writeDraft,
+  writeDraftEdit,
+  writeDraftImages,
   writeDraftText,
   writeDraftUploads,
 } from "../../../src/client/composer/draft.ts";
@@ -72,6 +75,27 @@ describe("composer drafts", () => {
     writeDraftUploads(KEY, []);
     expect(rows.has(KEY)).toBe(false);
     expect(readDraft(KEY)).toEqual(EMPTY_DRAFT);
+  });
+
+  test("keeps staged images beside the files, and images alone keep the key", () => {
+    const shot = { projectId: "p1", id: "im1", name: "shot.png" };
+    writeDraftImages(KEY, [shot]);
+    expect(readDraft(KEY)).toEqual({ text: "", uploads: [], images: [shot] });
+    writeDraftText(KEY, "look");
+    writeDraftEdit(KEY, "look again", undefined);
+    expect(readDraft(KEY).images).toEqual([shot]);
+    dropDraftImages(KEY, ["im1"]);
+    expect(rows.has(KEY)).toBe(true);
+    writeDraftText(KEY, "");
+    expect(rows.has(KEY)).toBe(false);
+  });
+
+  test("a stored image of another shape is left out", () => {
+    rows.set(
+      KEY,
+      JSON.stringify({ text: "x", uploads: [], images: [{ id: 1 }] }),
+    );
+    expect(readDraft(KEY)).toEqual({ text: "x", uploads: [] });
   });
 
   test("a send drops only its ids from the draft as stored now", () => {
