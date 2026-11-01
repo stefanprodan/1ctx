@@ -179,6 +179,13 @@ describe("a queued message's images", () => {
     });
     expect(res.status).toBe(202);
     const { queued } = (await res.json()) as QueuedResponse;
+    // a stale edit is the 409 first, as a send's
+    const stale = await s.chat.member.call(
+      "PATCH",
+      `/api/sessions/${started.sessionId}/queued/${queued.id}`,
+      { body: { message: "@blind look", revision: queued.revision + 1 } },
+    );
+    expect(stale.status).toBe(409);
     const edited = await s.chat.member.call(
       "PATCH",
       `/api/sessions/${started.sessionId}/queued/${queued.id}`,

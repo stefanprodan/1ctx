@@ -3,8 +3,8 @@
 //
 // An upload staged as an image: under the uploads' admission and process
 // slot, the rate and the staged count checked before the body is read
-// and again in the write, the body cut past its cap, then ingest under
-// the decode bound.
+// and again in the write, the body cut past its cap, then ingest. The
+// decode place is taken before the process slot.
 
 import type { StagedImageResponse } from "../../shared/api/images.ts";
 import { type Db, transact } from "../db/index.ts";
@@ -12,7 +12,7 @@ import { readBytes } from "../lib/body.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { BadRequest, PayloadTooLarge, TooManyRequests } from "../lib/errors.ts";
 import type { ImageCaps } from "../limits/index.ts";
-import { decoding } from "./decode.ts";
+import { acquireDecode } from "./decode.ts";
 import { ingest } from "./ingest.ts";
 import { MAX_STAGED_IMAGES } from "./limits.ts";
 import { imageName } from "./names.ts";
@@ -28,6 +28,7 @@ export type WithUpload = <Input, Result>(
     signal: AbortSignal,
     running: () => void,
   ) => Promise<Result>,
+  gate?: (signal: AbortSignal) => Promise<() => void>,
 ) => Promise<Result>;
 
 export type StageDeps = {
@@ -87,13 +88,9 @@ export function stageImage(
         throw error;
       }
       running();
-      // the header read, both encodes and the transparency check
-      const image = await decoding(signal, () => {
-        running();
-        return ingest(bytes, {
-          maxPixels: caps.imageMaxPixels,
-          longSide: caps.imageLongSide,
-        });
+      const image = await ingest(bytes, {
+        maxPixels: caps.imageMaxPixels,
+        longSide: caps.imageLongSide,
       });
       running();
       return transact(deps.db, () => {
@@ -111,5 +108,8 @@ export function stageImage(
         return { result: { image: staged(row) } };
       });
     },
+    // a decode place before the process slot: the header read, both
+    // encodes and the transparency check run inside it
+    acquireDecode,
   );
 }

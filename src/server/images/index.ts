@@ -51,7 +51,7 @@ export type ImagesDeps = {
   sessions: SessionsPort;
   // the uploads' admission and process slot, so a user runs one upload
   // or image at a time and an image takes a slot as a command does;
-  // decodes have their own, smaller bound besides
+  // a decode place, its own smaller bound, is taken before the slot
   withUpload: WithUpload;
 };
 

@@ -52,12 +52,16 @@ what ingest keeps is stored, in the main database.
 
 - **Under the uploads' admission.** `stageImage()` runs inside
   `withUpload()` from `knowledge/`: one upload or image at a time per
-  user, a process slot taken before the body is read, one deadline.
-- **At most `MAX_DECODES` (2) ingests decode at once**, process-wide
-  and apart from the process slots (`decode.ts`). The bound covers the
-  whole ingest, the header read, both encodes and the transparency
-  check; a third waits in arrival order under the upload's deadline,
-  never refused for the wait. A decode holds up to 4 bytes a pixel, so
+  user, a decode place then a process slot taken before the body is
+  read, one deadline.
+- **At most `MAX_DECODES` (2) image uploads decode at once**,
+  process-wide and apart from the process slots (`decode.ts`). The
+  place is taken before the process slot, never inside one, so a wait
+  for it never idles a slot that commands share; the order is the same
+  everywhere. It covers the body read and the whole ingest, the header
+  read, both encodes and the transparency check. A third waits in
+  arrival order under the upload's deadline (503 past it, gone on an
+  abort), never refused for the wait. A decode holds up to 4 bytes a pixel, so
   the decoded pixels stay under 2 x 4 x `imageMaxPixels`: 400 MB at the
   default 50 MP, 800 MB at the 100 MP ceiling, where the slots alone
   would let 4 to 16 run.

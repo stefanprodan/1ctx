@@ -124,10 +124,6 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
             chatAgent === null
               ? null
               : summonOf(deps.agents, chatAgent.name, fields.message);
-          // the enqueue's check, against the agent the new text takes
-          if (row.images.length > 0 && !(summoned ?? chatAgent)?.images) {
-            throw new BadRequest(CANNOT_READ_IMAGES);
-          }
           const next = store.queue.edit(
             row.id,
             fields.revision,
@@ -135,6 +131,11 @@ export function queuedRoutes(deps: QueuedRoutesDeps): RouteDescriptor[] {
             deps.clock(),
           );
           if (next === null) throw new Conflict(CHANGED);
+          // the enqueue's check, against the agent the new text takes,
+          // after the revision's as at send; the throw undoes the edit
+          if (row.images.length > 0 && !(summoned ?? chatAgent)?.images) {
+            throw new BadRequest(CANNOT_READ_IMAGES);
+          }
           const { state, events } = queueAnswer(
             deps.db,
             store,
