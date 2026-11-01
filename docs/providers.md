@@ -73,7 +73,9 @@ Each wire's body is built in its own file over `providers/openai.ts`,
 but `azure`'s and `anthropic`'s, which are their own. These are what
 the providers refuse or need; a field added to the shared body must be
 checked against each. A request is counted in its wire's shape
-(`requestText()`), so every window fit matches what goes out. The tool catalog's counts
+(`requestText()`), so every window fit matches what goes out; an image
+part is left out of the text and added as its estimate
+(`docs/images.md`, The estimate). The tool catalog's counts
 (`tools/offer.ts`'s MCP mode, the Tools page) stay in the Chat
 Completions shape, about one token a tool under the azure one.
 
@@ -100,7 +102,8 @@ Completions shape, about one token a tool under the azure one.
   never goes. Pieces with one index and type are merged
   (`mergeReasoningDetail()`).
 - **OpenRouter's per-family rules.** Claude models get `cache_control`
-  breakpoints on the system prompt and the last two turns; other
+  breakpoints on the system prompt and the last two turns, each on the
+  message's last part, an image included; other
   upstreams cache on their own. DeepSeek refuses an assistant message
   with no reasoning field, so each gets an empty one.
 - **`openai-strict` (NIM, Groq) refuses any field outside the OpenAI

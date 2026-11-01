@@ -20,7 +20,8 @@ completions refuse function tools with any thinking.
   Tools always carry `strict: false`, or Azure makes every property
   required. The system text is the first input item. There is no
   author field (`name` is refused), so a named user message opens with
-  `markOf()`'s `[name] `.
+  `markOf()`'s `[name] `. Its images follow the `input_text` as
+  `input_image` parts (`docs/images.md`, The wires).
 - **Thinking:** an effort is `{effort, summary: "auto"}`; Off and
   `least` (`leastThinking()`) are `{effort: "none"}`; the default is
   `{summary: "auto"}`, the model's own level. Only azure and anthropic
@@ -81,7 +82,8 @@ it behind another base URL. The page names the preset Claude API.
   output-tokens-per-minute limit from it. A `least` round on a model
   that always thinks gets at least 1,024, its thinking paid from it.
 - **The body:** `system` is one text block, the system parts joined.
-  A named user message opens with `markOf()`'s `[name] `. An assistant
+  A named user message opens with `markOf()`'s `[name] `, its images
+  after the text as base64 `image` blocks (`docs/images.md`). An assistant
   message is its thinking records, a text block when it has text, then
   one `tool_use` per call, the order the models answer in. A step's
   results are one user message of `tool_result` blocks, `is_error` on
@@ -105,8 +107,8 @@ it behind another base URL. The page names the preset Claude API.
   never the signature. After a summary the tail goes without its
   thinking (`docs/compaction.md`).
 - **Caching:** `cache_control` on the system block, which caches the
-  tools before it, and on the last text, call or result block of each
-  of the last two turns, never on thinking. The request's `cacheLife`
+  tools before it, and on the last text, image, call or result block of
+  each of the last two turns, never on thinking. The request's `cacheLife`
   sets the lifetime: `short` (or none) is `{type: "ephemeral"}`, five
   minutes, everywhere; `long` is `{type: "ephemeral", ttl: "1h"}`
   everywhere, since the tail of a chat's last round is the next turn's
