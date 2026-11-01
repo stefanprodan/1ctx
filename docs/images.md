@@ -240,8 +240,10 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
   text, a blank line between; the lines alone for images alone.
 - **The model reads a line** where it gets no part: every image to an
   agent whose `images` is false (its history may hold images from before
-  an agent change, and a summoned agent may differ), and a freed one
-  always.
+  an agent change, and a summoned agent may differ), a freed one always,
+  and one too large for any request of the wire (`imageTooLarge()`):
+  past `IMAGE_REQUEST_BYTES`, or past Anthropic's 10 MB of base64 for
+  one image on a Claude model.
 - **The Markdown download and export** put each line as its own
   paragraph, escaped, before the attached files. The feed's line of a
   message of images alone is its first image's. Search reads the text
@@ -285,16 +287,22 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
     `ceil(multiplier * 32 px patches)`, 1.2 unless listed, with no patch
     budget, since auto keeps the original size on the newest; an Azure
     deployment's own name is a patch model;
-  - Gemini: 258 within 384, else 258 per 768 tile before Gemini 3; 1,120
-    from 3; the larger for a name without a version;
+  - Gemini: 258 within 384, else 258 a tile of the crop unit
+    `floor(min(w, h) / 1.5)`, each side rounded up (960x540 is 6 tiles),
+    before Gemini 3; 1,120 from 3; the larger for a name without a
+    version;
   - any other: a token per 28 px patch, uncapped (5,476 at 2048).
 
 ## The check
 
 - **Before a request that carries an image,** never one without:
-  `unfitImages()` refuses past `imagesPerRequest` parts, or past the
+  `unfitImages()` refuses past `imagesPerRequest` parts, past
+  `IMAGE_REQUEST_BYTES` (12 MiB) of their stored `bytes`, or past the
   window less the round's own `maxTokens` (none on a chat round; the
-  summary's cap) and 256. Never at `compactsAt()`: a request between
+  summary's cap) and 256. The byte bound is a constant under Gemini's
+  20 MB for a whole request with inline data, the smallest of the wires
+  served, with room for text (base64 is a third more); it also bounds a
+  request's memory. It counts the column, never loaded bytes. Never at `compactsAt()`: a request between
   the threshold and the window is sent and compacted after its answer,
   as one without images is. With no window only the count applies.
 - **At the start, in its transaction** (`refuseUnfit()`), after the
@@ -315,13 +323,15 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
   (`docs/compaction.md`): every image after the last summary and in its
   tail, sent as it was. The set moves only at a summary, so the cache
   holds between turns.
-- **A request that carried `imagesPerRequest` images makes the summary
+- **A request that carried `imagesPerRequest` images, or past
+  `IMAGE_DUE_BYTES` (three quarters of the bound), makes the summary
   due** after its answer, as the threshold does, so the next has room.
 - **The summary round reads the images in its history,** so the summary
   can describe them; after it, an image before the cut is gone with its
   turn and one in the tail is replayed.
-- **The tail replays at most half of `imagesPerRequest`** (`tailImages()`),
-  stopping at the turn that would pass it, so a summary never leaves a
+- **The tail replays at most half of `imagesPerRequest`** (`tailImages()`)
+  and `IMAGE_TAIL_BYTES` (half the bound), stopping at the turn that
+  would pass either, so a summary never leaves a
   history due again at once. At 32K the tail's budget (about 3,200
   tokens) takes no 2048 image; at 200K and 1M the count and the request
   size bind before tokens.

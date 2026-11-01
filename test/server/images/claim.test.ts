@@ -47,6 +47,7 @@ describe("the claim at send", () => {
         mediaType: "image/png",
         width: 12,
         height: 8,
+        bytes: expect.any(Number),
         freed: false,
       },
       {
@@ -55,6 +56,7 @@ describe("the claim at send", () => {
         mediaType: "image/png",
         width: 12,
         height: 8,
+        bytes: expect.any(Number),
         freed: false,
       },
     ]);

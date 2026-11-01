@@ -5,11 +5,13 @@
 
 import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
+import { IMAGE_TAIL_BYTES } from "../../shared/images.ts";
 import type { Wire } from "../../shared/words.ts";
 import { CHARS_PER_TOKEN, tokens } from "../lib/tokens.ts";
 import {
   type ChatMessageIn,
   imagePartsOf,
+  requestImageBytes,
   requestImageTokens,
   requestText,
 } from "../providers/index.ts";
@@ -74,7 +76,8 @@ export function costWithin(
 }
 
 // the most image parts a tail replays: half a request's, so a summary
-// never leaves a history whose images make the next one due at once
+// never leaves a history whose images make the next one due at once;
+// its bytes are held to IMAGE_TAIL_BYTES the same way
 export const tailImages = (imagesPerRequest: number) =>
   Math.floor(imagesPerRequest / 2);
 
@@ -103,7 +106,7 @@ export type Tail = {
 };
 
 // the newest whole turns before rows[cut] whose estimate fits the
-// budget and whose images fit `images`. The walk stops at the first
+// budget and whose images fit `images` and IMAGE_TAIL_BYTES. The walk stops at the first
 // turn that does not fit, so a newest turn over the budget leaves the
 // tail empty and the count never reads further back than the budget
 export function tailOf(
@@ -119,6 +122,7 @@ export function tailOf(
   const parts: ChatMessageIn[][] = [];
   let total = 0;
   let pictures = 0;
+  let held = 0;
   let start = cut;
   while (budget > 0 && start > 0) {
     const sendId = rows[start - 1]!.sendId;
@@ -129,7 +133,8 @@ export function tailOf(
       renderRows(rows.slice(begin, start), policy, lookups, turns),
     );
     const count = imagePartsOf(messages).length;
-    if (pictures + count > images) break;
+    const bytes = requestImageBytes(messages);
+    if (pictures + count > images || held + bytes > IMAGE_TAIL_BYTES) break;
     const cost =
       messages.length === 0
         ? 0
@@ -137,6 +142,7 @@ export function tailOf(
     if (cost === null) break;
     total += cost;
     pictures += count;
+    held += bytes;
     parts.unshift(messages);
     start = begin;
   }

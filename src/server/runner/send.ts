@@ -54,8 +54,9 @@ export type RoundState = {
   tokens: number;
   // what the tool-work budget adds: tokens with cached reads weighed
   spent: number;
-  // the image parts its request carried
+  // the image parts its request carried, and their stored bytes
   images: number;
+  imageBytes: number;
   // the tool calls the provider assembled this round, once the stream
   // ends normally; the loop reads them after the round
   calls: ToolCall[];
@@ -254,6 +255,7 @@ export function newRound(messageId: string, now: number): RoundState {
     tokens: 0,
     spent: 0,
     images: 0,
+    imageBytes: 0,
     calls: [],
     drafts: new Map(),
     retry: null,

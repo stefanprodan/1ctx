@@ -28,6 +28,8 @@ import type { ActiveSend } from "../../../src/server/runner/send.ts";
 import { compactsAt } from "../../../src/shared/compaction.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import {
+  IMAGE_REQUEST_BYTES,
+  IMAGE_TAIL_BYTES,
   imagesFit,
   type MessageImage,
   NO_IMAGE_ROOM,
@@ -146,6 +148,7 @@ const pictures = (
   count: number,
   side = 2048,
   freed = false,
+  bytes = 0,
 ): MessageImage[] =>
   Array.from({ length: count }, (_, i) => ({
     id: `${prefix}${i}`,
@@ -153,8 +156,11 @@ const pictures = (
     mediaType: "image/png",
     width: side,
     height: side,
+    bytes,
     freed,
   }));
+
+const MiB = 1024 * 1024;
 
 // a user turn of images, answered
 const turn = (id: string, images: MessageImage[]): Message[] => [
@@ -227,7 +233,30 @@ describe("the check before a request", () => {
     expect(unfitImages(requestOf(full, p), p)).toBe(NO_IMAGE_ROOM);
   });
 
-  test("with no window only imagesPerRequest applies", () => {
+  test("a request past the byte bound is refused, the words saying how many fit", () => {
+    const p = at(200_000, "anthropic", "claude-opus-5");
+    const rows = [
+      ...turn("a", pictures("a", 1, 640, false, 7 * MiB)),
+      row({
+        id: "u",
+        kind: "user",
+        images: pictures("b", 2, 640, false, 3 * MiB),
+      }),
+    ];
+    expect(IMAGE_REQUEST_BYTES).toBe(12 * MiB);
+    expect(unfitImages(requestOf(rows, p), p, 2)).toBe(imagesFit(1, 2));
+    const fits = [
+      ...turn("a", pictures("a", 1, 640, false, 6 * MiB)),
+      row({
+        id: "u",
+        kind: "user",
+        images: pictures("b", 2, 640, false, 3 * MiB),
+      }),
+    ];
+    expect(unfitImages(requestOf(fits, p), p, 2)).toBeNull();
+  });
+
+  test("with no window only imagesPerRequest and the byte bound apply", () => {
     const p = at(null, "openai-compatible", "qwen3-vl");
     const ok = [row({ id: "u", kind: "user", images: pictures("a", 20) })];
     expect(unfitImages(requestOf(ok, p), p, 20)).toBeNull();
@@ -279,9 +308,51 @@ describe("images in history", () => {
           mediaType: "image/png",
           width: 640,
           height: 640,
+          bytes: 0,
         },
       ],
     });
+  });
+
+  test("an image too large for any request of its wire goes as its line", () => {
+    const rows = (bytes: number) => [
+      row({
+        id: "u",
+        kind: "user",
+        content: "look",
+        images: pictures("big", 1, 640, false, bytes),
+      }),
+    ];
+    const claude = at(200_000, "anthropic", "claude-opus-5");
+    // 8 MiB is past Anthropic's 10 MB of base64 for one image
+    expect(history(rows(8 * MiB), claude, lookups, NOW)[1]).toMatchObject({
+      content: "look\n\n[image: big0.png, 640x640]",
+    });
+    expect(imagePartsOf(history(rows(7 * MiB), claude, lookups, NOW))).toEqual([
+      expect.objectContaining({ id: "big0", bytes: 7 * MiB }),
+    ]);
+    const other = at(200_000, "openrouter", "qwen/qwen3-vl");
+    expect(
+      imagePartsOf(history(rows(8 * MiB), other, lookups, NOW)),
+    ).toHaveLength(1);
+    // past the request bound on every wire
+    expect(
+      imagePartsOf(history(rows(IMAGE_REQUEST_BYTES + 1), other, lookups, NOW)),
+    ).toHaveLength(0);
+  });
+
+  test("the tail holds at most half the request bound's bytes", () => {
+    const rows = [
+      ...turn("a", pictures("a", 1, 640, false, 4 * MiB)),
+      ...turn("b", pictures("b", 1, 640, false, 4 * MiB)),
+      row({ id: "sum", kind: "summary", userId: null, content: "so far" }),
+      row({ id: "n", kind: "user", content: "next" }),
+    ];
+    const p = at(200_000, "openai-compatible", "qwen3-vl");
+    expect(
+      imagePartsOf(history(rows, p, lookups, NOW)).map((image) => image.id),
+    ).toEqual(["b0"]);
+    expect(IMAGE_TAIL_BYTES).toBe(6 * MiB);
   });
 
   test("the images sent from history do not change between turns without a summary", () => {
@@ -353,6 +424,10 @@ describe("images in history", () => {
     const one = at(200_000, "openai-compatible", "qwen3-vl", 1);
     const lined = buildRequest(summarizing(one), rows, lookups, NOW);
     expect(imagePartsOf(lined.messages)).toHaveLength(0);
+    // past the byte bound too
+    const heavy = turn("a", pictures("a", 2, 640, false, 7 * MiB));
+    const heavyRead = buildRequest(summarizing(fits), heavy, lookups, NOW);
+    expect(imagePartsOf(heavyRead.messages)).toHaveLength(0);
     expect(
       userOf(
         lined.messages,

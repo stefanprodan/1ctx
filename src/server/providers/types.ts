@@ -34,6 +34,8 @@ export type ImagePart = {
   mediaType: string;
   width: number;
   height: number;
+  // the stored size, which a request's byte bound counts
+  bytes: number;
 };
 
 export type ChatMessageIn = (

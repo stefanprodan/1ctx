@@ -5,7 +5,7 @@
 // parts read into bytes only when a body is built, and their tokens
 // counted by an estimate, never by the base64's length.
 
-import { imageLine } from "../../shared/images.ts";
+import { IMAGE_REQUEST_BYTES, imageLine } from "../../shared/images.ts";
 import type { Wire } from "../../shared/words.ts";
 import type { ChatMessageIn, ChatRequest, ImagePart } from "./types.ts";
 
@@ -152,14 +152,18 @@ function openAiTokens(model: string, w: number, h: number): number {
   return Math.ceil(multiplier * Math.ceil(w / 32) * Math.ceil(h / 32));
 }
 
-// https://ai.google.dev/gemini-api/docs/tokens: 258 for an image within
-// 384 on both sides, else 258 per 768 tile; Gemini 3 and later take
-// 1,120 at the default resolution
-// (https://ai.google.dev/gemini-api/docs/media-resolution). A name
-// without a version takes the larger
+// https://ai.google.dev/gemini-api/docs/image-understanding: 258 for an
+// image within 384 on both sides, else 258 a tile of the crop unit
+// floor(min(w, h) / 1.5), each side divided by it and rounded up (960x540
+// is 3 x 2 tiles); Gemini 3 and later take 1,120 at the default
+// resolution (https://ai.google.dev/gemini-api/docs/media-resolution).
+// A name without a version takes the larger
 function geminiTokens(model: string, w: number, h: number): number {
+  const unit = Math.max(1, Math.floor(Math.min(w, h) / 1.5));
   const tiles =
-    w <= 384 && h <= 384 ? 258 : Math.ceil(w / 768) * Math.ceil(h / 768) * 258;
+    w <= 384 && h <= 384
+      ? 258
+      : Math.ceil(w / unit) * Math.ceil(h / unit) * 258;
   const v = version(bare(model).replace(/^gemini-/, ""));
   if (v !== null && v < 3) return tiles;
   if (v !== null) return 1120;
@@ -185,6 +189,35 @@ export function imageTokens(
     default:
       return Math.ceil(width / 28) * Math.ceil(height / 28);
   }
+}
+
+// the base64 a part's stored bytes become on the wire
+export const base64Bytes = (bytes: number) => 4 * Math.ceil(bytes / 3);
+
+// Anthropic's per-image limit, 10 MB of base64 on the Claude API
+// (https://platform.claude.com/docs/en/build-with-claude/vision, Request
+// limits); the other wires state none below a whole request's
+const ANTHROPIC_IMAGE_BASE64 = 10_000_000;
+
+// an image no request of the wire takes, sent as its line: past the
+// request bound, or past the wire's per-image limit
+export function imageTooLarge(
+  wire: Wire | null,
+  model: string,
+  bytes: number,
+): boolean {
+  if (bytes > IMAGE_REQUEST_BYTES) return true;
+  return (
+    imageFamily(wire, model) === "anthropic" &&
+    base64Bytes(bytes) > ANTHROPIC_IMAGE_BASE64
+  );
+}
+
+// the stored bytes of a request's image parts
+export function requestImageBytes(messages: readonly ChatMessageIn[]): number {
+  let total = 0;
+  for (const image of imagePartsOf(messages)) total += image.bytes;
+  return total;
 }
 
 // the image parts a request carries, in order

@@ -15,6 +15,7 @@ import {
   imagePartsOf,
   mergeReasoningDetail,
   ProviderRefusal,
+  requestImageBytes,
   requestTokens,
   type Usage,
   withImagesAsLines,
@@ -438,6 +439,7 @@ async function streamRound(
   }
   visuals?.flush();
   round.images = imagePartsOf(req.messages).length;
+  round.imageBytes = requestImageBytes(req.messages);
   if (round.usage === null) {
     round.tokens = requestTokens(send.policy.wire, req);
     round.spent = round.tokens;

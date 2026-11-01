@@ -72,6 +72,8 @@ export {
   type ImageData,
   imagePartsOf,
   imageTokens,
+  imageTooLarge,
+  requestImageBytes,
   requestImageTokens,
   withImagesAsLines,
 } from "./images.ts";

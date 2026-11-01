@@ -20,6 +20,21 @@ export const imagesFit = (fit: number, of: number): string =>
     ? NO_IMAGE_ROOM
     : `only ${fit} of these ${of} images fit in this chat`;
 
+// the most stored image bytes one request carries, base64 a third more
+// on the wire: under Gemini's 20 MB for a whole request with inline data
+// (https://ai.google.dev/gemini-api/docs/image-understanding), the
+// smallest whole-request limit of the wires served, with room for a long
+// history's text; Anthropic's Messages API takes 128 MB
+// (https://platform.claude.com/docs/en/api/overview) and OpenAI's 512 MB
+// (https://developers.openai.com/api/docs/guides/images-vision). It
+// also bounds a request's memory
+export const IMAGE_REQUEST_BYTES = 12 * 1024 * 1024;
+// a request past this makes the summary due, and a tail holds at most
+// the half, so the next message has room and a summary is never due at
+// once
+export const IMAGE_DUE_BYTES = (IMAGE_REQUEST_BYTES * 3) / 4;
+export const IMAGE_TAIL_BYTES = IMAGE_REQUEST_BYTES / 2;
+
 // the most images one message may name, imagesPerMessage's ceiling; the
 // limit itself is checked at the claim
 export const MAX_IMAGES_PER_MESSAGE = 12;
@@ -32,6 +47,9 @@ export type MessageImage = {
   mediaType: string;
   width: number;
   height: number;
+  // the stored size, which a request's byte bound counts; absent on a
+  // row read before it was carried
+  bytes?: number;
   freed: boolean;
 };
 

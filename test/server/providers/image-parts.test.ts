@@ -27,6 +27,7 @@ const SHOT: ImagePart = {
   mediaType: "image/png",
   width: 1000,
   height: 1000,
+  bytes: 4,
 };
 const GONE: ImagePart = { ...SHOT, id: "i2", name: "gone.jpg" };
 const BYTES = new Uint8Array([1, 2, 3, 4]);
@@ -162,8 +163,12 @@ describe("the token estimate", () => {
     // Gemini 2: 258 within 384, else per 768 tile; 3 and later 1,120
     ["gemini", "gemini-2.5-flash", 384, 384, 258],
     ["gemini", "gemini-2.5-flash", 1000, 1000, 1032],
+    // the doc's own: a 360 crop unit, 3 x 2 tiles
+    ["gemini", "gemini-2.0-flash", 960, 540, 1548],
+    ["gemini", "gemini-2.5-pro", 2048, 100, 16_512],
     ["openrouter", "google/gemini-3-pro-preview", 2048, 2048, 1120],
-    ["gemini", "gemini-flash-latest", 2048, 2048, 2322],
+    ["gemini", "gemini-flash-latest", 2048, 2048, 1120],
+    ["gemini", "gemini-flash-latest", 3000, 1000, 2580],
     // any other: a token per 28 px patch, uncapped
     ["openai-compatible", "qwen3-vl", 2048, 2048, 5476],
   ] as const)("%s %s %ix%i is %i", (wire, model, w, h, expected) => {

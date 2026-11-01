@@ -15,7 +15,8 @@ token cap for its own latest turn, and its thinking replay rule, under
 - **A summary round triggers at `compactsAt()`**
   (`shared/compaction.ts`) from an answer round's usage:
   `contextLength - min(contextReserve, contextLength / 4)`, or when the
-  round's request carried `imagesPerRequest` images, any window or none
+  round's request carried `imagesPerRequest` images or past
+  `IMAGE_DUE_BYTES` of them, any window or none
   (`docs/images.md`, History).
 - **The summary round sends no tools and thinking off,** or the wire's
   least effort for a `thinkingRequired` model, since a provider refuses
@@ -49,7 +50,8 @@ token cap for its own latest turn, and its thinking replay rule, under
   `requestTokens()`; the last keeps a small window from compacting the
   turn after a summary. An unknown window gets no tail. An image costs
   its estimate, and the tail holds at most half of `imagesPerRequest`
-  images, stopping at the turn that would pass it.
+  images and of the image byte bound, stopping at the turn that would
+  pass either.
 - **Nothing about the tail is stored.** The same rows, policy and
   window give the same tail every turn, so the cached prefix holds; a
   fork copies the rows and a regenerate drops the trailing summaries, so
