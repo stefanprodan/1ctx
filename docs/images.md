@@ -203,8 +203,9 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
   where they remain, created now; the budget then runs as after a
   claim, never freeing the copies.
 - **A fork at a user turn stages that message's images** for the user
-  forking, under a fresh lease and outside the staged count, answered as
-  `draftImages`; a freed one is left out.
+  forking, under a fresh lease, answered as `draftImages`; a freed one
+  is left out, and so is any past the user's room under
+  `MAX_STAGED_IMAGES`, so a fork never blocks their next upload.
 - **Regenerate reuses the message's images**: its user rows stay.
 
 ## Image lines

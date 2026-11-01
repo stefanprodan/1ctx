@@ -10,7 +10,7 @@ import type { StagedImage } from "../../shared/api/images.ts";
 import type { MessageImage } from "../../shared/images.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { ImageCaps } from "../limits/index.ts";
-import { FREE_BATCH } from "./limits.ts";
+import { FREE_BATCH, MAX_STAGED_IMAGES } from "./limits.ts";
 import { type ImageStore, staged, type Taken } from "./store.ts";
 
 export const IMAGE_GONE = "an image is gone, add it again";
@@ -118,7 +118,8 @@ export function holdImages(
 // A fork's copied user messages get copies of their images, freed ones
 // staying freed, and the copies count against the budget as a claim's
 // do. A fork at a user turn stages that message's images again for the
-// user forking it, so the draft can send them; a freed one is left out
+// user forking it, so the draft can send them; a freed one, and any
+// past the user's room under MAX_STAGED_IMAGES, is left out
 export function forkImages(
   deps: ClaimDeps,
   fields: {
@@ -142,9 +143,17 @@ export function forkImages(
   }
   if (kept.size > 0) enforceBudget(deps, fields.projectId, kept);
   const draft: StagedImage[] = [];
-  for (const id of fields.draft?.images ?? []) {
-    const row = deps.store.copyStaged(id, fields.draft!.userId, now);
-    if (row !== null) draft.push(staged(row));
+  if (fields.draft === null) return draft;
+  // the forker's staged images stay within MAX_STAGED_IMAGES, so a fork
+  // never blocks their next upload; the rest are left out
+  let room =
+    MAX_STAGED_IMAGES - deps.store.stagedCount(fields.draft.userId, now);
+  for (const id of fields.draft.images) {
+    if (room <= 0) break;
+    const row = deps.store.copyStaged(id, fields.draft.userId, now);
+    if (row === null) continue;
+    draft.push(staged(row));
+    room--;
   }
   return draft;
 }

@@ -16,7 +16,13 @@ import type { Migration } from "../migration.ts";
 // the message's serves its images in order too. The user's counts the
 // staged images, the expiry's the lease sweep. The budget's covers a
 // project's sent images that still have bytes, oldest first, with their
-// sizes.
+// sizes, message_id and (data is not null): a partial index's own terms
+// are checked against the table unless the index holds them, so
+// without those two each budget read would touch every row's record.
+//
+// A queued message holds its images by queued_id, never as a sent one
+// too, and names them in order in queued_messages.images, as it names
+// its uploads, so a start reads them from the row it holds.
 //
 // image_uploads logs each accepted upload for the hourly rate, which a
 // delete of the image cannot reset; the sweep drops rows past the hour.
@@ -31,7 +37,8 @@ export const m0080: Migration = {
         session_id text references sessions(id) on delete cascade,
         message_id text references messages(id) on delete cascade
           check ((message_id is null) = (session_id is null)),
-        queued_id text references queued_messages(id) on delete cascade,
+        queued_id text references queued_messages(id) on delete cascade
+          check (queued_id is null or message_id is null),
         position integer not null default 0 check (position >= 0),
         name text not null,
         media_type text not null,
@@ -54,8 +61,10 @@ export const m0080: Migration = {
       create index images_user on images(user_id, created_at);
       create index images_expiry on images(expires_at)
         where expires_at is not null;
-      create index images_budget on images(project_id, created_at, bytes)
+      create index images_budget
+        on images(project_id, created_at, bytes, message_id, (data is not null))
         where message_id is not null and data is not null;
+      alter table queued_messages add column images text;
 
       create table image_uploads (
         user_id text not null references users(id),

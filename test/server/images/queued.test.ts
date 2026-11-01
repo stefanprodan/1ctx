@@ -8,7 +8,10 @@ import { describe, expect, test } from "bun:test";
 import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { CHANNEL_NO_IMAGES } from "../../../src/server/runner/channel.ts";
 import { CANNOT_READ_IMAGES } from "../../../src/server/runner/images.ts";
-import type { QueuedResponse } from "../../../src/shared/api/sessions.ts";
+import type {
+  NotSentResponse,
+  QueuedResponse,
+} from "../../../src/shared/api/sessions.ts";
 import { sessionSettled } from "../../helpers/chat.ts";
 import { imageApp, userTexts } from "./helpers.ts";
 
@@ -115,6 +118,26 @@ describe("a queued message's images", () => {
     await sessionSettled(s.app, started.sessionId);
     await s.app.shutdown();
   });
+});
+
+test("a queued message of images alone says its first image on Home's not-sent list", async () => {
+  const s = await imageApp();
+  const started = await s.start("first", []);
+  const a = await s.stage(s.chat.projectId, s.chat.member, "pod.png");
+  expect(
+    (await s.send(started.sessionId, { message: "", images: [a.id] })).status,
+  ).toBe(202);
+  // the agent stops reading images, so the start refuses the row
+  s.reads(s.chat.agentId, false);
+  started.script.reply("hi");
+  await sessionSettled(s.app, started.sessionId);
+  const res = await s.chat.member.call("GET", "/api/me/not-sent");
+  const { rows } = (await res.json()) as NotSentResponse;
+  expect(rows.map(({ line, reason }) => ({ line, reason }))).toEqual([
+    { line: "[image: pod.png, 12x8]", reason: "failed" },
+  ]);
+  expect(s.image(a.id)?.queued_id).toBe(rows[0]!.id);
+  await s.app.shutdown();
 });
 
 test("a channel post naming images is refused", async () => {

@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The images a user message carries, as the wire and the text readers
-// see them. Pure: the same images always give the same lines, so a
-// replayed history and its tail read the same bytes.
+// see them. Pure: an image's line changes only once, when the budget
+// frees it, so a replayed history and its tail read the same bytes
+// between frees.
 
 // the most images one message may name, imagesPerMessage's ceiling; the
 // limit itself is checked at the claim

@@ -137,8 +137,8 @@ export function prepareSend(fields: {
   const now = fields.now;
   const { turn } = fields;
   const bash = offers(fields.policy.offered, "bash");
-  // a regenerate reuses its rows, and their files are in the tree already
   checkImages(fields.policy, fields.kind, "users" in turn ? turn.users : []);
+  // a regenerate reuses its rows, and their files are in the tree already
   for (const user of "users" in turn ? turn.users : []) {
     if (!user.uploads?.length) continue;
     if (fields.kind !== "chat") {

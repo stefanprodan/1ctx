@@ -6,6 +6,7 @@
 // message says one line per image.
 
 import { describe, expect, test } from "bun:test";
+import { MAX_STAGED_IMAGES } from "../../../src/server/images/limits.ts";
 import { envelopeRow } from "../../../src/server/sessions/feed.ts";
 import type {
   ForkSessionResponse,
@@ -122,6 +123,26 @@ describe("fork", () => {
     await sessionSettled(s.app, atSecond.session.id);
     const atFirst = await fork(s, sessionId, first!.id, s.robin);
     expect(atFirst.draftImages.map((image) => image.name)).toEqual(["b.png"]);
+    await s.app.shutdown();
+  });
+
+  test("stages no more draft images than the user's room under the staged cap", async () => {
+    const s = await imageApp();
+    const { sessionId, rows } = await twoTurns(s, s.team.id);
+    const [first, second] = rows.filter((row) => row.kind === "user");
+    for (let i = 0; i < MAX_STAGED_IMAGES - 1; i++) {
+      await s.stage(s.team.id, s.robin);
+    }
+    const staged = () =>
+      s.app.images.store.stagedCount(s.robinId, s.app.now.value);
+    // one place left: the second turn's one image takes it
+    const atSecond = await fork(s, sessionId, second!.id, s.robin);
+    expect(atSecond.draftImages.map((image) => image.name)).toEqual(["c.png"]);
+    expect(staged()).toBe(MAX_STAGED_IMAGES);
+    // none left: the first turn's live image is left out
+    const atFirst = await fork(s, sessionId, first!.id, s.robin);
+    expect(atFirst.draftImages).toEqual([]);
+    expect(staged()).toBe(MAX_STAGED_IMAGES);
     await s.app.shutdown();
   });
 

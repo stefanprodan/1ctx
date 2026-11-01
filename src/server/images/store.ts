@@ -48,12 +48,16 @@ export const messageImagesSql = (table: string) =>
       'freed', json(iif(data is null, 'true', 'false'))) order by position)
     from images where message_id = ${table}.id)`;
 
-// the first image of a message as one MessageImage, null for none
-export const firstImageSql = (table: string) =>
+// the first image of a message, or of a queued one by queued_id, as one
+// MessageImage, null for none
+export const firstImageSql = (
+  table: string,
+  owner: "message_id" | "queued_id" = "message_id",
+) =>
   `(select json_object('id', id, 'name', name, 'mediaType', media_type,
       'width', width, 'height', height,
       'freed', json(iif(data is null, 'true', 'false')))
-    from images where message_id = ${table}.id order by position limit 1)`;
+    from images where ${owner} = ${table}.id order by position limit 1)`;
 
 export const hasImagesSql = (table: string) =>
   `exists (select 1 from images where message_id = ${table}.id)`;
