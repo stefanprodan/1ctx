@@ -23,6 +23,7 @@ import {
   sessionDetail,
 } from "../sessions/index.ts";
 import { channelContext } from "./channel-context.ts";
+import { checkImages } from "./images.ts";
 import { offers, type SendPolicy } from "./policy.ts";
 import type { Registry } from "./registry.ts";
 import { type ActiveSend, live, newSend, type SendOp } from "./send.ts";
@@ -137,6 +138,7 @@ export function prepareSend(fields: {
   const { turn } = fields;
   const bash = offers(fields.policy.offered, "bash");
   // a regenerate reuses its rows, and their files are in the tree already
+  checkImages(fields.policy, fields.kind, "users" in turn ? turn.users : []);
   for (const user of "users" in turn ? turn.users : []) {
     if (!user.uploads?.length) continue;
     if (fields.kind !== "chat") {

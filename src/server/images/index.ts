@@ -2,18 +2,36 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Images added to chat messages: ingest, the staged rows and their
-// lease, and the one answer for their bytes.
+// lease, the claim at send and the project's budget, and the one
+// answer for their bytes.
 
+import type { StagedImage } from "../../shared/api/images.ts";
+import type { MessageImage } from "../../shared/images.ts";
 import { type Db, transact } from "../db/index.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { Gone, HttpError, NotFound } from "../lib/errors.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { ImageCaps } from "../limits/index.ts";
+import {
+  type ClaimDeps,
+  claimImages,
+  forkImages,
+  holdImages,
+  type ImageClaim,
+} from "./claim.ts";
 import { SWEEP_BATCH } from "./limits.ts";
 import { type AccessPort, type ImagesPort, routes } from "./routes.ts";
 import { serveBytes } from "./serve.ts";
 import { stageImage, type WithUpload } from "./stage.ts";
 import { ImageStore } from "./store.ts";
+
+export {
+  IMAGE_GONE,
+  IMAGE_REPEATED,
+  type ImageClaim,
+  tooManyImages,
+} from "./claim.ts";
+export { firstImageSql, hasImagesSql, messageImagesSql } from "./store.ts";
 
 export const FREED = "image removed to free space";
 const MISSING = "no such image";
@@ -37,6 +55,24 @@ export type ImagesDeps = {
 
 export type ImagesArea = ImagesPort & {
   store: ImageStore;
+  // in the send's transaction: each message's staged images take it,
+  // then the project's budget frees the oldest sent bytes past it
+  claim(
+    projectId: string,
+    sessionId: string,
+    claims: readonly ImageClaim[],
+  ): MessageImage[][];
+  // in the enqueue's transaction: the queued message holds them
+  hold(
+    userId: string,
+    projectId: string,
+    queuedId: string,
+    ids: readonly string[],
+  ): void;
+  // a queued message's images staged again under a fresh lease, before
+  // its row goes
+  release(queuedId: string): void;
+  fork: (fields: Parameters<typeof forkImages>[1]) => StagedImage[];
   routes: RouteDescriptor[];
   // the expired staged rows and the rate's rows past the hour removed,
   // at most a batch of each
@@ -45,6 +81,11 @@ export type ImagesArea = ImagesPort & {
 
 export function imagesArea(deps: ImagesDeps): ImagesArea {
   const store = new ImageStore(deps.db);
+  const claims: ClaimDeps = {
+    store,
+    caps: () => deps.limits.current(),
+    now: () => deps.clock(),
+  };
   const port: ImagesPort = {
     stage: (projectId, userId, name, req) =>
       stageImage(
@@ -96,6 +137,14 @@ export function imagesArea(deps: ImagesDeps): ImagesArea {
   return {
     ...port,
     store,
+    claim: (projectId, sessionId, list) =>
+      claimImages(claims, projectId, sessionId, list),
+    hold: (userId, projectId, queuedId, ids) =>
+      holdImages(claims, userId, projectId, queuedId, ids),
+    release: (queuedId) => {
+      store.release(queuedId, deps.clock());
+    },
+    fork: (fields) => forkImages(claims, fields),
     sweep: (now) =>
       store.sweep(now, SWEEP_BATCH) +
       store.sweepLog(now - HOUR_MS, SWEEP_BATCH),

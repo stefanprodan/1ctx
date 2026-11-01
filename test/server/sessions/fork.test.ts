@@ -180,6 +180,7 @@ describe("forkPoint", () => {
         expect(result).toEqual({
           rows: fixture.ids!.map((id) => rows.find((row) => row.id === id)!),
           draft: fixture.draft ?? null,
+          draftImages: [],
         });
       }
       expect({ rows, sends }).toEqual(before);
@@ -347,6 +348,7 @@ describe("POST /api/sessions/:id/fork", () => {
       expect(copied).toEqual({
         ...(await detail(chat.member, copied.session.id)),
         draftUploads: [],
+        draftImages: [],
       });
       expect({
         session: store.byId(source.sessionId),

@@ -68,6 +68,8 @@ export function pendingFields(deps: RunnerDeps, row: PendingRow) {
   };
 }
 
+export const CHANNEL_NO_IMAGES = "a channel post cannot carry images";
+
 function postChannel(
   deps: ChannelDeps,
   channel: SessionRow,
@@ -77,6 +79,9 @@ function postChannel(
   const { registry, queue } = deps;
   if (fields.capabilities !== undefined) {
     throw new BadRequest("a channel has no capability switches");
+  }
+  if (fields.images !== undefined) {
+    throw new BadRequest(CHANNEL_NO_IMAGES);
   }
   const agent =
     channelFirstWord(fields.message, channel.projectId, {

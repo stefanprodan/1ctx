@@ -93,6 +93,7 @@ const EXPECTED_IDS = [
   "0079-repos-block",
   "0080-images",
   "0081-agent-images",
+  "0082-queued-images",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2161,6 +2162,62 @@ describe("the schema", () => {
       expect(() =>
         db.exec("update agents set images = null where id = 'a'"),
       ).toThrow(/NOT NULL/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0082 names a queued message's images, never held and sent at once", () => {
+    const db = seed(MIGRATIONS.slice(0, 81));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0082-queued-images"));
+      db.exec(`
+        insert into queued_messages (id, session_id, author_id, content,
+          images, queued_at, changed_at)
+          values ('q', 'sess', 'u', 'look', '["held"]', 0, 0);
+        insert into images (id, project_id, user_id, queued_id, name,
+          media_type, bytes, width, height, digest, created_at, data)
+          values ('held', 'p', 'u', 'q', 'a.png', 'image/png', 3, 1, 1, 'd',
+            0, x'010203');
+      `);
+      expect(
+        db.query("select images from queued_messages where id = 'q'").get(),
+      ).toEqual({ images: '["held"]' });
+      expect(() =>
+        db.exec(
+          "update images set session_id = 'sess', message_id = 'm1' where id = 'held'",
+        ),
+      ).toThrow("an image is held or sent, never both");
+      expect(() =>
+        db.exec(`
+          insert into images (id, project_id, user_id, session_id, message_id,
+            queued_id, name, media_type, bytes, width, height, digest,
+            created_at, data)
+          values ('both', 'p', 'u', 'sess', 'm1', 'q', 'a.png', 'image/png',
+            3, 1, 1, 'd', 0, x'01')
+        `),
+      ).toThrow("an image is held or sent, never both");
+      db.exec(`
+        update images set queued_id = null, session_id = 'sess',
+          message_id = 'm1' where id = 'held'
+      `);
+      expect(
+        db.query("select queued_id, message_id from images").get(),
+      ).toEqual({ queued_id: null, message_id: "m1" });
+      // the budget reads the index alone, never a row of bytes
+      for (const sql of [
+        "select sum(bytes) from images where project_id = ? and message_id is not null and data is not null",
+        "select rowid, bytes from images where project_id = ? and message_id is not null and data is not null order by created_at limit 9",
+      ]) {
+        expect(
+          db
+            .query<{ detail: string }, [string]>(`explain query plan ${sql}`)
+            .all("p")
+            .map((row) => row.detail),
+        ).toEqual([
+          "SEARCH images USING COVERING INDEX images_budget (project_id=?)",
+        ]);
+      }
     } finally {
       db.close();
     }
@@ -4258,6 +4315,7 @@ describe("project channel migrations", () => {
       "0079-repos-block",
       "0080-images",
       "0081-agent-images",
+      "0082-queued-images",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4476,6 +4534,7 @@ describe("project channel migrations", () => {
           "0079-repos-block",
           "0080-images",
           "0081-agent-images",
+          "0082-queued-images",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4643,6 +4702,7 @@ describe("project channel migrations", () => {
         "0079-repos-block",
         "0080-images",
         "0081-agent-images",
+        "0082-queued-images",
       ]);
       expect(
         db

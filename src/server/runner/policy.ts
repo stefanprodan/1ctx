@@ -88,6 +88,8 @@ export type SendPolicy = {
   // retries depend on whether a local server caches the conversation
   wire: Wire | null;
   model: string;
+  // the agent's image flag: a turn of images on one without is refused
+  images: boolean;
   contextLength: number | null;
   // the most a reply may hold, where the catalog says; absent elsewhere
   outputLimit?: number;
@@ -296,6 +298,7 @@ export function buildPolicy(input: {
     wire: input.wire ?? null,
     price: priceOf(input.wire ?? null, agent.model.listedAs),
     model: agent.model.id,
+    images: agent.images,
     contextLength: agent.model.contextLength,
     ...(agent.model.outputLimit === undefined
       ? {}

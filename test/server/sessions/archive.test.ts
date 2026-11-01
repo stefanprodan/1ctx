@@ -137,6 +137,7 @@ describe("an archived chat is read-only", () => {
       clock: () => chat.app.now.value,
       sessions: chat.app.sessions,
       uploads: {} as StartDeps["uploads"],
+      images: {} as StartDeps["images"],
       views: { start() {}, resetSeen() {} },
     };
     expect(() =>

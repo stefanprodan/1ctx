@@ -18,6 +18,7 @@ import {
   parseChange,
 } from "../../shared/capabilities.ts";
 import { MAX_LAST_LINE } from "../../shared/contracts/session.ts";
+import { MAX_IMAGES_PER_MESSAGE } from "../../shared/images.ts";
 import { cutText } from "../../shared/text.ts";
 import { MAX_UPLOADS_PER_MESSAGE } from "../../shared/uploads.ts";
 import {
@@ -102,24 +103,53 @@ export function parseCreateSession(body: unknown): CreateSessionRequest {
     "agentId",
     "message",
     "uploads",
+    "images",
     "capabilities",
   ]);
+  const images = parseImages(b);
   return {
     projectId: id(b.projectId, "projectId"),
     agentId: id(b.agentId, "agentId"),
-    message: parseMessage(b.message),
+    message: messageWith(b.message, images),
     ...parseUploads(b),
+    ...images,
     ...parseCapabilities(b),
   };
 }
 
 export function parseSendMessage(body: unknown): SendMessageRequest {
-  const b = fields(body, ["message", "uploads", "capabilities"]);
+  const b = fields(body, ["message", "uploads", "images", "capabilities"]);
+  const images = parseImages(b);
   return {
-    message: parseMessage(b.message),
+    message: messageWith(b.message, images),
     ...parseUploads(b),
+    ...images,
     ...parseCapabilities(b),
   };
+}
+
+// a message of images alone may leave its text blank, kept as empty
+function messageWith(value: unknown, images: { images?: string[] }): string {
+  if (images.images !== undefined && typeof value === "string") {
+    if (value.trim() === "") return "";
+  }
+  return parseMessage(value);
+}
+
+function parseImages(body: Record<string, unknown>): { images?: string[] } {
+  if (!Object.hasOwn(body, "images")) return {};
+  const value = body.images;
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_IMAGES_PER_MESSAGE ||
+    value.some((id) => typeof id !== "string" || id.trim() === "") ||
+    new Set(value).size !== value.length
+  ) {
+    throw new BadRequest(
+      `images must be at most ${MAX_IMAGES_PER_MESSAGE} distinct non-empty ids`,
+    );
+  }
+  return value.length === 0 ? {} : { images: value };
 }
 
 export function parseEditQueued(body: unknown): EditQueuedRequest {

@@ -49,7 +49,8 @@ table, not an editable queued text row.
 - **A queued row holds no place in any cap.** A user holds at most
   `queuedPerUser` rows (including pending channel turns), a chat
   `MAX_QUEUED_PER_CHAT` queued ones; past either is a 429. A staged
-  upload id may sit in one queued row of a chat only.
+  upload id may sit in one queued row of a chat only. A queued row
+  holds its images by `queued_id` (`docs/images.md`).
 - **A queue change bumps the revision alone.** It publishes no
   project-wide envelope (`queueChanged()`), since nothing a list shows
   moved. It publishes `queue.changed`, which the socket sends to the

@@ -34,6 +34,8 @@ export type QueuedRow = {
   authorId: string;
   text: string;
   uploads: string[];
+  // the images it holds, in order; their rows carry its id
+  images: string[];
   capabilities: CapabilityChange | undefined;
   state: QueuedState;
   reason: NotSentReason | null;
@@ -48,6 +50,7 @@ type RawQueued = {
   author_id: string;
   content: string;
   uploads: string | null;
+  images: string | null;
   capabilities: string | null;
   state: QueuedState;
   reason: NotSentReason | null;
@@ -56,8 +59,8 @@ type RawQueued = {
   changed_at: number;
 };
 
-const COLUMNS = `id, session_id, author_id, content, uploads, capabilities,
-  state, reason, revision, queued_at, changed_at`;
+const COLUMNS = `id, session_id, author_id, content, uploads, images,
+  capabilities, state, reason, revision, queued_at, changed_at`;
 
 const row = (raw: RawQueued): QueuedRow => ({
   id: raw.id,
@@ -65,6 +68,7 @@ const row = (raw: RawQueued): QueuedRow => ({
   authorId: raw.author_id,
   text: raw.content,
   uploads: raw.uploads === null ? [] : JSON.parse(raw.uploads),
+  images: raw.images === null ? [] : JSON.parse(raw.images),
   capabilities:
     raw.capabilities === null ? undefined : JSON.parse(raw.capabilities),
   state: raw.state,
@@ -94,6 +98,7 @@ export const onWire = (
   author: { id: queued.authorId, username },
   ...(cut ? preview(queued.text) : { text: queued.text, cut: false }),
   uploads: queued.uploads.length,
+  ...(queued.images.length > 0 ? { images: queued.images.length } : {}),
   state: queued.state,
   reason: queued.reason,
   revision: queued.revision,
@@ -115,7 +120,7 @@ export function chatQueue(
   return db
     .query<RawQueued & { username: string }, [string, string]>(
       `select q.id, q.session_id, q.author_id, q.content, q.uploads,
-         q.capabilities, q.state, q.reason, q.revision, q.queued_at,
+         q.images, q.capabilities, q.state, q.reason, q.revision, q.queued_at,
          q.changed_at, u.username
        from queued_messages q join users u on u.id = q.author_id
        where q.session_id = ? and ${which}
@@ -208,6 +213,7 @@ export class QueueStore {
     authorId: string;
     text: string;
     uploads?: readonly string[];
+    images?: readonly string[];
     capabilities?: CapabilityChange;
     now: number;
   }): QueuedRow {
@@ -215,8 +221,8 @@ export class QueueStore {
     this.db
       .query(
         `insert into queued_messages (id, session_id, author_id, content,
-           uploads, capabilities, queued_at, changed_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?)`,
+           uploads, images, capabilities, queued_at, changed_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -224,6 +230,7 @@ export class QueueStore {
         fields.authorId,
         fields.text,
         listJson(fields.uploads),
+        listJson(fields.images),
         fields.capabilities === undefined
           ? null
           : JSON.stringify(fields.capabilities),

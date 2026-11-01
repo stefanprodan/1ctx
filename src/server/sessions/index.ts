@@ -43,6 +43,7 @@ import { chatQueue, queueChanged } from "./queued.ts";
 import { queuedRoutes } from "./queued-routes.ts";
 import {
   type AccessPort,
+  type ImagesPort,
   type LivePort,
   routes,
   type UploadsPort,
@@ -159,6 +160,7 @@ export type SessionsDeps = {
   channelMeter(sessionId: string): ChannelMeter;
   usage: UsagePort;
   uploads: UploadsPort;
+  images: ImagesPort;
   scratch: SweepScratch;
   limits: { current(): { archivedDeleteDays: number } };
   // the server's one search queue, shared with knowledge search
@@ -416,6 +418,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         access: deps.access,
         live: deps.live,
         uploads: deps.uploads,
+        images: deps.images,
         keptDays: () => deps.limits.current().archivedDeleteDays,
         visible,
         wakeQueue: () => deps.wakeQueue(),
@@ -428,6 +431,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
         store,
         visibleProjectIds: (userId) => deps.access.visibleProjectIds(userId),
         visible,
+        images: deps.images,
       }),
     ],
   };

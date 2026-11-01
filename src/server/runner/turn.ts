@@ -10,6 +10,7 @@ import {
   applyChange,
   type CapabilityChange,
 } from "../../shared/capabilities.ts";
+import { IMAGE_REPEATED } from "../images/index.ts";
 import { BadRequest } from "../lib/errors.ts";
 import {
   MAX_QUEUED_PER_CHAT,
@@ -22,7 +23,11 @@ export const MAX_TURN_MESSAGES = MAX_QUEUED_PER_CHAT;
 
 // the author by id: a message may start long after it was written, so
 // the runner reads the author as they are at the start
-export type TurnMessage = SendMessageRequest & { userId: string };
+// queuedId names the queued message that holds its images
+export type TurnMessage = SendMessageRequest & {
+  userId: string;
+  queuedId?: string;
+};
 
 export function checkTurn(messages: readonly TurnMessage[]): void {
   if (messages.length === 0 || messages.length > MAX_TURN_MESSAGES) {
@@ -31,12 +36,18 @@ export function checkTurn(messages: readonly TurnMessage[]): void {
     );
   }
   const seen = new Set<string>();
-  for (const { message, uploads, capabilities } of messages) {
+  const images = new Set<string>();
+  for (const { message, uploads, capabilities, ...rest } of messages) {
     parseSendMessage({
       message,
       ...(uploads === undefined ? {} : { uploads }),
+      ...(rest.images === undefined ? {} : { images: rest.images }),
       ...(capabilities === undefined ? {} : { capabilities }),
     });
+    for (const id of rest.images ?? []) {
+      if (images.has(id)) throw new BadRequest(IMAGE_REPEATED);
+      images.add(id);
+    }
     // a second claim of one staged file would roll the whole turn back
     for (const id of uploads ?? []) {
       if (seen.has(id)) {
@@ -67,6 +78,7 @@ export const messagesOf = (rows: readonly QueuedRow[]): TurnMessage[] =>
     userId: row.authorId,
     message: row.text,
     ...(row.uploads.length > 0 ? { uploads: row.uploads } : {}),
+    ...(row.images.length > 0 ? { images: row.images, queuedId: row.id } : {}),
     ...(row.capabilities === undefined
       ? {}
       : { capabilities: row.capabilities }),

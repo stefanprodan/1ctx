@@ -12,3 +12,8 @@ export const MAX_STAGED_IMAGES = 32;
 // the expired staged rows, and the rate's old rows, one sweep pass
 // removes; the rest go next hour
 export const SWEEP_BATCH = 1000;
+// the sent images one claim or fork frees at most: a message of the
+// largest images past the budget frees a few of its size, and a budget
+// lowered by gigabytes frees a batch at each claim rather than
+// thousands of rows in one send's transaction
+export const FREE_BATCH = 256;

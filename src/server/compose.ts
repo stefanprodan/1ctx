@@ -499,6 +499,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     usage,
     limits,
     uploads: knowledge,
+    images,
     searches,
     scratch: bash.scratch,
     wakeQueue: () => runner.queue.wake(),
@@ -656,6 +657,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       claimUploads: (projectId, sessionId, claims) =>
         knowledge.claimUploads(projectId, sessionId, claims),
     },
+    images,
     memory: {
       read: (projectId, automationId) => memory.read(projectId, automationId),
       commit: (work, sessionId) => memory.commit(work, sessionId),

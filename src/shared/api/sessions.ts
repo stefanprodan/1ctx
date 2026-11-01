@@ -18,6 +18,7 @@ import type {
   SessionSummary,
 } from "../contracts/session.ts";
 import type { NotSentReason } from "../words.ts";
+import type { StagedImage } from "./images.ts";
 
 // GET /api/sessions?project=&q=&origin=&before=: a page of the sessions
 // the caller may see, running first, then by last activity, each with
@@ -99,12 +100,15 @@ export type OpenedFileResponse = OpenedFile & { html: string; text: string };
 
 // POST /api/sessions: a chat in a project with an agent, and its first
 // message. uploads names the caller's staged items in the project, at
-// most MAX_UPLOADS_PER_MESSAGE distinct ids, claimed by the send
+// most MAX_UPLOADS_PER_MESSAGE distinct ids, claimed by the send.
+// images names the caller's staged images in the project, at most
+// imagesPerMessage distinct ids; with one, message may be blank
 export type CreateSessionRequest = {
   projectId: string;
   agentId: string;
   message: string;
   uploads?: string[];
+  images?: string[];
   capabilities?: CapabilityChange;
 };
 
@@ -114,6 +118,7 @@ export type CreateSessionRequest = {
 export type SendMessageRequest = {
   message: string;
   uploads?: string[];
+  images?: string[];
   capabilities?: CapabilityChange;
 };
 
@@ -180,8 +185,12 @@ export type ForkSessionRequest = {
 };
 
 // the fork's answer, 201: the new chat, and the staged ids of the files
-// an unsent user turn carried, empty for any other fork
-export type ForkSessionResponse = SessionDetail & { draftUploads: string[] };
+// and the staged images an unsent user turn carried, empty for any
+// other fork; a freed image is not staged
+export type ForkSessionResponse = SessionDetail & {
+  draftUploads: string[];
+  draftImages: StagedImage[];
+};
 
 // an MCP server a chat can turn off: one an agent is offered now, with
 // how many of its tools that is

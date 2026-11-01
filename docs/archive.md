@@ -81,7 +81,8 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
   key and writes a row only `where packed = 0`, counting the rest as
   skipped. The main thread only reads, copies and writes; both scale
   with a file's size, about 5 ms for 32 MiB. Fork unpacks what it
-  copies (`docs/bash.md`).
+  copies (`docs/bash.md`). Packing never touches images; fork copies
+  their rows (`docs/images.md`).
 - **A child session goes with its root, never alone.** Archiving a
   root archives its children with the same reason, and packs and frees
   them when it packs and frees its own. The sweep's steps pick roots,

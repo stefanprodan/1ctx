@@ -28,6 +28,7 @@ import type { DelegateInput, ToolContext } from "../tools/index.ts";
 import type { UserRow } from "../users/index.ts";
 import type { AttentionPort } from "./attention.ts";
 import type { CountedPort } from "./compact.ts";
+import type { EnqueueDeps } from "./enqueue.ts";
 import type { Event } from "./event.ts";
 import type { ToolResult, ToolsPort } from "./policy.ts";
 import type { PreparedRun } from "./prepare.ts";
@@ -80,6 +81,7 @@ export type RunnerDeps = {
       ids: readonly string[],
     ): void;
   };
+  images: WriterDeps["images"] & EnqueueDeps["images"];
   limits: { current(): Limits };
   usage: WriterDeps["usage"] & CountedPort;
   render: WriterDeps["render"];

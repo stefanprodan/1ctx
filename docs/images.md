@@ -1,9 +1,10 @@
 # Images
 
 Governs `src/server/images/` (the image store, ingest, the image
-routes and their lease), the agent's image flag and where the catalogs
-say it, and `shared/api/images.ts`. Uploads of text files are in
-`docs/knowledge.md`.
+routes and their lease, the claim and the budget), `runner/images.ts`,
+the agent's image flag and where the catalogs say it,
+`shared/images.ts` and `shared/api/images.ts`. Uploads of text files
+are in `docs/knowledge.md`.
 
 An image is a photo or screenshot a user adds to a chat message. Only
 what ingest keeps is stored, in the main database.
@@ -18,10 +19,14 @@ what ingest keeps is stored, in the main database.
   column, so a read of the others never touches its overflow pages.
 - **Only `store.ts` reads the table.** Callers get rows and bytes, never
   a statement, so moving bytes beside the database later changes one
-  file and the commit protocol, not the callers.
-- **Staged or sent, never both.** A staged image has a lease
-  (`expires_at`) and no session or message; a sent one has both and no
-  lease; a staged image always has bytes. The checks hold it.
+  file and the commit protocol, not the callers. The message reads
+  (`MESSAGE_COLUMNS`, the export, the feed's line) take its SQL
+  fragments (`messageImagesSql()` and the like), never the bytes.
+- **Staged, held or sent, one at a time.** A staged image has a lease
+  (`expires_at`) and no session or message; a held one a `queued_id`
+  and no lease; a sent one a session and message and no lease; a staged
+  image always has bytes. The checks hold it, and two triggers refuse a
+  row both held and sent.
 - **A freed image keeps its row.** The budget sets `data` null; name,
   type, width and height stay, and its route answers 410.
 - **Rows go with their message, chat or project** (foreign key
@@ -29,9 +34,12 @@ what ingest keeps is stored, in the main database.
 - **The media type has no check.** The allowlist is ingest's output
   (`image/jpeg`, `image/png`); a later type widens it in code, since a
   widened check would rebuild a table of bytes.
-- **The budget's index is ready for the claim.** `images_budget` covers
-  a project's sent images that still have bytes, oldest first, with
-  their sizes; `images_user` the staged count.
+- **The budget's index covers it.** `images_budget` holds a project's
+  sent images that still have bytes, oldest first, with their sizes,
+  `message_id` and `(data is not null)`: a partial index's own terms
+  are checked against the table unless the index holds them, so
+  without those two every budget read touched each row's record.
+  `images_user` serves the staged count.
 - **The rate has its own log.** `image_uploads` keeps one row (user,
   time) per accepted upload, written in the stage's transaction, so a
   delete of the image never frees a place. The hourly sweep drops rows
@@ -137,3 +145,79 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
   again.
 - **Provisioning takes `images`** as the API does, and keeps a stated
   one while the model stays.
+
+## The claim
+
+- **A user message names its staged images** in `images`, beside
+  `uploads`, on a new chat, a message and a queued message: at most
+  `MAX_IMAGES_PER_MESSAGE` (12, the ceiling) distinct ids in the
+  parser, `imagesPerMessage` at the claim, never one id twice in a
+  turn. With an image the text may be blank, kept as empty; a new chat
+  of images alone is titled "Image".
+- **Refused before a row is written** when the agent that takes the
+  turn cannot read images (`images` false), a summoned one included:
+  "this agent cannot read images". A run, regenerate or compact never
+  claims. Images need no `bash`.
+- **Claimed in `startSend`'s transaction** (`runner/images.ts`): each
+  image is the author's live staged one in the chat's project, or the
+  claim is the 400 "an image is gone, add it again". It takes the
+  session, the message and its position and drops its lease. A refused
+  start rolls back, so the images stay staged.
+- **A send that names no images never calls this area.** The message
+  reads probe `images_message` once per user row, as `opened_files`
+  is probed per tool row.
+- **A subagent never sees images.** `delegate` passes the task's text
+  alone.
+
+## The budget
+
+- **A claim past `imageProjectBytes` frees the oldest sent bytes**
+  (`enforceBudget()`), in its transaction: the sum and the oldest-first
+  walk read `images_budget` alone, ordered by `created_at`, across every
+  chat of the project, archived ones included. It frees until the
+  project is under the budget, never the rows the claim added, never a
+  staged or held one. A freed row keeps its name, type and size.
+- **At most `FREE_BATCH` (256) rows a claim.** A claim frees what its
+  own bytes took past the budget; a budget lowered by gigabytes frees a
+  batch at each claim until under it, so no send's transaction frees
+  thousands of rows.
+
+## Queued messages
+
+- **A queued message holds its images.** The enqueue checks the agent
+  as the start does and sets `queued_id` on the author's live staged
+  images, dropping their lease; `queued_messages.images` keeps their
+  ids in order, so a start reads them from the row.
+- **A start releases them before it takes the row**, since `queued_id`
+  cascades: staged again under a fresh lease, then claimed in the same
+  transaction.
+- **An edit keeps them; a removal stages them again** under a fresh
+  lease, as a removed message's uploads stay staged. A not-sent row
+  keeps them until it is discarded, swept or dropped, and they go with
+  it.
+
+## Fork and regenerate
+
+- **Fork copies the images of every copied user message** in its
+  transaction with an `insert ... select`, no decode, its bytes only
+  where they remain, created now; the budget then runs as after a
+  claim, never freeing the copies.
+- **A fork at a user turn stages that message's images** for the user
+  forking, under a fresh lease and outside the staged count, answered as
+  `draftImages`; a freed one is left out.
+- **Regenerate reuses the message's images**: its user rows stay.
+
+## Image lines
+
+- **One line per image wherever a message is read as text**
+  (`shared/images.ts`): `[image: <name>, <width>x<height>]`, and
+  `[image removed: <name>, <width>x<height>]` once freed. After the
+  text, a blank line between; the lines alone for images alone.
+- **The model reads the lines** (`userMessage()`), in history and the
+  summary's tail alike, until a wire sends image parts.
+- **The Markdown download and export** put each line as its own
+  paragraph, escaped, before the attached files. The feed's line of a
+  message of images alone is its first image's. Search reads the text
+  alone.
+- **The channel refuses images** in a post, "a channel post cannot
+  carry images".

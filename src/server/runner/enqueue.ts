@@ -22,6 +22,7 @@ import {
   summonOf,
 } from "../sessions/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { CANNOT_READ_IMAGES } from "./images.ts";
 
 export type EnqueueDeps = {
   db: Db;
@@ -35,6 +36,15 @@ export type EnqueueDeps = {
     checkUploads(
       userId: string,
       projectId: string,
+      ids: readonly string[],
+    ): void;
+  };
+  images: {
+    // in the enqueue's transaction: the queued row holds them
+    hold(
+      userId: string,
+      projectId: string,
+      queuedId: string,
       ids: readonly string[],
     ): void;
   };
@@ -56,7 +66,14 @@ export function queueMessage(
     throw new Conflict("a channel post cannot wait in the chat queue");
   }
   const chatAgent = deps.agents.byId(session.agentId);
-  if (chatAgent !== null) summonOf(deps.agents, chatAgent.name, fields.message);
+  const summoned =
+    chatAgent === null
+      ? null
+      : summonOf(deps.agents, chatAgent.name, fields.message);
+  // the start checks again, against the agent as it is then
+  if (fields.images?.length && !(summoned ?? chatAgent)?.images) {
+    throw new BadRequest(CANNOT_READ_IMAGES);
+  }
   if (fields.uploads?.length) {
     deps.uploads.checkUploads(user.id, session.projectId, fields.uploads);
   }
@@ -84,9 +101,13 @@ export function queueMessage(
       authorId: user.id,
       text: fields.message,
       uploads: fields.uploads,
+      images: fields.images,
       capabilities: fields.capabilities,
       now,
     });
+    if (fields.images?.length) {
+      deps.images.hold(user.id, session.projectId, row.id, fields.images);
+    }
     const { state, events } = queueAnswer(
       deps.db,
       deps.sessions,

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { LastLine, Message } from "../../shared/contracts/session.ts";
+import { imageLine } from "../../shared/images.ts";
 import { lineFrom } from "../sessions/index.ts";
 
 // undefined for a row with nothing to say, so the envelope keeps the
@@ -10,7 +11,11 @@ export const lastLine = (
   message: Message,
   author: string,
 ): LastLine | undefined => {
-  const text = lineFrom(message.content);
+  const text = lineFrom(
+    message.content === "" && message.images?.length
+      ? imageLine(message.images[0]!)
+      : message.content,
+  );
   return text === "" ? undefined : { seq: message.seq, author, text };
 };
 

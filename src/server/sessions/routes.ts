@@ -3,6 +3,7 @@
 //
 // Starting and stopping a send are the runner's routes.
 
+import type { StagedImage } from "../../shared/api/images.ts";
 import type {
   ChildWorkResponse,
   ForkSessionResponse,
@@ -58,6 +59,19 @@ export type UploadsPort = {
   ): string[];
 };
 
+export type ImagesPort = {
+  // a queued message's images staged again, before its row goes
+  release(queuedId: string): void;
+  // in the fork's transaction: the copied user messages' images, then
+  // the budget; a fork at a user turn stages its images for the draft
+  fork(fields: {
+    projectId: string;
+    sessionId: string;
+    copies: readonly { messageId: string; images: readonly string[] }[];
+    draft: { userId: string; images: readonly string[] } | null;
+  }): StagedImage[];
+};
+
 export type RoutesDeps = {
   db: Db;
   clock: Clock;
@@ -66,6 +80,7 @@ export type RoutesDeps = {
   access: AccessPort;
   live: LivePort;
   uploads: UploadsPort;
+  images: ImagesPort;
   // the days an archived chat is kept, as the limit reads now
   keptDays(): number;
   // the session when the principal may see it, else the one 404
@@ -257,12 +272,33 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           if (deps.agents.byId(fields.agentId) === null) {
             throw new BadRequest("no such agent");
           }
-          const { session, messages, messageIds, draft } = deps.store.fork({
+          const forked = deps.store.fork({
             source,
             ...fields,
             ownerId: principal.userId,
             now: deps.clock(),
           });
+          const { session, messageIds, draft, imageCopies } = forked;
+          const draftImages =
+            imageCopies.length === 0 && forked.draftImages.length === 0
+              ? []
+              : deps.images.fork({
+                  projectId: source.projectId,
+                  sessionId: session.id,
+                  copies: imageCopies,
+                  draft:
+                    draft === null
+                      ? null
+                      : {
+                          userId: principal.userId,
+                          images: forked.draftImages,
+                        },
+                });
+          // the copies' images are read with their rows
+          const messages =
+            imageCopies.length === 0
+              ? forked.messages
+              : deps.store.messages(session.id);
           const draftUploads = deps.uploads.copyUploads(
             source.id,
             session.id,
@@ -284,6 +320,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
               principal.userId,
             ),
             draftUploads,
+            draftImages,
           };
           return {
             result,
