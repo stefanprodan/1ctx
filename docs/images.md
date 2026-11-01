@@ -62,8 +62,8 @@ what ingest keeps is stored, in the main database.
   everywhere. It covers the body read and the whole ingest, the header
   read, both encodes and the transparency check. A third waits in
   arrival order under the upload's deadline (503 past it, gone on an
-  abort), never refused for the wait. A decode holds up to 4 bytes a pixel, so
-  the decoded pixels stay under 2 x 4 x `imageMaxPixels`: 400 MB at the
+  abort), never refused for the wait. A decode holds up to 4 bytes a
+  pixel, so the decoded pixels stay under 2 x 4 x `imageMaxPixels`: 400 MB at the
   default 50 MP, 800 MB at the 100 MP ceiling, where the slots alone
   would let 4 to 16 run.
 - **The rate and the staged count are checked before the body is
@@ -71,8 +71,7 @@ what ingest keeps is stored, in the main database.
   `image_uploads` rows of the last hour, and answers 429 with
   `Retry-After` until the oldest leaves the hour. At most
   `MAX_STAGED_IMAGES` (32) live staged images per user, counted by a
-  live lease, never by `created_at`, so an image released from a queued
-  message counts however old its row.
+  live lease, never by `created_at`.
 - **The body is a stream cut past `imageUploadBytes`** with a 413. Its
   ceiling is the request backstop (`MAX_REQUEST_BYTES`).
 - **The type comes from the bytes, never the client.** `sniff()` admits
@@ -251,11 +250,12 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
 - **A user message's images sit under its card,** each at its own
   shape fitted in 320 px on its long side (`fitBox()`), less on a
   phone, with `width` and `height` set and the width and ratio inline,
-  so a lazy load moves nothing, and its name as the alt. A message of images alone has no card.
+  so a lazy load moves nothing, and its name as the alt. A message of
+  images alone has no card.
   A freed one is the line "Image removed to free space" in its place.
 - **A queued message counts its images,** as it counts its files: the
   wire carries the count alone.
 - **A click opens the image in `ui/Viewer.tsx`,** the route's bytes
   fitted to the window. The opener is passed in, never read from the
-  page's focus: Safari does not focus a button on a click. No Download button: the browser saves it as
-  any image.
+  page's focus: Safari does not focus a button on a click. No Download
+  button: the browser saves it as any image.

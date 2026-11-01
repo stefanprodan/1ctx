@@ -178,8 +178,7 @@ export class ImageStore {
   }
 
   // live staged images of the user in every project, by their lease:
-  // only a staged row has one, and a released one's is fresh however old
-  // the row
+  // only a staged row has one
   stagedCount(userId: string, now: number): number {
     return this.db
       .query<{ n: number }, [string, number]>(
