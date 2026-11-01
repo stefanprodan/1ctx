@@ -11,6 +11,15 @@ export const CANNOT_READ_IMAGES = "this agent cannot read images";
 export const IMAGE_GONE = "an image is gone, add it again";
 export const CHANNEL_NO_IMAGES = "a channel post cannot carry images";
 
+// a request whose images pass the window or imagesPerRequest: how many
+// of the new message's images fit, none when the history's are the cause
+export const NO_IMAGE_ROOM =
+  "no more images fit in this chat: compact it or start a new one";
+export const imagesFit = (fit: number, of: number): string =>
+  fit === 0
+    ? NO_IMAGE_ROOM
+    : `only ${fit} of these ${of} images fit in this chat`;
+
 // the most images one message may name, imagesPerMessage's ceiling; the
 // limit itself is checked at the claim
 export const MAX_IMAGES_PER_MESSAGE = 12;

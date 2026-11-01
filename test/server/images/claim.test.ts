@@ -22,12 +22,10 @@ import {
   sessionSettled,
   setLimits,
 } from "../../helpers/chat.ts";
-import { imageApp, MiB, userTexts } from "./helpers.ts";
-
-const LINE = "[image: shot.png, 12x8]";
+import { imageApp, MiB, partBytes, userTexts } from "./helpers.ts";
 
 describe("the claim at send", () => {
-  test("a message takes the author's staged images, and the model reads their lines", async () => {
+  test("a message takes the author's staged images, and the model reads them as parts", async () => {
     const s = await imageApp();
     // no bash: images need no tool
     const plain = await s.chat.makeAgent({ name: "plain", model: NO_TOOLS });
@@ -61,8 +59,17 @@ describe("the claim at send", () => {
       },
     ]);
     expect(userTexts(started.script)).toEqual([
-      `look\n\n${LINE}\n[image: two.png, 12x8]`,
+      "look\n<image/png>\n<image/png>",
     ]);
+    // the stored bytes, read as the body was built
+    const stored = s.app.db
+      .query<{ data: Uint8Array }, [string]>(
+        "select data from images where id = ?",
+      )
+      .get(a.id)!.data;
+    expect(partBytes(started.script)[0]!.equals(Buffer.from(stored))).toBe(
+      true,
+    );
     expect(s.ofSession(started.sessionId)).toEqual([
       expect.objectContaining({
         id: a.id,
@@ -85,13 +92,13 @@ describe("the claim at send", () => {
     await s.app.shutdown();
   });
 
-  test("a message of images alone keeps empty text, its lines alone on the wire", async () => {
+  test("a message of images alone keeps empty text, its parts alone on the wire", async () => {
     const s = await imageApp();
     const a = await s.stage(s.chat.projectId);
     const started = await s.start("  ", [a.id]);
     expect(started.detail.session.title).toBe(IMAGE_TITLE);
     expect(started.detail.messages[0].content).toBe("");
-    expect(userTexts(started.script)).toEqual([LINE]);
+    expect(userTexts(started.script)).toEqual(["<image/png>"]);
     started.script.reply("seen");
     await sessionSettled(s.app, started.sessionId);
     const blank = await s.send(started.sessionId, { message: " " });
@@ -257,7 +264,7 @@ describe("an agent that cannot read images", () => {
     });
     expect(summoned.status).toBe(201);
     const script = await pending;
-    expect(userTexts(script).at(-1)).toBe(`@seer look\n\n${LINE}`);
+    expect(userTexts(script).at(-1)).toBe("@seer look\n<image/png>");
     script.reply("seen");
     await sessionSettled(s.app, started.sessionId);
     expect(s.image(a.id)?.session_id).toBe(started.sessionId);

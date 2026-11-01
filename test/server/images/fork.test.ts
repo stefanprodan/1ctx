@@ -116,8 +116,8 @@ describe("fork", () => {
     expect(sent.status).toBe(201);
     const script = await pending;
     expect(userTexts(script)).toEqual([
-      "one\n\n[image removed: a.png, 12x8]\n[image: b.png, 12x8]",
-      "two\n\n[image: c.png, 12x8]",
+      "one\n\n[image removed: a.png, 12x8]\n<image/png>",
+      "two\n<image/png>",
     ]);
     script.reply("again");
     await sessionSettled(s.app, atSecond.session.id);
@@ -169,7 +169,7 @@ describe("fork", () => {
 });
 
 describe("regenerate", () => {
-  test("keeps the message's images and sends their lines again", async () => {
+  test("keeps the message's images and sends them again", async () => {
     const s = await imageApp();
     const a = await s.stage(s.chat.projectId);
     const started = await s.start("look", [a.id]);
@@ -183,7 +183,7 @@ describe("regenerate", () => {
     );
     expect(res.status).toBe(201);
     const script = await pending;
-    expect(userTexts(script)).toEqual(["look\n\n[image: shot.png, 12x8]"]);
+    expect(userTexts(script)).toEqual(["look\n<image/png>"]);
     script.reply("again");
     await sessionSettled(s.app, started.sessionId);
     expect(s.ofSession(started.sessionId).map((row) => row.id)).toEqual([a.id]);

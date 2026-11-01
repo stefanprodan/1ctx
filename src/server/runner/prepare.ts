@@ -132,6 +132,10 @@ export function prepareSend(fields: {
   automationId: string | null;
   // a fresh session's first message files, as a check's answer
   kept?: readonly KeptFile[];
+  // in the start's transaction, after the claim: throws when the first
+  // request cannot carry the turn's `fresh` new images, so the start
+  // rolls back and they stay staged
+  fitImages?(send: ActiveSend, fresh: number): void;
   now: number;
 }): PreparedRun {
   const now = fields.now;
@@ -242,6 +246,14 @@ export function prepareSend(fields: {
       if (fields.kept?.length) {
         writeKeptFiles(fields.db, firstMessageId(turn), fields.kept);
       }
+      const fresh =
+        "users" in turn
+          ? turn.users.reduce(
+              (sum, user) => sum + (user.images?.length ?? 0),
+              0,
+            )
+          : 0;
+      if (fresh > 0) fields.fitImages?.(send, fresh);
       return { result, events: [] };
     });
     if (send.channel === null) {

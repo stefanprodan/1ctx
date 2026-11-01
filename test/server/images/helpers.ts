@@ -136,8 +136,31 @@ export async function imageApp() {
 export type ImageApp = Awaited<ReturnType<typeof imageApp>>;
 export type { ChatApp };
 
-// the user messages' text on the wire
+type Part = { type: string; text?: string; image_url?: { url: string } };
+
+// the user messages on the wire as text: an image part as <its type>
 export const userTexts = (script: Script) =>
-  (script.body.messages as { role: string; content: string }[])
+  (script.body.messages as { role: string; content: string | Part[] }[])
     .filter((message) => message.role === "user")
-    .map((message) => message.content);
+    .map((message) =>
+      typeof message.content === "string"
+        ? message.content
+        : message.content
+            .map((part) =>
+              part.type === "text"
+                ? part.text
+                : `<${part.image_url!.url.slice(5, part.image_url!.url.indexOf(";"))}>`,
+            )
+            .join("\n"),
+    );
+
+// the bytes of the user messages' image parts, in order
+export const partBytes = (script: Script): Buffer[] =>
+  (script.body.messages as { role: string; content: string | Part[] }[])
+    .flatMap((message) =>
+      message.role === "user" && Array.isArray(message.content)
+        ? message.content
+        : [],
+    )
+    .filter((part) => part.type === "image_url")
+    .map((part) => Buffer.from(part.image_url!.url.split(",")[1]!, "base64"));

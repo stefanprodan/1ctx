@@ -12,12 +12,15 @@ import {
   type ChatEvent,
   type ChatRequest,
   costOf,
+  imagePartsOf,
   mergeReasoningDetail,
   ProviderRefusal,
   requestTokens,
   type Usage,
+  withImagesAsLines,
 } from "../providers/index.ts";
 import { history, request, summaryRequest, withExhausted } from "./context.ts";
+import { unfitImages } from "./image-fit.ts";
 import { offers } from "./policy.ts";
 import { NO_REPO_LINES } from "./prompt.ts";
 import type { ContextLookups } from "./render.ts";
@@ -133,12 +136,24 @@ export function buildRequest(
             messages: historyOf(rows.filter((row) => row.seq < through)),
           }
         : null;
-    return summaryRequest(
+    const summary = summaryRequest(
       send.policy,
       send.sessionId,
       messages,
       send.used,
       counted,
+    );
+    if (unfitImages(summary, send.policy) === null) return summary;
+    // the summary reads the images where they fit; where they do not it
+    // reads their lines, so a chat their images filled can still compact
+    return summaryRequest(
+      send.policy,
+      send.sessionId,
+      withImagesAsLines(messages),
+      send.used,
+      counted === null
+        ? null
+        : { ...counted, messages: withImagesAsLines(counted.messages) },
     );
   }
   const req = request(
@@ -220,6 +235,10 @@ async function streamRound(
       buildRequest(send, rows, deps.lookups, deps.clock())),
     cacheLife: cacheLife(send),
   };
+  // the start checked the new message's images; this one catches a
+  // request that grew past the window with images in it
+  const unfit = unfitImages(req, send.policy);
+  if (unfit !== null) throw new Error(unfit);
   const open = () =>
     deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
   let iterator = open();
@@ -418,6 +437,7 @@ async function streamRound(
     throw new Error("the stream ended early");
   }
   visuals?.flush();
+  round.images = imagePartsOf(req.messages).length;
   if (round.usage === null) {
     round.tokens = requestTokens(send.policy.wire, req);
     round.spent = round.tokens;
