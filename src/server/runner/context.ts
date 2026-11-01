@@ -31,7 +31,7 @@ import {
   roundComplete,
   type Turn,
 } from "./render.ts";
-import { lastSummary, tailBudget, tailOf } from "./tail.ts";
+import { lastSummary, tailBudget, tailImages, tailOf } from "./tail.ts";
 import { roundKey, toolRowsByRound } from "./trace.ts";
 
 export const SUMMARIZE = `Summarize the conversation so far. The chat continues from your summary, followed by its newest turns as they were when they fit, so cover all of it, the newest turns included. Write Markdown with these sections, terse bullets, no prose:
@@ -106,6 +106,8 @@ export type TailRoom = {
   wire: Wire | null;
   system: ChatMessageIn[];
   tools: readonly ChatTool[];
+  // a request's most image parts
+  imagesPerRequest: number;
 };
 
 export function history(
@@ -130,6 +132,7 @@ export function history(
       wire: policy.wire,
       system: [system],
       tools: policy.offered.tools,
+      imagesPerRequest: policy.limits.imagesPerRequest,
     }),
   ];
 }
@@ -171,6 +174,7 @@ export function historyMessages(
       lookups,
       turns,
       room?.wire ?? null,
+      room === null ? 0 : tailImages(room.imagesPerRequest),
     );
   const tail = tailAt(cut);
   const previous = lastSummary(rows, cut);

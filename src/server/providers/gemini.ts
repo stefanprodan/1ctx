@@ -5,6 +5,7 @@ import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import { canStopThinking } from "../../shared/thinking.ts";
 import { isRecord } from "../../shared/words.ts";
 import { frameEvents, num, parseFrame } from "./frames.ts";
+import { type ImageData, NO_IMAGE_DATA } from "./images.ts";
 import { baseChatBody } from "./openai.ts";
 import { CatalogError, type ChatEvent, type ChatRequest } from "./types.ts";
 
@@ -81,8 +82,11 @@ const THINKING_BUDGETS = { low: 1024, medium: 8192, high: 24576 } as const;
 // https://ai.google.dev/gemini-api/docs/thought-signatures
 export const FOREIGN_SIGNATURE = "skip_thought_signature_validator";
 
-export function buildChatBody(req: ChatRequest): Record<string, unknown> {
-  const body = baseChatBody(req, { usageOption: true });
+export function buildChatBody(
+  req: ChatRequest,
+  images: ImageData = NO_IMAGE_DATA,
+): Record<string, unknown> {
+  const body = baseChatBody(req, { usageOption: true, images });
   const messages = body.messages as Record<string, unknown>[];
   messages.forEach((message, index) => {
     if (message.role !== "assistant") return;

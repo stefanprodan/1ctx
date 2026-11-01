@@ -11,6 +11,7 @@
 
 import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
+import { IMAGE_DUE_BYTES } from "../../shared/images.ts";
 import type { SendCause } from "../../shared/words.ts";
 import type { Clock } from "../lib/clock.ts";
 import { messageOf } from "../lib/errors.ts";
@@ -117,14 +118,17 @@ export async function toolLoop(
         limits.contextReserve,
       );
       // a summoned turn never compacts: compaction is the chat agent's;
-      // nor a subagent, whose answer at the threshold is its last
+      // nor a subagent, whose answer at the threshold is its last. A
+      // request that carried imagesPerRequest images, or past
+      // IMAGE_DUE_BYTES of them, is due too, so the next has room
       if (
         send.kind === "chat" &&
         send.channel === null &&
         send.policy.summoned === null &&
         send.child === null &&
-        threshold !== null &&
-        round.tokens >= threshold
+        ((threshold !== null && round.tokens >= threshold) ||
+          round.images >= limits.imagesPerRequest ||
+          round.imageBytes > IMAGE_DUE_BYTES)
       ) {
         const summary = deps.writer.startSummary(send);
         send.summarizing = true;

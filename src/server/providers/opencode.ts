@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import { type ImageData, NO_IMAGE_DATA } from "./images.ts";
 import { baseChatBody } from "./openai.ts";
 import type { ChatMessageIn, ChatRequest } from "./types.ts";
 
@@ -26,11 +27,15 @@ export const sendsReasoning =
     !!message.reasoning &&
     message.model === req.model;
 
-export function buildChatBody(req: ChatRequest): Record<string, unknown> {
+export function buildChatBody(
+  req: ChatRequest,
+  images: ImageData = NO_IMAGE_DATA,
+): Record<string, unknown> {
   const body = baseChatBody(req, {
     usageOption: true,
     effort: true,
     offAsNone: true,
+    images,
   });
   const messages = body.messages as Record<string, unknown>[];
   const sends = sendsReasoning(req);

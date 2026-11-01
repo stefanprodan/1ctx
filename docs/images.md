@@ -2,9 +2,11 @@
 
 Governs `src/server/images/` (the image store, ingest, the image
 routes and their lease, the claim and the budget), `runner/images.ts`,
-the agent's image flag and where the catalogs say it,
-`shared/images.ts` and `shared/api/images.ts`, and a message's images
-on the page (`transcript/Images.tsx`). Uploads of text files are in
+`runner/image-fit.ts` and `runner/image-start.ts` (the check),
+`providers/images.ts` (the parts and the estimate), the agent's image
+flag and where the catalogs say it, `shared/images.ts` and
+`shared/api/images.ts`, and a message's images on the page
+(`transcript/Images.tsx`). Uploads of text files are in
 `docs/knowledge.md`; the composer's side is in `docs/composer.md`.
 
 An image is a photo or screenshot a user adds to a chat message. Only
@@ -236,14 +238,107 @@ Rows in `limits/defaults.ts`, scope `images`, read at each upload:
   (`shared/images.ts`): `[image: <name>, <width>x<height>]`, and
   `[image removed: <name>, <width>x<height>]` once freed. After the
   text, a blank line between; the lines alone for images alone.
-- **The model reads the lines** (`userMessage()`), in history and the
-  summary's tail alike, until a wire sends image parts.
+- **The model reads a line** where it gets no part: every image to an
+  agent whose `images` is false (its history may hold images from before
+  an agent change, and a summoned agent may differ), a freed one always,
+  and one too large for any request of the wire (`imageTooLarge()`):
+  past `IMAGE_REQUEST_BYTES`, or past Anthropic's 10 MB of base64 for
+  one image on a Claude model.
 - **The Markdown download and export** put each line as its own
   paragraph, escaped, before the attached files. The feed's line of a
   message of images alone is its first image's. Search reads the text
   alone.
 - **The channel refuses images** in a post, "a channel post cannot
   carry images".
+
+## The wires
+
+- **A user message holds its images as ids** (`ImagePart`: id, name,
+  type, width, height, stored bytes) beside its text (`userMessage()`). The bytes are
+  read through the providers' images port (`ImageData`, a closure over
+  the image store in `compose.ts`, since images is built after
+  providers) only as a body is built, so a request in memory or retried
+  carries no base64. Bytes freed between the history read and the body
+  make that image its removed line.
+- **The text goes first, then each image; no text part when the text is
+  empty.**
+  - chat completions (`openrouter`, `openai-compatible`,
+    `openai-strict`, `gemini`, `opencode`): `{type: "image_url",
+    image_url: {url: "data:<type>;base64,..."}}`;
+  - `azure` (Responses): `{type: "input_image", image_url: "data:..."}`,
+    the URL a plain string;
+  - `anthropic`: `{type: "image", source: {type: "base64", media_type,
+    data}}`.
+- **A cache mark goes on a message's last part, image or text**
+  (`withCacheBreakpoints()`, anthropic's `markable`), so its images sit
+  inside the cached prefix.
+
+## The estimate
+
+- **An image counts as `imageTokens(wire, model, width, height)`,**
+  never its base64: `requestText()` leaves image parts out and
+  `requestTokens()` and the tail's `costWithin()` add the estimate. The
+  family comes from the wire, else the model's name (claude, gemini,
+  gpt or o-series); each figure cites its doc in the code:
+  - Anthropic: `ceil(w/28) * ceil(h/28)`, capped at 1,568 before Claude
+    4.7 and 4,784 from it or for a name without a version;
+  - OpenAI and Azure: tile models (gpt-4o, gpt-4.1, gpt-5, gpt-5.1, o1,
+    o3) base plus tiles after the 2048 and 768 fit; the rest
+    `ceil(multiplier * 32 px patches)`, 1.2 unless listed, with no patch
+    budget, since auto keeps the original size on the newest; an Azure
+    deployment's own name is a patch model;
+  - both plus 16 an image, since they matched reported prompt tokens
+    within a few either way, so the estimate errs high;
+  - Gemini: 258 within 384, else 258 a tile of the crop unit
+    `floor(min(w, h) / 1.5)`, each side rounded up (960x540 is 6 tiles),
+    before Gemini 3; 1,120 from 3; the larger for a name without a
+    version;
+  - any other: a token per 28 px patch, uncapped (5,476 at 2048).
+
+## The check
+
+- **Before a request that carries an image,** never one without:
+  `unfitImages()` refuses past `imagesPerRequest` parts, past
+  `IMAGE_REQUEST_BYTES` (10 MiB) of their stored `bytes`, or past the
+  window less the round's own `maxTokens` (none on a chat round; the
+  summary's cap) and 256. The byte bound is a constant under Gemini's
+  20 MB for a whole request with inline data, the smallest of the wires
+  served, with room for text (base64 is a third more); it also bounds a
+  request's memory. It counts the column, never loaded bytes. Never at `compactsAt()`: a request between
+  the threshold and the window is sent and compacted after its answer,
+  as one without images is. With no window only the count applies.
+- **At the start, in its transaction** (`refuseUnfit()`), after the
+  claim, on the first request as the round builds it: a refusal is a
+  400 that rolls the rows back, so the images stay staged. The words say
+  how many of the new images fit, "only 2 of these 3 images fit in this
+  chat", or, when none does or the history is the cause, "no more images
+  fit in this chat: compact it or start a new one".
+- **Each round checks again** and fails the turn with the same words, for
+  a request its tool results grew.
+- **The summary round falls back to lines** when its request with the
+  images does not fit, so a chat its images filled can still compact.
+
+## History
+
+- **Which images go as parts is a fixed function of the rows, the
+  window and the limits,** never of the new message, as the tail is
+  (`docs/compaction.md`): every image after the last summary and in its
+  tail, sent as it was. The set moves only at a summary, so the cache
+  holds between turns.
+- **A request that carried `imagesPerRequest` images, or past
+  `IMAGE_DUE_BYTES` (half the bound), makes the summary
+  due** after its answer, as the threshold does, so the next has room.
+- **The summary round reads the images in its history,** so the summary
+  can describe them; after it, an image before the cut is gone with its
+  turn and one in the tail is replayed.
+- **The tail replays at most half of `imagesPerRequest`** (`tailImages()`)
+  and `IMAGE_TAIL_BYTES` (a quarter of it), stopping at the turn that
+  would pass either, so a summary never leaves a
+  history due again at once. At 32K the tail's budget (about 3,200
+  tokens) takes no 2048 image; at 200K and 1M the count and the request
+  size bind before tokens.
+- **A subagent, the memory phase and the attention step** read no
+  images: a subagent gets the task's text, and the packets read runs.
 
 ## On the page
 

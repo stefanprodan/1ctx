@@ -50,7 +50,7 @@ describe("a queued message's images", () => {
     started.script.reply("hi");
     const script = await next;
     expect(userTexts(script).at(-1)).toBe(
-      "look again\n\n[image: shot.png, 12x8]\n[image: shot.png, 12x8]",
+      "look again\n<image/png>\n<image/png>",
     );
     script.reply("seen");
     await sessionSettled(s.app, started.sessionId);

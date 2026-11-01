@@ -14,6 +14,7 @@ import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import { Catalogs, type Fetcher, gateway, servesDecisions } from "./catalog.ts";
 import { fetchEndpoints } from "./endpoints.ts";
+import type { ImageData } from "./images.ts";
 import { keyOf, providerFor } from "./provider.ts";
 import {
   type AgentsPort,
@@ -68,6 +69,15 @@ export {
   parseCatalog as parseGeminiCatalog,
 } from "./gemini.ts";
 export {
+  type ImageData,
+  imagePartsOf,
+  imageTokens,
+  imageTooLarge,
+  requestImageBytes,
+  requestImageTokens,
+  withImagesAsLines,
+} from "./images.ts";
+export {
   costOf,
   type ModelPrice,
   modelPrice,
@@ -110,6 +120,7 @@ export type {
   ChatMessageIn,
   ChatRequest,
   ChatTool,
+  ImagePart,
   ReasoningDetail,
   ToolCall,
   Usage,
@@ -123,6 +134,9 @@ export type ProvidersDeps = {
   keys: () => string[];
   // what reaches a provider; a test passes a fake
   fetcher: Fetcher;
+  // the images port: a sent image's bytes, read only as a body is built;
+  // a closure, since images is built after this area
+  images?: ImageData;
   log: Log;
   agents: AgentsPort;
   deciders: DecidersPort;

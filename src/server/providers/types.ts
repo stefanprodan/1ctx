@@ -26,11 +26,24 @@ export type ReasoningDetail = {
   [field: string]: unknown;
 };
 
+// a sent image as a request holds it: its id, read into bytes only when
+// the body is built, so a request in memory carries no base64
+export type ImagePart = {
+  id: string;
+  name: string;
+  mediaType: string;
+  width: number;
+  height: number;
+  // the stored size, which a request's byte bound counts
+  bytes: number;
+};
+
 export type ChatMessageIn = (
   | { role: "system"; content: string }
   // the author's name rides on a user message, so a model in a session
-  // with more than one author knows who wrote what
-  | { role: "user"; content: string; name?: string }
+  // with more than one author knows who wrote what; its images go after
+  // the text
+  | { role: "user"; content: string; name?: string; images?: ImagePart[] }
   | {
       role: "assistant";
       model?: string;

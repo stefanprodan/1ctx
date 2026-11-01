@@ -16,7 +16,12 @@ import {
   type Wire,
 } from "../../shared/words.ts";
 import type { AgentRow } from "../agents/index.ts";
-import type { Limits, LoopLimits, SendCaps } from "../limits/index.ts";
+import type {
+  ImageCaps,
+  Limits,
+  LoopLimits,
+  SendCaps,
+} from "../limits/index.ts";
 import type { ProjectRow } from "../projects/index.ts";
 import {
   type ChatRequest,
@@ -137,8 +142,9 @@ export type SendPolicy = {
     attentionGuidance: string;
   } | null;
   deadlineMs: number | null;
-  // the caps the send started on, the limits area's word at that moment
-  limits: LoopLimits;
+  // the caps the send started on, the limits area's word at that moment;
+  // imagesPerRequest bounds a request's image parts
+  limits: LoopLimits & Pick<ImageCaps, "imagesPerRequest">;
   toolCaps: ToolCaps;
   // what admission holds the send to, read in the same turn
   sendCaps: SendCaps;
@@ -351,6 +357,7 @@ export function buildPolicy(input: {
       childrenAtOnce: input.limits.childrenAtOnce,
       childrenPerSend: input.limits.childrenPerSend,
       childAnswerChars: input.limits.childAnswerChars,
+      imagesPerRequest: input.limits.imagesPerRequest,
     },
     toolCaps: {
       callTimeoutMs: input.limits.callTimeoutMs,

@@ -4,10 +4,11 @@
 // Rows to wire messages; an incomplete work round goes as plain text.
 
 import type { Message } from "../../shared/contracts/session.ts";
-import { withImageLines } from "../../shared/images.ts";
+import { type MessageImage, withImageLines } from "../../shared/images.ts";
 import { uploadsBlock } from "../../shared/uploads.ts";
 import {
   type ChatMessageIn,
+  imageTooLarge,
   markOf,
   type ReasoningDetail,
   type ToolCall,
@@ -50,7 +51,11 @@ export type ContextLookups = {
 export type RenderPolicy = Pick<
   SendPolicy,
   "username" | "userId" | "providerId" | "model" | "agentId" | "summoned"
-> & { offered: Pick<Offered, "mcp" | "skills"> };
+> &
+  // images left out: they go as their lines
+  Partial<Pick<SendPolicy, "images" | "wire">> & {
+    offered: Pick<Offered, "mcp" | "skills">;
+  };
 
 type Builder = Pick<SendPolicy, "agentId" | "summoned">;
 
@@ -121,10 +126,13 @@ export function roundComplete(
 }
 
 // a user message on the wire, with the author's name when it is not the
-// sender and is known
+// sender and is known. Its images go as parts to an agent that reads
+// them; a freed one, one too large for any request of the wire, and any
+// to an agent that does not read them as its line
 export function userMessage(
   row: Message,
-  policy: Pick<SendPolicy, "username" | "userId">,
+  policy: Pick<SendPolicy, "username" | "userId"> &
+    Partial<Pick<SendPolicy, "images" | "wire" | "model">>,
   lookups: ContextLookups,
 ): ChatMessageIn {
   const name =
@@ -133,14 +141,33 @@ export function userMessage(
       : row.userId === null
         ? null
         : lookups.usernameOf(row.userId);
-  // the wire sends no image bytes yet, so the model reads their lines
-  const text = withImageLines(row.content, row.images);
+  const all = row.images ?? [];
+  const sent = (image: MessageImage) =>
+    !image.freed &&
+    !imageTooLarge(policy.wire ?? null, policy.model ?? "", image.bytes ?? 0);
+  const parts = policy.images ? all.filter(sent) : [];
+  const text = withImageLines(
+    row.content,
+    parts.length === 0 ? all : all.filter((image) => !sent(image)),
+  );
   return {
     role: "user",
     content: row.uploads?.length
       ? `${text}\n\n${uploadsBlock(row.uploads)}`
       : text,
     ...(name === null ? {} : { name }),
+    ...(parts.length === 0
+      ? {}
+      : {
+          images: parts.map((image) => ({
+            id: image.id,
+            name: image.name,
+            mediaType: image.mediaType,
+            width: image.width,
+            height: image.height,
+            bytes: image.bytes ?? 0,
+          })),
+        }),
   };
 }
 

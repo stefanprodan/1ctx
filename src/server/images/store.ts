@@ -45,7 +45,7 @@ const row = (raw: Raw): ImageRow => ({ ...raw, freed: raw.freed === 1 });
 export const messageImagesSql = (table: string) =>
   `(select json_group_array(json_object('id', id, 'name', name,
       'mediaType', media_type, 'width', width, 'height', height,
-      'freed', json(iif(data is null, 'true', 'false'))) order by position)
+      'bytes', bytes, 'freed', json(iif(data is null, 'true', 'false'))) order by position)
     from images where message_id = ${table}.id)`;
 
 // the first image of a message, or of a queued one by queued_id, as one
@@ -55,7 +55,7 @@ export const firstImageSql = (
   owner: "message_id" | "queued_id" = "message_id",
 ) =>
   `(select json_object('id', id, 'name', name, 'mediaType', media_type,
-      'width', width, 'height', height,
+      'width', width, 'height', height, 'bytes', bytes,
       'freed', json(iif(data is null, 'true', 'false')))
     from images where ${owner} = ${table}.id order by position limit 1)`;
 
@@ -73,7 +73,7 @@ const taken = ({ rowid, freed, ...image }: RawTaken): Taken => ({
 });
 
 const TAKEN = `rowid, id, name, media_type as mediaType, width, height,
-  data is null as freed`;
+  bytes, data is null as freed`;
 
 export const staged = (image: ImageRow): StagedImage => ({
   id: image.id,

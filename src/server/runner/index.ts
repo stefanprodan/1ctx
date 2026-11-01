@@ -30,6 +30,7 @@ import { childRowsTo, delegate } from "./child.ts";
 import { compactSend } from "./compact.ts";
 import { endSend, FINALIZE_RETRY_MS } from "./ending.ts";
 import type { Event } from "./event.ts";
+import { refuseUnfit } from "./image-start.ts";
 import { IMAGE_TITLE } from "./images.ts";
 import { roundLookups } from "./lookups.ts";
 import { commitMemory } from "./memory-phase.ts";
@@ -246,6 +247,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
       kept: event?.kept ?? [],
       checkUploads: deps.uploads.checkUploads,
       startKept: (id, afterSeq) => deps.bash.startKept(id, afterSeq),
+      fitImages: refuseUnfit(roundDeps, historyOf),
       now: deps.clock(),
     });
   };

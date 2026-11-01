@@ -5,6 +5,7 @@ import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Log } from "../lib/log.ts";
 import { errorEvent } from "./anthropic-stream.ts";
 import { markOf } from "./author.ts";
+import { type ImageData, loadImages, NO_IMAGE_DATA } from "./images.ts";
 import {
   type CacheLife,
   CatalogError,
@@ -135,15 +136,45 @@ function thinkingBlocks(
 type BuildOptions = {
   // the provider refused the history: no thinking goes this time
   dropThinking?: boolean;
-  // as a fit counts it: no cache marks, a thinking block by its text
+  // as a fit counts it: no cache marks, a thinking block by its text,
+  // no image, which the estimate adds
   counting?: boolean;
+  // the images port; without one an image goes as its removed line
+  images?: ImageData;
 };
 
-// text, a call or a result, never thinking
+// text, an image, a call or a result, never thinking: a mark on the
+// last text of a turn would leave its images after the breakpoint
 const markable = (block: Block) =>
   block.type === "tool_use" ||
   block.type === "tool_result" ||
+  block.type === "image" ||
   (block.type === "text" && block.text !== "");
+
+// the text first, then each image as a base64 source
+function userBlocks(
+  message: Extract<ChatMessageIn, { role: "user" }>,
+  options: BuildOptions,
+): Block[] {
+  const own = message.name
+    ? `${markOf(message.name)}${message.content}`
+    : message.content;
+  if (options.counting || !message.images?.length) {
+    return own === "" ? [] : [{ type: "text", text: own }];
+  }
+  const { text, loaded } = loadImages(
+    own,
+    message.images,
+    options.images ?? NO_IMAGE_DATA,
+  );
+  return [
+    ...(text === "" ? [] : [{ type: "text", text }]),
+    ...loaded.map((image) => ({
+      type: "image",
+      source: { type: "base64", media_type: image.mediaType, data: image.data },
+    })),
+  ];
+}
 
 // the last block a mark may sit on, at or before the end of the turns
 function lastMarkable(turns: Turn[]): At | null {
@@ -177,13 +208,9 @@ function turnsOf(
       case "system":
         if (message.content !== "") system.push(message.content);
         break;
-      case "user": {
-        const text = message.name
-          ? `${markOf(message.name)}${message.content}`
-          : message.content;
-        push("user", text === "" ? [] : [{ type: "text", text }]);
+      case "user":
+        push("user", userBlocks(message, options));
         break;
-      }
       case "tool":
         push("user", [
           {
@@ -338,6 +365,7 @@ const sendsThinking = (body: Record<string, unknown>) =>
 export type AnthropicChatDeps = {
   // one request with this body, as the wire streams it
   open(body: Record<string, unknown>): AsyncIterable<ChatEvent>;
+  images?: ImageData;
   providerName: string;
   log?: Log;
 };
@@ -351,7 +379,8 @@ export async function* anthropicChat(
   deps: AnthropicChatDeps,
 ): AsyncIterable<ChatEvent> {
   const fields = { provider: deps.providerName, model: req.model };
-  const first = buildChatBody(req);
+  const images = deps.images === undefined ? {} : { images: deps.images };
+  const first = buildChatBody(req, images);
   let yielded = false;
   let refused = false;
   for await (const event of deps.open(first)) {
@@ -371,7 +400,7 @@ export async function* anthropicChat(
   if (!refused) return;
   let answered = false;
   for await (const event of deps.open(
-    buildChatBody(req, { dropThinking: true }),
+    buildChatBody(req, { ...images, dropThinking: true }),
   )) {
     if (!answered && event.kind !== "error") {
       answered = true;
