@@ -559,7 +559,7 @@ describe("what a check saw", () => {
 });
 
 describe("the reach of a check", () => {
-  test("an MCP server's origin signs with its key, the web row off", async () => {
+  test("an MCP server's own URL signs with its key, the web row off", async () => {
     const host = checkHost();
     const chat = await chatApp({
       fetcher: host.fetcher,
@@ -601,7 +601,9 @@ describe("the reach of a check", () => {
           })
         ).status,
       ).toBe(200);
-      const automation = await createAutomation(chat, { checkUrl: URL_ });
+      const automation = await createAutomation(chat, {
+        checkUrl: `${CHECK_URL}/mcp/alerts`,
+      });
       host.answer(() => new Response(null, { status: 204 }));
       makeDue(chat, automation.id);
       await fireChecked(chat, automation.id);

@@ -232,7 +232,7 @@ setting or changing it clears the validators.
 - **Redirects are followed as curl follows them,** by hand
   (`redirect: "manual"`), at most `CHECK_REDIRECTS` hops, http and https
   only (`hop()`). A signed check stays inside its credential's prefix or
-  its MCP server's origin, so no key reaches another origin; an
+  its MCP server's URL, so no key goes past what it signs; an
   unsigned one meets the web rules on every hop and stays unsigned,
   under a prefix too. The final answer decides.
 - **A held answer is dropped, never kept for later.** The fire's
@@ -286,9 +286,11 @@ setting or changing it clears the validators.
   failed` log line with the id, result and duration, `check error` for
   an internal one; the URL is never a field.
 - **The check reaches what the run's tools could** (`reach()`). An MCP
-  server linked to the agent, not turned off for the task and on the
-  URL's origin signs with its `mcp-` key and ignores the web row.
-  Otherwise the web row and the task's `web` switch must allow it, and
+  server linked to the agent and not turned off for the task signs a
+  URL under its own URL (`underPrefix()`) with its `mcp-` key and
+  ignores the web row, so an MCP-signed check polls the server's own
+  endpoint only. The rest of its origin is the web's, unsigned by it,
+  so the key never skirts the server's patterns. Otherwise the web row and the task's `web` switch must allow it, and
   `originAllowed()` in `listed` mode. An `https:` URL under a project
   credential's prefix (`underPrefix()`) carries its header and, as
   curl's credential fetch, needs no listed host. As in curl, a
