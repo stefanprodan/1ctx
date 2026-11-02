@@ -639,7 +639,7 @@ export async function chatApp(
         model: fields.model,
         thinking: null,
         effort: null,
-        servers: [],
+        mcp: true,
         mcpMode: "auto",
         ...(options.wire === "azure"
           ? { contextLength: options.window ?? 400_000, tools: true }

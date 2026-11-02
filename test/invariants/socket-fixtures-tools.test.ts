@@ -37,7 +37,7 @@ describe("socket fixtures for tools", () => {
   test("an MCP tool round then an answer", async () => {
     const flux = mcpFetch({ recorded: await fixture("flux") });
     const chat = await chatApp({ fetcher: flux.fetcher });
-    const { server } = await (
+    await (
       await chat.admin.call("POST", "/api/mcp", {
         body: {
           name: "flux",
@@ -64,7 +64,7 @@ describe("socket fixtures for tools", () => {
         effort: agent.effort,
         prompt: agent.prompt,
         skills: agent.skills,
-        servers: [{ serverId: server.id, read: true, write: false }],
+        mcp: true,
         mcpMode: "all",
       },
     });

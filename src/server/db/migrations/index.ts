@@ -88,6 +88,7 @@ import { m0079 } from "./0079-repos-block.ts";
 import { m0080 } from "./0080-images.ts";
 import { m0081 } from "./0081-agent-images.ts";
 import { m0082 } from "./0082-mcp-projects.ts";
+import { m0083 } from "./0083-mcp-access.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -172,4 +173,5 @@ export const MIGRATIONS: Migration[] = [
   m0080,
   m0081,
   m0082,
+  m0083,
 ];

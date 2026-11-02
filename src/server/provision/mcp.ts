@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An McpServer document: its offline checks and its apply through the
-// MCP routes. Its projects are all or team project names.
+// MCP routes. Its projects are all or team project names, its choices
+// team projects' sides, applied after the server and its grants.
 
 import type {
   McpResponse,
   PatchMcpEndpoint,
   PatchMcpSettings,
+  ProjectMcpResponse,
 } from "../../shared/api/mcp.ts";
 import type { ProjectsResponse } from "../../shared/api/projects.ts";
 import { PERSONAL_PROJECT_NAME } from "../../shared/words.ts";
@@ -28,6 +30,15 @@ export function checkMcpServer(
   const { keyFrom, projects } = spec;
   if (keyFrom && !exists && projects === undefined) {
     fail("projects", "is required for a new server with a key");
+  }
+  if (keyFrom && !exists && spec.personal === undefined) {
+    fail("personal", "is required for a new server with a key");
+  }
+  for (const choice of spec.choices ?? []) {
+    if (choice.project === PERSONAL_PROJECT_NAME) {
+      fail("choices", "cannot name a personal project");
+    }
+    reference("choices", "Project", choice.project);
   }
   if (keyFrom && Array.isArray(projects) && projects.length === 0) {
     fail("projects", "must be all or name a project with a key");
@@ -56,14 +67,38 @@ export async function applyMcpServer(
 ): Promise<Action> {
   const { servers } = await api.call<McpResponse>("GET", "/api/mcp");
   const before = servers.find((row) => row.name === doc.name);
-  const { url, keyFrom, projects: named, ...rest } = doc.spec;
+  const { url, keyFrom, projects: named, choices, ...rest } = doc.spec;
   let projects: "all" | string[] | undefined =
     named === "all" ? "all" : undefined;
+  const teams = async () =>
+    (await api.call<ProjectsResponse>("GET", "/api/projects")).projects.filter(
+      (row) => row.kind === "team",
+    );
   if (Array.isArray(named)) {
-    const found = await api.call<ProjectsResponse>("GET", "/api/projects");
-    const teams = found.projects.filter((row) => row.kind === "team");
-    projects = named.map((name) => idOf(teams, name));
+    const found = await teams();
+    projects = named.map((name) => idOf(found, name));
   }
+  const chose = async (): Promise<boolean> => {
+    if (choices === undefined || choices.length === 0) return false;
+    const found = await teams();
+    const { servers: after } = await api.call<McpResponse>("GET", "/api/mcp");
+    const serverId = idOf(after, doc.name);
+    let moved = false;
+    for (const { project, side } of choices) {
+      const projectId = idOf(found, project);
+      const list = await api.call<ProjectMcpResponse>(
+        "GET",
+        `/api/projects/${projectId}/mcp`,
+      );
+      const held = list.servers.find((row) => row.id === serverId);
+      if (held?.choice === side) continue;
+      await api.call("PUT", `/api/projects/${projectId}/mcp/${serverId}/side`, {
+        side,
+      });
+      moved = true;
+    }
+    return moved;
+  };
   // left out, an update keeps the scope and a create takes the API's
   const settings = { ...rest, ...(projects === undefined ? {} : { projects }) };
   const endpoint = {
@@ -84,6 +119,7 @@ export async function applyMcpServer(
       excludedPatterns: [],
       ...settings,
     });
+    await chose();
     return "created";
   }
   const endpointPatch: PatchMcpEndpoint = difference(before, endpoint);
@@ -96,11 +132,15 @@ export async function applyMcpServer(
     settings,
   );
   const changedEndpoint = Object.keys(endpointPatch).length > 0;
-  // the scope goes with a new endpoint, so a key added never reaches
+  // the grants go with a new endpoint, so a key added never reaches
   // everyone between two writes
   if (changedEndpoint && projects !== undefined) {
     endpointPatch.projects = projects;
     delete settingsPatch.projects;
+  }
+  if (changedEndpoint && settings.personal !== undefined) {
+    endpointPatch.personal = settings.personal;
+    delete settingsPatch.personal;
   }
   const changedSettings = Object.keys(settingsPatch).length > 0;
   if (changedEndpoint) {
@@ -109,5 +149,8 @@ export async function applyMcpServer(
   if (changedSettings) {
     await api.call("PATCH", `/api/mcp/${before.id}`, settingsPatch);
   }
-  return changedEndpoint || changedSettings ? "updated" : "unchanged";
+  const changedChoices = await chose();
+  return changedEndpoint || changedSettings || changedChoices
+    ? "updated"
+    : "unchanged";
 }

@@ -7,10 +7,7 @@ import type {
   SaveAgentRequest,
 } from "../../../shared/api/agents.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import type {
-  AgentServer,
-  McpServerSummary,
-} from "../../../shared/contracts/mcp.ts";
+import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import {
   MAX_INSTRUCTIONS_BLOCK,
   offeredServers,
@@ -19,6 +16,7 @@ import {
 import { MCP_MODES, type McpMode } from "../../../shared/words.ts";
 import { ago, commas, plural } from "../../lib/format.ts";
 import {
+  type AgentLink,
   agentFieldOf,
   listed,
   statedFields,
@@ -55,7 +53,7 @@ export function cardBody(
     effort: agent.effort,
     prompt: agent.prompt,
     skills: listed(agent.skills, (id) => id, rows.skills),
-    servers: listed(agent.servers, (s) => s.serverId, rows.servers),
+    mcp: agent.mcp,
     mcpMode: agent.mcpMode,
     upstream: agent.upstream,
     skip4Bit: agent.skip4Bit,
@@ -79,6 +77,13 @@ export function cardBody(
   return body;
 }
 
+// a draft's links as the sides the rule reads
+export const sidesOf = (links: AgentLink[]) =>
+  links.map((link) => ({
+    serverId: link.serverId,
+    side: link.write ? ("write" as const) : ("read" as const),
+  }));
+
 export function lastUse(
   activity: AgentActivity | undefined,
   now: number,
@@ -91,14 +96,16 @@ export function lastUse(
 type Refreshed = { id: string; refreshFailedAt: number | null };
 
 export function failing(
-  agent: Pick<AgentSummary, "servers" | "skills">,
+  agent: Pick<AgentSummary, "mcp" | "skills">,
   servers: Refreshed[] | null,
   skills: Refreshed[] | null,
 ): { servers: number; skills: number } {
   const bad = (rows: Refreshed[] | null, id: string) =>
     rows?.some((r) => r.id === id && r.refreshFailedAt !== null) ?? false;
   return {
-    servers: agent.servers.filter((s) => bad(servers, s.serverId)).length,
+    servers: agent.mcp
+      ? (servers ?? []).filter((s) => bad(servers, s.id)).length
+      : 0,
     skills: agent.skills.filter((id) => bad(skills, id)).length,
   };
 }
@@ -150,7 +157,7 @@ export function isModeValue(value: string): value is McpMode {
 
 export function promptPreview(
   rows: McpServerSummary[],
-  links: AgentServer[],
+  links: AgentLink[],
 ): {
   line: string;
   warnings: string[];
@@ -158,7 +165,7 @@ export function promptPreview(
   count: number;
   from: string[];
 } {
-  const offered = offeredServers(rows, links);
+  const offered = offeredServers(rows, sidesOf(links));
   const snapshot = promptSnapshot(offered, () => "");
   const warnings: string[] = [];
   for (const name of snapshot.leftForInstructions) {

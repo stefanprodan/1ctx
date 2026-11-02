@@ -25,7 +25,7 @@ import { me } from "./me.ts";
 export const switchable = signal<readonly string[] | null>(null);
 
 // by agent id, the MCP servers the agent is offered now, from the same
-// answer; an agent without one has no entry
+// answer: the project's list for an agent on MCP; one off has no entry
 export const servers = signal<Readonly<Record<string, SwitchableServer[]>>>({});
 
 // by agent id, the skills the agent carries, from the same answer
@@ -56,7 +56,15 @@ export const switchablesOf = (agentId: string): Switchables => ({
 // the project's agents answered: what can be switched there now
 export function answered(body: ProjectAgentsResponse): void {
   switchable.value = body.capabilities;
-  servers.value = body.servers;
+  const listed = Array.isArray(body.servers) ? body.servers : [];
+  servers.value =
+    listed.length === 0
+      ? {}
+      : Object.fromEntries(
+          (body.agents ?? [])
+            .filter((agent) => agent.mcp)
+            .map((agent) => [agent.id, listed]),
+        );
   skills.value = body.skills;
   credentials.value = body.credentials;
   repos.value = body.repos;

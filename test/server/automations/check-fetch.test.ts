@@ -16,7 +16,7 @@ import { CHECK_URL } from "../../helpers/app.ts";
 const ask: CheckAsk = {
   url: `${CHECK_URL}/alerts?token=q`,
   projectId: "p1",
-  servers: [],
+  mcpOn: false,
   disabled: [],
   etag: null,
   lastModified: null,
@@ -180,7 +180,7 @@ describe("what a check reaches", () => {
   const linked = {
     ...ask,
     url: `${CHECK_URL}/mcp/alerts?token=q`,
-    servers: [{ serverId: "m1", read: true, write: false }],
+    mcpOn: true,
   };
 
   test("an MCP server's own URL carries its bearer, the web row off", () => {
@@ -195,6 +195,8 @@ describe("what a check reaches", () => {
       "web access is off",
     );
     expect(reach(off, ask)).toBe("web access is off");
+    // an agent off MCP signs with none of its project's servers
+    expect(reach(off, { ...linked, mcpOn: false })).toBe("web access is off");
   });
 
   test("the rest of an MCP server's origin is the web's, unsigned", () => {
@@ -391,7 +393,7 @@ describe("a check's redirects", () => {
           {
             ...ask,
             url: `${CHECK_URL}/mcp/feed`,
-            servers: [{ serverId: "m1", read: true, write: false }],
+            mcpOn: true,
           },
           signal,
         ),

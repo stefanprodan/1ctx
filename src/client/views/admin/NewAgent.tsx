@@ -74,7 +74,6 @@ function Form({ providerId }: { providerId: string }) {
         prompt: d.prompt.value.trim(),
         ...d.modelBody(wireOf()),
         skills: [],
-        servers: [],
         mcpMode: "auto",
       });
       if (address() === from) navigate(configAgentHref(created.name));

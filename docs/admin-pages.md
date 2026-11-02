@@ -103,9 +103,9 @@ reporting.
   after Endpoint. The list row says `scopeCount()`; the agent's MCP tab
   puts `scopeWords()` before a listed server's line, and its server
   picker before every option's.
-- **An agent's MCP link is Read or Read and write.** Write alone is
-  refused by the server. "Default for new users" is sent only when
-  flipped.
+- **An agent holds one MCP switch** (`mcp`); the project chooses the
+  servers, and a save still holding `servers` is refused by the
+  server. "Default for new users" is sent only when flipped.
 - **A choice that cannot work stays in sight, disabled with its reason
   as the tooltip.** Skip 4-bit is locked by `skip4BitLock()`, and with
   it on the 4-bit options of Preferred provider are disabled. A

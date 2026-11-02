@@ -6,7 +6,7 @@ import { format } from "../../src/server/lib/log.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import { collectLogs } from "../helpers/app.ts";
 import { chatApp, startChat, tick, waitScript } from "../helpers/chat.ts";
-import { link, seedServer } from "../server/mcp/switches.helpers.ts";
+import { seedServer } from "../server/mcp/switches.helpers.ts";
 
 const at = new Date("2026-09-22T10:00:00.000Z");
 
@@ -152,7 +152,6 @@ test("failure events scrub keys, URLs, later lines and causes", async () => {
   chat.app.db
     .query("update mcp_servers set key_name = ? where id = ?")
     .run("mcp-fault", server.id);
-  chat.app.mcp.setAgentServers(chat.agentId, [link(server)]);
 
   const mcp = await startChat(chat, "call the server");
   mcp.script.toolRound([

@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import type {
-  AgentServer,
-  McpServerSummary,
-} from "../../../shared/contracts/mcp.ts";
+import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import { MAX_INSTRUCTIONS_BLOCK, offeredServers } from "../../../shared/mcp.ts";
 import { updateAgent } from "../../data/agents.ts";
 import { servers as serverRows } from "../../data/mcp.ts";
@@ -37,9 +34,10 @@ import {
   MODE_HINT,
   MODE_OPTIONS,
   promptPreview,
+  sidesOf,
 } from "./AgentPage.model.ts";
 import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
-import { listed } from "./Agents.model.ts";
+import { type AgentLink, listed } from "./Agents.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 
@@ -47,8 +45,8 @@ const OFF = "Disabled in the server config";
 
 type Access = "read" | "write" | "none";
 
-const toolCount = (server: McpServerSummary, link: AgentServer) =>
-  offeredServers([server], [link])[0]?.tools.length ?? 0;
+const toolCount = (server: McpServerSummary, link: AgentLink) =>
+  offeredServers([server], sidesOf([link]))[0]?.tools.length ?? 0;
 
 const scopeOf = (server: McpServerSummary) =>
   scopeWords(
@@ -98,7 +96,7 @@ function Servers({
     d.save(async () => {
       const saved = await updateAgent(
         latest.current.id,
-        cardBody(latest.current, { servers: chosen() }, loadedRows()),
+        cardBody(latest.current, { mcp: chosen().length > 0 }, loadedRows()),
       );
       d.resetServers(saved);
     }),
@@ -106,7 +104,7 @@ function Servers({
   const links = chosen();
   const linkOf = (id: string) => links.find((l) => l.serverId === id);
   const rows = byName((all ?? []).filter((s) => linkOf(s.id) !== undefined));
-  const set = (serverId: string, next: AgentServer | null) => {
+  const set = (serverId: string, next: AgentLink | null) => {
     d.servers.value = [
       ...links.filter((l) => l.serverId !== serverId),
       ...(next === null ? [] : [next]),

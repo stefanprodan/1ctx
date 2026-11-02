@@ -74,6 +74,9 @@ instance's database, creating or updating what they name.
 - **An `Agent`'s `subagents` is a boolean.** A new agent without it is
   off; left out on an update it stays. `images` is in
   `docs/images.md`.
+- **An `Agent`'s `mcp` is a boolean.** A new agent without it is on;
+  left out on an update it stays. A file still naming `servers` fails
+  the apply: a project chooses its MCP servers (`McpServer.choices`).
 - **`default: true` is the only value for an `Agent` or `Decider`.**
   A second default of one kind in an apply is refused. Leaving it out
   keeps the mark where it is.
@@ -87,11 +90,19 @@ instance's database, creating or updating what they name.
   file must be present and usable. Its `projects` name team projects
   only. The per-project cap and prefix overlaps are checked over the
   held rows with the input laid on them.
-- **An `McpServer`'s `projects` is `all` or team project names.**
-  Left out, an update keeps the scope, so a partial apply never widens
-  a narrowed server; a keyless create is `all` and a keyed one fails
-  preflight. A key with `[]`, a personal or an unknown name fails
+- **An `McpServer`'s `projects` is `all` (every team project) or team
+  project names; `personal` is `off`, `read` or `write`.** Left out, an
+  update keeps each, so a partial apply never widens a narrowed server;
+  a keyless create is `all` and `read`, and a keyed one without either
+  fails preflight. A key with `[]`, a personal or an unknown name fails
   preflight, and an unknown one fails apply too.
+- **An `McpServer`'s `choices` is a list of `{ project, side }`** for
+  team projects, applied after the server and its grants through the
+  choice route, so a server and its grant made in the same file work.
+  It sets the choices it names and leaves the rest; a personal
+  project's choice is its owner's alone. A choice outside the grant or
+  above the ceiling fails apply. It sits on the server since `KINDS`
+  applies `Project` before `McpServer`.
 - **A `Repository` is a team project's, matched by `project` and
   name.** The name is `spec.name`, else `metadata.name`, so two projects
   may each hold one named alike. `keyFrom` names an `http-` key file,

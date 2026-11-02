@@ -28,8 +28,8 @@ async function bound() {
   const finops = (await createTeam(chat.admin, "finops", [chat.memberId])).id;
   const research = (await createTeam(chat.admin, "research", [chat.memberId]))
     .id;
-  const checker = await chat.makeAgent({ name: "checker", model: FLASH });
-  const markets = chat.app.mcp.create(
+  await chat.makeAgent({ name: "checker", model: FLASH });
+  chat.app.mcp.create(
     {
       name: "markets",
       url: "http://markets.test/mcp",
@@ -42,6 +42,7 @@ async function bound() {
       writePatterns: [],
       excludedPatterns: [],
       projects: [finops],
+      personal: "off",
     },
     {
       serverName: "markets",
@@ -62,11 +63,6 @@ async function bound() {
       ],
     },
   );
-  for (const agentId of [chat.agentId, checker]) {
-    chat.app.mcp.setAgentServers(agentId, [
-      { serverId: markets.id, read: true, write: false },
-    ]);
-  }
   return { chat, finops, research };
 }
 

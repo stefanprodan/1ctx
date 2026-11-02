@@ -194,9 +194,10 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   server refuses both anyway. The delete ask says how many external
   tasks carry the label, closed ones too (`deleteAsk()` over the
   detail's `tasks`).
-- **The directory's MCP tab says each server's scope**
-  (`scopeWords()`): `All projects` or the names of the projects the
-  viewer sees.
+- **The directory's MCP tab says where each server is on**
+  (`onWords()`): the names of the projects the viewer sees, the
+  viewer's own personal one as `Personal`, then an admin's count of
+  personal projects. An agent off MCP lists none.
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted in its provider's wire shape; the client never
   counts tokens.

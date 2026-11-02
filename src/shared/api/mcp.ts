@@ -4,7 +4,7 @@
 // Request and response bodies of the MCP routes: the admin's, and a
 // project's list of its servers.
 
-import type { McpScope, McpServerSummary } from "../contracts/mcp.ts";
+import type { McpScope, McpServerSummary, McpSide } from "../contracts/mcp.ts";
 import type { Windowed } from "./admin.ts";
 
 // GET /api/mcp: the rows, the names of the mcp- key files the form may
@@ -24,9 +24,12 @@ export type McpServerResponse = { server: McpServerSummary };
 // where a server is offered: "all", or the team project ids it lists
 export type McpProjects = "all" | string[];
 
+// the grants: the team projects, and the most a personal project gets
+export type McpGrants = { projects?: McpProjects; personal?: McpSide };
+
 // POST /api/mcp: discovers, then inserts the row and its tools.
-// projects is required with a key and defaults to all without one; a
-// key with an empty list is refused
+// projects and personal are required with a key; without one they
+// default to all and read; a key with an empty list is refused
 export type CreateMcpRequest = {
   name: string;
   url: string;
@@ -38,12 +41,11 @@ export type CreateMcpRequest = {
   readPatterns: string[];
   writePatterns: string[];
   excludedPatterns: string[];
-  projects?: McpProjects;
-};
+} & McpGrants;
 
 // PATCH /api/mcp/:id: the settings, any of them, or the endpoint
-// (url and/or keyName), which discovers first; projects goes with
-// either and replaces the held scope, else the scope stays
+// (url and/or keyName), which discovers first; the grants go with
+// either and replace what is held, else they stay
 export type PatchMcpSettings = Partial<{
   read: boolean;
   write: boolean;
@@ -52,13 +54,13 @@ export type PatchMcpSettings = Partial<{
   readPatterns: string[];
   writePatterns: string[];
   excludedPatterns: string[];
-  projects: McpProjects;
-}>;
+}> &
+  McpGrants;
 export type PatchMcpEndpoint = Partial<{
   url: string;
   keyName: string | null;
-  projects: McpProjects;
-}>;
+}> &
+  McpGrants;
 export type PatchMcpRequest = PatchMcpSettings | PatchMcpEndpoint;
 
 export type McpCalls = { calls: number; failed: number };
@@ -73,22 +75,30 @@ export type McpServersUsage = McpCalls & {
 export type McpUsageResponse = Windowed<McpUsage>;
 export type McpUsageAllResponse = Windowed<McpServersUsage>;
 
-// a server offered in a project: its tool count by its own switches and
-// patterns, and whether every project has it or this one is listed.
-// Never its URL or key file. projects is an admin's, on a list row: how
-// many projects the list holds, so removing the last one asks first
+// a server granted to a project: its tool count by its own switches and
+// patterns, and whether every team project has it or this one is
+// listed (all on a personal project). choice is the project's, read
+// when it made none; ceiling the most it may choose; side what a send
+// is given (offeredSide()). read is the server's Read switch, so a page
+// hides Read when it is off. Never its URL or key file. projects is an
+// admin's, on a team list row: how many projects the list holds, so
+// removing the last one asks first
 export type ProjectMcpServer = {
   id: string;
   name: string;
   tools: number;
   scope: McpScope;
+  choice: McpSide;
+  ceiling: McpSide;
+  side: McpSide;
+  read: boolean;
   projects?: number;
 };
 
 // GET /api/projects/:id/mcp, in name order, and the answer of its
-// POST and DELETE. addable is an admin's on a team project: the servers with a
-// list that does not hold the project, an empty one included; empty
-// for anyone else
+// POST, DELETE and the side PUTs. addable is an admin's on a team
+// project: the servers with a list that does not hold the project, an
+// empty one included; empty for anyone else
 export type ProjectMcpResponse = {
   servers: ProjectMcpServer[];
   addable: { id: string; name: string }[];
@@ -96,3 +106,9 @@ export type ProjectMcpResponse = {
 
 // POST /api/projects/:id/mcp: lists the project on the server
 export type AddProjectMcpRequest = { serverId: string };
+
+// PUT /api/projects/:id/mcp/:serverId/side (an admin, a team project)
+// and PUT /api/profile/project/mcp/:serverId/side (the owner): the
+// project's choice; a server not granted is a 404, a side above the
+// ceiling a 400
+export type ProjectMcpSideRequest = { side: McpSide };

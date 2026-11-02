@@ -10,8 +10,15 @@ import { mcpKey } from "../../../src/shared/capabilities.ts";
 import { MCP_CATALOG_FROM_TOKENS } from "../../../src/shared/mcp-catalog.ts";
 import { collectLogs, fakeFetch } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
-import { link, NO_PROJECTS, seedServer } from "../mcp/switches.helpers.ts";
+import {
+  NO_PROJECTS,
+  seedProject,
+  seedServer,
+} from "../mcp/switches.helpers.ts";
 import { context } from "./memory.helpers.ts";
+
+// a send in the team project p1, which chose nothing: every server read
+const P = { projectId: "p1", automation: null, phase: "main" as const };
 
 const NO_USAGE = {
   calls: () => ({ calls: 0, failed: 0, tools: [] }),
@@ -25,6 +32,7 @@ function setup(
   port?: (mcp: Mcp) => NonNullable<Parameters<typeof toolsArea>[0]["mcp"]>,
 ) {
   const db = memoryDb();
+  seedProject(db, "p1");
   const fetched = fakeFetch();
   const mcp = mcpArea({
     db,
@@ -42,7 +50,6 @@ function setup(
   });
   const flux = seedServer(mcp.store, "flux", large ? 48 : 1);
   const docs = seedServer(mcp.store, "docs");
-  const links = [link(flux), link(docs)];
   const tools = toolsArea({
     db,
     fetcher: fetched.fetcher,
@@ -65,18 +72,16 @@ function setup(
       refuse: (_projectId, _sessionId, reason) => reason,
     },
   });
-  return { db, mcp, tools, flux, docs, links };
+  return { db, mcp, tools, flux, docs };
 }
 
 test.each(["all", "catalog"] as const)(
-  "%s filters disabled links from every MCP surface and dispatch",
+  "%s filters disabled servers from every MCP surface and dispatch",
   async (mode) => {
-    const { db, mcp, tools, flux, docs, links } = setup();
+    const { db, mcp, tools, flux, docs } = setup();
     try {
-      const all = tools.offered(1, "", links, mode);
-      const off = tools.offered(1, "", links, mode, undefined, [
-        mcpKey(flux.id),
-      ]);
+      const all = tools.offered(1, "", true, mode, P);
+      const off = tools.offered(1, "", true, mode, P, [mcpKey(flux.id)]);
       expect(all.mcp.map((server) => server.name)).toEqual(["docs", "flux"]);
       expect(off.mcp.map((server) => server.name)).toEqual(["docs"]);
       expect(off.mcpPrompt.digest).toEqual({
@@ -144,7 +149,7 @@ test.each(["all", "catalog"] as const)(
         content: 'Error: tool "mcp__flux__get_item0" not found.',
       });
       expect(calls).toBe(0);
-      const none = tools.offered(1, "", links, mode, undefined, [
+      const none = tools.offered(1, "", true, mode, P, [
         mcpKey(flux.id),
         mcpKey(docs.id),
       ]);
@@ -162,10 +167,11 @@ test.each(["all", "catalog"] as const)(
 );
 
 test("a tool outside the snapshot is refused though its row exists", async () => {
-  const { db, mcp, tools, docs } = setup();
+  const { db, mcp, tools, flux } = setup();
   try {
     const both = seedServer(mcp.store, "both", 2);
-    // the server allows writes, so only the link keeps the write side out
+    mcp.store.setChoice("p1", flux.id, "off");
+    // the server allows writes, so only the choice keeps the write side out
     mcp.store.updateSettings(both.id, {
       write: true,
       readPatterns: ["get_item0"],
@@ -180,20 +186,20 @@ test("a tool outside the snapshot is refused though its row exists", async () =>
       error: true,
       content: `Error: MCP tool ${name} is not available; use a name from the available MCP tools`,
     });
-    // the write side of a read-only link
-    const read = tools.offered(1, "", [link(both), link(docs)], "catalog");
+    // the write side of a read choice
+    const read = tools.offered(1, "", true, "catalog", P);
     expect(read.mcpCatalog).toContain("mcp__both__get_item0");
     expect(read.mcpCatalog).not.toContain("mcp__both__get_item1");
     expect(
       await tools.run(read, call("mcp__both__get_item1"), context()),
     ).toEqual(refused("mcp__both__get_item1"));
-    // a subagent's links are read alone, whatever its parent's are
-    const writes = [{ ...link(both), write: true }, link(docs)];
-    expect(tools.offered(1, "", writes, "catalog").mcpCatalog).toContain(
+    // a subagent's sides are read alone, whatever its parent's are
+    mcp.store.setChoice("p1", both.id, "write");
+    expect(tools.offered(1, "", true, "catalog", P).mcpCatalog).toContain(
       "mcp__both__get_item1",
     );
-    const child = tools.offered(1, "", writes, "catalog", {
-      projectId: null,
+    const child = tools.offered(1, "", true, "catalog", {
+      projectId: "p1",
       automation: null,
       phase: "child",
     });
@@ -209,14 +215,15 @@ test("a tool outside the snapshot is refused though its row exists", async () =>
 
 test("a catalog past its floor keeps every tool and logs the count alone", async () => {
   const logs = collectLogs();
-  const { db, mcp, tools, docs } = setup(
+  const { db, mcp, tools, flux } = setup(
     false,
     undefined,
     logs.logFactory("tools"),
   );
   try {
-    const huge = seedServer(mcp.store, "huge", 900);
-    const offer = tools.offered(1, "", [link(huge), link(docs)], "catalog");
+    seedServer(mcp.store, "huge", 900);
+    mcp.store.setChoice("p1", flux.id, "off");
+    const offer = tools.offered(1, "", true, "catalog", P);
     expect(offer.mcp.map((server) => server.name)).toEqual(["docs", "huge"]);
     expect(offer.mcpCatalog).toContain("\nmcp__huge__get_item899\n");
     expect(offer.mcpCatalog).toContain(
@@ -239,10 +246,10 @@ test("a catalog past its floor keeps every tool and logs the count alone", async
 
 test("a catalog with no tool to list offers neither catalog tool", async () => {
   // offeredServers drops a server with no tool, so the port strips them
-  const { db, mcp, tools, links } = setup(false, undefined, silent, (m) => ({
+  const { db, mcp, tools } = setup(false, undefined, silent, (m) => ({
     ...m,
-    offered: (agentLinks, projectId) => {
-      const offer = m.offered(agentLinks, projectId);
+    offered: (projectId, options) => {
+      const offer = m.offered(projectId, options);
       return {
         ...offer,
         servers: offer.servers.map((server) => ({ ...server, tools: [] })),
@@ -250,7 +257,7 @@ test("a catalog with no tool to list offers neither catalog tool", async () => {
     },
   }));
   try {
-    const offer = tools.offered(1, "", links, "catalog");
+    const offer = tools.offered(1, "", true, "catalog", P);
     expect(offer.mcp).toHaveLength(2);
     expect(offer.mcpCatalog).toBe("");
     expect(offer.tools.map((tool) => tool.name)).not.toContain("mcp_describe");
@@ -262,10 +269,10 @@ test("a catalog with no tool to list offers neither catalog tool", async () => {
 });
 
 test("all and catalog mode carry the same MCP prompt", async () => {
-  const { db, mcp, tools, links } = setup(true);
+  const { db, mcp, tools } = setup(true);
   try {
-    const all = tools.offered(1, "", links, "all");
-    const catalog = tools.offered(1, "", links, "catalog");
+    const all = tools.offered(1, "", true, "all", P);
+    const catalog = tools.offered(1, "", true, "catalog", P);
     expect(catalog.mcpPrompt).toEqual(all.mcpPrompt);
     expect(catalog.mcp).toEqual(all.mcp);
   } finally {
@@ -275,17 +282,15 @@ test("all and catalog mode carry the same MCP prompt", async () => {
 });
 
 test("auto recounts the remaining schemas and moves from catalog to all", async () => {
-  const { db, mcp, tools, flux, links } = setup(true);
+  const { db, mcp, tools, flux } = setup(true);
   try {
-    const direct = tools.offered(1, "", links, "all");
+    const direct = tools.offered(1, "", true, "all", P);
     expect(
       wireTokens(direct.tools.filter((tool) => tool.name.startsWith("mcp__"))),
     ).toBeGreaterThan(MCP_CATALOG_FROM_TOKENS);
-    const before = tools.offered(1, "", links, "auto");
+    const before = tools.offered(1, "", true, "auto", P);
     expect(before.tools.map((tool) => tool.name)).toContain("mcp_call");
-    const after = tools.offered(1, "", links, "auto", undefined, [
-      mcpKey(flux.id),
-    ]);
+    const after = tools.offered(1, "", true, "auto", P, [mcpKey(flux.id)]);
     expect(
       wireTokens(after.tools.filter((tool) => tool.name.startsWith("mcp__"))),
     ).toBeLessThanOrEqual(MCP_CATALOG_FROM_TOKENS);
@@ -301,13 +306,14 @@ test("auto recounts the remaining schemas and moves from catalog to all", async 
   }
 });
 
-test("unassigned and missing server keys leave the offer byte-identical", async () => {
-  const { db, mcp, tools, links } = setup();
+test("an off server's and a missing server's keys leave the offer byte-identical", async () => {
+  const { db, mcp, tools } = setup();
   try {
     const other = seedServer(mcp.store, "other");
+    mcp.store.setChoice("p1", other.id, "off");
     for (const mode of ["all", "catalog", "auto"] as const) {
-      const on = tools.offered(1, "", links, mode);
-      const off = tools.offered(1, "", links, mode, undefined, [
+      const on = tools.offered(1, "", true, mode, P);
+      const off = tools.offered(1, "", true, mode, P, [
         mcpKey(other.id),
         mcpKey("missing"),
       ]);
@@ -320,7 +326,7 @@ test("unassigned and missing server keys leave the offer byte-identical", async 
 });
 
 test("memory phase offers only memory_edit and never reads MCP or the set", async () => {
-  const { db, mcp, tools, flux, links } = setup();
+  const { db, mcp, tools, flux } = setup();
   try {
     const scope = {
       projectId: "project",
@@ -330,8 +336,8 @@ test("memory phase offers only memory_edit and never reads MCP or the set", asyn
     mcp.offered = () => {
       throw new Error("memory phase read MCP");
     };
-    const on = tools.offered(1, "", links, "catalog", scope);
-    const off = tools.offered(1, "", links, "catalog", scope, [
+    const on = tools.offered(1, "", true, "catalog", scope);
+    const off = tools.offered(1, "", true, "catalog", scope, [
       mcpKey(flux.id),
       "web",
     ]);
@@ -350,10 +356,10 @@ test("memory phase offers only memory_edit and never reads MCP or the set", asyn
   }
 });
 
-test("switchable follows links, sides and patterns without prompt caps", async () => {
-  const { db, mcp, flux, docs, links } = setup();
+test("switchable follows choices, sides and patterns without prompt caps", async () => {
+  const { db, mcp, flux, docs } = setup();
   try {
-    expect(mcp.switchable(links, "p1")).toEqual([
+    expect(mcp.switchable("p1")).toEqual([
       { id: docs.id, name: "docs", tools: 1 },
       { id: flux.id, name: "flux", tools: 1 },
     ]);
@@ -362,17 +368,23 @@ test("switchable follows links, sides and patterns without prompt caps", async (
       JSON.stringify({ type: "string", enum: ["x".repeat(1024 * 1024)] }),
       huge.id,
     );
-    expect(mcp.switchable([link(huge)], "p1")).toEqual([
-      { id: huge.id, name: "huge", tools: 1 },
+    expect(mcp.switchable("p1")).toContainEqual({
+      id: huge.id,
+      name: "huge",
+      tools: 1,
+    });
+    expect(mcp.offered("p1").servers.map((server) => server.name)).toEqual([
+      "docs",
+      "flux",
     ]);
-    expect(mcp.offered([link(huge)], "p1").servers).toEqual([]);
     mcp.store.updateSettings(flux.id, { excludedPatterns: ["*"] });
-    expect(mcp.switchable([...links, link({ id: "missing" })], "p1")).toEqual([
+    mcp.store.setChoice("p1", huge.id, "off");
+    expect(mcp.switchable("p1")).toEqual([
       { id: docs.id, name: "docs", tools: 1 },
     ]);
-    expect(mcp.switchable([{ ...link(docs), read: false }], "p1")).toEqual([]);
+    expect(mcp.switchable("missing")).toEqual([]);
     mcp.store.updateSettings(docs.id, { read: false });
-    expect(mcp.switchable(links, "p1")).toEqual([]);
+    expect(mcp.switchable("p1")).toEqual([]);
   } finally {
     await mcp.close();
     db.close();
@@ -380,8 +392,8 @@ test("switchable follows links, sides and patterns without prompt caps", async (
 });
 
 // bug: the agents route read every catalog once per agent
-test("switchableBy reads the catalogs once for every agent", async () => {
-  const { db, mcp, flux, docs, links } = setup();
+test("switchable reads the catalogs once", async () => {
+  const { db, mcp } = setup();
   try {
     const list = mcp.store.list.bind(mcp.store);
     let reads = 0;
@@ -389,21 +401,7 @@ test("switchableBy reads the catalogs once for every agent", async () => {
       reads += 1;
       return list();
     };
-    const agents = [
-      { id: "a1", servers: links },
-      { id: "a2", servers: [link(flux)] },
-      { id: "a3", servers: [] },
-      { id: "a4", servers: [link({ id: "missing" })] },
-    ];
-    expect(mcp.switchableBy(agents, "p1")).toEqual({
-      a1: [
-        { id: docs.id, name: "docs", tools: 1 },
-        { id: flux.id, name: "flux", tools: 1 },
-      ],
-      a2: [{ id: flux.id, name: "flux", tools: 1 }],
-    });
-    expect(reads).toBe(1);
-    expect(mcp.switchableBy([{ id: "a3", servers: [] }], "p1")).toEqual({});
+    expect(mcp.switchable("p1")).toHaveLength(2);
     expect(reads).toBe(1);
   } finally {
     await mcp.close();
@@ -419,7 +417,7 @@ test.each(["all", "catalog"] as const)(
       "bash: mcp__docs__get_item0: command not found",
       "bash: frobnicate: command not found",
     ].join("\n");
-    const { db, tools, links } = setup(false, {
+    const { db, tools } = setup(false, {
       run: async () => ({
         content: `${printed}\nexit 127`,
         error: true,
@@ -427,7 +425,7 @@ test.each(["all", "catalog"] as const)(
       }),
     });
     try {
-      const offered = tools.offered(1, "", links, mode);
+      const offered = tools.offered(1, "", true, mode, P);
       const result = await tools.run(
         offered,
         {

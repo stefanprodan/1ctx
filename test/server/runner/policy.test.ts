@@ -57,7 +57,7 @@ const agent: AgentRow = {
   effort: "high",
   prompt: "",
   skills: [],
-  servers: [],
+  mcp: true,
   mcpMode: "auto",
   upstream: null,
   skip4Bit: false,

@@ -70,7 +70,7 @@ const agent: AgentSummary = {
   effort: "high",
   prompt: "Be brief.",
   skills: ["sk1", "sk2"],
-  servers: [{ serverId: "s1", read: true, write: false }],
+  mcp: true,
   mcpMode: "auto",
   upstream: "vendor/fp8",
   skip4Bit: false,
@@ -145,7 +145,7 @@ describe("a card's body", () => {
       effort: "high",
       prompt: "Be brief.",
       skills: ["sk1", "sk2"],
-      servers: [{ serverId: "s1", read: true, write: false }],
+      mcp: true,
       mcpMode: "auto",
       upstream: "vendor/fp8",
       skip4Bit: false,
@@ -185,7 +185,7 @@ describe("a card's body", () => {
     expect(again).toMatchObject({ contextLength: 8192, tools: false });
   });
 
-  test("leaves out a skill or a server deleted since the page loaded", () => {
+  test("leaves out a skill deleted since the page loaded", () => {
     const body = cardBody(
       agent,
       { name: "x" },
@@ -195,7 +195,7 @@ describe("a card's body", () => {
       },
     );
     expect(body.skills).toEqual(["sk2"]);
-    expect(body.servers).toEqual([]);
+    expect(body.mcp).toBe(true);
     // a list that did not load keeps the picks as they are
     expect(cardBody(agent, {}, { skills: null, servers: null }).skills).toEqual(
       ["sk1", "sk2"],
@@ -228,7 +228,7 @@ test("the last use says running, when it ran, or never", () => {
   );
 });
 
-test("what is failing counts the agent's own servers and skills", () => {
+test("what is failing counts every server for an agent on MCP, and its skills", () => {
   const counts = failing(
     agent,
     [
@@ -240,8 +240,8 @@ test("what is failing counts the agent's own servers and skills", () => {
       { id: "sk2", refreshFailedAt: null },
     ],
   );
-  expect(counts).toEqual({ servers: 1, skills: 1 });
-  expect(failingLine(counts)).toBe("1 MCP Server, 1 skill failing");
+  expect(counts).toEqual({ servers: 2, skills: 1 });
+  expect(failingLine(counts)).toBe("2 MCP Servers, 1 skill failing");
   expect(failingLine({ servers: 5, skills: 3 })).toBe(
     "5 MCP Servers, 3 skills failing",
   );
@@ -625,6 +625,8 @@ describe("the cards", () => {
       excludedPatterns: [],
       scope: "all",
       projects: [],
+      personal: "read",
+      on: { projects: [], personal: 0 },
       serverName: "",
       serverVersion: "",
       protocolVersion: "",

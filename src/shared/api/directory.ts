@@ -7,7 +7,6 @@
 import type { AgentSummary } from "../contracts/agent.ts";
 import type { DeciderSummary } from "../contracts/decider.ts";
 import type { DecisionId } from "../contracts/decision.ts";
-import type { McpScope } from "../contracts/mcp.ts";
 import type { ProjectSummary } from "../contracts/project.ts";
 import type { OfferedSkill } from "../contracts/skill.ts";
 import type { DirectoryUser, UserSummary } from "../contracts/user.ts";
@@ -56,17 +55,19 @@ export type DirectoryTool = {
 // loading every skill costs) and the tool schemas every request carries
 export type DirectoryTokens = { prompt: number; skills: number; tools: number };
 
-// an MCP server a send would offer the agent now: how many of its tools
-// reach the model, when its list was last discovered and when a refresh
-// last failed since, if one did, and where: every project, or the
-// listed team projects the viewer sees by name, every one for an admin
+// an MCP server a send would offer the agent now, in a project the
+// viewer sees: how many of its tools reach the model, when its list was
+// last discovered and when a refresh last failed since, if one did, and
+// where it is on: those projects by name, the viewer's own personal one
+// as Personal; for an admin every team project and personal ones as a
+// count, 0 for anyone else
 export type DirectoryMcpServer = {
   name: string;
   tools: number;
   checkedAt: number;
   refreshFailedAt: number | null;
-  scope: McpScope;
   projects: string[];
+  personal: number;
 };
 
 // the agent's MCP: the offered servers and their lean schemas' count

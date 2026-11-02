@@ -15,10 +15,15 @@ import { mcpKey } from "../../../src/shared/capabilities.ts";
 import { call, row, tool } from "../../fixtures/runner/trace.ts";
 import { fakeFetch } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
-import { link, NO_PROJECTS, seedServer } from "../mcp/switches.helpers.ts";
+import {
+  NO_PROJECTS,
+  seedProject,
+  seedServer,
+} from "../mcp/switches.helpers.ts";
 
 function offers() {
   const db = memoryDb();
+  seedProject(db, "p1");
   const fetched = fakeFetch();
   const mcp = mcpArea({
     db,
@@ -38,7 +43,7 @@ function offers() {
     ...NO_PROJECTS,
   });
   const flux = seedServer(mcp.store, "flux");
-  const docs = seedServer(mcp.store, "docs");
+  seedServer(mcp.store, "docs");
   const tools = toolsArea({
     db,
     fetcher: fetched.fetcher,
@@ -49,11 +54,11 @@ function offers() {
     skills: { forAgent: () => [], body: () => null, file: () => null },
     mcp,
   });
-  const links = [link(flux), link(docs)];
+  const scope = { projectId: "p1", automation: null, phase: "main" as const };
   return {
     db,
-    all: tools.offered(1, "", links, "all"),
-    off: tools.offered(1, "", links, "all", undefined, [mcpKey(flux.id)]),
+    all: tools.offered(1, "", true, "all", scope),
+    off: tools.offered(1, "", true, "all", scope, [mcpKey(flux.id)]),
   };
 }
 

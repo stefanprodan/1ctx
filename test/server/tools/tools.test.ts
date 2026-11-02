@@ -513,7 +513,7 @@ describe("skill tools from the required skills port", () => {
 
   test("run() refuses a skill the chat turned off though its row exists", async () => {
     const tools = area({}, null, skillsPort(catalog));
-    const offered = tools.offered(now, "agent", [], "auto", undefined, [
+    const offered = tools.offered(now, "agent", false, "auto", undefined, [
       "skill:s1",
     ]);
     expect(offered.tools.some((tool) => tool.name === "skill_file")).toBeTrue();

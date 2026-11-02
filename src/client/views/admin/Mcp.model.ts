@@ -129,8 +129,7 @@ export function mcpFieldOf(message: string): string | undefined {
 export const usersOf = (
   agents: readonly AgentSummary[],
   serverId: string,
-): AgentSummary[] =>
-  agents.filter((a) => a.servers.some((s) => s.serverId === serverId));
+): AgentSummary[] => (serverId === "" ? [] : agents.filter((a) => a.mcp));
 
 export function sidesLine(server: McpServerSummary): string {
   const sides = classify(server.name, server.tools, {

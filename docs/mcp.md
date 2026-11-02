@@ -5,8 +5,9 @@ MCP tools in a send (`tools/offer.ts`, `tools/builtin/mcp.ts`,
 `runner/policy.ts`) and how an MCP result becomes files
 (`tools/kept.ts`). Kept files' storage and mount are in `docs/bash.md`.
 
-An MCP server is a remote tool server an admin adds by URL; its tools
-reach the model in the sends of agents linked to it.
+An MCP server is a remote tool server an admin adds by URL and grants
+to projects; each project chooses it, and its tools reach the model in
+the sends of agents on MCP there.
 
 ## Servers
 
@@ -28,8 +29,8 @@ reach the model in the sends of agents linked to it.
 - **One refresh coordinator per `mcpArea`, never module state.** It is
   closed in `shutdown()` after the runner, since ending calls may still
   ask for a refresh. A delete aborts a discovery in flight.
-- **A server an agent references cannot be deleted.** The delete is a
-  409.
+- **A delete goes with its grants and choices.** Nothing refuses it:
+  `mcp_server_projects` and `project_mcp` cascade.
 - **A tool's side, read or write, is never stored.** `classify()` in
   `shared/mcp.ts` derives it from the admin's patterns (unusable,
   excluded, read, write, in that order), so a pattern change applies at
@@ -39,54 +40,78 @@ reach the model in the sends of agents linked to it.
 
 ## Where a server is offered
 
-- **A server's scope is `all` or a list of team projects**
-  (`mcp_servers.scope`, `mcp_server_projects`). `all` offers it in
-  every project, personal ones included; a list only in its team
-  projects, never a personal one. The scope is the server's, never the
-  key's or the agent's: an agent keeps its links everywhere.
+- **Five layers, each only narrowing.** A tool reaches a model only when
+  all allow it: the server's Read and Write switches and patterns; its
+  grants; the project's choice; the agent's MCP switch
+  (`agents.mcp_on`); the chat's or the automation's switches
+  (`mcp:<id>` in `disabledCapabilities`).
+- **A team grant is `all` or a list of team projects**
+  (`mcp_servers.scope`, `mcp_server_projects`); `all` means every team
+  project, never a personal one. **A personal grant is separate**
+  (`mcp_servers.personal`: `off`, `read`, `write`), the most any
+  personal project gets. The grants are the server's, never the key's.
 - **A key never reaches everyone by accident.** A create with a key
-  names `projects` (`all` or ids), and a key with `projects: []` is a
-  400. A keyless create defaults to `all`. A key added later keeps the
-  scope. An emptied list, by a Remove or a deleted project, offers the
-  server nowhere and is never widened to `all`.
-- **`inScope()` in `shared/mcp.ts` decides it for every caller,** in
-  memory over the rows `store.list()` and `store.scopes()` load: the
-  send's offer and catalog (`offered(links, projectId)`), the project
-  agents route's `servers` and `agents[].servers`, the `automation`
-  tool's names, the prompt's list of servers turned off, and the check
-  URL's signing. An out of scope name never reaches a model. An offer
-  with no project fails closed to the `all` servers; only the
-  directory, which chose its links by the viewer's visible projects,
-  takes them as given (`offeredChosen()`, the scope's `mcpChosen`).
+  names `projects` and `personal`; a key with `projects: []` is a 400.
+  A keyless create defaults to `all` and `read`. A key added later
+  keeps the grants; a PATCH that adds one may carry both. An emptied
+  list offers the server nowhere and is never widened to `all`.
+- **The project chooses each granted server** (`project_mcp`, `off`,
+  `read`, `write`). Absent is read, held as no row. The ceiling is the
+  server's Write switch for a team project, the personal grant (capped
+  by Write) for a personal one. A choice above the ceiling is a 400 when
+  made and capped at send when the ceiling drops later, never deleted.
+  A choice for a server the project lost is kept, harmless.
+- **`offeredSide()` in `shared/mcp.ts` decides it for every caller:**
+  the grant, the choice and the switches give `off`, `read` or `write`;
+  Read off with Write on gives a read choice nothing and a write choice
+  its write tools only. Callers: the send's offer and catalog
+  (`mcpArea().offered(projectId)`), the project agents route's
+  `servers` (one list for the project; `agents[].mcp`), the
+  `automation` tool's names and hidden set, the prompt's list of
+  servers turned off, the check URL's signing and the project's list.
+  An offer with no project, or a missing one, offers none; only the
+  directory takes its sides as given (`offeredSides()`, the scope's
+  `mcpSides`).
+- **A send reads its project's choices in one indexed query**
+  (`choicesOf()`, the project's row joined to `project_mcp`), beside
+  the rows `store.list()` loads; never one per server.
+- **An agent off MCP gets none of it**, its subagents included. A
+  subagent is read only: `childOffered()` asks for the read side.
 - **Every send takes its session's project**, through the one offer in
   `runner/policy.ts`: a chat, a queued message, a channel turn and a
   summoned agent, a subagent (its parent's offer), a run, Run now and a
-  confirmed proposal. A narrowed scope applies from the next send, like
-  a pattern change, and the change note tells the model; earlier
-  results and kept files stay. An `mcp:` key left in a disabled set for
-  a server out of scope is kept, harmless.
+  confirmed proposal. A change applies from the next send, like a
+  pattern change, and the change note tells the model; earlier results
+  and kept files stay.
 - **A project's list** (`GET /api/projects/:id/mcp`, `access.project()`)
-  shows its servers in scope: name, tool count by the server's own
-  switches and patterns, and `all` or `projects`, never a URL or key
-  file. An admin's answer gives a list row's project count
-  (`projects`) and, on a team project, `addable`, the list-scoped
-  servers without it. `POST` (a `serverId`) and `DELETE .../:serverId`
-  add or remove a team project on a list server, each answering the
-  list; an `all` server is a 409, a personal project a 404.
-- **The directory shows what the viewer reaches.** An agent's page
-  keeps the servers that are `all` or listed in a project the viewer
-  sees, each with those project names, every one for an admin; the
-  list, both token totals and `agent.servers` come from that one set.
+  shows its granted servers: name, tool count by the server's own
+  switches and patterns, `all` or `projects`, the `choice` (read when
+  none), the `ceiling`, the `side` it gives and the server's `read`,
+  never a URL or key file. An admin's answer gives a team list row's
+  project count and, on a team project, `addable`. `POST` and
+  `DELETE .../:serverId` add or remove a team project on a list server
+  (an `all` server a 409, a personal project a 404).
+  `PUT .../:serverId/side` (admin, team only) and
+  `PUT /api/profile/project/mcp/:serverId/side` (the owner's personal
+  project) set the choice; a server not granted is a 404, a side above
+  the ceiling a 400. Each answers the list.
+- **The server's GET says where it is on** (`on`): the team projects by
+  name and personal projects as a count, since an admin never sees
+  whose.
+- **The directory shows what the viewer reaches.** An agent on MCP
+  lists the servers on in the projects the viewer sees, each with those
+  names (their own personal project as `Personal`), on the widest side;
+  an admin sees every server on anywhere, personal ones as a count. The
+  list, both token totals and the schemas come from that one set.
 
 ## MCP tools in a send
 
-- **An agent's MCP tools are one send snapshot.** An agent links
-  servers with `read` and `write`; `read` is always on, since write
-  alone is refused by the parser, the store and provisioning. Access to
-  an agent grants its MCP tools.
+- **An agent's MCP tools are one send snapshot.** An agent holds one
+  switch, `mcp`, on for a new one; a save body still holding `servers`
+  is a 400. The project decides the servers, whoever drives the agent.
 - **The page and the send compute the same set.** The offer is the
-  server's and the agent's switches over the patterns, through
-  `offeredServers()` in `shared/mcp.ts`. Never compute it a second way.
+  sided servers over the patterns, through `offeredServers()` in
+  `shared/mcp.ts`. Never compute it a second way.
 - **The `tools` array is byte-stable across a session.** Schemas are
   lean (`wireSchema`, `wireDescription`, description cut at 1,024),
   sorted by server then name, after the built-ins and the skill tools.

@@ -20,12 +20,13 @@ import {
 
 export type Named = { id: string; name: string };
 
-// what an automation's switches can name: its agent's servers and skills, its
-// project's credentials and repositories
+// what an automation's switches can name: its project's servers, its
+// agent's skills, its project's credentials and repositories
 export type SwitchNames = {
   servers: Named[];
-  // the agent's servers out of the project's scope, by id: a key left
-  // for one is kept and never named
+  // the servers the run is not offered, by id: out of the grant, chosen
+  // off, or every one when the agent is off MCP; a key left for one is
+  // kept and never named
   serversOut: string[];
   skills: Named[];
   credentials: Named[];

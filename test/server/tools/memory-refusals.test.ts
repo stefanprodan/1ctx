@@ -9,7 +9,7 @@ import { area, context, now, ownNote } from "./memory.helpers.ts";
 describe("memory tool refusals", () => {
   test("refusals show current entry sizes, totals and the required cuts", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", ownNote);
+    const offered = tools.offered(now, "agent", false, "auto", ownNote);
     const handle = offered.memory!;
     const entries = [
       { topic: "First", text: "a".repeat(500) },
@@ -96,7 +96,7 @@ describe("memory tool refusals", () => {
 
   test("empty-note refusals give the right fix without asking for another set", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", ownNote);
+    const offered = tools.offered(now, "agent", false, "auto", ownNote);
     const cases = [
       {
         args: { action: "set", topic: "NVDA run notes", text: "x".repeat(913) },
@@ -139,7 +139,7 @@ describe("memory tool refusals", () => {
 
   test("an absent topic returns the working texts and the whole refusal stays under the result cut", async () => {
     const tools = area();
-    const offered = tools.offered(now, "agent", [], "auto", ownNote);
+    const offered = tools.offered(now, "agent", false, "auto", ownNote);
     offered.memory!.work!.entries = [
       { topic: "Sources", text: "Use the feed." },
     ];
@@ -176,7 +176,7 @@ describe("memory tool refusals", () => {
     "an edit the send's abort ended in %s stays interrupted",
     async (_, scope) => {
       const tools = area();
-      const offered = tools.offered(now, "agent", [], "auto", scope);
+      const offered = tools.offered(now, "agent", false, "auto", scope);
       expect(offered.memory).not.toBeNull();
       const controller = new AbortController();
       controller.abort();

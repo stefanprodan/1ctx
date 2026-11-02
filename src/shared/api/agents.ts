@@ -5,7 +5,6 @@
 // the agent the signed-in user last picked.
 
 import type { AgentSummary } from "../contracts/agent.ts";
-import type { AgentServer } from "../contracts/mcp.ts";
 import type { Avatar, Effort, McpMode } from "../words.ts";
 
 // an agent that never ran has no entry
@@ -48,9 +47,9 @@ export type SaveAgentRequest = {
   prompt: string;
   // skill ids, at most MAX_SKILLS_PER_AGENT, empty allowed
   skills: string[];
-  // the full set of servers, each with read on (write alone is refused),
-  // at most 50; an unknown id is a 400
-  servers: AgentServer[];
+  // the agent's MCP switch; absent is on for a new agent and unchanged
+  // on a save. The project chooses the servers, so servers is a 400
+  mcp?: boolean;
   mcpMode: McpMode;
   // the OpenRouter endpoint tag tried first, from the model's endpoints;
   // absent or null lets OpenRouter route. Refused on another wire

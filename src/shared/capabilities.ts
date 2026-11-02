@@ -10,9 +10,9 @@
 // which only a chat is offered, the email_user tool with an automation's
 // alert emails, and the automation and external_task tools, which only
 // a chat is offered too. An MCP server is `mcp:<server id>`: the id,
-// since the name is not what an agent's links hold. A skill is
-// `skill:<skill id>`, by the same rule. An HTTP credential is
-// `credential:<credential id>`, a repository `repo:<repo id>`.
+// since the rows hold it, not the name. A skill is `skill:<skill id>`,
+// by the same rule. An HTTP credential is `credential:<credential id>`,
+// a repository `repo:<repo id>`.
 
 export const WEB = "web";
 export const VISUALIZE = "visualize";

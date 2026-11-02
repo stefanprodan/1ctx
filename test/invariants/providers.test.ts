@@ -229,7 +229,7 @@ describe("the providers", () => {
         model: "deepseek/deepseek-chat",
         thinking: null,
         effort: null,
-        servers: [],
+        mcp: true,
         mcpMode: "auto",
       },
     });
@@ -299,7 +299,7 @@ describe("GET /api/providers/:id/catalog", () => {
           model: matches[0].id,
           thinking: "on",
           effort: "high",
-          servers: [],
+          mcp: true,
           mcpMode: "auto",
         },
       });
@@ -372,7 +372,7 @@ describe("GET /api/providers/:id/catalog", () => {
           model: "gpt-6-luna",
           thinking: "on",
           effort: "xhigh",
-          servers: [],
+          mcp: true,
           mcpMode: "auto",
           contextLength: 400_000,
           tools: true,
@@ -428,7 +428,7 @@ describe("GET /api/providers/:id/catalog", () => {
           model: "claude-haiku-5-5",
           thinking: "off",
           effort: null,
-          servers: [],
+          mcp: true,
           mcpMode: "auto",
         },
       });

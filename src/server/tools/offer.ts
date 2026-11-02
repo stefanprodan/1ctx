@@ -15,7 +15,6 @@ import {
   VISUALIZE,
   WEB,
 } from "../../shared/capabilities.ts";
-import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { PromptServer } from "../../shared/mcp.ts";
 import { mcpCatalog, resolveMode } from "../../shared/mcp-catalog.ts";
@@ -29,7 +28,7 @@ import {
 } from "../../shared/words.ts";
 import type { CredentialRow } from "../credentials/index.ts";
 import type { Log } from "../lib/log.ts";
-import type { Mcp, OfferedServer } from "../mcp/index.ts";
+import { type Mcp, NO_OFFER, type OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import { type ChatTool, wireTokens } from "../providers/index.ts";
 import { CATALOG_CAP } from "../skills/index.ts";
@@ -75,7 +74,7 @@ const NO_CREDENTIALS: SendCredentials = { offered: [], off: [] };
 type OfferDeps = {
   store: Pick<ToolStore, "row">;
   skills: SkillsPort;
-  mcp: Pick<Mcp, "offered" | "offeredChosen">;
+  mcp: Pick<Mcp, "offered" | "offeredSides">;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
   credentials?: CredentialsPort;
   // the admin's email_user row is on and email is set up
@@ -186,6 +185,8 @@ function attentionFor(scope: MemoryScope | undefined): AttentionHandle | null {
   return { guidance: attention.guidance, reason: null, answered: false };
 }
 
+const MCP_PREFIX = mcpKey("");
+
 const EMPTY: Omit<Offered, "tools" | "memory"> = {
   visuals: false,
   knowledge: false,
@@ -222,7 +223,7 @@ function directSchemas(servers: OfferedServer[]): ChatTool[] {
 }
 
 // what a subagent is never offered, whatever its parent has: MCP's
-// write side goes by the links below
+// write side goes by the read-only offer below
 const CHILD_CUT: ReadonlySet<string> = new Set([
   DELEGATE_TOOL,
   "memory_edit",
@@ -232,17 +233,17 @@ const CHILD_CUT: ReadonlySet<string> = new Set([
 ]);
 
 // A subagent's offer, the one place it is decided: its parent's main
-// offer less CHILD_CUT and every MCP tool on the write side, the links
-// read alone so offeredServers() drops the write side as it always
-// decides it. Its bash leaves out open and its credentials sign GET
-// and HEAD alone. The trimmed array never shares
+// offer less CHILD_CUT and every MCP tool on the write side, each
+// server's side read alone so offeredServers() drops the write side as
+// it always decides it. Its bash leaves out open and its credentials
+// sign GET and HEAD alone. The trimmed array never shares
 // the parent's cached prefix; the alternative is the parent's array
 // here with the cut names refused at dispatch.
 function childOffered(
   deps: OfferDeps,
   now: number,
   agentId: string,
-  agentServers: AgentServer[],
+  mcpOn: boolean,
   requestedMode: McpMode,
   scope: MemoryScope,
   disabledCapabilities: readonly string[],
@@ -251,7 +252,7 @@ function childOffered(
     deps,
     now,
     agentId,
-    agentServers.map((link) => ({ ...link, write: false })),
+    mcpOn,
     requestedMode,
     {
       projectId: scope.projectId,
@@ -274,7 +275,8 @@ export function offered(
   deps: OfferDeps,
   now: number,
   agentId: string,
-  agentServers: AgentServer[] = [],
+  // the agent's MCP switch: off, a send is offered no server
+  mcpOn = false,
   requestedMode: McpMode = "auto",
   scope?: MemoryScope,
   disabledCapabilities: readonly string[] = [],
@@ -287,7 +289,7 @@ export function offered(
       deps,
       now,
       agentId,
-      agentServers,
+      mcpOn,
       requestedMode,
       scope,
       disabledCapabilities,
@@ -399,14 +401,23 @@ export function offered(
     ].map(schema),
     now,
   );
-  // a send's project decides the scope, and none offers only the all
-  // servers; the directory passes the links it chose by scope
-  const links = agentServers.filter(
-    (link) => !disabledCapabilities.includes(mcpKey(link.serverId)),
+  // the send's project chooses the servers, none without one; the
+  // directory passes the sides it chose by the viewer's projects
+  const off = new Set(
+    disabledCapabilities.flatMap((key) =>
+      key.startsWith(MCP_PREFIX) ? [key.slice(MCP_PREFIX.length)] : [],
+    ),
   );
-  const offered = scope?.mcpChosen
-    ? deps.mcp.offeredChosen(links)
-    : deps.mcp.offered(links, scope?.projectId ?? null);
+  const offered = !mcpOn
+    ? NO_OFFER
+    : scope?.mcpSides !== undefined
+      ? deps.mcp.offeredSides(
+          scope.mcpSides.filter((link) => !off.has(link.serverId)),
+        )
+      : deps.mcp.offered(scope?.projectId ?? null, {
+          off,
+          readOnly: subagent,
+        });
   // the catalog never narrows the offer: every offered server keeps its
   // instructions, its digest and its tools in either mode
   const mcp = offered.servers;

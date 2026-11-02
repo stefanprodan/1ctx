@@ -922,7 +922,18 @@ describe("the pages", () => {
         [
           "p2",
           {
-            servers: [{ id: "m1", name: "flux", tools: 5, scope: "all" }],
+            servers: [
+              {
+                id: "m1",
+                name: "flux",
+                tools: 5,
+                scope: "all",
+                choice: "read",
+                ceiling: "write",
+                side: "read",
+                read: true,
+              },
+            ],
             addable: [],
           },
         ],
@@ -1172,7 +1183,7 @@ describe("the pages", () => {
         effort: null,
         prompt: "",
         skills: [],
-        servers: [],
+        mcp: true,
         mcpMode: "auto",
         upstream: null,
         createdAt: 0,

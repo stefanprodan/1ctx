@@ -46,6 +46,7 @@ const keyed = (spec: Record<string, unknown> = {}) =>
   object("McpServer", "markets", {
     url: MCP_URL,
     keyFrom: "mcp-markets",
+    personal: "off",
     ...spec,
   });
 
@@ -57,6 +58,20 @@ describe("McpServer projects preflight", () => {
     check(documents(keyed({ projects: "all" })));
     check(documents(keyed({ projects: ["finops"] })));
     check(documents(object("McpServer", "docs", { url: MCP_URL })));
+    // and its personal grant
+    expect(() =>
+      check(
+        documents(
+          object("McpServer", "markets", {
+            url: MCP_URL,
+            keyFrom: "mcp-markets",
+            projects: "all",
+          }),
+        ),
+      ),
+    ).toThrow(
+      "McpServer/markets: spec.personal is required for a new server with a key",
+    );
     // an update leaves the held scope as it is
     check(documents(keyed()), { McpServer: ["markets"] });
     expect(() => check(documents(keyed({ projects: [] })))).toThrow(
@@ -80,6 +95,27 @@ describe("McpServer projects preflight", () => {
         keyed({ projects: ["newteam"] }),
       ),
     );
+    // a choice names a team project too
+    expect(() =>
+      check(
+        documents(
+          keyed({
+            projects: "all",
+            choices: [{ project: "personal", side: "off" }],
+          }),
+        ),
+      ),
+    ).toThrow("spec.choices cannot name a personal project");
+    expect(() =>
+      check(
+        documents(
+          keyed({
+            projects: "all",
+            choices: [{ project: "nowhere", side: "off" }],
+          }),
+        ),
+      ),
+    ).toThrow("spec.choices references missing Project/nowhere");
   });
 });
 
@@ -145,6 +181,81 @@ describe("McpServer projects apply", () => {
   });
 });
 
+describe("McpServer personal and choices apply", () => {
+  test("a server, its grant and its choices made in one file; omitted leaves them", async () => {
+    const fake = network();
+    const app = await testApp({
+      activate: false,
+      fetcher: fake.fetcher,
+      secrets: { "mcp-markets": "markets-key" },
+    });
+    const ignore = () => {};
+    try {
+      const file = documents(
+        object("Project", "finops", { description: "A team project." }),
+        object("Project", "research", { description: "A team project." }),
+        keyed({
+          projects: "all",
+          personal: "read",
+          write: true,
+          choices: [
+            { project: "finops", side: "write" },
+            { project: "research", side: "off" },
+          ],
+        }),
+      );
+      expect(await app.provision.apply(file, ignore)).toMatchObject({
+        created: 3,
+      });
+      const server = app.mcp.list().find((row) => row.name === "markets")!;
+      const id = (name: string) =>
+        app.projects
+          .teamProjectIds()
+          .find((projectId) => app.projects.byId(projectId)?.name === name)!;
+      expect(server.personal).toBe("read");
+      const sides = (name: string) => app.mcp.choices(id(name))?.sides;
+      expect(sides("finops")?.get(server.id)).toBe("write");
+      expect(sides("research")?.get(server.id)).toBe("off");
+      expect(await app.provision.apply(file, ignore)).toEqual({
+        created: 0,
+        updated: 0,
+        unchanged: 3,
+      });
+      // a choice not named, and personal omitted, stay as they are
+      await app.provision.apply(
+        documents(
+          object("McpServer", "markets", {
+            choices: [{ project: "research", side: "read" }],
+          }),
+        ),
+        ignore,
+      );
+      expect(sides("finops")?.get(server.id)).toBe("write");
+      expect(sides("research")?.has(server.id)).toBe(false);
+      expect(app.mcp.byId(server.id)?.personal).toBe("read");
+      // a choice in a project outside the grant fails the apply
+      const failed = await app.provision
+        .apply(
+          documents(
+            keyed({
+              projects: ["finops"],
+              choices: [{ project: "research", side: "read" }],
+            }),
+          ),
+          ignore,
+        )
+        .then(
+          () => null,
+          (error: Error) => error.message,
+        );
+      expect(failed).toContain("not granted");
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+});
+
 describe("McpServer projects with a new key", () => {
   test("the scope goes in the endpoint's PATCH, never a second one", async () => {
     const writes: { method: string; path: string; body: unknown }[] = [];
@@ -167,6 +278,7 @@ describe("McpServer projects with a new key", () => {
                 excludedPatterns: [],
                 scope: "all",
                 projects: [],
+                personal: "off",
               },
             ],
           };
@@ -181,14 +293,19 @@ describe("McpServer projects with a new key", () => {
     expect(
       await applyMcpServer(api, {
         name: "markets",
-        spec: { keyFrom: "mcp-markets", projects: ["finops"], write: true },
+        spec: {
+          keyFrom: "mcp-markets",
+          projects: ["finops"],
+          personal: "read",
+          write: true,
+        },
       }),
     ).toBe("updated");
     expect(writes).toEqual([
       {
         method: "PATCH",
         path: "/api/mcp/s1",
-        body: { keyName: "mcp-markets", projects: ["t1"] },
+        body: { keyName: "mcp-markets", projects: ["t1"], personal: "read" },
       },
       { method: "PATCH", path: "/api/mcp/s1", body: { write: true } },
     ]);

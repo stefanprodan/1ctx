@@ -98,6 +98,8 @@ const server = (changes: Partial<McpServerSummary> = {}): McpServerSummary => ({
   excludedPatterns: ["install_*"],
   scope: "all",
   projects: [],
+  personal: "read",
+  on: { projects: [], personal: 0 },
   serverName: "flux-operator-mcp",
   serverVersion: "1.0.0",
   protocolVersion: "2026-07-28",
@@ -259,10 +261,12 @@ describe("the model", () => {
       count: 0,
       from: [],
     });
-    // write alone on the agent while the server has it off: nothing offered
+    // a read side while the server has Read off: nothing offered
     expect(
-      promptPreview([flux], [{ serverId: "m1", read: false, write: true }])
-        .line,
+      promptPreview(
+        [{ ...flux, read: false }],
+        [{ serverId: "m1", read: true, write: false }],
+      ).line,
     ).toBe("");
   });
 
@@ -388,12 +392,12 @@ describe("the entity", () => {
   });
 });
 
-const agent = (name: string, write: boolean) =>
+const agent = (name: string, _write: boolean) =>
   ({
     id: `a-${name}`,
     name,
     avatar: "bot",
-    servers: [{ serverId: "m1", read: true, write }],
+    mcp: true,
   }) as unknown as AgentSummary;
 
 describe("the list", () => {
@@ -444,7 +448,6 @@ describe("a server's page", () => {
     expect(html).toContain("2026-07-28");
     expect(html).toContain(`value="${flux.url}"`);
     expect(html).toContain('href="/admin/config/agents/sre/mcp"');
-    expect(html).toContain("Read and write");
     expect(html).toContain("1 agent uses it. Remove it from that agent first.");
     // the server refuses a server an agent uses, so Delete waits
     expect(html).toMatch(/<button[^>]*disabled[^>]*>Delete</);

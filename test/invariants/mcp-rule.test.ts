@@ -425,7 +425,7 @@ describe("the lean schema", () => {
         { "flux-schema": "schema", "flux-docs": "docs" }[name] ?? name,
       );
       const [offered] = offeredServers(server ? [server] : [], [
-        { serverId: name, read: true, write: true },
+        { serverId: name, side: "write" as const },
       ]);
       const chat = offered!.tools.map((t) => ({
         name: t.wireName,
@@ -592,7 +592,7 @@ describe("offeredServers", () => {
     });
     const readOnly = offeredServers(
       [server],
-      [{ serverId: "flux", read: true, write: true }],
+      [{ serverId: "flux", side: "write" as const }],
     );
     expect(readOnly).toHaveLength(1);
     expect(readOnly[0]?.tools.map((t) => t.wireName)).toContain(
@@ -602,39 +602,56 @@ describe("offeredServers", () => {
       "mcp__flux__reconcile_flux_resource",
     );
     expect(readOnly[0]?.instructions).toBe(flux.initialize.instructions!);
-    // write alone on the agent, off on the server: nothing
+    // a write side on a server with Read and Write off: nothing
+    const neither = offerable("flux", "flux", { read: false, write: false });
     expect(
-      offeredServers(
-        [server],
-        [{ serverId: "flux", read: false, write: true }],
-      ),
+      offeredServers([neither], [{ serverId: "flux", side: "write" }]),
     ).toEqual([]);
     // the switch off: instructions null
     const quiet = offerable("flux", "flux", { instructionsOn: false });
     expect(
-      offeredServers(
-        [quiet],
-        [{ serverId: "flux", read: true, write: true }],
-      )[0]?.instructions,
+      offeredServers([quiet], [{ serverId: "flux", side: "write" as const }])[0]
+        ?.instructions,
     ).toBeNull();
     // no usable tool on the side: nothing
     const excluded = offerable("flux", "flux", { excludedPatterns: ["*"] });
     expect(
       offeredServers(
         [excluded],
-        [{ serverId: "flux", read: true, write: true }],
+        [{ serverId: "flux", side: "write" as const }],
       ),
     ).toEqual([]);
     // an unknown server id is skipped
     expect(
-      offeredServers([server], [{ serverId: "x", read: true, write: true }]),
+      offeredServers([server], [{ serverId: "x", side: "write" as const }]),
     ).toEqual([]);
+  });
+
+  test("a read side drops the write tools; Read off keeps only them", () => {
+    const patterns = {
+      readPatterns: fluxPatterns.read,
+      excludedPatterns: fluxPatterns.excluded,
+    };
+    const names = (over: Partial<OfferableServer>, side: "read" | "write") =>
+      offeredServers(
+        [offerable("flux", "flux", { ...patterns, ...over })],
+        [{ serverId: "flux", side }],
+      )[0]?.tools.map((t) => t.wireName) ?? [];
+    expect(names({}, "read")).toContain("mcp__flux__get_flux_instance");
+    expect(names({}, "read")).not.toContain(
+      "mcp__flux__reconcile_flux_resource",
+    );
+    expect(names({}, "write")).toContain("mcp__flux__reconcile_flux_resource");
+    const writeOnly = names({ read: false }, "write");
+    expect(writeOnly).toContain("mcp__flux__reconcile_flux_resource");
+    expect(writeOnly).not.toContain("mcp__flux__get_flux_instance");
+    expect(names({ read: false }, "read")).toEqual([]);
   });
 
   test("the tools are lean and sorted", () => {
     const [offered] = offeredServers(
       [offerable("github", "github")],
-      [{ serverId: "github", read: true, write: true }],
+      [{ serverId: "github", side: "write" as const }],
     );
     const names = offered!.tools.map((t) => t.wireName);
     expect(names).toEqual(sortOffered(offered!.tools).map((t) => t.wireName));
@@ -784,8 +801,7 @@ describe("the catalog and the mode", () => {
       ],
       ["flux", "flux-schema", "flux-docs", "github"].map((id) => ({
         serverId: id,
-        read: true,
-        write: true,
+        side: "write" as const,
       })),
     );
     const cat = mcpCatalog(all);

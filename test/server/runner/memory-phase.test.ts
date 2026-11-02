@@ -664,7 +664,7 @@ describe("memory phase input", () => {
           model: FLASH,
           thinking: "on",
           effort: "high",
-          servers: [],
+          mcp: true,
           mcpMode: "auto",
         },
       },

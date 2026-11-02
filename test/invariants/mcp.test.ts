@@ -265,8 +265,8 @@ describe("MCP servers over the routes", () => {
     expect(kept.tools.map((t) => t.name)).toContain("get_flux_report");
   });
 
-  test("delete is 409 while an agent references it and 204 after", async () => {
-    const { app, client } = await setup();
+  test("delete goes through though an agent is on MCP, then 404", async () => {
+    const { client } = await setup();
     const { server } = await (
       await client.call("POST", "/api/mcp", { body: create() })
     ).json();
@@ -290,19 +290,14 @@ describe("MCP servers over the routes", () => {
         effort: null,
         prompt: "",
         skills: [],
-        servers: [],
+        mcp: true,
         mcpMode: "auto",
       },
     });
     expect(made.status).toBe(201);
     const { agent } = await made.json();
-    app.mcp.setAgentServers(agent.id, [
-      { serverId: server.id, read: true, write: false },
-    ]);
-    const refused = await client.call("DELETE", `/api/mcp/${server.id}`);
-    expect(refused.status).toBe(409);
-    expect((await refused.json()).error).toBe("an agent uses the MCP server");
-    app.mcp.setAgentServers(agent.id, []);
+    expect(agent.mcp).toBe(true);
+    // an agent on MCP holds no server, so the delete goes through
     expect((await client.call("DELETE", `/api/mcp/${server.id}`)).status).toBe(
       204,
     );
@@ -364,11 +359,23 @@ async function waitDone(
   await sessionSettled(app, id);
 }
 
+// the agent on MCP in the mode, and the personal project choosing these
+// servers on their sides, every other one off; a write side needs the
+// personal grant's write
 async function saveServers(
   chat: Awaited<ReturnType<typeof chatApp>>,
   servers: { serverId: string; read: boolean; write: boolean }[],
   mcpMode: "all" | "catalog" | "auto",
 ) {
+  for (const row of chat.app.mcp.list()) {
+    const link = servers.find((s) => s.serverId === row.id);
+    if (link?.write) chat.app.mcp.setPersonal(row.id, "write");
+    chat.app.mcp.setChoice(
+      chat.projectId,
+      row.id,
+      link === undefined ? "off" : link.write ? "write" : "read",
+    );
+  }
   const agent = chat.app.agents.byId(chat.agentId)!;
   const saved = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
     body: {
@@ -380,7 +387,7 @@ async function saveServers(
       effort: agent.effort,
       prompt: agent.prompt,
       skills: agent.skills,
-      servers,
+      mcp: true,
       mcpMode,
     },
   });
@@ -491,7 +498,13 @@ describe("MCP tools in a send", () => {
 
     const list = await (await chat.admin.call("GET", "/api/mcp")).json();
     const prompt = promptSnapshot(
-      offeredServers(list.servers, servers),
+      offeredServers(
+        list.servers,
+        servers.map((link) => ({
+          serverId: link.serverId,
+          side: link.write ? ("write" as const) : ("read" as const),
+        })),
+      ),
       sha256,
     ).text;
     const messages = started.script.body.messages as {
@@ -536,7 +549,7 @@ describe("MCP tools in a send", () => {
       flux.requests.filter((request) => request.method === "tools/call"),
     ).toHaveLength(1);
 
-    // write alone is no link: the agent keeps what it had
+    // a body still naming servers is refused: the agent keeps what it had
     const agent = chat.app.agents.byId(chat.agentId)!;
     const refused = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
       body: {
@@ -553,7 +566,7 @@ describe("MCP tools in a send", () => {
       },
     });
     expect(refused.status).toBe(400);
-    expect(chat.app.agents.byId(agent.id)!.servers).toEqual(agent.servers);
+    expect(chat.app.agents.byId(agent.id)).toEqual(agent);
   });
 
   test("records an MCP isError answer as a failed tool row", async () => {
@@ -1887,7 +1900,7 @@ describe("MCP mid-send mutation matrix", () => {
     await waitDone(chat.app, first.sessionId);
   });
 
-  test("an endpoint move waits for the next send and delete stays 409", async () => {
+  test("an endpoint move waits for the next send", async () => {
     const flux = mcpFetch({ recorded: await fixture("flux") });
     const docs = mcpFetch({ recorded: await fixture("flux-docs") });
     const chat = await chatApp({
@@ -1918,8 +1931,6 @@ describe("MCP mid-send mutation matrix", () => {
       body: { url: "http://docs.test/mcp" },
     });
     expect(moved.status).toBe(200);
-    const refused = await chat.admin.call("DELETE", `/api/mcp/${server.id}`);
-    expect(refused.status).toBe(409);
     expect(active.policy.offered.mcp[0]?.url).toBe("http://flux.test/mcp");
     expect(
       active.policy.offered.mcp[0]?.tools.map((tool) => tool.name),

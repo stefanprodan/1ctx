@@ -79,6 +79,18 @@ export function serverLine(
 
 // where a server is offered: every project, or the names of the team
 // projects it lists, none when the list is empty
+// where a server is on for the viewer: the projects by name, then
+// personal projects as a count, an admin's
+export function onWords(projects: readonly string[], personal: number): string {
+  const words = [
+    ...projects,
+    ...(personal > 0
+      ? [`${personal} personal project${personal === 1 ? "" : "s"}`]
+      : []),
+  ];
+  return words.length === 0 ? "No projects" : words.join(", ");
+}
+
 export function scopeWords(
   scope: McpScope,
   projects: readonly string[],

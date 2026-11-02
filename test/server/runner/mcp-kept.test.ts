@@ -71,7 +71,6 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
     },
   });
   expect(created.status).toBe(201);
-  const { server } = (await created.json()) as { server: { id: string } };
   const agent = chat.app.agents.byId(chat.agentId)!;
   const saved = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
     body: {
@@ -80,7 +79,7 @@ test("an MCP answer past the cut is read back from /mcp in the chat", async () =
       model: agent.model.id,
       thinking: agent.thinking,
       effort: agent.effort,
-      servers: [{ serverId: server.id, read: true, write: false }],
+      mcp: true,
       mcpMode: "all",
     },
   });

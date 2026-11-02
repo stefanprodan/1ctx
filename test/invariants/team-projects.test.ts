@@ -735,7 +735,7 @@ describe("the personal project's settings", () => {
           model: FLASH,
           thinking: null,
           effort: null,
-          servers: [],
+          mcp: true,
           mcpMode: "auto",
         },
       },

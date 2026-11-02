@@ -452,11 +452,7 @@ function UsedBy({ server }: { server: McpServerSummary }) {
       <AgentLinks
         agents={users}
         href={(a) => configAgentHref(a.name, "mcp")}
-        sub={(a) =>
-          a.servers.find((s) => s.serverId === server.id)?.write
-            ? "Read and write"
-            : "Read"
-        }
+        sub={() => (server.write ? "Read and write" : "Read")}
       />
     </Setting>
   );

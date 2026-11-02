@@ -59,7 +59,7 @@ import {
   capabilities,
   effortText,
   filesText,
-  scopeWords,
+  onWords,
   serverLine,
   serverMeta,
   switchItems,
@@ -223,7 +223,7 @@ function McpTab({
             </RowsAvatar>
             <RowsTitle
               name={server.name}
-              sub={`${line.text} · ${scopeWords(server.scope, server.projects)}`}
+              sub={`${line.text} · ${onWords(server.projects, server.personal)}`}
               bad={line.bad}
               mono
             />

@@ -26,18 +26,38 @@ const createBody = () => ({
 });
 
 describe("MCP request parsing", () => {
-  test("accepts a complete create body, all projects without a key", () => {
+  test("accepts a complete create body, all and read without a key", () => {
     expect(parseCreate(createBody())).toEqual({
       ...createBody(),
       projects: "all",
+      personal: "read",
     });
   });
 
-  test("a key never reaches everyone by accident", () => {
-    const keyed = { ...createBody(), keyName: "mcp-markets" };
-    expect(() => parseCreate(keyed)).toThrow(
-      "a server with a key needs projects",
+  test("personal is off, read or write, and joins projects as a grant", () => {
+    for (const side of ["off", "read", "write"] as const) {
+      expect(parseCreate({ ...createBody(), personal: side }).personal).toBe(
+        side,
+      );
+      expect(parsePatch({ personal: side })).toEqual({ personal: side });
+    }
+    expect(() => parseCreate({ ...createBody(), personal: "all" })).toThrow(
+      "personal must be off, read or write",
     );
+    // a key added in a PATCH may carry both grants
+    expect(
+      parsePatch({ keyName: "mcp-markets", projects: "all", personal: "off" }),
+    ).toEqual({ keyName: "mcp-markets", projects: "all", personal: "off" });
+  });
+
+  test("a key never reaches everyone by accident", () => {
+    expect(() =>
+      parseCreate({ ...createBody(), keyName: "mcp-markets", projects: "all" }),
+    ).toThrow("a server with a key needs personal");
+    const keyed = { ...createBody(), keyName: "mcp-markets", personal: "off" };
+    expect(() =>
+      parseCreate({ ...createBody(), keyName: "mcp-markets" }),
+    ).toThrow("a server with a key needs projects");
     expect(() => parseCreate({ ...keyed, projects: [] })).toThrow(
       "needs all or a project",
     );

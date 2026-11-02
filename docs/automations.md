@@ -286,8 +286,9 @@ setting or changing it clears the validators.
   failed` log line with the id, result and duration, `check error` for
   an internal one; the URL is never a field.
 - **The check reaches what the run's tools could** (`reach()`). An MCP
-  server linked to the agent, in scope for the automation's project
-  (`docs/mcp.md`) and not turned off for the task signs a
+  server the automation's project offers (`offeredSide()` not off,
+  `docs/mcp.md`), with the agent on MCP and the server not turned off
+  for the task, signs a
   URL under its own URL (`underPrefix()`) with its `mcp-` key and
   ignores the web row, so an MCP-signed check polls the server's own
   endpoint only, and a server at its origin's root (`https://host/`)

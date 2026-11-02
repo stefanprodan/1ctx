@@ -43,10 +43,12 @@ errors and cuts every tool shares are in `docs/tools.md`.
   Check URL line never shows the query, which may hold a key.
 - **It reads through `AutomationsPort`,** wired in `compose.ts`. An id
   of another project is not found. A switch is named only from the
-  automation's agent's servers and skills and its project's credentials
-  and repositories; any other key is an item no longer available, but
-  one for an agent's server out of the project's scope is skipped
-  unnamed (`serversOut`), so its name never reaches the model.
+  servers the project offers its agent, the agent's skills and the
+  project's credentials and repositories; any other key is an item no
+  longer available, but one for a server the run is not offered (out
+  of the grant, chosen off, or every server when the agent is off MCP)
+  is skipped unnamed (`serversOut`), so its name never reaches the
+  model.
 - **The last run's line is its send's.** `lastSend()`, then
   `runAnswer()` before its memory round: by status, cause and error,
   never the status alone, and a running run has no result yet. One that

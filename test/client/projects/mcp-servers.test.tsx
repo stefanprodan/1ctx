@@ -35,17 +35,25 @@ import type { ProjectAgentsResponse } from "../../../src/shared/api/sessions.ts"
 import { clientFetch } from "../../helpers/client-fetch.ts";
 import { admin } from "../../helpers/client-fixtures.ts";
 
+const SIDES = {
+  choice: "read",
+  ceiling: "write",
+  side: "read",
+  read: true,
+} as const;
 const flux: ProjectMcpServer = {
   id: "m1",
   name: "flux",
   tools: 3,
   scope: "all",
+  ...SIDES,
 };
 const markets: ProjectMcpServer = {
   id: "m2",
   name: "markets",
   tools: 1,
   scope: "projects",
+  ...SIDES,
   projects: 2,
 };
 
@@ -174,7 +182,7 @@ describe("the project's agents", () => {
       agents: [],
       startsOn: null,
       capabilities: [],
-      servers: {},
+      servers: [],
       skills: {},
       credentials: [],
       repos: [],

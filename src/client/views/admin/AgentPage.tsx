@@ -128,7 +128,9 @@ function Body({
             t.tab === "skills"
               ? agent.skills.length
               : t.tab === "mcp"
-                ? agent.servers.length
+                ? agent.mcp
+                  ? (servers.value ?? []).length
+                  : 0
                 : undefined,
         }))}
         active={configAgentHref(agent.name, tab)}

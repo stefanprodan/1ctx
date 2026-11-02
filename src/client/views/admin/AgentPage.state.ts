@@ -3,7 +3,6 @@
 
 import { signal } from "@preact/signals";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import type { AgentServer } from "../../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import type { Avatar, Effort, McpMode, Wire } from "../../../shared/words.ts";
 import { servers } from "../../data/mcp.ts";
@@ -11,6 +10,8 @@ import { skills } from "../../data/skills.ts";
 import { sameIds } from "../../lib/ids.ts";
 import { at, type Problem } from "../../lib/save.ts";
 import {
+  type AgentLink,
+  linksOf,
   sameServers,
   sentEffort,
   statedFields,
@@ -65,7 +66,7 @@ export class AgentDrafts {
   readonly saving = signal(false);
 
   readonly skills = signal<string[]>([]);
-  readonly servers = signal<AgentServer[]>([]);
+  readonly servers = signal<AgentLink[]>([]);
   readonly mode = signal<McpMode>("auto");
   readonly subagents = signal(false);
 
@@ -117,8 +118,10 @@ export class AgentDrafts {
     this.skills.value = agent.skills;
   }
 
-  resetServers(agent: AgentServer[] | AgentSummary): void {
-    this.servers.value = Array.isArray(agent) ? agent : agent.servers;
+  resetServers(agent: AgentLink[] | AgentSummary): void {
+    this.servers.value = Array.isArray(agent)
+      ? agent
+      : linksOf(agent, servers.value);
   }
 
   resetMode(agent: AgentSummary): void {
@@ -314,7 +317,7 @@ export class AgentDrafts {
   }
 
   serversDirty(agent: AgentSummary): boolean {
-    return !sameServers(this.servers.value, agent.servers);
+    return !sameServers(this.servers.value, linksOf(agent, servers.value));
   }
 
   modeDirty(agent: AgentSummary): boolean {

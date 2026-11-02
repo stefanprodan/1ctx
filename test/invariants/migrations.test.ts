@@ -8,6 +8,7 @@ import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { migrate, open } from "../../src/server/db/index.ts";
 import { MIGRATIONS } from "../../src/server/db/migrations/index.ts";
+import { offeredSide } from "../../src/shared/mcp.ts";
 import { EFFORTS, WIRES } from "../../src/shared/words.ts";
 import { fileDb, memoryDb } from "../helpers/db.ts";
 
@@ -94,6 +95,7 @@ const EXPECTED_IDS = [
   "0080-images",
   "0081-agent-images",
   "0082-mcp-projects",
+  "0083-mcp-access",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -123,6 +125,7 @@ const LATER_COLUMNS = [
   "run_session_id",
   "model_images",
   "images",
+  "mcp_on",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -2180,7 +2183,10 @@ describe("the schema", () => {
           values ('s', 'markets', 'http://x/mcp', 1, 0, '[]', '[]', '[]',
                   '', '', '2025-06-18', '', 'f', 0, 0);
       `);
-      expect(migrate(db)).toEqual(expectedFrom("0082-mcp-projects"));
+      // 0083 moves an all server nobody links, so this stops before it
+      expect(migrate(db, MIGRATIONS.slice(0, 82))).toEqual([
+        "0082-mcp-projects",
+      ]);
       expect(db.query("select id, scope from mcp_servers").all()).toEqual([
         { id: "s", scope: "all" },
       ]);
@@ -2206,6 +2212,200 @@ describe("the schema", () => {
       expect(
         db.query("select count(*) as n from mcp_server_projects").get(),
       ).toEqual({ n: 0 });
+    } finally {
+      db.close();
+    }
+  });
+
+  // the servers of 0083's fixtures: scope, the list, and per agent its
+  // link (r read, w write)
+  const SERVERS_0083: [
+    string,
+    "all" | "projects",
+    string[],
+    Record<string, string>,
+  ][] = [
+    ["allw", "all", [], { a: "w", c: "r" }],
+    ["allr", "all", [], { a: "r" }],
+    ["allnone", "all", [], {}],
+    ["list", "projects", ["t1"], { a: "r" }],
+    ["listnone", "projects", ["t1", "t2"], {}],
+  ];
+  function seed0083(links: Record<string, Record<string, string>>) {
+    const db = seed(MIGRATIONS.slice(0, 82));
+    db.exec(`
+      insert into users (id, username, full_name, email, role, password_hash, created_at)
+        values ('u2', 'other', 'Other', 'other@example.com', 'member', 'x', 0);
+      insert into projects (id, kind, name, owner_id, created_at)
+        values ('p2', 'personal', 'personal', 'u2', 0),
+               ('t1', 'team', 'finops', 'u', 0),
+               ('t2', 'team', 'research', 'u', 0);
+      insert into agents (id, name, provider_id, model, model_name, created_at)
+        values ('b', 'bare', 'pr', 'm', 'M', 0), ('c', 'coder', 'pr', 'm', 'M', 0);
+    `);
+    for (const [id, scope, list] of SERVERS_0083) {
+      db.query(
+        `insert into mcp_servers
+           (id, name, url, read, write, read_patterns, write_patterns,
+            excluded_patterns, server_name, server_version, protocol_version,
+            instructions, fingerprint, checked_at, created_at, scope)
+         values (?, ?, 'http://x/mcp', 1, 1, '[]', '[]', '[]', '', '',
+                 '2025-06-18', '', 'f', 0, 0, ?)`,
+      ).run(id, id, scope);
+      for (const projectId of list) {
+        db.query(
+          "insert into mcp_server_projects (server_id, project_id) values (?, ?)",
+        ).run(id, projectId);
+      }
+      for (const [agentId, side] of Object.entries(links[id] ?? {})) {
+        db.query(
+          "insert into agent_servers (agent_id, server_id, read, write) values (?, ?, 1, ?)",
+        ).run(agentId, id, side === "w" ? 1 : 0);
+      }
+    }
+    return db;
+  }
+
+  test("0083 moves the agents' links to the projects' choices and drops them", () => {
+    const db = seed0083(
+      Object.fromEntries(SERVERS_0083.map(([id, , , links]) => [id, links])),
+    );
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0083-mcp-access"));
+      expect(
+        db.query("select id, mcp_on from agents order by id").all(),
+      ).toEqual([
+        { id: "a", mcp_on: 1 },
+        { id: "b", mcp_on: 0 },
+        { id: "c", mcp_on: 1 },
+      ]);
+      expect(
+        db
+          .query("select id, scope, personal from mcp_servers order by id")
+          .all(),
+      ).toEqual([
+        { id: "allnone", scope: "projects", personal: "off" },
+        { id: "allr", scope: "all", personal: "read" },
+        { id: "allw", scope: "all", personal: "write" },
+        { id: "list", scope: "projects", personal: "off" },
+        { id: "listnone", scope: "projects", personal: "off" },
+      ]);
+      expect(
+        db
+          .query(
+            "select server_id, project_id from mcp_server_projects order by server_id, project_id",
+          )
+          .all(),
+      ).toEqual([
+        { server_id: "list", project_id: "t1" },
+        { server_id: "listnone", project_id: "t1" },
+        { server_id: "listnone", project_id: "t2" },
+      ]);
+      expect(
+        db
+          .query(
+            "select project_id, server_id, side from project_mcp order by server_id, project_id",
+          )
+          .all(),
+      ).toEqual([
+        { project_id: "p", server_id: "allw", side: "write" },
+        { project_id: "p2", server_id: "allw", side: "write" },
+        { project_id: "t1", server_id: "allw", side: "write" },
+        { project_id: "t2", server_id: "allw", side: "write" },
+        { project_id: "t1", server_id: "listnone", side: "off" },
+        { project_id: "t2", server_id: "listnone", side: "off" },
+      ]);
+      expect(
+        db
+          .query(
+            "select count(*) as n from sqlite_schema where name like 'agent_servers%'",
+          )
+          .get(),
+      ).toEqual({ n: 0 });
+      expect(() =>
+        db.exec("update project_mcp set side = 'all' where project_id = 'p'"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec("update mcp_servers set personal = 'some' where id = 'allw'"),
+      ).toThrow(/CHECK/);
+      expect(() =>
+        db.exec("update agents set mcp_on = 2 where id = 'a'"),
+      ).toThrow(/CHECK/);
+      // a choice goes with its project and with its server
+      db.exec("delete from projects where id = 't2'");
+      db.exec("delete from mcp_servers where id = 'allw'");
+      expect(
+        db.query("select project_id, server_id from project_mcp").all(),
+      ).toEqual([{ project_id: "t1", server_id: "listnone" }]);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0083 keeps every offer where every agent linked the same servers", () => {
+    const same = { a: "w", c: "w" };
+    const links: Record<string, Record<string, string>> = {
+      allw: same,
+      allr: { a: "r", c: "r" },
+      list: { a: "r", c: "r" },
+    };
+    const db = seed0083(links);
+    const projects = [
+      { id: "p", kind: "personal" as const },
+      { id: "p2", kind: "personal" as const },
+      { id: "t1", kind: "team" as const },
+      { id: "t2", kind: "team" as const },
+    ];
+    // before: in scope (a list never holds a personal project) and linked
+    const before = (id: string, project: (typeof projects)[number]) => {
+      const [, scope, list] = SERVERS_0083.find(([s]) => s === id)!;
+      const side = links[id]?.a;
+      const inScope = scope === "all" || list.includes(project.id);
+      return !inScope || side === undefined
+        ? "off"
+        : side === "w"
+          ? "write"
+          : "read";
+    };
+    try {
+      migrate(db);
+      const servers = db
+        .query<
+          {
+            id: string;
+            scope: "all" | "projects";
+            personal: "off" | "read" | "write";
+          },
+          []
+        >("select id, scope, personal from mcp_servers")
+        .all();
+      for (const server of servers) {
+        const listed = db
+          .query<{ project_id: string }, [string]>(
+            "select project_id from mcp_server_projects where server_id = ?",
+          )
+          .all(server.id)
+          .map((row) => row.project_id);
+        for (const project of projects) {
+          const choice =
+            db
+              .query<{ side: "off" | "read" | "write" }, [string, string]>(
+                "select side from project_mcp where project_id = ? and server_id = ?",
+              )
+              .get(project.id, server.id)?.side ?? null;
+          const granted = {
+            ...server,
+            projectIds: listed,
+            read: true,
+            write: true,
+          };
+          expect([
+            server.id,
+            project.id,
+            offeredSide(granted, project, choice),
+          ]).toEqual([server.id, project.id, before(server.id, project)]);
+        }
+      }
     } finally {
       db.close();
     }
@@ -3274,6 +3474,7 @@ describe("the schema", () => {
               output_limit: _______________,
               model_images: ________________,
               images: _________________,
+              mcp_on: __________________,
               ...rest
             }) => rest,
           ),
@@ -3991,7 +4192,10 @@ describe("0009 mcp migration", () => {
         (id, name, provider_id, model, model_name, created_at)
         values ('a9', 'agent9', 'p9', 'm', 'M', 0);
     `);
-    expect(migrate(db)).toEqual(expectedFrom("0009-mcp"));
+    // 0083 drops agent_servers, so this stops before it
+    expect(migrate(db, MIGRATIONS.slice(0, 82))).toEqual(
+      expectedFrom("0009-mcp").slice(0, -1),
+    );
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
     ).toEqual({ mcp_mode: "auto" });
@@ -4257,6 +4461,7 @@ describe("0008 search tavily migration", () => {
             output_limit: null,
             model_images: null,
             images: 0,
+            mcp_on: 0,
           })),
         );
         db.exec(`
@@ -4394,6 +4599,7 @@ describe("project channel migrations", () => {
       "0080-images",
       "0081-agent-images",
       "0082-mcp-projects",
+      "0083-mcp-access",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4613,6 +4819,7 @@ describe("project channel migrations", () => {
           "0080-images",
           "0081-agent-images",
           "0082-mcp-projects",
+          "0083-mcp-access",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4781,6 +4988,7 @@ describe("project channel migrations", () => {
         "0080-images",
         "0081-agent-images",
         "0082-mcp-projects",
+        "0083-mcp-access",
       ]);
       expect(
         db

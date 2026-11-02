@@ -420,7 +420,7 @@ describe("the directory", () => {
         thinking: null,
         effort: null,
         prompt: "You write code. Keep diffs small.",
-        servers: [],
+        mcp: true,
         mcpMode: "auto",
       },
     });

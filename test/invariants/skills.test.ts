@@ -778,7 +778,6 @@ describe("agent skill assignments", () => {
       thinking: agent.thinking,
       effort: agent.effort,
       prompt: agent.prompt,
-      servers: agent.servers,
       mcpMode: agent.mcpMode,
     };
     const unknown = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
@@ -809,7 +808,6 @@ describe("agent skill assignments", () => {
         effort: agent.effort,
         prompt: agent.prompt,
         skills: [skill.id],
-        servers: agent.servers,
         mcpMode: agent.mcpMode,
       },
     });

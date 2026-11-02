@@ -13,11 +13,11 @@ import {
   EXTERNAL_TASKS,
   KNOWLEDGE,
   MEMORY,
+  mcpKey,
   skillKey,
   VISUALIZE,
   WEB,
 } from "../../shared/capabilities.ts";
-import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { WebAccess, WebSnapshot } from "../../shared/web.ts";
 import {
   AUTOMATION_TOOL,
@@ -146,7 +146,7 @@ export type ToolsDeps = {
   skills: SkillsPort;
   mcp?: Pick<
     Mcp,
-    "offered" | "offeredChosen" | "switchable" | "call" | "validateArguments"
+    "offered" | "offeredSides" | "switchable" | "call" | "validateArguments"
   >;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
   bash?: Pick<BashCapability, "run">;
@@ -171,14 +171,18 @@ export type ToolsDeps = {
 
 export type Tools = {
   capabilities(): string[];
-  // the names of the links' servers in scope for the project
-  serverNames(links: AgentServer[], projectId: string): string[];
+  // the names of the servers offered in the project that a disabled set
+  // turns off
+  serverNames(
+    projectId: string,
+    disabledCapabilities: readonly string[],
+  ): string[];
   // the names of the agent's skills a disabled set turns off
   skillsOff(agentId: string, disabledCapabilities: readonly string[]): string[];
   offered(
     now: number,
     agentId: string,
-    agentServers?: AgentServer[],
+    mcpOn?: boolean,
     mode?: McpMode,
     scope?: MemoryScope,
     disabledCapabilities?: readonly string[],
@@ -211,7 +215,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const mcpService = deps.mcp ?? {
     switchable: () => [],
     offered: () => NO_OFFER,
-    offeredChosen: () => NO_OFFER,
+    offeredSides: () => NO_OFFER,
     async call() {
       throw new Error("MCP is not configured");
     },
@@ -361,22 +365,18 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       KNOWLEDGE,
       MEMORY,
     ],
-    serverNames: (links, projectId) =>
-      mcpService.switchable(links, projectId).map((server) => server.name),
+    serverNames: (projectId, disabledCapabilities) =>
+      mcpService
+        .switchable(projectId)
+        .filter((server) => disabledCapabilities.includes(mcpKey(server.id)))
+        .map((server) => server.name),
     skillsOff: (agentId, disabledCapabilities) =>
       skillStore
         .forAgent(agentId)
         .filter((skill) => disabledCapabilities.includes(skillKey(skill.id)))
         .map((skill) => skill.name),
     routes: [],
-    offered(
-      now,
-      agentId,
-      agentServers,
-      requestedMode,
-      scope,
-      disabledCapabilities,
-    ) {
+    offered(now, agentId, mcpOn, requestedMode, scope, disabledCapabilities) {
       return offered(
         {
           store,
@@ -392,7 +392,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
         },
         now,
         agentId,
-        agentServers,
+        mcpOn,
         requestedMode,
         scope,
         disabledCapabilities,
