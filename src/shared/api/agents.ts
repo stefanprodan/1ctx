@@ -31,6 +31,13 @@ export type AgentImpactResponse = {
   automations: number;
   running: number;
 };
+
+// GET /api/agents/:id/mcp: every server's tokens for the agent, each on
+// its own switches and counted in the agent's wire and mode: the
+// schemas in all and auto (what the cap reads), the server's catalog
+// lines in catalog. Empty for a model that takes no tools
+export type AgentMcpResponse = { servers: { id: string; tokens: number }[] };
+
 // PUT /api/profile/agent, for any signed-in user: the composer's pick,
 // kept so their next new chat starts on it; answers the agent it will
 export type PickAgentRequest = { agentId: string };

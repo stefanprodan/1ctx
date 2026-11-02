@@ -1,7 +1,6 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type {
   CatalogMatch,
   Endpoint,
@@ -130,31 +129,6 @@ export function sentEffort(
 
 export function skillsCount(chosen: number, cap: number): string {
   return `${chosen} of ${cap}`;
-}
-
-// the MCP tab's draft: every server on its side while the agent is on
-// MCP, since the project chooses the servers now
-export type AgentLink = { serverId: string; read: boolean; write: boolean };
-
-export function linksOf(
-  agent: Pick<AgentSummary, "mcp">,
-  rows: readonly { id: string; write: boolean }[] | null,
-): AgentLink[] {
-  return agent.mcp
-    ? (rows ?? []).map((row) => ({
-        serverId: row.id,
-        read: true,
-        write: row.write,
-      }))
-    : [];
-}
-
-export function sameServers(a: AgentLink[], b: AgentLink[]): boolean {
-  if (a.length !== b.length) return false;
-  const key = (s: AgentLink) =>
-    `${s.serverId}:${s.read ? 1 : 0}${s.write ? 1 : 0}`;
-  const bKeys = new Set(b.map(key));
-  return a.every((s) => bKeys.has(key(s)));
 }
 
 // a list that did not load keeps the picks as they are

@@ -206,9 +206,11 @@ function McpTab({
   if (shown.mcp.servers.length === 0) {
     return (
       <RowsNote>
-        {shown.agent.model.tools
-          ? "No MCP Servers."
-          : "The model does not take tools."}
+        {!shown.agent.model.tools
+          ? "The model does not take tools."
+          : shown.agent.mcp
+            ? "No MCP Servers."
+            : "MCP is off for this agent."}
       </RowsNote>
     );
   }

@@ -607,6 +607,31 @@ describe("MCP tools in a send", () => {
     expect(JSON.stringify(logs.events)).not.toContain("flux refused");
   });
 
+  test("the agent's MCP tab counts each server in the agent's mode, wherever it is on", async () => {
+    const { chat, server } = await sendFixture({ mode: "all" });
+    const agentId = chat.agentId;
+    const read = async () =>
+      (await chat.admin.call("GET", `/api/agents/${agentId}/mcp`)).json();
+    const directory = await (
+      await chat.admin.call("GET", "/api/directory/agents/coder")
+    ).json();
+    const all = await read();
+    expect(all.servers).toEqual([
+      { id: server.id, tokens: directory.mcp.tokens },
+    ]);
+    expect(all.servers[0].tokens).toBeGreaterThan(0);
+    // chosen off in every project, the row still counts it
+    chat.app.mcp.setChoice(chat.projectId, server.id, "off");
+    expect(await read()).toEqual(all);
+    await saveServers(chat, [], "catalog");
+    const catalog = (await read()).servers[0].tokens;
+    expect(catalog).toBeGreaterThan(0);
+    expect(catalog).not.toBe(all.servers[0].tokens);
+    expect(
+      (await chat.member.call("GET", `/api/agents/${agentId}/mcp`)).status,
+    ).toBe(403);
+  });
+
   test("catalog mode describes and validates calls without changing its tools", async () => {
     const { chat, flux } = await sendFixture({ mode: "catalog" });
     const started = await startChat(chat);

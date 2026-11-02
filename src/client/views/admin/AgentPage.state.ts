@@ -5,14 +5,10 @@ import { signal } from "@preact/signals";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import type { Avatar, Effort, McpMode, Wire } from "../../../shared/words.ts";
-import { servers } from "../../data/mcp.ts";
 import { skills } from "../../data/skills.ts";
 import { sameIds } from "../../lib/ids.ts";
 import { at, type Problem } from "../../lib/save.ts";
 import {
-  type AgentLink,
-  linksOf,
-  sameServers,
   sentEffort,
   statedFields,
   statedModel,
@@ -66,7 +62,7 @@ export class AgentDrafts {
   readonly saving = signal(false);
 
   readonly skills = signal<string[]>([]);
-  readonly servers = signal<AgentLink[]>([]);
+  readonly mcp = signal(true);
   readonly mode = signal<McpMode>("auto");
   readonly subagents = signal(false);
 
@@ -77,7 +73,7 @@ export class AgentDrafts {
     drafts.resetGeneral(agent);
     drafts.resetModel(agent);
     drafts.resetSkills(agent);
-    drafts.resetServers(agent);
+    drafts.resetMcp(agent);
     drafts.resetMode(agent);
     drafts.resetSubagents(agent);
     return drafts;
@@ -118,10 +114,8 @@ export class AgentDrafts {
     this.skills.value = agent.skills;
   }
 
-  resetServers(agent: AgentLink[] | AgentSummary): void {
-    this.servers.value = Array.isArray(agent)
-      ? agent
-      : linksOf(agent, servers.value);
+  resetMcp(agent: AgentSummary): void {
+    this.mcp.value = agent.mcp;
   }
 
   resetMode(agent: AgentSummary): void {
@@ -148,7 +142,7 @@ export class AgentDrafts {
       this.isDefault.value = after.default;
     }
     if (!this.skillsDirty(before)) this.resetSkills(after);
-    if (!this.serversDirty(before)) this.resetServers(after);
+    if (!this.mcpDirty(before)) this.resetMcp(after);
     if (!this.modeDirty(before)) this.resetMode(after);
     if (!this.subagentsDirty(before)) this.resetSubagents(after);
     const untouched =
@@ -316,8 +310,8 @@ export class AgentDrafts {
     return !sameIds(this.skills.value, agent.skills);
   }
 
-  serversDirty(agent: AgentSummary): boolean {
-    return !sameServers(this.servers.value, linksOf(agent, servers.value));
+  mcpDirty(agent: AgentSummary): boolean {
+    return this.mcp.value !== agent.mcp;
   }
 
   modeDirty(agent: AgentSummary): boolean {
@@ -329,7 +323,4 @@ export class AgentDrafts {
   }
 }
 
-export const loadedRows = () => ({
-  skills: skills.value,
-  servers: servers.value,
-});
+export const loadedRows = () => ({ skills: skills.value });

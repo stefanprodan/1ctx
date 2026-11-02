@@ -25,6 +25,7 @@ import {
 import { createTeam } from "../../helpers/projects.ts";
 import { allowSubagents, system, toolNames } from "../../helpers/subagents.ts";
 import { settle } from "../../helpers/tool-loop.ts";
+import { seedServer } from "../mcp/switches.helpers.ts";
 
 async function app(): Promise<ChatApp> {
   const chat = await chatApp();
@@ -379,6 +380,63 @@ describe("the switches an automation shows", () => {
       );
       expect(shown.answers[0]).not.toContain("billing");
       await finish(chat, shown.next);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+});
+
+describe("the servers an automation hides", () => {
+  test("a server chosen off, and every one for an agent off MCP, is skipped silently", async () => {
+    const chat = await app();
+    try {
+      const flux = seedServer(chat.app.mcp, "flux");
+      const docs = seedServer(chat.app.mcp, "docs");
+      chat.app.mcp.setChoice(chat.projectId, flux.id, "off");
+      const created = await chat.member.call(
+        "POST",
+        `/api/projects/${chat.projectId}/automations`,
+        {
+          body: automationBody(chat, {
+            name: "nightly-check",
+            disabledCapabilities: [`mcp:${flux.id}`, `mcp:${docs.id}`],
+          }),
+        },
+      );
+      expect(created.status).toBe(201);
+      const automation = (await created.json()).automation as { id: string };
+      const show = async () => {
+        const { script } = await start(chat);
+        const shown = await round(chat, script, [
+          { action: "show", id: automation.id },
+        ]);
+        await finish(chat, shown.next);
+        return shown.answers[0]!;
+      };
+      const chosen = await show();
+      expect(chosen).toContain("Turned off for its runs: MCP server docs");
+      expect(chosen).not.toContain("flux");
+      expect(chosen).not.toContain("no longer available");
+
+      const agent = chat.app.agents.byId(chat.agentId)!;
+      const saved = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
+        body: {
+          name: agent.name,
+          avatar: agent.avatar,
+          providerId: agent.providerId,
+          model: agent.model.id,
+          thinking: agent.thinking,
+          effort: agent.effort,
+          prompt: agent.prompt,
+          skills: agent.skills,
+          mcp: false,
+          mcpMode: agent.mcpMode,
+        },
+      });
+      expect(saved.status).toBe(200);
+      const off = await show();
+      expect(off).not.toContain("MCP server");
+      expect(off).not.toContain("no longer available");
     } finally {
       await chat.app.shutdown();
     }

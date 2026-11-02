@@ -654,6 +654,20 @@ describe("the pages", () => {
     expect(html).toContain(
       'class="rows-sub">refreshed 1h ago · finops, 3 personal projects<',
     );
+    // the viewer's own personal project is named Personal by the server
+    agentPage.value = {
+      ...agent,
+      mcp: {
+        servers: [{ ...flux, projects: ["finops", "Personal"], personal: 0 }],
+        tokens: 900,
+      },
+    };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain("refreshed 1h ago · finops, Personal<");
+    // an agent off MCP lists none and says so
+    agentPage.value = { ...agent, agent: { ...agent.agent, mcp: false } };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain("MCP is off for this agent.");
   });
 
   test.serial("Agent draws its activity ghost, then its days", () => {

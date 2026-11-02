@@ -3,7 +3,8 @@
 //
 // A project's MCP servers: a section on every project's Settings tab and
 // a card on a team project's admin page, drawn as Repos.tsx draws its
-// rows. No URL and no key file, which a member's answer never carries.
+// rows, each with the project's side of it. No URL and no key file,
+// which a member's answer never carries.
 
 import { type Signal, useSignal } from "@preact/signals";
 import type { ProjectMcpServer } from "../../../shared/api/mcp.ts";
@@ -12,6 +13,7 @@ import {
   projectMcpErrorOf,
   projectMcpOf,
   removeProjectMcp,
+  setProjectMcpSide,
 } from "../../data/project-mcp.ts";
 import { configMcpHref } from "../../lib/hrefs.ts";
 import { useAction, useSave } from "../../lib/save.ts";
@@ -19,24 +21,30 @@ import { countOf } from "../../lib/search.ts";
 import { Finder } from "../../ui/Finder.tsx";
 import { AskDelete, Foot } from "../../ui/Foot.tsx";
 import {
-  RowsButton,
+  RowsEnd,
   RowsFailed,
   RowsGo,
   RowsLine,
   RowsList,
+  RowsMeta,
   RowsNew,
   RowsNote,
+  RowsRemove,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Section } from "../../ui/Section.tsx";
+import { Seg } from "../../ui/Seg.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import {
   mcpText,
   type OpenServer,
   openOf,
+  pickOptions,
+  pickValue,
   removeAsk,
   rowKind,
   rowLine,
+  sideWord,
 } from "./McpServers.model.ts";
 import "./mcp-servers.css";
 
@@ -132,7 +140,8 @@ function ServerRows({
   if (list === null) {
     return error === null ? null : <RowsFailed failure={error} />;
   }
-  const opened = admin && !personal ? openOf(open.value, list) : null;
+  const kind = rowKind(admin, personal);
+  const opened = kind === "admin" ? openOf(open.value, list) : null;
   const close = () => {
     open.value = null;
   };
@@ -147,6 +156,7 @@ function ServerRows({
               <RemoveForm
                 projectId={projectId}
                 projectName={projectName}
+                personal={personal}
                 row={server}
                 onClose={close}
               />
@@ -154,30 +164,46 @@ function ServerRows({
           );
         }
         const title = (
-          <RowsTitle name={server.name} mono prose sub={rowLine(server)} />
+          <RowsTitle
+            name={server.name}
+            mono
+            prose
+            sub={rowLine(server, personal)}
+          />
         );
-        const kind = rowKind(server, admin, personal);
-        if (kind === "edit") {
+        if (kind === "read") {
           return (
-            <RowsButton
-              key={server.id}
-              edit
-              disabled={opened !== null}
-              onClick={() => {
-                open.value = server;
-              }}
-            >
+            <RowsLine key={server.id} flush>
               {title}
-            </RowsButton>
+              <RowsMeta>{sideWord(server)}</RowsMeta>
+            </RowsLine>
           );
         }
-        return kind === "link" ? (
-          <RowsGo key={server.id} href={configMcpHref(server.name)}>
+        const end = (
+          <SideEnd
+            projectId={projectId}
+            personal={personal}
+            row={server}
+            locked={opened !== null}
+            onRemove={
+              kind === "admin" && server.scope === "projects"
+                ? () => {
+                    open.value = server;
+                  }
+                : undefined
+            }
+          />
+        );
+        // an admin follows the row to the server's page, where its grants
+        // change; an owner's row has no link
+        return kind === "admin" ? (
+          <RowsGo key={server.id} href={configMcpHref(server.name)} end={end}>
             {title}
           </RowsGo>
         ) : (
           <RowsLine key={server.id} flush>
             {title}
+            {end}
           </RowsLine>
         );
       })}
@@ -185,14 +211,65 @@ function ServerRows({
   );
 }
 
+// the project's pick of the row's side, written at once, and Remove for
+// a listed row; a row with nothing to pick but Off says its word
+function SideEnd({
+  projectId,
+  personal,
+  row,
+  locked,
+  onRemove,
+}: {
+  projectId: string;
+  personal: boolean;
+  row: ProjectMcpServer;
+  locked: boolean;
+  onRemove?: () => void;
+}) {
+  const picking = useAction();
+  const options = pickOptions(row);
+  const busy = picking.busy.value || locked;
+  const pick = options.length > 1;
+  if (!pick && onRemove === undefined) {
+    return <RowsMeta>{sideWord(row)}</RowsMeta>;
+  }
+  return (
+    <RowsEnd
+      words={pick ? undefined : sideWord(row)}
+      error={picking.failure.value}
+    >
+      {pick && (
+        <Seg
+          label={`Side of ${row.name}`}
+          small
+          class="mcp-servers-pick"
+          value={pickValue(row)}
+          options={options.map((o) => ({ ...o, disabled: busy }))}
+          onPick={(side) => {
+            if (side === row.choice) return;
+            void picking.run(() =>
+              setProjectMcpSide(projectId, row.id, side, personal),
+            );
+          }}
+        />
+      )}
+      {onRemove !== undefined && (
+        <RowsRemove name={row.name} disabled={busy} onRemove={onRemove} />
+      )}
+    </RowsEnd>
+  );
+}
+
 function RemoveForm({
   projectId,
   projectName,
+  personal,
   row,
   onClose,
 }: {
   projectId: string;
   projectName: string;
+  personal: boolean;
   row: ProjectMcpServer;
   onClose: () => void;
 }) {
@@ -219,7 +296,7 @@ function RemoveForm({
   );
   return (
     <div class="mcp-servers-form">
-      <RowsTitle name={row.name} mono prose sub={rowLine(row)} />
+      <RowsTitle name={row.name} mono prose sub={rowLine(row, personal)} />
       {asking.value ? (
         <Foot save={save}>
           <div class="mcp-servers-remove">{remove}</div>

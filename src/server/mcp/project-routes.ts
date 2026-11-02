@@ -59,7 +59,8 @@ export function projectRoutes(deps: ProjectRoutesDeps): RouteDescriptor[] {
         id: row.id,
         name: row.name,
         tools: counts.get(row.id) ?? 0,
-        scope: row.scope,
+        // a personal project reads the personal grant, every one's alike
+        scope: project.kind === "team" ? row.scope : "all",
         choice: chosen.get(row.id) ?? "read",
         ceiling: ceilingOf(row, project),
         side: offeredSide(row, project, chosen.get(row.id)),

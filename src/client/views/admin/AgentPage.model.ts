@@ -16,7 +16,6 @@ import {
 import { MCP_MODES, type McpMode } from "../../../shared/words.ts";
 import { ago, commas, plural } from "../../lib/format.ts";
 import {
-  type AgentLink,
   agentFieldOf,
   listed,
   statedFields,
@@ -37,12 +36,12 @@ type Rows = { id: string }[] | null;
 // the route takes the whole agent: the saved one with the card's fields
 // over it. An undescribed model re-sends its stated window and tools, and
 // a model whose catalog is silent on images its stated flag, which go
-// only with the model they were stated for; a deleted skill or server
-// drops, or the server refuses its id
+// only with the model they were stated for; a deleted skill drops, or
+// the server refuses its id
 export function cardBody(
   agent: AgentSummary,
   change: Partial<SaveAgentRequest>,
-  rows: { skills: Rows; servers: Rows },
+  rows: { skills: Rows },
 ): SaveAgentRequest {
   const body: SaveAgentRequest = {
     name: agent.name,
@@ -76,13 +75,6 @@ export function cardBody(
   }
   return body;
 }
-
-// a draft's links as the sides the rule reads
-export const sidesOf = (links: AgentLink[]) =>
-  links.map((link) => ({
-    serverId: link.serverId,
-    side: link.write ? ("write" as const) : ("read" as const),
-  }));
 
 export function lastUse(
   activity: AgentActivity | undefined,
@@ -138,6 +130,18 @@ export function deleteLine(impact: AgentImpactResponse | null): string {
     .join(" ");
 }
 
+// the MCP switch: on, the agent takes what each project chose
+export const mcpSwitchLine = (on: boolean): string =>
+  on
+    ? "Gets the MCP Servers each project turns on."
+    : "Gets no MCP tools, so its turns and runs carry no MCP schemas.";
+
+// over the read-only list: where a server is chosen, and that its
+// tokens are its own, since which servers a turn carries is the
+// project's
+export const MCP_LINE =
+  "Chosen on a project's Settings or the server's page. Tokens are each server's own, in this mode.";
+
 export const MODE_OPTIONS: { value: McpMode; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "all", label: "All schemas" },
@@ -155,17 +159,19 @@ export function isModeValue(value: string): value is McpMode {
   return (MCP_MODES as readonly string[]).includes(value);
 }
 
-export function promptPreview(
-  rows: McpServerSummary[],
-  links: AgentLink[],
-): {
+// every server on its own switches: what a project choosing each one
+// for read and write would carry
+export const widest = (rows: readonly McpServerSummary[]) =>
+  rows.map((row) => ({ serverId: row.id, side: "write" as const }));
+
+export function promptPreview(rows: McpServerSummary[]): {
   line: string;
   warnings: string[];
   text: string;
   count: number;
   from: string[];
 } {
-  const offered = offeredServers(rows, sidesOf(links));
+  const offered = offeredServers(rows, widest(rows));
   const snapshot = promptSnapshot(offered, () => "");
   const warnings: string[] = [];
   for (const name of snapshot.leftForInstructions) {

@@ -14,7 +14,6 @@ import type {
 } from "../../../shared/api/directory.ts";
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import type { McpScope } from "../../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import type { Role, Wire } from "../../../shared/words.ts";
 import { priceLine, windowLine } from "../../agents/meta.ts";
@@ -77,10 +76,8 @@ export function serverLine(
   return { text: `refreshed ${ago(server.checkedAt, now)}`, bad: false };
 }
 
-// where a server is offered: every project, or the names of the team
-// projects it lists, none when the list is empty
-// where a server is on for the viewer: the projects by name, then
-// personal projects as a count, an admin's
+// where a server is on: the projects by name, then personal projects
+// as a count, which only an admin is given
 export function onWords(projects: readonly string[], personal: number): string {
   const words = [
     ...projects,
@@ -89,14 +86,6 @@ export function onWords(projects: readonly string[], personal: number): string {
       : []),
   ];
   return words.length === 0 ? "No projects" : words.join(", ");
-}
-
-export function scopeWords(
-  scope: McpScope,
-  projects: readonly string[],
-): string {
-  if (scope === "all") return "All projects";
-  return projects.length === 0 ? "No projects" : projects.join(", ");
 }
 
 // what a server gives the model: its tools that reach it

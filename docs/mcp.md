@@ -85,7 +85,8 @@ the sends of agents on MCP there.
   and kept files stay.
 - **A project's list** (`GET /api/projects/:id/mcp`, `access.project()`)
   shows its granted servers: name, tool count by the server's own
-  switches and patterns, `all` or `projects`, the `choice` (read when
+  switches and patterns, `all` or `projects` (always `all` on a personal
+  project, whose grant is every one's), the `choice` (read when
   none), the `ceiling`, the `side` it gives and the server's `read`,
   never a URL or key file. An admin's answer gives a team list row's
   project count and, on a team project, `addable`. `POST` and
@@ -103,6 +104,11 @@ the sends of agents on MCP there.
   names (their own personal project as `Personal`), on the widest side;
   an admin sees every server on anywhere, personal ones as a count. The
   list, both token totals and the schemas come from that one set.
+- **The agent's MCP tab counts each server alone**
+  (`GET /api/agents/:id/mcp`, admin): every server on its own switches,
+  whichever projects choose it, in the agent's wire and mode: its
+  schemas in all and auto, which the cap reads, its catalog lines
+  without the lead in catalog. A model with no tools gets none.
 
 ## MCP tools in a send
 

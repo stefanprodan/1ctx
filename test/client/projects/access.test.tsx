@@ -7,9 +7,13 @@
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { answered } from "../../../src/client/data/capabilities.ts";
+import {
+  answered,
+  switchablesOf,
+} from "../../../src/client/data/capabilities.ts";
 import { AccessSection } from "../../../src/client/views/projects/AccessSection.tsx";
 import { AccessLines } from "../../../src/client/views/projects/AutomationAccess.tsx";
+import type { ProjectAgentsResponse } from "../../../src/shared/api/sessions.ts";
 import type { AutomationSummary } from "../../../src/shared/contracts/automation.ts";
 
 const credentials = [
@@ -210,6 +214,40 @@ describe("the Setup aside", () => {
     expect(html).toContain("podinfo");
     expect(html).not.toContain("flux2");
   });
+
+  test.serial(
+    "MCP off names the project's servers for an agent on MCP only",
+    () => {
+      answered({
+        agents: [
+          { id: "a1", mcp: true },
+          { id: "a2", mcp: false },
+        ] as unknown as ProjectAgentsResponse["agents"],
+        startsOn: null,
+        capabilities: [],
+        servers: [{ id: "m1", name: "flux", tools: 3 }],
+        skills: {},
+        credentials: [],
+        repos: [],
+      });
+      expect(switchablesOf("a1").servers.map((s) => s.name)).toEqual(["flux"]);
+      expect(switchablesOf("a2").servers).toEqual([]);
+      const on = render(<AccessLines row={row(["mcp:m1"])} />);
+      expect(on).toContain("MCP off");
+      expect(on).toContain("flux");
+      const off = render(
+        <AccessLines
+          row={
+            {
+              agentId: "a2",
+              disabledCapabilities: ["mcp:m1"],
+            } as unknown as AutomationSummary
+          }
+        />,
+      );
+      expect(off).not.toContain("MCP off");
+    },
+  );
 
   test.serial("says Web access Off alone while the web is off", () => {
     answered({

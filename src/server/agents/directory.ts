@@ -4,6 +4,7 @@
 // The agents list and an agent's page for every signed-in user: what a
 // send would offer it now, and its token counts.
 
+import type { AgentMcpResponse } from "../../shared/api/agents.ts";
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
@@ -12,6 +13,11 @@ import type {
 import type { McpSide, ServerSide } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import { SIDE_RANK } from "../../shared/mcp.ts";
+import {
+  CATALOG_LEAD,
+  CATALOG_OPENINGS,
+  mcpCatalog,
+} from "../../shared/mcp-catalog.ts";
 import { firstSentence, MAX_CATALOG_LINE } from "../../shared/text.ts";
 import { type ProjectKind, WEB_TOOLS, type Wire } from "../../shared/words.ts";
 import { parseName, parseNoQuery } from "../lib/body.ts";
@@ -50,6 +56,33 @@ function schemaTokens(servers: OfferedServer[], wire: Wire | null): number {
     })),
   );
   return wireTokens(schemas, wire);
+}
+
+// the catalog's lead and wrapper, which a send carries once, not per server
+const CATALOG_FRAME = tokens(
+  `${CATALOG_LEAD}\n${CATALOG_OPENINGS[0]}\n\n<available_mcp_tools>\n</available_mcp_tools>`,
+);
+
+// one server's share of the agent's MCP tokens in its mode: its catalog
+// lines in catalog, else its schemas, which the auto cap reads
+function serverTokens(
+  server: OfferedServer,
+  mode: AgentRow["mcpMode"],
+  wire: Wire | null,
+): number {
+  if (mode !== "catalog") return schemaTokens([server], wire);
+  const { text } = mcpCatalog([
+    {
+      name: server.name,
+      instructions: null,
+      tools: server.tools.map((tool) => ({
+        wireName: tool.wireName,
+        description: tool.description,
+        schemaJson: tool.schemaJson,
+      })),
+    },
+  ]);
+  return text === "" ? 0 : Math.max(0, tokens(text) - CATALOG_FRAME);
 }
 
 export type SkillsListPort = {
@@ -289,6 +322,38 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             // included
             tools: wireTokens(offered.tools, wire),
           },
+        };
+        return json(body);
+      },
+    },
+    {
+      // the agent's MCP tab: every server on its own switches, whichever
+      // projects choose it, so each row is the most it costs
+      method: "GET",
+      path: "/api/agents/:id/mcp",
+      policy: "admin",
+      handle(_req, ctx) {
+        const agent = deps.store.byId(ctx.params.id);
+        if (agent === null) throw new NotFound("no such agent");
+        const wire = deps.providers.byId(agent.providerId)?.wire ?? null;
+        const sides: ServerSide[] = [...deps.mcp.whereOn().keys()].map(
+          (serverId) => ({ serverId, side: "write" }),
+        );
+        const offered = agent.model.tools
+          ? deps.tools.offered(deps.clock(), agent.id, true, "all", {
+              projectId: null,
+              automation: null,
+              phase: "main",
+              chat: { sessionId: "", userId: "" },
+              delegate: false,
+              mcpSides: sides,
+            }).mcp
+          : [];
+        const body: AgentMcpResponse = {
+          servers: offered.map((server) => ({
+            id: server.id,
+            tokens: serverTokens(server, agent.mcpMode, wire),
+          })),
         };
         return json(body);
       },

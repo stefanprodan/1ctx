@@ -4,10 +4,11 @@
 // The cluster target's instance as provision YAML, deterministic for a
 // count and a namespace: admins adm01.., members u001.. in 2 to 5 team
 // projects each (every team at least 5), the fake provider, the three
-// fake MCP servers, written in every team, the agents on MCP. The users' keys are throwaway
-// and made once, so the chart's Secret keeps them across installs. The
-// team docs are not here: a ConfigMap is flat and capped at 1 MiB, so
-// the driver's setup writes them through the API.
+// fake MCP servers, written in every team and read in personal projects,
+// the agents on MCP. The users' keys are throwaway and made once, so the
+// chart's Secret keeps them across installs. The team docs are not
+// here: a ConfigMap is flat and capped at 1 MiB, so the driver's setup
+// writes them through the API.
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -112,7 +113,7 @@ spec:
   keyFrom: null
   read: true
   write: true
-  personal: write
+  personal: read
   choices:
 ${choices}
 `;

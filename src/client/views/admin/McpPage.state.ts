@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { signal } from "@preact/signals";
-import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
+import type {
+  McpServerSummary,
+  McpSide,
+} from "../../../shared/contracts/mcp.ts";
 import type { Patterns } from "../../../shared/mcp.ts";
 import { NO_KEY } from "../../lib/secrets.ts";
 import {
@@ -40,6 +43,7 @@ export class McpDrafts {
 
   readonly reach = signal<Reach>("all");
   readonly projectIds = signal<string[]>([]);
+  readonly personal = signal<McpSide>("read");
 
   readonly patterns = signal<Patterns>({ read: [], write: [], excluded: [] });
   readonly q = signal("");
@@ -55,6 +59,7 @@ export class McpDrafts {
     d.resetTimeout(server);
     d.resetInstructions(server);
     d.resetProjects(server);
+    d.resetPersonal(server);
     d.resetTools(server);
     return d;
   }
@@ -80,6 +85,10 @@ export class McpDrafts {
   resetProjects(s: McpServerSummary): void {
     this.reach.value = reachOf(s);
     this.projectIds.value = s.projects.map((p) => p.id);
+  }
+
+  resetPersonal(s: McpServerSummary): void {
+    this.personal.value = s.personal;
   }
 
   resetTools(s: McpServerSummary): void {
@@ -116,6 +125,10 @@ export class McpDrafts {
     );
   }
 
+  personalDirty(s: McpServerSummary): boolean {
+    return this.personal.value !== s.personal;
+  }
+
   toolsDirty(s: McpServerSummary): boolean {
     return !samePatterns(this.patterns.value, patternsOf(s));
   }
@@ -128,6 +141,7 @@ export class McpDrafts {
     if (!this.timeoutDirty(before)) this.resetTimeout(after);
     if (!this.instructionsDirty(before)) this.resetInstructions(after);
     if (!this.projectsDirty(before)) this.resetProjects(after);
+    if (!this.personalDirty(before)) this.resetPersonal(after);
     if (!this.toolsDirty(before)) {
       this.patterns.value = patternsOf(after);
     }

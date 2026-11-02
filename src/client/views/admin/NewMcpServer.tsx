@@ -15,13 +15,17 @@ import { Page } from "../../ui/Page.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
   mcpFieldOf,
+  type Personal,
+  personalForKey,
+  personalHint,
+  personalProblem,
   projectsBody,
   projectsProblem,
   type Reach,
   reachForKey,
   reachHint,
 } from "./Mcp.model.ts";
-import { ProjectsPicks, ReachSeg } from "./McpProjects.tsx";
+import { PersonalSeg, ProjectsPicks, ReachSeg } from "./McpProjects.tsx";
 import { NewCard } from "./NewCard.tsx";
 import "./mcp-page.css";
 
@@ -49,6 +53,9 @@ function Form() {
   // until the admin picks, the reach follows the key
   const reachPicked = useSignal(false);
   const projectIds = useSignal<string[]>([]);
+  const personal = useSignal<Personal>(personalForKey(false));
+  // and the personal grant, by the same rule
+  const personalPicked = useSignal(false);
   const keyed = keyName.value !== NO_KEY;
   const save = useSave(async () => {
     const from = address();
@@ -65,6 +72,7 @@ function Form() {
       writePatterns: [],
       excludedPatterns: [],
       projects: projectsBody(reach.value, projectIds.value),
+      ...(personal.value === "" ? {} : { personal: personal.value }),
     });
     if (address() === from) navigate(configMcpHref(created.name, "tools"));
   }, mcpFieldOf);
@@ -88,7 +96,8 @@ function Form() {
             at(
               "projects",
               projectsProblem(keyed, reach.value, projectIds.value),
-            ),
+            ) ??
+            at("personal", personalProblem(personal.value)),
         );
       }}
     >
@@ -127,6 +136,8 @@ function Form() {
               keyName.value = value;
               if (!reachPicked.value)
                 reach.value = reachForKey(value !== NO_KEY);
+              if (!personalPicked.value)
+                personal.value = personalForKey(value !== NO_KEY);
               save.touch();
             }}
           />
@@ -177,6 +188,26 @@ function Form() {
                 }}
               />
             )}
+          </Labelled>
+        </div>
+        <div class="pair-wide">
+          <Labelled
+            label="Personal projects"
+            field="personal"
+            save={save}
+            required={keyed}
+            hint={personalHint(personal.value, keyed)}
+          >
+            <PersonalSeg
+              personal={personal.value}
+              save={save}
+              onPick={(value) => {
+                if (value === personal.value) return;
+                personal.value = value;
+                personalPicked.value = true;
+                save.touch();
+              }}
+            />
           </Labelled>
         </div>
       </div>

@@ -184,7 +184,9 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   user who sees the project writes its description and its labels
   there (`views/projects/Labels.tsx`). An admin writes a team project's
   repositories through the admin page's routes and entities, and a
-  member reads them; the name is the admin page's alone. Every project
+  member reads them; the MCP servers' sides are an admin's on a team
+  project and the owner's on a personal one (`docs/project-settings.md`);
+  the name is the admin page's alone. Every project
   write's answer goes through `keepProject()`, and a metadata write's
   through `onProjectSaved()` too, so both pages show one row.
 - **A label row is its button** (`RowsButton`): a click opens its
@@ -197,7 +199,7 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
 - **The directory's MCP tab says where each server is on**
   (`onWords()`): the names of the projects the viewer sees, the
   viewer's own personal one as `Personal`, then an admin's count of
-  personal projects. An agent off MCP lists none.
+  personal projects. An agent off MCP lists none and says MCP is off.
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted in its provider's wire shape; the client never
   counts tokens.

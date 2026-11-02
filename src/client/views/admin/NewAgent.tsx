@@ -74,6 +74,8 @@ function Form({ providerId }: { providerId: string }) {
         prompt: d.prompt.value.trim(),
         ...d.modelBody(wireOf()),
         skills: [],
+        // on: each project chooses the servers it gets
+        mcp: true,
         mcpMode: "auto",
       });
       if (address() === from) navigate(configAgentHref(created.name));

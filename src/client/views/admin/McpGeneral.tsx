@@ -6,8 +6,6 @@ import type {
   McpChange,
   McpServerSummary,
 } from "../../../shared/contracts/mcp.ts";
-import { AgentLinks } from "../../agents/AgentLinks.tsx";
-import { agents } from "../../data/agents.ts";
 import {
   callTimeoutMs,
   deleteServer,
@@ -17,14 +15,13 @@ import {
   refreshServer,
 } from "../../data/mcp.ts";
 import { ago, commas, showAll } from "../../lib/format.ts";
-import { configAgentHref, MCP_HREF } from "../../lib/hrefs.ts";
+import { adminProjectHref, MCP_HREF } from "../../lib/hrefs.ts";
 import { at, useAction, useSave } from "../../lib/save.ts";
-import { byName } from "../../lib/search.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Fold } from "../../ui/Fold.tsx";
 import { NumberBox } from "../../ui/NumberBox.tsx";
-import { RowsSwitch } from "../../ui/Rows.tsx";
+import { RowsGo, RowsLine, RowsSwitch, RowsTitle } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
@@ -38,6 +35,7 @@ import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 import {
   changeLine,
+  deleteAsk,
   deleteLine,
   instructionsBox,
   instructionsLine,
@@ -46,16 +44,12 @@ import {
   type Offer,
   offerOf,
   offerSides,
-  projectsBody,
-  projectsProblem,
-  reachHint,
   timeoutMs,
   timeoutProblem,
   timeoutText,
-  usersOf,
 } from "./Mcp.model.ts";
 import type { McpDrafts } from "./McpPage.state.ts";
-import { ProjectsPicks, ReachSeg } from "./McpProjects.tsx";
+import { PersonalCard, ProjectsCard } from "./McpProjects.tsx";
 
 type Props = { server: McpServerSummary; drafts: McpDrafts };
 
@@ -64,11 +58,12 @@ export function McpGeneral({ server, drafts, now }: Props & { now: number }) {
     <>
       <About server={server} now={now} />
       <Endpoint server={server} drafts={drafts} />
-      <Projects server={server} drafts={drafts} />
+      <ProjectsCard server={server} drafts={drafts} />
+      <PersonalCard server={server} drafts={drafts} />
       <Offered server={server} drafts={drafts} />
       <Timeout server={server} drafts={drafts} />
       <Instructions server={server} drafts={drafts} />
-      <UsedBy server={server} />
+      <OnIn server={server} />
       <Delete server={server} />
     </>
   );
@@ -226,74 +221,6 @@ function Endpoint({ server, drafts: d }: Props) {
   );
 }
 
-// beside the endpoint, so an admin adding a key sees where it reaches
-function Projects({ server, drafts: d }: Props) {
-  const latest = useLatest(server);
-  const save = useSave(async () => {
-    d.resetProjects(
-      await patchServer(latest.current.id, {
-        projects: projectsBody(d.reach.value, d.projectIds.value),
-      }),
-    );
-  }, mcpFieldOf);
-  const ids = d.projectIds.value;
-  const refused = save.fieldError("projects");
-  return (
-    <SettingForm
-      save={save}
-      check={() =>
-        at(
-          "projects",
-          projectsProblem(
-            latest.current.keyName !== null,
-            d.reach.value,
-            d.projectIds.value,
-          ),
-        )
-      }
-    >
-      <Setting
-        title="Projects"
-        line={reachHint(d.reach.value, ids, server.keyName !== null)}
-        action={
-          <ReachSeg
-            reach={d.reach.value}
-            save={save}
-            onPick={(reach) => {
-              d.reach.value = reach;
-              save.touch();
-            }}
-          />
-        }
-        foot={
-          <DraftFoot
-            save={save}
-            dirty={d.projectsDirty(server)}
-            hint={
-              refused !== null ? (
-                <FieldError save={save} field="projects" />
-              ) : undefined
-            }
-            onDiscard={() => d.resetProjects(latest.current)}
-          />
-        }
-      >
-        {d.reach.value === "picked" && (
-          <ProjectsPicks
-            projectIds={ids}
-            held={server.projects}
-            save={save}
-            onChange={(projectIds) => {
-              d.projectIds.value = projectIds;
-              save.touch();
-            }}
-          />
-        )}
-      </Setting>
-    </SettingForm>
-  );
-}
-
 function Offered({ server, drafts: d }: Props) {
   const latest = useLatest(server);
   const save = useSave(async () => {
@@ -443,30 +370,36 @@ function Instructions({ server, drafts: d }: Props) {
   );
 }
 
-function UsedBy({ server }: { server: McpServerSummary }) {
-  const users = byName(usersOf(agents.value ?? [], server.id));
-  // Delete's line says no agent uses it
-  if (users.length === 0) return null;
+// where a send is offered it now: each team project, whose admin page
+// holds its choice, and personal projects as a count
+function OnIn({ server }: { server: McpServerSummary }) {
+  const { projects, personal } = server.on;
+  // Delete's line says it is on nowhere
+  if (projects.length === 0 && personal === 0) return null;
   return (
-    <Setting list title="Used by" count={String(users.length)}>
-      <AgentLinks
-        agents={users}
-        href={(a) => configAgentHref(a.name, "mcp")}
-        sub={() => (server.write ? "Read and write" : "Read")}
-      />
+    <Setting list title="On in" count={String(projects.length + personal)}>
+      {projects.map((p) => (
+        <RowsGo key={p.id} href={adminProjectHref(p.id)}>
+          <RowsTitle name={p.name} mono />
+        </RowsGo>
+      ))}
+      {personal > 0 && (
+        <RowsLine flush>
+          <RowsTitle
+            name={`${personal} personal project${personal === 1 ? "" : "s"}`}
+          />
+        </RowsLine>
+      )}
     </Setting>
   );
 }
 
 function Delete({ server }: { server: McpServerSummary }) {
-  const used = usersOf(agents.value ?? [], server.id).length;
   return (
     <SettingDelete
       title={`Delete ${server.name}`}
-      line={deleteLine(used)}
-      ask={`Delete ${server.name}?`}
-      // the server refuses to delete a server an agent uses
-      off={used > 0}
+      line={deleteLine(server.on)}
+      ask={deleteAsk(server.name, server.on)}
       onDelete={() => deleteServer(server.id)}
       leaveTo={MCP_HREF}
     />

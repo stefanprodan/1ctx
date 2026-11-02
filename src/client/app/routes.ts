@@ -919,7 +919,7 @@ export const ROUTES: Route[] = [
     title: () => "MCP Servers",
     role: "admin",
     load: async () => {
-      await Promise.all([loadMcp(), loadAgents(), loadAllUsage()]);
+      await Promise.all([loadMcp(), loadAllUsage()]);
     },
   },
   ...tabRoutes(
@@ -932,7 +932,7 @@ export const ROUTES: Route[] = [
     "admin",
     (params) =>
       thenUsage(
-        [loadMcp(), loadAgents()],
+        [loadMcp()],
         servers,
         (s) => s.name === params.name,
         loadServerUsage,

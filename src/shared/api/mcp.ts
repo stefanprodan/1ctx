@@ -77,7 +77,8 @@ export type McpUsageAllResponse = Windowed<McpServersUsage>;
 
 // a server granted to a project: its tool count by its own switches and
 // patterns, and whether every team project has it or this one is
-// listed (all on a personal project). choice is the project's, read
+// listed; on a personal project always all, since the personal grant is
+// every personal project's, a list server's included. choice is the project's, read
 // when it made none; ceiling the most it may choose; side what a send
 // is given (offeredSide()). read is the server's Read switch, so a page
 // hides Read when it is off. Never its URL or key file. projects is an

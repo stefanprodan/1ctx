@@ -2,15 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { McpProjects } from "../../../shared/api/mcp.ts";
-import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type {
   McpChange,
+  McpOn,
   McpServerSummary,
+  McpSide,
 } from "../../../shared/contracts/mcp.ts";
 import { classify, serverBlock } from "../../../shared/mcp.ts";
 import { MCP_TIMEOUT_MS } from "../../../shared/words.ts";
 import { ago, pluralCommas } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
+import { onWords } from "../directory/Directory.model.ts";
 
 export function changeLine(change: McpChange | null, now: number): string {
   if (change === null) return "";
@@ -82,13 +84,19 @@ export function instructionsLine(on: boolean): string {
 }
 
 // write alone has no option
-export type Offer = "off" | "read" | "write";
+export type Offer = McpSide;
 
-export const OFFER_OPTIONS: { value: Offer; label: string }[] = [
-  { value: "off", label: "Off" },
-  { value: "read", label: "Read" },
-  { value: "write", label: "Read and write" },
-];
+// a side's word: the server's switches, a personal grant, a project's
+// choice
+export const SIDE_WORDS: Record<McpSide, string> = {
+  off: "Off",
+  read: "Read",
+  write: "Read and write",
+};
+
+export const OFFER_OPTIONS: { value: Offer; label: string }[] = (
+  ["off", "read", "write"] as const
+).map((value) => ({ value, label: SIDE_WORDS[value] }));
 
 export function offerOf(read: boolean, write: boolean): Offer {
   if (write) return "write";
@@ -109,8 +117,12 @@ export function mcpFieldOf(message: string): string | undefined {
     "writePatterns",
     "excludedPatterns",
     "projects",
+    "personal",
   ]) {
     if (message.startsWith(field)) return field;
+  }
+  if (message.startsWith("a server with a key needs personal")) {
+    return "personal";
   }
   if (
     message.startsWith("a server with a key needs") ||
@@ -125,11 +137,6 @@ export function mcpFieldOf(message: string): string | undefined {
   if (/^(the MCP server|MCP request)\b/.test(message)) return "url";
   return undefined;
 }
-
-export const usersOf = (
-  agents: readonly AgentSummary[],
-  serverId: string,
-): AgentSummary[] => (serverId === "" ? [] : agents.filter((a) => a.mcp));
 
 export function sidesLine(server: McpServerSummary): string {
   const sides = classify(server.name, server.tools, {
@@ -149,18 +156,31 @@ export function sidesLine(server: McpServerSummary): string {
   ].join(" · ");
 }
 
-export function deleteLine(users: number): string {
-  if (users === 0) return "No agent uses it.";
-  return `${pluralCommas(users, "agent uses", "agents use")} it. Remove it from ${
-    users === 1 ? "that agent" : "them"
-  } first.`;
+// where a server is on, as the directory says it
+export const whereOn = (on: McpOn): string =>
+  onWords(
+    on.projects.map((p) => p.name),
+    on.personal,
+  );
+
+const isOn = (on: McpOn) => on.projects.length > 0 || on.personal > 0;
+
+// the delete's line and its ask say the same: what loses the server
+export function deleteLine(on: McpOn): string {
+  return isOn(on) ? `On in ${whereOn(on)}.` : "On in no project.";
+}
+
+export function deleteAsk(name: string, on: McpOn): string {
+  return isOn(on)
+    ? `Delete ${name}? It is on in ${whereOn(on)}.`
+    : `Delete ${name}?`;
 }
 
 // where a server is offered, as a form picks it: "" until picked
 export type Reach = "all" | "picked" | "";
 
 export const REACH_OPTIONS: { value: Reach; label: string }[] = [
-  { value: "all", label: "All projects" },
+  { value: "all", label: "All team projects" },
   { value: "picked", label: "Picked projects" },
 ];
 
@@ -201,19 +221,47 @@ export function reachHint(
   projectIds: readonly string[],
   keyed: boolean,
 ): string | undefined {
-  if (reach === "all") return "Personal projects included.";
-  if (reach === "" || keyed) return undefined;
-  return projectIds.length === 0 ? "Offered in no project." : undefined;
+  if (reach !== "picked" || keyed) return undefined;
+  return projectIds.length === 0 ? "Offered in no team project." : undefined;
+}
+
+// the most a personal project may choose, as a form picks it: "" until
+// picked
+export type Personal = McpSide | "";
+
+// a new server's start: a keyless one reads, a keyed one nothing until
+// the admin picks, since there every user acts as the key's owner
+export const personalForKey = (keyed: boolean): Personal =>
+  keyed ? "" : "read";
+
+export const personalProblem = (personal: Personal): string | null =>
+  personal === "" ? "Pick what personal projects get" : null;
+
+// under the Personal projects field: what a keyed grant means
+export function personalHint(
+  personal: Personal,
+  keyed: boolean,
+): string | undefined {
+  if (!keyed || personal === "" || personal === "off") return undefined;
+  return "Every user acts as the key's owner in their own project.";
 }
 
 export const sameIds = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((id) => b.includes(id));
 
-// the list row: every project, how many, or none
-export function scopeCount(
-  server: Pick<McpServerSummary, "scope" | "projects">,
+// the list row: every team, how many, or none, then the personal
+// grant when it is not off
+export function grantWords(
+  server: Pick<McpServerSummary, "scope" | "projects" | "personal">,
 ): string {
-  if (server.scope === "all") return "All projects";
   const n = server.projects.length;
-  return n === 0 ? "No projects" : pluralCommas(n, "project", "projects");
+  const teams =
+    server.scope === "all"
+      ? "All teams"
+      : n === 0
+        ? "No projects"
+        : pluralCommas(n, "project", "projects");
+  return server.personal === "off"
+    ? teams
+    : `${teams} · personal ${SIDE_WORDS[server.personal].toLowerCase()}`;
 }

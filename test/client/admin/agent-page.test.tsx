@@ -4,7 +4,7 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { query } from "../../../src/client/app/router.ts";
-import { agents } from "../../../src/client/data/agents.ts";
+import { agents, loadMcpTokens } from "../../../src/client/data/agents.ts";
 import { servers } from "../../../src/client/data/mcp.ts";
 import { providers } from "../../../src/client/data/providers.ts";
 import { skills } from "../../../src/client/data/skills.ts";
@@ -186,20 +186,15 @@ describe("a card's body", () => {
   });
 
   test("leaves out a skill deleted since the page loaded", () => {
-    const body = cardBody(
-      agent,
-      { name: "x" },
-      {
-        skills: [{ id: "sk2" }],
-        servers: [],
-      },
-    );
+    const body = cardBody(agent, { name: "x" }, { skills: [{ id: "sk2" }] });
     expect(body.skills).toEqual(["sk2"]);
     expect(body.mcp).toBe(true);
+    expect(body).not.toHaveProperty("servers");
     // a list that did not load keeps the picks as they are
-    expect(cardBody(agent, {}, { skills: null, servers: null }).skills).toEqual(
-      ["sk1", "sk2"],
-    );
+    expect(cardBody(agent, {}, { skills: null }).skills).toEqual([
+      "sk1",
+      "sk2",
+    ]);
   });
 });
 
@@ -549,8 +544,9 @@ describe("the model draft", () => {
     expect(d.isDefault.value).toBe(false);
     d.skills.value = ["sk2", "sk1"];
     expect(d.skillsDirty(agent)).toBe(false);
-    d.servers.value = [{ serverId: "s1", read: true, write: true }];
-    expect(d.serversDirty(agent)).toBe(true);
+    expect(d.mcpDirty(agent)).toBe(false);
+    d.mcp.value = false;
+    expect(d.mcpDirty(agent)).toBe(true);
   });
 });
 
@@ -605,54 +601,90 @@ describe("the cards", () => {
     servers.value = null;
   });
 
-  test.serial("a listed server is marked with its projects", () => {
-    const row = (
-      id: string,
-      name: string,
-      changes: Partial<McpServerSummary>,
-    ): McpServerSummary => ({
-      id,
-      name,
-      url: `https://${name}.test/mcp`,
-      keyName: null,
-      hasKey: false,
-      read: true,
-      write: false,
-      instructionsOn: true,
-      timeoutMs: null,
-      readPatterns: [],
-      writePatterns: [],
-      excludedPatterns: [],
-      scope: "all",
-      projects: [],
-      personal: "read",
-      on: { projects: [], personal: 0 },
-      serverName: "",
-      serverVersion: "",
-      protocolVersion: "",
-      instructions: "",
-      checkedAt: Date.now() - 60 * 60 * 1000,
-      lastChange: null,
-      refreshError: null,
-      refreshFailedAt: null,
-      createdAt: 1,
-      tools: [],
-      ...changes,
-    });
-    servers.value = [
-      row("s1", "markets", {
-        scope: "projects",
-        projects: [{ id: "p2", name: "finops" }],
-      }),
-      row("s2", "flux", {}),
-    ];
-    const html = render(
-      <AgentMcp agent={agent} drafts={AgentDrafts.of(agent)} />,
-    );
-    expect(html).toContain("refreshed 1h ago · finops");
-    expect(html).not.toContain("refreshed 1h ago · All projects");
-    servers.value = null;
-  });
+  test.serial(
+    "the MCP tab lists every server with its tokens and where it is on",
+    async () => {
+      const row = (
+        id: string,
+        name: string,
+        changes: Partial<McpServerSummary>,
+      ): McpServerSummary => ({
+        id,
+        name,
+        url: `https://${name}.test/mcp`,
+        keyName: null,
+        hasKey: false,
+        read: true,
+        write: false,
+        instructionsOn: true,
+        timeoutMs: null,
+        readPatterns: [],
+        writePatterns: [],
+        excludedPatterns: [],
+        scope: "all",
+        projects: [],
+        personal: "read",
+        on: { projects: [], personal: 0 },
+        serverName: "",
+        serverVersion: "",
+        protocolVersion: "",
+        instructions: "",
+        checkedAt: Date.now() - 60 * 60 * 1000,
+        lastChange: null,
+        refreshError: null,
+        refreshFailedAt: null,
+        createdAt: 1,
+        tools: [],
+        ...changes,
+      });
+      servers.value = [
+        row("s1", "markets", {
+          scope: "projects",
+          projects: [{ id: "p2", name: "finops" }],
+          on: { projects: [{ id: "p2", name: "finops" }], personal: 2 },
+        }),
+        row("s2", "flux", {}),
+      ];
+      const original = globalThis.fetch;
+      globalThis.fetch = Object.assign(
+        async () =>
+          Response.json({
+            servers: [
+              { id: "s1", tokens: 1200 },
+              { id: "s2", tokens: 0 },
+            ],
+          }),
+        { preconnect() {} },
+      );
+      try {
+        await loadMcpTokens(agent.id);
+      } finally {
+        globalThis.fetch = original;
+      }
+      const html = render(
+        <AgentMcp agent={agent} drafts={AgentDrafts.of(agent)} />,
+      );
+      // every server, on or not, each linking to its page; no picker
+      expect(html).toContain("refreshed 1h ago · finops, 2 personal projects");
+      expect(html).toContain("refreshed 1h ago · No projects");
+      expect(html).toContain('href="/admin/config/mcp/markets"');
+      expect(html).toContain('href="/admin/config/mcp/flux"');
+      expect(html).toContain("1.2K tokens");
+      expect(html).toContain("Chosen on a project's Settings");
+      expect(html).not.toContain("Add server");
+      expect(html).toContain('name="mcp"');
+      expect(html).toContain('name="mcpMode"');
+      // off MCP: the switch and the mode, no list
+      const off = { ...agent, mcp: false };
+      const bare = render(
+        <AgentMcp agent={off} drafts={AgentDrafts.of(off)} />,
+      );
+      expect(bare).toContain('name="mcp"');
+      expect(bare).toContain('name="mcpMode"');
+      expect(bare).not.toContain("markets");
+      servers.value = null;
+    },
+  );
 
   test.serial("a model that takes no tools gets no skills to add", () => {
     skills.value = [skill];

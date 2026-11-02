@@ -6,6 +6,7 @@ import type { SendTotalsResponse } from "../../shared/api/admin.ts";
 import type {
   AgentActivity,
   AgentImpactResponse,
+  AgentMcpResponse,
   AgentResponse,
   AgentsResponse,
   SaveAgentRequest,
@@ -14,7 +15,7 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
-import { readSlot } from "./slot.ts";
+import { readSlot, usageSlot } from "./slot.ts";
 
 export const agents = signal<AgentSummary[] | null>(null);
 export const agentsError = signal<Failure | null>(null);
@@ -96,10 +97,22 @@ const facts = readSlot<Facts>(async (id) => {
 
 export const factsFor = facts.valueFor;
 
+// every server's tokens in the agent's mode, for its MCP tab
+const mcpTokens = usageSlot<AgentMcpResponse>(
+  (id) => `/api/agents/${encodeURIComponent(id)}/mcp`,
+);
+
+export const mcpTokensFor = mcpTokens.valueFor;
+
+// a mode saved counts the tokens again
+export const loadMcpTokens = (id: string): Promise<void> => mcpTokens.load(id);
+
 // the address names the agent; its facts are read by id
 export async function loadFacts(name: string): Promise<void> {
   const agent = agents.value?.find((a) => a.name === name);
-  if (agent !== undefined) await facts.load(agent.id);
+  if (agent !== undefined) {
+    await Promise.all([facts.load(agent.id), mcpTokens.load(agent.id)]);
+  }
 }
 
 export async function deleteAgent(id: string): Promise<void> {

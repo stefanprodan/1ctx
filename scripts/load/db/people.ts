@@ -212,10 +212,11 @@ export function servers(b: Build) {
   const insTool = db.query(
     `insert into mcp_tools (server_id, name, description, input_schema, unusable) values (?, ?, ?, ?, null)`,
   );
-  // every project chooses the write side where the server has one, as
-  // every live agent's link once did
+  // every team project chooses the write side where the server has one,
+  // as every live agent's link once did; personal projects read, as
+  // provision.ts makes them, since it sets no personal choice
   const insChoice = db.query(
-    `insert into project_mcp (project_id, server_id, side) select id, ?, 'write' from projects`,
+    `insert into project_mcp (project_id, server_id, side) select id, ?, 'write' from projects where kind = 'team'`,
   );
   for (const [si, server] of Object.values(SERVERS).entries()) {
     const id = b.newId();
@@ -232,7 +233,7 @@ export function servers(b: Build) {
       print,
       NOW - HOUR,
       clock.start,
-      write === 1 ? "write" : "read",
+      "read",
     );
     for (const tool of server.tools) {
       const def = toolDef(server.name, tool);

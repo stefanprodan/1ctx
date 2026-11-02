@@ -482,6 +482,18 @@ describe("a project's choice", () => {
       );
       // a list server is not granted to a personal project
       expect((await put(chat.member, markets.id, "read")).status).toBe(404);
+      // until its personal grant is on, and then it reads all there
+      chat.app.mcp.setPersonal(markets.id, "read");
+      const granted = await put(chat.member, markets.id, "read");
+      expect(granted.status).toBe(200);
+      expect(
+        (await granted.json()).servers.map(
+          (s: { name: string; scope: string }) => [s.name, s.scope],
+        ),
+      ).toEqual([
+        ["docs", "all"],
+        ["markets", "all"],
+      ]);
       // the personal grant is the ceiling
       expect((await put(chat.member, docs.id, "write")).status).toBe(400);
     } finally {
