@@ -32,6 +32,10 @@
     background: transparent;
     font-size: var(--text-small);
   }
+  .select-trigger-small {
+    height: 30px;
+    font-size: var(--text-small);
+  }
   .select-trigger:disabled {
     color: var(--dim);
     cursor: default;

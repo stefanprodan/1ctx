@@ -95,7 +95,7 @@ export const SIDE_WORDS: Record<McpSide, string> = {
 };
 
 // the server's own switches, as the Access card names them
-export const CEILING_LABEL = "Most any project may use";
+export const CEILING_LABEL = "Most a project may use";
 
 export const OFFER_OPTIONS: { value: Offer; label: string }[] = (
   ["off", "read", "write"] as const

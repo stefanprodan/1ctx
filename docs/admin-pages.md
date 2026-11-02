@@ -103,7 +103,7 @@ reporting.
   the admin picks (`reachForKey()`, `personalForKey()`);
   `projectsProblem()` and `personalProblem()` refuse that save, as the
   server does. On the page both sit in one Access card after Endpoint,
-  with the server's own Read and Write switches as "Most any project
+  with the server's own Read and Write switches as "Most a project
   may use": one draft, one PATCH of what changed (`accessBody()`),
   which the server writes in one transaction. The list row says
   `grantWords()`.

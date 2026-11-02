@@ -544,6 +544,18 @@ describe("the drafts", () => {
     expect(d.accessDirty(flux)).toBe(false);
   });
 
+  test.serial(
+    "an edited Access part never sends back another admin's change",
+    () => {
+      const d = McpDrafts.of(flux);
+      d.personal.value = "off";
+      const after = { ...flux, write: !flux.write };
+      d.follow(flux, after);
+      expect(d.write.value).toBe(after.write);
+      expect(d.accessBody(after)).toEqual({ personal: "off" });
+    },
+  );
+
   test.serial("General draws one Access card with one foot", () => {
     servers.value = [flux];
     path.value = "/admin/config/mcp/flux";
@@ -551,7 +563,7 @@ describe("the drafts", () => {
     expect(html).toContain(">Access<");
     expect(html).toContain(">Team projects<");
     expect(html).toContain(">Personal projects<");
-    expect(html).toContain(">Most any project may use<");
+    expect(html).toContain(">Most a project may use<");
     expect(html).not.toContain("Tool access");
     // Endpoint, Access, Call timeout and Instructions each save
     expect(html.match(/>Discard</g)).toHaveLength(4);

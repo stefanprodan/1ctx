@@ -253,7 +253,7 @@ function SideEnd({
           <span class="mcp-servers-pick">
             <Select
               label={`Side of ${row.name}`}
-              quiet
+              small
               value={pickValue(row)}
               options={options}
               disabled={busy}

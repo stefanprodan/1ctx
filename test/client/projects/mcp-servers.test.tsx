@@ -348,7 +348,7 @@ describe("the list", () => {
       expect(html).toContain('href="/admin/config/mcp/markets"');
       // one dropdown per row, showing the pick
       expect(html.match(/aria-label="Side of /g)).toHaveLength(2);
-      expect(html.match(/select-trigger-quiet/g)).toHaveLength(2);
+      expect(html.match(/select-trigger-small/g)).toHaveLength(2);
       expect(html.match(/select-label cut">Read</g)).toHaveLength(2);
       // only the listed row has More, with Remove in it; the other keeps
       // its room so the picks line up

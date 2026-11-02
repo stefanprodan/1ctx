@@ -42,7 +42,7 @@ page share: its repositories (`views/projects/Repos.tsx`,
   listed row, `This project` (`rowLine()`), never a URL or key file.
 - **Every granted server is a row with the project's side,** an Off
   one included. An admin on a team project and the owner of a personal
-  one pick it (`rowKind()`) from a quiet `Select` at the row's end, one
+  one pick it (`rowKind()`) from a small `Select` at the row's end, one
   width on every row, written at once (`setProjectMcpSide()`): Off,
   Read while the server's Read is on, Read and write only under a write
   ceiling (`pickOptions()`). A choice above a lowered ceiling shows the

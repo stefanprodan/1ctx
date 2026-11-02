@@ -124,7 +124,7 @@ export function ProjectsPicks({
 }
 
 // one card for who gets the server and how much: the team projects, the
-// personal grant and the server's own switches, the most any project
+// personal grant and the server's own switches, the most a project
 // may use; one draft, saved in one PATCH
 export function AccessCard({ server, drafts: d }: Props) {
   const latest = useLatest(server);
@@ -137,15 +137,18 @@ export function AccessCard({ server, drafts: d }: Props) {
   return (
     <SettingForm
       save={save}
+      // a list emptied by a deleted project still saves its other parts
       check={() =>
-        at(
-          "projects",
-          projectsProblem(
-            latest.current.keyName !== null,
-            d.reach.value,
-            d.projectIds.value,
-          ),
-        )
+        d.projectsDirty(latest.current)
+          ? at(
+              "projects",
+              projectsProblem(
+                latest.current.keyName !== null,
+                d.reach.value,
+                d.projectIds.value,
+              ),
+            )
+          : null
       }
     >
       <Setting

@@ -75,7 +75,7 @@ export class McpDrafts {
   }
 
   // the Access card: the team projects, the personal grant and the
-  // server's switches, the most any project may use
+  // server's switches, the most a project may use
   resetAccess(s: McpServerSummary): void {
     this.resetProjects(s);
     this.resetPersonal(s);
@@ -161,11 +161,14 @@ export class McpDrafts {
     return !samePatterns(this.patterns.value, patternsOf(s));
   }
 
-  // each card saves only its own fields: one at rest takes the row
-  // another save or a refresh answered, an edited one stays
+  // each part at rest takes the row another save or a refresh
+  // answered and an edited one stays, the Access card's three parts
+  // each on its own, so a save never sends back a value it never saw
   follow(before: McpServerSummary, after: McpServerSummary): void {
     if (!this.endpointDirty(before)) this.resetEndpoint(after);
-    if (!this.accessDirty(before)) this.resetAccess(after);
+    if (!this.projectsDirty(before)) this.resetProjects(after);
+    if (!this.personalDirty(before)) this.resetPersonal(after);
+    if (!this.offerDirty(before)) this.resetOffer(after);
     if (!this.timeoutDirty(before)) this.resetTimeout(after);
     if (!this.instructionsDirty(before)) this.resetInstructions(after);
     if (!this.toolsDirty(before)) {
