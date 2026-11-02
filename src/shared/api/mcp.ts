@@ -75,16 +75,18 @@ export type McpUsageAllResponse = Windowed<McpServersUsage>;
 
 // a server offered in a project: its tool count by its own switches and
 // patterns, and whether every project has it or this one is listed.
-// Never its URL or key file
+// Never its URL or key file. projects is an admin's, on a list row: how
+// many projects the list holds, so removing the last one asks first
 export type ProjectMcpServer = {
   id: string;
   name: string;
   tools: number;
   scope: McpScope;
+  projects?: number;
 };
 
 // GET /api/projects/:id/mcp, in name order, and the answer of its
-// POST. addable is an admin's on a team project: the servers with a
+// POST and DELETE. addable is an admin's on a team project: the servers with a
 // list that does not hold the project, an empty one included; empty
 // for anyone else
 export type ProjectMcpResponse = {

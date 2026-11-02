@@ -114,6 +114,9 @@ export type MemoryScope = {
   chat?: { sessionId: string; userId: string } | null;
   // the agent's Subagents switch: a main offer carries delegate
   delegate?: boolean;
+  // the agent's links were chosen by scope already, so the offer takes
+  // them as given; the directory's, which has no project
+  mcpChosen?: boolean;
   // the send's origin; a subagent's offer has no automation of its own,
   // so it carries its parent's, and a run's children read no automations
   origin?: SessionOrigin;

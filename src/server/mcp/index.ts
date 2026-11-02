@@ -70,6 +70,18 @@ export type McpOffer = {
   prompt: ReturnType<typeof promptSnapshot>;
 };
 
+// what a send without MCP is offered
+export const NO_OFFER: McpOffer = {
+  servers: [],
+  prompt: {
+    text: "",
+    included: [],
+    leftForSchemas: [],
+    leftForInstructions: [],
+    digest: {},
+  },
+};
+
 export type McpCallOptions = {
   signal: AbortSignal;
   timeoutMs: number;
@@ -102,9 +114,12 @@ export type McpDeps = {
 export type Mcp = {
   store: McpServerStore;
   routes: RouteDescriptor[];
-  // the links' servers in scope for a send in the project; null takes
-  // the links as given, for a caller that chose them by scope itself
+  // the links' servers in scope for a send in the project; null offers
+  // only the all servers
   offered(agentServers: AgentServer[], projectId: string | null): McpOffer;
+  // the links as given, for the directory, which chose them by the
+  // viewer's projects itself
+  offeredChosen(agentServers: AgentServer[]): McpOffer;
   switchable(links: AgentServer[], projectId: string): SwitchableServer[];
   // the same per agent id over one read of the catalogs, agents without a
   // switchable server left out
@@ -131,10 +146,11 @@ export type Mcp = {
   ): Promise<McpCallOutput>;
 };
 
-// the rows a send in the project may be offered
+// the rows a send in the project may be offered; with no project only
+// the all servers, so a missing one never reaches a bound server
 function scoped(rows: McpServerRow[], projectId: string | null) {
   return projectId === null
-    ? rows
+    ? rows.filter((row) => row.scope === "all")
     : rows.filter((row) => inScope(row, projectId));
 }
 
@@ -251,11 +267,7 @@ export function mcpArea(deps: McpDeps): Mcp {
     log: deps.log,
     discover: runDiscovery,
   });
-  const offered = (
-    links: AgentServer[],
-    projectId: string | null,
-  ): McpOffer => {
-    const rows = scoped(store.list(), projectId);
+  const offerOver = (rows: McpServerRow[], links: AgentServer[]): McpOffer => {
     const prompts = promptRows(rows, links);
     const snapshot = promptSnapshot(prompts, sha256);
     for (const name of snapshot.leftForSchemas) {
@@ -284,7 +296,9 @@ export function mcpArea(deps: McpDeps): Mcp {
   const area: Mcp = {
     store,
     routes: [],
-    offered,
+    offered: (links, projectId) =>
+      offerOver(scoped(store.list(), projectId), links),
+    offeredChosen: (links) => offerOver(store.list(), links),
     switchable(links, projectId) {
       return links.length === 0
         ? []

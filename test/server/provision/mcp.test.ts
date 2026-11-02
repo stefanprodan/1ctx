@@ -3,6 +3,8 @@
 
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
+import type { Client } from "../../../src/server/provision/client.ts";
+import { applyMcpServer } from "../../../src/server/provision/mcp.ts";
 import {
   type Inventory,
   preflight,
@@ -140,5 +142,55 @@ describe("McpServer projects apply", () => {
       await app.shutdown();
       app.db.close();
     }
+  });
+});
+
+describe("McpServer projects with a new key", () => {
+  test("the scope goes in the endpoint's PATCH, never a second one", async () => {
+    const writes: { method: string; path: string; body: unknown }[] = [];
+    const api = {
+      async call(method: string, path: string, body?: unknown) {
+        if (method === "GET" && path === "/api/mcp") {
+          return {
+            servers: [
+              {
+                id: "s1",
+                name: "markets",
+                url: MCP_URL,
+                keyName: null,
+                read: true,
+                write: false,
+                instructionsOn: true,
+                timeoutMs: null,
+                readPatterns: [],
+                writePatterns: [],
+                excludedPatterns: [],
+                scope: "all",
+                projects: [],
+              },
+            ],
+          };
+        }
+        if (method === "GET" && path === "/api/projects") {
+          return { projects: [{ id: "t1", name: "finops", kind: "team" }] };
+        }
+        writes.push({ method, path, body });
+        return {};
+      },
+    } as unknown as Client;
+    expect(
+      await applyMcpServer(api, {
+        name: "markets",
+        spec: { keyFrom: "mcp-markets", projects: ["finops"], write: true },
+      }),
+    ).toBe("updated");
+    expect(writes).toEqual([
+      {
+        method: "PATCH",
+        path: "/api/mcp/s1",
+        body: { keyName: "mcp-markets", projects: ["t1"] },
+      },
+      { method: "PATCH", path: "/api/mcp/s1", body: { write: true } },
+    ]);
   });
 });

@@ -74,6 +74,7 @@ export type ToolsPort = {
       phase: "main";
       chat: { sessionId: string; userId: string };
       delegate: boolean;
+      mcpChosen: true;
     },
   ): {
     tools: ChatTool[];
@@ -220,6 +221,7 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
                 phase: "main",
                 chat: { sessionId: "", userId: "" },
                 delegate: agent.subagents,
+                mcpChosen: true,
               },
             )
           : { tools: [], search: null, mcp: [], mcpCatalog: "" };

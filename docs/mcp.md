@@ -54,9 +54,10 @@ reach the model in the sends of agents linked to it.
   send's offer and catalog (`offered(links, projectId)`), the project
   agents route's `servers` and `agents[].servers`, the `automation`
   tool's names, the prompt's list of servers turned off, and the check
-  URL's signing. An out of scope name never reaches a model. A null
-  project takes the links as given, for the directory, which chose
-  them by the viewer's visible projects.
+  URL's signing. An out of scope name never reaches a model. An offer
+  with no project fails closed to the `all` servers; only the
+  directory, which chose its links by the viewer's visible projects,
+  takes them as given (`offeredChosen()`, the scope's `mcpChosen`).
 - **Every send takes its session's project**, through the one offer in
   `runner/policy.ts`: a chat, a queued message, a channel turn and a
   summoned agent, a subagent (its parent's offer), a run, Run now and a
@@ -67,10 +68,11 @@ reach the model in the sends of agents linked to it.
 - **A project's list** (`GET /api/projects/:id/mcp`, `access.project()`)
   shows its servers in scope: name, tool count by the server's own
   switches and patterns, and `all` or `projects`, never a URL or key
-  file. An admin's answer on a team project carries `addable`, the
-  list-scoped servers without it. `POST` (a `serverId`) and `DELETE
-  .../:serverId` add or remove a team project on a list server; an
-  `all` server is a 409, a personal project a 404.
+  file. An admin's answer gives a list row's project count
+  (`projects`) and, on a team project, `addable`, the list-scoped
+  servers without it. `POST` (a `serverId`) and `DELETE .../:serverId`
+  add or remove a team project on a list server, each answering the
+  list; an `all` server is a 409, a personal project a 404.
 - **The directory shows what the viewer reaches.** An agent's page
   keeps the servers that are `all` or listed in a project the viewer
   sees, each with those project names, every one for an admin; the

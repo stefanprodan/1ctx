@@ -75,7 +75,7 @@ const NO_CREDENTIALS: SendCredentials = { offered: [], off: [] };
 type OfferDeps = {
   store: Pick<ToolStore, "row">;
   skills: SkillsPort;
-  mcp: Pick<Mcp, "offered">;
+  mcp: Pick<Mcp, "offered" | "offeredChosen">;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
   credentials?: CredentialsPort;
   // the admin's email_user row is on and email is set up
@@ -399,14 +399,14 @@ export function offered(
     ].map(schema),
     now,
   );
-  // a send's project decides the scope; the directory has none and
-  // passes the links it chose by scope
-  const offered = deps.mcp.offered(
-    agentServers.filter(
-      (link) => !disabledCapabilities.includes(mcpKey(link.serverId)),
-    ),
-    scope?.projectId ?? null,
+  // a send's project decides the scope, and none offers only the all
+  // servers; the directory passes the links it chose by scope
+  const links = agentServers.filter(
+    (link) => !disabledCapabilities.includes(mcpKey(link.serverId)),
   );
+  const offered = scope?.mcpChosen
+    ? deps.mcp.offeredChosen(links)
+    : deps.mcp.offered(links, scope?.projectId ?? null);
   // the catalog never narrows the offer: every offered server keeps its
   // instructions, its digest and its tools in either mode
   const mcp = offered.servers;

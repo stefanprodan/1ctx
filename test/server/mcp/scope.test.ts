@@ -105,6 +105,34 @@ describe("a bound server's offer", () => {
     }
   });
 
+  test("an offer with no project fails closed to the all servers", async () => {
+    const { db, mcp, tools, links } = setup();
+    try {
+      const none = { ...scope("team1"), projectId: null };
+      for (const offer of [
+        tools.offered(1, "", links, "all", none),
+        tools.offered(1, "", links, "all"),
+      ]) {
+        expect(offer.mcp.map((server) => server.name)).toEqual(["docs"]);
+      }
+      expect(mcp.offered(links, null).servers.map((s) => s.name)).toEqual([
+        "docs",
+      ]);
+      // only the directory's chosen links are taken as given
+      const chosen = tools.offered(1, "", links, "all", {
+        ...none,
+        mcpChosen: true,
+      });
+      expect(chosen.mcp.map((server) => server.name)).toEqual([
+        "docs",
+        "markets",
+      ]);
+    } finally {
+      await mcp.close();
+      db.close();
+    }
+  });
+
   test("an emptied list offers it nowhere, all everywhere again", async () => {
     const { db, mcp, tools, markets, links } = setup();
     try {

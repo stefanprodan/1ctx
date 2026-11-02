@@ -290,8 +290,10 @@ setting or changing it clears the validators.
   (`docs/mcp.md`) and not turned off for the task signs a
   URL under its own URL (`underPrefix()`) with its `mcp-` key and
   ignores the web row, so an MCP-signed check polls the server's own
-  endpoint only. The rest of its origin is the web's, unsigned by it,
-  so the key never skirts the server's patterns. Otherwise the web row and the task's `web` switch must allow it, and
+  endpoint only, and a server at its origin's root (`https://host/`)
+  signs the whole origin. The rest of its origin is the web's,
+  unsigned by it, so the key never skirts the server's patterns.
+  Otherwise the web row and the task's `web` switch must allow it, and
   `originAllowed()` in `listed` mode. An `https:` URL under a project
   credential's prefix (`underPrefix()`) carries its header and, as
   curl's credential fetch, needs no listed host. As in curl, a

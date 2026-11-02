@@ -180,12 +180,26 @@ describe("a project's MCP list", () => {
         "docs",
         "markets",
       ]);
+      // a member never learns how many projects a list holds
       expect(body.servers[1]).toEqual({
         id: expect.any(String),
         name: "markets",
         tools: 1,
         scope: "projects",
       });
+      const admin = await (
+        await chat.admin.call("GET", `/api/projects/${finops}/mcp`)
+      ).json();
+      expect(admin.servers).toEqual([
+        { id: expect.any(String), name: "docs", tools: 1, scope: "all" },
+        {
+          id: expect.any(String),
+          name: "markets",
+          tools: 1,
+          scope: "projects",
+          projects: 1,
+        },
+      ]);
       expect(JSON.stringify(body)).not.toContain("markets.test");
       expect(body.addable).toEqual([]);
       expect(
@@ -265,15 +279,18 @@ describe("a project's MCP list", () => {
           )
         ).status,
       ).toBe(404);
+      // each answers the list, the server gone from it
       for (const projectId of [research, finops]) {
+        const removed = await chat.admin.call(
+          "DELETE",
+          `/api/projects/${projectId}/mcp/${markets.id}`,
+        );
+        expect(removed.status).toBe(200);
         expect(
-          (
-            await chat.admin.call(
-              "DELETE",
-              `/api/projects/${projectId}/mcp/${markets.id}`,
-            )
-          ).status,
-        ).toBe(204);
+          (await removed.json()).servers.map(
+            (row: { name: string }) => row.name,
+          ),
+        ).toEqual(["docs"]);
       }
       // the last one removed: offered nowhere, never widened
       expect(chat.app.mcp.byId(markets.id)).toMatchObject({

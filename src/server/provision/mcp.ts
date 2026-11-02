@@ -4,7 +4,11 @@
 // An McpServer document: its offline checks and its apply through the
 // MCP routes. Its projects are all or team project names.
 
-import type { McpResponse, PatchMcpSettings } from "../../shared/api/mcp.ts";
+import type {
+  McpResponse,
+  PatchMcpEndpoint,
+  PatchMcpSettings,
+} from "../../shared/api/mcp.ts";
 import type { ProjectsResponse } from "../../shared/api/projects.ts";
 import { PERSONAL_PROJECT_NAME } from "../../shared/words.ts";
 import { type Action, type Client, difference, idOf } from "./client.ts";
@@ -82,7 +86,7 @@ export async function applyMcpServer(
     });
     return "created";
   }
-  const endpointPatch = difference(before, endpoint);
+  const endpointPatch: PatchMcpEndpoint = difference(before, endpoint);
   const settingsPatch: PatchMcpSettings = difference(
     {
       ...before,
@@ -92,6 +96,12 @@ export async function applyMcpServer(
     settings,
   );
   const changedEndpoint = Object.keys(endpointPatch).length > 0;
+  // the scope goes with a new endpoint, so a key added never reaches
+  // everyone between two writes
+  if (changedEndpoint && projects !== undefined) {
+    endpointPatch.projects = projects;
+    delete settingsPatch.projects;
+  }
   const changedSettings = Object.keys(settingsPatch).length > 0;
   if (changedEndpoint) {
     await api.call("PATCH", `/api/mcp/${before.id}`, endpointPatch);

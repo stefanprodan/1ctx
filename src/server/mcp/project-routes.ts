@@ -49,6 +49,9 @@ export function projectRoutes(deps: ProjectRoutesDeps): RouteDescriptor[] {
         name: row.name,
         tools: counts.get(row.id) ?? 0,
         scope: row.scope,
+        ...(admin && row.scope === "projects"
+          ? { projects: row.projectIds.length }
+          : {}),
       })),
       addable:
         admin && project.kind === "team"
@@ -112,7 +115,7 @@ export function projectRoutes(deps: ProjectRoutesDeps): RouteDescriptor[] {
           }
           return { result: undefined };
         });
-        return new Response(null, { status: 204 });
+        return json(list(team(ctx.params.id), true));
       },
     },
   ];
