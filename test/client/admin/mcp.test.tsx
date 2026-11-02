@@ -516,12 +516,45 @@ describe("a server's page", () => {
 });
 
 describe("the drafts", () => {
-  test.serial("saving Offered keeps a timeout typed and not saved", () => {
+  test.serial("saving Access keeps a timeout typed and not saved", () => {
     const d = McpDrafts.of(flux);
     d.timeout.value = "30";
-    d.resetOffer(server({ write: true }));
+    d.resetAccess(server({ write: true }));
     expect(d.timeout.value).toBe("30");
     expect(d.write.value).toBe(true);
+  });
+
+  test.serial("Access saves what changed in one body", () => {
+    const d = McpDrafts.of(flux);
+    expect(d.accessDirty(flux)).toBe(false);
+    expect(d.accessBody(flux)).toEqual({});
+    d.personal.value = "off";
+    expect(d.accessBody(flux)).toEqual({ personal: "off" });
+    d.write.value = true;
+    d.reach.value = "picked";
+    d.projectIds.value = ["p2"];
+    expect(d.accessDirty(flux)).toBe(true);
+    expect(d.accessBody(flux)).toEqual({
+      projects: ["p2"],
+      personal: "off",
+      read: true,
+      write: true,
+    });
+    d.resetAccess(flux);
+    expect(d.accessDirty(flux)).toBe(false);
+  });
+
+  test.serial("General draws one Access card with one foot", () => {
+    servers.value = [flux];
+    path.value = "/admin/config/mcp/flux";
+    const html = render(<McpPage params={{ name: "flux" }} />);
+    expect(html).toContain(">Access<");
+    expect(html).toContain(">Team projects<");
+    expect(html).toContain(">Personal projects<");
+    expect(html).toContain(">Most any project may use<");
+    expect(html).not.toContain("Tool access");
+    // Endpoint, Access, Call timeout and Instructions each save
+    expect(html.match(/>Discard</g)).toHaveLength(4);
   });
 
   test.serial("a card at rest follows the row, an edited one stays", () => {
@@ -627,7 +660,7 @@ describe("a server's projects", () => {
     expect(render(<McpList />)).toContain("1 project · personal read");
     path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
-    expect(html).toContain(">Projects<");
+    expect(html).toContain(">Team projects<");
     expect(html).toMatch(/aria-pressed="true"[^>]*>Picked projects</);
     expect(html).toContain(">finops<");
   });

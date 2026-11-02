@@ -161,7 +161,7 @@ function Form() {
         </label>
         <div class="pair-wide">
           <Labelled
-            label="Projects"
+            label="Team projects"
             field="projects"
             save={save}
             required={keyed}

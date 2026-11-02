@@ -18,13 +18,32 @@
     gap: var(--space-2);
     width: 100%;
   }
-  .mcp-servers-pick.seg {
-    flex-wrap: nowrap;
-    white-space: nowrap;
-  }
   .mcp-servers-ask {
     margin-right: auto;
     font-size: var(--text-ui);
     color: var(--fg);
+  }
+  /* the row's end: the pick, one width on every row so "Read and write"
+     fits uncut, its open list's check mark included, then the More menu or its room */
+  .mcp-servers-end {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
+  }
+  .mcp-servers-pick {
+    display: grid;
+    width: 144px;
+  }
+  .mcp-servers-word {
+    padding: 0 var(--space-3);
+    font-size: var(--text-small);
+    color: var(--dim);
+    white-space: nowrap;
+  }
+  .mcp-servers-gap {
+    flex-shrink: 0;
+    width: 32px;
   }
 }

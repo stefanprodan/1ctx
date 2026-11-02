@@ -29,9 +29,11 @@ import {
   agentTab,
   agentTabs,
   capabilities,
+  directoryOnCount,
   effortText,
   filesText,
   localTime,
+  onCount,
   roleWords,
   serverLine,
   serverMeta,
@@ -392,6 +394,18 @@ describe("Directory.model", () => {
     expect(serverMeta({ tools: 1 })).toBe("1 tool");
   });
 
+  test("where a server is on, counted, the viewer's own as personal", () => {
+    expect(onCount(6, 8)).toBe("6 teams · 8 personal");
+    expect(onCount(1, 1)).toBe("1 team · 1 personal");
+    expect(onCount(0, 2)).toBe("2 personal");
+    expect(onCount(3, 0)).toBe("3 teams");
+    expect(onCount(0, 0)).toBe("Nowhere");
+    expect(directoryOnCount(["finops", "Personal"], 0)).toBe(
+      "1 team · 1 personal",
+    );
+    expect(directoryOnCount([], 0)).toBe("Nowhere");
+  });
+
   test("a skill counts its files, SKILL.md one of them", () => {
     expect(filesText(1)).toBe("1 file");
     expect(filesText(8)).toBe("8 files");
@@ -633,9 +647,10 @@ describe("the pages", () => {
     };
     html = render(<Agent params={{ name: "coder" }} />);
     expect(html).toContain('</nav><span class="rows-hint cut">900 tokens<');
-    // where it is on and the refresh under the name, the tools at the row's end
+    // where it is on, counted, and the refresh under the name, the names
+    // on hover, the tools at the row's end
     expect(html).toContain(
-      'class="rows-sub">refreshed 1h ago · finops, research<',
+      'class="rows-sub">refreshed 1h ago · <span title="finops, research">2 teams<',
     );
     expect(html).toContain('class="rows-meta">12 tools<');
     expect(html).toContain(
@@ -652,7 +667,7 @@ describe("the pages", () => {
     };
     html = render(<Agent params={{ name: "coder" }} />);
     expect(html).toContain(
-      'class="rows-sub">refreshed 1h ago · finops, 3 personal projects<',
+      '<span title="finops, 3 personal projects">1 team · 3 personal<',
     );
     // the viewer's own personal project is named Personal by the server
     agentPage.value = {
@@ -663,7 +678,9 @@ describe("the pages", () => {
       },
     };
     html = render(<Agent params={{ name: "coder" }} />);
-    expect(html).toContain("refreshed 1h ago · finops, Personal<");
+    expect(html).toContain(
+      '<span title="finops, Personal">1 team · 1 personal<',
+    );
     // an agent off MCP lists none and says so
     agentPage.value = { ...agent, agent: { ...agent.agent, mcp: false } };
     html = render(<Agent params={{ name: "coder" }} />);

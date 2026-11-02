@@ -4,7 +4,7 @@
 // Where an MCP server is offered: All team projects, or the team
 // projects picked as on a credential's page (ProjectPicks.tsx), and the
 // most a personal project gets. The new server's form draws the fields,
-// the server's page their cards.
+// the server's page its Access card, with the server's own switches.
 
 import type {
   McpProject,
@@ -13,7 +13,7 @@ import type {
 import { patchServer } from "../../data/mcp.ts";
 import { projects } from "../../data/projects.ts";
 import { at, type Save, useSave } from "../../lib/save.ts";
-import { FieldError } from "../../ui/FieldError.tsx";
+import { Labelled } from "../../ui/Labelled.tsx";
 import { RowsList } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm } from "../../ui/Setting.tsx";
@@ -21,11 +21,13 @@ import { teamsOf } from "./Credentials.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
 import {
+  CEILING_LABEL,
   mcpFieldOf,
   OFFER_OPTIONS,
+  offerOf,
+  offerSides,
   type Personal,
   personalHint,
-  projectsBody,
   projectsProblem,
   REACH_OPTIONS,
   type Reach,
@@ -49,7 +51,7 @@ export function ReachSeg({
 }) {
   return (
     <Seg
-      label="Projects"
+      label="Team projects"
       name="projects"
       value={reach}
       invalid={save.fieldError("projects") !== null}
@@ -121,18 +123,17 @@ export function ProjectsPicks({
   );
 }
 
-// beside the endpoint, so an admin adding a key sees where it reaches
-export function ProjectsCard({ server, drafts: d }: Props) {
+// one card for who gets the server and how much: the team projects, the
+// personal grant and the server's own switches, the most any project
+// may use; one draft, saved in one PATCH
+export function AccessCard({ server, drafts: d }: Props) {
   const latest = useLatest(server);
   const save = useSave(async () => {
-    d.resetProjects(
-      await patchServer(latest.current.id, {
-        projects: projectsBody(d.reach.value, d.projectIds.value),
-      }),
-    );
+    const s = latest.current;
+    d.resetAccess(await patchServer(s.id, d.accessBody(s)));
   }, mcpFieldOf);
+  const keyed = server.keyName !== null;
   const ids = d.projectIds.value;
-  const refused = save.fieldError("projects");
   return (
     <SettingForm
       save={save}
@@ -148,86 +149,77 @@ export function ProjectsCard({ server, drafts: d }: Props) {
       }
     >
       <Setting
-        title="Projects"
-        line={reachHint(d.reach.value, ids, server.keyName !== null)}
-        action={
-          <ReachSeg
-            reach={d.reach.value}
-            save={save}
-            onPick={(reach) => {
-              d.reach.value = reach;
-              save.touch();
-            }}
-          />
-        }
+        title="Access"
         foot={
           <DraftFoot
             save={save}
-            dirty={d.projectsDirty(server)}
-            hint={
-              refused !== null ? (
-                <FieldError save={save} field="projects" />
-              ) : undefined
-            }
-            onDiscard={() => d.resetProjects(latest.current)}
+            dirty={d.accessDirty(server)}
+            onDiscard={() => d.resetAccess(latest.current)}
           />
         }
       >
-        {d.reach.value === "picked" && (
-          <ProjectsPicks
-            projectIds={ids}
-            held={server.projects}
+        <div class="mcp-page-access">
+          <Labelled
+            label="Team projects"
+            field="projects"
             save={save}
-            onChange={(projectIds) => {
-              d.projectIds.value = projectIds;
-              save.touch();
-            }}
-          />
-        )}
+            hint={reachHint(d.reach.value, ids, keyed)}
+          >
+            <ReachSeg
+              reach={d.reach.value}
+              save={save}
+              onPick={(reach) => {
+                d.reach.value = reach;
+                save.touch();
+              }}
+            />
+            {d.reach.value === "picked" && (
+              <ProjectsPicks
+                projectIds={ids}
+                held={server.projects}
+                save={save}
+                onChange={(projectIds) => {
+                  d.projectIds.value = projectIds;
+                  save.touch();
+                }}
+              />
+            )}
+          </Labelled>
+          <Labelled
+            label="Personal projects"
+            field="personal"
+            save={save}
+            hint={personalHint(d.personal.value, keyed)}
+          >
+            <PersonalSeg
+              personal={d.personal.value}
+              save={save}
+              onPick={(personal) => {
+                if (personal === "") return;
+                d.personal.value = personal;
+                save.touch();
+              }}
+            />
+          </Labelled>
+          <Labelled label={CEILING_LABEL} field="offer" save={save}>
+            <Seg
+              label={CEILING_LABEL}
+              name="offer"
+              value={offerOf(d.read.value, d.write.value)}
+              options={OFFER_OPTIONS.map((o) => ({
+                ...o,
+                disabled: save.busy,
+              }))}
+              onPick={(offer) => {
+                const sides = offerSides(offer);
+                d.read.value = sides.read;
+                d.write.value = sides.write;
+                save.touch();
+              }}
+            />
+          </Labelled>
+        </div>
       </Setting>
-    </SettingForm>
-  );
-}
-
-export function PersonalCard({ server, drafts: d }: Props) {
-  const latest = useLatest(server);
-  const save = useSave(async () => {
-    d.resetPersonal(
-      await patchServer(latest.current.id, { personal: d.personal.value }),
-    );
-  }, mcpFieldOf);
-  return (
-    <SettingForm save={save}>
-      <Setting
-        title="Personal projects"
-        line={
-          personalHint(d.personal.value, server.keyName !== null) ??
-          "The most a personal project may choose."
-        }
-        action={
-          <PersonalSeg
-            personal={d.personal.value}
-            save={save}
-            onPick={(personal) => {
-              if (personal === "") return;
-              d.personal.value = personal;
-              save.touch();
-            }}
-          />
-        }
-        foot={
-          <DraftFoot
-            save={save}
-            dirty={d.personalDirty(server)}
-            hint={
-              save.fieldError("personal") !== null ? (
-                <FieldError save={save} field="personal" />
-              ) : undefined
-            }
-            onDiscard={() => d.resetPersonal(latest.current)}
-          />
-        }
-      />
     </SettingForm>
   );
 }

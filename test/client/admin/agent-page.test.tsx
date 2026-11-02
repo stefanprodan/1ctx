@@ -18,6 +18,7 @@ import {
   failing,
   failingLine,
   lastUse,
+  MCP_LINE,
 } from "../../../src/client/views/admin/AgentPage.model.ts";
 import { AgentDrafts } from "../../../src/client/views/admin/AgentPage.state.ts";
 import { tabOf } from "../../../src/client/views/admin/AgentPage.tsx";
@@ -665,12 +666,17 @@ describe("the cards", () => {
         <AgentMcp agent={agent} drafts={AgentDrafts.of(agent)} />,
       );
       // every server, on or not, each linking to its page; no picker
-      expect(html).toContain("refreshed 1h ago · finops, 2 personal projects");
-      expect(html).toContain("refreshed 1h ago · No projects");
+      // where each is on, counted, the names on hover
+      expect(html).toContain(
+        'refreshed 1h ago · <span title="finops, 2 personal projects">1 team · 2 personal<',
+      );
+      expect(html).toContain(
+        'refreshed 1h ago · <span title="No projects">Nowhere<',
+      );
       expect(html).toContain('href="/admin/config/mcp/markets"');
       expect(html).toContain('href="/admin/config/mcp/flux"');
       expect(html).toContain("1.2K tokens");
-      expect(html).toContain("Chosen on a project's Settings");
+      expect(html).toContain(MCP_LINE);
       expect(html).not.toContain("Add server");
       expect(html).toContain('name="mcp"');
       expect(html).toContain('name="mcpMode"');

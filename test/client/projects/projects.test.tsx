@@ -945,7 +945,7 @@ describe("the pages", () => {
       expect(html).not.toContain("setting-count");
       // the second line in the body font, as a label's
       expect(html).toContain(
-        'class="rows-sub rows-sub-wrap rows-sub-prose">5 tools · All team projects<',
+        'class="rows-sub rows-sub-wrap rows-sub-prose">5 tools<',
       );
       projectMcpLists.value = new Map();
     });

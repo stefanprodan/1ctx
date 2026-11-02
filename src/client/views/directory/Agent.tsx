@@ -57,6 +57,7 @@ import {
   agentTabHref,
   agentTabs,
   capabilities,
+  directoryOnCount,
   effortText,
   filesText,
   onWords,
@@ -225,7 +226,15 @@ function McpTab({
             </RowsAvatar>
             <RowsTitle
               name={server.name}
-              sub={`${line.text} · ${onWords(server.projects, server.personal)}`}
+              // the counts, their names on hover
+              sub={
+                <>
+                  {`${line.text} · `}
+                  <span title={onWords(server.projects, server.personal)}>
+                    {directoryOnCount(server.projects, server.personal)}
+                  </span>
+                </>
+              }
               bad={line.bad}
               mono
             />

@@ -22,7 +22,6 @@ import { FieldError } from "../../ui/FieldError.tsx";
 import { Fold } from "../../ui/Fold.tsx";
 import { NumberBox } from "../../ui/NumberBox.tsx";
 import { RowsGo, RowsLine, RowsSwitch, RowsTitle } from "../../ui/Rows.tsx";
-import { Seg } from "../../ui/Seg.tsx";
 import { Select } from "../../ui/Select.tsx";
 import {
   Setting,
@@ -40,16 +39,12 @@ import {
   instructionsBox,
   instructionsLine,
   mcpFieldOf,
-  OFFER_OPTIONS,
-  type Offer,
-  offerOf,
-  offerSides,
   timeoutMs,
   timeoutProblem,
   timeoutText,
 } from "./Mcp.model.ts";
 import type { McpDrafts } from "./McpPage.state.ts";
-import { PersonalCard, ProjectsCard } from "./McpProjects.tsx";
+import { AccessCard } from "./McpProjects.tsx";
 
 type Props = { server: McpServerSummary; drafts: McpDrafts };
 
@@ -58,9 +53,7 @@ export function McpGeneral({ server, drafts, now }: Props & { now: number }) {
     <>
       <About server={server} now={now} />
       <Endpoint server={server} drafts={drafts} />
-      <ProjectsCard server={server} drafts={drafts} />
-      <PersonalCard server={server} drafts={drafts} />
-      <Offered server={server} drafts={drafts} />
+      <AccessCard server={server} drafts={drafts} />
       <Timeout server={server} drafts={drafts} />
       <Instructions server={server} drafts={drafts} />
       <OnIn server={server} />
@@ -217,48 +210,6 @@ function Endpoint({ server, drafts: d }: Props) {
           </div>
         </div>
       </Setting>
-    </SettingForm>
-  );
-}
-
-function Offered({ server, drafts: d }: Props) {
-  const latest = useLatest(server);
-  const save = useSave(async () => {
-    d.resetOffer(
-      await patchServer(latest.current.id, {
-        read: d.read.value,
-        write: d.write.value,
-      }),
-    );
-  }, mcpFieldOf);
-  const pick = (offer: Offer) => {
-    const sides = offerSides(offer);
-    d.read.value = sides.read;
-    d.write.value = sides.write;
-    save.touch();
-  };
-  return (
-    <SettingForm save={save}>
-      <Setting
-        title="Tool access"
-        line="The most any project may choose."
-        action={
-          <Seg
-            label="Tool access"
-            name="offer"
-            value={offerOf(d.read.value, d.write.value)}
-            options={OFFER_OPTIONS.map((o) => ({ ...o, disabled: save.busy }))}
-            onPick={pick}
-          />
-        }
-        foot={
-          <DraftFoot
-            save={save}
-            dirty={d.offerDirty(server)}
-            onDiscard={() => d.resetOffer(latest.current)}
-          />
-        }
-      />
     </SettingForm>
   );
 }

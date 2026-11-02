@@ -12,13 +12,11 @@ export const PERSONAL_TEXT = "Tools for agents, offered by admins.";
 export const mcpText = (personal: boolean): string =>
   personal ? PERSONAL_TEXT : TEAM_TEXT;
 
-// under a server's name: its tools here, then on a team project every
-// team project or this one; a personal project's grant is every one's
+// under a server's name: its tools here, and This project on a team
+// project's listed row; a row granted to every one says no more
 export function rowLine(row: ProjectMcpServer, personal: boolean): string {
-  if (personal) return serverMeta(row);
-  return `${serverMeta(row)} · ${
-    row.scope === "all" ? "All team projects" : "This project"
-  }`;
+  if (personal || row.scope === "all") return serverMeta(row);
+  return `${serverMeta(row)} · This project`;
 }
 
 // what a row is for its viewer: a team's admin picks its side and
@@ -30,6 +28,13 @@ export function rowKind(admin: boolean, personal: boolean): RowKind {
   if (personal) return "owner";
   return admin ? "admin" : "read";
 }
+
+// only a team's admin takes the project off a listed row, from its More
+// menu; a row granted to every team project is changed on its page
+export const removable = (
+  kind: RowKind,
+  row: Pick<ProjectMcpServer, "scope">,
+): boolean => kind === "admin" && row.scope === "projects";
 
 // the sides a row may pick: Off always, Read while the server's Read is
 // on, Read and write only under a write ceiling

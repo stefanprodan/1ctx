@@ -24,6 +24,7 @@ import {
   PERSONAL_TEXT,
   pickOptions,
   pickValue,
+  removable,
   removeAsk,
   rowKind,
   rowLine,
@@ -84,8 +85,8 @@ const held = (projectId: string, body: ProjectMcpResponse) => {
 };
 
 describe("the model", () => {
-  test("a row says its tools and every team project or this one", () => {
-    expect(rowLine(flux, false)).toBe("3 tools · All team projects");
+  test("a row says its tools, and This project only on a listed one", () => {
+    expect(rowLine(flux, false)).toBe("3 tools");
     expect(rowLine(markets, false)).toBe("1 tool · This project");
     // a personal project's grant is every one's alike
     expect(rowLine(flux, true)).toBe("3 tools");
@@ -96,6 +97,13 @@ describe("the model", () => {
     expect(rowKind(false, false)).toBe("read");
     expect(rowKind(false, true)).toBe("owner");
     expect(rowKind(true, true)).toBe("owner");
+  });
+
+  test("only a team admin's listed row has Remove", () => {
+    expect(removable("admin", markets)).toBe(true);
+    expect(removable("admin", flux)).toBe(false);
+    expect(removable("owner", markets)).toBe(false);
+    expect(removable("read", markets)).toBe(false);
   });
 
   test("the sides a row offers: Read with the server's Read, write under a write ceiling", () => {
@@ -333,16 +341,20 @@ describe("the list", () => {
       );
       expect(html).toContain(">MCP Servers<");
       expect(html).toContain(TEAM_TEXT);
-      expect(html).toContain("3 tools · All team projects");
+      expect(html).not.toContain("All team projects");
+      expect(html).toContain(">3 tools<");
       expect(html).toContain("1 tool · This project");
       expect(html).toContain('href="/admin/config/mcp/flux"');
       expect(html).toContain('href="/admin/config/mcp/markets"');
+      // one dropdown per row, showing the pick
       expect(html.match(/aria-label="Side of /g)).toHaveLength(2);
-      expect(html.match(/aria-pressed="true"[^>]*>Read</g)).toHaveLength(2);
-      expect(html).toContain(">Read and write<");
-      // only the listed row is removed here
-      expect(html.match(/aria-label="Remove /g)).toHaveLength(1);
-      expect(html).toContain('aria-label="Remove markets"');
+      expect(html.match(/select-trigger-quiet/g)).toHaveLength(2);
+      expect(html.match(/select-label cut">Read</g)).toHaveLength(2);
+      // only the listed row has More, with Remove in it; the other keeps
+      // its room so the picks line up
+      expect(html.match(/aria-label="More for /g)).toHaveLength(1);
+      expect(html).toContain('aria-label="More for markets"');
+      expect(html.match(/mcp-servers-gap/g)).toHaveLength(1);
       expect(html).toContain("Add server");
     },
   );
@@ -378,9 +390,10 @@ describe("the list", () => {
     expect(html).not.toContain("Side of");
     expect(html).not.toContain("<a ");
     expect(html).not.toContain("Add server");
-    expect(html).not.toContain("Remove");
-    // each row says what the project chose, an off one too
-    expect(html).toContain(">Read<");
+    expect(html).not.toContain("More for");
+    // each row says what the project chose, an off one too, in the
+    // pick's column
+    expect(html).toContain('<span class="mcp-servers-word">Read<');
   });
 
   test.serial("an off row stays, saying Off", () => {
@@ -405,7 +418,7 @@ describe("the list", () => {
         admin
       />,
     );
-    expect(picked).toMatch(/aria-pressed="true"[^>]*>Off</);
+    expect(picked).toContain('select-label cut">Off<');
   });
 
   test.serial(
@@ -428,7 +441,8 @@ describe("the list", () => {
       // a read ceiling hides Read and write
       expect(html).not.toContain("Read and write");
       expect(html).not.toContain("<a ");
-      expect(html).not.toContain("Remove");
+      expect(html).not.toContain("More for");
+      expect(html).not.toContain("mcp-servers-gap");
     },
   );
 

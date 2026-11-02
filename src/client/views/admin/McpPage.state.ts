@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { signal } from "@preact/signals";
+import type { PatchMcpSettings } from "../../../shared/api/mcp.ts";
 import type {
   McpServerSummary,
   McpSide,
@@ -9,6 +10,7 @@ import type {
 import type { Patterns } from "../../../shared/mcp.ts";
 import { NO_KEY } from "../../lib/secrets.ts";
 import {
+  projectsBody,
   type Reach,
   reachOf,
   sameIds,
@@ -55,11 +57,9 @@ export class McpDrafts {
   static of(server: McpServerSummary): McpDrafts {
     const d = new McpDrafts();
     d.resetEndpoint(server);
-    d.resetOffer(server);
+    d.resetAccess(server);
     d.resetTimeout(server);
     d.resetInstructions(server);
-    d.resetProjects(server);
-    d.resetPersonal(server);
     d.resetTools(server);
     return d;
   }
@@ -72,6 +72,14 @@ export class McpDrafts {
   resetOffer(s: McpServerSummary): void {
     this.read.value = s.read;
     this.write.value = s.write;
+  }
+
+  // the Access card: the team projects, the personal grant and the
+  // server's switches, the most any project may use
+  resetAccess(s: McpServerSummary): void {
+    this.resetProjects(s);
+    this.resetPersonal(s);
+    this.resetOffer(s);
   }
 
   resetTimeout(s: McpServerSummary): void {
@@ -129,6 +137,26 @@ export class McpDrafts {
     return this.personal.value !== s.personal;
   }
 
+  accessDirty(s: McpServerSummary): boolean {
+    return this.projectsDirty(s) || this.personalDirty(s) || this.offerDirty(s);
+  }
+
+  // the Access card's one PATCH: only what changed, which the server
+  // takes together and writes in one transaction
+  accessBody(s: McpServerSummary): PatchMcpSettings {
+    const body: PatchMcpSettings = {};
+    if (this.projectsDirty(s)) {
+      const projects = projectsBody(this.reach.value, this.projectIds.value);
+      if (projects !== undefined) body.projects = projects;
+    }
+    if (this.personalDirty(s)) body.personal = this.personal.value;
+    if (this.offerDirty(s)) {
+      body.read = this.read.value;
+      body.write = this.write.value;
+    }
+    return body;
+  }
+
   toolsDirty(s: McpServerSummary): boolean {
     return !samePatterns(this.patterns.value, patternsOf(s));
   }
@@ -137,11 +165,9 @@ export class McpDrafts {
   // another save or a refresh answered, an edited one stays
   follow(before: McpServerSummary, after: McpServerSummary): void {
     if (!this.endpointDirty(before)) this.resetEndpoint(after);
-    if (!this.offerDirty(before)) this.resetOffer(after);
+    if (!this.accessDirty(before)) this.resetAccess(after);
     if (!this.timeoutDirty(before)) this.resetTimeout(after);
     if (!this.instructionsDirty(before)) this.resetInstructions(after);
-    if (!this.projectsDirty(before)) this.resetProjects(after);
-    if (!this.personalDirty(before)) this.resetPersonal(after);
     if (!this.toolsDirty(before)) {
       this.patterns.value = patternsOf(after);
     }

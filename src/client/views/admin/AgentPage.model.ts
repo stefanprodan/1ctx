@@ -140,7 +140,7 @@ export const mcpSwitchLine = (on: boolean): string =>
 // tokens are its own, since which servers a turn carries is the
 // project's
 export const MCP_LINE =
-  "Chosen on a project's Settings or the server's page. Tokens are each server's own, in this mode.";
+  "Projects choose servers on their Settings or on the server's page. Each row's tokens are that server's cost in this agent's mode.";
 
 export const MODE_OPTIONS: { value: McpMode; label: string }[] = [
   { value: "auto", label: "Auto" },

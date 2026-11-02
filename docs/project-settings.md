@@ -38,18 +38,21 @@ page share: its repositories (`views/projects/Repos.tsx`,
 - **One `views/projects/McpServers.tsx` draws every list,** after
   Repositories: the team project's card on its admin page and a
   section on every project's Settings tab, from `data/project-mcp.ts`.
-  A row is the server's name, its tool count and, on a team project,
-  `All team projects` or `This project`, never a URL or key file.
+  A row is the server's name, its tool count and, on a team project's
+  listed row, `This project` (`rowLine()`), never a URL or key file.
 - **Every granted server is a row with the project's side,** an Off
   one included. An admin on a team project and the owner of a personal
-  one pick it (`rowKind()`) from a small `Seg` written at once
-  (`setProjectMcpSide()`): Off, Read while the server's Read is on, Read
-  and write only under a write ceiling (`pickOptions()`). A choice
-  above a lowered ceiling shows the side it gives (`pickValue()`).
-  Anyone else reads the side's word.
+  one pick it (`rowKind()`) from a quiet `Select` at the row's end, one
+  width on every row, written at once (`setProjectMcpSide()`): Off,
+  Read while the server's Read is on, Read and write only under a write
+  ceiling (`pickOptions()`). A choice above a lowered ceiling shows the
+  side it gives (`pickValue()`). Anyone else, or a row with only Off,
+  reads the side's word in the same column.
 - **An admin's row links to the server's page,** where its grants
-  change. A `This project` row also ends in Remove, which opens a form
-  asked with `removeAsk()`, naming the last project's consequence.
+  change. A `This project` row also ends in a More menu (`MoreMenu`)
+  holding Remove (`removable()`), which opens a form asked with
+  `removeAsk()`, naming the last project's consequence. An admin's
+  other rows keep the menu's room, so the picks line up.
   Add server is a `Finder` over the answer's `addable`, hidden when
   empty. A personal project has neither.
 - **A write reads the project's agents again**

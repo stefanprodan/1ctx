@@ -26,21 +26,21 @@ import {
   RowsGo,
   RowsLine,
   RowsList,
-  RowsMeta,
   RowsNew,
   RowsNote,
-  RowsRemove,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Section } from "../../ui/Section.tsx";
-import { Seg } from "../../ui/Seg.tsx";
+import { Select } from "../../ui/Select.tsx";
 import { Setting } from "../../ui/Setting.tsx";
+import { MoreMenu } from "../knowledge/file/DocMenus.tsx";
 import {
   mcpText,
   type OpenServer,
   openOf,
   pickOptions,
   pickValue,
+  removable,
   removeAsk,
   rowKind,
   rowLine,
@@ -176,7 +176,9 @@ function ServerRows({
           return (
             <RowsLine key={server.id} flush>
               {title}
-              <RowsMeta>{sideWord(server)}</RowsMeta>
+              <span class="mcp-servers-end">
+                <SideWord row={server} />
+              </span>
             </RowsLine>
           );
         }
@@ -186,8 +188,10 @@ function ServerRows({
             personal={personal}
             row={server}
             locked={opened !== null}
+            // an admin's rows keep the menu's room, so every pick lines up
+            menu={kind === "admin"}
             onRemove={
-              kind === "admin" && server.scope === "projects"
+              removable(kind, server)
                 ? () => {
                     open.value = server;
                   }
@@ -212,51 +216,76 @@ function ServerRows({
   );
 }
 
-// the project's pick of the row's side, written at once, and Remove for
-// a listed row; a row with nothing to pick but Off says its word
+// the side, in the pick's column whether or not it can change
+function SideWord({ row }: { row: ProjectMcpServer }) {
+  return (
+    <span class="mcp-servers-pick">
+      <span class="mcp-servers-word">{sideWord(row)}</span>
+    </span>
+  );
+}
+
+// the project's pick of the row's side, written at once, and Remove in
+// the More menu of a listed row; a row with nothing to pick but Off says
+// its word
 function SideEnd({
   projectId,
   personal,
   row,
   locked,
+  menu,
   onRemove,
 }: {
   projectId: string;
   personal: boolean;
   row: ProjectMcpServer;
   locked: boolean;
+  menu: boolean;
   onRemove?: () => void;
 }) {
   const picking = useAction();
   const options = pickOptions(row);
   const busy = picking.busy.value || locked;
-  const pick = options.length > 1;
-  if (!pick && onRemove === undefined) {
-    return <RowsMeta>{sideWord(row)}</RowsMeta>;
-  }
   return (
-    <RowsEnd
-      words={pick ? undefined : sideWord(row)}
-      error={picking.failure.value}
-    >
-      {pick && (
-        <Seg
-          label={`Side of ${row.name}`}
-          small
-          class="mcp-servers-pick"
-          value={pickValue(row)}
-          options={options.map((o) => ({ ...o, disabled: busy }))}
-          onPick={(side) => {
-            if (side === pickValue(row)) return;
-            void picking.run(() =>
-              setProjectMcpSide(projectId, row.id, side, personal),
-            );
-          }}
-        />
-      )}
-      {onRemove !== undefined && (
-        <RowsRemove name={row.name} disabled={busy} onRemove={onRemove} />
-      )}
+    <RowsEnd error={picking.failure.value}>
+      <span class="mcp-servers-end">
+        {options.length > 1 ? (
+          <span class="mcp-servers-pick">
+            <Select
+              label={`Side of ${row.name}`}
+              quiet
+              value={pickValue(row)}
+              options={options}
+              disabled={busy}
+              onChange={(value) => {
+                const side = options.find((o) => o.value === value)?.value;
+                if (side === undefined || side === pickValue(row)) return;
+                void picking.run(() =>
+                  setProjectMcpSide(projectId, row.id, side, personal),
+                );
+              }}
+            />
+          </span>
+        ) : (
+          <SideWord row={row} />
+        )}
+        {onRemove !== undefined ? (
+          <MoreMenu
+            label={`More for ${row.name}`}
+            disabled={busy}
+            actions={[
+              {
+                label: "Remove",
+                icon: "close",
+                danger: true,
+                onPick: onRemove,
+              },
+            ]}
+          />
+        ) : (
+          menu && <span class="mcp-servers-gap" />
+        )}
+      </span>
     </RowsEnd>
   );
 }

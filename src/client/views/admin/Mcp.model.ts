@@ -12,7 +12,7 @@ import { classify, serverBlock } from "../../../shared/mcp.ts";
 import { MCP_TIMEOUT_MS } from "../../../shared/words.ts";
 import { ago, pluralCommas } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
-import { onWords } from "../directory/Directory.model.ts";
+import { onCount, onWords } from "../directory/Directory.model.ts";
 
 export function changeLine(change: McpChange | null, now: number): string {
   if (change === null) return "";
@@ -94,6 +94,9 @@ export const SIDE_WORDS: Record<McpSide, string> = {
   write: "Read and write",
 };
 
+// the server's own switches, as the Access card names them
+export const CEILING_LABEL = "Most any project may use";
+
 export const OFFER_OPTIONS: { value: Offer; label: string }[] = (
   ["off", "read", "write"] as const
 ).map((value) => ({ value, label: SIDE_WORDS[value] }));
@@ -162,6 +165,10 @@ export const whereOn = (on: McpOn): string =>
     on.projects.map((p) => p.name),
     on.personal,
   );
+
+// the agent's MCP tab: counted, the names on hover
+export const whereOnCount = (on: McpOn): string =>
+  onCount(on.projects.length, on.personal);
 
 const isOn = (on: McpOn) => on.projects.length > 0 || on.personal > 0;
 

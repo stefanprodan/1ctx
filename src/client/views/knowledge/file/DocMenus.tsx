@@ -59,12 +59,14 @@ export function MoreMenu({
   label = "More",
   icon = "more",
   button = "btn-icon",
+  disabled,
 }: {
   actions: MoreAction[];
   label?: string;
   icon?: IconName;
   // the button's own classes: an icon alone, or a small button
   button?: string;
+  disabled?: boolean;
 }) {
   const { open, root } = useMenu();
   return (
@@ -76,6 +78,7 @@ export function MoreMenu({
         title={label}
         aria-haspopup="menu"
         aria-expanded={open.value}
+        disabled={disabled}
         onClick={() => {
           open.value = !open.value;
         }}

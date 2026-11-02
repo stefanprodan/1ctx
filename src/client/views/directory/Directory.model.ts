@@ -88,6 +88,25 @@ export function onWords(projects: readonly string[], personal: number): string {
   return words.length === 0 ? "No projects" : words.join(", ");
 }
 
+// where a server is on, counted, since the names run long; they show
+// on hover
+export function onCount(teams: number, personal: number): string {
+  const words = [
+    ...(teams > 0 ? [`${teams} team${teams === 1 ? "" : "s"}`] : []),
+    ...(personal > 0 ? [`${personal} personal`] : []),
+  ];
+  return words.length === 0 ? "Nowhere" : words.join(" · ");
+}
+
+// the directory's names, the viewer's own personal project as Personal
+export const directoryOnCount = (
+  projects: readonly string[],
+  personal: number,
+): string => {
+  const own = projects.includes("Personal") ? 1 : 0;
+  return onCount(projects.length - own, personal + own);
+};
+
 // what a server gives the model: its tools that reach it
 export function serverMeta(server: { tools: number }): string {
   const n = server.tools;

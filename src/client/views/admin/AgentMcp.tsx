@@ -36,7 +36,7 @@ import {
 import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
-import { whereOn } from "./Mcp.model.ts";
+import { whereOn, whereOnCount } from "./Mcp.model.ts";
 
 // the tools a server gives on its own switches, the most any project gets
 const toolCount = (server: McpServerSummary) =>
@@ -145,7 +145,15 @@ function Servers({
             <RowsGo key={server.id} href={configMcpHref(server.name)}>
               <RowsTitle
                 name={server.name}
-                sub={`${line.text} · ${whereOn(server.on)}`}
+                // the counts, their names on hover
+                sub={
+                  <>
+                    {`${line.text} · `}
+                    <span title={whereOn(server.on)}>
+                      {whereOnCount(server.on)}
+                    </span>
+                  </>
+                }
                 bad={line.bad}
                 mono
               />
