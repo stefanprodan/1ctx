@@ -24,7 +24,8 @@
     color: var(--fg);
   }
   /* the row's end: the pick, one width on every row so "Read and write"
-     fits uncut, its open list's check mark included, then the More menu or its room */
+     fits uncut, its open list's check mark included, then the More
+     menu */
   .mcp-servers-end {
     display: flex;
     flex-shrink: 0;
@@ -41,9 +42,5 @@
     font-size: var(--text-small);
     color: var(--dim);
     white-space: nowrap;
-  }
-  .mcp-servers-gap {
-    flex-shrink: 0;
-    width: 32px;
   }
 }

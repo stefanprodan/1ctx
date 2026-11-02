@@ -48,11 +48,11 @@ page share: its repositories (`views/projects/Repos.tsx`,
   ceiling (`pickOptions()`). A choice above a lowered ceiling shows the
   side it gives (`pickValue()`). Anyone else, or a row with only Off,
   reads the side's word in the same column.
-- **An admin's row links to the server's page,** where its grants
-  change. A `This project` row also ends in a More menu (`MoreMenu`)
-  holding Remove (`removable()`), which opens a form asked with
-  `removeAsk()`, naming the last project's consequence. An admin's
-  other rows keep the menu's room, so the picks line up.
+- **A row is no link.** An admin's row ends in a More menu
+  (`MoreMenu`): Edit opens the server's page, where its grants change,
+  and a `This project` row adds Remove (`removable()`), which opens a
+  form asked with `removeAsk()`, naming the last project's
+  consequence.
   Add server is a `Finder` over the answer's `addable`, hidden when
   empty. A personal project has neither.
 - **A write reads the project's agents again**

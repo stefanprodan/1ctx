@@ -3,6 +3,7 @@
 
 import type { ProjectMcpServer } from "../../../shared/api/mcp.ts";
 import type { McpSide } from "../../../shared/contracts/mcp.ts";
+import { configMcpHref } from "../../lib/hrefs.ts";
 import { SIDE_WORDS } from "../admin/Mcp.model.ts";
 import { serverMeta } from "../directory/Directory.model.ts";
 
@@ -35,6 +36,13 @@ export const removable = (
   kind: RowKind,
   row: Pick<ProjectMcpServer, "scope">,
 ): boolean => kind === "admin" && row.scope === "projects";
+
+// the server's page, for Edit in every row's More menu; only an admin
+// opens it, on any project, their own personal one included
+export const editHref = (
+  admin: boolean,
+  row: Pick<ProjectMcpServer, "name">,
+): string | undefined => (admin ? configMcpHref(row.name) : undefined);
 
 // the sides a row may pick: Off always, Read while the server's Read is
 // on, Read and write only under a write ceiling

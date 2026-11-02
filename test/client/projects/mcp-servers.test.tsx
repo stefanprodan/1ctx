@@ -19,6 +19,7 @@ import {
   setProjectMcpSide,
 } from "../../../src/client/data/project-mcp.ts";
 import {
+  editHref,
   mcpText,
   openOf,
   PERSONAL_TEXT,
@@ -97,6 +98,12 @@ describe("the model", () => {
     expect(rowKind(false, false)).toBe("read");
     expect(rowKind(false, true)).toBe("owner");
     expect(rowKind(true, true)).toBe("owner");
+  });
+
+  test("an admin's every row edits the server's page, anyone else's none", () => {
+    expect(editHref(true, flux)).toBe("/admin/config/mcp/flux");
+    expect(editHref(true, markets)).toBe("/admin/config/mcp/markets");
+    expect(editHref(false, flux)).toBeUndefined();
   });
 
   test("only a team admin's listed row has Remove", () => {
@@ -327,7 +334,7 @@ describe("the project's agents", () => {
 
 describe("the list", () => {
   test.serial(
-    "a team's admin: every row picks and links, a listed one removes",
+    "a team's admin: every row picks and has a More menu, no row links",
     () => {
       held("p2", answerOf([flux, markets], [{ id: "m3", name: "github" }]));
       const html = render(
@@ -344,17 +351,15 @@ describe("the list", () => {
       expect(html).not.toContain("All team projects");
       expect(html).toContain(">3 tools<");
       expect(html).toContain("1 tool · This project");
-      expect(html).toContain('href="/admin/config/mcp/flux"');
-      expect(html).toContain('href="/admin/config/mcp/markets"');
+      // the row is no link: Edit sits in its More menu
+      expect(html).not.toContain('href="/admin/config/mcp/');
+      expect(html).not.toContain("rows-go");
       // one dropdown per row, showing the pick
       expect(html.match(/aria-label="Side of /g)).toHaveLength(2);
       expect(html.match(/select-trigger-small/g)).toHaveLength(2);
       expect(html.match(/select-label cut">Read</g)).toHaveLength(2);
-      // only the listed row has More, with Remove in it; the other keeps
-      // its room so the picks line up
-      expect(html.match(/aria-label="More for /g)).toHaveLength(1);
-      expect(html).toContain('aria-label="More for markets"');
-      expect(html.match(/mcp-servers-gap/g)).toHaveLength(1);
+      // every admin row has More (Edit), the listed one adds Remove
+      expect(html.match(/aria-label="More for /g)).toHaveLength(2);
       expect(html).toContain("Add server");
     },
   );

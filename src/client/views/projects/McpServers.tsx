@@ -15,7 +15,6 @@ import {
   removeProjectMcp,
   setProjectMcpSide,
 } from "../../data/project-mcp.ts";
-import { configMcpHref } from "../../lib/hrefs.ts";
 import { useAction, useSave } from "../../lib/save.ts";
 import { countOf } from "../../lib/search.ts";
 import { Finder } from "../../ui/Finder.tsx";
@@ -23,7 +22,6 @@ import { AskDelete, Foot } from "../../ui/Foot.tsx";
 import {
   RowsEnd,
   RowsFailed,
-  RowsGo,
   RowsLine,
   RowsList,
   RowsNew,
@@ -35,6 +33,7 @@ import { Select } from "../../ui/Select.tsx";
 import { Setting } from "../../ui/Setting.tsx";
 import { MoreMenu } from "../knowledge/file/DocMenus.tsx";
 import {
+  editHref,
   mcpText,
   type OpenServer,
   openOf,
@@ -188,8 +187,7 @@ function ServerRows({
             personal={personal}
             row={server}
             locked={opened !== null}
-            // an admin's rows keep the menu's room, so every pick lines up
-            menu={kind === "admin"}
+            edit={editHref(admin, server)}
             onRemove={
               removable(kind, server)
                 ? () => {
@@ -199,13 +197,8 @@ function ServerRows({
             }
           />
         );
-        // an admin follows the row to the server's page, where its grants
-        // change; an owner's row has no link
-        return kind === "admin" ? (
-          <RowsGo key={server.id} href={configMcpHref(server.name)} end={end}>
-            {title}
-          </RowsGo>
-        ) : (
+        // the row is no link: its pick and menu are the only targets
+        return (
           <RowsLine key={server.id} flush>
             {title}
             {end}
@@ -225,22 +218,22 @@ function SideWord({ row }: { row: ProjectMcpServer }) {
   );
 }
 
-// the project's pick of the row's side, written at once, and Remove in
-// the More menu of a listed row; a row with nothing to pick but Off says
-// its word
+// the project's pick of the row's side, written at once, then the More
+// menu: Edit for an admin, Remove on a listed row; a row with nothing to
+// pick but Off says its word
 function SideEnd({
   projectId,
   personal,
   row,
   locked,
-  menu,
+  edit,
   onRemove,
 }: {
   projectId: string;
   personal: boolean;
   row: ProjectMcpServer;
   locked: boolean;
-  menu: boolean;
+  edit?: string;
   onRemove?: () => void;
 }) {
   const picking = useAction();
@@ -269,21 +262,26 @@ function SideEnd({
         ) : (
           <SideWord row={row} />
         )}
-        {onRemove !== undefined ? (
+        {(edit !== undefined || onRemove !== undefined) && (
           <MoreMenu
             label={`More for ${row.name}`}
             disabled={busy}
             actions={[
-              {
-                label: "Remove",
-                icon: "close",
-                danger: true,
-                onPick: onRemove,
-              },
+              ...(edit !== undefined
+                ? [{ label: "Edit", icon: "pencil" as const, href: edit }]
+                : []),
+              ...(onRemove !== undefined
+                ? [
+                    {
+                      label: "Remove",
+                      icon: "close" as const,
+                      danger: true,
+                      onPick: onRemove,
+                    },
+                  ]
+                : []),
             ]}
           />
-        ) : (
-          menu && <span class="mcp-servers-gap" />
         )}
       </span>
     </RowsEnd>
