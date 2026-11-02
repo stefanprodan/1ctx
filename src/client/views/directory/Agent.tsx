@@ -59,6 +59,7 @@ import {
   capabilities,
   effortText,
   filesText,
+  scopeWords,
   serverLine,
   serverMeta,
   switchItems,
@@ -220,7 +221,12 @@ function McpTab({
             <RowsAvatar>
               <Icon name="mcp" size={14} />
             </RowsAvatar>
-            <RowsTitle name={server.name} sub={line.text} bad={line.bad} mono />
+            <RowsTitle
+              name={server.name}
+              sub={`${line.text} · ${scopeWords(server.scope, server.projects)}`}
+              bad={line.bad}
+              mono
+            />
             <RowsMeta>{serverMeta(server)}</RowsMeta>
           </RowsLine>
         );

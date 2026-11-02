@@ -124,6 +124,13 @@ export async function loadProjectAgents(projectId: string): Promise<void> {
   }
 }
 
+// a write changed what the project offers: the project on screen reads
+// its agents again, another's held answer goes
+export function reloadProjectAgents(projectId: string): void {
+  if (shownFor === projectId) void loadProjectAgents(projectId);
+  else kept.delete(projectId);
+}
+
 // Home's composer moves to another project: its agents replace the
 // last project's, the held ones or none until they answer
 export async function pickHomeProject(projectId: string): Promise<void> {

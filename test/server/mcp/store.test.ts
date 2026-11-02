@@ -3,7 +3,8 @@
 
 import { describe, expect, test } from "bun:test";
 import type { DiscoveryResult } from "../../../src/server/mcp/discover.ts";
-import { McpServerStore, summary } from "../../../src/server/mcp/store.ts";
+import { McpServerStore } from "../../../src/server/mcp/store.ts";
+import { summary } from "../../../src/server/mcp/summary.ts";
 import type { CreateMcpRequest } from "../../../src/shared/api/mcp.ts";
 import { memoryDb } from "../../helpers/db.ts";
 
@@ -162,6 +163,7 @@ describe("MCP server store", () => {
         markdown = text;
         return "<pre>parameters</pre>";
       },
+      () => null,
     );
     expect(value.hasKey).toBeTrue();
     expect(value.tools[0].wireName).toBe("mcp__cluster__get_status");

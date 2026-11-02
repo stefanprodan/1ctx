@@ -67,6 +67,7 @@ import {
   overviewRange,
 } from "../data/overview.ts";
 import { loadProfile } from "../data/profile.ts";
+import { loadProjectMcp } from "../data/project-mcp.ts";
 import {
   loadProject,
   loadProjects,
@@ -577,6 +578,7 @@ export const ROUTES: Route[] = [
       await Promise.all([
         ...frame(params.id),
         loadRepos(params.id),
+        loadProjectMcp(params.id),
         ...(keys ? [loadCredentials()] : []),
       ]);
     },
@@ -680,6 +682,7 @@ export const ROUTES: Route[] = [
         loadAdminProject(params.id),
         loadProjectUsage(params.id),
         loadRepos(params.id),
+        loadProjectMcp(params.id),
         loadCredentials(),
       ]);
     },

@@ -8,7 +8,7 @@ import type {
   KnowledgeFileDetailResponse,
   KnowledgeListResponse,
 } from "../../shared/api/knowledge.ts";
-import type { McpResponse, PatchMcpSettings } from "../../shared/api/mcp.ts";
+import type { McpResponse } from "../../shared/api/mcp.ts";
 import type {
   ProjectResponse,
   ProjectsResponse,
@@ -36,6 +36,7 @@ import {
 import { decider } from "./decider.ts";
 import { applyDictation } from "./dictation.ts";
 import { keptStated } from "./fields.ts";
+import { applyMcpServer } from "./mcp.ts";
 import { type Document, KINDS, type LabelSpec, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
 import { applySmtpServer } from "./smtp.ts";
@@ -303,43 +304,6 @@ async function skill(api: Client, doc: Of<"Skill">): Promise<Action> {
   return "created";
 }
 
-async function mcp(api: Client, doc: Of<"McpServer">): Promise<Action> {
-  const { servers } = await api.call<McpResponse>("GET", "/api/mcp");
-  const before = servers.find((row) => row.name === doc.name);
-  const { url, keyFrom, ...settings } = doc.spec;
-  const endpoint = {
-    ...(url === undefined ? {} : { url }),
-    ...(keyFrom === undefined ? {} : { keyName: keyFrom }),
-  };
-  if (!before) {
-    await api.call("POST", "/api/mcp", {
-      name: doc.name,
-      url,
-      keyName: keyFrom ?? null,
-      read: true,
-      write: false,
-      instructionsOn: true,
-      timeoutMs: null,
-      readPatterns: [],
-      writePatterns: [],
-      excludedPatterns: [],
-      ...settings,
-    });
-    return "created";
-  }
-  const endpointPatch = difference(before, endpoint);
-  const settingsPatch: PatchMcpSettings = difference(before, settings);
-  const changedEndpoint = Object.keys(endpointPatch).length > 0;
-  const changedSettings = Object.keys(settingsPatch).length > 0;
-  if (changedEndpoint) {
-    await api.call("PATCH", `/api/mcp/${before.id}`, endpointPatch);
-  }
-  if (changedSettings) {
-    await api.call("PATCH", `/api/mcp/${before.id}`, settingsPatch);
-  }
-  return changedEndpoint || changedSettings ? "updated" : "unchanged";
-}
-
 async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
   const { agents } = await api.call<AgentsResponse>("GET", "/api/agents");
   const before = agents.find((row) => row.name === doc.name);
@@ -473,7 +437,7 @@ export async function apply(
             action = await skill(api, doc);
             break;
           case "McpServer":
-            action = await mcp(api, doc);
+            action = await applyMcpServer(api, doc);
             break;
           case "Agent":
             action = await agent(api, doc);

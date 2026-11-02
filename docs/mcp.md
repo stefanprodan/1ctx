@@ -37,6 +37,47 @@ reach the model in the sends of agents linked to it.
 - **Usage counts tool rows by wire name.** A catalog call counts under
   its tool, and a deleted server's calls stay under its name.
 
+## Where a server is offered
+
+- **A server's scope is `all` or a list of team projects**
+  (`mcp_servers.scope`, `mcp_server_projects`). `all` offers it in
+  every project, personal ones included; a list only in its team
+  projects, never a personal one. The scope is the server's, never the
+  key's or the agent's: an agent keeps its links everywhere.
+- **A key never reaches everyone by accident.** A create with a key
+  names `projects` (`all` or ids), and a key with `projects: []` is a
+  400. A keyless create defaults to `all`. A key added later keeps the
+  scope. An emptied list, by a Remove or a deleted project, offers the
+  server nowhere and is never widened to `all`.
+- **`inScope()` in `shared/mcp.ts` decides it for every caller,** in
+  memory over the rows `store.list()` and `store.scopes()` load: the
+  send's offer and catalog (`offered(links, projectId)`), the project
+  agents route's `servers` and `agents[].servers`, the `automation`
+  tool's names, the prompt's list of servers turned off, and the check
+  URL's signing. An out of scope name never reaches a model. An offer
+  with no project fails closed to the `all` servers; only the
+  directory, which chose its links by the viewer's visible projects,
+  takes them as given (`offeredChosen()`, the scope's `mcpChosen`).
+- **Every send takes its session's project**, through the one offer in
+  `runner/policy.ts`: a chat, a queued message, a channel turn and a
+  summoned agent, a subagent (its parent's offer), a run, Run now and a
+  confirmed proposal. A narrowed scope applies from the next send, like
+  a pattern change, and the change note tells the model; earlier
+  results and kept files stay. An `mcp:` key left in a disabled set for
+  a server out of scope is kept, harmless.
+- **A project's list** (`GET /api/projects/:id/mcp`, `access.project()`)
+  shows its servers in scope: name, tool count by the server's own
+  switches and patterns, and `all` or `projects`, never a URL or key
+  file. An admin's answer gives a list row's project count
+  (`projects`) and, on a team project, `addable`, the list-scoped
+  servers without it. `POST` (a `serverId`) and `DELETE .../:serverId`
+  add or remove a team project on a list server, each answering the
+  list; an `all` server is a 409, a personal project a 404.
+- **The directory shows what the viewer reaches.** An agent's page
+  keeps the servers that are `all` or listed in a project the viewer
+  sees, each with those project names, every one for an admin; the
+  list, both token totals and `agent.servers` come from that one set.
+
 ## MCP tools in a send
 
 - **An agent's MCP tools are one send snapshot.** An agent links

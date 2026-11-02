@@ -3,19 +3,25 @@
 
 import type {
   CreateMcpRequest,
+  McpProjects,
   PatchMcpSettings,
 } from "../../shared/api/mcp.ts";
 import type {
   AgentServer,
   McpChange,
-  McpServerSummary,
-  McpToolSummary,
+  McpScope,
 } from "../../shared/contracts/mcp.ts";
-import { wireName } from "../../shared/mcp.ts";
 import { type Db, parseStored, transact } from "../db/index.ts";
 import { BadRequest, Conflict } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { DiscoveredTool, DiscoveryResult } from "./discover.ts";
+import {
+  addLink,
+  allProjectIds,
+  projectIdsOf,
+  removeLink,
+  writeScope,
+} from "./scope.ts";
 
 export type McpToolRow = {
   serverId: string;
@@ -37,6 +43,9 @@ export type McpServerRow = {
   readPatterns: string[];
   writePatterns: string[];
   excludedPatterns: string[];
+  scope: McpScope;
+  // the team projects a list holds, by id; empty for all
+  projectIds: string[];
   serverName: string;
   serverVersion: string;
   protocolVersion: string;
@@ -62,6 +71,7 @@ type RawServer = {
   read_patterns: string;
   write_patterns: string;
   excluded_patterns: string;
+  scope: McpScope;
   server_name: string;
   server_version: string;
   protocol_version: string;
@@ -73,6 +83,12 @@ type RawServer = {
   refresh_failed_at: number | null;
   created_at: number;
 };
+
+// a server's endpoint and scope, without its tools
+export type McpScopeRow = Pick<
+  McpServerRow,
+  "id" | "name" | "url" | "keyName" | "scope" | "projectIds"
+>;
 
 type RawTool = {
   server_id: string;
@@ -98,7 +114,11 @@ function toolRow(raw: RawTool): McpToolRow {
   };
 }
 
-function row(raw: RawServer, tools: McpToolRow[]): McpServerRow {
+function row(
+  raw: RawServer,
+  tools: McpToolRow[],
+  projectIds: string[],
+): McpServerRow {
   return {
     id: raw.id,
     name: raw.name,
@@ -111,6 +131,8 @@ function row(raw: RawServer, tools: McpToolRow[]): McpServerRow {
     readPatterns: parseStored(raw.read_patterns, []),
     writePatterns: parseStored(raw.write_patterns, []),
     excludedPatterns: parseStored(raw.excluded_patterns, []),
+    scope: raw.scope,
+    projectIds: raw.scope === "all" ? [] : projectIds,
     serverName: raw.server_name,
     serverVersion: raw.server_version,
     protocolVersion: raw.protocol_version,
@@ -121,65 +143,6 @@ function row(raw: RawServer, tools: McpToolRow[]): McpServerRow {
     refreshError: raw.refresh_error,
     refreshFailedAt: raw.refresh_failed_at,
     createdAt: raw.created_at,
-    tools,
-  };
-}
-
-function codeFence(json: string): string {
-  const longest = Math.max(
-    0,
-    ...Array.from(json.matchAll(/`+/g), (match) => match[0].length),
-  );
-  const fence = "`".repeat(Math.max(3, longest + 1));
-  return `${fence}json\n${json}\n${fence}`;
-}
-
-export function summary(
-  server: McpServerRow,
-  hasSecret: (name: string) => boolean,
-  render: (markdown: string) => string,
-): McpServerSummary {
-  const tools: McpToolSummary[] = server.tools.map((tool) => {
-    const name = wireName(server.name, tool.name);
-    let value: unknown = {};
-    try {
-      value = JSON.parse(tool.inputSchema);
-    } catch {
-      value = {};
-    }
-    const json = JSON.stringify(value, null, 2);
-    return {
-      name: tool.name,
-      wireName: name,
-      unusable: tool.unusable ?? (name === null ? "unusable name" : null),
-      description: tool.description,
-      parameters: value as object,
-      schemaJson: tool.inputSchema,
-      parametersHtml: render(codeFence(json)),
-    };
-  });
-  return {
-    id: server.id,
-    name: server.name,
-    url: server.url,
-    keyName: server.keyName,
-    hasKey: server.keyName !== null && hasSecret(server.keyName),
-    read: server.read,
-    write: server.write,
-    instructionsOn: server.instructionsOn,
-    timeoutMs: server.timeoutMs,
-    readPatterns: server.readPatterns,
-    writePatterns: server.writePatterns,
-    excludedPatterns: server.excludedPatterns,
-    serverName: server.serverName,
-    serverVersion: server.serverVersion,
-    protocolVersion: server.protocolVersion,
-    instructions: server.instructions,
-    checkedAt: server.checkedAt,
-    lastChange: server.lastChange,
-    refreshError: server.refreshError,
-    refreshFailedAt: server.refreshFailedAt,
-    createdAt: server.createdAt,
     tools,
   };
 }
@@ -210,12 +173,37 @@ export class McpServerStore {
     return out;
   }
 
+  private full(raw: RawServer): McpServerRow {
+    return row(raw, this.tools(raw.id), projectIdsOf(this.db, raw.id));
+  }
+
   list(): McpServerRow[] {
     const tools = this.allTools();
+    const projects = allProjectIds(this.db);
     return this.db
       .query<RawServer, []>("select * from mcp_servers order by name")
       .all()
-      .map((raw) => row(raw, tools.get(raw.id) ?? []));
+      .map((raw) =>
+        row(raw, tools.get(raw.id) ?? [], projects.get(raw.id) ?? []),
+      );
+  }
+
+  // every server's endpoint and scope in name order, its tools unread
+  scopes(): McpScopeRow[] {
+    const projects = allProjectIds(this.db);
+    return this.db
+      .query<Pick<RawServer, "id" | "name" | "url" | "key_name" | "scope">, []>(
+        "select id, name, url, key_name, scope from mcp_servers order by name",
+      )
+      .all()
+      .map((raw) => ({
+        id: raw.id,
+        name: raw.name,
+        url: raw.url,
+        keyName: raw.key_name,
+        scope: raw.scope,
+        projectIds: raw.scope === "all" ? [] : (projects.get(raw.id) ?? []),
+      }));
   }
 
   exists(id: string): boolean {
@@ -228,14 +216,14 @@ export class McpServerStore {
     const raw = this.db
       .query<RawServer, [string]>("select * from mcp_servers where id = ?")
       .get(id);
-    return raw === null ? null : row(raw, this.tools(raw.id));
+    return raw === null ? null : this.full(raw);
   }
 
   byName(name: string): McpServerRow | null {
     const raw = this.db
       .query<RawServer, [string]>("select * from mcp_servers where name = ?")
       .get(name);
-    return raw === null ? null : row(raw, this.tools(raw.id));
+    return raw === null ? null : this.full(raw);
   }
 
   private insertTools(serverId: string, tools: DiscoveredTool[]): void {
@@ -293,6 +281,7 @@ export class McpServerStore {
           found.checkedAt,
         );
       this.insertTools(id, found.tools);
+      this.setScope(id, fields.projects ?? "all");
       return { result: this.byId(id)! };
     });
   }
@@ -407,6 +396,21 @@ export class McpServerStore {
     });
   }
 
+  // the whole scope, replacing what was held; ids are checked team
+  // projects
+  setScope(id: string, projects: McpProjects): void {
+    writeScope(this.db, id, projects);
+  }
+
+  // one project onto a list, or off it; false when nothing moved
+  addProject(id: string, projectId: string): boolean {
+    return addLink(this.db, id, projectId);
+  }
+
+  removeProject(id: string, projectId: string): boolean {
+    return removeLink(this.db, id, projectId);
+  }
+
   recordFailure(id: string, error: string, now: number): void {
     this.db
       .query(
@@ -437,7 +441,7 @@ export class McpServerStore {
          order by checked_at, name`,
       )
       .all(before)
-      .map((raw) => row(raw, this.tools(raw.id)));
+      .map((raw) => this.full(raw));
   }
 
   agentServers(agentId: string): AgentServer[] {

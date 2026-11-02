@@ -23,11 +23,15 @@ import type {
 } from "../../shared/api/sessions.ts";
 import {
   AUTOMATIONS,
+  CREDENTIAL,
   credentialKey,
   EMAIL,
   EXTERNAL_TASKS,
+  MCP,
   mcpKey,
+  REPO,
   repoKey,
+  SKILL,
   skillKey,
   WEB,
 } from "../../shared/capabilities.ts";
@@ -93,6 +97,12 @@ export const externalTasksItem = (input: Parameters<typeof switchItem>[1]) =>
 export function agentMoved(last: string | null, next: string | null): boolean {
   return last !== null && next !== null && last !== next;
 }
+
+// the flip kinds another project on Home drops: its credentials,
+// repositories and the servers in its scope are other keys
+export const PROJECT_KINDS = [CREDENTIAL, REPO, MCP] as const;
+// and another agent: its servers and skills are other keys
+export const AGENT_KINDS = [MCP, SKILL] as const;
 
 // a switch of a pane: the key it flips, and what stands before the switch
 export type PaneRow = {

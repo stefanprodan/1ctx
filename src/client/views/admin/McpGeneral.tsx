@@ -46,12 +46,16 @@ import {
   type Offer,
   offerOf,
   offerSides,
+  projectsBody,
+  projectsProblem,
+  reachHint,
   timeoutMs,
   timeoutProblem,
   timeoutText,
   usersOf,
 } from "./Mcp.model.ts";
 import type { McpDrafts } from "./McpPage.state.ts";
+import { ProjectsPicks, ReachSeg } from "./McpProjects.tsx";
 
 type Props = { server: McpServerSummary; drafts: McpDrafts };
 
@@ -60,6 +64,7 @@ export function McpGeneral({ server, drafts, now }: Props & { now: number }) {
     <>
       <About server={server} now={now} />
       <Endpoint server={server} drafts={drafts} />
+      <Projects server={server} drafts={drafts} />
       <Offered server={server} drafts={drafts} />
       <Timeout server={server} drafts={drafts} />
       <Instructions server={server} drafts={drafts} />
@@ -216,6 +221,74 @@ function Endpoint({ server, drafts: d }: Props) {
             )}
           </div>
         </div>
+      </Setting>
+    </SettingForm>
+  );
+}
+
+// beside the endpoint, so an admin adding a key sees where it reaches
+function Projects({ server, drafts: d }: Props) {
+  const latest = useLatest(server);
+  const save = useSave(async () => {
+    d.resetProjects(
+      await patchServer(latest.current.id, {
+        projects: projectsBody(d.reach.value, d.projectIds.value),
+      }),
+    );
+  }, mcpFieldOf);
+  const ids = d.projectIds.value;
+  const refused = save.fieldError("projects");
+  return (
+    <SettingForm
+      save={save}
+      check={() =>
+        at(
+          "projects",
+          projectsProblem(
+            latest.current.keyName !== null,
+            d.reach.value,
+            d.projectIds.value,
+          ),
+        )
+      }
+    >
+      <Setting
+        title="Projects"
+        line={reachHint(d.reach.value, ids, server.keyName !== null)}
+        action={
+          <ReachSeg
+            reach={d.reach.value}
+            save={save}
+            onPick={(reach) => {
+              d.reach.value = reach;
+              save.touch();
+            }}
+          />
+        }
+        foot={
+          <DraftFoot
+            save={save}
+            dirty={d.projectsDirty(server)}
+            hint={
+              refused !== null ? (
+                <FieldError save={save} field="projects" />
+              ) : undefined
+            }
+            onDiscard={() => d.resetProjects(latest.current)}
+          />
+        }
+      >
+        {d.reach.value === "picked" && (
+          <ProjectsPicks
+            projectIds={ids}
+            held={server.projects}
+            save={save}
+            onChange={(projectIds) => {
+              d.projectIds.value = projectIds;
+              save.touch();
+            }}
+          />
+        )}
       </Setting>
     </SettingForm>
   );

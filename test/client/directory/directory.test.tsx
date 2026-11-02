@@ -438,7 +438,14 @@ describe("Directory.model", () => {
       skills: [],
       mcp: {
         servers: [
-          { name: "flux", tools: 3, checkedAt: 0, refreshFailedAt: null },
+          {
+            name: "flux",
+            tools: 3,
+            checkedAt: 0,
+            refreshFailedAt: null,
+            scope: "all" as const,
+            projects: [],
+          },
         ],
         tokens: 90,
       },
@@ -617,6 +624,8 @@ describe("the pages", () => {
             tools: 12,
             checkedAt: Date.now() - 60 * 60 * 1000,
             refreshFailedAt: null,
+            scope: "all",
+            projects: [],
           },
         ],
         tokens: 900,
@@ -624,12 +633,23 @@ describe("the pages", () => {
     };
     html = render(<Agent params={{ name: "coder" }} />);
     expect(html).toContain('</nav><span class="rows-hint cut">900 tokens<');
-    // the refresh under the name, the tools at the row's end
-    expect(html).toContain('class="rows-sub">refreshed 1h ago<');
+    // the scope and the refresh under the name, the tools at the row's end
+    expect(html).toContain('class="rows-sub">refreshed 1h ago · All projects<');
     expect(html).toContain('class="rows-meta">12 tools<');
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/agents/coder/mcp" aria-current="page">MCP<',
     );
+    // a listed server names the projects the viewer sees
+    const flux = agentPage.value.mcp.servers[0]!;
+    agentPage.value = {
+      ...agent,
+      mcp: {
+        servers: [{ ...flux, scope: "projects", projects: ["finops"] }],
+        tokens: 900,
+      },
+    };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain('class="rows-sub">refreshed 1h ago · finops<');
   });
 
   test.serial("Agent draws its activity ghost, then its days", () => {

@@ -179,14 +179,15 @@ describe("what a check reaches", () => {
   };
   const linked = {
     ...ask,
+    url: `${CHECK_URL}/mcp/alerts?token=q`,
     servers: [{ serverId: "m1", read: true, write: false }],
   };
 
-  test("an MCP server's origin carries its bearer, the web row off", () => {
+  test("an MCP server's own URL carries its bearer, the web row off", () => {
     const off = ports({ ...mcp, web: () => ({ mode: "off", domains: [] }) });
     expect(reach(off, linked)).toEqual({
       headers: { authorization: "Bearer mcp-secret" },
-      scope: { origin: CHECK_URL },
+      scope: { server: `${CHECK_URL}/mcp` },
       key: "mcp-secret",
     });
     // the task turned the server off: the web row decides
@@ -194,6 +195,21 @@ describe("what a check reaches", () => {
       "web access is off",
     );
     expect(reach(off, ask)).toBe("web access is off");
+  });
+
+  test("the rest of an MCP server's origin is the web's, unsigned", () => {
+    const outside = { ...linked, url: `${CHECK_URL}/api/v1/portfolio` };
+    expect(reach(ports(mcp), outside)).toEqual({
+      headers: {},
+      scope: null,
+      key: null,
+    });
+    // a sibling path sharing the prefix's text is outside it too
+    expect(
+      reach(ports(mcp), { ...linked, url: `${CHECK_URL}/mcp-admin` }),
+    ).toEqual({ headers: {}, scope: null, key: null });
+    const off = ports({ ...mcp, web: () => ({ mode: "off", domains: [] }) });
+    expect(reach(off, outside)).toBe("web access is off");
   });
 
   test("the web as curl: off, listed hosts on default ports, credentials", () => {
@@ -359,28 +375,29 @@ describe("a check's redirects", () => {
     ).toEqual({ result: "redirected outside its credential's URL" });
     expect(away.seen.map((call) => call.url)).toEqual([ask.url]);
 
-    const server = site({
-      [`${CHECK_URL}/feed`]: moved(301, "https://cdn.test/feed"),
-    });
-    expect(
-      await check(
-        ports({
-          fetch: server.fetch,
-          mcpServers: () => [
-            { id: "m1", url: `${CHECK_URL}/mcp`, keyName: "mcp-k" },
-          ],
-          mcpKey: () => "mcp-secret",
-        }),
-        clock().fake,
-        {
-          ...ask,
-          url: `${CHECK_URL}/feed`,
-          servers: [{ serverId: "m1", read: true, write: false }],
-        },
-        signal,
-      ),
-    ).toEqual({ result: "redirected away from its MCP server" });
-    expect(server.seen).toHaveLength(1);
+    // off its server's URL, to another origin or the same one
+    for (const to of ["https://cdn.test/feed", `${CHECK_URL}/api/feed`]) {
+      const server = site({ [`${CHECK_URL}/mcp/feed`]: moved(301, to) });
+      expect(
+        await check(
+          ports({
+            fetch: server.fetch,
+            mcpServers: () => [
+              { id: "m1", url: `${CHECK_URL}/mcp`, keyName: "mcp-k" },
+            ],
+            mcpKey: () => "mcp-secret",
+          }),
+          clock().fake,
+          {
+            ...ask,
+            url: `${CHECK_URL}/mcp/feed`,
+            servers: [{ serverId: "m1", read: true, write: false }],
+          },
+          signal,
+        ),
+      ).toEqual({ result: "redirected away from its MCP server" });
+      expect(server.seen).toHaveLength(1);
+    }
 
     // from outside a prefix into it: no key goes
     const into = site({

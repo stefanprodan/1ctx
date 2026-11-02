@@ -45,6 +45,7 @@ import {
   SettingStack,
 } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { McpServers } from "../projects/McpServers.tsx";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
 import { Repos } from "../projects/Repos.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
@@ -131,6 +132,13 @@ function Body({ project }: { project: ProjectDetail }) {
       <MembersCard project={project} saving={saving} />
       <LabelsCard project={project} />
       <Repos projectId={project.id} personal={false} />
+      <McpServers
+        projectId={project.id}
+        projectName={project.name}
+        personal={false}
+        section={false}
+        admin
+      />
       <SettingDelete
         title={`Delete ${project.name}`}
         line={deleteLine(project)}

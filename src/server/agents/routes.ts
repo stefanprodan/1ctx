@@ -22,6 +22,7 @@ import type {
   CatalogMatch,
   Endpoint,
 } from "../../shared/contracts/provider.ts";
+import { inScope, type Scoped } from "../../shared/mcp.ts";
 import { fourBitEndpoint, isFourBitTag } from "../../shared/quantization.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
@@ -83,7 +84,10 @@ export type McpPort = {
   setAgentServers(agentId: string, rows: AgentServer[]): void;
   switchableBy(
     agents: { id: string; servers: AgentServer[] }[],
+    projectId: string,
   ): Record<string, SwitchableServer[]>;
+  // every server's scope, its tools unread
+  scopes(): (Scoped & { id: string; name: string })[];
 };
 
 export type CapabilitiesPort = {
@@ -389,12 +393,22 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const project = deps.access.project(ctx.principal!, ctx.params.id);
-        const agents = deps.store.list();
+        // a server out of the project's scope is in no list of the answer
+        const out = new Set(
+          deps.mcp
+            .scopes()
+            .filter((row) => !inScope(row, project.id))
+            .map((row) => row.id),
+        );
+        const agents = deps.store.list().map((agent) => ({
+          ...agent,
+          servers: agent.servers.filter((link) => !out.has(link.serverId)),
+        }));
         const body: ProjectAgentsResponse = {
           agents,
           startsOn: startingOf(deps.store, deps.users, ctx.principal!.userId),
           capabilities: deps.tools.capabilities(),
-          servers: deps.mcp.switchableBy(agents),
+          servers: deps.mcp.switchableBy(agents, project.id),
           skills: deps.skills.switchable(),
           credentials: deps.credentials
             .forProject(project.id)

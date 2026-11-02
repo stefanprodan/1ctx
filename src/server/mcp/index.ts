@@ -4,6 +4,7 @@
 import type { SwitchableServer } from "../../shared/api/sessions.ts";
 import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
+  inScope,
   offeredServers,
   promptSnapshot,
   type SidedServer,
@@ -12,16 +13,21 @@ import {
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { ToolError } from "../lib/errors.ts";
-import type { RouteDescriptor } from "../lib/http.ts";
+import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import type { Fetcher } from "../providers/index.ts";
 import { type ListedTool, scrub, withClient } from "./client.ts";
 import { discover, identityOf } from "./discover.ts";
+import { projectRoutes } from "./project-routes.ts";
 import { RefreshCoordinator } from "./refresh.ts";
 import { type McpCallOutput, resultText } from "./result.ts";
 import { routes, type UsagePort } from "./routes.ts";
-import { type McpServerRow, McpServerStore } from "./store.ts";
+import {
+  type McpScopeRow,
+  type McpServerRow,
+  McpServerStore,
+} from "./store.ts";
 import { validateArguments } from "./validate.ts";
 
 export { changeNote } from "./note.ts";
@@ -32,7 +38,7 @@ export {
   parseUrl,
 } from "./parse.ts";
 export type { McpCallOutput, McpContent } from "./result.ts";
-export { McpServerStore } from "./store.ts";
+export { type McpScopeRow, McpServerStore } from "./store.ts";
 
 export type OfferedMcpTool = {
   name: string;
@@ -64,6 +70,18 @@ export type McpOffer = {
   prompt: ReturnType<typeof promptSnapshot>;
 };
 
+// what a send without MCP is offered
+export const NO_OFFER: McpOffer = {
+  servers: [],
+  prompt: {
+    text: "",
+    included: [],
+    leftForSchemas: [],
+    leftForInstructions: [],
+    digest: {},
+  },
+};
+
 export type McpCallOptions = {
   signal: AbortSignal;
   timeoutMs: number;
@@ -85,18 +103,32 @@ export type McpDeps = {
   capabilities: { forget(key: string): void };
   // a closure, sessions is built later
   usage: UsagePort;
+  // closures, both built later: a project's kind and name, and the
+  // project a principal may see, else a 404
+  projects: { byId(id: string): { kind: string; name: string } | null };
+  access: {
+    project(principal: Principal, id: string): { id: string; kind: string };
+  };
 };
 
 export type Mcp = {
   store: McpServerStore;
   routes: RouteDescriptor[];
-  offered(agentServers: AgentServer[]): McpOffer;
-  switchable(links: AgentServer[]): SwitchableServer[];
+  // the links' servers in scope for a send in the project; null offers
+  // only the all servers
+  offered(agentServers: AgentServer[], projectId: string | null): McpOffer;
+  // the links as given, for the directory, which chose them by the
+  // viewer's projects itself
+  offeredChosen(agentServers: AgentServer[]): McpOffer;
+  switchable(links: AgentServer[], projectId: string): SwitchableServer[];
   // the same per agent id over one read of the catalogs, agents without a
   // switchable server left out
   switchableBy(
     agents: { id: string; servers: AgentServer[] }[],
+    projectId: string,
   ): Record<string, SwitchableServer[]>;
+  // every server's endpoint and scope, its tools unread
+  scopes(): McpScopeRow[];
   refreshSoon(id: string, observed: string): Promise<void>;
   start(): void;
   close(): Promise<void>;
@@ -114,6 +146,14 @@ export type Mcp = {
   ): Promise<McpCallOutput>;
 };
 
+// the rows a send in the project may be offered; with no project only
+// the all servers, so a missing one never reaches a bound server
+function scoped(rows: McpServerRow[], projectId: string | null) {
+  return projectId === null
+    ? rows.filter((row) => row.scope === "all")
+    : rows.filter((row) => inScope(row, projectId));
+}
+
 function switchableOver(
   rows: McpServerRow[],
   links: AgentServer[],
@@ -127,6 +167,18 @@ function switchableOver(
       return tools === undefined ? [] : [{ id: row.id, name: row.name, tools }];
     })
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// each server's tools on the sides its own switches and patterns turn
+// on, as an agent linked to both sides would get them
+function toolCounts(rows: McpServerRow[]): Map<string, number> {
+  const counts = new Map(
+    promptRows(
+      rows,
+      rows.map((row) => ({ serverId: row.id, read: true, write: true })),
+    ).map((server) => [server.name, server.tools.length]),
+  );
+  return new Map(rows.map((row) => [row.id, counts.get(row.name) ?? 0]));
 }
 
 function promptRows(rows: McpServerRow[], links: AgentServer[]): SidedServer[] {
@@ -215,8 +267,7 @@ export function mcpArea(deps: McpDeps): Mcp {
     log: deps.log,
     discover: runDiscovery,
   });
-  const offered = (links: AgentServer[]): McpOffer => {
-    const rows = store.list();
+  const offerOver = (rows: McpServerRow[], links: AgentServer[]): McpOffer => {
     const prompts = promptRows(rows, links);
     const snapshot = promptSnapshot(prompts, sha256);
     for (const name of snapshot.leftForSchemas) {
@@ -245,13 +296,17 @@ export function mcpArea(deps: McpDeps): Mcp {
   const area: Mcp = {
     store,
     routes: [],
-    offered,
-    switchable(links) {
-      return links.length === 0 ? [] : switchableOver(store.list(), links);
+    offered: (links, projectId) =>
+      offerOver(scoped(store.list(), projectId), links),
+    offeredChosen: (links) => offerOver(store.list(), links),
+    switchable(links, projectId) {
+      return links.length === 0
+        ? []
+        : switchableOver(scoped(store.list(), projectId), links);
     },
-    switchableBy(agents) {
+    switchableBy(agents, projectId) {
       if (agents.every((agent) => agent.servers.length === 0)) return {};
-      const rows = store.list();
+      const rows = scoped(store.list(), projectId);
       return Object.fromEntries(
         agents.flatMap((agent) => {
           const servers =
@@ -262,6 +317,7 @@ export function mcpArea(deps: McpDeps): Mcp {
         }),
       );
     },
+    scopes: () => store.scopes(),
     refreshSoon: (id, observed) => coordinator.refreshSoon(id, observed),
     start: () => coordinator.start(),
     close: () => coordinator.close(),
@@ -300,6 +356,10 @@ export function mcpArea(deps: McpDeps): Mcp {
       });
     },
   };
+  const teamName = (id: string) => {
+    const project = deps.projects.byId(id);
+    return project?.kind === "team" ? project.name : null;
+  };
   area.routes = routes({
     db: deps.db,
     store,
@@ -312,6 +372,16 @@ export function mcpArea(deps: McpDeps): Mcp {
     render: deps.render,
     discover: runDiscovery,
     usage: deps.usage,
+    teamName,
   });
+  area.routes.push(
+    ...projectRoutes({
+      db: deps.db,
+      store,
+      access: deps.access,
+      teamName,
+      toolCounts: (rows) => toolCounts(rows),
+    }),
+  );
   return area;
 }

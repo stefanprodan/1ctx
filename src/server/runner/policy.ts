@@ -54,7 +54,7 @@ export type {
 // port is the runner's own interface over the area's types; compose
 // passes the tools area
 export type ToolsPort = {
-  serverNames(links: AgentRow["servers"]): string[];
+  serverNames(links: AgentRow["servers"], projectId: string): string[];
   skillsOff(agentId: string, disabledCapabilities: readonly string[]): string[];
   offered(
     now: number,
@@ -325,6 +325,7 @@ export function buildPolicy(input: {
               agent.servers.filter((link) =>
                 disabledCapabilities.includes(mcpKey(link.serverId)),
               ),
+              input.project.id,
             )
             .sort()
         : [],

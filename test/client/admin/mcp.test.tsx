@@ -36,6 +36,12 @@ import {
   mcpFieldOf,
   offerOf,
   offerSides,
+  projectsBody,
+  projectsProblem,
+  reachForKey,
+  reachHint,
+  reachOf,
+  scopeCount,
   sidesLine,
   timeoutMs,
   timeoutProblem,
@@ -45,6 +51,7 @@ import { McpList } from "../../../src/client/views/admin/McpList.tsx";
 import { McpDrafts } from "../../../src/client/views/admin/McpPage.state.ts";
 import { McpPage, mcpTabOf } from "../../../src/client/views/admin/McpPage.tsx";
 import { ToolParams } from "../../../src/client/views/admin/ToolParams.tsx";
+import { scopeWords } from "../../../src/client/views/directory/Directory.model.ts";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
 import type {
   McpServerSummary,
@@ -89,6 +96,8 @@ const server = (changes: Partial<McpServerSummary> = {}): McpServerSummary => ({
   readPatterns: ["get_*", "trace_*"],
   writePatterns: [],
   excludedPatterns: ["install_*"],
+  scope: "all",
+  projects: [],
   serverName: "flux-operator-mcp",
   serverVersion: "1.0.0",
   protocolVersion: "2026-07-28",
@@ -557,6 +566,95 @@ describe("the drafts", () => {
       server({ timeoutMs: 30_000, write: false }),
     );
     expect(d.write.value).toBe(true);
+  });
+});
+
+describe("a server's projects", () => {
+  const finops = { id: "p2", name: "finops" };
+  const research = { id: "p3", name: "research" };
+
+  test("the list row says all, the count, or none", () => {
+    expect(scopeCount(flux)).toBe("All projects");
+    expect(scopeCount(server({ scope: "projects", projects: [] }))).toBe(
+      "No projects",
+    );
+    expect(
+      scopeCount(server({ scope: "projects", projects: [finops, research] })),
+    ).toBe("2 projects");
+  });
+
+  test("the scope words name the projects", () => {
+    expect(scopeWords("all", [])).toBe("All projects");
+    expect(scopeWords("projects", [])).toBe("No projects");
+    expect(scopeWords("projects", ["finops", "research"])).toBe(
+      "finops, research",
+    );
+  });
+
+  test("a keyless server starts at all, a keyed one at nothing", () => {
+    expect(reachForKey(false)).toBe("all");
+    expect(reachForKey(true)).toBe("");
+    expect(reachOf(flux)).toBe("all");
+    expect(reachOf(server({ scope: "projects" }))).toBe("picked");
+  });
+
+  test("a keyed server with nothing picked cannot save", () => {
+    expect(projectsProblem(true, "", [])).not.toBeNull();
+    expect(projectsProblem(true, "picked", [])).not.toBeNull();
+    expect(projectsProblem(true, "picked", ["p2"])).toBeNull();
+    expect(projectsProblem(true, "all", [])).toBeNull();
+    // a keyless one may be offered nowhere
+    expect(projectsProblem(false, "picked", [])).toBeNull();
+    expect(projectsBody("all", ["p2"])).toBe("all");
+    expect(projectsBody("picked", ["p2"])).toEqual(["p2"]);
+    expect(projectsBody("", [])).toBeUndefined();
+  });
+
+  test("the hint names a consequence only", () => {
+    expect(reachHint("all", [], true)).toBe("Personal projects included.");
+    expect(reachHint("picked", [], false)).toBe("Offered in no project.");
+    // a keyed server's empty pick is the field's error, not a hint
+    expect(reachHint("picked", [], true)).toBeUndefined();
+    expect(reachHint("picked", ["p2"], false)).toBeUndefined();
+    expect(reachHint("", [], true)).toBeUndefined();
+  });
+
+  test("the server's refusals land on the field", () => {
+    expect(mcpFieldOf("projects must be all or distinct project ids")).toBe(
+      "projects",
+    );
+    expect(mcpFieldOf("a server with a key needs projects")).toBe("projects");
+    expect(mcpFieldOf("no such team project p9")).toBe("projects");
+  });
+
+  test.serial("the list row and the page show the scope", () => {
+    const bound = server({ scope: "projects", projects: [finops] });
+    servers.value = [bound];
+    agents.value = [];
+    expect(render(<McpList />)).toContain("1 project · No agents");
+    path.value = "/admin/config/mcp/flux";
+    const html = render(<McpPage params={{ name: "flux" }} />);
+    expect(html).toContain(">Projects<");
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Picked projects</);
+    expect(html).toContain(">finops<");
+  });
+
+  test.serial("the drafts follow the projects at rest", () => {
+    const d = McpDrafts.of(flux);
+    expect(d.projectsDirty(flux)).toBe(false);
+    d.reach.value = "picked";
+    expect(d.projectsDirty(flux)).toBe(true);
+    const bound = server({ scope: "projects", projects: [finops] });
+    d.resetProjects(bound);
+    expect(d.projectIds.value).toEqual(["p2"]);
+    d.projectIds.value = ["p2", "p3"];
+    expect(d.projectsDirty(bound)).toBe(true);
+    // an edited card stays, one at rest takes the newer row
+    d.follow(bound, server({ scope: "projects", projects: [research] }));
+    expect(d.projectIds.value).toEqual(["p2", "p3"]);
+    d.resetProjects(bound);
+    d.follow(bound, server({ scope: "projects", projects: [research] }));
+    expect(d.projectIds.value).toEqual(["p3"]);
   });
 });
 

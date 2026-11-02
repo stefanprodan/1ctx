@@ -389,6 +389,24 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
+    // through the project access check: a project the caller may not
+    // see is the same 404
+    method: "GET",
+    path: "/api/projects/:id/mcp",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
+    path: "/api/projects/:id/mcp",
+    body: { serverId: "missing" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/projects/:id/mcp/:serverId",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
     // the caller's own personal project, whoever they are
     method: "POST",
     path: "/api/profile/project/repos",
@@ -899,9 +917,34 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 502 },
   },
   {
+    method: "POST",
+    path: "/api/mcp",
+    // a key with its scope, still the admin's 502
+    body: {
+      name: "markets",
+      url: "http://mcp.test/mcp",
+      keyName: "mcp-markets",
+      read: true,
+      write: false,
+      instructionsOn: true,
+      timeoutMs: null,
+      readPatterns: [],
+      writePatterns: [],
+      excludedPatterns: [],
+      projects: "all",
+    },
+    expect: { anonymous: 401, member: 403, admin: 502 },
+  },
+  {
     method: "PATCH",
     path: "/api/mcp/:id",
     body: { read: true },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "PATCH",
+    path: "/api/mcp/:id",
+    body: { projects: "all" },
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {

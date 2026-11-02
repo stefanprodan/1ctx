@@ -3,8 +3,9 @@
 Governs what pages draw: `src/client/views/`, `feed/`, `transcript/`
 and the `data/` entities behind them. The admin pages are in
 `docs/admin-pages.md`, the external task pages in
-`docs/external-task-pages.md`, the composer in `docs/composer.md`; the
-primitives, forms and the data layer's general rules are in
+`docs/external-task-pages.md`, the composer in `docs/composer.md`, a
+project's repositories and MCP servers in `docs/project-settings.md`;
+the primitives, forms and the data layer's general rules are in
 `docs/ui.md`.
 
 ## The feed
@@ -193,36 +194,12 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   server refuses both anyway. The delete ask says how many external
   tasks carry the label, closed ones too (`deleteAsk()` over the
   detail's `tasks`).
+- **The directory's MCP tab says each server's scope**
+  (`scopeWords()`): `All projects` or the names of the projects the
+  viewer sees.
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted in its provider's wire shape; the client never
   counts tokens.
-
-## Repositories
-
-- **One `views/projects/Repos.tsx` draws every list:** the team
-  project's card on its admin page and a section on every project's
-  Settings tab. `personal` picks the routes in `data/repos.ts` and
-  leaves out the key and the kind. A team's member gets `edit` off: the
-  rows with their state, no control. The Key select lists the `http-`
-  files from `credentialKeys`, after None.
-- **An editor's row is its button,** opening its form, as a label's
-  does. Refresh sits in the form's foot beside Delete, and its refusal
-  is the form's notice.
-- **A ready row that kept no file is drawn as a fault,** since its ignore
-  rules most often exclude a parent of what they meant to keep.
-- **A row's state is read again while it waits or fetches.** No frame
-  says a fetch ended, so `watchRepos()` reads the list every
-  `REPO_POLL_MS` while a row is pending or fetching and the tab is
-  seen, every `REPO_FAILED_POLL_MS` while a row failed, so a refresh
-  from another tab shows, and stops once every row is ready. A tick
-  while a read is out skips, so a slow answer is never superseded by
-  the next poll.
-- **A failed read keeps the rows** with `RowsFailed` above them and
-  polls on until a read succeeds; a 403 or 404 drops them.
-- **A change sends only what changed** (`patchBody()`) against the row
-  as its form opened it: a rename alone never fetches the tree again, and
-  a field another admin changed since is never sent back. A row gone
-  from the list closes its form.
 
 ## Access keys
 

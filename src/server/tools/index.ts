@@ -31,7 +31,12 @@ import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import type { Mcp, OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
+import {
+  type Mcp,
+  NO_OFFER,
+  type OfferedMcpTool,
+  type OfferedServer,
+} from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { type AgentEmailDeps, agentEmails } from "./agent-email.ts";
@@ -139,7 +144,10 @@ export type ToolsDeps = {
   log: Log;
   render: (markdown: string) => string;
   skills: SkillsPort;
-  mcp?: Pick<Mcp, "offered" | "switchable" | "call" | "validateArguments">;
+  mcp?: Pick<
+    Mcp,
+    "offered" | "offeredChosen" | "switchable" | "call" | "validateArguments"
+  >;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
   bash?: Pick<BashCapability, "run">;
   // the project's credentials for a send, and each row and key again at
@@ -163,7 +171,8 @@ export type ToolsDeps = {
 
 export type Tools = {
   capabilities(): string[];
-  serverNames(links: AgentServer[]): string[];
+  // the names of the links' servers in scope for the project
+  serverNames(links: AgentServer[], projectId: string): string[];
   // the names of the agent's skills a disabled set turns off
   skillsOff(agentId: string, disabledCapabilities: readonly string[]): string[];
   offered(
@@ -201,16 +210,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
   const skillStore: SkillsPort = deps.skills;
   const mcpService = deps.mcp ?? {
     switchable: () => [],
-    offered: () => ({
-      servers: [],
-      prompt: {
-        text: "",
-        included: [],
-        leftForSchemas: [],
-        leftForInstructions: [],
-        digest: {},
-      },
-    }),
+    offered: () => NO_OFFER,
+    offeredChosen: () => NO_OFFER,
     async call() {
       throw new Error("MCP is not configured");
     },
@@ -360,8 +361,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       KNOWLEDGE,
       MEMORY,
     ],
-    serverNames: (links) =>
-      mcpService.switchable(links).map((server) => server.name),
+    serverNames: (links, projectId) =>
+      mcpService.switchable(links, projectId).map((server) => server.name),
     skillsOff: (agentId, disabledCapabilities) =>
       skillStore
         .forAgent(agentId)

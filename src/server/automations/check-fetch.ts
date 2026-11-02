@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A check's GET and its answer (docs/automations.md, The check). It
-// reaches only what the run's tools could: a linked MCP server with its
-// bearer, else the web as curl would, signed by the matching project
-// credential. No error message is kept: one may name the URL's query.
+// reaches only what the run's tools could: a linked MCP server's own
+// URL with its bearer, else the web as curl would, signed by the
+// matching project credential. No error message is kept: one may name
+// the URL's query.
 
 import { credentialKey, mcpKey, WEB } from "../../shared/capabilities.ts";
 import {
@@ -39,7 +40,10 @@ export const MAX_CHECK_BYTES = 4 * 1024 * 1024;
 export type CheckPorts = {
   fetch: Fetcher;
   web(): { mode: WebAccessMode; domains: string[] };
-  mcpServers(): { id: string; url: string; keyName: string | null }[];
+  // the servers in scope for the run's project
+  mcpServers(
+    projectId: string,
+  ): { id: string; url: string; keyName: string | null }[];
   // an mcp- key file's value, read at the moment of use
   mcpKey(keyName: string): string | null;
   credentials(projectId: string): {
@@ -84,7 +88,7 @@ export type CheckAnswer =
 // scope is where the key may go; null for an unsigned check
 export type Signing = {
   headers: Record<string, string>;
-  scope: { prefix: string } | { origin: string } | null;
+  scope: { prefix: string } | { server: string } | null;
   // scrubbed from the answer, as curl and MCP scrub what a server echoes
   key: string | null;
 };
@@ -121,19 +125,18 @@ export function reach(
       .filter((link) => !ask.disabled.includes(mcpKey(link.serverId)))
       .map((link) => link.serverId),
   );
-  // the web row never applies to an MCP server, as to its calls
+  // the web row never applies to an MCP server, as to its calls; the
+  // rest of its origin is the web's, so the key never skirts its patterns
   const server = ports
-    .mcpServers()
-    .find(
-      (row) => linked.has(row.id) && URL.parse(row.url)?.origin === url.origin,
-    );
+    .mcpServers(ask.projectId)
+    .find((row) => linked.has(row.id) && underPrefix(ask.url, row.url));
   if (server !== undefined) {
     const key = server.keyName === null ? null : ports.mcpKey(server.keyName);
     return key === null
       ? UNSIGNED
       : {
           headers: { authorization: `Bearer ${key}` },
-          scope: { origin: url.origin },
+          scope: { server: server.url },
           key,
         };
   }
@@ -183,7 +186,7 @@ export function hop(
       : "redirected outside its credential's URL";
   }
   if (scope !== null) {
-    return next.origin === scope.origin
+    return underPrefix(next.href, scope.server)
       ? null
       : "redirected away from its MCP server";
   }

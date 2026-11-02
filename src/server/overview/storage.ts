@@ -78,6 +78,7 @@ export const STORAGE_TABLES: Record<StorageAreaKey, readonly string[]> = {
     "mcp_servers",
     "mcp_tools",
     "agent_servers",
+    "mcp_server_projects",
     "credentials",
     "credential_projects",
     "repos",

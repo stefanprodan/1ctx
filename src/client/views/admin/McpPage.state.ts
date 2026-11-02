@@ -5,7 +5,13 @@ import { signal } from "@preact/signals";
 import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import type { Patterns } from "../../../shared/mcp.ts";
 import { NO_KEY } from "../../lib/secrets.ts";
-import { timeoutMs, timeoutText } from "./Mcp.model.ts";
+import {
+  type Reach,
+  reachOf,
+  sameIds,
+  timeoutMs,
+  timeoutText,
+} from "./Mcp.model.ts";
 import type { SideFilter } from "./McpTools.model.ts";
 
 const patternsOf = (s: McpServerSummary): Patterns => ({
@@ -32,6 +38,9 @@ export class McpDrafts {
 
   readonly instructionsOn = signal(true);
 
+  readonly reach = signal<Reach>("all");
+  readonly projectIds = signal<string[]>([]);
+
   readonly patterns = signal<Patterns>({ read: [], write: [], excluded: [] });
   readonly q = signal("");
   readonly filter = signal<SideFilter>("all");
@@ -45,6 +54,7 @@ export class McpDrafts {
     d.resetOffer(server);
     d.resetTimeout(server);
     d.resetInstructions(server);
+    d.resetProjects(server);
     d.resetTools(server);
     return d;
   }
@@ -65,6 +75,11 @@ export class McpDrafts {
 
   resetInstructions(s: McpServerSummary): void {
     this.instructionsOn.value = s.instructionsOn;
+  }
+
+  resetProjects(s: McpServerSummary): void {
+    this.reach.value = reachOf(s);
+    this.projectIds.value = s.projects.map((p) => p.id);
   }
 
   resetTools(s: McpServerSummary): void {
@@ -90,6 +105,17 @@ export class McpDrafts {
     return this.instructionsOn.value !== s.instructionsOn;
   }
 
+  projectsDirty(s: McpServerSummary): boolean {
+    if (this.reach.value !== reachOf(s)) return true;
+    return (
+      this.reach.value === "picked" &&
+      !sameIds(
+        this.projectIds.value,
+        s.projects.map((p) => p.id),
+      )
+    );
+  }
+
   toolsDirty(s: McpServerSummary): boolean {
     return !samePatterns(this.patterns.value, patternsOf(s));
   }
@@ -101,6 +127,7 @@ export class McpDrafts {
     if (!this.offerDirty(before)) this.resetOffer(after);
     if (!this.timeoutDirty(before)) this.resetTimeout(after);
     if (!this.instructionsDirty(before)) this.resetInstructions(after);
+    if (!this.projectsDirty(before)) this.resetProjects(after);
     if (!this.toolsDirty(before)) {
       this.patterns.value = patternsOf(after);
     }

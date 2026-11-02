@@ -62,7 +62,8 @@ in `docs/ui.md`.
 - **Another agent or project drops the flips it cannot carry.**
   `composer/switches.ts`: another agent in a chat not made yet drops
   `mcp:` and `skill:` flips (`dropKind()`); another project on Home
-  drops `credential:` and `repo:` flips. The agent list going away for
+  drops `credential:`, `repo:` and `mcp:` flips, since a server's
+  scope depends on the project (`PROJECT_KINDS`). The agent list going away for
   a moment is no pick (`agentMoved()`).
 - **A channel's composer posts** (`channel` on `Composer`): it reads
   "Message #project", has no agent chip and no switches, its plus opens

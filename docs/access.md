@@ -253,7 +253,9 @@ from `emailOn` in `GET /api/me`.
   personal project, an admin's own included. An owner writes their
   personal project's under `/api/profile/project/repos`, so no route
   lets a member write a team project's. A key file's name (`keyName`)
-  is in an admin's answer only.
+  is in an admin's answer only. A project's MCP servers take the same
+  split on `/api/projects/:id/mcp`, admins writing team ones alone
+  (`docs/mcp.md`).
 - **Removing a member drops their waiting messages in the same
   transaction.** If they lose visibility, it also unclaims their
   external tasks there. An admin made a member unclaims external tasks

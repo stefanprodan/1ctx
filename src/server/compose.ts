@@ -10,6 +10,7 @@
 import { availableParallelism } from "node:os";
 import { WAIT_GRACE_MS } from "../shared/contracts/automation.ts";
 import { ATTENTION_AT } from "../shared/contracts/decision.ts";
+import { inScope } from "../shared/mcp.ts";
 import {
   EMAIL_KEY_PREFIX,
   MCP_KEY_PREFIX,
@@ -326,6 +327,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
       calls: (server, since, until) => sessions.mcpCalls(server, since, until),
       servers: (since, until) => sessions.mcpServerCalls(since, until),
     },
+    projects: { byId: (id) => projects.store.byId(id) },
+    access: { project: (principal, id) => access.project(principal, id) },
   });
   const skills: Skills = skillsArea({
     db,
@@ -418,6 +421,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     mcp,
     credentials,
     repos: { switchable: (projectId) => repos.switchable(projectId) },
+    projects: projects.store,
     tools: {
       capabilities: () => tools.capabilities(),
       offered: (now, agentId, agentServers, mode, scope) =>
@@ -606,8 +610,18 @@ export async function compose(options: ComposeOptions): Promise<App> {
       // and skills, its project's credentials and repositories
       switchNames(agentId, projectId) {
         const agent = agents.byId(agentId);
+        const links = agent?.servers ?? [];
+        const out = new Set(
+          mcp
+            .scopes()
+            .filter((row) => !inScope(row, projectId))
+            .map((row) => row.id),
+        );
         return {
-          servers: agent === null ? [] : mcp.switchable(agent.servers),
+          servers: mcp.switchable(links, projectId),
+          serversOut: links
+            .filter((link) => out.has(link.serverId))
+            .map((link) => link.serverId),
           skills: skills.forAgent(agentId),
           credentials: credentials.forProject(projectId),
           repos: repos.switchable(projectId),
@@ -705,7 +719,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     check: {
       fetch: fetcher,
       web: () => configuredTools.webAccess(),
-      mcpServers: () => mcp.store.list(),
+      mcpServers: (projectId) =>
+        mcp.scopes().filter((row) => inScope(row, projectId)),
       mcpKey: (name) => secret(MCP_KEY_PREFIX, name),
       credentials: (projectId) => credentials.forProject(projectId),
       readKey: (keyName) => credentials.readKey(keyName),
