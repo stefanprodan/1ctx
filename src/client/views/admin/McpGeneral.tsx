@@ -240,11 +240,11 @@ function Offered({ server, drafts: d }: Props) {
   return (
     <SettingForm save={save}>
       <Setting
-        title="Offered to agents"
-        line="Tool set access"
+        title="Tool access"
+        line="The most any project may choose."
         action={
           <Seg
-            label="Offered to agents"
+            label="Tool access"
             name="offer"
             value={offerOf(d.read.value, d.write.value)}
             options={OFFER_OPTIONS.map((o) => ({ ...o, disabled: save.busy }))}

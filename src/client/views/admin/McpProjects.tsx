@@ -219,6 +219,11 @@ export function PersonalCard({ server, drafts: d }: Props) {
           <DraftFoot
             save={save}
             dirty={d.personalDirty(server)}
+            hint={
+              save.fieldError("personal") !== null ? (
+                <FieldError save={save} field="personal" />
+              ) : undefined
+            }
             onDiscard={() => d.resetPersonal(latest.current)}
           />
         }

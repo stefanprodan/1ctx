@@ -196,6 +196,53 @@ describe("the entity", () => {
     expect(calls.at(-1)!.url).toBe("/api/profile/project/mcp/m1/side");
   });
 
+  test.serial(
+    "an older pick's answer arriving last never undoes a newer one",
+    async () => {
+      const agentsBody: ProjectAgentsResponse = {
+        agents: [],
+        startsOn: null,
+        capabilities: [],
+        servers: [],
+        skills: {},
+        credentials: [],
+        repos: [],
+      };
+      answer = () => Response.json(agentsBody);
+      await loadProjectAgents("p2");
+      held("p2", answerOf([flux, markets]));
+      let release: () => void = () => {};
+      const first = answerOf([
+        { ...flux, choice: "off", side: "off" },
+        markets,
+      ]);
+      const second = answerOf([
+        { ...flux, choice: "off", side: "off" },
+        { ...markets, choice: "write", side: "write" },
+      ]);
+      answer = (url) => {
+        if (url.endsWith("/agents")) return Response.json(agentsBody);
+        if (url.includes("/m1/")) {
+          return new Promise<Response>((done) => {
+            release = () => done(Response.json(first));
+          });
+        }
+        return Response.json(second);
+      };
+      const before = calls.length;
+      const slow = setProjectMcpSide("p2", "m1", "off", false);
+      await setProjectMcpSide("p2", "m2", "write", false);
+      release();
+      await slow;
+      expect(projectMcpOf("p2")?.servers[1]?.choice).toBe("write");
+      // both writes changed the offer, so both read the agents again
+      const agents = calls
+        .slice(before)
+        .filter((c) => c.url.endsWith("/agents")).length;
+      expect(agents).toBe(2);
+    },
+  );
+
   test.serial("a refused side reads the list again", async () => {
     held("p2", answerOf([flux]));
     answer = (_url, init) =>

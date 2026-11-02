@@ -85,17 +85,20 @@ export async function loadProjectMcp(projectId: string): Promise<void> {
   }
 }
 
-// a write's answer is the whole list and lands over any load out
+// a write's answer is the whole list; only the newest write's or
+// load's lands, so a slower answer never undoes a later pick. Every
+// write that went through changed the agents' offer, landed or not
 function keep(
   projectId: string,
   body: ProjectMcpResponse,
   forUser: string | null,
+  mine: number,
 ) {
   if (owner !== forUser) return;
-  turnOf(projectId);
+  reloadProjectAgents(projectId);
+  if (turns.get(projectId) !== mine) return;
   setList(projectId, body);
   setError(projectId, null);
-  reloadProjectAgents(projectId);
 }
 
 export async function addProjectMcp(
@@ -103,6 +106,7 @@ export async function addProjectMcp(
   serverId: string,
 ): Promise<void> {
   const forUser = owner;
+  const mine = turnOf(projectId);
   const body: AddProjectMcpRequest = { serverId };
   try {
     const answer = await api<ProjectMcpResponse>(
@@ -110,7 +114,7 @@ export async function addProjectMcp(
       "POST",
       body,
     );
-    keep(projectId, answer, forUser);
+    keep(projectId, answer, forUser, mine);
   } catch (err) {
     // a server another tab added, widened or deleted: the list, and its
     // addable, read again
@@ -124,12 +128,13 @@ export async function removeProjectMcp(
   serverId: string,
 ): Promise<void> {
   const forUser = owner;
+  const mine = turnOf(projectId);
   try {
     const answer = await api<ProjectMcpResponse>(
       `${listUrl(projectId)}/${encodeURIComponent(serverId)}`,
       "DELETE",
     );
-    keep(projectId, answer, forUser);
+    keep(projectId, answer, forUser, mine);
   } catch (err) {
     // another tab took it out, or widened it to every project: the list
     // reads again either way
@@ -147,6 +152,7 @@ export async function setProjectMcpSide(
   personal: boolean,
 ): Promise<void> {
   const forUser = owner;
+  const mine = turnOf(projectId);
   const body: ProjectMcpSideRequest = { side };
   const server = encodeURIComponent(serverId);
   try {
@@ -157,7 +163,7 @@ export async function setProjectMcpSide(
       "PUT",
       body,
     );
-    keep(projectId, answer, forUser);
+    keep(projectId, answer, forUser, mine);
   } catch (err) {
     // a grant lowered or taken away meanwhile: the list reads again
     await loadProjectMcp(projectId);

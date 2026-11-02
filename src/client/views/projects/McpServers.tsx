@@ -168,6 +168,7 @@ function ServerRows({
             name={server.name}
             mono
             prose
+            wrap
             sub={rowLine(server, personal)}
           />
         );
@@ -246,7 +247,7 @@ function SideEnd({
           value={pickValue(row)}
           options={options.map((o) => ({ ...o, disabled: busy }))}
           onPick={(side) => {
-            if (side === row.choice) return;
+            if (side === pickValue(row)) return;
             void picking.run(() =>
               setProjectMcpSide(projectId, row.id, side, personal),
             );
