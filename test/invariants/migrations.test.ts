@@ -93,6 +93,7 @@ const EXPECTED_IDS = [
   "0079-repos-block",
   "0080-images",
   "0081-agent-images",
+  "0082-mcp-projects",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2163,6 +2164,48 @@ describe("the schema", () => {
       expect(() =>
         db.exec("update agents set images = null where id = 'a'"),
       ).toThrow(/NOT NULL/);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0082 keeps every MCP server in all projects, its links going with either side", () => {
+    const db = seed(MIGRATIONS.slice(0, 81));
+    try {
+      db.exec(`
+        insert into mcp_servers
+          (id, name, url, read, write, read_patterns, write_patterns,
+           excluded_patterns, server_name, server_version, protocol_version,
+           instructions, fingerprint, checked_at, created_at)
+          values ('s', 'markets', 'http://x/mcp', 1, 0, '[]', '[]', '[]',
+                  '', '', '2025-06-18', '', 'f', 0, 0);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0082-mcp-projects"));
+      expect(db.query("select id, scope from mcp_servers").all()).toEqual([
+        { id: "s", scope: "all" },
+      ]);
+      expect(
+        db.query("select count(*) as n from mcp_server_projects").get(),
+      ).toEqual({ n: 0 });
+      expect(() =>
+        db.exec("update mcp_servers set scope = 'some' where id = 's'"),
+      ).toThrow(/CHECK/);
+      db.exec(`
+        insert into projects (id, kind, name, owner_id, created_at)
+          values ('t1', 'team', 'finops', 'u', 0),
+                 ('t2', 'team', 'research', 'u', 0);
+        update mcp_servers set scope = 'projects' where id = 's';
+        insert into mcp_server_projects (server_id, project_id)
+          values ('s', 't1'), ('s', 't2');
+        delete from projects where id = 't1';
+      `);
+      expect(
+        db.query("select server_id, project_id from mcp_server_projects").all(),
+      ).toEqual([{ server_id: "s", project_id: "t2" }]);
+      db.exec("delete from mcp_servers where id = 's'");
+      expect(
+        db.query("select count(*) as n from mcp_server_projects").get(),
+      ).toEqual({ n: 0 });
     } finally {
       db.close();
     }
@@ -4350,6 +4393,7 @@ describe("project channel migrations", () => {
       "0079-repos-block",
       "0080-images",
       "0081-agent-images",
+      "0082-mcp-projects",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4568,6 +4612,7 @@ describe("project channel migrations", () => {
           "0079-repos-block",
           "0080-images",
           "0081-agent-images",
+          "0082-mcp-projects",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4735,6 +4780,7 @@ describe("project channel migrations", () => {
         "0079-repos-block",
         "0080-images",
         "0081-agent-images",
+        "0082-mcp-projects",
       ]);
       expect(
         db

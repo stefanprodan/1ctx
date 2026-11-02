@@ -48,3 +48,13 @@ export const link = (server: { id: string }): AgentServer => ({
   read: true,
   write: false,
 });
+
+// an area built alone: no project is known and no route is called
+export const NO_PROJECTS = {
+  projects: { byId: () => null },
+  access: {
+    project: (): never => {
+      throw new Error("no projects");
+    },
+  },
+};

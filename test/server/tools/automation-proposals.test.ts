@@ -148,6 +148,7 @@ test.serial(
       lastRun: () => null,
       switchNames: () => ({
         servers: [],
+        serversOut: [],
         skills: [],
         credentials: [],
         repos: [],

@@ -31,6 +31,13 @@ export type McpToolSummary = {
   parametersHtml: string;
 };
 
+// where a server is offered: every project, personal ones included, or
+// only the team projects it lists, none when the list is empty
+export type McpScope = "all" | "projects";
+
+// a team project a server lists
+export type McpProject = { id: string; name: string };
+
 export type McpServerSummary = {
   id: string;
   name: string;
@@ -47,6 +54,9 @@ export type McpServerSummary = {
   readPatterns: string[];
   writePatterns: string[];
   excludedPatterns: string[];
+  scope: McpScope;
+  // the listed team projects in name order, empty for all
+  projects: McpProject[];
   // what the server said about itself, "" when not given
   serverName: string;
   serverVersion: string;

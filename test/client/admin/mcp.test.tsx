@@ -89,6 +89,8 @@ const server = (changes: Partial<McpServerSummary> = {}): McpServerSummary => ({
   readPatterns: ["get_*", "trace_*"],
   writePatterns: [],
   excludedPatterns: ["install_*"],
+  scope: "all",
+  projects: [],
   serverName: "flux-operator-mcp",
   serverVersion: "1.0.0",
   protocolVersion: "2026-07-28",

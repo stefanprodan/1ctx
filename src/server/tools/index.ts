@@ -163,7 +163,8 @@ export type ToolsDeps = {
 
 export type Tools = {
   capabilities(): string[];
-  serverNames(links: AgentServer[]): string[];
+  // the names of the links' servers in scope for the project
+  serverNames(links: AgentServer[], projectId: string): string[];
   // the names of the agent's skills a disabled set turns off
   skillsOff(agentId: string, disabledCapabilities: readonly string[]): string[];
   offered(
@@ -360,8 +361,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       KNOWLEDGE,
       MEMORY,
     ],
-    serverNames: (links) =>
-      mcpService.switchable(links).map((server) => server.name),
+    serverNames: (links, projectId) =>
+      mcpService.switchable(links, projectId).map((server) => server.name),
     skillsOff: (agentId, disabledCapabilities) =>
       skillStore
         .forAgent(agentId)

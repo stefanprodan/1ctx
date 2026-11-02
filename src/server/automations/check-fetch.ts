@@ -40,7 +40,10 @@ export const MAX_CHECK_BYTES = 4 * 1024 * 1024;
 export type CheckPorts = {
   fetch: Fetcher;
   web(): { mode: WebAccessMode; domains: string[] };
-  mcpServers(): { id: string; url: string; keyName: string | null }[];
+  // the servers in scope for the run's project
+  mcpServers(
+    projectId: string,
+  ): { id: string; url: string; keyName: string | null }[];
   // an mcp- key file's value, read at the moment of use
   mcpKey(keyName: string): string | null;
   credentials(projectId: string): {
@@ -125,7 +128,7 @@ export function reach(
   // the web row never applies to an MCP server, as to its calls; the
   // rest of its origin is the web's, so the key never skirts its patterns
   const server = ports
-    .mcpServers()
+    .mcpServers(ask.projectId)
     .find((row) => linked.has(row.id) && underPrefix(ask.url, row.url));
   if (server !== undefined) {
     const key = server.keyName === null ? null : ports.mcpKey(server.keyName);

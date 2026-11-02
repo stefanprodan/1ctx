@@ -15,7 +15,7 @@ import { mcpKey } from "../../../src/shared/capabilities.ts";
 import { call, row, tool } from "../../fixtures/runner/trace.ts";
 import { fakeFetch } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
-import { link, seedServer } from "../mcp/switches.helpers.ts";
+import { link, NO_PROJECTS, seedServer } from "../mcp/switches.helpers.ts";
 
 function offers() {
   const db = memoryDb();
@@ -35,6 +35,7 @@ function offers() {
       calls: () => ({ calls: 0, failed: 0, tools: [] }),
       servers: () => ({ calls: 0, failed: 0, servers: [] }),
     },
+    ...NO_PROJECTS,
   });
   const flux = seedServer(mcp.store, "flux");
   const docs = seedServer(mcp.store, "docs");

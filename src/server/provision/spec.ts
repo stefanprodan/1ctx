@@ -190,6 +190,8 @@ export type McpServerSpec = {
   readPatterns?: string[];
   writePatterns?: string[];
   excludedPatterns?: string[];
+  // all, or team project names
+  projects?: "all" | string[];
 };
 
 export type AgentSpec = {
@@ -375,6 +377,7 @@ export function mcpServer(value: unknown): McpServerSpec {
     readPatterns: (v) => parsePatterns(v, "readPatterns"),
     writePatterns: (v) => parsePatterns(v, "writePatterns"),
     excludedPatterns: (v) => parsePatterns(v, "excludedPatterns"),
+    projects: (v) => (v === "all" ? v : names(v, isName)),
   });
 }
 

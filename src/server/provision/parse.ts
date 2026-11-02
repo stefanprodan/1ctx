@@ -26,6 +26,7 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import { isToolName, type ToolName } from "../tools/index.ts";
 import { checkDictation, dictationSpec } from "./dictation.ts";
 import { object } from "./fields.ts";
+import { checkMcpServer, teamNames } from "./mcp.ts";
 import { checkHeldWire } from "./provider.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
 import {
@@ -385,12 +386,7 @@ export function preflight(
       case "Credential": {
         if (!exists) required(["keyFrom", "url", "header", "value"]);
         if (doc.spec.keyFrom !== undefined) httpKey(doc.spec.keyFrom);
-        for (const name of doc.spec.projects ?? []) {
-          if (name === PERSONAL_PROJECT_NAME) {
-            fail("projects", "cannot name a personal project");
-          }
-          reference("projects", "Project", name);
-        }
+        teamNames(doc.spec.projects ?? [], fail, reference);
         break;
       }
       case "Repository": {
@@ -420,6 +416,7 @@ export function preflight(
       case "McpServer":
         if (!exists) required(["url"]);
         if (doc.spec.keyFrom) readSecret("keyFrom", "mcp-", doc.spec.keyFrom);
+        checkMcpServer(doc.spec, exists, fail, reference);
         break;
       case "Agent":
         if (!exists) required(["provider", "model"]);

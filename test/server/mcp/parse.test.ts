@@ -26,8 +26,49 @@ const createBody = () => ({
 });
 
 describe("MCP request parsing", () => {
-  test("accepts a complete create body", () => {
-    expect(parseCreate(createBody())).toEqual(createBody());
+  test("accepts a complete create body, all projects without a key", () => {
+    expect(parseCreate(createBody())).toEqual({
+      ...createBody(),
+      projects: "all",
+    });
+  });
+
+  test("a key never reaches everyone by accident", () => {
+    const keyed = { ...createBody(), keyName: "mcp-markets" };
+    expect(() => parseCreate(keyed)).toThrow(
+      "a server with a key needs projects",
+    );
+    expect(() => parseCreate({ ...keyed, projects: [] })).toThrow(
+      "needs all or a project",
+    );
+    expect(parseCreate({ ...keyed, projects: "all" }).projects).toBe("all");
+    expect(parseCreate({ ...keyed, projects: ["p1", "p2"] }).projects).toEqual([
+      "p1",
+      "p2",
+    ]);
+    // without a key a list may be empty: offered nowhere
+    expect(parseCreate({ ...createBody(), projects: [] }).projects).toEqual([]);
+    expect(() => parsePatch({ keyName: "mcp-markets", projects: [] })).toThrow(
+      "needs all or a project",
+    );
+    // a key added keeps the held scope; an emptied list is a Remove's
+    expect(parsePatch({ keyName: "mcp-markets" })).toEqual({
+      keyName: "mcp-markets",
+    });
+    expect(parsePatch({ keyName: null, projects: [] })).toEqual({
+      keyName: null,
+      projects: [],
+    });
+    expect(parsePatch({ projects: [] })).toEqual({ projects: [] });
+    expect(parsePatch({ read: true, projects: "all" })).toEqual({
+      read: true,
+      projects: "all",
+    });
+    for (const projects of ["some", ["p1", "p1"], ["Bad Id"], [1], {}, null]) {
+      expect(() => parsePatch({ projects })).toThrow(
+        "projects must be all or distinct project ids",
+      );
+    }
   });
 
   test("validates patterns and repeats", () => {

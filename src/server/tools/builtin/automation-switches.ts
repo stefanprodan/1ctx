@@ -24,6 +24,9 @@ export type Named = { id: string; name: string };
 // project's credentials and repositories
 export type SwitchNames = {
   servers: Named[];
+  // the agent's servers out of the project's scope, by id: a key left
+  // for one is kept and never named
+  serversOut: string[];
   skills: Named[];
   credentials: Named[];
   repos: Named[];
@@ -59,8 +62,11 @@ export function switchedOff(
   const webOff = keys.includes(WEB);
   const out: string[] = [];
   let gone = 0;
+  const hidden = new Set(names.serversOut);
   for (const key of keys) {
     if (CHAT_ONLY.has(key)) continue;
+    const server = serverOf(key);
+    if (server !== null && hidden.has(server)) continue;
     const kind = Object.hasOwn(KIND_WORDS, key) ? KIND_WORDS[key] : undefined;
     if (kind !== undefined) {
       out.push(kind);

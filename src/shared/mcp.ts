@@ -9,7 +9,7 @@
 // Environment neutral: no Bun, no DOM, no packages. The hash is an
 // argument, so the server passes Bun's and the page a stub.
 
-import type { AgentServer } from "./contracts/mcp.ts";
+import type { AgentServer, McpScope } from "./contracts/mcp.ts";
 import { cutText } from "./text.ts";
 import { isRecord } from "./words.ts";
 
@@ -365,6 +365,15 @@ export function promptSnapshot(
     leftForInstructions,
     digest,
   };
+}
+
+// a server's scope as the rows hold it
+export type Scoped = { scope: McpScope; projectIds: readonly string[] };
+
+// whether a send in the project is offered the server: a list never
+// holds a personal project (docs/mcp.md)
+export function inScope(server: Scoped, projectId: string): boolean {
+  return server.scope === "all" || server.projectIds.includes(projectId);
 }
 
 // a server as the page or the server's rows offer it: the summary's

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
+  McpProjects,
   McpResponse,
   McpServerResponse,
   McpServersUsage,
@@ -15,6 +16,7 @@ import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import {
   BadGateway,
+  BadRequest,
   Conflict,
   messageOf,
   NotFound,
@@ -25,7 +27,8 @@ import { lastDays } from "../usage/index.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { parseCreate, parsePatch } from "./parse.ts";
 import type { RefreshCoordinator, RefreshKind } from "./refresh.ts";
-import { type McpServerRow, type McpServerStore, summary } from "./store.ts";
+import type { McpServerRow, McpServerStore } from "./store.ts";
+import { summary } from "./summary.ts";
 
 export type RoutesDeps = {
   db: Db;
@@ -42,6 +45,8 @@ export type RoutesDeps = {
     signal: AbortSignal,
   ): Promise<DiscoveryResult>;
   usage: UsagePort;
+  // a team project's name, null for a personal or a missing one
+  teamName(id: string): string | null;
 };
 
 export type UsagePort = {
@@ -54,7 +59,18 @@ function gateway(error: unknown): BadGateway {
 }
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
-  const show = (row: McpServerRow) => summary(row, deps.hasSecret, deps.render);
+  const show = (row: McpServerRow) =>
+    summary(row, deps.hasSecret, deps.render, deps.teamName);
+  // in the write's transaction, so a project deleted since is refused
+  const teamProjects = (projects: McpProjects) => {
+    if (projects === "all") return projects;
+    for (const id of projects) {
+      if (deps.teamName(id) === null) {
+        throw new BadRequest(`no such team project ${id}`);
+      }
+    }
+    return projects;
+  };
   const find = (id: string) => {
     const row = deps.store.byId(id);
     if (row === null) throw new NotFound("no such MCP server");
@@ -117,9 +133,15 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       async handle(req) {
         const fields = parseCreate(await jsonBody(req));
-        const taken = run(`new:${fields.name}`, "candidate", async (signal) =>
-          deps.store.create(fields, await discovered(fields, signal)),
-        );
+        // refused before a discovery is spent on it
+        teamProjects(fields.projects ?? "all");
+        const taken = run(`new:${fields.name}`, "candidate", async (signal) => {
+          const found = await discovered(fields, signal);
+          return transact(deps.db, () => {
+            teamProjects(fields.projects ?? "all");
+            return { result: deps.store.create(fields, found) };
+          });
+        });
         const row = await taken.promise;
         return json(response(row), 201);
       },
@@ -131,26 +153,34 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const change = parsePatch(await jsonBody(req));
         const before = find(ctx.params.id);
+        const { projects } = change;
+        if (projects !== undefined) teamProjects(projects);
+        // the scope with the rest, in one transaction
+        const scoped = (write: () => McpServerRow | null) =>
+          transact(deps.db, () => {
+            const row = write();
+            if (row === null || projects === undefined) return { result: row };
+            deps.store.setScope(row.id, teamProjects(projects));
+            return { result: deps.store.byId(row.id) };
+          });
         if ("url" in change || "keyName" in change) {
           const endpoint = change as PatchMcpEndpoint;
           const moved = {
             url: endpoint.url ?? before.url,
             keyName: "keyName" in endpoint ? endpoint.keyName! : before.keyName,
           };
-          const taken = run(before.id, "candidate", async (signal) =>
-            deps.store.applyDiscovery(
-              before.id,
-              await discovered(moved, signal, before.id),
-              moved,
-            ),
-          );
+          const taken = run(before.id, "candidate", async (signal) => {
+            const found = await discovered(moved, signal, before.id);
+            return scoped(() =>
+              deps.store.applyDiscovery(before.id, found, moved),
+            );
+          });
           const row = await taken.promise;
           if (row === null) throw new NotFound("no such MCP server");
           return json(response(row));
         }
-        const row = deps.store.updateSettings(
-          before.id,
-          change as PatchMcpSettings,
+        const row = scoped(() =>
+          deps.store.updateSettings(before.id, change as PatchMcpSettings),
         );
         if (row === null) throw new NotFound("no such MCP server");
         return json(response(row));

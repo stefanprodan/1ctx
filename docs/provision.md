@@ -87,6 +87,11 @@ instance's database, creating or updating what they name.
   file must be present and usable. Its `projects` name team projects
   only. The per-project cap and prefix overlaps are checked over the
   held rows with the input laid on them.
+- **An `McpServer`'s `projects` is `all` or team project names.**
+  Left out, an update keeps the scope, so a partial apply never widens
+  a narrowed server; a keyless create is `all` and a keyed one fails
+  preflight. A key with `[]`, a personal or an unknown name fails
+  preflight, and an unknown one fails apply too.
 - **A `Repository` is a team project's, matched by `project` and
   name.** The name is `spec.name`, else `metadata.name`, so two projects
   may each hold one named alike. `keyFrom` names an `http-` key file,

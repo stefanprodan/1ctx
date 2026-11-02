@@ -3,6 +3,7 @@
 
 import type {
   CreateMcpRequest,
+  McpProjects,
   PatchMcpEndpoint,
   PatchMcpRequest,
   PatchMcpSettings,
@@ -31,6 +32,7 @@ const CREATE_FIELDS = [
   "readPatterns",
   "writePatterns",
   "excludedPatterns",
+  "projects",
 ];
 const SETTINGS_FIELDS = [
   "read",
@@ -42,6 +44,13 @@ const SETTINGS_FIELDS = [
   "excludedPatterns",
 ];
 const ENDPOINT_FIELDS = ["url", "keyName"];
+// goes with either group
+const SCOPE_FIELD = "projects";
+
+// a row id, as lib/ids.ts makes them
+const ID = /^[0-9a-z]{1,32}$/;
+// more than any instance holds, so a list past it is a typo
+const MAX_PROJECTS = 256;
 
 function boolean(value: unknown, name: string): boolean {
   if (typeof value !== "boolean") {
@@ -78,6 +87,33 @@ export function parseUrl(value: unknown): string {
     throw new BadRequest("url must not have user info or a fragment");
   }
   return value;
+}
+
+// all, or distinct project ids; whether each is a team project is the
+// route's to check against the rows
+export function parseProjects(value: unknown): McpProjects {
+  if (value === "all") return value;
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_PROJECTS ||
+    !value.every((id) => typeof id === "string" && ID.test(id)) ||
+    new Set(value).size !== value.length
+  ) {
+    throw new BadRequest("projects must be all or distinct project ids");
+  }
+  return value as string[];
+}
+
+// a key acting for one owner never reaches everyone by accident, nor
+// is it saved reaching no one
+function keyedScope(
+  keyName: string | null | undefined,
+  projects: McpProjects | undefined,
+): void {
+  if (typeof keyName !== "string") return;
+  if (projects !== undefined && projects !== "all" && projects.length === 0) {
+    throw new BadRequest("a server with a key needs all or a project");
+  }
 }
 
 export function parsePatterns(value: unknown, name: string): string[] {
@@ -134,20 +170,27 @@ function patterns(
 export function parseCreate(body: unknown): CreateMcpRequest {
   const b = fields(body, CREATE_FIELDS);
   if (!isServerName(b.name)) throw new BadRequest("name is invalid");
+  const keyName = parseMcpKeyName(b.keyName);
+  if (keyName !== null && b.projects === undefined) {
+    throw new BadRequest("a server with a key needs projects");
+  }
+  const projects = b.projects === undefined ? "all" : parseProjects(b.projects);
+  keyedScope(keyName, projects);
   return {
     name: b.name,
     url: parseUrl(b.url),
-    keyName: parseMcpKeyName(b.keyName),
+    keyName,
     read: boolean(b.read, "read"),
     write: boolean(b.write, "write"),
     instructionsOn: boolean(b.instructionsOn, "instructionsOn"),
     timeoutMs: parseTimeout(b.timeoutMs),
     ...patterns(b),
+    projects,
   };
 }
 
 export function parsePatch(body: unknown): PatchMcpRequest {
-  const b = fields(body, [...SETTINGS_FIELDS, ...ENDPOINT_FIELDS]);
+  const b = fields(body, [...SETTINGS_FIELDS, ...ENDPOINT_FIELDS, SCOPE_FIELD]);
   const keys = Object.keys(b);
   if (keys.length === 0) throw new BadRequest("patch must not be empty");
   const endpoint = keys.some((key) => ENDPOINT_FIELDS.includes(key));
@@ -155,13 +198,16 @@ export function parsePatch(body: unknown): PatchMcpRequest {
   if (endpoint && settings) {
     throw new BadRequest("endpoint fields must be changed alone");
   }
+  const projects = SCOPE_FIELD in b ? parseProjects(b[SCOPE_FIELD]) : undefined;
+  const scope = projects === undefined ? {} : { projects };
   if (endpoint) {
-    const out: PatchMcpEndpoint = {};
+    const out: PatchMcpEndpoint = { ...scope };
     if ("url" in b) out.url = parseUrl(b.url);
     if ("keyName" in b) out.keyName = parseMcpKeyName(b.keyName);
+    keyedScope(out.keyName, projects);
     return out;
   }
-  const out: PatchMcpSettings = {};
+  const out: PatchMcpSettings = { ...scope };
   if ("read" in b) out.read = boolean(b.read, "read");
   if ("write" in b) out.write = boolean(b.write, "write");
   if ("instructionsOn" in b) {

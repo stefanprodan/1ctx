@@ -399,10 +399,13 @@ export function offered(
     ].map(schema),
     now,
   );
+  // a send's project decides the scope; the directory has none and
+  // passes the links it chose by scope
   const offered = deps.mcp.offered(
     agentServers.filter(
       (link) => !disabledCapabilities.includes(mcpKey(link.serverId)),
     ),
+    scope?.projectId ?? null,
   );
   // the catalog never narrows the offer: every offered server keeps its
   // instructions, its digest and its tools in either mode

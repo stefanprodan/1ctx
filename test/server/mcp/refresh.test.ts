@@ -14,6 +14,7 @@ import { collectLogs } from "../../helpers/app.ts";
 import { rejection } from "../../helpers/async.ts";
 import { memoryDb } from "../../helpers/db.ts";
 import { fixture, mcpFetch } from "./fake.ts";
+import { NO_PROJECTS } from "./switches.helpers.ts";
 
 const NO_USAGE = {
   calls: () => ({ calls: 0, failed: 0, tools: [] }),
@@ -113,6 +114,7 @@ describe("MCP refresh coordinator", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -169,6 +171,7 @@ describe("MCP refresh coordinator", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -194,6 +197,7 @@ describe("MCP refresh coordinator", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -228,6 +232,7 @@ describe("MCP refresh coordinator", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -282,6 +287,7 @@ describe("MCP refresh coordinator", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -341,6 +347,7 @@ describe("MCP refresh coordinator", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -384,6 +391,7 @@ describe("MCP refresh coordinator", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -429,6 +437,7 @@ describe("MCP refresh coordinator", () => {
       store,
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      teamName: () => null,
       coordinator,
       clock: time.clock,
       hasSecret: () => false,
@@ -467,6 +476,7 @@ describe("MCP refresh coordinator", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher: fake.fetcher,
       secret: () => null,
@@ -518,6 +528,7 @@ describe("MCP refresh coordinator", () => {
       mcpArea({
         capabilities: { forget: () => {} },
         usage: NO_USAGE,
+        ...NO_PROJECTS,
         db,
         fetcher,
         secret: () => null,
@@ -579,6 +590,7 @@ describe("MCP refresh routes", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -630,6 +642,7 @@ describe("MCP refresh routes", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -687,6 +700,7 @@ describe("MCP refresh routes", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -749,6 +763,7 @@ describe("MCP refresh routes", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -798,6 +813,7 @@ describe("MCP refresh routes", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -860,6 +876,7 @@ describe("MCP refresh routes", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,
@@ -903,6 +920,7 @@ describe("MCP refresh routes", () => {
     const area = mcpArea({
       capabilities: { forget: () => {} },
       usage: NO_USAGE,
+      ...NO_PROJECTS,
       db,
       fetcher,
       secret: () => null,

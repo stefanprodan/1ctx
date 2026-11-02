@@ -10,7 +10,7 @@ import { mcpKey } from "../../../src/shared/capabilities.ts";
 import { MCP_CATALOG_FROM_TOKENS } from "../../../src/shared/mcp-catalog.ts";
 import { collectLogs, fakeFetch } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
-import { link, seedServer } from "../mcp/switches.helpers.ts";
+import { link, NO_PROJECTS, seedServer } from "../mcp/switches.helpers.ts";
 import { context } from "./memory.helpers.ts";
 
 const NO_USAGE = {
@@ -38,6 +38,7 @@ function setup(
     render: (text) => text,
     capabilities: { forget: () => {} },
     usage: NO_USAGE,
+    ...NO_PROJECTS,
   });
   const flux = seedServer(mcp.store, "flux", large ? 48 : 1);
   const docs = seedServer(mcp.store, "docs");
@@ -240,8 +241,8 @@ test("a catalog with no tool to list offers neither catalog tool", async () => {
   // offeredServers drops a server with no tool, so the port strips them
   const { db, mcp, tools, links } = setup(false, undefined, silent, (m) => ({
     ...m,
-    offered: (agentLinks) => {
-      const offer = m.offered(agentLinks);
+    offered: (agentLinks, projectId) => {
+      const offer = m.offered(agentLinks, projectId);
       return {
         ...offer,
         servers: offer.servers.map((server) => ({ ...server, tools: [] })),
@@ -352,7 +353,7 @@ test("memory phase offers only memory_edit and never reads MCP or the set", asyn
 test("switchable follows links, sides and patterns without prompt caps", async () => {
   const { db, mcp, flux, docs, links } = setup();
   try {
-    expect(mcp.switchable(links)).toEqual([
+    expect(mcp.switchable(links, "p1")).toEqual([
       { id: docs.id, name: "docs", tools: 1 },
       { id: flux.id, name: "flux", tools: 1 },
     ]);
@@ -361,17 +362,17 @@ test("switchable follows links, sides and patterns without prompt caps", async (
       JSON.stringify({ type: "string", enum: ["x".repeat(1024 * 1024)] }),
       huge.id,
     );
-    expect(mcp.switchable([link(huge)])).toEqual([
+    expect(mcp.switchable([link(huge)], "p1")).toEqual([
       { id: huge.id, name: "huge", tools: 1 },
     ]);
-    expect(mcp.offered([link(huge)]).servers).toEqual([]);
+    expect(mcp.offered([link(huge)], "p1").servers).toEqual([]);
     mcp.store.updateSettings(flux.id, { excludedPatterns: ["*"] });
-    expect(mcp.switchable([...links, link({ id: "missing" })])).toEqual([
+    expect(mcp.switchable([...links, link({ id: "missing" })], "p1")).toEqual([
       { id: docs.id, name: "docs", tools: 1 },
     ]);
-    expect(mcp.switchable([{ ...link(docs), read: false }])).toEqual([]);
+    expect(mcp.switchable([{ ...link(docs), read: false }], "p1")).toEqual([]);
     mcp.store.updateSettings(docs.id, { read: false });
-    expect(mcp.switchable(links)).toEqual([]);
+    expect(mcp.switchable(links, "p1")).toEqual([]);
   } finally {
     await mcp.close();
     db.close();
@@ -394,7 +395,7 @@ test("switchableBy reads the catalogs once for every agent", async () => {
       { id: "a3", servers: [] },
       { id: "a4", servers: [link({ id: "missing" })] },
     ];
-    expect(mcp.switchableBy(agents)).toEqual({
+    expect(mcp.switchableBy(agents, "p1")).toEqual({
       a1: [
         { id: docs.id, name: "docs", tools: 1 },
         { id: flux.id, name: "flux", tools: 1 },
@@ -402,7 +403,7 @@ test("switchableBy reads the catalogs once for every agent", async () => {
       a2: [{ id: flux.id, name: "flux", tools: 1 }],
     });
     expect(reads).toBe(1);
-    expect(mcp.switchableBy([{ id: "a3", servers: [] }])).toEqual({});
+    expect(mcp.switchableBy([{ id: "a3", servers: [] }], "p1")).toEqual({});
     expect(reads).toBe(1);
   } finally {
     await mcp.close();

@@ -87,6 +87,7 @@ const automation = (
 
 const NO_NAMES: SwitchNames = {
   servers: [],
+  serversOut: [],
   skills: [],
   credentials: [],
   repos: [],
@@ -650,6 +651,7 @@ describe("show", () => {
   test("switches are named only from the automation's own agent and project", async () => {
     const names: SwitchNames = {
       servers: [{ id: "srv1", name: "flux" }],
+      serversOut: [],
       skills: [{ id: "skl1", name: "triage" }],
       credentials: [{ id: "cred1", name: "grafana" }],
       repos: [{ id: "repo1", name: "infra" }],

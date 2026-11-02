@@ -9,6 +9,8 @@ import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import {
+  type DirectoryAccessPort,
+  type DirectoryProjectsPort,
   directoryRoutes,
   type SkillsListPort,
   type ToolsPort,
@@ -47,7 +49,8 @@ export type AgentsDeps = {
   tools: ToolsPort & CapabilitiesPort;
   credentials: CredentialsPort;
   repos: ReposPort;
-  access: AccessPort;
+  access: AccessPort & DirectoryAccessPort;
+  projects: DirectoryProjectsPort;
   sessions: () => SessionsPort;
   automations: () => AutomationsPort;
   runner: () => RunnerPort;

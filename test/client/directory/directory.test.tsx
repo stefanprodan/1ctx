@@ -438,7 +438,14 @@ describe("Directory.model", () => {
       skills: [],
       mcp: {
         servers: [
-          { name: "flux", tools: 3, checkedAt: 0, refreshFailedAt: null },
+          {
+            name: "flux",
+            tools: 3,
+            checkedAt: 0,
+            refreshFailedAt: null,
+            scope: "all" as const,
+            projects: [],
+          },
         ],
         tokens: 90,
       },
@@ -617,6 +624,8 @@ describe("the pages", () => {
             tools: 12,
             checkedAt: Date.now() - 60 * 60 * 1000,
             refreshFailedAt: null,
+            scope: "all",
+            projects: [],
           },
         ],
         tokens: 900,
