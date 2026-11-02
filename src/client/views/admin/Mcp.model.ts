@@ -187,7 +187,7 @@ export function projectsProblem(
   reach: Reach,
   projectIds: readonly string[],
 ): string | null {
-  if (reach === "") return "Pick All projects or the team projects";
+  if (reach === "") return "Pick the projects";
   if (keyed && reach === "picked" && projectIds.length === 0) {
     return "A server with a key needs a project";
   }
@@ -195,13 +195,15 @@ export function projectsProblem(
 }
 
 // under the Projects field: what a pick means, only where it is not
-// plain from the rows
+// plain from the rows; a keyed server with nothing picked gets the
+// field's error instead
 export function reachHint(
   reach: Reach,
   projectIds: readonly string[],
+  keyed: boolean,
 ): string | undefined {
   if (reach === "all") return "Personal projects included.";
-  if (reach === "") return "Pick where its key may be used.";
+  if (reach === "" || keyed) return undefined;
   return projectIds.length === 0 ? "Offered in no project." : undefined;
 }
 

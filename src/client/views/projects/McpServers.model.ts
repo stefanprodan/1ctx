@@ -5,7 +5,7 @@ import type { ProjectMcpServer } from "../../../shared/api/mcp.ts";
 import { serverMeta } from "../directory/Directory.model.ts";
 
 export const TEAM_TEXT = "Tools for agents, managed by admins.";
-export const PERSONAL_TEXT = "Servers every project has, managed by admins.";
+export const PERSONAL_TEXT = "Offered in every project, managed by admins.";
 
 export const mcpText = (personal: boolean): string =>
   personal ? PERSONAL_TEXT : TEAM_TEXT;

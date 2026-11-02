@@ -136,6 +136,7 @@ function Body({ project }: { project: ProjectDetail }) {
         projectId={project.id}
         projectName={project.name}
         personal={false}
+        section={false}
         admin
       />
       <SettingDelete

@@ -647,8 +647,8 @@ describe("the cards", () => {
     const html = render(
       <AgentMcp agent={agent} drafts={AgentDrafts.of(agent)} />,
     );
-    expect(html).toContain("finops · refreshed 1h ago");
-    expect(html).not.toContain("All projects · refreshed");
+    expect(html).toContain("refreshed 1h ago · finops");
+    expect(html).not.toContain("refreshed 1h ago · All projects");
     servers.value = null;
   });
 

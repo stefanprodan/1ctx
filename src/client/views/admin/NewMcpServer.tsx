@@ -101,7 +101,6 @@ function Form() {
             aria-required="true"
             autocomplete="off"
             spellcheck={false}
-            placeholder="flux"
             aria-invalid={invalid("name") || undefined}
             disabled={busy}
             value={name.value}
@@ -155,12 +154,13 @@ function Form() {
             field="projects"
             save={save}
             required={keyed}
-            hint={reachHint(reach.value, projectIds.value)}
+            hint={reachHint(reach.value, projectIds.value, keyed)}
           >
             <ReachSeg
               reach={reach.value}
               save={save}
               onPick={(value) => {
+                if (value === reach.value) return;
                 reach.value = value;
                 reachPicked.value = true;
                 save.touch();

@@ -57,9 +57,10 @@ const scopeOf = (server: McpServerSummary) =>
   );
 
 // a bound server says where it reaches, so an agent's admin sees which
-// of its projects get it; an all server needs no word
+// of its projects get it; an all server needs no word. The refresh goes
+// first, so a cut never hides a failure
 const boundLine = (server: McpServerSummary, line: string) =>
-  server.scope === "all" ? line : `${scopeOf(server)} · ${line}`;
+  server.scope === "all" ? line : `${line} · ${scopeOf(server)}`;
 
 export function AgentMcp({
   agent,
@@ -138,7 +139,7 @@ function Servers({
                 return {
                   value: s.id,
                   label: s.name,
-                  sub: `${scopeOf(s)} · ${tools} · ${line.text}`,
+                  sub: `${line.text} · ${tools} · ${scopeOf(s)}`,
                   subBad: line.bad,
                 };
               })}

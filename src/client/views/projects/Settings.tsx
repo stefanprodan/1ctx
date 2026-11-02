@@ -95,6 +95,7 @@ export function Settings({ params }: { params: Params }) {
               projectId={shown.id}
               projectName={shown.name}
               personal={personal}
+              section
               admin={admin}
             />
           </div>

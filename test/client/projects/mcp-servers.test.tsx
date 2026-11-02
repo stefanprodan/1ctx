@@ -140,6 +140,19 @@ describe("the entity", () => {
     ]);
   });
 
+  test.serial("a refused add reads the list again", async () => {
+    held("p2", answerOf([flux], [{ id: "m2", name: "markets" }]));
+    answer = (_url, init) =>
+      init?.method === "POST"
+        ? Response.json({ error: "no such MCP server" }, { status: 404 })
+        : Response.json(answerOf([flux]));
+    await expect(addProjectMcp("p2", "m2")).rejects.toThrow();
+    expect(calls.at(-1)!.url).toBe("/api/projects/p2/mcp");
+    expect(calls.at(-1)!.init?.method ?? "GET").toBe("GET");
+    // the stale row is gone from Add
+    expect(projectMcpOf("p2")?.addable).toEqual([]);
+  });
+
   test.serial("a refused remove reads the list again", async () => {
     held("p2", answerOf([flux, markets]));
     answer = (_url, init) =>
@@ -212,7 +225,13 @@ describe("the list", () => {
   test.serial("nothing to add hides Add server", () => {
     held("p2", answerOf([flux, markets]));
     const html = render(
-      <McpServers projectId="p2" projectName="finops" personal={false} admin />,
+      <McpServers
+        projectId="p2"
+        projectName="finops"
+        personal={false}
+        section={false}
+        admin
+      />,
     );
     expect(html).not.toContain("Add server");
     // the admin page's card counts its rows
@@ -239,7 +258,7 @@ describe("the list", () => {
   test.serial("a personal project lists its all servers, read-only", () => {
     held("p1", answerOf([flux]));
     const html = render(
-      <McpServers projectId="p1" projectName="admin" personal admin />,
+      <McpServers projectId="p1" projectName="admin" personal section admin />,
     );
     expect(html).toContain(PERSONAL_TEXT);
     expect(html).toContain("3 tools · All projects");

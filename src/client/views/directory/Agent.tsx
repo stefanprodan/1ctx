@@ -223,7 +223,7 @@ function McpTab({
             </RowsAvatar>
             <RowsTitle
               name={server.name}
-              sub={`${scopeWords(server.scope, server.projects)} · ${line.text}`}
+              sub={`${line.text} · ${scopeWords(server.scope, server.projects)}`}
               bad={line.bad}
               mono
             />

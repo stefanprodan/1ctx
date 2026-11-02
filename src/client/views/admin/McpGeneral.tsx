@@ -254,7 +254,7 @@ function Projects({ server, drafts: d }: Props) {
     >
       <Setting
         title="Projects"
-        line={reachHint(d.reach.value, ids)}
+        line={reachHint(d.reach.value, ids, server.keyName !== null)}
         action={
           <ReachSeg
             reach={d.reach.value}

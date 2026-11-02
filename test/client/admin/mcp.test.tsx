@@ -611,10 +611,12 @@ describe("a server's projects", () => {
   });
 
   test("the hint names a consequence only", () => {
-    expect(reachHint("all", [])).toBe("Personal projects included.");
-    expect(reachHint("picked", [])).toBe("Offered in no project.");
-    expect(reachHint("picked", ["p2"])).toBeUndefined();
-    expect(reachHint("", [])).toBe("Pick where its key may be used.");
+    expect(reachHint("all", [], true)).toBe("Personal projects included.");
+    expect(reachHint("picked", [], false)).toBe("Offered in no project.");
+    // a keyed server's empty pick is the field's error, not a hint
+    expect(reachHint("picked", [], true)).toBeUndefined();
+    expect(reachHint("picked", ["p2"], false)).toBeUndefined();
+    expect(reachHint("", [], true)).toBeUndefined();
   });
 
   test("the server's refusals land on the field", () => {

@@ -102,12 +102,19 @@ export async function addProjectMcp(
 ): Promise<void> {
   const forUser = owner;
   const body: AddProjectMcpRequest = { serverId };
-  const answer = await api<ProjectMcpResponse>(
-    listUrl(projectId),
-    "POST",
-    body,
-  );
-  keep(projectId, answer, forUser);
+  try {
+    const answer = await api<ProjectMcpResponse>(
+      listUrl(projectId),
+      "POST",
+      body,
+    );
+    keep(projectId, answer, forUser);
+  } catch (err) {
+    // a server another tab added, widened or deleted: the list, and its
+    // addable, read again
+    await loadProjectMcp(projectId);
+    throw err;
+  }
 }
 
 export async function removeProjectMcp(

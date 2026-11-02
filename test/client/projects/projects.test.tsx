@@ -13,6 +13,7 @@ import { Rail } from "../../../src/client/app/Rail.tsx";
 import { path } from "../../../src/client/app/router.ts";
 import { adminProject } from "../../../src/client/data/admin-projects.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { projectMcpLists } from "../../../src/client/data/project-mcp.ts";
 import {
   addLabel,
   changeLabel,
@@ -35,6 +36,7 @@ import {
 import { daysFailed } from "../../../src/client/data/usage.ts";
 import type { OpenLabel } from "../../../src/client/views/projects/Labels.model.ts";
 import { LabelRows } from "../../../src/client/views/projects/Labels.tsx";
+import { TEAM_TEXT } from "../../../src/client/views/projects/McpServers.model.ts";
 import { Members } from "../../../src/client/views/projects/Members.tsx";
 import {
   aboutLine,
@@ -913,6 +915,29 @@ describe("the pages", () => {
         expect(html).toContain("No repositories yet.");
       },
     );
+
+    test.serial("the MCP servers are a section, as the repositories", () => {
+      project.value = teamRow();
+      projectMcpLists.value = new Map([
+        [
+          "p2",
+          {
+            servers: [{ id: "m1", name: "flux", tools: 5, scope: "all" }],
+            addable: [],
+          },
+        ],
+      ]);
+      const html = render(<Settings params={{ id: "p2" }} />);
+      expect(html).toContain(
+        `<h2 class="section-title">MCP Servers</h2><p class="section-text">${TEAM_TEXT}</p>`,
+      );
+      expect(html).not.toContain("setting-count");
+      // the second line in the body font, as a label's
+      expect(html).toContain(
+        'class="rows-sub rows-sub-prose">5 tools · All projects<',
+      );
+      projectMcpLists.value = new Map();
+    });
 
     test.serial("a project at the cap offers no Add label", () => {
       project.value = {

@@ -44,14 +44,14 @@ export function McpServers({
   projectId,
   projectName,
   personal,
-  section = personal,
+  section,
   admin,
 }: {
   projectId: string;
   projectName: string;
   personal: boolean;
   // a Settings tab's section rather than the admin page's card
-  section?: boolean;
+  section: boolean;
   admin: boolean;
 }) {
   const open = useSignal<OpenServer>(null);
@@ -154,7 +154,7 @@ function ServerRows({
           );
         }
         const title = (
-          <RowsTitle name={server.name} mono sub={rowLine(server)} />
+          <RowsTitle name={server.name} mono prose sub={rowLine(server)} />
         );
         const kind = rowKind(server, admin, personal);
         if (kind === "edit") {
@@ -219,7 +219,7 @@ function RemoveForm({
   );
   return (
     <div class="mcp-servers-form">
-      <RowsTitle name={row.name} mono sub={rowLine(row)} />
+      <RowsTitle name={row.name} mono prose sub={rowLine(row)} />
       {asking.value ? (
         <Foot save={save}>
           <div class="mcp-servers-remove">{remove}</div>

@@ -634,7 +634,7 @@ describe("the pages", () => {
     html = render(<Agent params={{ name: "coder" }} />);
     expect(html).toContain('</nav><span class="rows-hint cut">900 tokens<');
     // the scope and the refresh under the name, the tools at the row's end
-    expect(html).toContain('class="rows-sub">All projects · refreshed 1h ago<');
+    expect(html).toContain('class="rows-sub">refreshed 1h ago · All projects<');
     expect(html).toContain('class="rows-meta">12 tools<');
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/agents/coder/mcp" aria-current="page">MCP<',
@@ -649,7 +649,7 @@ describe("the pages", () => {
       },
     };
     html = render(<Agent params={{ name: "coder" }} />);
-    expect(html).toContain('class="rows-sub">finops · refreshed 1h ago<');
+    expect(html).toContain('class="rows-sub">refreshed 1h ago · finops<');
   });
 
   test.serial("Agent draws its activity ghost, then its days", () => {
