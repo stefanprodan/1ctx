@@ -26,6 +26,7 @@ import { AgentSubagents } from "../../../src/client/views/admin/AgentSubagents.t
 import { windowText } from "../../../src/client/views/admin/Agents.model.ts";
 import { NewAgent } from "../../../src/client/views/admin/NewAgent.tsx";
 import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
+import type { McpServerSummary } from "../../../src/shared/contracts/mcp.ts";
 import type {
   CatalogMatch,
   ProviderSummary,
@@ -601,6 +602,53 @@ describe("the cards", () => {
     }
     providers.value = null;
     skills.value = null;
+    servers.value = null;
+  });
+
+  test.serial("a listed server is marked with its projects", () => {
+    const row = (
+      id: string,
+      name: string,
+      changes: Partial<McpServerSummary>,
+    ): McpServerSummary => ({
+      id,
+      name,
+      url: `https://${name}.test/mcp`,
+      keyName: null,
+      hasKey: false,
+      read: true,
+      write: false,
+      instructionsOn: true,
+      timeoutMs: null,
+      readPatterns: [],
+      writePatterns: [],
+      excludedPatterns: [],
+      scope: "all",
+      projects: [],
+      serverName: "",
+      serverVersion: "",
+      protocolVersion: "",
+      instructions: "",
+      checkedAt: Date.now() - 60 * 60 * 1000,
+      lastChange: null,
+      refreshError: null,
+      refreshFailedAt: null,
+      createdAt: 1,
+      tools: [],
+      ...changes,
+    });
+    servers.value = [
+      row("s1", "markets", {
+        scope: "projects",
+        projects: [{ id: "p2", name: "finops" }],
+      }),
+      row("s2", "flux", {}),
+    ];
+    const html = render(
+      <AgentMcp agent={agent} drafts={AgentDrafts.of(agent)} />,
+    );
+    expect(html).toContain("finops · refreshed 1h ago");
+    expect(html).not.toContain("All projects · refreshed");
     servers.value = null;
   });
 

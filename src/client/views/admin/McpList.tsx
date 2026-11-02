@@ -22,7 +22,7 @@ import {
 import { Search } from "../../ui/Search.tsx";
 import { AsideLine, Split } from "../../ui/Split.tsx";
 import { KeyFilesSection, TopSection, UsageSection } from "./AdminAside.tsx";
-import { sidesLine, usersOf } from "./Mcp.model.ts";
+import { scopeCount, sidesLine, usersOf } from "./Mcp.model.ts";
 import { NewMcpServer } from "./NewMcpServer.tsx";
 import "./mcp-page.css";
 
@@ -92,7 +92,9 @@ function Row({ server, now }: { server: McpServerSummary; now: number }) {
         bad={failed}
       />
       <RowsMeta keep under={sidesLine(server)}>
-        {users === 0 ? "No agents" : pluralCommas(users, "agent", "agents")}
+        {`${scopeCount(server)} · ${
+          users === 0 ? "No agents" : pluralCommas(users, "agent", "agents")
+        }`}
       </RowsMeta>
     </RowsGo>
   );

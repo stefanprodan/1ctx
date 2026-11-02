@@ -26,7 +26,11 @@ import {
 } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm } from "../../ui/Setting.tsx";
-import { serverLine, serverMeta } from "../directory/Directory.model.ts";
+import {
+  scopeWords,
+  serverLine,
+  serverMeta,
+} from "../directory/Directory.model.ts";
 import {
   cardBody,
   isModeValue,
@@ -45,6 +49,17 @@ type Access = "read" | "write" | "none";
 
 const toolCount = (server: McpServerSummary, link: AgentServer) =>
   offeredServers([server], [link])[0]?.tools.length ?? 0;
+
+const scopeOf = (server: McpServerSummary) =>
+  scopeWords(
+    server.scope,
+    server.projects.map((p) => p.name),
+  );
+
+// a bound server says where it reaches, so an agent's admin sees which
+// of its projects get it; an all server needs no word
+const boundLine = (server: McpServerSummary, line: string) =>
+  server.scope === "all" ? line : `${scopeOf(server)} · ${line}`;
 
 export function AgentMcp({
   agent,
@@ -123,7 +138,7 @@ function Servers({
                 return {
                   value: s.id,
                   label: s.name,
-                  sub: `${tools} · ${line.text}`,
+                  sub: `${scopeOf(s)} · ${tools} · ${line.text}`,
                   subBad: line.bad,
                 };
               })}
@@ -173,7 +188,7 @@ function Servers({
               <RowsLine key={server.id} flush>
                 <RowsTitle
                   name={server.name}
-                  sub={line.text}
+                  sub={boundLine(server, line.text)}
                   bad={line.bad}
                   mono
                 />

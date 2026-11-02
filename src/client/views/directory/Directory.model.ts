@@ -14,6 +14,7 @@ import type {
 } from "../../../shared/api/directory.ts";
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
+import type { McpScope } from "../../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../../shared/contracts/provider.ts";
 import type { Role, Wire } from "../../../shared/words.ts";
 import { priceLine, windowLine } from "../../agents/meta.ts";
@@ -74,6 +75,16 @@ export function serverLine(
     };
   }
   return { text: `refreshed ${ago(server.checkedAt, now)}`, bad: false };
+}
+
+// where a server is offered: every project, or the names of the team
+// projects it lists, none when the list is empty
+export function scopeWords(
+  scope: McpScope,
+  projects: readonly string[],
+): string {
+  if (scope === "all") return "All projects";
+  return projects.length === 0 ? "No projects" : projects.join(", ");
 }
 
 // what a server gives the model: its tools that reach it

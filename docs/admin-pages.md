@@ -94,6 +94,15 @@ reporting.
   `Seg`, saved with its Save; a pick of another model starts it off.
   Where the catalog says yes, the model's line reads "images" as it
   reads "tools", and nothing is asked.
+- **An MCP server's Projects field is All projects or Picked
+  projects** (`McpProjects.tsx`), the picks drawn as a credential's
+  (`ProjectPicks.tsx`). A new server starts at All projects, or with
+  nothing picked once a key is chosen, until the admin picks
+  (`reachForKey()`); `projectsProblem()` refuses a keyed save with
+  nothing picked, as the server does. On the page it is its own card
+  after Endpoint. The list row says `scopeCount()`; the agent's MCP tab
+  puts `scopeWords()` before a listed server's line, and its server
+  picker before every option's.
 - **An agent's MCP link is Read or Read and write.** Write alone is
   refused by the server. "Default for new users" is sent only when
   flipped.

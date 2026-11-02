@@ -3,21 +3,18 @@
 //
 // The plus menu's switches for the composer's chat and agent, over the
 // flips kept in data/capabilities.ts. A flip never sent goes when the
-// chat does; another project drops the credential and repository flips,
-// since those are the project's, and another agent the server and
-// skill flips, since its servers and skills are other keys.
+// chat does; another project drops the credential, repository and
+// server flips, since those depend on the project, and another agent
+// the server and skill flips, since its servers and skills are other
+// keys.
 
 import { useEffect, useRef } from "preact/hooks";
 import {
   AUTOMATIONS,
-  CREDENTIAL,
   EMAIL,
   EXTERNAL_TASKS,
   KNOWLEDGE,
-  MCP,
   MEMORY,
-  REPO,
-  SKILL,
   VISUALIZE,
   WEB,
 } from "../../shared/capabilities.ts";
@@ -32,10 +29,12 @@ import {
   switchable,
 } from "../data/capabilities.ts";
 import {
+  AGENT_KINDS,
   agentMoved,
   automationsItem,
   emailItem,
   externalTasksItem,
+  PROJECT_KINDS,
   reposItem,
   serversItem,
   skillsItem,
@@ -60,16 +59,14 @@ export function useSwitches({
   const lastProject = useRef<string | null>(null);
   useEffect(() => {
     if (agentMoved(lastProject.current, projectId)) {
-      dropKind(chat, CREDENTIAL);
-      dropKind(chat, REPO);
+      for (const kind of PROJECT_KINDS) dropKind(chat, kind);
     }
     lastProject.current = projectId;
   }, [chat, projectId]);
   const lastAgent = useRef<string | null>(null);
   useEffect(() => {
     if (agentMoved(lastAgent.current, agent)) {
-      dropKind(chat, MCP);
-      dropKind(chat, SKILL);
+      for (const kind of AGENT_KINDS) dropKind(chat, kind);
     }
     if (agent !== null) lastAgent.current = agent;
   }, [chat, agent]);

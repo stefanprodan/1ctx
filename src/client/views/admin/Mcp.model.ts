@@ -1,6 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { McpProjects } from "../../../shared/api/mcp.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
 import type {
   McpChange,
@@ -107,8 +108,15 @@ export function mcpFieldOf(message: string): string | undefined {
     "readPatterns",
     "writePatterns",
     "excludedPatterns",
+    "projects",
   ]) {
     if (message.startsWith(field)) return field;
+  }
+  if (
+    message.startsWith("a server with a key needs") ||
+    message.startsWith("no such team project")
+  ) {
+    return "projects";
   }
   if (message.startsWith("an MCP server named")) return "name";
   // a failed discovery is the endpoint's: the key or the address
@@ -147,4 +155,64 @@ export function deleteLine(users: number): string {
   return `${pluralCommas(users, "agent uses", "agents use")} it. Remove it from ${
     users === 1 ? "that agent" : "them"
   } first.`;
+}
+
+// where a server is offered, as a form picks it: "" until picked
+export type Reach = "all" | "picked" | "";
+
+export const REACH_OPTIONS: { value: Reach; label: string }[] = [
+  { value: "all", label: "All projects" },
+  { value: "picked", label: "Picked projects" },
+];
+
+export const reachOf = (server: Pick<McpServerSummary, "scope">): Reach =>
+  server.scope === "all" ? "all" : "picked";
+
+// a new server's start: a keyless one reaches every project, a keyed
+// one nothing until the admin picks, so a key never reaches everyone by
+// accident
+export const reachForKey = (keyed: boolean): Reach => (keyed ? "" : "all");
+
+export function projectsBody(
+  reach: Reach,
+  projectIds: readonly string[],
+): McpProjects | undefined {
+  if (reach === "all") return "all";
+  return reach === "picked" ? [...projectIds] : undefined;
+}
+
+// the server's rule: a key needs all or at least one team project
+export function projectsProblem(
+  keyed: boolean,
+  reach: Reach,
+  projectIds: readonly string[],
+): string | null {
+  if (reach === "") return "Pick All projects or the team projects";
+  if (keyed && reach === "picked" && projectIds.length === 0) {
+    return "A server with a key needs a project";
+  }
+  return null;
+}
+
+// under the Projects field: what a pick means, only where it is not
+// plain from the rows
+export function reachHint(
+  reach: Reach,
+  projectIds: readonly string[],
+): string | undefined {
+  if (reach === "all") return "Personal projects included.";
+  if (reach === "") return "Pick where its key may be used.";
+  return projectIds.length === 0 ? "Offered in no project." : undefined;
+}
+
+export const sameIds = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((id) => b.includes(id));
+
+// the list row: every project, how many, or none
+export function scopeCount(
+  server: Pick<McpServerSummary, "scope" | "projects">,
+): string {
+  if (server.scope === "all") return "All projects";
+  const n = server.projects.length;
+  return n === 0 ? "No projects" : pluralCommas(n, "project", "projects");
 }

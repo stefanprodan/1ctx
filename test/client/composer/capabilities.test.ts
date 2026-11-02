@@ -3,6 +3,10 @@
 
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
+  AGENT_KINDS,
+  PROJECT_KINDS,
+} from "../../../src/client/composer/Add.model.ts";
+import {
   accepted,
   carry,
   changeOf,
@@ -196,6 +200,21 @@ describe("pending capability flips", () => {
     flip("s1", ["repo:r1"], "repo:r1");
     expect(isOff("s1", ["repo:r1"], "repo:r1")).toBe(false);
     expect(changeOf("s1")).toEqual({ capabilities: { enable: ["repo:r1"] } });
+  });
+
+  test.serial("another project on Home drops the server flips too", () => {
+    flip(null, [], WEB);
+    flip(null, [], "mcp:m1");
+    flip(null, [], "credential:c1");
+    flip(null, [], "repo:r1");
+    flip(null, [], "skill:k1");
+    // a server's scope depends on the project, so its flip goes
+    for (const kind of PROJECT_KINDS) dropKind(null, kind);
+    expect(changeOf(null)).toEqual({
+      capabilities: { disable: ["skill:k1", WEB] },
+    });
+    for (const kind of AGENT_KINDS) dropKind(null, kind);
+    expect(changeOf(null)).toEqual({ capabilities: { disable: [WEB] } });
   });
 
   test.serial("leaving the chat gives up what was never sent", () => {

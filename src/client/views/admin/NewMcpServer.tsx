@@ -10,9 +10,18 @@ import { configMcpHref, MCP_HREF } from "../../lib/hrefs.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { keyOptions, NO_KEY } from "../../lib/secrets.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
+import { Labelled } from "../../ui/Labelled.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Select } from "../../ui/Select.tsx";
-import { mcpFieldOf } from "./Mcp.model.ts";
+import {
+  mcpFieldOf,
+  projectsBody,
+  projectsProblem,
+  type Reach,
+  reachForKey,
+  reachHint,
+} from "./Mcp.model.ts";
+import { ProjectsPicks, ReachSeg } from "./McpProjects.tsx";
 import { NewCard } from "./NewCard.tsx";
 import "./mcp-page.css";
 
@@ -36,6 +45,11 @@ function Form() {
   const name = useSignal("");
   const url = useSignal("");
   const keyName = useSignal(NO_KEY);
+  const reach = useSignal<Reach>(reachForKey(false));
+  // until the admin picks, the reach follows the key
+  const reachPicked = useSignal(false);
+  const projectIds = useSignal<string[]>([]);
+  const keyed = keyName.value !== NO_KEY;
   const save = useSave(async () => {
     const from = address();
     const created = await addServer({
@@ -50,6 +64,7 @@ function Form() {
       readPatterns: [],
       writePatterns: [],
       excludedPatterns: [],
+      projects: projectsBody(reach.value, projectIds.value),
     });
     if (address() === from) navigate(configMcpHref(created.name, "tools"));
   }, mcpFieldOf);
@@ -69,7 +84,11 @@ function Form() {
       onSubmit={() => {
         void save.run(
           at("name", trimmed === "" ? "A name is required" : null) ??
-            at("url", url.value.trim() === "" ? "A URL is required" : null),
+            at("url", url.value.trim() === "" ? "A URL is required" : null) ??
+            at(
+              "projects",
+              projectsProblem(keyed, reach.value, projectIds.value),
+            ),
         );
       }}
     >
@@ -107,6 +126,8 @@ function Form() {
             invalid={invalid("keyName")}
             onChange={(value) => {
               keyName.value = value;
+              if (!reachPicked.value)
+                reach.value = reachForKey(value !== NO_KEY);
               save.touch();
             }}
           />
@@ -128,6 +149,36 @@ function Form() {
           />
           <FieldError save={save} field="url" />
         </label>
+        <div class="pair-wide">
+          <Labelled
+            label="Projects"
+            field="projects"
+            save={save}
+            required={keyed}
+            hint={reachHint(reach.value, projectIds.value)}
+          >
+            <ReachSeg
+              reach={reach.value}
+              save={save}
+              onPick={(value) => {
+                reach.value = value;
+                reachPicked.value = true;
+                save.touch();
+              }}
+            />
+            {reach.value === "picked" && (
+              <ProjectsPicks
+                projectIds={projectIds.value}
+                held={[]}
+                save={save}
+                onChange={(ids) => {
+                  projectIds.value = ids;
+                  save.touch();
+                }}
+              />
+            )}
+          </Labelled>
+        </div>
       </div>
     </NewCard>
   );
