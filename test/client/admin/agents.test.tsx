@@ -113,7 +113,7 @@ const coder: AgentSummary = {
   effort: null,
   prompt: "",
   skills: [],
-  servers: [],
+  mcp: true,
   mcpMode: "auto",
   upstream: null,
   skip4Bit: false,
@@ -947,7 +947,7 @@ describe("the default agent", () => {
       effort: null,
       prompt: "",
       skills: [],
-      servers: [],
+      mcp: true,
       mcpMode: "auto" as const,
     };
     await updateAgent("ag2", body);

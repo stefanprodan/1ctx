@@ -407,6 +407,20 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
+    // a team project's choice is an admin's
+    method: "PUT",
+    path: "/api/projects/:id/mcp/:serverId/side",
+    body: { side: "off" },
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    // the caller's own personal project, whoever they are
+    method: "PUT",
+    path: "/api/profile/project/mcp/:serverId/side",
+    body: { side: "off" },
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
     // the caller's own personal project, whoever they are
     method: "POST",
     path: "/api/profile/project/repos",
@@ -602,7 +616,7 @@ export const AUTH_CASES: AuthCase[] = [
       model: "x",
       thinking: null,
       effort: null,
-      servers: [],
+      mcp: true,
       mcpMode: "auto",
     },
     expect: { anonymous: 401, member: 403, admin: 400 },
@@ -616,7 +630,7 @@ export const AUTH_CASES: AuthCase[] = [
       model: "x",
       thinking: null,
       effort: null,
-      servers: [],
+      mcp: true,
       mcpMode: "auto",
     },
     expect: { anonymous: 401, member: 403, admin: 404 },
@@ -634,6 +648,11 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "GET",
     path: "/api/agents/:id/usage",
+    expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    method: "GET",
+    path: "/api/agents/:id/mcp",
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
@@ -919,7 +938,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/mcp",
-    // a key with its scope, still the admin's 502
+    // a key with its grants, still the admin's 502
     body: {
       name: "markets",
       url: "http://mcp.test/mcp",
@@ -932,6 +951,7 @@ export const AUTH_CASES: AuthCase[] = [
       writePatterns: [],
       excludedPatterns: [],
       projects: "all",
+      personal: "off",
     },
     expect: { anonymous: 401, member: 403, admin: 502 },
   },
@@ -944,7 +964,7 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "PATCH",
     path: "/api/mcp/:id",
-    body: { projects: "all" },
+    body: { projects: "all", personal: "read" },
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {

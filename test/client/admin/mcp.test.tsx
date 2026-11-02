@@ -9,7 +9,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { path } from "../../../src/client/app/router.ts";
-import { agents } from "../../../src/client/data/agents.ts";
 import {
   addServer,
   callTimeoutMs,
@@ -25,23 +24,25 @@ import {
 } from "../../../src/client/data/mcp.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { promptPreview } from "../../../src/client/views/admin/AgentPage.model.ts";
-import {
-  listed,
-  sameServers,
-} from "../../../src/client/views/admin/Agents.model.ts";
+import { listed } from "../../../src/client/views/admin/Agents.model.ts";
 import {
   changeLine,
+  deleteAsk,
+  deleteLine,
+  grantWords,
   instructionsBox,
   instructionsLine,
   mcpFieldOf,
   offerOf,
   offerSides,
+  personalForKey,
+  personalHint,
+  personalProblem,
   projectsBody,
   projectsProblem,
   reachForKey,
   reachHint,
   reachOf,
-  scopeCount,
   sidesLine,
   timeoutMs,
   timeoutProblem,
@@ -51,8 +52,7 @@ import { McpList } from "../../../src/client/views/admin/McpList.tsx";
 import { McpDrafts } from "../../../src/client/views/admin/McpPage.state.ts";
 import { McpPage, mcpTabOf } from "../../../src/client/views/admin/McpPage.tsx";
 import { ToolParams } from "../../../src/client/views/admin/ToolParams.tsx";
-import { scopeWords } from "../../../src/client/views/directory/Directory.model.ts";
-import type { AgentSummary } from "../../../src/shared/contracts/agent.ts";
+import { onWords } from "../../../src/client/views/directory/Directory.model.ts";
 import type {
   McpServerSummary,
   McpToolSummary,
@@ -98,6 +98,8 @@ const server = (changes: Partial<McpServerSummary> = {}): McpServerSummary => ({
   excludedPatterns: ["install_*"],
   scope: "all",
   projects: [],
+  personal: "read",
+  on: { projects: [], personal: 0 },
   serverName: "flux-operator-mcp",
   serverVersion: "1.0.0",
   protocolVersion: "2026-07-28",
@@ -213,11 +215,8 @@ describe("the model", () => {
       instructions: "x".repeat(MAX_INSTRUCTIONS_BLOCK),
       readPatterns: [],
     });
-    const links = [
-      { serverId: "m1", read: true, write: true },
-      { serverId: "m2", read: true, write: true },
-    ];
-    const preview = promptPreview([flux, docs], links);
+    // every server on its own switches, whichever projects choose it
+    const preview = promptPreview([flux, docs]);
     expect(preview.line).toMatch(
       /^Instructions in the prompt: [\d,]+ of 32,000 characters, from flux$/,
     );
@@ -239,19 +238,13 @@ describe("the model", () => {
         },
       ],
     });
-    const schemaPreview = promptPreview(
-      [flux, huge],
-      [links[0]!, { serverId: "m3", read: true, write: true }],
-    );
+    const schemaPreview = promptPreview([flux, huge]);
     expect(schemaPreview.warnings).toEqual([
       "huge left out: its tools are over the 1 MB cap",
     ]);
     expect(schemaPreview.line).toEndWith("from flux");
     // the switch off on the only server: no line, no warning
-    const quiet = promptPreview(
-      [server({ instructionsOn: false })],
-      [links[0]!],
-    );
+    const quiet = promptPreview([server({ instructionsOn: false })]);
     expect(quiet).toEqual({
       line: "",
       warnings: [],
@@ -259,11 +252,8 @@ describe("the model", () => {
       count: 0,
       from: [],
     });
-    // write alone on the agent while the server has it off: nothing offered
-    expect(
-      promptPreview([flux], [{ serverId: "m1", read: false, write: true }])
-        .line,
-    ).toBe("");
+    // a server with both switches off: nothing offered
+    expect(promptPreview([{ ...flux, read: false }]).line).toBe("");
   });
 
   test.serial("a refusal's field", () => {
@@ -278,18 +268,14 @@ describe("the model", () => {
     expect(mcpFieldOf("MCP request timed out")).toBe("url");
     expect(mcpFieldOf("an agent uses the MCP server")).toBeUndefined();
     expect(mcpFieldOf("the MCP server is refreshing")).toBeUndefined();
+    expect(mcpFieldOf("a server with a key needs personal")).toBe("personal");
+    expect(mcpFieldOf("personal must be off, read or write")).toBe("personal");
   });
 
-  test.serial("the agent's servers: the listed ones, the same set", () => {
-    const one = [{ serverId: "m1", read: true, write: false }];
-    const both = [{ serverId: "m1", read: true, write: true }];
-    expect(listed(both, (s) => s.serverId, null)).toBe(both);
-    expect(listed(both, (s) => s.serverId, [{ id: "m2" }])).toEqual([]);
-    expect(listed(["s1", "s2"], (id) => id, [{ id: "s2" }])).toEqual(["s2"]);
-    expect(
-      sameServers(both, [{ serverId: "m1", write: true, read: true }]),
-    ).toBe(true);
-    expect(sameServers(both, one)).toBe(false);
+  test.serial("the agent's skills: the listed ones", () => {
+    const both = ["s1", "s2"];
+    expect(listed(both, (id) => id, null)).toBe(both);
+    expect(listed(both, (id) => id, [{ id: "s2" }])).toEqual(["s2"]);
   });
 });
 
@@ -388,23 +374,14 @@ describe("the entity", () => {
   });
 });
 
-const agent = (name: string, write: boolean) =>
-  ({
-    id: `a-${name}`,
-    name,
-    avatar: "bot",
-    servers: [{ serverId: "m1", read: true, write }],
-  }) as unknown as AgentSummary;
-
 describe("the list", () => {
-  test.serial("a row per server: the URL, its agents and its sides", () => {
+  test.serial("a row per server: the URL, its grants and its sides", () => {
     servers.value = [flux];
     keys.value = ["mcp-github"];
-    agents.value = [agent("sre", false)];
     const html = render(<McpList />);
     expect(html).toContain('href="/admin/config/mcp/flux"');
     expect(html).toContain(flux.url);
-    expect(html).toContain("1 agent");
+    expect(html).toContain("All teams · personal read");
     expect(html).toContain("2 read · write off");
     expect(html).toContain('href="/admin/config/mcp?new"');
     expect(html).toContain("mcp-github.key");
@@ -421,10 +398,8 @@ describe("the list", () => {
     servers.value = [
       server({ refreshError: "offline", refreshFailedAt: Date.now() - 60_000 }),
     ];
-    agents.value = [];
     const html = render(<McpList />);
     expect(html).toContain("refresh failed 1m ago");
-    expect(html).toContain("No agents");
   });
 });
 
@@ -435,30 +410,28 @@ describe("a server's page", () => {
     expect(mcpTabOf("/admin/config/mcp/tools")).toBe("general");
   });
 
-  test.serial("General: the facts, the endpoint, the agents on it", () => {
-    servers.value = [flux];
-    agents.value = [agent("sre", true)];
+  test.serial("General: the facts, the endpoint, where it is on", () => {
+    servers.value = [
+      server({
+        on: { projects: [{ id: "p2", name: "finops" }], personal: 3 },
+      }),
+    ];
     path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
     expect(html).toContain("flux-operator-mcp 1.0.0");
     expect(html).toContain("2026-07-28");
     expect(html).toContain(`value="${flux.url}"`);
-    expect(html).toContain('href="/admin/config/agents/sre/mcp"');
-    expect(html).toContain("Read and write");
-    expect(html).toContain("1 agent uses it. Remove it from that agent first.");
-    // the server refuses a server an agent uses, so Delete waits
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>Delete</);
+    expect(html).toContain(">On in<");
+    expect(html).toContain('href="/admin/access/projects/p2"');
+    expect(html).toContain("3 personal projects");
+    expect(html).toContain("On in finops, 3 personal projects.");
+    expect(html).not.toContain("Used by");
+    // no agent holds a server, so Delete only asks
+    expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Delete</);
+    expect(html).toContain(">Personal projects<");
+    expect(html).toMatch(/aria-pressed="true"[^>]*>Read</);
     expect(html).toContain('aria-label="Instructions on"');
     expect(html).toContain(instructionsLine(true));
-  });
-
-  test.serial("waits for the agents, so Delete never opens early", () => {
-    servers.value = [flux];
-    agents.value = null;
-    path.value = "/admin/config/mcp/flux";
-    const html = render(<McpPage params={{ name: "flux" }} />);
-    expect(html).toContain("Loading");
-    expect(html).not.toContain("Delete flux");
   });
 
   test.serial("General: a failed refresh over the tabs, no agents", () => {
@@ -470,13 +443,12 @@ describe("a server's page", () => {
         checkedAt: Date.now() - 2 * HOUR,
       }),
     ];
-    agents.value = [];
     path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
     expect(html).toContain("Discovery failed. Last refresh 1m ago.");
     expect(html).toContain("The server sent no instructions.");
-    expect(html).toContain("No agent uses it.");
-    expect(html).not.toContain("Used by");
+    expect(html).toContain("On in no project.");
+    expect(html).not.toContain(">On in<");
     expect(html).not.toMatch(/<button[^>]*disabled[^>]*>Delete</);
   });
 
@@ -488,7 +460,6 @@ describe("a server's page", () => {
         ),
       }),
     ];
-    agents.value = [];
     path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
     expect(html).toMatch(/fold-more">[^<]*<button[^>]*>Show all \d+ lines</);
@@ -498,7 +469,6 @@ describe("a server's page", () => {
     "Tools: the matchers with what they decide, each tool's side",
     () => {
       servers.value = [server({ readPatterns: ["get_*", "trace_*", "gte_*"] })];
-      agents.value = [];
       path.value = "/admin/config/mcp/flux/tools";
       const html = render(<McpPage params={{ name: "flux" }} />);
       // get_* decides one tool, a typo matches none and is marked
@@ -523,7 +493,6 @@ describe("a server's page", () => {
       me.value = null;
       me.value = admin;
       servers.value = [flux];
-      agents.value = [];
       path.value = "/admin/config/mcp/flux";
       const page = () => render(<McpPage params={{ name: "flux" }} />);
       expect(page()).toContain("Loading");
@@ -547,12 +516,57 @@ describe("a server's page", () => {
 });
 
 describe("the drafts", () => {
-  test.serial("saving Offered keeps a timeout typed and not saved", () => {
+  test.serial("saving Access keeps a timeout typed and not saved", () => {
     const d = McpDrafts.of(flux);
     d.timeout.value = "30";
-    d.resetOffer(server({ write: true }));
+    d.resetAccess(server({ write: true }));
     expect(d.timeout.value).toBe("30");
     expect(d.write.value).toBe(true);
+  });
+
+  test.serial("Access saves what changed in one body", () => {
+    const d = McpDrafts.of(flux);
+    expect(d.accessDirty(flux)).toBe(false);
+    expect(d.accessBody(flux)).toEqual({});
+    d.personal.value = "off";
+    expect(d.accessBody(flux)).toEqual({ personal: "off" });
+    d.write.value = true;
+    d.reach.value = "picked";
+    d.projectIds.value = ["p2"];
+    expect(d.accessDirty(flux)).toBe(true);
+    expect(d.accessBody(flux)).toEqual({
+      projects: ["p2"],
+      personal: "off",
+      read: true,
+      write: true,
+    });
+    d.resetAccess(flux);
+    expect(d.accessDirty(flux)).toBe(false);
+  });
+
+  test.serial(
+    "an edited Access part never sends back another admin's change",
+    () => {
+      const d = McpDrafts.of(flux);
+      d.personal.value = "off";
+      const after = { ...flux, write: !flux.write };
+      d.follow(flux, after);
+      expect(d.write.value).toBe(after.write);
+      expect(d.accessBody(after)).toEqual({ personal: "off" });
+    },
+  );
+
+  test.serial("General draws one Access card with one foot", () => {
+    servers.value = [flux];
+    path.value = "/admin/config/mcp/flux";
+    const html = render(<McpPage params={{ name: "flux" }} />);
+    expect(html).toContain(">Access<");
+    expect(html).toContain(">Team projects<");
+    expect(html).toContain(">Personal projects<");
+    expect(html).toContain(">Most a project may use<");
+    expect(html).not.toContain("Tool access");
+    // Endpoint, Access, Call timeout and Instructions each save
+    expect(html.match(/>Discard</g)).toHaveLength(4);
   });
 
   test.serial("a card at rest follows the row, an edited one stays", () => {
@@ -573,22 +587,47 @@ describe("a server's projects", () => {
   const finops = { id: "p2", name: "finops" };
   const research = { id: "p3", name: "research" };
 
-  test("the list row says all, the count, or none", () => {
-    expect(scopeCount(flux)).toBe("All projects");
-    expect(scopeCount(server({ scope: "projects", projects: [] }))).toBe(
-      "No projects",
-    );
+  test("the list row says all teams, the count, or none, then personal", () => {
+    expect(grantWords(flux)).toBe("All teams · personal read");
     expect(
-      scopeCount(server({ scope: "projects", projects: [finops, research] })),
-    ).toBe("2 projects");
+      grantWords(server({ scope: "projects", projects: [], personal: "off" })),
+    ).toBe("No projects");
+    expect(
+      grantWords(
+        server({
+          scope: "projects",
+          projects: [finops, research],
+          personal: "write",
+        }),
+      ),
+    ).toBe("2 projects · personal read and write");
   });
 
-  test("the scope words name the projects", () => {
-    expect(scopeWords("all", [])).toBe("All projects");
-    expect(scopeWords("projects", [])).toBe("No projects");
-    expect(scopeWords("projects", ["finops", "research"])).toBe(
-      "finops, research",
+  test("where it is on: team projects by name, personal ones as a count", () => {
+    expect(onWords([], 0)).toBe("No projects");
+    expect(onWords(["finops", "research"], 1)).toBe(
+      "finops, research, 1 personal project",
     );
+    const on = { projects: [finops], personal: 2 };
+    expect(deleteLine(on)).toBe("On in finops, 2 personal projects.");
+    expect(deleteAsk("flux", on)).toBe(
+      "Delete flux? It is on in finops, 2 personal projects.",
+    );
+    expect(deleteLine({ projects: [], personal: 0 })).toBe("On in no project.");
+    expect(deleteAsk("flux", { projects: [], personal: 0 })).toBe(
+      "Delete flux?",
+    );
+  });
+
+  test("a keyless server's personal grant starts at read, a keyed one unset", () => {
+    expect(personalForKey(false)).toBe("read");
+    expect(personalForKey(true)).toBe("");
+    expect(personalProblem("")).not.toBeNull();
+    expect(personalProblem("off")).toBeNull();
+    // only a keyed grant that is on warns
+    expect(personalHint("read", true)).toContain("key's owner");
+    expect(personalHint("off", true)).toBeUndefined();
+    expect(personalHint("read", false)).toBeUndefined();
   });
 
   test("a keyless server starts at all, a keyed one at nothing", () => {
@@ -611,8 +650,8 @@ describe("a server's projects", () => {
   });
 
   test("the hint names a consequence only", () => {
-    expect(reachHint("all", [], true)).toBe("Personal projects included.");
-    expect(reachHint("picked", [], false)).toBe("Offered in no project.");
+    expect(reachHint("all", [], true)).toBeUndefined();
+    expect(reachHint("picked", [], false)).toBe("Offered in no team project.");
     // a keyed server's empty pick is the field's error, not a hint
     expect(reachHint("picked", [], true)).toBeUndefined();
     expect(reachHint("picked", ["p2"], false)).toBeUndefined();
@@ -630,11 +669,10 @@ describe("a server's projects", () => {
   test.serial("the list row and the page show the scope", () => {
     const bound = server({ scope: "projects", projects: [finops] });
     servers.value = [bound];
-    agents.value = [];
-    expect(render(<McpList />)).toContain("1 project · No agents");
+    expect(render(<McpList />)).toContain("1 project · personal read");
     path.value = "/admin/config/mcp/flux";
     const html = render(<McpPage params={{ name: "flux" }} />);
-    expect(html).toContain(">Projects<");
+    expect(html).toContain(">Team projects<");
     expect(html).toMatch(/aria-pressed="true"[^>]*>Picked projects</);
     expect(html).toContain(">finops<");
   });

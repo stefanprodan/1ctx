@@ -208,17 +208,18 @@ export type SwitchableRepo = { id: string; name: string; ref: string };
 
 // GET /api/projects/:id/agents: the agents the composer offers, the
 // capability keys a send starting now could turn off (`web` while the
-// admin's web access is not off), and by agent id the MCP servers it is
-// offered now and the skills it carries, in name order; an agent without
-// one has no entry. The credentials and the repositories are the
-// project's, for any agent, in name order
+// admin's web access is not off), the MCP servers the project offers an
+// agent on MCP (agents[].mcp; one off gets none), and by agent id the
+// skills it carries, in name order; an agent without one has no entry.
+// The credentials and the repositories are the project's, for any
+// agent, in name order
 export type ProjectAgentsResponse = {
   agents: AgentSummary[];
   // the agent a new chat starts on for the caller: the one they last
   // picked, else the default; null with no agents
   startsOn: string | null;
   capabilities: string[];
-  servers: Record<string, SwitchableServer[]>;
+  servers: SwitchableServer[];
   skills: Record<string, SwitchableSkill[]>;
   credentials: SwitchableCredential[];
   repos: SwitchableRepo[];

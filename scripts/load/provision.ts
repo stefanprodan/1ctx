@@ -4,10 +4,11 @@
 // The cluster target's instance as provision YAML, deterministic for a
 // count and a namespace: admins adm01.., members u001.. in 2 to 5 team
 // projects each (every team at least 5), the fake provider, the three
-// fake MCP servers, the agents on them. The users' keys are throwaway
-// and made once, so the chart's Secret keeps them across installs. The
-// team docs are not here: a ConfigMap is flat and capped at 1 MiB, so
-// the driver's setup writes them through the API.
+// fake MCP servers, written in every team and read in personal projects,
+// the agents on MCP. The users' keys are throwaway and made once, so the
+// chart's Secret keeps them across installs. The team docs are not
+// here: a ConfigMap is flat and capped at 1 MiB, so the driver's setup
+// writes them through the API.
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -100,6 +101,9 @@ spec:
   baseUrl: ${modelUrl(ns)}
   keyFrom: null
 `;
+  const choices = n.teams
+    .map((t) => `    - { project: ${t}, side: write }`)
+    .join("\n");
   const server = (s: string) => `${API}
 kind: McpServer
 metadata:
@@ -109,10 +113,10 @@ spec:
   keyFrom: null
   read: true
   write: true
+  personal: read
+  choices:
+${choices}
 `;
-  const links = SERVER_NAMES.map(
-    (s) => `    - { name: ${s}, read: true, write: true }`,
-  ).join("\n");
   const agent = (a: string, i: number) => `${API}
 kind: Agent
 metadata:
@@ -122,8 +126,7 @@ spec:
   model: ${FAKE.model}
   avatar: bot
   prompt: Answer directly and briefly.
-  servers:
-${links}
+  mcp: true
 ${i === 0 ? "  default: true\n" : ""}`;
   return {
     "users.yaml": [

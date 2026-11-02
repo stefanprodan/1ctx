@@ -38,15 +38,24 @@ page share: its repositories (`views/projects/Repos.tsx`,
 - **One `views/projects/McpServers.tsx` draws every list,** after
   Repositories: the team project's card on its admin page and a
   section on every project's Settings tab, from `data/project-mcp.ts`.
-  A row is the server's name, its tool count and `All projects` or
-  `This project`, never a URL or key file.
-- **Only an admin on a team project edits it** (`rowKind()`). A `This
-  project` row is its button, opening a form whose foot holds Remove,
-  asked with `removeAsk()`, which names the last project's
-  consequence. An `All projects` row links to the server's page, where
-  its scope changes; it is never narrowed here. Add server is a
-  `Finder` over the answer's `addable`, hidden when empty. A member,
-  and anyone on a personal project, reads the rows.
-- **An add or remove reads the project's agents again**
+  A row is the server's name, its tool count and, on a team project's
+  listed row, `This project` (`rowLine()`), never a URL or key file.
+- **Every granted server is a row with the project's side,** an Off
+  one included. An admin on a team project and the owner of a personal
+  one pick it (`rowKind()`) from a small `Select` at the row's end, one
+  width on every row, written at once (`setProjectMcpSide()`): Off,
+  Read while the server's Read is on, Read and write only under a write
+  ceiling (`pickOptions()`). A choice above a lowered ceiling shows the
+  side it gives (`pickValue()`). Anyone else, or a row with only Off,
+  reads the side's word in the same column.
+- **A row is no link.** An admin's row ends in a More menu
+  (`MoreMenu`): Edit opens the server's page, where its grants change,
+  and a `This project` row adds Remove (`removable()`), which opens a
+  form asked with `removeAsk()`, naming the last project's
+  consequence.
+  Add server is a `Finder` over the answer's `addable`, hidden when
+  empty. A personal project has neither.
+- **A write reads the project's agents again**
   (`reloadProjectAgents()`), so the composer's servers follow; another
-  project's held answer is dropped instead.
+  project's held answer is dropped instead. A refused write reads the
+  list again.

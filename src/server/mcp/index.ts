@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { SwitchableServer } from "../../shared/api/sessions.ts";
-import type { AgentServer } from "../../shared/contracts/mcp.ts";
+import type { McpSide, ServerSide } from "../../shared/contracts/mcp.ts";
 import {
-  inScope,
   offeredServers,
+  offeredSide,
   promptSnapshot,
   type SidedServer,
   wireName,
 } from "../../shared/mcp.ts";
+import type { ProjectKind } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { ToolError } from "../lib/errors.ts";
@@ -23,6 +24,7 @@ import { projectRoutes } from "./project-routes.ts";
 import { RefreshCoordinator } from "./refresh.ts";
 import { type McpCallOutput, resultText } from "./result.ts";
 import { routes, type UsagePort } from "./routes.ts";
+import { choicesIn, type ProjectChoices, whereOn } from "./scope.ts";
 import {
   type McpScopeRow,
   type McpServerRow,
@@ -34,6 +36,7 @@ export { changeNote } from "./note.ts";
 export {
   parseMcpKeyName,
   parsePatterns,
+  parseSide,
   parseTimeout,
   parseUrl,
 } from "./parse.ts";
@@ -103,37 +106,53 @@ export type McpDeps = {
   capabilities: { forget(key: string): void };
   // a closure, sessions is built later
   usage: UsagePort;
-  // closures, both built later: a project's kind and name, and the
-  // project a principal may see, else a 404
-  projects: { byId(id: string): { kind: string; name: string } | null };
+  // closures, both built later: a project's kind and name, a user's
+  // personal project, and the project a principal may see, else a 404
+  projects: {
+    byId(id: string): { kind: string; name: string } | null;
+    personal(userId: string): { id: string } | null;
+  };
   access: {
-    project(principal: Principal, id: string): { id: string; kind: string };
+    project(
+      principal: Principal,
+      id: string,
+    ): { id: string; kind: ProjectKind };
   };
 };
+
+// where a server is on for one viewer's lists: the projects by id with
+// the side each gives, the personal count, and the widest side
+export type McpWhere = {
+  teams: Map<string, McpSide>;
+  personal: number;
+  widest: McpSide;
+};
+
+// what an offer in a project leaves out: the servers a chat or a run
+// turned off, and the write side for a subagent
+export type OfferOptions = { off?: ReadonlySet<string>; readOnly?: boolean };
 
 export type Mcp = {
   store: McpServerStore;
   routes: RouteDescriptor[];
-  // the links' servers in scope for a send in the project; null offers
-  // only the all servers
-  offered(agentServers: AgentServer[], projectId: string | null): McpOffer;
-  // the links as given, for the directory, which chose them by the
+  // the project's chosen servers on their sides; none with no project
+  offered(projectId: string | null, options?: OfferOptions): McpOffer;
+  // the sides as given, for the directory, which chose them by the
   // viewer's projects itself
-  offeredChosen(agentServers: AgentServer[]): McpOffer;
-  switchable(links: AgentServer[], projectId: string): SwitchableServer[];
-  // the same per agent id over one read of the catalogs, agents without a
-  // switchable server left out
-  switchableBy(
-    agents: { id: string; servers: AgentServer[] }[],
-    projectId: string,
-  ): Record<string, SwitchableServer[]>;
-  // every server's endpoint and scope, its tools unread
+  offeredSides(sides: ServerSide[]): McpOffer;
+  // the servers a send in the project is offered, with tool counts
+  switchable(projectId: string): SwitchableServer[];
+  // the servers on in the project, on their sides, in name order
+  sides(projectId: string): ServerSide[];
+  // every server's endpoint and grants, its tools unread
   scopes(): McpScopeRow[];
+  // per server, the sides it gives in each of the projects named
+  sidesIn(projectIds: readonly string[]): Map<string, Map<string, McpSide>>;
+  // per server, where it is on in every project
+  whereOn(): Map<string, McpWhere>;
   refreshSoon(id: string, observed: string): Promise<void>;
   start(): void;
   close(): Promise<void>;
-  agentServers(agentId: string): AgentServer[];
-  setAgentServers(agentId: string, rows: AgentServer[]): void;
   validateArguments(
     schema: Record<string, unknown>,
     input: Record<string, unknown>,
@@ -146,17 +165,24 @@ export type Mcp = {
   ): Promise<McpCallOutput>;
 };
 
-// the rows a send in the project may be offered; with no project only
-// the all servers, so a missing one never reaches a bound server
-function scoped(rows: McpServerRow[], projectId: string | null) {
-  return projectId === null
-    ? rows.filter((row) => row.scope === "all")
-    : rows.filter((row) => inScope(row, projectId));
+// each row on in the project with its side, in the rows' order; a
+// missing project gets none
+function sidedIn(
+  rows: readonly McpScopeRow[],
+  projectId: string,
+  project: ProjectChoices | null,
+): ServerSide[] {
+  if (project === null) return [];
+  const ref = { id: projectId, kind: project.kind };
+  return rows.flatMap((row) => {
+    const side = offeredSide(row, ref, project.sides.get(row.id));
+    return side === "off" ? [] : [{ serverId: row.id, side }];
+  });
 }
 
 function switchableOver(
   rows: McpServerRow[],
-  links: AgentServer[],
+  links: ServerSide[],
 ): SwitchableServer[] {
   const counts = new Map(
     promptRows(rows, links).map((server) => [server.name, server.tools.length]),
@@ -175,13 +201,13 @@ function toolCounts(rows: McpServerRow[]): Map<string, number> {
   const counts = new Map(
     promptRows(
       rows,
-      rows.map((row) => ({ serverId: row.id, read: true, write: true })),
+      rows.map((row) => ({ serverId: row.id, side: "write" as const })),
     ).map((server) => [server.name, server.tools.length]),
   );
   return new Map(rows.map((row) => [row.id, counts.get(row.name) ?? 0]));
 }
 
-function promptRows(rows: McpServerRow[], links: AgentServer[]): SidedServer[] {
+function promptRows(rows: McpServerRow[], links: ServerSide[]): SidedServer[] {
   return offeredServers(
     rows.map((server) => ({
       id: server.id,
@@ -267,7 +293,7 @@ export function mcpArea(deps: McpDeps): Mcp {
     log: deps.log,
     discover: runDiscovery,
   });
-  const offerOver = (rows: McpServerRow[], links: AgentServer[]): McpOffer => {
+  const offerOver = (rows: McpServerRow[], links: ServerSide[]): McpOffer => {
     const prompts = promptRows(rows, links);
     const snapshot = promptSnapshot(prompts, sha256);
     for (const name of snapshot.leftForSchemas) {
@@ -296,33 +322,42 @@ export function mcpArea(deps: McpDeps): Mcp {
   const area: Mcp = {
     store,
     routes: [],
-    offered: (links, projectId) =>
-      offerOver(scoped(store.list(), projectId), links),
-    offeredChosen: (links) => offerOver(store.list(), links),
-    switchable(links, projectId) {
-      return links.length === 0
-        ? []
-        : switchableOver(scoped(store.list(), projectId), links);
+    offered(projectId, options = {}) {
+      if (projectId === null) return NO_OFFER;
+      const rows = store.list();
+      const sides = sidedIn(rows, projectId, store.choices(projectId))
+        .filter((link) => !options.off?.has(link.serverId))
+        .map((link) =>
+          options.readOnly ? { ...link, side: "read" as const } : link,
+        );
+      return sides.length === 0 ? NO_OFFER : offerOver(rows, sides);
     },
-    switchableBy(agents, projectId) {
-      if (agents.every((agent) => agent.servers.length === 0)) return {};
-      const rows = scoped(store.list(), projectId);
-      return Object.fromEntries(
-        agents.flatMap((agent) => {
-          const servers =
-            agent.servers.length === 0
-              ? []
-              : switchableOver(rows, agent.servers);
-          return servers.length === 0 ? [] : [[agent.id, servers]];
-        }),
-      );
+    offeredSides: (sides) =>
+      sides.length === 0 ? NO_OFFER : offerOver(store.list(), sides),
+    switchable(projectId) {
+      const rows = store.list();
+      const sides = sidedIn(rows, projectId, store.choices(projectId));
+      return sides.length === 0 ? [] : switchableOver(rows, sides);
     },
+    sides: (projectId) =>
+      sidedIn(store.scopes(), projectId, store.choices(projectId)),
     scopes: () => store.scopes(),
+    sidesIn(projectIds) {
+      const rows = store.scopes();
+      const out = new Map<string, Map<string, McpSide>>();
+      for (const [id, project] of choicesIn(deps.db, projectIds)) {
+        for (const link of sidedIn(rows, id, project)) {
+          const held = out.get(link.serverId) ?? new Map<string, McpSide>();
+          held.set(id, link.side);
+          out.set(link.serverId, held);
+        }
+      }
+      return out;
+    },
+    whereOn: () => whereOn(deps.db, store.scopes()),
     refreshSoon: (id, observed) => coordinator.refreshSoon(id, observed),
     start: () => coordinator.start(),
     close: () => coordinator.close(),
-    agentServers: (agentId) => store.agentServers(agentId),
-    setAgentServers: (agentId, links) => store.setAgentServers(agentId, links),
     validateArguments,
     async call(server, tool, args, options) {
       const key = server.keyName === null ? null : deps.secret(server.keyName);
@@ -380,6 +415,7 @@ export function mcpArea(deps: McpDeps): Mcp {
       store,
       access: deps.access,
       teamName,
+      personal: (userId) => deps.projects.personal(userId),
       toolCounts: (rows) => toolCounts(rows),
     }),
   );

@@ -2,34 +2,74 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { ProjectMcpServer } from "../../../shared/api/mcp.ts";
+import type { McpSide } from "../../../shared/contracts/mcp.ts";
+import { configMcpHref } from "../../lib/hrefs.ts";
+import { SIDE_WORDS } from "../admin/Mcp.model.ts";
 import { serverMeta } from "../directory/Directory.model.ts";
 
-export const TEAM_TEXT = "Tools for agents, managed by admins.";
-export const PERSONAL_TEXT = "Offered in every project, managed by admins.";
+export const TEAM_TEXT = "Tools for agents, chosen by admins.";
+export const PERSONAL_TEXT = "Tools for agents, offered by admins.";
 
 export const mcpText = (personal: boolean): string =>
   personal ? PERSONAL_TEXT : TEAM_TEXT;
 
-// under a server's name: its tools here, then every project or this one
-export function rowLine(row: ProjectMcpServer): string {
-  return `${serverMeta(row)} · ${
-    row.scope === "all" ? "All projects" : "This project"
-  }`;
+// under a server's name: its tools here, and This project on a team
+// project's listed row; a row granted to every one says no more
+export function rowLine(row: ProjectMcpServer, personal: boolean): string {
+  if (personal || row.scope === "all") return serverMeta(row);
+  return `${serverMeta(row)} · This project`;
 }
 
-// what a row is for its viewer: a team's admin opens a listed row's
-// form and follows an all row to the server's page, where its scope is
-// changed; a member, and anyone on a personal project, only reads it
-export type RowKind = "edit" | "link" | "read";
+// what a row is for its viewer: a team's admin picks its side and
+// follows it to the server's page, removing a listed one there too; the
+// owner of a personal project picks its side; anyone else reads the word
+export type RowKind = "admin" | "owner" | "read";
 
-export function rowKind(
+export function rowKind(admin: boolean, personal: boolean): RowKind {
+  if (personal) return "owner";
+  return admin ? "admin" : "read";
+}
+
+// only a team's admin takes the project off a listed row, from its More
+// menu; a row granted to every team project is changed on its page
+export const removable = (
+  kind: RowKind,
   row: Pick<ProjectMcpServer, "scope">,
+): boolean => kind === "admin" && row.scope === "projects";
+
+// the server's page, for Edit in every row's More menu; only an admin
+// opens it, on any project, their own personal one included
+export const editHref = (
   admin: boolean,
-  personal: boolean,
-): RowKind {
-  if (!admin || personal) return "read";
-  return row.scope === "all" ? "link" : "edit";
+  row: Pick<ProjectMcpServer, "name">,
+): string | undefined => (admin ? configMcpHref(row.name) : undefined);
+
+// the sides a row may pick: Off always, Read while the server's Read is
+// on, Read and write only under a write ceiling
+export function pickOptions(
+  row: Pick<ProjectMcpServer, "read" | "ceiling">,
+): { value: McpSide; label: string }[] {
+  const sides: McpSide[] = [
+    "off",
+    ...(row.read ? (["read"] as const) : []),
+    ...(row.ceiling === "write" ? (["write"] as const) : []),
+  ];
+  return sides.map((value) => ({ value, label: SIDE_WORDS[value] }));
 }
+
+// the pick shown: the choice, or what it gives when the ceiling dropped
+// under it, which the choice comes back to when the ceiling does
+export function pickValue(
+  row: Pick<ProjectMcpServer, "choice" | "side" | "read" | "ceiling">,
+): McpSide {
+  return pickOptions(row).some((o) => o.value === row.choice)
+    ? row.choice
+    : row.side;
+}
+
+// a reader's word: what the project's agents are given
+export const sideWord = (row: Pick<ProjectMcpServer, "side">): string =>
+  SIDE_WORDS[row.side];
 
 // the open form: the row as it was when it opened, or none
 export type OpenServer = ProjectMcpServer | null;

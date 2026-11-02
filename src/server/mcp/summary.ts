@@ -4,8 +4,10 @@
 // A server row as the admin's page reads it.
 
 import type {
+  McpOn,
   McpProject,
   McpServerSummary,
+  McpSide,
   McpToolSummary,
 } from "../../shared/contracts/mcp.ts";
 import { wireName } from "../../shared/mcp.ts";
@@ -34,11 +36,26 @@ export function projectsOf(
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// where.teams by name, a project gone since left out
+export function onOf(
+  where: { teams: Map<string, McpSide>; personal: number } | undefined,
+  teamName: (id: string) => string | null,
+): McpOn {
+  return {
+    projects: projectsOf(
+      { projectIds: [...(where?.teams.keys() ?? [])] },
+      teamName,
+    ),
+    personal: where?.personal ?? 0,
+  };
+}
+
 export function summary(
   server: McpServerRow,
   hasSecret: (name: string) => boolean,
   render: (markdown: string) => string,
   teamName: (id: string) => string | null,
+  where?: { teams: Map<string, McpSide>; personal: number },
 ): McpServerSummary {
   const tools: McpToolSummary[] = server.tools.map((tool) => {
     const name = wireName(server.name, tool.name);
@@ -74,6 +91,8 @@ export function summary(
     excludedPatterns: server.excludedPatterns,
     scope: server.scope,
     projects: projectsOf(server, teamName),
+    personal: server.personal,
+    on: onOf(where, teamName),
     serverName: server.serverName,
     serverVersion: server.serverVersion,
     protocolVersion: server.protocolVersion,

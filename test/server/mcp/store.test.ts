@@ -119,23 +119,9 @@ describe("MCP server store", () => {
     const db = memoryDb();
     const store = new McpServerStore(db);
     const row = store.create(fields(), found());
-    expect(store.deleteUnreferenced(row.id)).toBe("deleted");
+    expect(store.delete(row.id)).toBe(true);
+    expect(store.delete(row.id)).toBe(false);
     expect(store.applyDiscovery(row.id, found(200))).toBeNull();
-    db.close();
-  });
-
-  test("does not delete a server referenced by an agent", () => {
-    const db = memoryDb();
-    const store = new McpServerStore(db);
-    const row = store.create(fields(), found());
-    db.exec("pragma foreign_keys = off");
-    db.query(
-      `insert into agent_servers (agent_id, server_id, read, write)
-       values (?, ?, 1, 0)`,
-    ).run("agent-test", row.id);
-    db.exec("pragma foreign_keys = on");
-    expect(store.deleteUnreferenced(row.id)).toBe("referenced");
-    expect(store.byId(row.id)).not.toBeNull();
     db.close();
   });
 

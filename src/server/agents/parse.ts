@@ -6,7 +6,6 @@
 // model is the route's check, not the parser's.
 
 import type { SaveAgentRequest } from "../../shared/api/agents.ts";
-import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import {
   isAvatar,
   isMcpMode,
@@ -18,13 +17,12 @@ import { fields, parseModel, parseName, refusal } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export const MAX_PROMPT = 16_000;
-export const MAX_SERVERS_PER_AGENT = 50;
 const MAX_UPSTREAM = 100;
 
 export type ParsedAgent = Omit<
   SaveAgentRequest,
   | "effort"
-  | "servers"
+  | "mcp"
   | "mcpMode"
   | "contextLength"
   | "tools"
@@ -38,7 +36,8 @@ export type ParsedAgent = Omit<
   skip4Bit: boolean;
   subagents: boolean;
   effort: string | null;
-  servers: AgentServer[];
+  // null leaves it as it is, on for a new agent
+  mcp: boolean | null;
   mcpMode: NonNullable<SaveAgentRequest["mcpMode"]>;
   // null when the body did not state them
   stated: { contextLength: number | null; tools: boolean } | null;
@@ -81,42 +80,12 @@ export function parsePrompt(
   return prompt.trim();
 }
 
-function parseServers(value: unknown): AgentServer[] {
-  if (!Array.isArray(value)) {
-    throw new BadRequest("servers must be an array");
-  }
-  if (value.length > MAX_SERVERS_PER_AGENT) {
+export function parseAgent(body: unknown): ParsedAgent {
+  if (body !== null && typeof body === "object" && "servers" in body) {
     throw new BadRequest(
-      `an agent may have at most ${MAX_SERVERS_PER_AGENT} MCP servers`,
+      "servers is gone: a project chooses its MCP servers, an agent has mcp",
     );
   }
-  const seen = new Set<string>();
-  return value.map((item) => {
-    const server = fields(item, ["serverId", "read", "write"]);
-    if (typeof server.serverId !== "string" || server.serverId === "") {
-      throw new BadRequest("serverId must be an id");
-    }
-    if (typeof server.read !== "boolean" || typeof server.write !== "boolean") {
-      throw new BadRequest("server read and write must be booleans");
-    }
-    // write alone is no link: a side that changes things needs the one
-    // that reads them
-    if (!server.read) {
-      throw new BadRequest("a server needs read");
-    }
-    if (seen.has(server.serverId)) {
-      throw new BadRequest("serverId must not repeat");
-    }
-    seen.add(server.serverId);
-    return {
-      serverId: server.serverId,
-      read: server.read,
-      write: server.write,
-    };
-  });
-}
-
-export function parseAgent(body: unknown): ParsedAgent {
   const b = fields(body, [
     "name",
     "avatar",
@@ -126,7 +95,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     "effort",
     "prompt",
     "skills",
-    "servers",
+    "mcp",
     "mcpMode",
     "contextLength",
     "tools",
@@ -161,7 +130,9 @@ export function parseAgent(body: unknown): ParsedAgent {
   if (new Set(skills).size !== skills.length) {
     throw new BadRequest("skills must not repeat");
   }
-  const servers = parseServers(b.servers);
+  if (b.mcp !== undefined && typeof b.mcp !== "boolean") {
+    throw new BadRequest("mcp must be true or false");
+  }
   if (!isMcpMode(b.mcpMode)) {
     throw new BadRequest("mcpMode must be all, catalog or auto");
   }
@@ -216,7 +187,7 @@ export function parseAgent(body: unknown): ParsedAgent {
     effort,
     prompt,
     skills,
-    servers,
+    mcp: b.mcp ?? null,
     mcpMode,
     upstream,
     skip4Bit: b.skip4Bit ?? false,

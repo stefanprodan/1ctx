@@ -184,7 +184,9 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   user who sees the project writes its description and its labels
   there (`views/projects/Labels.tsx`). An admin writes a team project's
   repositories through the admin page's routes and entities, and a
-  member reads them; the name is the admin page's alone. Every project
+  member reads them; the MCP servers' sides are an admin's on a team
+  project and the owner's on a personal one (`docs/project-settings.md`);
+  the name is the admin page's alone. Every project
   write's answer goes through `keepProject()`, and a metadata write's
   through `onProjectSaved()` too, so both pages show one row.
 - **A label row is its button** (`RowsButton`): a click opens its
@@ -194,9 +196,11 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   server refuses both anyway. The delete ask says how many external
   tasks carry the label, closed ones too (`deleteAsk()` over the
   detail's `tasks`).
-- **The directory's MCP tab says each server's scope**
-  (`scopeWords()`): `All projects` or the names of the projects the
-  viewer sees.
+- **The directory's MCP tab says where each server is on** as counts
+  (`directoryOnCount()`): the team projects the viewer sees, then
+  personal ones, the viewer's own `Personal` among them and an admin's
+  count, with the names (`onWords()`) on hover. An agent off MCP lists
+  none and says MCP is off.
 - **Token counts come from the server.** The agent page shows what
   `wireTokens()` counted in its provider's wire shape; the client never
   counts tokens.

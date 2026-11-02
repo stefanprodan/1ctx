@@ -97,7 +97,7 @@ export function checks(deps: CheckDeps) {
       {
         url,
         projectId: row.projectId,
-        servers: deps.agents.byId(row.agentId)?.servers ?? [],
+        mcpOn: deps.agents.byId(row.agentId)?.mcp === true,
         disabled: row.disabledCapabilities,
         ...saved,
         compare: row.checkCompare,

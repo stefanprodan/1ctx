@@ -79,7 +79,7 @@ const agentBody = (name: string, providerId: string) => ({
   model: FLASH,
   thinking: null,
   effort: null,
-  servers: [],
+  mcp: true,
   mcpMode: "auto",
 });
 
@@ -131,9 +131,6 @@ describe("deleting an agent", () => {
       const loaded = app.skills.create(skill("gitops"), app.now.value);
       app.skills.assign(chat.agentId, [loaded.id]);
       const cluster = server(chat);
-      app.mcp.setAgentServers(chat.agentId, [
-        { serverId: cluster.id, read: true, write: false },
-      ]);
       expect(
         (
           await chat.member.call("PUT", "/api/profile/agent", {

@@ -57,9 +57,10 @@ import {
   agentTabHref,
   agentTabs,
   capabilities,
+  directoryOnCount,
   effortText,
   filesText,
-  scopeWords,
+  onWords,
   serverLine,
   serverMeta,
   switchItems,
@@ -206,9 +207,11 @@ function McpTab({
   if (shown.mcp.servers.length === 0) {
     return (
       <RowsNote>
-        {shown.agent.model.tools
-          ? "No MCP Servers."
-          : "The model does not take tools."}
+        {!shown.agent.model.tools
+          ? "The model does not take tools."
+          : shown.agent.mcp
+            ? "No MCP Servers."
+            : "MCP is off for this agent."}
       </RowsNote>
     );
   }
@@ -223,7 +226,15 @@ function McpTab({
             </RowsAvatar>
             <RowsTitle
               name={server.name}
-              sub={`${line.text} · ${scopeWords(server.scope, server.projects)}`}
+              // the counts, their names on hover
+              sub={
+                <>
+                  {`${line.text} · `}
+                  <span title={onWords(server.projects, server.personal)}>
+                    {directoryOnCount(server.projects, server.personal)}
+                  </span>
+                </>
+              }
               bad={line.bad}
               mono
             />

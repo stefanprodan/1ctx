@@ -922,7 +922,18 @@ describe("the pages", () => {
         [
           "p2",
           {
-            servers: [{ id: "m1", name: "flux", tools: 5, scope: "all" }],
+            servers: [
+              {
+                id: "m1",
+                name: "flux",
+                tools: 5,
+                scope: "all",
+                choice: "read",
+                ceiling: "write",
+                side: "read",
+                read: true,
+              },
+            ],
             addable: [],
           },
         ],
@@ -934,7 +945,7 @@ describe("the pages", () => {
       expect(html).not.toContain("setting-count");
       // the second line in the body font, as a label's
       expect(html).toContain(
-        'class="rows-sub rows-sub-prose">5 tools · All projects<',
+        'class="rows-sub rows-sub-wrap rows-sub-prose">5 tools<',
       );
       projectMcpLists.value = new Map();
     });
@@ -1172,7 +1183,7 @@ describe("the pages", () => {
         effort: null,
         prompt: "",
         skills: [],
-        servers: [],
+        mcp: true,
         mcpMode: "auto",
         upstream: null,
         createdAt: 0,

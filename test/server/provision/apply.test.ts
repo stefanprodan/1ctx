@@ -191,8 +191,13 @@ describe("provision through the composed app", () => {
         providerId: app.providers.list()[0]!.id,
         model: { id: "fake-model", tools: true },
         skills: [skill.id],
-        servers: [{ serverId: server.id, read: true, write: false }],
+        mcp: true,
       });
+      // the server's choice in nebula, made in the same file
+      const nebula = app.projects
+        .teamProjectIds()
+        .find((id) => app.projects.byId(id)?.name === "nebula")!;
+      expect(app.mcp.choices(nebula)?.sides.get(server.id)).toBe("off");
       expect(app.deciders.store.byName("judge")).toMatchObject({
         providerId: app.providers.list()[0]!.id,
         model: "fake-decider",
@@ -688,14 +693,14 @@ describe("provision through the composed app", () => {
         documents(
           object("Agent", "guide", {
             skills: [],
-            servers: [],
+            mcp: false,
           }),
         ),
         ignore,
       );
       expect(app.agents.byName("guide")).toMatchObject({
         skills: [],
-        servers: [],
+        mcp: false,
       });
       expect(app.skills.list()).toHaveLength(1);
       expect(app.mcp.list()).toHaveLength(1);
@@ -750,7 +755,7 @@ describe("provision through the composed app", () => {
         effort: null,
         mcpMode: "auto",
         skills: [],
-        servers: [],
+        mcp: true,
       });
       await app.provision.apply(
         documents(

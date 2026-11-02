@@ -8,7 +8,6 @@ import type {
   KnowledgeFileDetailResponse,
   KnowledgeListResponse,
 } from "../../shared/api/knowledge.ts";
-import type { McpResponse } from "../../shared/api/mcp.ts";
 import type {
   ProjectResponse,
   ProjectsResponse,
@@ -307,7 +306,7 @@ async function skill(api: Client, doc: Of<"Skill">): Promise<Action> {
 async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
   const { agents } = await api.call<AgentsResponse>("GET", "/api/agents");
   const before = agents.find((row) => row.name === doc.name);
-  const { provider, skills, servers, ...fields } = doc.spec;
+  const { provider, skills, ...fields } = doc.spec;
   const { providers } = await api.call<ProvidersResponse>(
     "GET",
     "/api/providers",
@@ -320,15 +319,6 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
   if (skills !== undefined) {
     const found = await api.call<SkillsResponse>("GET", "/api/skills");
     savedSkills = skills.map((name) => idOf(found.skills, name));
-  }
-  let savedServers = before?.servers ?? [];
-  if (servers !== undefined) {
-    const found = await api.call<McpResponse>("GET", "/api/mcp");
-    savedServers = servers.map(({ name, read, write }) => ({
-      serverId: idOf(found.servers, name),
-      read,
-      write,
-    }));
   }
   const keep = (row: typeof before) => keptStated(row, fields.model);
   const desired = {
@@ -352,10 +342,10 @@ async function agent(api: Client, doc: Of<"Agent">): Promise<Action> {
     skip4Bit:
       before && providerId === before.providerId ? before.skip4Bit : false,
     subagents: before?.subagents ?? false,
+    mcp: before?.mcp ?? true,
     ...keep(before),
     ...fields,
     skills: savedSkills,
-    servers: savedServers,
   };
   if (
     before &&

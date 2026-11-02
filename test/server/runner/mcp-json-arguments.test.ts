@@ -48,7 +48,6 @@ for (const mode of ["all", "catalog"] as const) {
       },
     });
     expect(created.status).toBe(201);
-    const { server } = (await created.json()) as { server: { id: string } };
     const agent = chat.app.agents.byId(chat.agentId)!;
     const saved = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
       body: {
@@ -57,7 +56,7 @@ for (const mode of ["all", "catalog"] as const) {
         model: agent.model.id,
         thinking: agent.thinking,
         effort: agent.effort,
-        servers: [{ serverId: server.id, read: true, write: false }],
+        mcp: true,
         mcpMode: mode,
       },
     });

@@ -3,7 +3,6 @@
 //
 // What a send runs under, decided once before startSend.
 
-import { mcpKey } from "../../shared/capabilities.ts";
 import type { MemoryEntry } from "../../shared/contracts/memory.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
@@ -54,12 +53,15 @@ export type {
 // port is the runner's own interface over the area's types; compose
 // passes the tools area
 export type ToolsPort = {
-  serverNames(links: AgentRow["servers"], projectId: string): string[];
+  serverNames(
+    projectId: string,
+    disabledCapabilities: readonly string[],
+  ): string[];
   skillsOff(agentId: string, disabledCapabilities: readonly string[]): string[];
   offered(
     now: number,
     agentId: string,
-    agentServers: AgentRow["servers"],
+    mcpOn: boolean,
     mode: AgentRow["mcpMode"],
     scope: MemoryScope,
     disabledCapabilities?: readonly string[],
@@ -234,7 +236,7 @@ export function buildPolicy(input: {
       ? tools.offered(
           input.now,
           agent.id,
-          agent.servers,
+          agent.mcp,
           agent.mcpMode,
           {
             projectId: input.project.id,
@@ -254,7 +256,7 @@ export function buildPolicy(input: {
       ? tools.offered(
           input.now,
           agent.id,
-          agent.servers,
+          agent.mcp,
           agent.mcpMode,
           {
             projectId: input.project.id,
@@ -267,7 +269,7 @@ export function buildPolicy(input: {
       : null;
   const memoryOffered =
     tools !== null && automationScope?.ownMemory
-      ? tools.offered(input.now, agent.id, agent.servers, agent.mcpMode, {
+      ? tools.offered(input.now, agent.id, agent.mcp, agent.mcpMode, {
           projectId: input.project.id,
           automation: automationScope,
           phase: "memory",
@@ -275,7 +277,7 @@ export function buildPolicy(input: {
       : null;
   const attentionOffered =
     tools !== null && automationScope?.attention
-      ? tools.offered(input.now, agent.id, [], "auto", {
+      ? tools.offered(input.now, agent.id, false, "auto", {
           projectId: input.project.id,
           automation: automationScope,
           phase: "attention",
@@ -319,15 +321,8 @@ export function buildPolicy(input: {
     offered,
     disabledCapabilities,
     mcpOff:
-      tools !== null
-        ? tools
-            .serverNames(
-              agent.servers.filter((link) =>
-                disabledCapabilities.includes(mcpKey(link.serverId)),
-              ),
-              input.project.id,
-            )
-            .sort()
+      tools !== null && agent.mcp
+        ? tools.serverNames(input.project.id, disabledCapabilities).sort()
         : [],
     skillsOff:
       tools !== null

@@ -254,7 +254,9 @@ from `emailOn` in `GET /api/me`.
   personal project's under `/api/profile/project/repos`, so no route
   lets a member write a team project's. A key file's name (`keyName`)
   is in an admin's answer only. A project's MCP servers take the same
-  split on `/api/projects/:id/mcp`, admins writing team ones alone
+  split: admins add, remove and choose a team project's on
+  `/api/projects/:id/mcp` (`PUT .../:serverId/side`), an owner chooses
+  their personal project's on `/api/profile/project/mcp/:serverId/side`
   (`docs/mcp.md`).
 - **Removing a member drops their waiting messages in the same
   transaction.** If they lose visibility, it also unclaims their

@@ -7,7 +7,6 @@
 // and the system prompt every session of it starts from.
 
 import type { Avatar, Effort, McpMode } from "../words.ts";
-import type { AgentServer } from "./mcp.ts";
 import type { CatalogMatch } from "./provider.ts";
 
 export type AgentSummary = {
@@ -24,8 +23,9 @@ export type AgentSummary = {
   prompt: string;
   // the ids of the skills it carries, in name order
   skills: string[];
-  // the MCP servers it may use, with the sides, in server name order
-  servers: AgentServer[];
+  // whether it takes MCP tools at all: on, it gets every server its
+  // project chose, on the side chosen
+  mcp: boolean;
   // how its MCP tools reach the model; auto flips on the token cap
   mcpMode: McpMode;
   // the OpenRouter endpoint tag tried first; null lets OpenRouter route

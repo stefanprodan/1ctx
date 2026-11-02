@@ -105,6 +105,10 @@ spec:
   readPatterns: ["get_*"]
   writePatterns: ["set_*"]
   excludedPatterns: []
+  personal: read
+  choices:
+    - project: nebula
+      side: "off"
 ---
 apiVersion: config.1ctx.dev/v1
 kind: Agent
@@ -118,9 +122,7 @@ spec:
   effort: null
   prompt: Answer directly.
   skills: [paper-skill]
-  servers:
-    - name: toolbox
-      write: false
+  mcp: true
   mcpMode: auto
 ---
 apiVersion: config.1ctx.dev/v1

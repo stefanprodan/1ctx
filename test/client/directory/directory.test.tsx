@@ -29,9 +29,11 @@ import {
   agentTab,
   agentTabs,
   capabilities,
+  directoryOnCount,
   effortText,
   filesText,
   localTime,
+  onCount,
   roleWords,
   serverLine,
   serverMeta,
@@ -76,7 +78,7 @@ const agent: DirectoryAgentResponse = {
     effort: "high",
     prompt: "You write code.\nSmall diffs.",
     skills: ["s1"],
-    servers: [],
+    mcp: true,
     mcpMode: "auto",
     upstream: null,
     skip4Bit: false,
@@ -392,6 +394,18 @@ describe("Directory.model", () => {
     expect(serverMeta({ tools: 1 })).toBe("1 tool");
   });
 
+  test("where a server is on, counted, the viewer's own as personal", () => {
+    expect(onCount(6, 8)).toBe("6 teams · 8 personal");
+    expect(onCount(1, 1)).toBe("1 team · 1 personal");
+    expect(onCount(0, 2)).toBe("2 personal");
+    expect(onCount(3, 0)).toBe("3 teams");
+    expect(onCount(0, 0)).toBe("Nowhere");
+    expect(directoryOnCount(["finops", "Personal"], 0)).toBe(
+      "1 team · 1 personal",
+    );
+    expect(directoryOnCount([], 0)).toBe("Nowhere");
+  });
+
   test("a skill counts its files, SKILL.md one of them", () => {
     expect(filesText(1)).toBe("1 file");
     expect(filesText(8)).toBe("8 files");
@@ -443,8 +457,8 @@ describe("Directory.model", () => {
             tools: 3,
             checkedAt: 0,
             refreshFailedAt: null,
-            scope: "all" as const,
             projects: [],
+            personal: 0,
           },
         ],
         tokens: 90,
@@ -624,8 +638,8 @@ describe("the pages", () => {
             tools: 12,
             checkedAt: Date.now() - 60 * 60 * 1000,
             refreshFailedAt: null,
-            scope: "all",
-            projects: [],
+            projects: ["finops", "research"],
+            personal: 0,
           },
         ],
         tokens: 900,
@@ -633,23 +647,44 @@ describe("the pages", () => {
     };
     html = render(<Agent params={{ name: "coder" }} />);
     expect(html).toContain('</nav><span class="rows-hint cut">900 tokens<');
-    // the scope and the refresh under the name, the tools at the row's end
-    expect(html).toContain('class="rows-sub">refreshed 1h ago · All projects<');
+    // where it is on, counted, and the refresh under the name, the names
+    // on hover, the tools at the row's end
+    expect(html).toContain(
+      'class="rows-sub">refreshed 1h ago · <span title="finops, research">2 teams<',
+    );
     expect(html).toContain('class="rows-meta">12 tools<');
     expect(html).toContain(
       'class="tabs-tab tabs-tab-on" href="/agents/coder/mcp" aria-current="page">MCP<',
     );
-    // a listed server names the projects the viewer sees
+    // an admin's count of personal projects follows the names
     const flux = agentPage.value.mcp.servers[0]!;
     agentPage.value = {
       ...agent,
       mcp: {
-        servers: [{ ...flux, scope: "projects", projects: ["finops"] }],
+        servers: [{ ...flux, projects: ["finops"], personal: 3 }],
         tokens: 900,
       },
     };
     html = render(<Agent params={{ name: "coder" }} />);
-    expect(html).toContain('class="rows-sub">refreshed 1h ago · finops<');
+    expect(html).toContain(
+      '<span title="finops, 3 personal projects">1 team · 3 personal<',
+    );
+    // the viewer's own personal project is named Personal by the server
+    agentPage.value = {
+      ...agent,
+      mcp: {
+        servers: [{ ...flux, projects: ["finops", "Personal"], personal: 0 }],
+        tokens: 900,
+      },
+    };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain(
+      '<span title="finops, Personal">1 team · 1 personal<',
+    );
+    // an agent off MCP lists none and says so
+    agentPage.value = { ...agent, agent: { ...agent.agent, mcp: false } };
+    html = render(<Agent params={{ name: "coder" }} />);
+    expect(html).toContain("MCP is off for this agent.");
   });
 
   test.serial("Agent draws its activity ghost, then its days", () => {

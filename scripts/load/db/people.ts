@@ -207,13 +207,16 @@ export const teamsOf = (b: Build, u: User) =>
 export function servers(b: Build) {
   const { db, clock } = b;
   const insServer = db.query(
-    `insert into mcp_servers (id, name, url, key_name, read, write, instructions_on, timeout_ms, read_patterns, write_patterns, excluded_patterns, server_name, server_version, protocol_version, instructions, fingerprint, checked_at, created_at) values (?, ?, ?, null, 1, ?, 1, null, '[]', '[]', '[]', ?, '1.0.0', '2025-06-18', ?, ?, ?, ?)`,
+    `insert into mcp_servers (id, name, url, key_name, read, write, instructions_on, timeout_ms, read_patterns, write_patterns, excluded_patterns, server_name, server_version, protocol_version, instructions, fingerprint, checked_at, created_at, personal) values (?, ?, ?, null, 1, ?, 1, null, '[]', '[]', '[]', ?, '1.0.0', '2025-06-18', ?, ?, ?, ?, ?)`,
   );
   const insTool = db.query(
     `insert into mcp_tools (server_id, name, description, input_schema, unusable) values (?, ?, ?, ?, null)`,
   );
-  const insLink = db.query(
-    `insert into agent_servers (agent_id, server_id, read, write) values (?, ?, 1, ?)`,
+  // every team project chooses the write side where the server has one,
+  // as every live agent's link once did; personal projects read, as
+  // provision.ts makes them, since it sets no personal choice
+  const insChoice = db.query(
+    `insert into project_mcp (project_id, server_id, side) select id, ?, 'write' from projects where kind = 'team'`,
   );
   for (const [si, server] of Object.values(SERVERS).entries()) {
     const id = b.newId();
@@ -230,6 +233,7 @@ export function servers(b: Build) {
       print,
       NOW - HOUR,
       clock.start,
+      "read",
     );
     for (const tool of server.tools) {
       const def = toolDef(server.name, tool);
@@ -240,7 +244,7 @@ export function servers(b: Build) {
         JSON.stringify(def.inputSchema),
       );
     }
-    for (const a of b.liveAgents) insLink.run(a.id, id, write);
+    if (write === 1) insChoice.run(id);
   }
 }
 

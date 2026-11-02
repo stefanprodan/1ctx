@@ -9,9 +9,9 @@
 // Environment neutral: no Bun, no DOM, no packages. The hash is an
 // argument, so the server passes Bun's and the page a stub.
 
-import type { AgentServer, McpScope } from "./contracts/mcp.ts";
+import type { McpScope, McpSide, ServerSide } from "./contracts/mcp.ts";
 import { cutText } from "./text.ts";
-import { isRecord } from "./words.ts";
+import { isRecord, type ProjectKind } from "./words.ts";
 
 const WIRE_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 export const WIRE_PREFIX = "mcp__";
@@ -367,14 +367,46 @@ export function promptSnapshot(
   };
 }
 
-// a server's scope as the rows hold it
-export type Scoped = { scope: McpScope; projectIds: readonly string[] };
+// a server's grants and switches as the rows hold them
+export type Granted = {
+  scope: McpScope;
+  projectIds: readonly string[];
+  personal: McpSide;
+  read: boolean;
+  write: boolean;
+};
+export type ProjectRef = { id: string; kind: ProjectKind };
 
-// whether a send in the project is offered the server: a list never
-// holds a personal project (docs/mcp.md)
-export function inScope(server: Scoped, projectId: string): boolean {
-  return server.scope === "all" || server.projectIds.includes(projectId);
+// the most the project may choose: off outside the grant, a team
+// project reads the team grant alone and a personal one the personal
+// grant alone, and write needs the server's Write (docs/mcp.md)
+export function ceilingOf(server: Granted, project: ProjectRef): McpSide {
+  const most =
+    project.kind === "team"
+      ? server.scope === "all" || server.projectIds.includes(project.id)
+        ? "write"
+        : "off"
+      : server.personal;
+  return most === "write" && !server.write ? "read" : most;
 }
+
+// what a send in the project is given: the choice, absent being read,
+// capped at the ceiling, and nothing on a side the server turned off;
+// write is the write tools, with the read ones when Read is on
+export function offeredSide(
+  server: Granted,
+  project: ProjectRef,
+  choice: McpSide | null | undefined,
+): McpSide {
+  const ceiling = ceilingOf(server, project);
+  const chosen = choice ?? "read";
+  if (ceiling === "off" || chosen === "off") return "off";
+  if (chosen === "write" && ceiling === "write") return "write";
+  return server.read ? "read" : "off";
+}
+
+// the order of the sides, for a cap and a widest
+export const SIDE_RANK: Record<McpSide, number> = { off: 0, read: 1, write: 2 };
 
 // a server as the page or the server's rows offer it: the summary's
 // fields the rule reads, so both sides call the one function
@@ -398,18 +430,18 @@ export type OfferableServer = {
   tools: OfferableTool[];
 };
 
-// decision 5: a side on in both switches, at least one usable tool on
-// that side; each tool shaped for the wire by decision 18
+// each server on the side offeredSide() gave it, at least one usable
+// tool on that side; each tool shaped for the wire by decision 18
 export function offeredServers(
   servers: OfferableServer[],
-  agentServers: AgentServer[],
+  sides: readonly ServerSide[],
 ): SidedServer[] {
   const out: SidedServer[] = [];
-  for (const link of agentServers) {
+  for (const link of sides) {
     const server = servers.find((s) => s.id === link.serverId);
     if (server === undefined) continue;
-    const read = link.read && server.read;
-    const write = link.write && server.write;
+    const read = server.read;
+    const write = link.side === "write" && server.write;
     if (!read && !write) continue;
     const sides = classify(server.name, server.tools, {
       read: server.readPatterns,

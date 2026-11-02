@@ -118,9 +118,10 @@ is its root.
   `memory_edit`, `email_user`, `visualize`, `attention`,
   `automation` and `external_task` when the parent is a run (the
   scope's `origin`), the write actions of both otherwise, its MCP
-  links read alone so `offeredServers()` drops the write side, a bash
-  that says nothing of `open`, and each credential signing `GET` and
-  `HEAD` alone (`readOnly`), refused as `writes` when it had neither.
+  servers on the read side alone so `offeredServers()` drops the
+  write side, a bash that says nothing of `open`, and each credential
+  signing `GET` and `HEAD` alone (`readOnly`), refused as `writes`
+  when it had neither.
   Sending the parent's array and refusing the cut names at dispatch is
   a swap inside that function.
 

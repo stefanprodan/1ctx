@@ -747,7 +747,7 @@ describe("the composer while a turn runs", () => {
     effort: null,
     prompt: "",
     skills: [],
-    servers: [],
+    mcp: true,
     mcpMode: "auto",
     upstream: null,
     skip4Bit: false,

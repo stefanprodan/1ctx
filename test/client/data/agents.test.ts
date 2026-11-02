@@ -46,8 +46,10 @@ test.serial("an agent's facts are read by its id and kept", async () => {
   }) as unknown as typeof fetch;
   expect(factsFor("ag1")).toBeUndefined();
   await loadFacts("coder");
+  // the MCP tab's tokens are read beside them
   expect(urls.sort()).toEqual([
     "/api/agents/ag1/impact",
+    "/api/agents/ag1/mcp",
     "/api/agents/ag1/usage",
   ]);
   expect(factsFor("ag1")).toEqual({

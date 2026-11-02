@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Agents: a name, an avatar, a provider and a model, and the system
-// prompt. The MCP capability owns the agent-to-server rows.
+// prompt, and its one MCP switch; a project chooses the servers.
 
-import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { Db } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import {
   type DirectoryAccessPort,
+  type DirectoryMcpPort,
   type DirectoryProjectsPort,
   directoryRoutes,
   type SkillsListPort,
@@ -33,7 +33,6 @@ import { type PicksPort, startingRoutes } from "./starting.ts";
 import { type AgentRow, AgentStore } from "./store.ts";
 
 export {
-  MAX_SERVERS_PER_AGENT,
   parseEffort,
   parsePrompt,
   parseThinking,
@@ -45,7 +44,7 @@ export type AgentsDeps = {
   clock: Clock;
   providers: ProvidersPort;
   skills: SkillsPort & SkillsListPort & { assigned(agentId: string): string[] };
-  mcp: McpPort & { agentServers(agentId: string): AgentServer[] };
+  mcp: McpPort & DirectoryMcpPort;
   tools: ToolsPort & CapabilitiesPort;
   credentials: CredentialsPort;
   repos: ReposPort;
@@ -66,11 +65,7 @@ export type Agents = {
 };
 
 export function agentsArea(deps: AgentsDeps): Agents {
-  const store = new AgentStore(
-    deps.db,
-    deps.skills.assigned,
-    deps.mcp.agentServers,
-  );
+  const store = new AgentStore(deps.db, deps.skills.assigned);
   return {
     store,
     byId: (id) => store.byId(id),

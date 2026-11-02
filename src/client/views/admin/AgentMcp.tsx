@@ -2,65 +2,45 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import type {
-  AgentServer,
-  McpServerSummary,
-} from "../../../shared/contracts/mcp.ts";
+import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import { MAX_INSTRUCTIONS_BLOCK, offeredServers } from "../../../shared/mcp.ts";
-import { updateAgent } from "../../data/agents.ts";
+import { loadMcpTokens, mcpTokensFor, updateAgent } from "../../data/agents.ts";
 import { servers as serverRows } from "../../data/mcp.ts";
-import { commas, showAll } from "../../lib/format.ts";
-import { MCP_HREF } from "../../lib/hrefs.ts";
+import { commas, showAll, tokensText } from "../../lib/format.ts";
+import { configMcpHref, MCP_HREF } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { useCut } from "../../lib/resize.ts";
 import { useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
-import { Finder } from "../../ui/Finder.tsx";
 import { Fold } from "../../ui/Fold.tsx";
 import {
-  RowsEnd,
-  RowsLine,
+  RowsGo,
+  RowsMeta,
   RowsNote,
-  RowsRemove,
+  RowsSwitch,
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm } from "../../ui/Setting.tsx";
-import {
-  scopeWords,
-  serverLine,
-  serverMeta,
-} from "../directory/Directory.model.ts";
+import { serverLine, serverMeta } from "../directory/Directory.model.ts";
 import {
   cardBody,
   isModeValue,
+  MCP_LINE,
   MODE_HINT,
   MODE_OPTIONS,
+  mcpSwitchLine,
   promptPreview,
+  widest,
 } from "./AgentPage.model.ts";
 import { type AgentDrafts, loadedRows } from "./AgentPage.state.ts";
-import { listed } from "./Agents.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { useLatest } from "./drafts.ts";
+import { whereOn, whereOnCount } from "./Mcp.model.ts";
 
-const OFF = "Disabled in the server config";
-
-type Access = "read" | "write" | "none";
-
-const toolCount = (server: McpServerSummary, link: AgentServer) =>
-  offeredServers([server], [link])[0]?.tools.length ?? 0;
-
-const scopeOf = (server: McpServerSummary) =>
-  scopeWords(
-    server.scope,
-    server.projects.map((p) => p.name),
-  );
-
-// a bound server says where it reaches, so an agent's admin sees which
-// of its projects get it; an all server needs no word. The refresh goes
-// first, so a cut never hides a failure
-const boundLine = (server: McpServerSummary, line: string) =>
-  server.scope === "all" ? line : `${line} · ${scopeOf(server)}`;
+// the tools a server gives on its own switches, the most any project gets
+const toolCount = (server: McpServerSummary) =>
+  offeredServers([server], widest([server]))[0]?.tools.length ?? 0;
 
 export function AgentMcp({
   agent,
@@ -72,172 +52,122 @@ export function AgentMcp({
   const takesTools = agent.model.tools;
   return (
     <>
-      <Servers agent={agent} drafts={d} takesTools={takesTools} />
-      {takesTools && serverRows.value !== null && (
-        <Schemas agent={agent} drafts={d} />
-      )}
+      <McpSwitch agent={agent} drafts={d} />
+      {takesTools && <Schemas agent={agent} drafts={d} />}
+      {agent.mcp && <Servers agent={agent} takesTools={takesTools} />}
     </>
   );
 }
 
-function Servers({
+function McpSwitch({
   agent,
   drafts: d,
-  takesTools,
 }: {
   agent: AgentSummary;
   drafts: AgentDrafts;
-  takesTools: boolean;
 }) {
   const latest = useLatest(agent);
-  const all = serverRows.value;
-  const now = useNow(60_000);
-  const chosen = () =>
-    listed(d.servers.value, (s) => s.serverId, serverRows.value);
   const save = useSave(() =>
     d.save(async () => {
       const saved = await updateAgent(
         latest.current.id,
-        cardBody(latest.current, { servers: chosen() }, loadedRows()),
+        cardBody(latest.current, { mcp: d.mcp.value }, loadedRows()),
       );
-      d.resetServers(saved);
+      d.resetMcp(saved);
     }),
   );
-  const links = chosen();
-  const linkOf = (id: string) => links.find((l) => l.serverId === id);
-  const rows = byName((all ?? []).filter((s) => linkOf(s.id) !== undefined));
-  const set = (serverId: string, next: AgentServer | null) => {
-    d.servers.value = [
-      ...links.filter((l) => l.serverId !== serverId),
-      ...(next === null ? [] : [next]),
-    ];
-    save.touch();
-  };
-  const listable = takesTools && all !== null && all.length > 0;
+  const on = d.mcp.value;
   return (
     <SettingForm save={save}>
       <Setting
-        list
-        title="MCP Servers"
+        title="MCP"
+        line={mcpSwitchLine(on)}
         action={
-          listable && (
-            <Finder
-              label="MCP Servers"
-              add="Add server"
-              disabled={save.busy}
-              options={byName(
-                all.filter((s) => linkOf(s.id) === undefined),
-              ).map((s) => {
-                const line = serverLine(s, now);
-                const tools = serverMeta({
-                  tools: toolCount(s, {
-                    serverId: s.id,
-                    read: true,
-                    write: false,
-                  }),
-                });
-                return {
-                  value: s.id,
-                  label: s.name,
-                  sub: `${line.text} · ${tools} · ${scopeOf(s)}`,
-                  subBad: line.bad,
-                };
-              })}
-              mono
-              wide
-              placeholder="Find a server"
-              none="No server matches"
-              empty="Every server is added"
-              onPick={(id) =>
-                set(id, { serverId: id, read: true, write: false })
-              }
-            />
-          )
+          <RowsSwitch
+            on={on}
+            label="MCP"
+            name="mcp"
+            disabled={save.busy}
+            onClick={() => {
+              d.mcp.value = !on;
+              save.touch();
+            }}
+          />
         }
         foot={
-          listable ? (
-            <DraftFoot
-              locked={d.saving.value}
-              save={save}
-              dirty={d.serversDirty(agent)}
-              onDiscard={() => d.resetServers(latest.current)}
-            />
-          ) : undefined
+          <DraftFoot
+            locked={d.saving.value}
+            save={save}
+            dirty={d.mcpDirty(agent)}
+            onDiscard={() => d.resetMcp(latest.current)}
+          />
         }
-      >
-        {all === null ? (
-          <RowsNote>The servers did not load. Reload the page.</RowsNote>
-        ) : all.length === 0 ? (
-          <RowsNote>
-            No MCP Servers yet. <a href={MCP_HREF}>Add one</a> and it shows
-            here.
-          </RowsNote>
-        ) : !takesTools ? (
-          <RowsNote>This model takes no tools.</RowsNote>
-        ) : rows.length === 0 ? (
-          <RowsNote>No MCP Servers.</RowsNote>
-        ) : (
-          rows.map((server) => {
-            const link = linkOf(server.id)!;
-            const line = serverLine(server, now);
-            const access: Access = !server.read
-              ? "none"
-              : link.write && server.write
-                ? "write"
-                : "read";
-            return (
-              <RowsLine key={server.id} flush>
-                <RowsTitle
-                  name={server.name}
-                  sub={boundLine(server, line.text)}
-                  bad={line.bad}
-                  mono
-                />
-                <span class="agent-page-server-end">
-                  <span class="agent-page-tools">
-                    {serverMeta({ tools: toolCount(server, link) })}
-                  </span>
-                  <Seg
-                    label={`Access for ${server.name}`}
-                    small
-                    class="agent-page-access"
-                    value={access}
-                    options={[
-                      {
-                        value: "read",
-                        label: "Read",
-                        disabled: save.busy || !server.read,
-                        title: server.read ? undefined : OFF,
-                      },
-                      {
-                        value: "write",
-                        label: "Read and write",
-                        disabled: save.busy || !server.read || !server.write,
-                        title: server.read && server.write ? undefined : OFF,
-                      },
-                    ]}
-                    onPick={(value) =>
-                      set(server.id, {
-                        serverId: server.id,
-                        read: true,
-                        write: value === "write",
-                      })
-                    }
-                  />
-                </span>
-                <RowsEnd>
-                  <RowsRemove
-                    name={server.name}
-                    disabled={save.busy}
-                    onRemove={() => set(server.id, null)}
-                  />
-                </RowsEnd>
-              </RowsLine>
-            );
-          })
-        )}
-      </Setting>
+      />
     </SettingForm>
+  );
+}
+
+// every server, read only: the project chooses, so the rows say where
+// each is on and link to the server's page
+function Servers({
+  agent,
+  takesTools,
+}: {
+  agent: AgentSummary;
+  takesTools: boolean;
+}) {
+  const all = serverRows.value;
+  const now = useNow(60_000);
+  const counted = mcpTokensFor(agent.id);
+  const tokensOf = (id: string) =>
+    counted?.servers.find((s) => s.id === id)?.tokens;
+  const rows = byName(all ?? []);
+  return (
+    <Setting
+      list
+      title="MCP Servers"
+      count={all === null || !takesTools ? undefined : String(rows.length)}
+      line={MCP_LINE}
+    >
+      {all === null ? (
+        <RowsNote>The servers did not load. Reload the page.</RowsNote>
+      ) : !takesTools ? (
+        <RowsNote>This model takes no tools.</RowsNote>
+      ) : rows.length === 0 ? (
+        <RowsNote>
+          No MCP Servers yet. <a href={MCP_HREF}>Add one</a> and it shows here.
+        </RowsNote>
+      ) : (
+        rows.map((server) => {
+          const line = serverLine(server, now);
+          const tokens = tokensOf(server.id);
+          return (
+            <RowsGo key={server.id} href={configMcpHref(server.name)}>
+              <RowsTitle
+                name={server.name}
+                // the counts, their names on hover
+                sub={
+                  <>
+                    {`${line.text} · `}
+                    <span title={whereOn(server.on)}>
+                      {whereOnCount(server.on)}
+                    </span>
+                  </>
+                }
+                bad={line.bad}
+                mono
+              />
+              <RowsMeta
+                keep
+                under={tokens === undefined ? undefined : tokensText(tokens)}
+              >
+                {serverMeta({ tools: toolCount(server) })}
+              </RowsMeta>
+            </RowsGo>
+          );
+        })
+      )}
+    </Setting>
   );
 }
 
@@ -256,12 +186,11 @@ function Schemas({
         cardBody(latest.current, { mcpMode: d.mode.value }, loadedRows()),
       );
       d.resetMode(saved);
+      // each server's tokens are counted in the mode
+      void loadMcpTokens(saved.id);
     }),
   );
-  const preview = promptPreview(
-    serverRows.value ?? [],
-    listed(d.servers.value, (s) => s.serverId, serverRows.value),
-  );
+  const preview = agent.mcp ? promptPreview(serverRows.value ?? []) : null;
   return (
     <SettingForm save={save}>
       <Setting
@@ -288,9 +217,10 @@ function Schemas({
           />
         }
       >
-        {(preview.text !== "" || preview.warnings.length > 0) && (
-          <Instructions preview={preview} />
-        )}
+        {preview !== null &&
+          (preview.text !== "" || preview.warnings.length > 0) && (
+            <Instructions preview={preview} />
+          )}
       </Setting>
     </SettingForm>
   );

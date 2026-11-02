@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A project's MCP servers: the words of a row, who edits which row, the
-// remove ask, the entity and its writes, and the list as drawn for a
-// team's admin, a member and a personal project.
+// A project's MCP servers: the words of a row, who picks which row and
+// from which sides, the remove ask, the entity and its writes, and the
+// list as drawn for a team's admin, a member and a personal project.
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
@@ -16,14 +16,20 @@ import {
   projectMcpLists,
   projectMcpOf,
   removeProjectMcp,
+  setProjectMcpSide,
 } from "../../../src/client/data/project-mcp.ts";
 import {
+  editHref,
   mcpText,
   openOf,
   PERSONAL_TEXT,
+  pickOptions,
+  pickValue,
+  removable,
   removeAsk,
   rowKind,
   rowLine,
+  sideWord,
   TEAM_TEXT,
 } from "../../../src/client/views/projects/McpServers.model.ts";
 import { McpServers } from "../../../src/client/views/projects/McpServers.tsx";
@@ -35,17 +41,25 @@ import type { ProjectAgentsResponse } from "../../../src/shared/api/sessions.ts"
 import { clientFetch } from "../../helpers/client-fetch.ts";
 import { admin } from "../../helpers/client-fixtures.ts";
 
+const SIDES = {
+  choice: "read",
+  ceiling: "write",
+  side: "read",
+  read: true,
+} as const;
 const flux: ProjectMcpServer = {
   id: "m1",
   name: "flux",
   tools: 3,
   scope: "all",
+  ...SIDES,
 };
 const markets: ProjectMcpServer = {
   id: "m2",
   name: "markets",
   tools: 1,
   scope: "projects",
+  ...SIDES,
   projects: 2,
 };
 
@@ -72,18 +86,58 @@ const held = (projectId: string, body: ProjectMcpResponse) => {
 };
 
 describe("the model", () => {
-  test("a row says its tools and every project or this one", () => {
-    expect(rowLine(flux)).toBe("3 tools · All projects");
-    expect(rowLine(markets)).toBe("1 tool · This project");
+  test("a row says its tools, and This project only on a listed one", () => {
+    expect(rowLine(flux, false)).toBe("3 tools");
+    expect(rowLine(markets, false)).toBe("1 tool · This project");
+    // a personal project's grant is every one's alike
+    expect(rowLine(flux, true)).toBe("3 tools");
   });
 
-  test("only a team's admin edits, and an all row only links", () => {
-    expect(rowKind(markets, true, false)).toBe("edit");
-    expect(rowKind(flux, true, false)).toBe("link");
-    expect(rowKind(markets, false, false)).toBe("read");
-    expect(rowKind(flux, false, false)).toBe("read");
-    // a personal project lists only all servers, read-only for everyone
-    expect(rowKind(flux, true, true)).toBe("read");
+  test("a team's admin and a personal project's owner pick, a member reads", () => {
+    expect(rowKind(true, false)).toBe("admin");
+    expect(rowKind(false, false)).toBe("read");
+    expect(rowKind(false, true)).toBe("owner");
+    expect(rowKind(true, true)).toBe("owner");
+  });
+
+  test("an admin's every row edits the server's page, anyone else's none", () => {
+    expect(editHref(true, flux)).toBe("/admin/config/mcp/flux");
+    expect(editHref(true, markets)).toBe("/admin/config/mcp/markets");
+    expect(editHref(false, flux)).toBeUndefined();
+  });
+
+  test("only a team admin's listed row has Remove", () => {
+    expect(removable("admin", markets)).toBe(true);
+    expect(removable("admin", flux)).toBe(false);
+    expect(removable("owner", markets)).toBe(false);
+    expect(removable("read", markets)).toBe(false);
+  });
+
+  test("the sides a row offers: Read with the server's Read, write under a write ceiling", () => {
+    const values = (row: Parameters<typeof pickOptions>[0]) =>
+      pickOptions(row).map((o) => o.label);
+    expect(values(flux)).toEqual(["Off", "Read", "Read and write"]);
+    expect(values({ read: true, ceiling: "read" })).toEqual(["Off", "Read"]);
+    expect(values({ read: false, ceiling: "write" })).toEqual([
+      "Off",
+      "Read and write",
+    ]);
+    expect(values({ read: false, ceiling: "read" })).toEqual(["Off"]);
+  });
+
+  test("a choice above a lowered ceiling shows what it gives, an off row says Off", () => {
+    expect(pickValue(flux)).toBe("read");
+    const capped = {
+      ...flux,
+      choice: "write",
+      ceiling: "read",
+      side: "read",
+    } as const;
+    expect(pickValue(capped)).toBe("read");
+    const off = { ...flux, choice: "off", side: "off" } as const;
+    expect(pickValue(off)).toBe("off");
+    expect(sideWord(off)).toBe("Off");
+    expect(sideWord({ side: "write" })).toBe("Read and write");
   });
 
   test("a form closes when its row goes or is widened", () => {
@@ -140,6 +194,83 @@ describe("the entity", () => {
     ]);
   });
 
+  test.serial("a side goes to the team's route or the owner's", async () => {
+    held("p2", answerOf([flux]));
+    const chosen = answerOf([{ ...flux, choice: "write", side: "write" }]);
+    answer = (url) =>
+      url.endsWith("/agents") ? Response.json({}) : Response.json(chosen);
+    const before = calls.length;
+    await setProjectMcpSide("p2", "m1", "write", false);
+    expect(calls[before]!.url).toBe("/api/projects/p2/mcp/m1/side");
+    expect(calls[before]!.init?.method).toBe("PUT");
+    expect(JSON.parse(String(calls[before]!.init?.body))).toEqual({
+      side: "write",
+    });
+    expect(projectMcpOf("p2")?.servers[0]?.choice).toBe("write");
+    await setProjectMcpSide("p1", "m1", "off", true);
+    expect(calls.at(-1)!.url).toBe("/api/profile/project/mcp/m1/side");
+  });
+
+  test.serial(
+    "an older pick's answer arriving last never undoes a newer one",
+    async () => {
+      const agentsBody: ProjectAgentsResponse = {
+        agents: [],
+        startsOn: null,
+        capabilities: [],
+        servers: [],
+        skills: {},
+        credentials: [],
+        repos: [],
+      };
+      answer = () => Response.json(agentsBody);
+      await loadProjectAgents("p2");
+      held("p2", answerOf([flux, markets]));
+      let release: () => void = () => {};
+      const first = answerOf([
+        { ...flux, choice: "off", side: "off" },
+        markets,
+      ]);
+      const second = answerOf([
+        { ...flux, choice: "off", side: "off" },
+        { ...markets, choice: "write", side: "write" },
+      ]);
+      answer = (url) => {
+        if (url.endsWith("/agents")) return Response.json(agentsBody);
+        if (url.includes("/m1/")) {
+          return new Promise<Response>((done) => {
+            release = () => done(Response.json(first));
+          });
+        }
+        return Response.json(second);
+      };
+      const before = calls.length;
+      const slow = setProjectMcpSide("p2", "m1", "off", false);
+      await setProjectMcpSide("p2", "m2", "write", false);
+      release();
+      await slow;
+      expect(projectMcpOf("p2")?.servers[1]?.choice).toBe("write");
+      // both writes changed the offer, so both read the agents again
+      const agents = calls
+        .slice(before)
+        .filter((c) => c.url.endsWith("/agents")).length;
+      expect(agents).toBe(2);
+    },
+  );
+
+  test.serial("a refused side reads the list again", async () => {
+    held("p2", answerOf([flux]));
+    answer = (_url, init) =>
+      init?.method === "PUT"
+        ? Response.json({ error: "side may be at most read" }, { status: 400 })
+        : Response.json(answerOf([{ ...flux, ceiling: "read" }]));
+    await expect(
+      setProjectMcpSide("p2", "m1", "write", false),
+    ).rejects.toThrow();
+    expect(calls.at(-1)!.init?.method ?? "GET").toBe("GET");
+    expect(projectMcpOf("p2")?.servers[0]?.ceiling).toBe("read");
+  });
+
   test.serial("a refused add reads the list again", async () => {
     held("p2", answerOf([flux], [{ id: "m2", name: "markets" }]));
     answer = (_url, init) =>
@@ -174,7 +305,7 @@ describe("the project's agents", () => {
       agents: [],
       startsOn: null,
       capabilities: [],
-      servers: {},
+      servers: [],
       skills: {},
       credentials: [],
       repos: [],
@@ -202,25 +333,36 @@ describe("the project's agents", () => {
 });
 
 describe("the list", () => {
-  test.serial("a team's admin: a listed row opens, an all row links", () => {
-    held("p2", answerOf([flux, markets], [{ id: "m3", name: "github" }]));
-    const html = render(
-      <McpServers
-        projectId="p2"
-        projectName="finops"
-        personal={false}
-        section
-        admin
-      />,
-    );
-    expect(html).toContain(">MCP Servers<");
-    expect(html).toContain(TEAM_TEXT);
-    expect(html).toContain("3 tools · All projects");
-    expect(html).toContain("1 tool · This project");
-    expect(html).toContain('href="/admin/config/mcp/flux"');
-    expect(html.match(/class="rows-line rows-button"/g)).toHaveLength(1);
-    expect(html).toContain("Add server");
-  });
+  test.serial(
+    "a team's admin: every row picks and has a More menu, no row links",
+    () => {
+      held("p2", answerOf([flux, markets], [{ id: "m3", name: "github" }]));
+      const html = render(
+        <McpServers
+          projectId="p2"
+          projectName="finops"
+          personal={false}
+          section
+          admin
+        />,
+      );
+      expect(html).toContain(">MCP Servers<");
+      expect(html).toContain(TEAM_TEXT);
+      expect(html).not.toContain("All team projects");
+      expect(html).toContain(">3 tools<");
+      expect(html).toContain("1 tool · This project");
+      // the row is no link: Edit sits in its More menu
+      expect(html).not.toContain('href="/admin/config/mcp/');
+      expect(html).not.toContain("rows-go");
+      // one dropdown per row, showing the pick
+      expect(html.match(/aria-label="Side of /g)).toHaveLength(2);
+      expect(html.match(/select-trigger-small/g)).toHaveLength(2);
+      expect(html.match(/select-label cut">Read</g)).toHaveLength(2);
+      // every admin row has More (Edit), the listed one adds Remove
+      expect(html.match(/aria-label="More for /g)).toHaveLength(2);
+      expect(html).toContain("Add server");
+    },
+  );
 
   test.serial("nothing to add hides Add server", () => {
     held("p2", answerOf([flux, markets]));
@@ -250,21 +392,64 @@ describe("the list", () => {
       />,
     );
     expect(html).toContain("1 tool · This project");
-    expect(html).not.toContain("rows-button");
+    expect(html).not.toContain("Side of");
     expect(html).not.toContain("<a ");
     expect(html).not.toContain("Add server");
+    expect(html).not.toContain("More for");
+    // each row says what the project chose, an off one too, in the
+    // pick's column
+    expect(html).toContain('<span class="mcp-servers-word">Read<');
   });
 
-  test.serial("a personal project lists its all servers, read-only", () => {
-    held("p1", answerOf([flux]));
-    const html = render(
-      <McpServers projectId="p1" projectName="admin" personal section admin />,
+  test.serial("an off row stays, saying Off", () => {
+    held("p2", answerOf([{ ...flux, choice: "off", side: "off" }]));
+    const read = render(
+      <McpServers
+        projectId="p2"
+        projectName="finops"
+        personal={false}
+        section
+        admin={false}
+      />,
     );
-    expect(html).toContain(PERSONAL_TEXT);
-    expect(html).toContain("3 tools · All projects");
-    expect(html).not.toContain("<a ");
-    expect(html).not.toContain("rows-button");
+    expect(read).toContain("flux");
+    expect(read).toContain(">Off<");
+    const picked = render(
+      <McpServers
+        projectId="p2"
+        projectName="finops"
+        personal={false}
+        section
+        admin
+      />,
+    );
+    expect(picked).toContain('select-label cut">Off<');
   });
+
+  test.serial(
+    "a personal project's owner picks, with no link and no remove",
+    () => {
+      held("p1", answerOf([{ ...flux, ceiling: "read" }]));
+      const html = render(
+        <McpServers
+          projectId="p1"
+          projectName="admin"
+          personal
+          section
+          admin={false}
+        />,
+      );
+      expect(html).toContain(PERSONAL_TEXT);
+      expect(html).toContain("3 tools");
+      expect(html).not.toContain("All team projects");
+      expect(html).toContain('aria-label="Side of flux"');
+      // a read ceiling hides Read and write
+      expect(html).not.toContain("Read and write");
+      expect(html).not.toContain("<a ");
+      expect(html).not.toContain("More for");
+      expect(html).not.toContain("mcp-servers-gap");
+    },
+  );
 
   test.serial("an empty list says so", () => {
     held("p2", answerOf([]));

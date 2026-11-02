@@ -7,19 +7,22 @@ import type {
   PatchMcpSettings,
 } from "../../shared/api/mcp.ts";
 import type {
-  AgentServer,
   McpChange,
   McpScope,
+  McpSide,
 } from "../../shared/contracts/mcp.ts";
 import { type Db, parseStored, transact } from "../db/index.ts";
-import { BadRequest, Conflict } from "../lib/errors.ts";
+import { Conflict } from "../lib/errors.ts";
 import { newId } from "../lib/ids.ts";
 import type { DiscoveredTool, DiscoveryResult } from "./discover.ts";
 import {
   addLink,
   allProjectIds,
+  choicesOf,
+  type ProjectChoices,
   projectIdsOf,
   removeLink,
+  writeChoice,
   writeScope,
 } from "./scope.ts";
 
@@ -46,6 +49,7 @@ export type McpServerRow = {
   scope: McpScope;
   // the team projects a list holds, by id; empty for all
   projectIds: string[];
+  personal: McpSide;
   serverName: string;
   serverVersion: string;
   protocolVersion: string;
@@ -72,6 +76,7 @@ type RawServer = {
   write_patterns: string;
   excluded_patterns: string;
   scope: McpScope;
+  personal: McpSide;
   server_name: string;
   server_version: string;
   protocol_version: string;
@@ -84,10 +89,18 @@ type RawServer = {
   created_at: number;
 };
 
-// a server's endpoint and scope, without its tools
+// a server's endpoint, grants and switches, without its tools
 export type McpScopeRow = Pick<
   McpServerRow,
-  "id" | "name" | "url" | "keyName" | "scope" | "projectIds"
+  | "id"
+  | "name"
+  | "url"
+  | "keyName"
+  | "scope"
+  | "projectIds"
+  | "personal"
+  | "read"
+  | "write"
 >;
 
 type RawTool = {
@@ -96,12 +109,6 @@ type RawTool = {
   description: string;
   input_schema: string;
   unusable: string | null;
-};
-
-type RawAgentServer = {
-  server_id: string;
-  read: number;
-  write: number;
 };
 
 function toolRow(raw: RawTool): McpToolRow {
@@ -133,6 +140,7 @@ function row(
     excludedPatterns: parseStored(raw.excluded_patterns, []),
     scope: raw.scope,
     projectIds: raw.scope === "all" ? [] : projectIds,
+    personal: raw.personal,
     serverName: raw.server_name,
     serverVersion: raw.server_version,
     protocolVersion: raw.protocol_version,
@@ -188,12 +196,24 @@ export class McpServerStore {
       );
   }
 
-  // every server's endpoint and scope in name order, its tools unread
+  // every server's endpoint and grants in name order, its tools unread
   scopes(): McpScopeRow[] {
     const projects = allProjectIds(this.db);
+    type Raw = Pick<
+      RawServer,
+      | "id"
+      | "name"
+      | "url"
+      | "key_name"
+      | "scope"
+      | "personal"
+      | "read"
+      | "write"
+    >;
     return this.db
-      .query<Pick<RawServer, "id" | "name" | "url" | "key_name" | "scope">, []>(
-        "select id, name, url, key_name, scope from mcp_servers order by name",
+      .query<Raw, []>(
+        `select id, name, url, key_name, scope, personal, read, write
+         from mcp_servers order by name`,
       )
       .all()
       .map((raw) => ({
@@ -203,7 +223,20 @@ export class McpServerStore {
         keyName: raw.key_name,
         scope: raw.scope,
         projectIds: raw.scope === "all" ? [] : (projects.get(raw.id) ?? []),
+        personal: raw.personal,
+        read: raw.read === 1,
+        write: raw.write === 1,
       }));
+  }
+
+  // the project's kind and its choices, null for a missing project
+  choices(projectId: string): ProjectChoices | null {
+    return choicesOf(this.db, projectId);
+  }
+
+  // read is the default, so it is held as no row
+  setChoice(projectId: string, serverId: string, side: McpSide): void {
+    writeChoice(this.db, projectId, serverId, side);
   }
 
   exists(id: string): boolean {
@@ -256,9 +289,9 @@ export class McpServerStore {
               timeout_ms, read_patterns, write_patterns, excluded_patterns,
               server_name, server_version, protocol_version, instructions,
               fingerprint, checked_at, last_change, refresh_error,
-              refresh_failed_at, created_at)
+              refresh_failed_at, created_at, personal)
            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null,
-                   null, null, ?)`,
+                   null, null, ?, ?)`,
         )
         .run(
           id,
@@ -279,6 +312,7 @@ export class McpServerStore {
           found.fingerprint,
           found.checkedAt,
           found.checkedAt,
+          fields.personal ?? "read",
         );
       this.insertTools(id, found.tools);
       this.setScope(id, fields.projects ?? "all");
@@ -402,6 +436,12 @@ export class McpServerStore {
     writeScope(this.db, id, projects);
   }
 
+  setPersonal(id: string, side: McpSide): void {
+    this.db
+      .query("update mcp_servers set personal = ? where id = ?")
+      .run(side, id);
+  }
+
   // one project onto a list, or off it; false when nothing moved
   addProject(id: string, projectId: string): boolean {
     return addLink(this.db, id, projectId);
@@ -420,18 +460,11 @@ export class McpServerStore {
       .run(error, now, id);
   }
 
-  deleteUnreferenced(id: string): "deleted" | "referenced" | "missing" {
-    return transact(this.db, () => {
-      if (this.byId(id) === null) return { result: "missing" as const };
-      const references = this.db
-        .query<{ n: number }, [string]>(
-          "select count(*) as n from agent_servers where server_id = ?",
-        )
-        .get(id)!.n;
-      if (references > 0) return { result: "referenced" as const };
-      this.db.query("delete from mcp_servers where id = ?").run(id);
-      return { result: "deleted" as const };
-    });
+  // its grants and choices go with it
+  delete(id: string): boolean {
+    return (
+      this.db.query("delete from mcp_servers where id = ?").run(id).changes > 0
+    );
   }
 
   stale(before: number): McpServerRow[] {
@@ -442,45 +475,5 @@ export class McpServerStore {
       )
       .all(before)
       .map((raw) => this.full(raw));
-  }
-
-  agentServers(agentId: string): AgentServer[] {
-    return this.db
-      .query<RawAgentServer, [string]>(
-        `select agent_servers.server_id, agent_servers.read, agent_servers.write
-         from agent_servers
-         join mcp_servers on mcp_servers.id = agent_servers.server_id
-         where agent_servers.agent_id = ? order by mcp_servers.name`,
-      )
-      .all(agentId)
-      .map((link) => ({
-        serverId: link.server_id,
-        read: link.read === 1,
-        write: link.write === 1,
-      }));
-  }
-
-  setAgentServers(agentId: string, links: AgentServer[]): void {
-    const seen = new Set<string>();
-    for (const link of links) {
-      if (seen.has(link.serverId)) {
-        throw new BadRequest("serverId must not repeat");
-      }
-      if (!link.read) {
-        throw new BadRequest("a server needs read");
-      }
-      if (!this.exists(link.serverId)) {
-        throw new BadRequest("serverId is unknown");
-      }
-      seen.add(link.serverId);
-    }
-    this.db.query("delete from agent_servers where agent_id = ?").run(agentId);
-    const insert = this.db.query(
-      `insert into agent_servers (agent_id, server_id, read, write)
-       values (?, ?, ?, ?)`,
-    );
-    for (const link of links) {
-      insert.run(agentId, link.serverId, link.read ? 1 : 0, link.write ? 1 : 0);
-    }
   }
 }

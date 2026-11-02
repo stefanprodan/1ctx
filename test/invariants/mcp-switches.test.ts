@@ -11,7 +11,6 @@ import {
   mcpOffLine,
   WEB_OFF_LINE,
 } from "../../src/shared/capabilities.ts";
-import type { AgentServer } from "../../src/shared/contracts/mcp.ts";
 import type { SessionDetail } from "../../src/shared/contracts/session.ts";
 import { CATALOG_LEAD } from "../../src/shared/mcp-catalog.ts";
 import type { McpMode } from "../../src/shared/words.ts";
@@ -30,13 +29,23 @@ import {
   startChat,
   waitScript,
 } from "../helpers/chat.ts";
-import { link, seedServer } from "../server/mcp/switches.helpers.ts";
+import { seedServer } from "../server/mcp/switches.helpers.ts";
 
+// the agent on MCP in the mode, and the personal project choosing these
+// servers, every other one off
 async function assign(
   chat: ChatApp,
-  servers: AgentServer[],
+  servers: { id: string }[],
   mcpMode: McpMode = "catalog",
 ) {
+  const chosen = new Set(servers.map((server) => server.id));
+  for (const row of chat.app.mcp.list()) {
+    chat.app.mcp.setChoice(
+      chat.projectId,
+      row.id,
+      chosen.has(row.id) ? "read" : "off",
+    );
+  }
   const agent = chat.app.agents.byId(chat.agentId)!;
   const response = await chat.admin.call("PATCH", `/api/agents/${agent.id}`, {
     body: {
@@ -46,7 +55,7 @@ async function assign(
       thinking: agent.thinking,
       effort: agent.effort,
       prompt: "Answer carefully.",
-      servers,
+      mcp: true,
       mcpMode,
     },
   });
@@ -58,7 +67,7 @@ async function setup(model?: string, logFactory?: LogFactory) {
   chat.app.automationScheduler.stop();
   const flux = seedServer(chat.app.mcp, "flux");
   const docs = seedServer(chat.app.mcp, "docs");
-  await assign(chat, [link(flux), link(docs)]);
+  await assign(chat, [flux, docs]);
   return { chat, flux, docs };
 }
 
@@ -185,7 +194,7 @@ test.serial(
   },
 );
 
-test("a chat fork keeps MCP keys even on an agent without their servers", async () => {
+test("a chat fork keeps MCP keys even on an agent off MCP", async () => {
   const { chat, flux, docs } = await setup();
   try {
     const keys = [mcpKey(flux.id), mcpKey(docs.id)].sort();
@@ -199,6 +208,7 @@ test("a chat fork keeps MCP keys even on an agent without their servers", async 
       .messages(id)
       .findLast((message) => message.kind === "reply")!;
     const plain = await chat.makeAgent({ name: "plain", model: FLASH });
+    chat.app.db.query("update agents set mcp_on = 0 where id = ?").run(plain);
     const response = await chat.member.call(
       "POST",
       `/api/sessions/${id}/fork`,
@@ -214,7 +224,7 @@ test("a chat fork keeps MCP keys even on an agent without their servers", async 
     expect(next.policy.mcpOff).toEqual([]);
     expect(system(next.script)).not.toContain("turned these MCP servers off");
     expect(next.policy.offered.mcp).toEqual([]);
-    next.script.reply("No linked servers.");
+    next.script.reply("No servers.");
     await settleRun(chat, fork.session.id);
   } finally {
     await chat.app.shutdown();
@@ -222,10 +232,11 @@ test("a chat fork keeps MCP keys even on an agent without their servers", async 
   }
 });
 
-test("the off line ignores missing, unassigned and otherwise-unoffered servers", async () => {
+test("the off line ignores missing, chosen off and otherwise-unoffered servers", async () => {
   const { chat, flux, docs } = await setup();
   try {
     const other = seedServer(chat.app.mcp, "other");
+    chat.app.mcp.setChoice(chat.projectId, other.id, "off");
     chat.app.mcp.updateSettings(docs.id, { excludedPatterns: ["*"] });
     const first = await send(chat, null, {
       disable: [
@@ -237,7 +248,7 @@ test("the off line ignores missing, unassigned and otherwise-unoffered servers",
     });
     expect(first.policy.mcpOff).toEqual(["flux"]);
     expect(system(first.script)).toContain(mcpOffLine(["flux"]));
-    await assign(chat, [link(docs)]);
+    await assign(chat, [docs]);
     expect(first.policy.mcpOff).toEqual(["flux"]);
     first.script.reply("Without flux.");
     await settleRun(chat, first.detail.session.id);
@@ -341,17 +352,14 @@ test.each(["manual", "schedule"] as const)(
   },
 );
 
-test("project agents expose the same switchable map to members and admins", async () => {
+test("project agents expose the same switchable list to members and admins", async () => {
   const { chat, flux, docs } = await setup();
   try {
     const plain = await chat.makeAgent({ name: "plain", model: FLASH });
-    const noTools = await chat.makeAgent({ name: "no-tools", model: NO_TOOLS });
-    const empty = seedServer(chat.app.mcp, "empty", 0);
+    seedServer(chat.app.mcp, "empty", 0);
     const excluded = seedServer(chat.app.mcp, "excluded");
     chat.app.mcp.updateSettings(excluded.id, { excludedPatterns: ["*"] });
-    await assign(chat, [link(flux), link(excluded), link(docs), link(empty)]);
-    chat.app.mcp.setAgentServers(plain, [link(empty), link(excluded)]);
-    chat.app.mcp.setAgentServers(noTools, [link(flux)]);
+    chat.app.db.query("update agents set mcp_on = 0 where id = ?").run(plain);
     const created = await chat.admin.call("POST", "/api/projects", {
       body: { name: "team", description: "A team project." },
     });
@@ -371,14 +379,14 @@ test("project agents expose the same switchable map to members and admins", asyn
     expect(member.status).toBe(200);
     const body = (await member.json()) as ProjectAgentsResponse;
     expect(body).toEqual(await admin.json());
-    expect(body.servers).toEqual({
-      [chat.agentId]: [
-        { id: docs.id, name: "docs", tools: 1 },
-        { id: flux.id, name: "flux", tools: 1 },
-      ],
-      [noTools]: [{ id: flux.id, name: "flux", tools: 1 }],
-    });
-    expect(body.servers).not.toHaveProperty(plain);
+    // one list for the project; a server with no tool on is left out
+    expect(body.servers).toEqual([
+      { id: docs.id, name: "docs", tools: 1 },
+      { id: flux.id, name: "flux", tools: 1 },
+    ]);
+    expect(
+      body.agents.map((agent) => [agent.id === plain, agent.mcp]),
+    ).toContainEqual([true, false]);
     expect(body.capabilities).toEqual([
       "web",
       "visualize",
@@ -391,7 +399,7 @@ test("project agents expose the same switchable map to members and admins", asyn
     chat.app.mcp.updateSettings(docs.id, { read: false });
     expect(
       (await (await chat.member.call("GET", path)).json()).servers,
-    ).toEqual({});
+    ).toEqual([]);
   } finally {
     await chat.app.shutdown();
     chat.app.db.close();
@@ -428,14 +436,7 @@ test.serial(
         ),
       );
       unsubscribe = subscribe((event) => events.push(event), silent);
-      expect(
-        (await chat.admin.call("DELETE", `/api/mcp/${flux.id}`)).status,
-      ).toBe(409);
-      expect(chat.app.sessions.byId(chats[0]!.id)).toEqual(chats[0]);
-      expect(chat.app.automations.byId(automations[0]!.id)).toEqual(
-        automations[0],
-      );
-      await assign(chat, [link(docs)]);
+      await assign(chat, [docs]);
       expect(chat.app.sessions.byId(chats[0]!.id)).toEqual(chats[0]);
       expect(chat.app.automations.byId(automations[0]!.id)).toEqual(
         automations[0],

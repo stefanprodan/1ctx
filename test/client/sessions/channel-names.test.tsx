@@ -47,7 +47,7 @@ const agent = (id: string, name: string): AgentSummary => ({
   effort: null,
   prompt: "",
   skills: [],
-  servers: [],
+  mcp: true,
   mcpMode: "auto",
   upstream: null,
   skip4Bit: false,

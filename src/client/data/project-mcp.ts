@@ -2,15 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A project's MCP servers, as its Settings tab and its admin page list
-// them, by project id. An admin's add and remove answer the whole list,
-// and change what the project's agents are offered, so the project's
-// agents are read again.
+// them, by project id. An admin's add and remove and a choice of a
+// server's side answer the whole list, and change what the project's
+// agents are offered, so the project's agents are read again.
 
 import { effect, signal } from "@preact/signals";
 import type {
   AddProjectMcpRequest,
   ProjectMcpResponse,
+  ProjectMcpSideRequest,
 } from "../../shared/api/mcp.ts";
+import type { McpSide } from "../../shared/contracts/mcp.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me } from "./me.ts";
@@ -83,17 +85,20 @@ export async function loadProjectMcp(projectId: string): Promise<void> {
   }
 }
 
-// a write's answer is the whole list and lands over any load out
+// a write's answer is the whole list; only the newest write's or
+// load's lands, so a slower answer never undoes a later pick. Every
+// write that went through changed the agents' offer, landed or not
 function keep(
   projectId: string,
   body: ProjectMcpResponse,
   forUser: string | null,
+  mine: number,
 ) {
   if (owner !== forUser) return;
-  turnOf(projectId);
+  reloadProjectAgents(projectId);
+  if (turns.get(projectId) !== mine) return;
   setList(projectId, body);
   setError(projectId, null);
-  reloadProjectAgents(projectId);
 }
 
 export async function addProjectMcp(
@@ -101,6 +106,7 @@ export async function addProjectMcp(
   serverId: string,
 ): Promise<void> {
   const forUser = owner;
+  const mine = turnOf(projectId);
   const body: AddProjectMcpRequest = { serverId };
   try {
     const answer = await api<ProjectMcpResponse>(
@@ -108,7 +114,7 @@ export async function addProjectMcp(
       "POST",
       body,
     );
-    keep(projectId, answer, forUser);
+    keep(projectId, answer, forUser, mine);
   } catch (err) {
     // a server another tab added, widened or deleted: the list, and its
     // addable, read again
@@ -122,15 +128,44 @@ export async function removeProjectMcp(
   serverId: string,
 ): Promise<void> {
   const forUser = owner;
+  const mine = turnOf(projectId);
   try {
     const answer = await api<ProjectMcpResponse>(
       `${listUrl(projectId)}/${encodeURIComponent(serverId)}`,
       "DELETE",
     );
-    keep(projectId, answer, forUser);
+    keep(projectId, answer, forUser, mine);
   } catch (err) {
     // another tab took it out, or widened it to every project: the list
     // reads again either way
+    await loadProjectMcp(projectId);
+    throw err;
+  }
+}
+
+// the project's choice of a server's side: an admin's on a team
+// project, the owner's on their personal one, which has its own route
+export async function setProjectMcpSide(
+  projectId: string,
+  serverId: string,
+  side: McpSide,
+  personal: boolean,
+): Promise<void> {
+  const forUser = owner;
+  const mine = turnOf(projectId);
+  const body: ProjectMcpSideRequest = { side };
+  const server = encodeURIComponent(serverId);
+  try {
+    const answer = await api<ProjectMcpResponse>(
+      personal
+        ? `/api/profile/project/mcp/${server}/side`
+        : `${listUrl(projectId)}/${server}/side`,
+      "PUT",
+      body,
+    );
+    keep(projectId, answer, forUser, mine);
+  } catch (err) {
+    // a grant lowered or taken away meanwhile: the list reads again
     await loadProjectMcp(projectId);
     throw err;
   }

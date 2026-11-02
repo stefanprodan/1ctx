@@ -58,7 +58,14 @@ describe("the knowledge switch in the tools area", () => {
     const { db, tools, seen } = setup();
     try {
       for (const disabled of [[], [KNOWLEDGE]]) {
-        const offered = tools.offered(1, "", [], "auto", undefined, disabled);
+        const offered = tools.offered(
+          1,
+          "",
+          false,
+          "auto",
+          undefined,
+          disabled,
+        );
         const off = disabled.length > 0;
         expect(offered.knowledge).toBe(!off);
         expect(offered.tools.map((tool) => tool.name)).toContain("bash");

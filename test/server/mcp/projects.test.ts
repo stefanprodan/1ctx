@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// An MCP server bound to team projects, through the composed app: the
-// sends, the composer's lists, a project's Settings list and its
-// writes, the agent directory and the admin's create and patch.
+// An MCP server granted to projects and chosen by each, through the
+// composed app: the sends, the composer's lists, a project's Settings
+// list and its writes, the choice routes, the agent directory and the
+// admin's create, patch and delete.
 
 import { describe, expect, test } from "bun:test";
 import type { McpProjects } from "../../../src/shared/api/mcp.ts";
@@ -37,20 +38,27 @@ async function team(chat: ChatApp, name: string, member = true) {
   return id;
 }
 
-function server(chat: ChatApp, name: string, projects: McpProjects) {
+// a list server is kept out of personal projects, as a keyed one is
+function server(
+  chat: ChatApp,
+  name: string,
+  projects: McpProjects,
+  write = false,
+) {
   return chat.app.mcp.create(
     {
       name,
       url: `http://${name}.test/mcp`,
       keyName: null,
       read: true,
-      write: false,
+      write,
       instructionsOn: false,
       timeoutMs: null,
       readPatterns: ["*"],
       writePatterns: [],
       excludedPatterns: [],
       projects,
+      personal: projects === "all" ? "read" : "off",
     },
     {
       serverName: name,
@@ -97,15 +105,10 @@ async function bound() {
   const markets = server(chat, "markets", [finops]);
   const docs = server(chat, "docs", "all");
   const secret = server(chat, "secret", [hidden]);
-  chat.app.mcp.setAgentServers(chat.agentId, [
-    { serverId: markets.id, read: true, write: false },
-    { serverId: docs.id, read: true, write: false },
-    { serverId: secret.id, read: true, write: false },
-  ]);
   return { chat, finops, research, hidden, markets, docs, secret };
 }
 
-describe("a bound server's sends", () => {
+describe("a granted server's sends", () => {
   test("a chat and a run in a bound project get it, others do not", async () => {
     const { chat, finops, research } = await bound();
     try {
@@ -135,7 +138,7 @@ describe("a bound server's sends", () => {
     }
   });
 
-  test("the composer's lists leave an out of scope server out", async () => {
+  test("the composer's list is the project's, and empty for an agent off MCP", async () => {
     const { chat, finops, research, markets, docs } = await bound();
     try {
       const listed = async (projectId: string) => {
@@ -149,20 +152,18 @@ describe("a bound server's sends", () => {
           (row: { id: string }) => row.id === chat.agentId,
         );
         return {
-          links: agent.servers.map(
-            (link: { serverId: string }) => link.serverId,
-          ),
-          servers: body.servers[chat.agentId].map(
-            (row: { name: string }) => row.name,
-          ),
+          mcp: agent.mcp,
+          servers: body.servers.map((row: { name: string }) => row.name),
         };
       };
       expect(await listed(finops)).toEqual({
-        links: expect.arrayContaining([markets.id, docs.id]),
+        mcp: true,
         servers: ["docs", "markets"],
       });
-      const other = await listed(research);
-      expect(other).toEqual({ links: [docs.id], servers: ["docs"] });
+      expect(await listed(research)).toEqual({ mcp: true, servers: ["docs"] });
+      chat.app.mcp.setChoice(finops, docs.id, "off");
+      expect((await listed(finops)).servers).toEqual(["markets"]);
+      expect(markets.id).not.toBe(docs.id);
     } finally {
       await chat.app.shutdown();
     }
@@ -180,23 +181,35 @@ describe("a project's MCP list", () => {
         "docs",
         "markets",
       ]);
+      const sides = { choice: "read", ceiling: "read", side: "read" };
       // a member never learns how many projects a list holds
       expect(body.servers[1]).toEqual({
         id: expect.any(String),
         name: "markets",
         tools: 1,
         scope: "projects",
+        read: true,
+        ...sides,
       });
       const admin = await (
         await chat.admin.call("GET", `/api/projects/${finops}/mcp`)
       ).json();
       expect(admin.servers).toEqual([
-        { id: expect.any(String), name: "docs", tools: 1, scope: "all" },
+        {
+          id: expect.any(String),
+          name: "docs",
+          tools: 1,
+          scope: "all",
+          read: true,
+          ...sides,
+        },
         {
           id: expect.any(String),
           name: "markets",
           tools: 1,
           scope: "projects",
+          read: true,
+          ...sides,
           projects: 1,
         },
       ]);
@@ -210,7 +223,14 @@ describe("a project's MCP list", () => {
       ).json();
       expect(personal).toEqual({
         servers: [
-          { id: expect.any(String), name: "docs", tools: 1, scope: "all" },
+          {
+            id: expect.any(String),
+            name: "docs",
+            tools: 1,
+            scope: "all",
+            read: true,
+            ...sides,
+          },
         ],
         addable: [],
       });
@@ -335,8 +355,8 @@ describe("a project's MCP list", () => {
 });
 
 describe("the agent directory", () => {
-  test("a member sees what they can reach; an admin sees every server", async () => {
-    const { chat, markets, docs } = await bound();
+  test("a member sees what is on where they can see; an admin sees every server", async () => {
+    const { chat, finops, docs } = await bound();
     try {
       const read = async (client = chat.member) => {
         const res = await client.call("GET", "/api/directory/agents/coder");
@@ -345,30 +365,172 @@ describe("the agent directory", () => {
       };
       const member = await read();
       expect(member.mcp.servers).toEqual([
-        expect.objectContaining({ name: "docs", scope: "all", projects: [] }),
+        expect.objectContaining({
+          name: "docs",
+          projects: ["finops", "Personal", "research"],
+          personal: 0,
+        }),
         expect.objectContaining({
           name: "markets",
-          scope: "projects",
           projects: ["finops"],
+          personal: 0,
         }),
       ]);
-      expect(
-        member.agent.servers.map((link: { serverId: string }) => link.serverId),
-      ).toEqual(expect.arrayContaining([docs.id, markets.id]));
-      expect(member.agent.servers).toHaveLength(2);
+      expect(member.agent.mcp).toBe(true);
       expect(JSON.stringify(member)).not.toContain("secret");
       const admin = await read(chat.admin);
       expect(
         admin.mcp.servers.map((row: { name: string }) => row.name),
       ).toEqual(["docs", "markets", "secret"]);
-      expect(admin.mcp.servers[2]).toMatchObject({
-        scope: "projects",
-        projects: ["hidden"],
+      // every team project by name, personal ones as a count
+      expect(admin.mcp.servers[0]).toMatchObject({
+        projects: ["finops", "hidden", "research"],
+        personal: 2,
       });
-      expect(admin.agent.servers).toHaveLength(3);
+      expect(admin.mcp.servers[2]).toMatchObject({
+        projects: ["hidden"],
+        personal: 0,
+      });
       // the hidden server's schema is in neither of the member's totals
       expect(admin.mcp.tokens).toBeGreaterThan(member.mcp.tokens);
       expect(admin.tokens.tools).toBeGreaterThan(member.tokens.tools);
+      // an off choice drops a project's name
+      chat.app.mcp.setChoice(finops, docs.id, "off");
+      expect((await read()).mcp.servers[0].projects).toEqual([
+        "Personal",
+        "research",
+      ]);
+      // an agent off MCP lists none and counts none
+      chat.app.db.exec(
+        `update agents set mcp_on = 0 where id = '${chat.agentId}'`,
+      );
+      const off = await read(chat.admin);
+      expect(off.mcp).toEqual({ servers: [], tokens: 0 });
+      expect(off.tokens.tools).toBeLessThan(admin.tokens.tools);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+});
+
+describe("a project's choice", () => {
+  test("an admin sets a team project's side; a member's PUT is a 403", async () => {
+    const { chat, finops, research, markets, docs } = await bound();
+    const editor = server(chat, "editor", [finops], true);
+    try {
+      const put = (
+        client: typeof chat.admin,
+        projectId: string,
+        serverId: string,
+        side: string,
+      ) =>
+        client.call("PUT", `/api/projects/${projectId}/mcp/${serverId}/side`, {
+          body: { side },
+        });
+      expect((await put(chat.member, finops, docs.id, "off")).status).toBe(403);
+      const off = await put(chat.admin, finops, docs.id, "off");
+      expect(off.status).toBe(200);
+      expect(
+        (await off.json()).servers.find(
+          (row: { name: string }) => row.name === "docs",
+        ),
+      ).toMatchObject({ choice: "off", side: "off" });
+      expect(await offeredIn(chat, finops)).not.toContain(
+        "mcp__docs__get_portfolio",
+      );
+      // above the ceiling, not granted, a personal project, an unknown side
+      expect((await put(chat.admin, finops, markets.id, "write")).status).toBe(
+        400,
+      );
+      expect((await put(chat.admin, research, markets.id, "read")).status).toBe(
+        404,
+      );
+      expect(
+        (await put(chat.admin, chat.projectId, docs.id, "off")).status,
+      ).toBe(404);
+      expect((await put(chat.admin, finops, docs.id, "all")).status).toBe(400);
+      expect((await put(chat.admin, finops, editor.id, "write")).status).toBe(
+        200,
+      );
+      expect(chat.app.mcp.choices(finops)?.sides.get(editor.id)).toBe("write");
+      // read is the default, held as no row
+      expect((await put(chat.admin, finops, docs.id, "read")).status).toBe(200);
+      expect(chat.app.mcp.choices(finops)?.sides.has(docs.id)).toBe(false);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("an owner sets their personal project's side, nobody reaches another's", async () => {
+    const { chat, docs, markets } = await bound();
+    try {
+      const put = (client: typeof chat.admin, serverId: string, side: string) =>
+        client.call("PUT", `/api/profile/project/mcp/${serverId}/side`, {
+          body: { side },
+        });
+      const res = await put(chat.member, docs.id, "off");
+      expect(res.status).toBe(200);
+      expect((await res.json()).servers[0]).toMatchObject({
+        name: "docs",
+        choice: "off",
+      });
+      expect(await offeredIn(chat, chat.projectId)).toEqual([]);
+      // the admin's own personal project is another one
+      expect((await put(chat.admin, docs.id, "read")).status).toBe(200);
+      expect(chat.app.mcp.choices(chat.projectId)?.sides.get(docs.id)).toBe(
+        "off",
+      );
+      // a list server is not granted to a personal project
+      expect((await put(chat.member, markets.id, "read")).status).toBe(404);
+      // until its personal grant is on, and then it reads all there
+      chat.app.mcp.setPersonal(markets.id, "read");
+      const granted = await put(chat.member, markets.id, "read");
+      expect(granted.status).toBe(200);
+      expect(
+        (await granted.json()).servers.map(
+          (s: { name: string; scope: string }) => [s.name, s.scope],
+        ),
+      ).toEqual([
+        ["docs", "all"],
+        ["markets", "all"],
+      ]);
+      // the personal grant is the ceiling
+      expect((await put(chat.member, docs.id, "write")).status).toBe(400);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("a server delete with grants and choices succeeds and cascades", async () => {
+    const { chat, finops, markets } = await bound();
+    try {
+      chat.app.mcp.setChoice(finops, markets.id, "off");
+      expect(
+        (await chat.admin.call("DELETE", `/api/mcp/${markets.id}`)).status,
+      ).toBe(204);
+      expect(chat.app.mcp.choices(finops)?.sides.size).toBe(0);
+      expect(chat.app.mcp.byId(markets.id)).toBeNull();
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("the server's GET says where it is on", async () => {
+    const { chat, finops, research, docs } = await bound();
+    try {
+      chat.app.mcp.setChoice(research, docs.id, "off");
+      const { servers } = await (
+        await chat.admin.call("GET", "/api/mcp")
+      ).json();
+      const row = servers.find((s: { name: string }) => s.name === "docs");
+      expect(row.personal).toBe("read");
+      expect(row.on).toEqual({
+        projects: [
+          { id: finops, name: "finops" },
+          { id: expect.any(String), name: "hidden" },
+        ],
+        personal: 2,
+      });
     } finally {
       await chat.app.shutdown();
     }
@@ -407,21 +569,30 @@ describe("the admin's server routes", () => {
       expect((await chat.admin.call("POST", "/api/mcp", { body })).status).toBe(
         400,
       );
+      // a key needs personal as it needs projects
       expect(
         (
           await chat.admin.call("POST", "/api/mcp", {
-            body: { ...body, projects: [chat.projectId] },
+            body: { ...body, projects: [finops] },
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await chat.admin.call("POST", "/api/mcp", {
+            body: { ...body, projects: [chat.projectId], personal: "off" },
           })
         ).status,
       ).toBe(400);
       const created = await chat.admin.call("POST", "/api/mcp", {
-        body: { ...body, projects: [finops] },
+        body: { ...body, projects: [finops], personal: "off" },
       });
       expect(created.status).toBe(201);
       const { server: made } = await created.json();
       expect(made).toMatchObject({
         scope: "projects",
         projects: [{ id: finops, name: "finops" }],
+        personal: "off",
       });
       // a key moved keeps the scope
       const moved = await chat.admin.call("PATCH", `/api/mcp/${made.id}`, {
@@ -432,12 +603,20 @@ describe("the admin's server routes", () => {
         { id: finops, name: "finops" },
       ]);
       const widened = await chat.admin.call("PATCH", `/api/mcp/${made.id}`, {
-        body: { projects: "all" },
+        body: { projects: "all", personal: "write" },
       });
       expect((await widened.json()).server).toMatchObject({
         scope: "all",
         projects: [],
+        personal: "write",
       });
+      expect(
+        (
+          await chat.admin.call("PATCH", `/api/mcp/${made.id}`, {
+            body: { personal: "some" },
+          })
+        ).status,
+      ).toBe(400);
       expect(
         (
           await chat.admin.call("PATCH", `/api/mcp/${made.id}`, {

@@ -49,11 +49,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     keyName: null,
     now: now.value,
   });
-  const agents = new AgentStore(
-    db,
-    () => [],
-    () => [],
-  );
+  const agents = new AgentStore(db, () => []);
   const coder = agents.create({
     name: "coder",
     avatar: "bot",
@@ -75,7 +71,7 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     effort: null,
     prompt: "",
     skills: [],
-    servers: [],
+    mcp: true,
     mcpMode: "auto",
     upstream: null,
     skip4Bit: false,

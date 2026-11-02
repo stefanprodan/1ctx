@@ -4,9 +4,8 @@
 import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import { query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
-import { agents, agentsError } from "../../data/agents.ts";
 import { allUsage, keys, servers, serversError } from "../../data/mcp.ts";
-import { ago, count, pluralCommas } from "../../lib/format.ts";
+import { ago, count } from "../../lib/format.ts";
 import { configMcpHref, MCP_HREF } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { byName, useListSearch } from "../../lib/search.ts";
@@ -22,7 +21,7 @@ import {
 import { Search } from "../../ui/Search.tsx";
 import { AsideLine, Split } from "../../ui/Split.tsx";
 import { KeyFilesSection, TopSection, UsageSection } from "./AdminAside.tsx";
-import { scopeCount, sidesLine, usersOf } from "./Mcp.model.ts";
+import { grantWords, sidesLine } from "./Mcp.model.ts";
 import { NewMcpServer } from "./NewMcpServer.tsx";
 import "./mcp-page.css";
 
@@ -40,14 +39,14 @@ function List() {
     shown,
     count: shownCount,
   } = useListSearch(all, (s) => [s.name, s.url, s.serverName]);
-  const error = serversError.value ?? agentsError.value;
+  const error = serversError.value;
   return (
     <Page
       steps={[zoneStep("Config")]}
       title="MCP Servers"
       split
       actions={<PageNew href={`${MCP_HREF}?new`} label="New server" />}
-      loading={(rows === null || agents.value === null) && error === null}
+      loading={rows === null && error === null}
       error={error}
     >
       <Split aside={<Aside list={all} />}>
@@ -76,7 +75,6 @@ function List() {
 }
 
 function Row({ server, now }: { server: McpServerSummary; now: number }) {
-  const users = usersOf(agents.value ?? [], server.id).length;
   const failed =
     server.refreshFailedAt !== null && server.refreshError !== null;
   return (
@@ -92,9 +90,7 @@ function Row({ server, now }: { server: McpServerSummary; now: number }) {
         bad={failed}
       />
       <RowsMeta keep under={sidesLine(server)}>
-        {`${scopeCount(server)} · ${
-          users === 0 ? "No agents" : pluralCommas(users, "agent", "agents")
-        }`}
+        {grantWords(server)}
       </RowsMeta>
     </RowsGo>
   );

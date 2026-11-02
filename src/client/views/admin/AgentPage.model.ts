@@ -7,10 +7,7 @@ import type {
   SaveAgentRequest,
 } from "../../../shared/api/agents.ts";
 import type { AgentSummary } from "../../../shared/contracts/agent.ts";
-import type {
-  AgentServer,
-  McpServerSummary,
-} from "../../../shared/contracts/mcp.ts";
+import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import {
   MAX_INSTRUCTIONS_BLOCK,
   offeredServers,
@@ -39,12 +36,12 @@ type Rows = { id: string }[] | null;
 // the route takes the whole agent: the saved one with the card's fields
 // over it. An undescribed model re-sends its stated window and tools, and
 // a model whose catalog is silent on images its stated flag, which go
-// only with the model they were stated for; a deleted skill or server
-// drops, or the server refuses its id
+// only with the model they were stated for; a deleted skill drops, or
+// the server refuses its id
 export function cardBody(
   agent: AgentSummary,
   change: Partial<SaveAgentRequest>,
-  rows: { skills: Rows; servers: Rows },
+  rows: { skills: Rows },
 ): SaveAgentRequest {
   const body: SaveAgentRequest = {
     name: agent.name,
@@ -55,7 +52,7 @@ export function cardBody(
     effort: agent.effort,
     prompt: agent.prompt,
     skills: listed(agent.skills, (id) => id, rows.skills),
-    servers: listed(agent.servers, (s) => s.serverId, rows.servers),
+    mcp: agent.mcp,
     mcpMode: agent.mcpMode,
     upstream: agent.upstream,
     skip4Bit: agent.skip4Bit,
@@ -91,14 +88,16 @@ export function lastUse(
 type Refreshed = { id: string; refreshFailedAt: number | null };
 
 export function failing(
-  agent: Pick<AgentSummary, "servers" | "skills">,
+  agent: Pick<AgentSummary, "mcp" | "skills">,
   servers: Refreshed[] | null,
   skills: Refreshed[] | null,
 ): { servers: number; skills: number } {
   const bad = (rows: Refreshed[] | null, id: string) =>
     rows?.some((r) => r.id === id && r.refreshFailedAt !== null) ?? false;
   return {
-    servers: agent.servers.filter((s) => bad(servers, s.serverId)).length,
+    servers: agent.mcp
+      ? (servers ?? []).filter((s) => bad(servers, s.id)).length
+      : 0,
     skills: agent.skills.filter((id) => bad(skills, id)).length,
   };
 }
@@ -131,6 +130,18 @@ export function deleteLine(impact: AgentImpactResponse | null): string {
     .join(" ");
 }
 
+// the MCP switch: on, the agent takes what each project chose
+export const mcpSwitchLine = (on: boolean): string =>
+  on
+    ? "Gets the MCP Servers each project turns on."
+    : "Gets no MCP tools, so its turns and runs carry no MCP schemas.";
+
+// over the read-only list: where a server is chosen, and that its
+// tokens are its own, since which servers a turn carries is the
+// project's
+export const MCP_LINE =
+  "Projects choose servers on their Settings or on the server's page. Each row's tokens are that server's cost in this agent's mode.";
+
 export const MODE_OPTIONS: { value: McpMode; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "all", label: "All schemas" },
@@ -148,17 +159,19 @@ export function isModeValue(value: string): value is McpMode {
   return (MCP_MODES as readonly string[]).includes(value);
 }
 
-export function promptPreview(
-  rows: McpServerSummary[],
-  links: AgentServer[],
-): {
+// every server on its own switches: what a project choosing each one
+// for read and write would carry
+export const widest = (rows: readonly McpServerSummary[]) =>
+  rows.map((row) => ({ serverId: row.id, side: "write" as const }));
+
+export function promptPreview(rows: McpServerSummary[]): {
   line: string;
   warnings: string[];
   text: string;
   count: number;
   from: string[];
 } {
-  const offered = offeredServers(rows, links);
+  const offered = offeredServers(rows, widest(rows));
   const snapshot = promptSnapshot(offered, () => "");
   const warnings: string[] = [];
   for (const name of snapshot.leftForInstructions) {

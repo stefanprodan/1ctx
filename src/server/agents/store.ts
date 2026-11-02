@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { AgentSummary } from "../../shared/contracts/agent.ts";
-import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type { CatalogMatch } from "../../shared/contracts/provider.ts";
 import type { Avatar, Effort, McpMode } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
@@ -33,6 +32,7 @@ type Raw = {
   effort: Effort | null;
   prompt: string;
   mcp_mode: McpMode;
+  mcp_on: number;
   upstream: string | null;
   skip_4bit: number;
   subagents: number;
@@ -42,7 +42,6 @@ type Raw = {
 const row = (
   raw: Raw,
   skills: string[],
-  servers: AgentServer[],
   defaultId: string | null,
 ): AgentRow => ({
   id: raw.id,
@@ -68,7 +67,7 @@ const row = (
   effort: raw.effort,
   prompt: raw.prompt,
   skills,
-  servers,
+  mcp: raw.mcp_on === 1,
   mcpMode: raw.mcp_mode,
   upstream: raw.upstream,
   skip4Bit: raw.skip_4bit === 1,
@@ -88,7 +87,7 @@ export type AgentFields = {
   effort: Effort | null;
   prompt: string;
   skills: string[];
-  servers: AgentServer[];
+  mcp: boolean;
   mcpMode: McpMode;
   upstream: string | null;
   skip4Bit: boolean;
@@ -103,16 +102,10 @@ export class AgentStore {
   constructor(
     private readonly db: Db,
     private readonly assigned: (agentId: string) => string[],
-    private readonly agentServers: (agentId: string) => AgentServer[],
   ) {}
 
   private row(raw: Raw, defaultId = this.defaultId()): AgentRow {
-    return row(
-      raw,
-      this.assigned(raw.id),
-      this.agentServers(raw.id),
-      defaultId,
-    );
+    return row(raw, this.assigned(raw.id), defaultId);
   }
 
   // the marked agent, else the first live one created, so deleting the
@@ -191,9 +184,9 @@ export class AgentStore {
            context_length, prompt_price, completion_price, tools, reasoning,
            thinking_required, reasoning_known, model_described, model_images,
            listed_as, output_limit, thinking, effort, prompt, mcp_mode,
-           upstream, skip_4bit, subagents, images, created_at)
+           upstream, skip_4bit, subagents, images, created_at, mcp_on)
          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-           ?, ?, ?, ?)`,
+           ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -222,6 +215,7 @@ export class AgentStore {
         fields.subagents ? 1 : 0,
         fields.images ? 1 : 0,
         fields.now,
+        fields.mcp ? 1 : 0,
       );
     return this.byId(id)!;
   }
@@ -236,7 +230,7 @@ export class AgentStore {
            reasoning_known = ?, model_described = ?, model_images = ?,
            listed_as = ?, output_limit = ?, thinking = ?,
            effort = ?, prompt = ?, mcp_mode = ?, upstream = ?, skip_4bit = ?,
-           subagents = ?, images = ?
+           subagents = ?, images = ?, mcp_on = ?
          where id = ? and deleted_at is null`,
       )
       .run(
@@ -264,6 +258,7 @@ export class AgentStore {
         fields.skip4Bit ? 1 : 0,
         fields.subagents ? 1 : 0,
         fields.images ? 1 : 0,
+        fields.mcp ? 1 : 0,
         id,
       );
     return this.byId(id);

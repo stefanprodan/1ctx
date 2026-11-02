@@ -64,7 +64,7 @@ for (const mode of ["off", "all", "listed"] as const) {
           const offered = tools.offered(
             1,
             "",
-            [],
+            false,
             "auto",
             undefined,
             disabled ? ["web"] : [],

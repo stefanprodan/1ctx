@@ -17,12 +17,10 @@ import type {
   SwitchableServer,
   SwitchableSkill,
 } from "../../shared/api/sessions.ts";
-import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import type {
   CatalogMatch,
   Endpoint,
 } from "../../shared/contracts/provider.ts";
-import { inScope, type Scoped } from "../../shared/mcp.ts";
 import { fourBitEndpoint, isFourBitTag } from "../../shared/quantization.ts";
 import { fixedThinking } from "../../shared/thinking.ts";
 import { EFFORTS, isEffort } from "../../shared/words.ts";
@@ -81,13 +79,8 @@ export type SkillsPort = {
 };
 
 export type McpPort = {
-  setAgentServers(agentId: string, rows: AgentServer[]): void;
-  switchableBy(
-    agents: { id: string; servers: AgentServer[] }[],
-    projectId: string,
-  ): Record<string, SwitchableServer[]>;
-  // every server's scope, its tools unread
-  scopes(): (Scoped & { id: string; name: string })[];
+  // the servers a send in the project is offered, with tool counts
+  switchable(projectId: string): SwitchableServer[];
 };
 
 export type CapabilitiesPort = {
@@ -257,7 +250,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         effort,
         prompt: body.prompt,
         skills: body.skills,
-        servers: body.servers,
+        mcp: body.mcp ?? before?.mcp ?? true,
         mcpMode: body.mcpMode,
         upstream: body.upstream,
         skip4Bit: body.skip4Bit,
@@ -296,7 +289,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           const created = deps.store.create({ ...values, now: deps.clock() });
           if (values.mark === true) deps.store.setDefault(created.id, true);
           deps.skills.assign(created.id, values.skills);
-          deps.mcp.setAgentServers(created.id, values.servers);
           return { result: deps.store.byId(created.id)! };
         });
         const body: AgentResponse = { agent: agent };
@@ -317,7 +309,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           if (values.mark !== null)
             deps.store.setDefault(agent.id, values.mark);
           deps.skills.assign(agent.id, values.skills);
-          deps.mcp.setAgentServers(agent.id, values.servers);
           return { result: deps.store.byId(agent.id)! };
         });
         const body: AgentResponse = { agent: updated };
@@ -354,8 +345,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       },
     },
     {
-      // retires the row, which frees its name, provider, skills and
-      // servers; its chats are archived and its automations paused
+      // retires the row, which frees its name, provider and skills; its
+      // chats are archived and its automations paused
       method: "DELETE",
       path: "/api/agents/:id",
       policy: "admin",
@@ -368,7 +359,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             throw new NotFound("no such agent");
           }
           deps.skills.assign(agent.id, []);
-          deps.mcp.setAgentServers(agent.id, []);
           deps.users.clearAgent(agent.id);
           return {
             result: undefined,
@@ -393,22 +383,11 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         const project = deps.access.project(ctx.principal!, ctx.params.id);
-        // a server out of the project's scope is in no list of the answer
-        const out = new Set(
-          deps.mcp
-            .scopes()
-            .filter((row) => !inScope(row, project.id))
-            .map((row) => row.id),
-        );
-        const agents = deps.store.list().map((agent) => ({
-          ...agent,
-          servers: agent.servers.filter((link) => !out.has(link.serverId)),
-        }));
         const body: ProjectAgentsResponse = {
-          agents,
+          agents: deps.store.list(),
           startsOn: startingOf(deps.store, deps.users, ctx.principal!.userId),
           capabilities: deps.tools.capabilities(),
-          servers: deps.mcp.switchableBy(agents, project.id),
+          servers: deps.mcp.switchable(project.id),
           skills: deps.skills.switchable(),
           credentials: deps.credentials
             .forProject(project.id)

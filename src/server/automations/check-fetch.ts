@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A check's GET and its answer (docs/automations.md, The check). It
-// reaches only what the run's tools could: a linked MCP server's own
-// URL with its bearer, else the web as curl would, signed by the
+// reaches only what the run's tools could: the own URL of an MCP server
+// the project offers, with its bearer, else the web as curl would, signed by the
 // matching project credential. No error message is kept: one may name
 // the URL's query.
 
@@ -19,7 +19,6 @@ import type {
   CheckQuiet,
 } from "../../shared/contracts/automation.ts";
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
-import type { AgentServer } from "../../shared/contracts/mcp.ts";
 import { originAllowed, type WebAccessMode } from "../../shared/web.ts";
 import { escapedForms } from "../bash/index.ts";
 import {
@@ -40,7 +39,7 @@ export const MAX_CHECK_BYTES = 4 * 1024 * 1024;
 export type CheckPorts = {
   fetch: Fetcher;
   web(): { mode: WebAccessMode; domains: string[] };
-  // the servers in scope for the run's project
+  // the servers the run's project offers, on either side
   mcpServers(
     projectId: string,
   ): { id: string; url: string; keyName: string | null }[];
@@ -60,8 +59,8 @@ export type CheckPorts = {
 export type CheckAsk = {
   url: string;
   projectId: string;
-  // the task's agent's MCP servers, and what the task turned off
-  servers: readonly AgentServer[];
+  // the task's agent's MCP switch, and what the task turned off
+  mcpOn: boolean;
   disabled: readonly string[];
   // what the answer that started the last run said
   etag: string | null;
@@ -120,16 +119,17 @@ export function reach(
   ask: CheckAsk,
 ): Signing | CheckFailure {
   const url = new URL(ask.url);
-  const linked = new Set(
-    ask.servers
-      .filter((link) => !ask.disabled.includes(mcpKey(link.serverId)))
-      .map((link) => link.serverId),
-  );
   // the web row never applies to an MCP server, as to its calls; the
   // rest of its origin is the web's, so the key never skirts its patterns
-  const server = ports
-    .mcpServers(ask.projectId)
-    .find((row) => linked.has(row.id) && underPrefix(ask.url, row.url));
+  const server = ask.mcpOn
+    ? ports
+        .mcpServers(ask.projectId)
+        .find(
+          (row) =>
+            !ask.disabled.includes(mcpKey(row.id)) &&
+            underPrefix(ask.url, row.url),
+        )
+    : undefined;
   if (server !== undefined) {
     const key = server.keyName === null ? null : ports.mcpKey(server.keyName);
     return key === null

@@ -424,8 +424,6 @@ export function preflight(
           reference("provider", "Provider", doc.spec.provider);
         for (const name of doc.spec.skills ?? [])
           reference("skills", "Skill", name);
-        for (const server of doc.spec.servers ?? [])
-          reference("servers", "McpServer", server.name);
         break;
       case "Tool":
         if (

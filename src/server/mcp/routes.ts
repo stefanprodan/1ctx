@@ -27,6 +27,7 @@ import { lastDays } from "../usage/index.ts";
 import type { DiscoveryResult } from "./discover.ts";
 import { parseCreate, parsePatch } from "./parse.ts";
 import type { RefreshCoordinator, RefreshKind } from "./refresh.ts";
+import { whereOn } from "./scope.ts";
 import type { McpServerRow, McpServerStore } from "./store.ts";
 import { summary } from "./summary.ts";
 
@@ -59,8 +60,13 @@ function gateway(error: unknown): BadGateway {
 }
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
-  const show = (row: McpServerRow) =>
-    summary(row, deps.hasSecret, deps.render, deps.teamName);
+  const showAll = (rows: McpServerRow[]) => {
+    const on = whereOn(deps.db, rows);
+    return rows.map((row) =>
+      summary(row, deps.hasSecret, deps.render, deps.teamName, on.get(row.id)),
+    );
+  };
+  const show = (row: McpServerRow) => showAll([row])[0]!;
   // in the write's transaction, so a project deleted since is refused
   const teamProjects = (projects: McpProjects) => {
     if (projects === "all") return projects;
@@ -119,7 +125,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle() {
         const body: McpResponse = {
-          servers: deps.store.list().map(show),
+          servers: showAll(deps.store.list()),
           keys: deps.keys(),
           callTimeoutMs: deps.callTimeoutMs(),
           loadedAt: deps.clock(),
@@ -153,14 +159,18 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const change = parsePatch(await jsonBody(req));
         const before = find(ctx.params.id);
-        const { projects } = change;
+        const { projects, personal } = change;
         if (projects !== undefined) teamProjects(projects);
-        // the scope with the rest, in one transaction
+        // the grants with the rest, in one transaction
         const scoped = (write: () => McpServerRow | null) =>
           transact(deps.db, () => {
             const row = write();
-            if (row === null || projects === undefined) return { result: row };
-            deps.store.setScope(row.id, teamProjects(projects));
+            if (row === null) return { result: row };
+            if (projects !== undefined) {
+              deps.store.setScope(row.id, teamProjects(projects));
+            }
+            if (personal !== undefined)
+              deps.store.setPersonal(row.id, personal);
             return { result: deps.store.byId(row.id) };
           });
         if ("url" in change || "keyName" in change) {
@@ -236,10 +246,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "admin",
       handle(_req, ctx) {
         transact(deps.db, () => {
-          const deleted = deps.store.deleteUnreferenced(ctx.params.id);
-          if (deleted === "missing") throw new NotFound("no such MCP server");
-          if (deleted === "referenced") {
-            throw new Conflict("an agent uses the MCP server");
+          if (!deps.store.delete(ctx.params.id)) {
+            throw new NotFound("no such MCP server");
           }
           deps.capabilities.forget(mcpKey(ctx.params.id));
           return { result: undefined };

@@ -51,7 +51,7 @@ const flash = {
 const defaults = {
   thinking: null,
   effort: null,
-  servers: [],
+  mcp: true,
   mcpMode: "auto",
 } as const;
 
@@ -136,34 +136,24 @@ describe("parseAgent", () => {
     expect(() => parseAgent({ ...body, effort: 1 })).toThrow();
   });
 
-  test("parses MCP servers and mode and refuses bad assignments", () => {
+  test("parses the MCP switch and mode and refuses servers", () => {
     const body = {
       ...defaults,
       name: "coder",
       providerId: "p",
       model: "m",
-      servers: [{ serverId: "s1", read: true, write: false }],
       mcpMode: "catalog",
     } as const;
-    expect(parseAgent(body)).toMatchObject({
-      servers: [{ serverId: "s1", read: true, write: false }],
-      mcpMode: "catalog",
-    });
-    expect(() =>
-      parseAgent({
-        ...body,
-        servers: [{ serverId: "s1", read: false, write: false }],
-      }),
-    ).toThrow("a server needs read");
-    expect(() =>
-      parseAgent({
-        ...body,
-        servers: [{ serverId: "s1", read: false, write: true }],
-      }),
-    ).toThrow("a server needs read");
-    expect(() =>
-      parseAgent({ ...body, servers: [...body.servers, ...body.servers] }),
-    ).toThrow("serverId must not repeat");
+    expect(parseAgent(body)).toMatchObject({ mcp: true, mcpMode: "catalog" });
+    expect(parseAgent({ ...body, mcp: false }).mcp).toBe(false);
+    const { mcp: _, ...bare } = body;
+    expect(parseAgent(bare).mcp).toBeNull();
+    expect(() => parseAgent({ ...body, mcp: "yes" })).toThrow(
+      "mcp must be true or false",
+    );
+    expect(() => parseAgent({ ...body, servers: [] })).toThrow(
+      "servers is gone",
+    );
     expect(() => parseAgent({ ...body, mcpMode: "sometimes" })).toThrow(
       "mcpMode must be all, catalog or auto",
     );
@@ -174,29 +164,8 @@ describe("parseAgent", () => {
         model: "m",
         thinking: null,
         effort: null,
-        mcpMode: "auto",
-      }),
-    ).toThrow("servers must be an array");
-    expect(() =>
-      parseAgent({
-        name: "coder",
-        providerId: "p",
-        model: "m",
-        thinking: null,
-        effort: null,
-        servers: [],
       }),
     ).toThrow("mcpMode must be all, catalog or auto");
-    expect(() =>
-      parseAgent({
-        ...body,
-        servers: Array.from({ length: 51 }, (_, index) => ({
-          serverId: `s${index}`,
-          read: true,
-          write: false,
-        })),
-      }),
-    ).toThrow("an agent may have at most 50 MCP servers");
   });
 });
 
@@ -256,7 +225,7 @@ describe("the agents", () => {
       effort: "xhigh",
       prompt: "You write Go.",
       skills: [],
-      servers: [],
+      mcp: true,
       mcpMode: "auto",
       upstream: null,
       skip4Bit: false,
@@ -342,20 +311,34 @@ describe("the agents", () => {
     expect((await plain.json()).agent.thinking).toBeNull();
   });
 
-  test("an unknown MCP server rolls the agent save back", async () => {
+  test("a body still holding servers is a 400; a new agent is on MCP", async () => {
     const { app, client, provider } = await setup();
-    const res = await client.call("POST", "/api/agents", {
-      body: {
-        ...defaults,
-        name: "coder",
-        providerId: provider.id,
-        model: flash.id,
-        servers: [{ serverId: "missing", read: true, write: false }],
-      },
+    const base = {
+      ...defaults,
+      name: "coder",
+      providerId: provider.id,
+      model: flash.id,
+    };
+    const refused = await client.call("POST", "/api/agents", {
+      body: { ...base, servers: [] },
     });
-    expect(res.status).toBe(400);
-    expect((await res.json()).error).toBe("serverId is unknown");
+    expect(refused.status).toBe(400);
+    expect((await refused.json()).error).toContain("servers is gone");
     expect(app.agents.list()).toEqual([]);
+    const { mcp: _, ...bare } = base;
+    const made = await client.call("POST", "/api/agents", { body: bare });
+    expect(made.status).toBe(201);
+    const { agent } = await made.json();
+    expect(agent.mcp).toBe(true);
+    const off = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...bare, mcp: false },
+    });
+    expect((await off.json()).agent.mcp).toBe(false);
+    // omitted on a save, it stays
+    const kept = await client.call("PATCH", `/api/agents/${agent.id}`, {
+      body: { ...bare, prompt: "Be brief." },
+    });
+    expect((await kept.json()).agent.mcp).toBe(false);
   });
 
   test("a model the catalog does not list, or a provider that is not there, is refused", async () => {
@@ -546,53 +529,12 @@ describe("the agents", () => {
     const [first, second] = await Promise.all([a, twin]);
     expect([first.status, second.status].sort()).toEqual([201, 409]);
     const { agent } = await (first.status === 201 ? first : second).json();
-    const server = app.mcp.create(
-      {
-        name: "cluster",
-        url: "http://cluster.test/mcp",
-        keyName: null,
-        read: true,
-        write: false,
-        instructionsOn: true,
-        timeoutMs: null,
-        readPatterns: ["*"],
-        writePatterns: [],
-        excludedPatterns: [],
-      },
-      {
-        serverName: "cluster",
-        serverVersion: "1",
-        protocolEra: "modern",
-        protocolVersion: "2026-07-28",
-        instructions: "",
-        fingerprint: "fingerprint",
-        checkedAt: app.now.value,
-        tools: [],
-      },
-    );
-    catalogs.forget(provider.id);
-    const vanished = client.call("POST", "/api/agents", {
-      body: {
-        ...body,
-        name: "vanished-server",
-        servers: [{ serverId: server.id, read: true, write: false }],
-      },
-    });
-    await asked(3);
-    expect(app.mcp.deleteUnreferenced(server.id)).toBe("deleted");
-    for (const g of gates) g();
-    const vanishedResponse = await vanished;
-    expect(vanishedResponse.status).toBe(400);
-    expect(await vanishedResponse.json()).toEqual({
-      error: "serverId is unknown",
-    });
-    expect(app.agents.byName("vanished-server")).toBeNull();
     // a PATCH whose agent goes while the catalog is asked
     catalogs.forget(provider.id);
     const patch = client.call("PATCH", `/api/agents/${agent.id}`, {
       body: { ...body, name: "other" },
     });
-    await asked(4);
+    await asked(3);
     expect(
       (await client.call("DELETE", `/api/agents/${agent.id}`)).status,
     ).toBe(200);
@@ -601,7 +543,7 @@ describe("the agents", () => {
     // a POST whose provider goes while the catalog is asked
     catalogs.forget(provider.id);
     const late = client.call("POST", "/api/agents", { body });
-    await asked(5);
+    await asked(4);
     expect(
       (await client.call("DELETE", `/api/providers/${provider.id}`)).status,
     ).toBe(200);

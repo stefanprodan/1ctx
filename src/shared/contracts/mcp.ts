@@ -31,12 +31,20 @@ export type McpToolSummary = {
   parametersHtml: string;
 };
 
-// where a server is offered: every project, personal ones included, or
-// only the team projects it lists, none when the list is empty
+// which team projects a server is granted to: every one, or only those
+// it lists, none when the list is empty. Never a personal project
 export type McpScope = "all" | "projects";
+
+// a side of a server: a personal grant, a project's choice, or what a
+// send in a project is given; write is read and write
+export type McpSide = "off" | "read" | "write";
 
 // a team project a server lists
 export type McpProject = { id: string; name: string };
+
+// where a server is on: the team projects by name, and how many
+// personal projects, since an admin never sees whose
+export type McpOn = { projects: McpProject[]; personal: number };
 
 export type McpServerSummary = {
   id: string;
@@ -57,6 +65,10 @@ export type McpServerSummary = {
   scope: McpScope;
   // the listed team projects in name order, empty for all
   projects: McpProject[];
+  // the most any personal project may choose
+  personal: McpSide;
+  // where a send is offered it now
+  on: McpOn;
   // what the server said about itself, "" when not given
   serverName: string;
   serverVersion: string;
@@ -72,9 +84,5 @@ export type McpServerSummary = {
   tools: McpToolSummary[];
 };
 
-// an agent's row for a server: the sides the agent may use
-export type AgentServer = {
-  serverId: string;
-  read: boolean;
-  write: boolean;
-};
+// a server as a send in a project is offered it, never off
+export type ServerSide = { serverId: string; side: "read" | "write" };

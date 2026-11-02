@@ -10,7 +10,6 @@
 import { availableParallelism } from "node:os";
 import { WAIT_GRACE_MS } from "../shared/contracts/automation.ts";
 import { ATTENTION_AT } from "../shared/contracts/decision.ts";
-import { inScope } from "../shared/mcp.ts";
 import {
   EMAIL_KEY_PREFIX,
   MCP_KEY_PREFIX,
@@ -327,7 +326,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
       calls: (server, since, until) => sessions.mcpCalls(server, since, until),
       servers: (since, until) => sessions.mcpServerCalls(since, until),
     },
-    projects: { byId: (id) => projects.store.byId(id) },
+    projects: {
+      byId: (id) => projects.store.byId(id),
+      personal: (userId) => projects.store.personal(userId),
+    },
     access: { project: (principal, id) => access.project(principal, id) },
   });
   const skills: Skills = skillsArea({
@@ -424,8 +426,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     projects: projects.store,
     tools: {
       capabilities: () => tools.capabilities(),
-      offered: (now, agentId, agentServers, mode, scope) =>
-        tools.offered(now, agentId, agentServers, mode, scope),
+      offered: (now, agentId, mcpOn, mode, scope) =>
+        tools.offered(now, agentId, mcpOn, mode, scope),
     },
     access,
     sessions: () => sessions,
@@ -606,22 +608,21 @@ export async function compose(options: ComposeOptions): Promise<App> {
           judged: session !== null && session.attention !== null,
         };
       },
-      // the names the automation's page shows: its agent's switchable servers
-      // and skills, its project's credentials and repositories
+      // the names the automation's page shows: the project's switchable
+      // servers when its agent is on MCP, its agent's skills, its
+      // project's credentials and repositories; every server not offered
+      // is hidden, so its key never reads as gone
       switchNames(agentId, projectId) {
-        const agent = agents.byId(agentId);
-        const links = agent?.servers ?? [];
-        const out = new Set(
-          mcp
-            .scopes()
-            .filter((row) => !inScope(row, projectId))
-            .map((row) => row.id),
+        const on = agents.byId(agentId)?.mcp === true;
+        const offered = new Set(
+          on ? mcp.sides(projectId).map((link) => link.serverId) : [],
         );
         return {
-          servers: mcp.switchable(links, projectId),
-          serversOut: links
-            .filter((link) => out.has(link.serverId))
-            .map((link) => link.serverId),
+          servers: on ? mcp.switchable(projectId) : [],
+          serversOut: mcp
+            .scopes()
+            .filter((row) => !offered.has(row.id))
+            .map((row) => row.id),
           skills: skills.forAgent(agentId),
           credentials: credentials.forProject(projectId),
           repos: repos.switchable(projectId),
@@ -719,8 +720,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     check: {
       fetch: fetcher,
       web: () => configuredTools.webAccess(),
-      mcpServers: (projectId) =>
-        mcp.scopes().filter((row) => inScope(row, projectId)),
+      mcpServers: (projectId) => {
+        const on = new Set(mcp.sides(projectId).map((link) => link.serverId));
+        return mcp.scopes().filter((row) => on.has(row.id));
+      },
       mcpKey: (name) => secret(MCP_KEY_PREFIX, name),
       credentials: (projectId) => credentials.forProject(projectId),
       readKey: (keyName) => credentials.readKey(keyName),

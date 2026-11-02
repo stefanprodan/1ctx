@@ -3,6 +3,7 @@
 
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import { MAX_LABELS_PER_PROJECT } from "../../shared/contracts/label.ts";
+import type { McpSide } from "../../shared/contracts/mcp.ts";
 import { sourceKind } from "../../shared/skills.ts";
 import { isWebAccessMode, type WebAccessMode } from "../../shared/web.ts";
 import {
@@ -11,10 +12,10 @@ import {
   isDescription,
   isMcpMode,
   isName,
+  isRecord,
   isRole,
   isSearchProvider,
   isSecretName,
-  isServerName,
   isSkillName,
   isUsername,
   isWire,
@@ -31,12 +32,7 @@ import {
   parseFullName,
   parseTz,
 } from "../access/index.ts";
-import {
-  MAX_SERVERS_PER_AGENT,
-  parseEffort,
-  parsePrompt,
-  parseThinking,
-} from "../agents/index.ts";
+import { parseEffort, parsePrompt, parseThinking } from "../agents/index.ts";
 import {
   parseKeyName as parseCredentialKey,
   parseHeader,
@@ -50,6 +46,7 @@ import { validPath } from "../lib/paths.ts";
 import {
   parseMcpKeyName,
   parsePatterns,
+  parseSide,
   parseTimeout,
   parseUrl,
 } from "../mcp/index.ts";
@@ -190,8 +187,12 @@ export type McpServerSpec = {
   readPatterns?: string[];
   writePatterns?: string[];
   excludedPatterns?: string[];
-  // all, or team project names
+  // all team projects, or team project names
   projects?: "all" | string[];
+  // the most a personal project may choose
+  personal?: McpSide;
+  // team projects' choices of this server; one not named is left
+  choices?: { project: string; side: McpSide }[];
 };
 
 export type AgentSpec = {
@@ -202,7 +203,8 @@ export type AgentSpec = {
   effort?: string | null;
   prompt?: string;
   skills?: string[];
-  servers?: { name: string; read: boolean; write: boolean }[];
+  // the agent's MCP switch; a new agent left without it is on
+  mcp?: boolean;
   mcpMode?: McpMode;
   // for a model its catalog does not describe, as the agents API takes
   contextLength?: number | null;
@@ -378,36 +380,33 @@ export function mcpServer(value: unknown): McpServerSpec {
     writePatterns: (v) => parsePatterns(v, "writePatterns"),
     excludedPatterns: (v) => parsePatterns(v, "excludedPatterns"),
     projects: (v) => (v === "all" ? v : names(v, isName)),
+    personal: (v) => parseSide(v, "personal"),
+    choices,
   });
 }
 
-function servers(value: unknown): NonNullable<AgentSpec["servers"]> {
-  if (!Array.isArray(value) || value.length > MAX_SERVERS_PER_AGENT) {
-    throw new BadRequest(
-      `must be an array of at most ${MAX_SERVERS_PER_AGENT} servers`,
-    );
-  }
+function choices(value: unknown): NonNullable<McpServerSpec["choices"]> {
+  if (!Array.isArray(value)) throw new BadRequest("must be an array");
   const seen = new Set<string>();
   return value.map((item, index) => {
-    const path = `spec.servers[${index}]`;
-    const b = object(item, ["name", "read", "write"], path);
-    const name = at(`${path}.name`, () =>
-      guarded(isServerName, "is invalid")(b.name),
+    const path = `spec.choices[${index}]`;
+    const b = object(item, ["project", "side"], path);
+    const project = at(`${path}.project`, () =>
+      guarded(isName, "must be a team project name")(b.project),
     );
-    if (seen.has(name)) throw new Error(`${path}.name must not repeat`);
-    seen.add(name);
-    const read = Object.hasOwn(b, "read")
-      ? at(`${path}.read`, () => boolean(b.read))
-      : true;
-    const write = Object.hasOwn(b, "write")
-      ? at(`${path}.write`, () => boolean(b.write))
-      : false;
-    if (!read) throw new Error(`${path} needs read`);
-    return { name, read, write };
+    if (seen.has(project)) throw new Error(`${path}.project must not repeat`);
+    seen.add(project);
+    const side = at(`${path}.side`, () => parseSide(b.side, "side"));
+    return { project, side };
   });
 }
 
 export function agent(value: unknown): AgentSpec {
+  if (isRecord(value) && Object.hasOwn(value, "servers")) {
+    throw new Error(
+      "spec.servers is gone: a project chooses its MCP servers now (McpServer spec.choices); an agent has spec.mcp",
+    );
+  }
   return optionalSpec<AgentSpec>(value, {
     provider: guarded(isName, "must be a provider name"),
     model: (v) => parseModel(v, null),
@@ -416,7 +415,7 @@ export function agent(value: unknown): AgentSpec {
     effort: (v) => parseEffort(v, null),
     prompt: (v) => parsePrompt(v, null),
     skills: (v) => names(v ?? [], isSkillName, MAX_SKILLS_PER_AGENT),
-    servers,
+    mcp: boolean,
     mcpMode: guarded(isMcpMode, "must be all, catalog or auto"),
     // the range is the API's to hold
     contextLength: (v) => {

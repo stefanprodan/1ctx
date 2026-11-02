@@ -23,4 +23,24 @@
     font-size: var(--text-ui);
     color: var(--fg);
   }
+  /* the row's end: the pick, one width on every row so "Read and write"
+     fits uncut, its open list's check mark included, then the More
+     menu */
+  .mcp-servers-end {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
+  }
+  .mcp-servers-pick {
+    display: grid;
+    width: 144px;
+  }
+  .mcp-servers-word {
+    padding: 0 var(--space-3);
+    font-size: var(--text-small);
+    color: var(--dim);
+    white-space: nowrap;
+  }
 }

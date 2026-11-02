@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A subagent's offer against its parent's, over fake parts: every cut
-// tool goes, the rest stays, and its MCP links are read alone.
+// tool goes, the rest stays, and its MCP offer is read only.
 
 import { describe, expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
+import type { OfferOptions } from "../../../src/server/mcp/index.ts";
 import { offered } from "../../../src/server/tools/offer.ts";
 import type { Tool } from "../../../src/server/tools/types.ts";
-import type { AgentServer } from "../../../src/shared/contracts/mcp.ts";
 
 const tool = (name: string): Tool => ({
   name,
@@ -18,7 +18,7 @@ const tool = (name: string): Tool => ({
 });
 
 function parts() {
-  const links: AgentServer[][] = [];
+  const links: [string | null, OfferOptions | undefined][] = [];
   const deps = {
     store: {
       row: () => ({
@@ -31,8 +31,8 @@ function parts() {
     },
     skills: { forAgent: () => [], body: () => null, file: () => null },
     mcp: {
-      offered: (given: AgentServer[]) => {
-        links.push(given);
+      offered: (projectId: string | null, options?: OfferOptions) => {
+        links.push([projectId, options]);
         return {
           servers: [],
           prompt: {
@@ -76,16 +76,14 @@ function parts() {
   return { deps, links };
 }
 
-const SERVERS: AgentServer[] = [{ serverId: "s1", read: true, write: true }];
-
 describe("a subagent's offer", () => {
-  test("is its parent's less every cut tool, and its links read alone", () => {
+  test("is its parent's less every cut tool, and its MCP read only", () => {
     const { deps, links } = parts();
     const main = offered(
       deps,
       0,
       "a",
-      SERVERS,
+      true,
       "auto",
       {
         projectId: "p",
@@ -109,7 +107,7 @@ describe("a subagent's offer", () => {
       deps,
       0,
       "a",
-      SERVERS,
+      true,
       "auto",
       { projectId: "p", automation: null, phase: "child" },
       [],
@@ -122,9 +120,19 @@ describe("a subagent's offer", () => {
     expect(child.subagent).toBe(true);
     expect(child.memory).toBeNull();
     expect(links).toEqual([
-      SERVERS,
-      [{ serverId: "s1", read: true, write: false }],
+      ["p", { off: new Set(), readOnly: false }],
+      ["p", { off: new Set(), readOnly: true }],
     ]);
+    // an agent off MCP asks for nothing, its child neither
+    links.length = 0;
+    for (const phase of ["main", "child"] as const) {
+      offered(deps, 0, "a", false, "auto", {
+        projectId: "p",
+        automation: null,
+        phase,
+      });
+    }
+    expect(links).toEqual([]);
   });
 
   test("marks credentials read-only, one with no read method off", () => {
@@ -132,7 +140,7 @@ describe("a subagent's offer", () => {
     const scope = { projectId: "p", automation: null } as const;
     const methods = (o: ReturnType<typeof offered>) =>
       o.credentials.map((c) => [c.name, c.methods, c.readOnly ?? false]);
-    const main = offered(deps, 0, "a", [], "auto", {
+    const main = offered(deps, 0, "a", false, "auto", {
       ...scope,
       phase: "main",
     });
@@ -141,7 +149,7 @@ describe("a subagent's offer", () => {
       ["c-w", ["POST", "PUT"], false],
       ["c-r", ["HEAD"], false],
     ]);
-    const child = offered(deps, 0, "a", [], "auto", {
+    const child = offered(deps, 0, "a", false, "auto", {
       ...scope,
       phase: "child",
     });
@@ -155,7 +163,7 @@ describe("a subagent's offer", () => {
 
   test("a main offer without the switch carries no delegate", () => {
     const { deps } = parts();
-    const main = offered(deps, 0, "a", [], "auto", {
+    const main = offered(deps, 0, "a", false, "auto", {
       projectId: "p",
       automation: null,
       phase: "main",

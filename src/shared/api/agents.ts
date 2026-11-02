@@ -5,7 +5,6 @@
 // the agent the signed-in user last picked.
 
 import type { AgentSummary } from "../contracts/agent.ts";
-import type { AgentServer } from "../contracts/mcp.ts";
 import type { Avatar, Effort, McpMode } from "../words.ts";
 
 // an agent that never ran has no entry
@@ -32,6 +31,13 @@ export type AgentImpactResponse = {
   automations: number;
   running: number;
 };
+
+// GET /api/agents/:id/mcp: every server's tokens for the agent, each on
+// its own switches and counted in the agent's wire and mode: the
+// schemas in all and auto (what the cap reads), the server's catalog
+// lines in catalog. Empty for a model that takes no tools
+export type AgentMcpResponse = { servers: { id: string; tokens: number }[] };
+
 // PUT /api/profile/agent, for any signed-in user: the composer's pick,
 // kept so their next new chat starts on it; answers the agent it will
 export type PickAgentRequest = { agentId: string };
@@ -48,9 +54,9 @@ export type SaveAgentRequest = {
   prompt: string;
   // skill ids, at most MAX_SKILLS_PER_AGENT, empty allowed
   skills: string[];
-  // the full set of servers, each with read on (write alone is refused),
-  // at most 50; an unknown id is a 400
-  servers: AgentServer[];
+  // the agent's MCP switch; absent is on for a new agent and unchanged
+  // on a save. The project chooses the servers, so servers is a 400
+  mcp?: boolean;
   mcpMode: McpMode;
   // the OpenRouter endpoint tag tried first, from the model's endpoints;
   // absent or null lets OpenRouter route. Refused on another wire

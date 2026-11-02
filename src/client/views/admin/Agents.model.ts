@@ -1,7 +1,6 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { AgentServer } from "../../../shared/contracts/mcp.ts";
 import type {
   CatalogMatch,
   Endpoint,
@@ -130,14 +129,6 @@ export function sentEffort(
 
 export function skillsCount(chosen: number, cap: number): string {
   return `${chosen} of ${cap}`;
-}
-
-export function sameServers(a: AgentServer[], b: AgentServer[]): boolean {
-  if (a.length !== b.length) return false;
-  const key = (s: AgentServer) =>
-    `${s.serverId}:${s.read ? 1 : 0}${s.write ? 1 : 0}`;
-  const bKeys = new Set(b.map(key));
-  return a.every((s) => bKeys.has(key(s)));
 }
 
 // a list that did not load keeps the picks as they are

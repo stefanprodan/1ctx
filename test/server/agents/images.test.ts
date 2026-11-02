@@ -46,7 +46,7 @@ async function setup() {
         model,
         thinking: null,
         effort: null,
-        servers: [],
+        mcp: true,
         mcpMode: "auto",
         ...extra,
       },

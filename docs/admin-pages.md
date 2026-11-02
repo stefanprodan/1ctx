@@ -35,7 +35,7 @@ reporting.
   one `saving` signal, set through `holding()`, that locks the other
   cards' Save and `SettingDelete`. Otherwise a slower answer puts back
   what a later save changed. An MCP server's cards send only their own
-  fields and share none.
+  changed fields and share none.
 - **An object's aside is kept per id.** The route reads its usage by id
   (`thenUsage()` in `app/routes.ts`) into a `usageSlot()`,
   `readSlot()` or `instanceSlot()` (`data/slot.ts`), and the view draws
@@ -87,25 +87,40 @@ reporting.
   which delete them. No admin page makes a key. The row is
   `views/keys/` (`docs/views.md`).
 - **The MCP tab's prompt preview is `promptPreview()`** over
-  `offeredServers()` and `promptSnapshot()` from `shared/mcp.ts`, the
-  bytes a send would carry. Never compute it apart.
+  `offeredServers()` and `promptSnapshot()` from `shared/mcp.ts`, every
+  server on its own switches (`widest()`): the most a send could carry.
+  Never compute it apart.
 - **Reads images is asked only where `model.images` is null,** on
   the Model card beside Context window and Tools, the same On and Off
   `Seg`, saved with its Save; a pick of another model starts it off.
   Where the catalog says yes, the model's line reads "images" as it
   reads "tools", and nothing is asked.
-- **An MCP server's Projects field is All projects or Picked
+- **An MCP server's Team projects field is All team projects or Picked
   projects** (`McpProjects.tsx`), the picks drawn as a credential's
-  (`ProjectPicks.tsx`). A new server starts at All projects, or with
-  nothing picked once a key is chosen, until the admin picks
-  (`reachForKey()`); `projectsProblem()` refuses a keyed save with
-  nothing picked, as the server does. On the page it is its own card
-  after Endpoint. The list row says `scopeCount()`; the agent's MCP tab
-  puts `scopeWords()` before a listed server's line, and its server
-  picker before every option's.
-- **An agent's MCP link is Read or Read and write.** Write alone is
-  refused by the server. "Default for new users" is sent only when
-  flipped.
+  (`ProjectPicks.tsx`). Its Personal projects field is Off, Read or
+  Read and write (`PersonalSeg`). A new server starts at All team
+  projects and Read, or with neither picked once a key is chosen, until
+  the admin picks (`reachForKey()`, `personalForKey()`);
+  `projectsProblem()` and `personalProblem()` refuse that save, as the
+  server does. On the page both sit in one Access card after Endpoint,
+  with the server's own Read and Write switches as "Most a project
+  may use": one draft, one PATCH of what changed (`accessBody()`),
+  which the server writes in one transaction. The list row says
+  `grantWords()`.
+- **A server's page says where it is on** (`server.on`): the On in
+  card lists the team projects, each linking to its admin page, and
+  the personal ones as a count. Delete's line and ask say the same
+  (`deleteLine()`, `deleteAsk()`); no agent holds a server, so Delete is
+  never disabled.
+- **An agent holds one MCP switch** (`mcp`), on for a new agent; the
+  project chooses the servers, and a save still holding `servers` is
+  refused by the server. The MCP tab is the switch, the mode, then,
+  while on, every server read only: its tools on its own switches, its
+  tokens from `GET /api/agents/:id/mcp` (`mcpTokensFor()`, read again
+  after a mode save) and where it is on as counts (`whereOnCount()`,
+  `6 teams · 8 personal` or `Nowhere`), `whereOn()`'s names on hover,
+  each row linking to the server's page. No picker and no total.
+  "Default for new users" is sent only when flipped.
 - **A choice that cannot work stays in sight, disabled with its reason
   as the tooltip.** Skip 4-bit is locked by `skip4BitLock()`, and with
   it on the 4-bit options of Preferred provider are disabled. A

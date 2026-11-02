@@ -31,7 +31,7 @@ function agent(id: string): AgentSummary {
     effort: null,
     prompt: "",
     skills: [],
-    servers: [],
+    mcp: true,
     mcpMode: "auto",
     upstream: null,
     skip4Bit: false,

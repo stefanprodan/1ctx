@@ -652,7 +652,7 @@ describe("GET /api/projects/:id/agents", () => {
         "knowledge",
         "memory",
       ],
-      servers: {},
+      servers: [],
       skills: {},
       credentials: [],
       repos: [],

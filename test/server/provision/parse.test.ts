@@ -71,9 +71,11 @@ describe("provision documents", () => {
     const docs = parse([await fixture("good")]);
     expect([...new Set(docs.map((doc) => doc.kind))]).toEqual([...KINDS]);
     expect(docs.every((doc) => doc.source === `${ROOT}/good.yaml`)).toBe(true);
-    expect(docs.find((doc) => doc.kind === "Agent")?.spec.servers).toEqual([
-      { name: "toolbox", read: true, write: false },
-    ]);
+    expect(docs.find((doc) => doc.kind === "Agent")?.spec.mcp).toBe(true);
+    expect(docs.find((doc) => doc.kind === "McpServer")?.spec).toMatchObject({
+      personal: "read",
+      choices: [{ project: "nebula", side: "off" }],
+    });
     check(docs.toReversed());
   });
 
@@ -145,8 +147,8 @@ describe("provision documents", () => {
       role: "member",
     });
     expect(parse([source("McpServer", "toolbox", {})])[0]?.spec).toEqual({});
-    const docs = parse([source("Agent", "guide", { skills: [], servers: [] })]);
-    expect(docs[0]?.spec).toEqual({ skills: [], servers: [] });
+    const docs = parse([source("Agent", "guide", { skills: [], mcp: false })]);
+    expect(docs[0]?.spec).toEqual({ skills: [], mcp: false });
   });
 
   test("normalizes present values the way the HTTP parsers do", () => {
@@ -238,11 +240,15 @@ describe("provision documents", () => {
     }
     expect(() =>
       parse([
-        source("Agent", "guide", {
-          servers: [{ name: "toolbox", extra: true }],
+        source("McpServer", "toolbox", {
+          choices: [{ project: "nebula", side: "off", extra: true }],
         }),
       ]),
-    ).toThrow("spec.servers[0].extra");
+    ).toThrow("spec.choices[0].extra");
+    // an agent holds no servers now: the line says the project chooses
+    expect(() =>
+      parse([source("Agent", "guide", { servers: [{ name: "toolbox" }] })]),
+    ).toThrow("a project chooses its MCP servers now");
   });
 
   test.each([
@@ -329,23 +335,24 @@ describe("provision documents", () => {
     ["Agent", "guide", { mcpMode: "other" }, "mcpMode"],
     ["Agent", "guide", { skills: ["bad_name"] }, "skills"],
     ["Agent", "guide", { skills: ["paper-skill", "paper-skill"] }, "skills"],
+    ["Agent", "guide", { mcp: "yes" }, "mcp"],
+    ["McpServer", "toolbox", { personal: "all" }, "personal"],
     [
-      "Agent",
-      "guide",
-      { servers: [{ name: "toolbox", read: false }] },
-      "servers",
+      "McpServer",
+      "toolbox",
+      { choices: [{ project: "nebula", side: "some" }] },
+      "choices[0].side",
     ],
     [
-      "Agent",
-      "guide",
-      { servers: [{ name: "toolbox", write: "false" }] },
-      "servers[0].write",
-    ],
-    [
-      "Agent",
-      "guide",
-      { servers: [{ name: "toolbox" }, { name: "toolbox" }] },
-      "servers[1].name",
+      "McpServer",
+      "toolbox",
+      {
+        choices: [
+          { project: "nebula", side: "off" },
+          { project: "nebula", side: "read" },
+        ],
+      },
+      "choices[1].project",
     ],
     ["Tool", "web", { provider: null }, "provider"],
     ["Tool", "web", { enabled: false }, "enabled"],
@@ -444,7 +451,9 @@ describe("provision preflight", () => {
         provider: "mock-provider",
         model: "fake-model",
         skills: ["paper-skill"],
-        servers: [{ name: "toolbox" }],
+      }),
+      source("McpServer", "toolbox", {
+        choices: [{ project: "nebula", side: "off" }],
       }),
       source("Project", "nebula", { members: ["zed-user", "admin"] }),
     ]);
@@ -459,7 +468,6 @@ describe("provision preflight", () => {
       ["User", "members"],
       ["Provider", "provider"],
       ["Skill", "skills"],
-      ["McpServer", "servers"],
     ] as const) {
       expect(() => check(docs, { ...existing, [kind]: [] })).toThrow(
         `spec.${field}`,

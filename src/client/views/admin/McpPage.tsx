@@ -5,7 +5,6 @@ import type { McpServerSummary } from "../../../shared/contracts/mcp.ts";
 import type { Params } from "../../app/params.ts";
 import { path } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
-import { agents, agentsError } from "../../data/agents.ts";
 import {
   patchServer,
   servers,
@@ -40,8 +39,7 @@ export function mcpTabOf(pathname: string): McpTab {
 export function McpPage({ params }: { params: Params }) {
   const list = servers.value;
   const server = list?.find((s) => s.name === params.name) ?? null;
-  // Used by and Delete name the agents too, so the page waits for them
-  const error = serversError.value ?? agentsError.value;
+  const error = serversError.value;
   const drafts = useRowDrafts(server, McpDrafts.of, (d, before, after) =>
     d.follow(before, after),
   );
@@ -83,7 +81,7 @@ export function McpPage({ params }: { params: Params }) {
         ) : undefined
       }
       split
-      loading={(list === null || agents.value === null) && error === null}
+      loading={list === null && error === null}
       empty={
         list !== null && server === null
           ? "No MCP Server by that name."

@@ -4,6 +4,7 @@
 // What a built-in tool is and what it is handed. The runner holds one
 // offered snapshot and calls run() with its counters and caps.
 
+import type { ServerSide } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
 import type { McpDigest } from "../../shared/mcp.ts";
 import type { WebSnapshot } from "../../shared/web.ts";
@@ -114,9 +115,9 @@ export type MemoryScope = {
   chat?: { sessionId: string; userId: string } | null;
   // the agent's Subagents switch: a main offer carries delegate
   delegate?: boolean;
-  // the agent's links were chosen by scope already, so the offer takes
-  // them as given; the directory's, which has no project
-  mcpChosen?: boolean;
+  // the servers on their sides, chosen already, so the offer takes them
+  // as given; the directory's, which has no project
+  mcpSides?: ServerSide[];
   // the send's origin; a subagent's offer has no automation of its own,
   // so it carries its parent's, and a run's children read no automations
   origin?: SessionOrigin;

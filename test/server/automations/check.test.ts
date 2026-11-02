@@ -591,9 +591,6 @@ describe("the reach of a check", () => {
           tools: [],
         },
       );
-      chat.app.mcp.setAgentServers(chat.agentId, [
-        { serverId: server.id, read: true, write: false },
-      ]);
       expect(
         (
           await chat.admin.call("PATCH", "/api/tools/web", {
@@ -612,11 +609,12 @@ describe("the reach of a check", () => {
       );
       expect(row(chat, automation.id).lastCheckResult).toBe("204");
 
-      // bound to a team project, it signs no check of another project
+      // granted to a team project alone, it signs no check of another
       const created = await chat.admin.call("POST", "/api/projects", {
         body: { name: "finops", description: "A team project." },
       });
       chat.app.mcp.setScope(server.id, [(await created.json()).project.id]);
+      chat.app.mcp.setPersonal(server.id, "off");
       makeDue(chat, automation.id);
       await fireChecked(chat, automation.id);
       expect(host.calls).toHaveLength(1);
@@ -624,9 +622,10 @@ describe("the reach of a check", () => {
         "check failed: web access is off",
       );
       chat.app.mcp.setScope(server.id, "all");
+      chat.app.mcp.setPersonal(server.id, "read");
 
-      // without the server the web row decides
-      chat.app.mcp.setAgentServers(chat.agentId, []);
+      // chosen off in the project, the web row decides
+      chat.app.mcp.setChoice(chat.projectId, server.id, "off");
       makeDue(chat, automation.id);
       await fireChecked(chat, automation.id);
       expect(host.calls).toHaveLength(1);

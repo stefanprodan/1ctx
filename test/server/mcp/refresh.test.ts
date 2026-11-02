@@ -793,7 +793,7 @@ describe("MCP refresh routes", () => {
     db.close();
   });
 
-  test("a refused delete leaves a running discovery alone", async () => {
+  test("a refused delete leaves another server's discovery alone", async () => {
     const db = memoryDb();
     const time = fakeClock();
     const started = latch();
@@ -825,12 +825,6 @@ describe("MCP refresh routes", () => {
       render: (text) => text,
     });
     const row = area.store.create(fields(), found(time.clock()));
-    db.exec("pragma foreign_keys = off");
-    db.query(
-      `insert into agent_servers (agent_id, server_id, read, write)
-       values (?, ?, 1, 0)`,
-    ).run("agent-test", row.id);
-    db.exec("pragma foreign_keys = on");
     void area.refreshSoon(row.id, "new");
     await started.opened;
     const route = area.routes.find(
@@ -840,14 +834,14 @@ describe("MCP refresh routes", () => {
       await rejection(
         Promise.resolve().then(() =>
           route.handle(
-            new Request(`https://app.test/api/mcp/${row.id}`, {
+            new Request("https://app.test/api/mcp/missing", {
               method: "DELETE",
             }),
-            routeContext(row.id),
+            routeContext("missing"),
           ),
         ),
       ),
-    ).toMatchObject({ status: 409 });
+    ).toMatchObject({ status: 404 });
     await flush();
     expect(ended).toBeFalse();
     expect(area.store.byId(row.id)).not.toBeNull();

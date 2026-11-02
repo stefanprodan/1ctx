@@ -192,7 +192,11 @@ describe("a subagent's MCP tools", () => {
           })),
         },
       );
-      seedServer(chat.app.mcp, "unused");
+      // the project chooses flux on its write side and the other off
+      const unused = seedServer(chat.app.mcp, "unused");
+      chat.app.mcp.setChoice(chat.projectId, unused.id, "off");
+      chat.app.mcp.setPersonal(server.id, "write");
+      chat.app.mcp.setChoice(chat.projectId, server.id, "write");
       const agent = chat.app.agents.byId(chat.agentId)!;
       const patched = await chat.admin.call(
         "PATCH",
@@ -205,7 +209,7 @@ describe("a subagent's MCP tools", () => {
             thinking: agent.thinking,
             effort: agent.effort,
             prompt: "",
-            servers: [{ serverId: server.id, read: true, write: true }],
+            mcp: true,
             mcpMode: "all",
             subagents: true,
           },

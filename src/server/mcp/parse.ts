@@ -3,11 +3,13 @@
 
 import type {
   CreateMcpRequest,
+  McpGrants,
   McpProjects,
   PatchMcpEndpoint,
   PatchMcpRequest,
   PatchMcpSettings,
 } from "../../shared/api/mcp.ts";
+import type { McpSide } from "../../shared/contracts/mcp.ts";
 import {
   isPattern,
   isSecretName,
@@ -33,6 +35,7 @@ const CREATE_FIELDS = [
   "writePatterns",
   "excludedPatterns",
   "projects",
+  "personal",
 ];
 const SETTINGS_FIELDS = [
   "read",
@@ -44,8 +47,8 @@ const SETTINGS_FIELDS = [
   "excludedPatterns",
 ];
 const ENDPOINT_FIELDS = ["url", "keyName"];
-// goes with either group
-const SCOPE_FIELD = "projects";
+// go with either group
+const GRANT_FIELDS = ["projects", "personal"];
 
 // a row id, as lib/ids.ts makes them
 const ID = /^[0-9a-z]{1,32}$/;
@@ -102,6 +105,13 @@ export function parseProjects(value: unknown): McpProjects {
     throw new BadRequest("projects must be all or distinct project ids");
   }
   return value as string[];
+}
+
+export function parseSide(value: unknown, name = "personal"): McpSide {
+  if (value !== "off" && value !== "read" && value !== "write") {
+    throw new BadRequest(`${name} must be off, read or write`);
+  }
+  return value;
 }
 
 // a key acting for one owner never reaches everyone by accident, nor
@@ -174,7 +184,11 @@ export function parseCreate(body: unknown): CreateMcpRequest {
   if (keyName !== null && b.projects === undefined) {
     throw new BadRequest("a server with a key needs projects");
   }
+  if (keyName !== null && b.personal === undefined) {
+    throw new BadRequest("a server with a key needs personal");
+  }
   const projects = b.projects === undefined ? "all" : parseProjects(b.projects);
+  const personal = b.personal === undefined ? "read" : parseSide(b.personal);
   keyedScope(keyName, projects);
   return {
     name: b.name,
@@ -186,11 +200,16 @@ export function parseCreate(body: unknown): CreateMcpRequest {
     timeoutMs: parseTimeout(b.timeoutMs),
     ...patterns(b),
     projects,
+    personal,
   };
 }
 
 export function parsePatch(body: unknown): PatchMcpRequest {
-  const b = fields(body, [...SETTINGS_FIELDS, ...ENDPOINT_FIELDS, SCOPE_FIELD]);
+  const b = fields(body, [
+    ...SETTINGS_FIELDS,
+    ...ENDPOINT_FIELDS,
+    ...GRANT_FIELDS,
+  ]);
   const keys = Object.keys(b);
   if (keys.length === 0) throw new BadRequest("patch must not be empty");
   const endpoint = keys.some((key) => ENDPOINT_FIELDS.includes(key));
@@ -198,8 +217,11 @@ export function parsePatch(body: unknown): PatchMcpRequest {
   if (endpoint && settings) {
     throw new BadRequest("endpoint fields must be changed alone");
   }
-  const projects = SCOPE_FIELD in b ? parseProjects(b[SCOPE_FIELD]) : undefined;
-  const scope = projects === undefined ? {} : { projects };
+  const projects = "projects" in b ? parseProjects(b.projects) : undefined;
+  const scope: McpGrants = {
+    ...(projects === undefined ? {} : { projects }),
+    ...("personal" in b ? { personal: parseSide(b.personal) } : {}),
+  };
   if (endpoint) {
     const out: PatchMcpEndpoint = { ...scope };
     if ("url" in b) out.url = parseUrl(b.url);

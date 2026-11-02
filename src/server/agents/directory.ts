@@ -4,16 +4,22 @@
 // The agents list and an agent's page for every signed-in user: what a
 // send would offer it now, and its token counts.
 
+import type { AgentMcpResponse } from "../../shared/api/agents.ts";
 import type {
   DirectoryAgentDaysResponse,
   DirectoryAgentResponse,
   DirectoryAgentsResponse,
 } from "../../shared/api/directory.ts";
-import type { McpScope } from "../../shared/contracts/mcp.ts";
+import type { McpSide, ServerSide } from "../../shared/contracts/mcp.ts";
 import type { OfferedSkill } from "../../shared/contracts/skill.ts";
-import type { Scoped } from "../../shared/mcp.ts";
+import { SIDE_RANK } from "../../shared/mcp.ts";
+import {
+  CATALOG_LEAD,
+  CATALOG_OPENINGS,
+  mcpCatalog,
+} from "../../shared/mcp-catalog.ts";
 import { firstSentence, MAX_CATALOG_LINE } from "../../shared/text.ts";
-import { WEB_TOOLS, type Wire } from "../../shared/words.ts";
+import { type ProjectKind, WEB_TOOLS, type Wire } from "../../shared/words.ts";
 import { parseName, parseNoQuery } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
@@ -52,6 +58,33 @@ function schemaTokens(servers: OfferedServer[], wire: Wire | null): number {
   return wireTokens(schemas, wire);
 }
 
+// the catalog's lead and wrapper, which a send carries once, not per server
+const CATALOG_FRAME = tokens(
+  `${CATALOG_LEAD}\n${CATALOG_OPENINGS[0]}\n\n<available_mcp_tools>\n</available_mcp_tools>`,
+);
+
+// one server's share of the agent's MCP tokens in its mode: its catalog
+// lines in catalog, else its schemas, which the auto cap reads
+function serverTokens(
+  server: OfferedServer,
+  mode: AgentRow["mcpMode"],
+  wire: Wire | null,
+): number {
+  if (mode !== "catalog") return schemaTokens([server], wire);
+  const { text } = mcpCatalog([
+    {
+      name: server.name,
+      instructions: null,
+      tools: server.tools.map((tool) => ({
+        wireName: tool.wireName,
+        description: tool.description,
+        schemaJson: tool.schemaJson,
+      })),
+    },
+  ]);
+  return text === "" ? 0 : Math.max(0, tokens(text) - CATALOG_FRAME);
+}
+
 export type SkillsListPort = {
   forAgent(agentId: string): OfferedSkill[];
   versions(
@@ -66,7 +99,7 @@ export type ToolsPort = {
   offered(
     now: number,
     agentId: string,
-    agentServers: AgentRow["servers"],
+    mcpOn: boolean,
     mode: AgentRow["mcpMode"],
     scope: {
       projectId: string | null;
@@ -74,7 +107,7 @@ export type ToolsPort = {
       phase: "main";
       chat: { sessionId: string; userId: string };
       delegate: boolean;
-      mcpChosen: true;
+      mcpSides: ServerSide[];
     },
   ): {
     tools: ChatTool[];
@@ -89,35 +122,56 @@ export type UsagePort = AgentTotalPort & {
   agentDays(agentId: string, timeZone: string): DirectoryAgentDaysResponse;
 };
 
-// what the viewer sees, for the scope of the agent's servers
+// what the viewer sees, for where the agent's servers are on
 export type DirectoryAccessPort = {
   visibleProjectIds(userId: string): string[] | null;
 };
 
 export type DirectoryMcpPort = {
-  scopes(): (Scoped & { id: string })[];
+  // per server, the side it gives in each project named
+  sidesIn(projectIds: readonly string[]): Map<string, Map<string, McpSide>>;
+  // per server, the team projects it is on, the personal count and the
+  // widest side
+  whereOn(): Map<
+    string,
+    { teams: Map<string, McpSide>; personal: number; widest: McpSide }
+  >;
 };
 
 export type DirectoryProjectsPort = {
-  byId(id: string): { name: string } | null;
+  byId(id: string): { name: string; kind: ProjectKind } | null;
 };
 
-// where a server reaches as the viewer may know it: all, or the listed
-// projects the viewer sees, every one for an admin; null leaves the
-// server out
+type Reach = { projectIds: string[]; personal: number; widest: McpSide };
+
+// where each server is on as the viewer may know it: in the projects
+// they see, every project for an admin with personal ones as a count
 function reachOf(
-  row: (Scoped & { id: string }) | undefined,
+  deps: Pick<DirectoryDeps, "access" | "mcp">,
+  userId: string,
   admin: boolean,
-  visible: ReadonlySet<string>,
-): { scope: McpScope; projectIds: string[] } | null {
-  if (row === undefined) return null;
-  if (row.scope === "all") return { scope: "all", projectIds: [] };
-  const projectIds = admin
-    ? [...row.projectIds]
-    : row.projectIds.filter((id) => visible.has(id));
-  return admin || projectIds.length > 0
-    ? { scope: "projects", projectIds }
-    : null;
+): Map<string, Reach> {
+  const out = new Map<string, Reach>();
+  if (admin) {
+    for (const [id, where] of deps.mcp.whereOn()) {
+      if (where.widest === "off") continue;
+      out.set(id, {
+        projectIds: [...where.teams.keys()],
+        personal: where.personal,
+        widest: where.widest,
+      });
+    }
+    return out;
+  }
+  const visible = deps.access.visibleProjectIds(userId) ?? [];
+  for (const [id, sides] of deps.mcp.sidesIn(visible)) {
+    let widest: McpSide = "off";
+    for (const side of sides.values()) {
+      if (SIDE_RANK[side] > SIDE_RANK[widest]) widest = side;
+    }
+    out.set(id, { projectIds: [...sides.keys()], personal: 0, widest });
+  }
+  return out;
 }
 
 export type DirectoryDeps = {
@@ -178,50 +232,41 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
       path: "/api/directory/agents/:name",
       policy: "authenticated",
       handle(_req, ctx) {
-        const found = deps.store.byName(parseName(ctx.params.name));
-        if (found === null) throw new NotFound("no such agent");
+        const agent = deps.store.byName(parseName(ctx.params.name));
+        if (agent === null) throw new NotFound("no such agent");
         const principal = ctx.principal!;
-        const visible = new Set(
-          deps.access.visibleProjectIds(principal.userId) ?? [],
+        // one set for the list, its tokens, the tools' total and the agent;
+        // an agent off MCP has none
+        const reach = agent.mcp
+          ? reachOf(deps, principal.userId, principal.role === "admin")
+          : new Map<string, Reach>();
+        const sides: ServerSide[] = [...reach].flatMap(([serverId, r]) =>
+          r.widest === "off" ? [] : [{ serverId, side: r.widest }],
         );
-        const scopes = new Map(deps.mcp.scopes().map((row) => [row.id, row]));
-        const reach = new Map(
-          found.servers.flatMap((link) => {
-            const reached = reachOf(
-              scopes.get(link.serverId),
-              principal.role === "admin",
-              visible,
-            );
-            return reached === null ? [] : [[link.serverId, reached] as const];
-          }),
-        );
-        // one set for the list, its tokens, the tools' total and the agent
-        const agent = {
-          ...found,
-          servers: found.servers.filter((link) => reach.has(link.serverId)),
-        };
+        // the viewer's own personal project reads Personal
         const names = (ids: string[]) =>
           ids
             .flatMap((id) => {
-              const name = deps.projects.byId(id)?.name;
-              return name === undefined ? [] : [name];
+              const project = deps.projects.byId(id);
+              if (project === null) return [];
+              return [project.kind === "personal" ? "Personal" : project.name];
             })
             .sort((a, b) => a.localeCompare(b));
         const offered = agent.model.tools
           ? deps.tools.offered(
               deps.clock(),
               agent.id,
-              agent.servers,
+              agent.mcp,
               agent.mcpMode,
               // a chat's send, with no chat: the schema is counted and
-              // never run; no project, the links chosen by scope above
+              // never run; no project, the sides chosen above
               {
                 projectId: null,
                 automation: null,
                 phase: "main",
                 chat: { sessionId: "", userId: "" },
                 delegate: agent.subagents,
-                mcpChosen: true,
+                mcpSides: sides,
               },
             )
           : { tools: [], search: null, mcp: [], mcpCatalog: "" };
@@ -260,8 +305,8 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
                   tools: server.tools.length,
                   checkedAt: server.checkedAt,
                   refreshFailedAt: server.refreshFailedAt,
-                  scope: reached?.scope ?? "all",
                   projects: names(reached?.projectIds ?? []),
+                  personal: reached?.personal ?? 0,
                 };
               })
               .sort(byName),
@@ -277,6 +322,38 @@ export function directoryRoutes(deps: DirectoryDeps): RouteDescriptor[] {
             // included
             tools: wireTokens(offered.tools, wire),
           },
+        };
+        return json(body);
+      },
+    },
+    {
+      // the agent's MCP tab: every server on its own switches, whichever
+      // projects choose it, so each row is the most it costs
+      method: "GET",
+      path: "/api/agents/:id/mcp",
+      policy: "admin",
+      handle(_req, ctx) {
+        const agent = deps.store.byId(ctx.params.id);
+        if (agent === null) throw new NotFound("no such agent");
+        const wire = deps.providers.byId(agent.providerId)?.wire ?? null;
+        const sides: ServerSide[] = [...deps.mcp.whereOn().keys()].map(
+          (serverId) => ({ serverId, side: "write" }),
+        );
+        const offered = agent.model.tools
+          ? deps.tools.offered(deps.clock(), agent.id, true, "all", {
+              projectId: null,
+              automation: null,
+              phase: "main",
+              chat: { sessionId: "", userId: "" },
+              delegate: false,
+              mcpSides: sides,
+            }).mcp
+          : [];
+        const body: AgentMcpResponse = {
+          servers: offered.map((server) => ({
+            id: server.id,
+            tokens: serverTokens(server, agent.mcpMode, wire),
+          })),
         };
         return json(body);
       },
