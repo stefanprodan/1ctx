@@ -8,15 +8,34 @@
 // command's.
 
 import type { Signal } from "@preact/signals";
+import type { RefObject } from "preact";
+import { useEffect, useRef } from "preact/hooks";
 import { says } from "../lib/format.ts";
 import { useSave } from "../lib/save.ts";
+import { touch } from "../lib/touch.ts";
 import { AskDelete } from "../ui/Foot.tsx";
 import { writeDraftText } from "./draft.ts";
 
-// what Enter on /clear runs: the question, never the delete
-export const askClear = (asking: Signal<boolean>) => async () => {
-  asking.value = true;
-};
+// what Enter on /clear runs: the question, never the delete, with the
+// menu put away so it never covers the question
+export const askClear =
+  (asking: Signal<boolean>, shut: Signal<boolean>) => async () => {
+    asking.value = true;
+    shut.value = true;
+  };
+
+// the question answered or put away: the cursor back in the box, since
+// the button that had focus is gone
+export function useAskFocus(
+  asking: Signal<boolean>,
+  input: RefObject<HTMLTextAreaElement | null>,
+): void {
+  const was = useRef(false);
+  useEffect(() => {
+    if (was.current && !asking.value && !touch()) input.current?.focus();
+    was.current = asking.value;
+  }, [asking.value]);
+}
 
 export function ClearAsk({
   name,

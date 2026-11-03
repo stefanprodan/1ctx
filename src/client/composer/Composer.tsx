@@ -35,7 +35,7 @@ import { Icon } from "../lib/icons.tsx";
 import { stepHighlight } from "../ui/Select.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
-import { askClear, ClearAsk } from "./ClearAsk.tsx";
+import { askClear, ClearAsk, useAskFocus } from "./ClearAsk.tsx";
 import { Commands } from "./Commands.tsx";
 import {
   type Command,
@@ -213,6 +213,7 @@ export function Composer({
     if (!touch()) input.current?.focus();
   }, [key, text, failure]);
   useEffect(grow, [text.value]);
+  useAskFocus(asking, input);
 
   // a message sent while the reply runs waits for it to end
   const ready = agent !== null && !busy && !locating.value;
@@ -291,7 +292,7 @@ export function Composer({
           onCompact,
           onRename,
           onFork,
-          onClear: channel?.onClear && askClear(asking),
+          onClear: channel?.onClear && askClear(asking, shut),
         });
         // the box keeps the word until the question is answered
         if (to.named.command.name === "clear") return;
