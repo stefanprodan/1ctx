@@ -206,10 +206,11 @@ export function Composer({
     el.style.height = "auto";
     el.style.height = `${Math.min(MAX_HEIGHT, el.scrollHeight)}px`;
   };
-  // the scope changed: the draft of the new one, and the cursor in the box
+  // another scope: its draft, the cursor, no /clear question asked elsewhere
   useEffect(() => {
     text.value = readDraft(key).text;
     failure.value = null;
+    asking.value = false;
     if (!touch()) input.current?.focus();
   }, [key, text, failure]);
   useEffect(grow, [text.value]);
