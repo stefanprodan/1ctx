@@ -57,6 +57,8 @@ export type UploadsPort = {
     restage?: { userId: string; projectId: string; messageId: string },
     messageIds?: ReadonlyMap<string, string>,
   ): string[];
+  // a cleared channel's files, in the caller's transaction
+  clearUploads(sessionId: string): void;
 };
 
 export type ImagesPort = {

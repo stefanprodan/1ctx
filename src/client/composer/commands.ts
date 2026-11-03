@@ -9,8 +9,9 @@
 // runs from the first word, and a sentence that happens to start with
 // a bare command's word is a message. /location is a message too: it
 // goes through the send, so it is never blocked and never run here.
+// /clear is a channel's alone, an admin's, and asks before it runs.
 
-export type CommandName = "compact" | "fork" | "location" | "rename";
+export type CommandName = "clear" | "compact" | "fork" | "location" | "rename";
 
 export type Command = {
   name: CommandName;
@@ -23,6 +24,11 @@ export type Command = {
 
 // by name, the order the menu shows
 export const COMMANDS: readonly Command[] = [
+  {
+    name: "clear",
+    text: "Delete every message in the channel",
+    arg: null,
+  },
   {
     name: "compact",
     text: "Free up context by summarizing the chat",
@@ -71,12 +77,14 @@ export function commandQuery(draft: string): string | null {
 
 // rename false leaves /rename out, for a chat its viewer may not retitle;
 // location false leaves /location out, where the browser cannot share it;
-// a channel, never compacted, forked or renamed, lists /location alone
+// a channel, never compacted, forked or renamed, lists /location and,
+// for an admin (clear true), /clear; a chat never lists /clear
 export function commandMatches(
   draft: string,
   rename = true,
   location = true,
   channel = false,
+  clear = false,
 ): Command[] {
   const query = commandQuery(draft);
   if (query === null) return [];
@@ -85,7 +93,9 @@ export function commandMatches(
       command.name.startsWith(query) &&
       (rename || command.name !== "rename") &&
       (location || command.name !== "location") &&
-      (!channel || command.name === "location"),
+      (channel
+        ? command.name === "location" || (clear && command.name === "clear")
+        : command.name !== "clear"),
   );
 }
 
@@ -124,6 +134,8 @@ export type CommandHandlers = {
   onRename?: (title: string) => Promise<void>;
   // /fork <name>: the chat so far, on the same agent, under the name
   onFork?: (title: string) => Promise<void>;
+  // /clear in a channel, an admin's: asks before anything is deleted
+  onClear?: () => Promise<void>;
 };
 
 // what Enter does with a command: refused with the block's reason, or
@@ -135,7 +147,13 @@ export async function runCommand(
   block: string | null,
   handlers: CommandHandlers,
 ): Promise<void> {
-  const { onCompact, onRename, onFork } = handlers;
+  const { onCompact, onRename, onFork, onClear } = handlers;
+  if (named.command.name === "clear") {
+    if (block !== null) throw new Error(`/clear: ${block}`);
+    if (onClear === undefined) throw new Error("/clear: only an admin");
+    await onClear();
+    return;
+  }
   if (block !== null || onCompact === undefined || onFork === undefined) {
     throw new Error(`/${named.command.name}: ${block ?? "not now"}`);
   }
@@ -169,6 +187,8 @@ export function commandBlock(
   command: Command,
 ): string | null {
   if (command.name === "location") return null;
+  // a running turn is the server's to refuse, since a channel runs many
+  if (command.name === "clear") return state.channel ? null : "not in a chat";
   if (state.channel) return "not in a channel";
   if (!state.started) return "the chat has not started";
   if (state.running && command.name !== "rename") return "a reply is running";

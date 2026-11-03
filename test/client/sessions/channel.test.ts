@@ -19,6 +19,7 @@ import {
   stopTurn,
 } from "../../../src/client/data/channel.ts";
 import {
+  clearedChannel,
   fillGap,
   inView,
   mergeAround,
@@ -995,4 +996,147 @@ describe("frames for rows above the pages", () => {
       expect(session.value?.messages[0]?.run?.sessionId).toBeNull();
     },
   );
+});
+
+describe("a channel an admin cleared", () => {
+  const meter = (tokens: number) => ({ tokens, budget: 100_000 });
+  const clearedFrame = (revision: number, channelContext = meter(0)) =>
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision }),
+      messages: [],
+      send: null,
+      cleared: true,
+      channelContext,
+    });
+  const pending = {
+    id: "w1",
+    messageId: "p40",
+    authorId: "u1",
+    agentId: "a1",
+    queuedAt: 1,
+    reason: null,
+  };
+
+  test("holds no row, turn, page or pending turn, and a zero meter", () => {
+    const held = page([post(30), answerOf("t30", 31)], 30, {
+      sends: [turnOf("t30", 30, { status: "running" })],
+      pending: [pending as never],
+      channelContext: meter(40_000),
+    });
+    const fresh = clearedChannel(
+      held,
+      channelSummary({ revision: 5 }),
+      undefined,
+    );
+    expect(fresh).toMatchObject({
+      session: { revision: 5 },
+      messages: [],
+      page: { before: null, after: null },
+      send: null,
+      sends: [],
+      live: [],
+      pending: [],
+      channelContext: meter(0),
+    });
+    expect(
+      clearedChannel(held, channelSummary(), meter(12)).channelContext,
+    ).toEqual(meter(12));
+    expect(
+      clearedChannel(page([], null), channelSummary(), undefined),
+    ).not.toHaveProperty("channelContext");
+  });
+
+  test.serial(
+    "starts over on the frame and reads the newest page",
+    async () => {
+      await open(
+        page([post(30), answerOf("t30", 31), post(40)], 30, {
+          sends: [turnOf("t30", 30)],
+          pending: [pending as never],
+          channelContext: meter(40_000),
+        }),
+      );
+      answer = (url) => {
+        expect(url).toBe("/api/sessions/c1?around=10");
+        return Response.json({
+          ...page([post(10)], null),
+          page: { before: null, after: 10 },
+        });
+      };
+      await showPost({ id: "p10", seq: 10 });
+      expect(channelGap.value).toEqual({ after: 10, before: 30 });
+      answer = (url) => {
+        expect(url).toBe("/api/sessions/c1");
+        return Response.json(
+          page([], null, {
+            session: channelSummary({ revision: 2 }),
+            channelContext: meter(0),
+          }),
+        );
+      };
+      clearedFrame(2);
+      expect(ids()).toEqual([]);
+      expect(session.value).toMatchObject({
+        page: { before: null, after: null },
+        sends: [],
+        pending: [],
+        channelContext: meter(0),
+      });
+      expect(channelGap.value).toBeNull();
+      expect(focusPost.value).toBeNull();
+      await settle();
+      await settle();
+      expect(asked.at(-1)?.url).toBe("/api/sessions/c1");
+      expect(ids()).toEqual([]);
+      // a frame of the clear held already changes nothing
+      clearedFrame(2, meter(5));
+      expect(session.value?.channelContext).toEqual(meter(5));
+    },
+  );
+
+  test.serial("drops an older page that answers after it", async () => {
+    await open(page([post(30), post(40)], 30));
+    let release: (body: SessionDetail) => void = () => {};
+    const answered = new Promise<SessionDetail>((done) => {
+      release = done;
+    });
+    answer = (url) =>
+      url === "/api/sessions/c1"
+        ? Response.json(
+            page([], null, { session: channelSummary({ revision: 2 }) }),
+          )
+        : answered.then((body) => Response.json(body));
+    const older = loadOlder();
+    clearedFrame(2);
+    release(page([post(10), post(20)], null));
+    await older;
+    await settle();
+    expect(ids()).toEqual([]);
+    expect(olderPage.value).toEqual({ loading: false, failure: null });
+  });
+
+  test.serial("drops a quote's window that answers after it", async () => {
+    await open(page([post(30), post(40)], 30));
+    let release: (body: SessionDetail) => void = () => {};
+    const answered = new Promise<SessionDetail>((done) => {
+      release = done;
+    });
+    answer = (url) =>
+      url === "/api/sessions/c1"
+        ? Response.json(
+            page([], null, { session: channelSummary({ revision: 2 }) }),
+          )
+        : answered.then((body) => Response.json(body));
+    const shown = showPost({ id: "p10", seq: 10 });
+    clearedFrame(2);
+    release({ ...page([post(10)], null), page: { before: null, after: 10 } });
+    await shown;
+    await settle();
+    expect(ids()).toEqual([]);
+    expect(channelGap.value).toBeNull();
+    expect(focusPost.value).toBeNull();
+  });
 });

@@ -52,7 +52,7 @@ describe("slash commands", () => {
     });
     expect(commandOf("/rename")).toEqual({ command: named("rename"), arg: "" });
     expect(commandOf("/renamed x")).toBeNull();
-    expect(commandFill(COMMANDS[0]!)).toBe("/compact");
+    expect(commandFill(named("compact"))).toBe("/compact");
     expect(commandFill(named("rename"))).toBe("/rename ");
   });
 
@@ -125,13 +125,68 @@ describe("slash commands", () => {
     const state = { started: false, running: false, channel: true };
     for (const command of COMMANDS) {
       expect(commandBlock(state, command)).toBe(
-        command.name === "location" ? null : "not in a channel",
+        command.name === "location" || command.name === "clear"
+          ? null
+          : "not in a channel",
       );
     }
     expect(commandMatches("/", true, true, true).map((c) => c.name)).toEqual([
       "location",
     ]);
     expect(commandMatches("/re", true, true, true)).toEqual([]);
+  });
+});
+
+describe("/clear", () => {
+  test("is listed in a channel for an admin alone, never in a chat", () => {
+    expect(
+      commandMatches("/", true, true, true, true).map((c) => c.name),
+    ).toEqual(["clear", "location"]);
+    expect(
+      commandMatches("/c", true, true, true, true).map((c) => c.name),
+    ).toEqual(["clear"]);
+    expect(commandMatches("/c", true, true, true, false)).toEqual([]);
+    expect(commandMatches("/cl", true, true, false, true)).toEqual([]);
+    expect(
+      commandMatches("/", true, true, false, true).map((c) => c.name),
+    ).toEqual(["compact", "fork", "location", "rename"]);
+  });
+
+  test("is blocked in a chat and never by a running turn", () => {
+    const clear = named("clear");
+    expect(commandBlock({ started: true, running: false }, clear)).toBe(
+      "not in a chat",
+    );
+    for (const running of [false, true]) {
+      expect(
+        commandBlock({ started: true, running, channel: true }, clear),
+      ).toBeNull();
+    }
+  });
+
+  test("runs its own handler, which a member has none of", async () => {
+    const calls: string[] = [];
+    const clear = commandOf("/clear")!;
+    expect(clear.command.name).toBe("clear");
+    expect(commandOf("/clear all")).toBeNull();
+    expect(dispatchOf("/clear")).toEqual({
+      kind: "command",
+      named: clear,
+      files: false,
+    });
+    // no compact or fork: a channel's composer has neither
+    await runCommand(clear, null, {
+      onClear: async () => {
+        calls.push("clear");
+      },
+    });
+    expect(calls).toEqual(["clear"]);
+    await expect(runCommand(clear, null, {})).rejects.toThrow(
+      "/clear: only an admin",
+    );
+    await expect(
+      runCommand(clear, "not in a chat", { onClear: async () => {} }),
+    ).rejects.toThrow("/clear: not in a chat");
   });
 });
 

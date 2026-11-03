@@ -35,6 +35,7 @@ import { Icon } from "../lib/icons.tsx";
 import { stepHighlight } from "../ui/Select.model.ts";
 import { Add } from "./Add.tsx";
 import { AgentPicker } from "./AgentPicker.tsx";
+import { askClear, ClearAsk } from "./ClearAsk.tsx";
 import { Commands } from "./Commands.tsx";
 import {
   type Command,
@@ -154,8 +155,13 @@ export function Composer({
   // /location's read of the position; null where the browser cannot
   // share one, which leaves the command out of the menu
   reader?: Locate | null;
-  // a project channel by name ("#finops"), and its meter when counted
-  channel?: { name: string; meter?: ChannelMeter };
+  // a project channel by name ("#finops"), its meter when counted, and
+  // /clear for an admin
+  channel?: {
+    name: string;
+    meter?: ChannelMeter;
+    onClear?: () => Promise<void>;
+  };
 }) {
   const key = draftKey(me.value?.id ?? "", scope);
   const text = useSignal(readDraft(key).text);
@@ -164,6 +170,8 @@ export function Composer({
   const files = useFiles(key, filesProjectId);
   const images = useImages(key, filesProjectId);
   const failure = useSignal<string | null>(null);
+  // /clear's question is up
+  const asking = useSignal(false);
   const placed =
     files.projectId.value === filesProjectId &&
     images.projectId.value === filesProjectId;
@@ -241,6 +249,7 @@ export function Composer({
         !started || onRename !== undefined,
         reader !== null,
         channel !== undefined,
+        channel?.onClear !== undefined,
       );
   // the @ menu, in a chat only: a new chat cannot summon
   const summonable = quiet
@@ -282,7 +291,10 @@ export function Composer({
           onCompact,
           onRename,
           onFork,
+          onClear: channel?.onClear && askClear(asking),
         });
+        // the box keeps the word until the question is answered
+        if (to.named.command.name === "clear") return;
       } else if (to.kind === "location") {
         locating.value = true;
         const message = await locate(to.question, reader).finally(() => {
@@ -347,6 +359,7 @@ export function Composer({
         onInput={(ev) => {
           text.value = ev.currentTarget.value;
           failure.value = null;
+          asking.value = false;
           shut.value = false;
           highlight.value = 0;
           files.refusal.value = null;
@@ -425,6 +438,14 @@ export function Composer({
         locked={busy}
         onRemove={(item) => images.remove(item)}
       />
+      {asking.value && channel?.onClear && (
+        <ClearAsk
+          name={channel.name}
+          asking={asking}
+          onClear={channel.onClear}
+          box={box}
+        />
+      )}
       {refusal && <p class="composer-failure error">{refusal}</p>}
       {over.value > 0 && (
         <div class="composer-drop-words">

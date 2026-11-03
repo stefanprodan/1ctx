@@ -30,6 +30,7 @@ import { automations, dismissAlert } from "../../data/automations.ts";
 import {
   cancelTurn,
   channelGap,
+  clearChannel,
   focusPost,
   loadGap,
   loadOlder,
@@ -367,6 +368,10 @@ function SessionPage({
                       ? {
                           name: channelName(shown.session.title),
                           meter: shown.channelContext,
+                          onClear:
+                            user?.role === "admin"
+                              ? () => clearChannel(shown.session.id)
+                              : undefined,
                         }
                       : undefined
                   }

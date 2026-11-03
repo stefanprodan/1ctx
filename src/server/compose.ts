@@ -652,6 +652,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     log: log("runner"),
     sessions: sessions.store,
+    clearChannel: (sessionId) => sessions.clearChannel(sessionId),
     access,
     visible: (principal, id) => sessions.visible(principal, id),
     agents: agentNames,

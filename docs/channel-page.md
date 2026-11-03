@@ -54,6 +54,12 @@ no date dividers, since each post shows its day.
   below the one held fills only what is missing, and at any revision an
   ended row or send never goes back to streaming or running
   (`mergeRows()`, `mergeSends()`).
+- **An admin's clear starts the page over** (`channelCleared()`): its
+  envelope carries `cleared`, and every tab drops its pages, window,
+  gap, unlinks, pending turns and turns, reads its meter (zero without
+  one), ends the page reads in flight so their answers are dropped, and
+  reads the newest page as a first open does. `seq` restarts at 1, so
+  nothing held may survive it.
 - **A reconnect drops older pages that still hold a running turn**: its
   end went with the lost frames, so scrolling up reads them again.
 - **A frame never adds a row outside the pages held** (`framed()`): an

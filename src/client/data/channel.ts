@@ -9,10 +9,16 @@
 
 import { signal } from "@preact/signals";
 import type { SessionResponse } from "../../shared/api/sessions.ts";
-import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
+import type {
+  ChannelMeter,
+  Message,
+  SessionDetail,
+  SessionSummary,
+} from "../../shared/contracts/session.ts";
 import { says } from "../lib/format.ts";
 import { api } from "./api.ts";
 import {
+  clearedChannel,
   fillGap,
   type Gap,
   inView,
@@ -48,17 +54,34 @@ export function channelLoaded(
   fresh: SessionDetail,
 ): SessionDetail {
   if (held === null || held.session.id !== fresh.session.id) {
-    turn++;
-    unlinked = new Set();
-    channelGap.value = null;
-    olderPage.value = { loading: false, failure: null };
-    focusPost.value = null;
+    restart();
     return fresh;
   }
   if (fresh.session.origin !== "channel") return fresh;
   const merged = mergeNewest(held, fresh, channelGap.value);
   channelGap.value = merged.gap;
   return unlink(merged.detail);
+}
+
+// the channel state as a first open leaves it; a read in flight then
+// answers for a page that moved on
+function restart(): void {
+  turn++;
+  unlinked = new Set();
+  channelGap.value = null;
+  olderPage.value = { loading: false, failure: null };
+  focusPost.value = null;
+}
+
+// an envelope of an admin's clear: the channel on screen starts over,
+// and the newest page read after it is merged over nothing
+export function channelCleared(
+  held: SessionDetail,
+  session: SessionSummary,
+  meter: ChannelMeter | undefined,
+): SessionDetail {
+  restart();
+  return clearedChannel(held, session, meter);
 }
 
 // a page's rows with the unlinks the page saw before it landed
@@ -175,6 +198,12 @@ export async function stopTurn(sessionId: string, sendId: string) {
     `/api/sessions/${encodeURIComponent(sessionId)}/sends/${encodeURIComponent(sendId)}/stop`,
     "POST",
   );
+}
+
+// every message of the channel gone; its frame resets every tab, this
+// one included
+export async function clearChannel(sessionId: string) {
+  await api(`/api/sessions/${encodeURIComponent(sessionId)}/clear`, "POST");
 }
 
 export async function cancelTurn(sessionId: string, turnId: string) {

@@ -27,7 +27,7 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { channelLoaded, framed, withSend } from "./channel.ts";
+import { channelCleared, channelLoaded, framed, withSend } from "./channel.ts";
 import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
@@ -249,6 +249,12 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     if (meter && ev.session.revision === held.session.revision) {
       session.value = { ...held, channelContext: meter };
     }
+    return;
+  }
+  if (ev.cleared === true) {
+    show(channelCleared(held, ev.session, ev.channelContext));
+    onQueueSocket(ev);
+    refetch();
     return;
   }
   const removed = new Set(ev.removedMessageIds ?? []);

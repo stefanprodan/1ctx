@@ -10,9 +10,11 @@
 // newest page keeps the older pages held; only the window goes.
 
 import type {
+  ChannelMeter,
   Message,
   SendSummary,
   SessionDetail,
+  SessionSummary,
 } from "../../shared/contracts/session.ts";
 
 // the window's last post and the block's first; the posts between are
@@ -69,6 +71,31 @@ export function withSend(
 ): Pick<SessionDetail, "sends"> {
   if (send == null || send.kind === "post") return { sends: detail.sends };
   return { sends: mergeSends(detail.sends, [send]) };
+}
+
+// a channel an admin cleared: no row, turn or page held stays, nothing
+// runs or waits, and the meter is the frame's count, else zero
+export function clearedChannel(
+  held: SessionDetail,
+  session: SessionSummary,
+  meter: ChannelMeter | undefined,
+): SessionDetail {
+  const budget = held.channelContext?.budget;
+  return {
+    ...held,
+    session,
+    messages: [],
+    page: { before: null, after: null },
+    send: null,
+    sends: [],
+    live: [],
+    pending: [],
+    ...(meter !== undefined
+      ? { channelContext: meter }
+      : budget !== undefined
+        ? { channelContext: { tokens: 0, budget } }
+        : {}),
+  };
 }
 
 // a turn's anchor: a post, or a run's posted answer, which has no user row

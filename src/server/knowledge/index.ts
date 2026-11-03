@@ -67,6 +67,8 @@ export type KnowledgeCapability = KnowledgePort & {
     messageIds?: ReadonlyMap<string, string>,
   ): string[];
   uploadsOf(sessionId: string): UploadTree;
+  // in the caller's transaction: every file of the session gone
+  clearUploads(sessionId: string): void;
   snapshot(projectId: string): { empty: boolean };
   counts(projectId: string): KnowledgeCounts;
   // the files changed last, newest first
@@ -163,6 +165,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
         messageIds,
       ),
     uploadsOf: (sessionId) => uploads.read(sessionId),
+    clearUploads: (sessionId) => uploads.clear(sessionId),
     stageUpload: (projectId, userId, req) =>
       stage(
         {
