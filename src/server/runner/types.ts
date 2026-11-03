@@ -16,6 +16,7 @@ import type { AgentRow } from "../agents/index.ts";
 import type { BashCapability } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
 import type { KnowledgeCapability } from "../knowledge/index.ts";
+import type { BusEvent } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
@@ -91,6 +92,8 @@ export type RunnerDeps = {
   attention: AttentionPort;
   // the automations area's open alert, built after the runner
   alerts: WriterDeps["alerts"];
+  // in the caller's transaction: every row of the channel deleted
+  clearChannel(sessionId: string): BusEvent[];
 };
 
 export type MessageAnswer =
@@ -130,6 +133,8 @@ export type Runner = {
   startRun(event: Event): PreparedRun;
   stop(principal: Principal, sessionId: string, sendId?: string): void;
   cancelPending(principal: Principal, sessionId: string, id: string): void;
+  // an admin's clear of a channel no turn runs in
+  clear(principal: Principal, sessionId: string): void;
   // every send on a deleted agent ends as a stop does
   stopAgent(agentId: string): void;
   // the tools area's delegate port: a subagent of the send whose

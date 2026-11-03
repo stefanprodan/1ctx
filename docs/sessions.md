@@ -114,6 +114,7 @@ arrives.
   starts no turn and has no send of its own to stop or run again.
 - **A channel is permanent within its project.** It cannot be forked, renamed,
   archived, deleted, regenerated, compacted or stopped through chat routes.
+  An admin may clear it (`docs/channel-context.md`).
 - **A channel agent keeps its own workspace.** Its `/tmp`, cwd, `/mcp`
   mount, folder counter and command queue use the channel and agent key
   across that agent's turns. `/knowledge` and `/repos` remain the

@@ -34,6 +34,9 @@ export type SessionSummary = {
   origin: SessionOrigin;
   // the first row agents still read in a channel; absent on chats and runs
   droppedSeq?: number | null;
+  // when an admin last cleared a channel, null before; a tab holding
+  // another value holds rows of a stream that is gone
+  clearedAt?: number | null;
   forkedFromId: string | null;
   // the automation a run belongs to; null for a chat, and for a run
   // whose automation was deleted

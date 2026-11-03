@@ -24,6 +24,7 @@ import {
   requiredUser,
 } from "./authors.ts";
 import { cancelPending, channelMessage, pendingFields } from "./channel.ts";
+import { clearChannel } from "./channel-clear.ts";
 import { channelMeter } from "./channel-context.ts";
 import { chatFor, sendToStop } from "./chat-guard.ts";
 import { childRowsTo, delegate } from "./child.ts";
@@ -442,6 +443,8 @@ export function runnerArea(deps: RunnerDeps): Runner {
     },
     cancelPending: (principal, sessionId, id) =>
       cancelPending(deps, principal, sessionId, id),
+    clear: (principal, sessionId) =>
+      clearChannel({ ...deps, registry }, principal, sessionId),
     stopAgent(agentId) {
       for (const send of registry.values()) {
         if (send.policy.agentId === agentId) void terminate(send, "stop");
@@ -487,6 +490,7 @@ export function runnerArea(deps: RunnerDeps): Runner {
     stop: (principal, id, sendId) => runner.stop(principal, id, sendId),
     cancelPending: (principal, id, turnId) =>
       runner.cancelPending(principal, id, turnId),
+    clear: (principal, id) => runner.clear(principal, id),
   });
   return runner;
 }

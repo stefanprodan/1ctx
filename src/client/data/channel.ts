@@ -7,23 +7,32 @@
 // stop and cancel, whose answers are empty since their frames bring
 // the change. A later load or a new channel drops what is in flight.
 
-import { signal } from "@preact/signals";
+import { effect, signal } from "@preact/signals";
 import type { SessionResponse } from "../../shared/api/sessions.ts";
-import type { Message, SessionDetail } from "../../shared/contracts/session.ts";
+import type {
+  ChannelMeter,
+  Message,
+  SessionDetail,
+  SessionSummary,
+} from "../../shared/contracts/session.ts";
 import { says } from "../lib/format.ts";
 import { api } from "./api.ts";
 import {
+  clearedChannel,
+  clearMoved,
   fillGap,
   type Gap,
   inView,
   mergeAround,
   mergeNewest,
   mergeOlder,
+  readBeforeClear,
 } from "./channel-pages.ts";
+import { me } from "./me.ts";
 import { session } from "./session-held.ts";
 import { syncValues } from "./session-values.ts";
 
-export { withSend } from "./channel-pages.ts";
+export { clearMoved, withSend } from "./channel-pages.ts";
 
 // the gap of the channel on screen, its older page in flight or why it
 // failed, and the post a quote asked the page to scroll to
@@ -40,25 +49,68 @@ let turn = 0;
 // page read before that commit never brings their link back
 let unlinked = new Set<string>();
 
+// the newest clear an envelope named per channel, so an answer read
+// before it is never shown, even when no page held the channel then
+const clears = new Map<string, number>();
+// another user's tab starts with none
+effect(() => {
+  void me.value?.id;
+  clears.clear();
+});
+
+export function noteClear(summary: SessionSummary): void {
+  const at = summary.clearedAt ?? null;
+  if (at !== null && at > (clears.get(summary.id) ?? 0)) {
+    clears.set(summary.id, at);
+  }
+}
+
+// a detail read before a clear an envelope named: its rows are gone, so
+// the load reads again
+export const answeredBeforeClear = (summary: SessionSummary): boolean =>
+  readBeforeClear(summary, clears.get(summary.id));
+
 // a detail answer: a channel's merged over the pages held when it is the
-// one on screen; any other page starts the channel state afresh, so a
-// channel's gap or failed page never reaches the next one or a chat
+// one on screen and of the same stream; any other page, a cleared one
+// included, starts the channel state afresh, so a channel's gap or
+// failed page never reaches the next one or a chat
 export function channelLoaded(
   held: SessionDetail | null,
   fresh: SessionDetail,
 ): SessionDetail {
-  if (held === null || held.session.id !== fresh.session.id) {
-    turn++;
-    unlinked = new Set();
-    channelGap.value = null;
-    olderPage.value = { loading: false, failure: null };
-    focusPost.value = null;
+  if (
+    held === null ||
+    held.session.id !== fresh.session.id ||
+    clearMoved(held.session, fresh.session)
+  ) {
+    restart();
     return fresh;
   }
   if (fresh.session.origin !== "channel") return fresh;
   const merged = mergeNewest(held, fresh, channelGap.value);
   channelGap.value = merged.gap;
   return unlink(merged.detail);
+}
+
+// the channel state as a first open leaves it; a read in flight then
+// answers for a page that moved on
+function restart(): void {
+  turn++;
+  unlinked = new Set();
+  channelGap.value = null;
+  olderPage.value = { loading: false, failure: null };
+  focusPost.value = null;
+}
+
+// an envelope from after an admin's clear: the channel on screen starts
+// over, and the newest page read after it is merged over nothing
+export function channelCleared(
+  held: SessionDetail,
+  session: SessionSummary,
+  meter: ChannelMeter | undefined,
+): SessionDetail {
+  restart();
+  return clearedChannel(held, session, meter);
 }
 
 // a page's rows with the unlinks the page saw before it landed
@@ -175,6 +227,12 @@ export async function stopTurn(sessionId: string, sendId: string) {
     `/api/sessions/${encodeURIComponent(sessionId)}/sends/${encodeURIComponent(sendId)}/stop`,
     "POST",
   );
+}
+
+// every message of the channel gone; its frame resets every tab, this
+// one included
+export async function clearChannel(sessionId: string) {
+  await api(`/api/sessions/${encodeURIComponent(sessionId)}/clear`, "POST");
 }
 
 export async function cancelTurn(sessionId: string, turnId: string) {

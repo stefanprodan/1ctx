@@ -72,7 +72,9 @@ export type SocketEvent =
   // feed row as it stands after the commit, read once per event;
   // null when the session was gone by then or the read failed, which
   // the list treats alike. messagesCut: the rows written were too large
-  // to carry, so a tab showing the chat reads its detail
+  // to carry, so a tab showing the chat reads its detail. cleared: an
+  // admin deleted every row of the channel, so the frame carries its
+  // meter; a tab starts over on the session's new clearedAt
   | {
       type: "session";
       projectId: string;
@@ -82,6 +84,7 @@ export type SocketEvent =
       send: SendSummary | null;
       last?: LastLine;
       messagesCut?: true;
+      cleared?: true;
       row: EnvelopeRow | null;
       channelContext?: ChannelMeter;
     }

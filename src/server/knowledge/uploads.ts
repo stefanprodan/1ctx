@@ -280,6 +280,20 @@ export class UploadStore {
     return { ...(row ?? empty), entries };
   }
 
+  // a cleared channel's files go with its posts; the revision moves as
+  // on any change to the tree
+  clear(sessionId: string): void {
+    this.db
+      .query("delete from session_upload_files where session_id = ?")
+      .run(sessionId);
+    this.db
+      .query(
+        `update session_uploads set revision = revision + 1, bytes = 0, files = 0
+         where session_id = ?`,
+      )
+      .run(sessionId);
+  }
+
   copy(
     sourceSessionId: string,
     targetSessionId: string,

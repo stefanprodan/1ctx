@@ -10,9 +10,11 @@
 // newest page keeps the older pages held; only the window goes.
 
 import type {
+  ChannelMeter,
   Message,
   SendSummary,
   SessionDetail,
+  SessionSummary,
 } from "../../shared/contracts/session.ts";
 
 // the window's last post and the block's first; the posts between are
@@ -69,6 +71,46 @@ export function withSend(
 ): Pick<SessionDetail, "sends"> {
   if (send == null || send.kind === "post") return { sends: detail.sends };
   return { sends: mergeSends(detail.sends, [send]) };
+}
+
+// whether a channel copy comes from another stream than the one held:
+// an admin cleared it in between, so nothing held may be merged with it
+export const clearMoved = (
+  held: SessionSummary,
+  next: SessionSummary,
+): boolean =>
+  held.origin === "channel" &&
+  (held.clearedAt ?? null) !== (next.clearedAt ?? null);
+
+// whether a detail was read before a clear an envelope already announced
+export const readBeforeClear = (
+  answer: SessionSummary,
+  seen: number | undefined,
+): boolean => seen !== undefined && (answer.clearedAt ?? 0) < seen;
+
+// a channel an admin cleared: no row, turn or page held stays, nothing
+// runs or waits, and the meter is the frame's count, else zero
+export function clearedChannel(
+  held: SessionDetail,
+  session: SessionSummary,
+  meter: ChannelMeter | undefined,
+): SessionDetail {
+  const budget = held.channelContext?.budget;
+  return {
+    ...held,
+    session,
+    messages: [],
+    page: { before: null, after: null },
+    send: null,
+    sends: [],
+    live: [],
+    pending: [],
+    ...(meter !== undefined
+      ? { channelContext: meter }
+      : budget !== undefined
+        ? { channelContext: { tokens: 0, budget } }
+        : {}),
+  };
 }
 
 // a turn's anchor: a post, or a run's posted answer, which has no user row

@@ -11,6 +11,7 @@ import { path, query } from "../../../src/client/app/router.ts";
 import {
   cancelTurn,
   channelGap,
+  channelLoaded,
   focusPost,
   loadGap,
   loadOlder,
@@ -19,11 +20,14 @@ import {
   stopTurn,
 } from "../../../src/client/data/channel.ts";
 import {
+  clearedChannel,
+  clearMoved,
   fillGap,
   inView,
   mergeAround,
   mergeNewest,
   mergeOlder,
+  readBeforeClear,
 } from "../../../src/client/data/channel-pages.ts";
 import { me } from "../../../src/client/data/me.ts";
 import { sendMessage } from "../../../src/client/data/queued.ts";
@@ -993,6 +997,278 @@ describe("frames for rows above the pages", () => {
       await older;
       expect(ids()).toEqual(["run10", "p100"]);
       expect(session.value?.messages[0]?.run?.sessionId).toBeNull();
+    },
+  );
+});
+
+describe("a channel an admin cleared", () => {
+  const meter = (tokens: number) => ({ tokens, budget: 100_000 });
+  const clearedFrame = (revision: number, channelContext = meter(0)) =>
+    onSocket({
+      type: "session",
+      row: null,
+      projectId: "p1",
+      session: channelSummary({ revision, clearedAt: 1_000 }),
+      messages: [],
+      send: null,
+      cleared: true,
+      channelContext,
+    });
+  const pending = {
+    id: "w1",
+    messageId: "p40",
+    authorId: "u1",
+    agentId: "a1",
+    queuedAt: 1,
+    reason: null,
+  };
+
+  test("holds no row, turn, page or pending turn, and a zero meter", () => {
+    const held = page([post(30), answerOf("t30", 31)], 30, {
+      sends: [turnOf("t30", 30, { status: "running" })],
+      pending: [pending as never],
+      channelContext: meter(40_000),
+    });
+    const fresh = clearedChannel(
+      held,
+      channelSummary({ revision: 5 }),
+      undefined,
+    );
+    expect(fresh).toMatchObject({
+      session: { revision: 5 },
+      messages: [],
+      page: { before: null, after: null },
+      send: null,
+      sends: [],
+      live: [],
+      pending: [],
+      channelContext: meter(0),
+    });
+    expect(
+      clearedChannel(held, channelSummary(), meter(12)).channelContext,
+    ).toEqual(meter(12));
+    expect(
+      clearedChannel(page([], null), channelSummary(), undefined),
+    ).not.toHaveProperty("channelContext");
+  });
+
+  test.serial(
+    "starts over on the frame and reads the newest page",
+    async () => {
+      await open(
+        page([post(30), answerOf("t30", 31), post(40)], 30, {
+          sends: [turnOf("t30", 30)],
+          pending: [pending as never],
+          channelContext: meter(40_000),
+        }),
+      );
+      answer = (url) => {
+        expect(url).toBe("/api/sessions/c1?around=10");
+        return Response.json({
+          ...page([post(10)], null),
+          page: { before: null, after: 10 },
+        });
+      };
+      await showPost({ id: "p10", seq: 10 });
+      expect(channelGap.value).toEqual({ after: 10, before: 30 });
+      answer = (url) => {
+        expect(url).toBe("/api/sessions/c1");
+        return Response.json(
+          page([], null, {
+            session: channelSummary({ revision: 2, clearedAt: 1_000 }),
+            channelContext: meter(0),
+          }),
+        );
+      };
+      clearedFrame(2);
+      expect(ids()).toEqual([]);
+      expect(session.value).toMatchObject({
+        page: { before: null, after: null },
+        sends: [],
+        pending: [],
+        channelContext: meter(0),
+      });
+      expect(channelGap.value).toBeNull();
+      expect(focusPost.value).toBeNull();
+      await settle();
+      await settle();
+      expect(asked.at(-1)?.url).toBe("/api/sessions/c1");
+      expect(ids()).toEqual([]);
+      // a frame of the clear held already changes nothing
+      clearedFrame(2, meter(5));
+      expect(session.value?.channelContext).toEqual(meter(5));
+    },
+  );
+
+  test.serial("drops an older page that answers after it", async () => {
+    await open(page([post(30), post(40)], 30));
+    let release: (body: SessionDetail) => void = () => {};
+    const answered = new Promise<SessionDetail>((done) => {
+      release = done;
+    });
+    answer = (url) =>
+      url === "/api/sessions/c1"
+        ? Response.json(
+            page([], null, {
+              session: channelSummary({ revision: 2, clearedAt: 1_000 }),
+            }),
+          )
+        : answered.then((body) => Response.json(body));
+    const older = loadOlder();
+    clearedFrame(2);
+    release(page([post(10), post(20)], null));
+    await older;
+    await settle();
+    expect(ids()).toEqual([]);
+    expect(olderPage.value).toEqual({ loading: false, failure: null });
+  });
+
+  test.serial("drops a quote's window that answers after it", async () => {
+    await open(page([post(30), post(40)], 30));
+    let release: (body: SessionDetail) => void = () => {};
+    const answered = new Promise<SessionDetail>((done) => {
+      release = done;
+    });
+    answer = (url) =>
+      url === "/api/sessions/c1"
+        ? Response.json(
+            page([], null, {
+              session: channelSummary({ revision: 2, clearedAt: 1_000 }),
+            }),
+          )
+        : answered.then((body) => Response.json(body));
+    const shown = showPost({ id: "p10", seq: 10 });
+    clearedFrame(2);
+    release({ ...page([post(10)], null), page: { before: null, after: 10 } });
+    await shown;
+    await settle();
+    expect(ids()).toEqual([]);
+    expect(channelGap.value).toBeNull();
+    expect(focusPost.value).toBeNull();
+  });
+});
+
+describe("a clear a tab missed", () => {
+  // the old stream's posts by id prefix, since seq restarts at 1
+  const posts = (from: number, to: number, prefix = "p") =>
+    Array.from({ length: to - from + 1 }, (_, i) => ({
+      ...post(from + i),
+      id: `${prefix}${from + i}`,
+    }));
+
+  test("a different clearedAt is another stream, an equal one is not", () => {
+    const before = channelSummary({ clearedAt: null });
+    const after = channelSummary({ clearedAt: 1_000 });
+    expect(clearMoved(before, after)).toBe(true);
+    expect(clearMoved(after, channelSummary({ clearedAt: 2_000 }))).toBe(true);
+    expect(clearMoved(after, channelSummary({ clearedAt: 1_000 }))).toBe(false);
+    expect(clearMoved(before, channelSummary())).toBe(false);
+    expect(
+      clearMoved({ ...after, origin: "chat" }, { ...before, origin: "chat" }),
+    ).toBe(false);
+    expect(readBeforeClear(before, 1_000)).toBe(true);
+    expect(readBeforeClear(after, 1_000)).toBe(false);
+    expect(readBeforeClear(before, undefined)).toBe(false);
+  });
+
+  // channelLoaded moves the gap the page holds
+  test.serial("a reload after a missed clear keeps no old row", () => {
+    channelGap.value = null;
+    // every old page held, then a clear and 40 new posts
+    const held = page(posts(1, 60, "old"), null);
+    const fresh = page(posts(21, 40), 21, {
+      session: channelSummary({ revision: 50, clearedAt: 1_000 }),
+    });
+    // the merge alone would keep the old rows under the new page
+    expect(
+      mergeNewest(held, fresh, null).detail.messages.some((m) =>
+        m.id.startsWith("old"),
+      ),
+    ).toBe(true);
+    const shown = channelLoaded(held, fresh);
+    expect(shown.messages.map((m) => m.id)).toEqual(
+      posts(21, 40).map((m) => m.id),
+    );
+    expect(shown.page?.before).toBe(21);
+  });
+
+  test.serial("a reload of the same stream merges as before", () => {
+    channelGap.value = null;
+    const at = { clearedAt: 1_000 };
+    const held = page(posts(1, 30), null, { session: channelSummary(at) });
+    const fresh = page(posts(21, 40), 21, {
+      session: channelSummary({ ...at, revision: 2 }),
+    });
+    const shown = channelLoaded(held, fresh);
+    expect(shown.messages).toHaveLength(40);
+    expect(shown.page?.before).toBeNull();
+  });
+
+  test.serial(
+    "a stream gap after a missed clear drops the old pages",
+    async () => {
+      await open(page([post(30), post(40)], 30));
+      answer = () => Response.json(page([post(10), post(20)], null));
+      await loadOlder();
+      answer = () =>
+        Response.json(
+          // the new stream's newest page, past the old posts' seqs
+          page(posts(50, 51, "n"), 50, {
+            session: channelSummary({ revision: 9, clearedAt: 1_000 }),
+          }),
+        );
+      onSocket({
+        type: "delta",
+        sessionId: "c1",
+        sendId: "t50",
+        messageId: "r51",
+        seq: 4,
+        content: "x",
+        reasoning: "",
+      } as never);
+      await settle();
+      await settle();
+      expect(ids()).toEqual(["n50", "n51"]);
+      expect(channelGap.value).toBeNull();
+    },
+  );
+
+  test.serial(
+    "a first load read before a clear's frame is read again",
+    async () => {
+      let release: (body: SessionDetail) => void = () => {};
+      const answered = new Promise<SessionDetail>((done) => {
+        release = done;
+      });
+      let reads = 0;
+      answer = () => {
+        reads++;
+        return reads === 1
+          ? answered.then((body) => Response.json(body))
+          : Response.json(
+              page([], null, {
+                session: channelSummary({ revision: 3, clearedAt: 2_000 }),
+              }),
+            );
+      };
+      const loading = loadSession("c1");
+      // the clear's frame lands while nothing is held yet
+      onSocket({
+        type: "session",
+        row: null,
+        projectId: "p1",
+        session: channelSummary({ revision: 3, clearedAt: 2_000 }),
+        messages: [],
+        send: null,
+        cleared: true,
+      });
+      release(page([post(30), post(40)], 30));
+      await loading;
+      await settle();
+      await settle();
+      expect(reads).toBe(2);
+      expect(ids()).toEqual([]);
+      expect(session.value?.session.clearedAt).toBe(2_000);
     },
   );
 });

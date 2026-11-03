@@ -33,7 +33,8 @@ export type BusEvents = {
   // one envelope per session transaction: the summary with its
   // revision, the rows written, the ids removed, the send row, and
   // the feed's last line when the transaction wrote one; messagesCut
-  // when the rows were too large to carry
+  // when the rows were too large to carry; cleared when an admin's
+  // clear deleted every row of the channel
   "session.changed": {
     projectId: string;
     session: SessionSummary;
@@ -42,6 +43,7 @@ export type BusEvents = {
     send: SendSummary | null;
     last?: LastLine;
     messagesCut?: true;
+    cleared?: true;
   };
   // a chat's queued rows changed: the rows, each text a preview, for
   // the chat's watchers alone; turn when the commit started a turn

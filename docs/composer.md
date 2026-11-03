@@ -69,11 +69,20 @@ in `docs/ui.md`.
   (`agentMoved()`).
 - **A channel's composer posts** (`channel` on `Composer`): it reads
   "Message #project", has no agent chip and no switches, its plus opens
-  the file picker, its @ menu lists every agent, its / menu only
-  `/location` (the others are refused "not in a channel"), and its meter
+  the file picker, its @ menu lists every agent, its / menu `/location`
+  and, for an admin, `/clear` (the others are refused "not in a
+  channel"; a chat never lists `/clear` and refuses it "not in a
+  chat"), and its meter
   is the detail's `channelContext` against its budget, hidden while
   absent, and follows the socket's meter updates. A
   turn's Stop is on the turn's own line, not the composer.
+- **`/clear` asks first** (`ClearAsk.tsx`): Enter opens "Delete every
+  message in #project?" under the box, and only its Delete calls `POST
+  /api/sessions/:id/clear`. Keep, Escape or a key in the box puts it
+  away. Done, the box empties unless typed in since; a refusal (the
+  server's 409 while a turn runs) shows in the failure slot. The page
+  resets on the clear's frame or the next copy with a new `clearedAt`,
+  never on the answer.
 - **A channel keeps the agent just summoned** (`nextPost()`): after a
   post whose first word named a listed agent, the box and the stored
   draft hold `@name ` for the next ask, so it survives a reload. Any

@@ -33,6 +33,7 @@ import type { DeletedRun } from "./alerts.ts";
 import { agentChats, agentRunning } from "./archive.ts";
 import { markAttention, runAnswer } from "./attention.ts";
 import { childWork, runningChildren } from "./child-work.ts";
+import { clearChannel } from "./clear.ts";
 import { detail, sessionInfo } from "./detail.ts";
 import type { DraftsPort } from "./drafts.ts";
 import { envelope } from "./envelope.ts";
@@ -178,6 +179,9 @@ export type Sessions = {
   store: SessionStore;
   createChannel(projectId: string, name: string, now: number): void;
   renameChannel(projectId: string, name: string): BusEvent[];
+  // in the caller's transaction, which found no turn running: every
+  // message and send of the channel gone, its envelope and queue frame
+  clearChannel(sessionId: string): BusEvent[];
   // the session when the principal may see its project, else the one
   // 404 access throws for the project
   visible(principal: Principal, id: string): SessionRow;
@@ -276,6 +280,18 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
       const row = store.renameChannel(projectId, name);
       return row === null ? [] : [envelope(row, [], store.lastSend(row.id))];
     },
+    clearChannel: (sessionId) =>
+      clearChannel(
+        {
+          db: deps.db,
+          store,
+          scratch: deps.scratch,
+          uploads: deps.uploads,
+          drafts: deps.drafts,
+        },
+        sessionId,
+        deps.clock(),
+      ),
     visible,
     sessionProject(principal, id) {
       try {

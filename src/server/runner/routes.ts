@@ -41,6 +41,7 @@ export type RoutesDeps = {
   compact(principal: Principal, sessionId: string): SessionDetail;
   stop(principal: Principal, sessionId: string, sendId?: string): void;
   cancelPending(principal: Principal, sessionId: string, id: string): void;
+  clear(principal: Principal, sessionId: string): void;
 };
 
 export function routes(deps: RoutesDeps): RouteDescriptor[] {
@@ -119,6 +120,16 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       policy: "authenticated",
       handle(_req, ctx) {
         return json(deps.compact(ctx.principal!, ctx.params.id));
+      },
+    },
+    {
+      // a channel's every message gone, for an admin alone
+      method: "POST",
+      path: "/api/sessions/:id/clear",
+      policy: "admin",
+      handle(_req, ctx) {
+        deps.clear(ctx.principal!, ctx.params.id);
+        return json({});
       },
     },
     {

@@ -33,7 +33,7 @@ export function sessionFrame(
     envelopeRow(id: string): EnvelopeRow | null;
   },
 ): Extract<SocketEvent, { type: "session" }> {
-  const { session, send, messages, messagesCut } = event.data;
+  const { session, send, messages, messagesCut, cleared } = event.data;
   // A failed read still sends the rows the open session needs.
   let row: EnvelopeRow | null = null;
   try {
@@ -44,12 +44,14 @@ export function sessionFrame(
       ...errorFields(err),
     });
   }
+  // a clear has no send but empties the stream the meter counts
   const meter =
     session.origin === "channel" &&
-    send !== null &&
-    (send.status !== "running" ||
-      messagesCut ||
-      messages.some((row) => row.kind === "user"))
+    (cleared === true ||
+      (send !== null &&
+        (send.status !== "running" ||
+          messagesCut ||
+          messages.some((row) => row.kind === "user"))))
       ? channelMeterOf(deps, session.id)
       : null;
   return {

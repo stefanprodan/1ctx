@@ -24,12 +24,13 @@ import type {
 import type { QueuedMessage } from "../../shared/contracts/session.ts";
 import { api } from "./api.ts";
 import { carry, changeOf } from "./capabilities.ts";
+import { clearMoved } from "./channel-pages.ts";
 import { partsOf } from "./queued-rows.ts";
 import { session } from "./session-held.ts";
 import { applyQueue } from "./session-queue.ts";
 import { sending } from "./session-start.ts";
 import { syncValues } from "./session-values.ts";
-import { take } from "./sessions.ts";
+import { loadSession, take } from "./sessions.ts";
 import { upsert } from "./sessions-rows.ts";
 
 type Seen = Pick<QueuedMessage, "id" | "revision">;
@@ -41,6 +42,11 @@ function takePost(post: ChannelPostResponse): void {
   const held = session.value;
   if (held === null || held.session.id !== post.session.id) return;
   if (post.session.revision <= held.session.revision) return;
+  // a clear this tab missed: the pages held are of a stream that is gone
+  if (clearMoved(held.session, post.session)) {
+    void loadSession(post.session.id);
+    return;
+  }
   session.value = {
     ...held,
     session: post.session,
