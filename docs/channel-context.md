@@ -127,6 +127,11 @@ Posting and parallel turns are in `docs/sessions.md`, pending turns in
   turn reads only what came after. The row, usage, runs, memory notes,
   knowledge and `session_workspaces` stay. Its envelope carries
   `cleared` and the meter, read after the delete.
+- **`cleared_at` marks each clear.** The clear sets it to the clock's
+  now, or one past the last clear when that is not later, so two clears
+  never share a mark. A channel's summary carries it as `clearedAt`,
+  null before any clear; a page compares it, never the revision, to
+  tell another stream (`docs/channel-page.md`).
 - **Detail carries `channelContext: {tokens, budget}`.** `watched` carries
   the same meter. A channel's `session` frame refreshes it on a post,
   a turn's start (which may move the mark), and a turn's end, not on work

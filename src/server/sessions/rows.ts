@@ -85,6 +85,7 @@ export type RawSession = {
   parent_session_id: string | null;
   parent_message_id: string | null;
   dropped_seq?: number | null;
+  cleared_at?: number | null;
 };
 
 export type UsagePort = {
@@ -101,7 +102,12 @@ export const session = (
   ownerId: raw.owner_id,
   agentId: raw.agent_id,
   origin: raw.origin,
-  ...(raw.origin === "channel" ? { droppedSeq: raw.dropped_seq ?? null } : {}),
+  ...(raw.origin === "channel"
+    ? {
+        droppedSeq: raw.dropped_seq ?? null,
+        clearedAt: raw.cleared_at ?? null,
+      }
+    : {}),
   automationId: raw.automation_id,
   runSource: raw.run_source,
   forkedFromId: raw.forked_from_session_id,

@@ -73,8 +73,8 @@ export type SocketEvent =
   // null when the session was gone by then or the read failed, which
   // the list treats alike. messagesCut: the rows written were too large
   // to carry, so a tab showing the chat reads its detail. cleared: an
-  // admin deleted every row of the channel, so a tab drops what it
-  // holds and reads the newest page as on a first open
+  // admin deleted every row of the channel, so the frame carries its
+  // meter; a tab starts over on the session's new clearedAt
   | {
       type: "session";
       projectId: string;

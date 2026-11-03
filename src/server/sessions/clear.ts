@@ -26,7 +26,11 @@ export type ClearDeps = {
 
 // in the caller's transaction, which has checked that no turn runs; a
 // command still held in an agent's workspace refuses it as a turn does
-export function clearChannel(deps: ClearDeps, sessionId: string): BusEvent[] {
+export function clearChannel(
+  deps: ClearDeps,
+  sessionId: string,
+  now: number,
+): BusEvent[] {
   const { db, store } = deps;
   const prefix = `${sessionId}:`;
   for (const id of deps.scratch.held()) {
@@ -46,9 +50,13 @@ export function clearChannel(deps: ClearDeps, sessionId: string): BusEvent[] {
   db.query("delete from sends where session_id = ?").run(sessionId);
   // every agent's workspace of the channel: its session_id is the channel
   deps.scratch.drop(sessionId);
-  db.query("update sessions set dropped_seq = null where id = ?").run(
-    sessionId,
-  );
+  // past the last clear even within one millisecond, so every clear is
+  // a new mark a tab can compare
+  db.query(
+    `update sessions set dropped_seq = null,
+       cleared_at = max(?, coalesce(cleared_at, 0) + 1)
+     where id = ?`,
+  ).run(now, sessionId);
   // moves the revision, and the pending list every watcher holds empties
   const queue = queueChanged(db, sessionId, { shared: true });
   const session = store.byId(sessionId);

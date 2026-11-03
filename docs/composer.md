@@ -81,7 +81,8 @@ in `docs/ui.md`.
   /api/sessions/:id/clear`. Keep, Escape or a key in the box puts it
   away. Done, the box empties unless typed in since; a refusal (the
   server's 409 while a turn runs) shows in the failure slot. The page
-  resets on the clear's frame, never on the answer.
+  resets on the clear's frame or the next copy with a new `clearedAt`,
+  never on the answer.
 - **A channel keeps the agent just summoned** (`nextPost()`): after a
   post whose first word named a listed agent, the box and the stored
   draft hold `@name ` for the next ask, so it survives a reload. Any

@@ -27,7 +27,15 @@ import {
   snapshotVisuals,
 } from "../transcript/visuals.ts";
 import { api } from "./api.ts";
-import { channelCleared, channelLoaded, framed, withSend } from "./channel.ts";
+import {
+  answeredBeforeClear,
+  channelCleared,
+  channelLoaded,
+  clearMoved,
+  framed,
+  noteClear,
+  withSend,
+} from "./channel.ts";
 import { applyEnvelope, dropRow, grantRows, revokeRows } from "./feed.ts";
 import { Held } from "./held.ts";
 import { me } from "./me.ts";
@@ -152,6 +160,7 @@ export async function loadSession(id: string): Promise<void> {
       `/api/sessions/${encodeURIComponent(id)}`,
     );
     if (wanted.turn !== turn) return;
+    if (answeredBeforeClear(detail.session)) return void loadSession(id);
     const from = detail.session.automationId;
     if (from !== null && purged.has(from)) {
       leaveRuns(from, detail.session.projectId, true);
@@ -236,6 +245,7 @@ export async function deleteSession(
 
 function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
   applyEnvelope(ev);
+  noteClear(ev.session);
   const held = session.value;
   if (held === null || held.session.id !== ev.session.id) {
     // a held chat that moved is loaded again when it is opened
@@ -251,7 +261,7 @@ function onEnvelope(ev: Extract<SocketEvent, { type: "session" }>): void {
     }
     return;
   }
-  if (ev.cleared === true) {
+  if (clearMoved(held.session, ev.session)) {
     show(channelCleared(held, ev.session, ev.channelContext));
     onQueueSocket(ev);
     refetch();

@@ -254,7 +254,9 @@ describe("an admin's clear of a channel", () => {
           title: before.title,
           projectId: project.id,
           droppedSeq: null,
+          clearedAt: chat.app.now.value,
         });
+        expect(before.clearedAt).toBeNull();
         expect(after.revision).toBeGreaterThan(before.revision);
         // what stays: usage, the run, another chat
         expect(count(setup, "usage")).toBe(usage);
@@ -336,6 +338,16 @@ describe("an admin's clear of a channel", () => {
       expect(count(setup, "messages")).toBeGreaterThan(0);
       expect((await clear(setup)).status).toBe(200);
       expect(count(setup, "messages")).toBe(0);
+      // a second clear in the same millisecond is still a new mark
+      const first = chat.app.sessions.byId(setup.channelId)!.clearedAt!;
+      expect(first).toBe(chat.app.now.value);
+      expect((await clear(setup)).status).toBe(200);
+      expect(chat.app.sessions.byId(setup.channelId)?.clearedAt).toBe(
+        first + 1,
+      );
+      expect(chat.app.sessions.byId(kept.sessionId)).not.toHaveProperty(
+        "clearedAt",
+      );
     } finally {
       await chat.app.shutdown();
     }

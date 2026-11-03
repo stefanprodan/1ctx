@@ -96,6 +96,7 @@ const EXPECTED_IDS = [
   "0081-agent-images",
   "0082-mcp-projects",
   "0083-mcp-access",
+  "0084-channel-clear",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -126,6 +127,7 @@ const LATER_COLUMNS = [
   "model_images",
   "images",
   "mcp_on",
+  "cleared_at",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -3475,6 +3477,7 @@ describe("the schema", () => {
               model_images: ________________,
               images: _________________,
               mcp_on: __________________,
+              cleared_at: ___________________,
               ...rest
             }) => rest,
           ),
@@ -4193,8 +4196,9 @@ describe("0009 mcp migration", () => {
         values ('a9', 'agent9', 'p9', 'm', 'M', 0);
     `);
     // 0083 drops agent_servers, so this stops before it
+    const before0083 = expectedFrom("0009-mcp");
     expect(migrate(db, MIGRATIONS.slice(0, 82))).toEqual(
-      expectedFrom("0009-mcp").slice(0, -1),
+      before0083.slice(0, before0083.indexOf("0083-mcp-access")),
     );
     expect(
       db.query("select mcp_mode from agents where id = 'a9'").get(),
@@ -4600,6 +4604,7 @@ describe("project channel migrations", () => {
       "0081-agent-images",
       "0082-mcp-projects",
       "0083-mcp-access",
+      "0084-channel-clear",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4820,6 +4825,7 @@ describe("project channel migrations", () => {
           "0081-agent-images",
           "0082-mcp-projects",
           "0083-mcp-access",
+          "0084-channel-clear",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4989,6 +4995,7 @@ describe("project channel migrations", () => {
         "0081-agent-images",
         "0082-mcp-projects",
         "0083-mcp-access",
+        "0084-channel-clear",
       ]);
       expect(
         db

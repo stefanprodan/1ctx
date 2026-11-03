@@ -73,6 +73,21 @@ export function withSend(
   return { sends: mergeSends(detail.sends, [send]) };
 }
 
+// whether a channel copy comes from another stream than the one held:
+// an admin cleared it in between, so nothing held may be merged with it
+export const clearMoved = (
+  held: SessionSummary,
+  next: SessionSummary,
+): boolean =>
+  held.origin === "channel" &&
+  (held.clearedAt ?? null) !== (next.clearedAt ?? null);
+
+// whether a detail was read before a clear an envelope already announced
+export const readBeforeClear = (
+  answer: SessionSummary,
+  seen: number | undefined,
+): boolean => seen !== undefined && (answer.clearedAt ?? 0) < seen;
+
 // a channel an admin cleared: no row, turn or page held stays, nothing
 // runs or waits, and the meter is the frame's count, else zero
 export function clearedChannel(

@@ -290,6 +290,7 @@ export function sessionsArea(deps: SessionsDeps): Sessions {
           drafts: deps.drafts,
         },
         sessionId,
+        deps.clock(),
       ),
     visible,
     sessionProject(principal, id) {
