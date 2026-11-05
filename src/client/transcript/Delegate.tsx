@@ -73,9 +73,11 @@ export function Delegate({
   const files = answered ? filesPart(shown.text) : "";
   return (
     <details
-      class={`transcript-fold${status === "running" ? " transcript-fold-live" : ""}${
-        open ? " transcript-fold-open" : ""
-      }`}
+      class={`transcript-fold${
+        status === "running" || status === "queued"
+          ? " transcript-fold-live"
+          : ""
+      }${open ? " transcript-fold-open" : ""}`}
       data-call={node.call.id}
       open={open}
       onToggle={onToggle}

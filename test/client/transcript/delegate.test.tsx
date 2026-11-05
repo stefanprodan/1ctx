@@ -210,9 +210,26 @@ describe("a delegate group", () => {
       }),
     ).toBe(true);
     expect(childStatus(delegate, null)).toBe("done");
-    expect(childStatus({ ...delegate, status: "streaming" }, work())).toBe(
+    // waiting for a place: no child session yet
+    expect(
+      childStatus(
+        { ...delegate, status: "streaming", childSessionId: undefined },
+        null,
+      ),
+    ).toBe("queued");
+    expect(childStatus({ ...delegate, status: "streaming" }, null)).toBe(
       "running",
     );
+    // ended while its siblings still run: the row streams on
+    expect(childStatus({ ...delegate, status: "streaming" }, work())).toBe(
+      "done",
+    );
+    expect(
+      childStatus(
+        { ...delegate, status: "streaming" },
+        work({ status: "running" }),
+      ),
+    ).toBe("running");
     // a stopped child is a failed result to its parent
     expect(
       childStatus(
@@ -234,6 +251,29 @@ describe("a delegate group", () => {
   test("the fold counts the root's calls, the delegate one of them", () => {
     const node = replyOf(rootRows()).work!;
     expect(workSummary(node, false).toolCalls).toBe(1);
+  });
+
+  test("the running fold says how many subagents run of those started", () => {
+    const rows = rootRows("streaming");
+    const other = {
+      ...rows[2]!,
+      id: "delegate-2",
+      seq: 4,
+      toolCallId: "d2",
+      childSessionId: undefined,
+    };
+    const node = replyOf([...rows, other]).work!;
+    // one running, one waiting for a place
+    const running = (id: string) =>
+      id === "delegate-1" ? work({ status: "running" }) : null;
+    expect(workSummary(node, true, 0, null, running).text).toMatch(
+      / · subagents 1\/2$/,
+    );
+    // one ended while its sibling's row still streams
+    const ended = (id: string) => (id === "delegate-1" ? work() : null);
+    expect(workSummary(node, true, 0, null, ended).text).toMatch(
+      / · subagents 0\/2$/,
+    );
   });
 
   test.serial("draws the child's rows with the fold's own rows", () => {

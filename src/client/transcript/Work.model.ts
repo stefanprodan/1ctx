@@ -1,15 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The fold's label. While the send runs, a clock and the calls
-// finished so far as a sign of progress; once done, how long the work
+// The fold's label. While the send runs, a clock, the calls finished
+// so far and the subagents running of those started, as a sign of
+// progress; once done, how long the work
 // took, the calls, the failures and whether a cap ended the loop.
 
 import type {
+  ChildWork,
   LiveRetry,
   Message,
   SessionSummary,
 } from "../../shared/contracts/session.ts";
+import { childStatus } from "./Delegate.model.ts";
 import type { WorkNode } from "./rows.ts";
 import { clock, retrying, secs } from "./stream.ts";
 
@@ -46,11 +49,34 @@ export function capWord(rows: Message[]): string | null {
   return repeat ? "repeat refused" : null;
 }
 
+// a delegate call that made a child or may still, and how many of
+// them run now: one waiting for a place or ended is not running
+export function subagents(
+  rows: Message[],
+  childOf: (rowId: string) => ChildWork | null,
+): { running: number; started: number } {
+  let running = 0;
+  let started = 0;
+  for (const row of rows) {
+    if (row.kind !== "tool" || row.toolName !== "delegate") continue;
+    const work = childOf(row.id);
+    const made =
+      work !== null ||
+      row.childSessionId !== undefined ||
+      row.status === "streaming";
+    if (!made) continue;
+    started++;
+    if (childStatus(row, work) === "running") running++;
+  }
+  return { running, started };
+}
+
 export function workSummary(
   node: WorkNode,
   live: boolean,
   now = 0,
   retry: LiveRetry | null = null,
+  childOf: (rowId: string) => ChildWork | null = () => null,
 ): WorkSummary {
   const tools = node.rows.filter(isTool);
   const finished = tools.filter(
@@ -93,6 +119,10 @@ export function workSummary(
     // the clock runs so a long send is seen to move
     text = `Working ${clock(durationMs)}`;
     if (finished > 0) text += ` · ${count(finished)}`;
+    const children = subagents(tools, childOf);
+    if (children.started > 0) {
+      text += ` · subagents ${children.running}/${children.started}`;
+    }
     text += retrying(retry);
   } else {
     text = `Worked for ${secs(durationMs)}`;
