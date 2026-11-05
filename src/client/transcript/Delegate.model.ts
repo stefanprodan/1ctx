@@ -12,7 +12,7 @@ import { tokensText } from "../lib/format.ts";
 import { type CallNode, type WorkRound, workRounds } from "./rows.ts";
 import { ranCall } from "./Tool.model.ts";
 
-export type ChildStatus = "running" | "done" | "failed" | "stopped";
+export type ChildStatus = "queued" | "running" | "done" | "failed" | "stopped";
 
 // a delegate call that made a child, or may still: one refused before
 // its child began (spent, stopped, out of time) or never run is an
@@ -52,11 +52,17 @@ export function taskOf(node: CallNode): string {
   return typeof value === "string" ? value : "";
 }
 
-// running while the parent's row runs; then the child's own end, since
-// a stopped or timed out child is a failed result to its parent
+// the child's own end first, since the parent's row runs until every
+// call of its round settles, and a stopped or timed out child is a
+// failed result to its parent; while the row runs, queued with no
+// session yet (waiting for a place), else running
 export function childStatus(row: Message, work: ChildWork | null): ChildStatus {
-  if (row.status === "streaming") return "running";
   if (work !== null && work.status !== "running") return work.status;
+  if (row.status === "streaming") {
+    return work === null && row.childSessionId === undefined
+      ? "queued"
+      : "running";
+  }
   return row.status === "done" || row.status === "stopped"
     ? row.status
     : "failed";

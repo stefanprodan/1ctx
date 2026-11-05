@@ -210,9 +210,26 @@ describe("a delegate group", () => {
       }),
     ).toBe(true);
     expect(childStatus(delegate, null)).toBe("done");
-    expect(childStatus({ ...delegate, status: "streaming" }, work())).toBe(
+    // waiting for a place: no child session yet
+    expect(
+      childStatus(
+        { ...delegate, status: "streaming", childSessionId: undefined },
+        null,
+      ),
+    ).toBe("queued");
+    expect(childStatus({ ...delegate, status: "streaming" }, null)).toBe(
       "running",
     );
+    // ended while its siblings still run: the row streams on
+    expect(childStatus({ ...delegate, status: "streaming" }, work())).toBe(
+      "done",
+    );
+    expect(
+      childStatus(
+        { ...delegate, status: "streaming" },
+        work({ status: "running" }),
+      ),
+    ).toBe("running");
     // a stopped child is a failed result to its parent
     expect(
       childStatus(

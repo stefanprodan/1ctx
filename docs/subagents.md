@@ -194,8 +194,10 @@ is its root.
   route takes a child's row.
 - **A `delegate` call is a group in the work fold** (`Delegate.tsx`),
   shut until opened like a call. Its head is the description, then the
-  status (running while the root's row runs, then the child's own:
-  done, failed or stopped) and the child's context, never a price: the
+  status (queued while no child session is held, since it waits for a
+  place, then running, then the child's own end: done, failed or
+  stopped, as soon as a frame brings it, since the root's row runs
+  until every call of its round settles) and the child's context, never a price: the
   root's reply line counts no child send. With none of the child's rows
   held, the status is the root's row's (done, stopped, else failed) and
   no tokens show until the group is opened or a watch brings them.
