@@ -197,10 +197,14 @@ is its root.
   status (queued while no child session is held, since it waits for a
   place, then running, then the child's own end: done, failed or
   stopped, as soon as a frame brings it, since the root's row runs
-  until every call of its round settles) and the child's context, never a price: the
-  root's reply line counts no child send. With none of the child's rows
-  held, the status is the root's row's (done, stopped, else failed) and
-  no tokens show until the group is opened or a watch brings them.
+  until every call of its round settles; a call refused while its
+  round runs reads queued until then) and the child's context, never a
+  price: the root's reply line counts no child send. With none of the
+  child's rows held, the status is the root's row's (done, stopped,
+  else failed) and no tokens show until the group is opened or a watch
+  brings them. While the turn runs, the work fold's head adds
+  `subagents R/S`: the running children of the `delegate` calls that
+  made one or may still; the finished head counts them as calls.
   Open, it shows the
   `task` input, the child's rounds drawn by the fold's own `Rounds` and
   `Tool`, the child's answer once it is done, then only the files part

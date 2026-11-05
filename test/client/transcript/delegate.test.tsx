@@ -253,6 +253,29 @@ describe("a delegate group", () => {
     expect(workSummary(node, false).toolCalls).toBe(1);
   });
 
+  test("the running fold says how many subagents run of those started", () => {
+    const rows = rootRows("streaming");
+    const other = {
+      ...rows[2]!,
+      id: "delegate-2",
+      seq: 4,
+      toolCallId: "d2",
+      childSessionId: undefined,
+    };
+    const node = replyOf([...rows, other]).work!;
+    // one running, one waiting for a place
+    const running = (id: string) =>
+      id === "delegate-1" ? work({ status: "running" }) : null;
+    expect(workSummary(node, true, 0, null, running).text).toMatch(
+      / · subagents 1\/2$/,
+    );
+    // one ended while its sibling's row still streams
+    const ended = (id: string) => (id === "delegate-1" ? work() : null);
+    expect(workSummary(node, true, 0, null, ended).text).toMatch(
+      / · subagents 0\/2$/,
+    );
+  });
+
   test.serial("draws the child's rows with the fold's own rows", () => {
     session.value = { session: { id: "root" } } as SessionDetail;
     takeChildren("root", [{ messageId: "delegate-1", child: work() }]);

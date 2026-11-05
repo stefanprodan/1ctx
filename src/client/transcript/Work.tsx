@@ -52,7 +52,13 @@ export function Work({
   useTick(running);
   const summary = memory
     ? memorySummary(node, running, Date.now(), retry, marked)
-    : workSummary(node, running, Date.now(), retry);
+    : workSummary(
+        node,
+        running,
+        Date.now(),
+        retry,
+        (rowId) => childWork.value.get(rowId)?.work ?? null,
+      );
   const wasRunning = useRef(running);
   const swept = node.send?.swept === true;
 
