@@ -1254,6 +1254,11 @@
       },
       "cat-jam-free": { "window": 1048576, "tools": true, "images": false },
       "claude-haiku-5-5": { "window": 1000000, "tools": true, "images": true },
+      "crouton-alpha-free": {
+        "window": 1048576,
+        "tools": true,
+        "images": true
+      },
       "deepseek-v4-pro": { "window": 1000000, "tools": true, "images": false },
       "deepseek-v4.1-flash": {
         "window": 1000000,
@@ -1274,6 +1279,7 @@
       "gpt-6-luna": { "window": 922000, "tools": true, "images": true },
       "grok-4.7": { "window": 500000, "tools": true, "images": true },
       "hy3": { "window": 192000, "tools": true, "images": false },
+      "hy4": { "window": 983010, "tools": true, "images": true },
       "hy4-preview": { "window": 1024000, "tools": true, "images": false },
       "iceman-contributor-free": {
         "window": 262144,
@@ -1284,6 +1290,12 @@
       "kimi-k3": { "window": 1048576, "tools": true, "images": true },
       "kimi-k3.1-pro": { "window": 1048576, "tools": true, "images": true },
       "longcat-2.0": { "window": 1000000, "tools": true, "images": false },
+      "longcat-2.5-free": {
+        "window": 1000000,
+        "tools": true,
+        "images": true,
+        "canonical": "longcat-2.5"
+      },
       "longcat-2.5-preview-free": {
         "window": 1000000,
         "tools": true,
