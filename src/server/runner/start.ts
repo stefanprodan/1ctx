@@ -238,11 +238,8 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
     // keeps the cached prefix. A run's own line says its start and a
     // channel says the day in its request-local message. A regenerate
     // says its own day: the cached prefix ends before this message
-    if (
-      !("posted" in turn) &&
-      (fields.kind ?? "chat") === "chat" &&
-      base.origin !== "channel"
-    ) {
+    const chat = (fields.kind ?? "chat") === "chat";
+    if (chat && base.origin !== "channel") {
       deps.sessions.mounts.setTurnNote(
         firstMessageId(turn),
         turnNote(now, policy.tz),
@@ -250,7 +247,7 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       );
     }
     // a chat keeps the note its first send read; a run reads it live
-    if ((fields.kind ?? "chat") === "chat") {
+    if (chat) {
       deps.views.start(
         base.id,
         policy.projectMemory,

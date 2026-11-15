@@ -163,7 +163,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/images.md` | `images/`: the image store, ingest, its limits, serving, access, the lease, the agent's image flag, the claim at send, the budget, queued and forked images, image lines, the wires' image parts, the token estimate, the check, images in history, a message's images on the page |
 | `docs/search.md` | `shared/search.ts`, knowledge search, session search and list |
-| `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials |
+| `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials, a turn's day note |
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
 | `docs/dictation.md` | `dictation/`: the Dictation setting, `POST /api/transcribe`, its WAV check, cap, call and usage row |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |

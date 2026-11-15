@@ -267,9 +267,9 @@ start answers `{ mounts, notices, release }`:
   after midnight stays byte for byte; after a summary the first tail
   turn gets its own. The note and the block share the one user message
   before the turn's first message, note first, a blank line between. A
-  regenerate replaces it, a fork copies it, a channel's post send stores
-  none, and an older turn without one replays none. A run's automation
-  line carries its start.
+  regenerate replaces it, a fork copies it, and an older turn without
+  one replays none. A channel stores none (its request-local message
+  says the day), nor does a run (its automation line carries its start).
 - **A project with no repositories costs one indexed query a send** and
   writes nothing.
 

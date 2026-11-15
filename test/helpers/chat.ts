@@ -45,6 +45,9 @@ export const NO_TOOLS = "deepseek/deepseek-r1-distill-llama-70b";
 // user's zone are unmoved
 export const DAY_NOTE = "Today is Thursday, 1970-01-01 (UTC).";
 export const DAY = { role: "user", content: DAY_NOTE } as const;
+// an author's message on the wire, the day note before a turn left out
+export const authored = (message: { role: string; content: unknown }) =>
+  message.role === "user" && message.content !== DAY_NOTE;
 
 // one tool call the provider streams, as the OpenAI wire carries it: an
 // index, an id, the name and the arguments as one JSON string

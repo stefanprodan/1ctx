@@ -32,30 +32,20 @@ export function readMountedRepos(
     : null;
 }
 
-// the first write wins, so a second summon of one message keeps the
-// first one's; a regenerate replaces it with what it mounted
-export function setReposBlock(
+// what a turn's first send said before its first message, kept as the
+// model read it. The first write wins, so a second summon of one
+// message keeps the first one's; a regenerate replaces it with its own.
+// Empty is stored as none
+export function setTurnText(
   db: Db,
+  column: "repos_block" | "turn_note",
   messageId: string,
-  block: string,
+  text: string,
   replace = false,
 ) {
   db.query(
-    `update messages set repos_block = ? where id = ?${replace ? "" : " and repos_block is null"}`,
-  ).run(block === "" ? null : block, messageId);
-}
-
-// the author's day as the turn's first send read it, kept the same way
-// as the repository block
-export function setTurnNote(
-  db: Db,
-  messageId: string,
-  note: string,
-  replace = false,
-) {
-  db.query(
-    `update messages set turn_note = ? where id = ?${replace ? "" : " and turn_note is null"}`,
-  ).run(note, messageId);
+    `update messages set ${column} = ? where id = ?${replace ? "" : ` and ${column} is null`}`,
+  ).run(text === "" ? null : text, messageId);
 }
 
 // each earlier turn's mounted commits, newest first, from its first
@@ -92,11 +82,11 @@ export class MountsStore {
   }
 
   setReposBlock(messageId: string, block: string, replace = false): void {
-    setReposBlock(this.db, messageId, block, replace);
+    setTurnText(this.db, "repos_block", messageId, block, replace);
   }
 
   setTurnNote(messageId: string, note: string, replace = false): void {
-    setTurnNote(this.db, messageId, note, replace);
+    setTurnText(this.db, "turn_note", messageId, note, replace);
   }
 
   mountedBefore(sessionId: string, firstMessageId: string): MountedRepos[] {

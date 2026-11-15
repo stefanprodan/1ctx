@@ -43,8 +43,6 @@ export type Turn = {
 // later day leaves every earlier turn's bytes as they were
 export type Said = { note: string | null };
 
-// what a turn says before its first message: its note where it changed,
-// then its repository block
 function turnContext(turn: Turn, said: Said): string {
   const note = turn.note && turn.note !== said.note ? turn.note : "";
   if (turn.note) said.note = turn.note;

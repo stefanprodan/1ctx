@@ -232,13 +232,12 @@ arrives.
   memory, knowledge, the off lines (web, visualize, knowledge, memory,
   email, automations, external tasks, MCP, skills, repositories), and
   last the MCP change note (`docs/mcp.md`). Commits, moved branches and
-  the day are in the turn's text (`docs/repos.md`), since the system
-  block leads every request and a date there drops the cached history
-  daily. What is fixed per agent and project leads; the user's line
-  follows, as a team chat's author changes it. A subagent's is
-  `subagentPrompt()` (`docs/subagents.md`). A channel has its own stable
-  head and one request-local message between its frozen stream and the
-  turn's own rows (`docs/channel-context.md`).
+  the day are in the turn's text (`docs/repos.md`). What is fixed per
+  agent and project leads; the user's line follows, as a team chat's
+  author changes it. A subagent's is `subagentPrompt()`
+  (`docs/subagents.md`). A channel has its own stable head and one
+  request-local message between its frozen stream and the turn's own
+  rows (`docs/channel-context.md`).
 
 ## Summons
 

@@ -24,30 +24,17 @@ import {
 } from "../../shared/capabilities.ts";
 import { knowledgeBlock } from "../../shared/knowledge.ts";
 import { memoryBlock } from "../../shared/memory.ts";
-import { isTimeZone } from "../../shared/words.ts";
-import { localMinute } from "../lib/clock.ts";
+import { localDay, localMinute, zoneOrUtc } from "../lib/clock.ts";
 import { offers, type SendPolicy } from "./policy.ts";
 
 // the author's day in their zone, said before a turn rather than in the
 // system prompt, so midnight never moves the cached prefix. Day only,
-// so it changes at most once a day; English weekday and ISO date, so no
-// runtime's locale moves the bytes
+// so it changes at most once a day. A zone the runtime does not know
+// would throw inside the start's transaction, so the note names the
+// zone it used
 export function turnNote(now: number, tz: string): string {
-  // a zone the runtime does not know would throw inside the start's
-  // transaction; the note names the zone it used
-  const zone = isTimeZone(tz) ? tz : "UTC";
-  const part = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: zone,
-      weekday: "long",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-      .formatToParts(now)
-      .map((p) => [p.type, p.value]),
-  );
-  return `Today is ${part.weekday}, ${part.year}-${part.month}-${part.day} (${zone}).`;
+  const zone = zoneOrUtc(tz);
+  return `Today is ${localDay(zone)(now)} (${zone}).`;
 }
 
 // a personal project is only ever its owner's, who is the one talking,

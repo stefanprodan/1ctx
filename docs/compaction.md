@@ -39,6 +39,8 @@ token cap for its own latest turn, and its thinking replay rule, under
   rows but its summary row, so queued messages stay one turn and a call
   keeps its result. The walk goes newest first and stops at the first
   turn that does not fit, so a newest turn over the budget leaves none.
+  The tail's first turn says its own day note, and the rows after the
+  summary carry on from the tail's last note.
 - **On `anthropic` the tail's replies go without their thinking.** The
   summary edits the history before them, and the API refuses a thinking
   block after an edited history on newer accounts; replay starts again

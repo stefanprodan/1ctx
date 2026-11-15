@@ -4,7 +4,12 @@
 import { describe, expect, test } from "bun:test";
 import type { ForkSessionResponse } from "../../../src/shared/api/sessions.ts";
 import { uploadsBlock } from "../../../src/shared/uploads.ts";
-import { type ChatApp, chatApp, setLimits } from "../../helpers/chat.ts";
+import {
+  authored,
+  type ChatApp,
+  chatApp,
+  setLimits,
+} from "../../helpers/chat.ts";
 import {
   close,
   files,
@@ -65,7 +70,7 @@ describe("forked chat uploads", () => {
       expect(chat.app.knowledge.uploads.read(source.sessionId)).toEqual(before);
 
       const next = await send(chat, copied.session.id, [], "continue the fork");
-      expect(messages(next.script)[2]?.content).toBe(
+      expect(messages(next.script).filter(authored)[0]?.content).toBe(
         `${firstRows[0]!.content}\n\n${uploadsBlock(firstRows[0]!.uploads!)}`,
       );
       await finish(chat, copied.session.id, next.script);
@@ -152,7 +157,7 @@ describe("forked chat uploads", () => {
         "edited instructions",
       );
       expect(edited.detail.messages[0]?.uploads).toEqual(user.uploads);
-      expect(messages(edited.script)[2]?.content).toBe(
+      expect(messages(edited.script).filter(authored)[0]?.content).toBe(
         `edited instructions\n\n${uploadsBlock(user.uploads!)}`,
       );
       expect(files(chat, copied.session.id)).toEqual(
@@ -253,7 +258,7 @@ describe("forked chat uploads", () => {
         "a recursively edited turn",
       );
       expect(edited.detail.messages[0]?.uploads).toEqual(rows[0]!.uploads);
-      expect(messages(edited.script)[2]?.content).toBe(
+      expect(messages(edited.script).filter(authored)[0]?.content).toBe(
         `a recursively edited turn\n\n${uploadsBlock(rows[0]!.uploads!)}`,
       );
       expect(files(chat, nested.session.id)).toEqual(

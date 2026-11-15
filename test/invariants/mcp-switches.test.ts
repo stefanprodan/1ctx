@@ -143,7 +143,7 @@ test.serial(
       expect(off).toContain(
         `${WEB_OFF_LINE}\n\n${line}\n\nSince your last turn`,
       );
-      expect(off.indexOf("Today is ")).toBeLessThan(off.indexOf(WEB_OFF_LINE));
+      expect(off).not.toContain("Today is ");
       expect(off).toContain("- flux: no longer available");
       expect(on.indexOf(CATALOG_LEAD)).toBeGreaterThan(0);
       expect(off.indexOf(CATALOG_LEAD)).toBeGreaterThan(0);

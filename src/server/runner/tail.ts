@@ -19,7 +19,6 @@ import {
   type ContextLookups,
   type RenderPolicy,
   renderRows,
-  type Said,
   type Turn,
 } from "./render.ts";
 
@@ -119,7 +118,6 @@ export function tailOf(
   turns: ReadonlyMap<string, Turn>,
   wire: Wire | null,
   images = Number.POSITIVE_INFINITY,
-  said?: Said,
 ): Tail {
   const parts: ChatMessageIn[][] = [];
   let total = 0;
@@ -148,15 +146,5 @@ export function tailOf(
     parts.unshift(messages);
     start = begin;
   }
-  // each turn was counted with its own note, as though it led the tail;
-  // the tail rendered whole says a note only where it changes, and
-  // leaves the last one said for the rows after the summary
-  const messages =
-    said === undefined || start === cut
-      ? parts.flat()
-      : withoutThinking(
-          wire,
-          renderRows(rows.slice(start, cut), policy, lookups, turns, said),
-        );
-  return { start, messages, tokens: total };
+  return { start, messages: parts.flat(), tokens: total };
 }

@@ -32,7 +32,13 @@ import {
   type Said,
   type Turn,
 } from "./render.ts";
-import { lastSummary, tailBudget, tailImages, tailOf } from "./tail.ts";
+import {
+  lastSummary,
+  tailBudget,
+  tailImages,
+  tailOf,
+  withoutThinking,
+} from "./tail.ts";
 import { roundKey, toolRowsByRound } from "./trace.ts";
 
 export const SUMMARIZE = `Summarize the conversation so far. The chat continues from your summary, followed by its newest turns as they were when they fit, so cover all of it, the newest turns included. Write Markdown with these sections, terse bullets, no prose:
@@ -165,7 +171,7 @@ export function historyMessages(
     rows.length === 0 ? new Map() : lookups.turnsOf(rows[0]!.sessionId);
   const cut = lastSummary(rows);
   if (cut < 0) return renderRows(rows, policy, lookups, turns);
-  const tailAt = (at: number, said?: Said) =>
+  const tailAt = (at: number) =>
     tailOf(
       rows,
       at,
@@ -175,11 +181,8 @@ export function historyMessages(
       turns,
       room?.wire ?? null,
       room === null ? 0 : tailImages(room.imagesPerRequest),
-      said,
     );
-  // the first turn after the summary has no note before it but its own
-  const said: Said = { note: null };
-  const tail = tailAt(cut, said);
+  const tail = tailAt(cut);
   const previous = lastSummary(rows, cut);
   const names = loadedSkills(
     rows,
@@ -197,9 +200,15 @@ export function historyMessages(
     .some((row) => row.kind === "user" && row.uploads?.length)
     ? `\n\n${UPLOADS_SUMMARY_LINE}`
     : "";
+  const said: Said = { note: null };
   return [
     { role: "user", content: `${leadOf(rows[cut]!)}${remembered}${uploads}` },
-    ...tail.messages,
+    // rendered whole, so a note goes only where it changes: the first
+    // turn after the summary says its own
+    ...withoutThinking(
+      room?.wire ?? null,
+      renderRows(rows.slice(tail.start, cut), policy, lookups, turns, said),
+    ),
     ...renderRows(rows.slice(cut + 1), policy, lookups, turns, said),
   ];
 }
