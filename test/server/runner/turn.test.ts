@@ -17,6 +17,7 @@ import { envelopeRow } from "../../../src/server/sessions/feed.ts";
 import type { Message } from "../../../src/shared/contracts/session.ts";
 import type { Wire } from "../../../src/shared/words.ts";
 import {
+  authored,
   type ChatApp,
   chatApp,
   type Script,
@@ -68,7 +69,7 @@ const turnOf = (chat: ChatApp, sessionId: string): Message[] => {
 
 const userMessages = (script: Script) =>
   (script.body.messages as { role: string; content: string; name?: string }[])
-    .filter((message) => message.role === "user")
+    .filter(authored)
     .map(({ content, name }) => ({ content, name }));
 
 describe("a turn of several user messages", () => {

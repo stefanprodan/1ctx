@@ -48,7 +48,6 @@ export {
   nextDay,
   type UsageWindow,
   usageWindow,
-  zoneOrUtc,
 } from "./window.ts";
 
 export type UsageDeps = { db: Db; clock: Clock; access: AccessPort };

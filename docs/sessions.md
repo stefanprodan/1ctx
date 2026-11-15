@@ -229,12 +229,12 @@ arrives.
   `runner/prompt.ts`): the agent and project line, the agent's prompt,
   `summonedLine()`, the user's or automation line, the skills catalog,
   the MCP catalog, `<mcp_instructions>`, project memory, automation
-  memory, knowledge, the date, the off lines (web, visualize, knowledge,
-  memory, email, automations, external tasks, MCP, skills,
-  repositories), and last the MCP change note (`docs/mcp.md`). Commits
-  and moved branches are in the turn's text (`docs/repos.md`). What is
-  fixed per agent and project leads; the user's line follows, as a team
-  chat's author changes it. A subagent's is `subagentPrompt()`
+  memory, knowledge, the off lines (web, visualize, knowledge, memory,
+  email, automations, external tasks, MCP, skills, repositories), and
+  last the MCP change note (`docs/mcp.md`). Commits, moved branches and
+  the day are in the turn's text (`docs/repos.md`). What is fixed per
+  agent and project leads; the user's line follows, as a team chat's
+  author changes it. A subagent's is `subagentPrompt()`
   (`docs/subagents.md`). A channel has its own stable head and one
   request-local message between its frozen stream and the turn's own
   rows (`docs/channel-context.md`).

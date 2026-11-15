@@ -90,6 +90,7 @@ import { m0081 } from "./0081-agent-images.ts";
 import { m0082 } from "./0082-mcp-projects.ts";
 import { m0083 } from "./0083-mcp-access.ts";
 import { m0084 } from "./0084-channel-clear.ts";
+import { m0085 } from "./0085-turn-note.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -176,4 +177,5 @@ export const MIGRATIONS: Migration[] = [
   m0082,
   m0083,
   m0084,
+  m0085,
 ];

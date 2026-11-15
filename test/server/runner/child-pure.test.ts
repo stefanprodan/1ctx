@@ -17,7 +17,6 @@ import {
 } from "../../../src/server/runner/child-slots.ts";
 import type { Offered } from "../../../src/server/runner/policy.ts";
 import {
-  dateLine,
   type PromptPolicy,
   SUBAGENT_LINE,
   subagentPrompt,
@@ -36,8 +35,6 @@ import { schema } from "../../../src/server/tools/catalog.ts";
 import { filesPart, NOT_COPIED } from "../../../src/shared/subagents.ts";
 import { cutAt } from "../../../src/shared/text.ts";
 import { tick } from "../../helpers/chat.ts";
-
-const NOW = Date.UTC(2026, 9, 6, 10, 0, 0);
 
 const OFFERED: Offered = {
   tools: [schema(makeBashTool({ subagent: true }))],
@@ -81,8 +78,8 @@ const policy: PromptPolicy = {
 };
 
 describe("a subagent's prompt", () => {
-  test("keeps the project, the agent's prompt, its line, the catalogs and the date", () => {
-    expect(subagentPrompt(policy, NOW)).toBe(
+  test("keeps the project, the agent's prompt, its line and the catalogs, with no date", () => {
+    expect(subagentPrompt(policy)).toBe(
       [
         "You are coder, an agent in the ops project: Incidents and pages.",
         "You write Go.",
@@ -90,18 +87,17 @@ describe("a subagent's prompt", () => {
         "<skills>one</skills>",
         "<mcp_catalog>x</mcp_catalog>",
         "<mcp_instructions>be kind</mcp_instructions>",
-        dateLine(NOW),
       ].join("\n\n"),
     );
   });
 
   test("is what systemPrompt answers for a subagent, notes and lines left out", () => {
-    const prompt = systemPrompt(policy, NOW, "the MCP tools changed", {
+    const prompt = systemPrompt(policy, "the MCP tools changed", {
       off: ["infra"],
       mounted: [],
       moved: ["repo infra moved"],
     });
-    expect(prompt).toBe(subagentPrompt(policy, NOW));
+    expect(prompt).toBe(subagentPrompt(policy));
     expect(prompt).not.toContain("You talk to");
     expect(prompt).not.toContain("Friday is frozen");
     expect(prompt).not.toContain("MCP tools changed");

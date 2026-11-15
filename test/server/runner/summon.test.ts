@@ -17,6 +17,7 @@ import { settleRun } from "../../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
+  DAY,
   FLASH,
   freed,
   type Script,
@@ -121,6 +122,7 @@ describe("a summon", () => {
       expect(system(summoned)).toStartWith("You are checker,");
       expect(system(summoned)).toContain(summonedLine("coder"));
       expect(turns(summoned)).toEqual([
+        DAY,
         { role: "user", content: "what time is it", name: "casey" },
         { role: "user", content: "[coder] it is noon" },
         {
@@ -137,6 +139,7 @@ describe("a summon", () => {
       expect(system(next)).toStartWith("You are coder,");
       expect(system(next)).not.toContain("summoned");
       expect(turns(next)).toEqual([
+        DAY,
         { role: "user", content: "what time is it", name: "casey" },
         { role: "assistant", content: null, calls: ["datetime"] },
         {
@@ -182,6 +185,7 @@ describe("a summon", () => {
       (await waitScript(chat.scripted, 4)).reply("checked");
       const again = await turn(chat, sessionId, "@checker again");
       expect(turns(again)).toEqual([
+        DAY,
         { role: "user", content: "what time is it", name: "casey" },
         { role: "user", content: "[coder] it is noon" },
         {
@@ -221,6 +225,7 @@ describe("a summon", () => {
       const next = await turn(chat, fork, "go on");
       expect(system(next)).toStartWith("You are checker,");
       expect(turns(next).map((message) => message.role)).toEqual([
+        "user",
         "user",
         "assistant",
         "tool",
@@ -581,6 +586,7 @@ describe("a summon", () => {
       const after = await turn(chat, sessionId, "@checker again");
       expect(turns(after)).toEqual([
         { role: "user", content: `${SUMMARY_LEAD}\n\nsecond summary` },
+        DAY,
         { role: "user", content: "@checker again", name: "casey" },
       ]);
       after.reply("fine again");
@@ -614,6 +620,7 @@ describe("a summon", () => {
       const asked = await turn(chat, sessionId, "@checker check");
       expect(turns(asked)).toEqual([
         { role: "user", content: `${SUMMARY_LEAD}\n\nthe summary` },
+        DAY,
         { role: "user", content: "@checker check", name: "casey" },
       ]);
       asked.reply("fine");
@@ -684,6 +691,7 @@ describe("a summon", () => {
       own.reply("noted");
       const again = await turn(chat, fork, "@checker again");
       expect(turns(again)).toEqual([
+        DAY,
         { role: "user", content: "what time is it", name: "casey" },
         { role: "user", content: "[coder] it is noon" },
         {
@@ -721,6 +729,7 @@ describe("a summon", () => {
       const second = await turn(chat, sessionId, "@auditor audit");
       expect(system(second)).toStartWith("You are auditor,");
       expect(turns(second)).toEqual([
+        DAY,
         { role: "user", content: "what time is it", name: "casey" },
         { role: "user", content: "[coder] it is noon" },
         {
@@ -755,6 +764,7 @@ describe("a summon", () => {
       expect(stopped.status).toBe(200);
       const next = await turn(chat, sessionId, "go on");
       expect(turns(next)).toEqual([
+        DAY,
         { role: "user", content: "hello", name: "casey" },
         { role: "assistant", content: "hi" },
         { role: "user", content: "@checker look", name: "casey" },

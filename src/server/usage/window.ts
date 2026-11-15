@@ -5,7 +5,6 @@
 
 import type { Windowed } from "../../shared/api/admin.ts";
 import { MAX_WEEKS } from "../../shared/api/usage.ts";
-import { isTimeZone } from "../../shared/words.ts";
 import { DAY_MS } from "../lib/clock.ts";
 
 export type UsageWindow = {
@@ -107,10 +106,6 @@ export function lastDays<T extends object>(
   const since = now - LAST_DAYS_MS;
   return { since, until: now, ...read(since, now) };
 }
-
-// a zone the runtime does not know counts in UTC
-export const zoneOrUtc = (timeZone: string): string =>
-  isTimeZone(timeZone) ? timeZone : "UTC";
 
 const zoneFormatter = (timeZone: string): Intl.DateTimeFormat =>
   new Intl.DateTimeFormat("en", {

@@ -259,6 +259,17 @@ start answers `{ mounts, notices, release }`:
   its parent's commit lines, no move. A channel puts the block in its
   request-local message (`docs/channel-context.md`) and stores none. A
   fork copies the column.
+- **The turn's note is stored beside it** (`turn_note`, first write
+  wins, `turnNote()` in `runner/prompt.ts`): `Today is Sunday,
+  2026-11-15 (Europe/Bucharest).`, the author's day, weekday and zone.
+  History emits a turn's note only when it differs from the last one
+  emitted in that request, so same-day turns add nothing and a replay
+  after midnight stays byte for byte; after a summary the first tail
+  turn gets its own. The note and the block share the one user message
+  before the turn's first message, note first, a blank line between. A
+  regenerate replaces it, a fork copies it, and an older turn without
+  one replays none. A channel stores none (its request-local message
+  says the day), nor does a run (its automation line carries its start).
 - **A project with no repositories costs one indexed query a send** and
   writes nothing.
 

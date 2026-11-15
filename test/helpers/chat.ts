@@ -41,6 +41,14 @@ export const ANTHROPIC_MODEL = "claude-haiku-5-5";
 // offered no tools and behaves as before
 export const NO_TOOLS = "deepseek/deepseek-r1-distill-llama-70b";
 
+// the day a chat turn says before it while the fake clock and a test
+// user's zone are unmoved
+export const DAY_NOTE = "Today is Thursday, 1970-01-01 (UTC).";
+export const DAY = { role: "user", content: DAY_NOTE } as const;
+// an author's message on the wire, the day note before a turn left out
+export const authored = (message: { role: string; content: unknown }) =>
+  message.role === "user" && message.content !== DAY_NOTE;
+
 // one tool call the provider streams, as the OpenAI wire carries it: an
 // index, an id, the name and the arguments as one JSON string
 export type ToolCallFrame = {

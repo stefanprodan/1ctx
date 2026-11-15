@@ -8,8 +8,7 @@
 
 import { isIP } from "node:net";
 import type { LinkPurpose } from "../../shared/api/access.ts";
-import { isTimeZone } from "../../shared/words.ts";
-import { DAY_MS, MINUTE_MS } from "../lib/clock.ts";
+import { DAY_MS, MINUTE_MS, zoneOrUtc } from "../lib/clock.ts";
 import { escapeHtml } from "../render/index.ts";
 
 export const LINK_TTL_MS: Record<LinkPurpose, number> = {
@@ -105,7 +104,7 @@ const NOTICE: Record<NoticeEvent, { subject: string; what: string }> = {
 // the email is opened; built from parts, since ICU builds join date and
 // time with "at" on one system and a comma on another
 export function noticeTime(at: number, tz: string): string {
-  const zone = isTimeZone(tz) ? tz : "UTC";
+  const zone = zoneOrUtc(tz);
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: zone,
     day: "numeric",

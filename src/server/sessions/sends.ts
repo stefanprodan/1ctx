@@ -274,6 +274,8 @@ export function sendTurns(
     firstMessageId: string;
     // the turn's repository block, said before its first message
     repos: string | null;
+    // the author's day, said before it where it changed
+    note: string | null;
   }
 > {
   const rows = db
@@ -287,12 +289,13 @@ export function sendTurns(
         swept: number | null;
         first_message_id: string;
         repos_block: string | null;
+        turn_note: string | null;
       },
       [string]
     >(
       `select sends.id, sends.agent_id, agents.name, sends.summoned,
          sends.provider_id, sends.swept, sends.first_message_id,
-         first.repos_block
+         first.repos_block, first.turn_note
        from sends join agents on agents.id = sends.agent_id
        left join messages as first on first.id = sends.first_message_id
        where sends.session_id = ? and sends.kind != 'post'`,
@@ -309,6 +312,7 @@ export function sendTurns(
         swept: row.swept === 1,
         firstMessageId: row.first_message_id,
         repos: row.repos_block,
+        note: row.turn_note,
       },
     ]),
   );

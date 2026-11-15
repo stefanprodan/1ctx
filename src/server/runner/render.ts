@@ -34,7 +34,20 @@ export type Turn = {
   // model first read it (runner/repos.ts)
   firstMessageId?: string;
   repos?: string | null;
+  // the author's day as the turn's first send read it
+  note?: string | null;
 };
+
+// the last note a request said, so a turn says its own only where the
+// day or the author's zone changed. It reads only the rows sent, so a
+// later day leaves every earlier turn's bytes as they were
+export type Said = { note: string | null };
+
+function turnContext(turn: Turn, said: Said): string {
+  const note = turn.note && turn.note !== said.note ? turn.note : "";
+  if (turn.note) said.note = turn.note;
+  return [note, turn.repos ?? ""].filter((part) => part !== "").join("\n\n");
+}
 
 export type ContextLookups = {
   // the author's username, for the name field on the wire
@@ -207,6 +220,7 @@ export function renderRows(
   policy: RenderPolicy,
   lookups: ContextLookups,
   turns: ReadonlyMap<string, Turn>,
+  said: Said = { note: null },
 ): ChatMessageIn[] {
   const out: ChatMessageIn[] = [];
   const own = (sendId: string) => ownTurn(turns.get(sendId), policy);
@@ -233,8 +247,9 @@ export function renderRows(
     }
     if (row.kind === "user") {
       const turn = turns.get(row.sendId);
-      if (turn?.repos && turn.firstMessageId === row.id) {
-        out.push({ role: "user", content: turn.repos });
+      if (turn !== undefined && turn.firstMessageId === row.id) {
+        const context = turnContext(turn, said);
+        if (context !== "") out.push({ role: "user", content: context });
       }
       out.push(userMessage(row, policy, lookups));
       continue;

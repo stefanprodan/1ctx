@@ -129,13 +129,16 @@ const bashOf = (script: Script) =>
 const systemOf = (script: Script) =>
   (script.body.messages as { content: string }[])[0]!.content;
 
+// the turn's day note leads the same message where it changed
+const blockIn = (content: string) => content.replace(/^Today is .*\n\n/, "");
+
 // the repository blocks of the request, one per turn that mounted, oldest
 // first, each right before its turn's first message
 const blocksOf = (script: Script) =>
   (script.body.messages as { role: string; content: string }[]).flatMap(
     (row, i, all) =>
-      row.role === "user" && row.content.startsWith(TURN_HEAD)
-        ? [{ block: row.content, next: all[i + 1]?.content }]
+      row.role === "user" && blockIn(row.content).startsWith(TURN_HEAD)
+        ? [{ block: blockIn(row.content), next: all[i + 1]?.content }]
         : [],
   );
 const blockOf = (script: Script) => blocksOf(script).at(-1)?.block;

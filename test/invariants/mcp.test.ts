@@ -806,9 +806,7 @@ describe("MCP tools in a send", () => {
     expect(system.indexOf("<available_mcp_tools>")).toBeLessThan(
       system.indexOf("<mcp_instructions>"),
     );
-    expect(system.indexOf("Today is ")).toBeLessThan(
-      system.indexOf("Since your last turn"),
-    );
+    expect(system).not.toContain("Today is ");
     expect(system).toContain("- github: now available");
     second.reply("second");
     await waitDone(chat.app, first.sessionId);
@@ -1186,9 +1184,7 @@ describe("MCP snapshots across sends", () => {
     expect(secondNames).not.toContain("mcp__flux__get_flux_instance");
     const secondSystem = systemOf(second.body);
     expect(secondSystem).toContain("Version two instructions.");
-    expect(secondSystem.indexOf("Today is ")).toBeLessThan(
-      secondSystem.indexOf("Since your last turn"),
-    );
+    expect(secondSystem).not.toContain("Today is ");
     expect(secondSystem).toContain("added mcp__flux__get_flux_report");
     expect(secondSystem).toContain("removed mcp__flux__get_flux_instance");
     expect(secondSystem).toContain("changed mcp__flux__search_flux_docs");

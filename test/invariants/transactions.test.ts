@@ -250,7 +250,7 @@ describe("finalizeSend", () => {
     const roles = (second.body.messages as { role: string }[]).map(
       (m) => m.role,
     );
-    expect(roles).toEqual(["system", "user", "assistant", "user"]);
+    expect(roles).toEqual(["system", "user", "user", "assistant", "user"]);
     second.reply("two");
   });
 

@@ -97,6 +97,7 @@ const EXPECTED_IDS = [
   "0082-mcp-projects",
   "0083-mcp-access",
   "0084-channel-clear",
+  "0085-turn-note",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2087,7 +2088,25 @@ describe("the schema", () => {
       expect(before.length).toBeGreaterThan(0);
       expect(migrate(db)).toEqual(expectedFrom("0079-repos-block"));
       expect(db.query("select * from messages order by rowid").all()).toEqual(
-        before.map((row) => ({ ...(row as object), repos_block: null })),
+        before.map((row) => ({
+          ...(row as object),
+          repos_block: null,
+          turn_note: null,
+        })),
+      );
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0085 adds the turn note, null on every message", () => {
+    const db = seed(MIGRATIONS.slice(0, 84));
+    try {
+      const before = db.query("select * from messages order by rowid").all();
+      expect(before.length).toBeGreaterThan(0);
+      expect(migrate(db)).toEqual(expectedFrom("0085-turn-note"));
+      expect(db.query("select * from messages order by rowid").all()).toEqual(
+        before.map((row) => ({ ...(row as object), turn_note: null })),
       );
     } finally {
       db.close();
@@ -4605,6 +4624,7 @@ describe("project channel migrations", () => {
       "0082-mcp-projects",
       "0083-mcp-access",
       "0084-channel-clear",
+      "0085-turn-note",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4826,6 +4846,7 @@ describe("project channel migrations", () => {
           "0082-mcp-projects",
           "0083-mcp-access",
           "0084-channel-clear",
+          "0085-turn-note",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -4996,6 +5017,7 @@ describe("project channel migrations", () => {
         "0082-mcp-projects",
         "0083-mcp-access",
         "0084-channel-clear",
+        "0085-turn-note",
       ]);
       expect(
         db

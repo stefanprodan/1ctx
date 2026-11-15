@@ -16,6 +16,7 @@ import {
   AZURE_MODEL,
   type ChatApp,
   chatApp,
+  DAY_NOTE,
   ringing,
   sessionSettled,
 } from "../helpers/chat.ts";
@@ -101,6 +102,10 @@ describe("the azure wire in a chat", () => {
       });
       expect(first!.input[1]).toEqual({
         role: "user",
+        content: [{ type: "input_text", text: DAY_NOTE }],
+      });
+      expect(first!.input[2]).toEqual({
+        role: "user",
         content: [{ type: "input_text", text: "[casey] find the prime" }],
       });
       expect(
@@ -108,7 +113,7 @@ describe("the azure wire in a chat", () => {
       ).toBe(true);
       // the three items as the stream gave them, no index, no id, then
       // the call and its result
-      const replayed = second!.input.slice(2);
+      const replayed = second!.input.slice(3);
       expect(
         replayed.map((item: Record<string, unknown>) => item.type),
       ).toEqual([
@@ -228,7 +233,7 @@ describe("the azure wire in a chat", () => {
       queue(fake, stream("chat-text-after-tool.sse"));
       await send(chat, sessionId, "next");
       const next = fake.bodies().at(-1)!;
-      expect(next.input[1]).toEqual({
+      expect(next.input[2]).toEqual({
         role: "user",
         content: [{ type: "input_text", text: "[casey] what did we decide" }],
       });

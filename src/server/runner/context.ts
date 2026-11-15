@@ -29,9 +29,16 @@ import {
   type RenderPolicy,
   renderRows,
   roundComplete,
+  type Said,
   type Turn,
 } from "./render.ts";
-import { lastSummary, tailBudget, tailImages, tailOf } from "./tail.ts";
+import {
+  lastSummary,
+  tailBudget,
+  tailImages,
+  tailOf,
+  withoutThinking,
+} from "./tail.ts";
 import { roundKey, toolRowsByRound } from "./trace.ts";
 
 export const SUMMARIZE = `Summarize the conversation so far. The chat continues from your summary, followed by its newest turns as they were when they fit, so cover all of it, the newest turns included. Write Markdown with these sections, terse bullets, no prose:
@@ -116,13 +123,12 @@ export function history(
     RenderPolicy &
     Pick<SendPolicy, "contextLength" | "limits" | "wire">,
   lookups: ContextLookups,
-  now: number,
   mcpNote = "",
   repos: RepoLines = NO_REPO_LINES,
 ): ChatMessageIn[] {
   const system: ChatMessageIn = {
     role: "system",
-    content: systemPrompt(policy, now, mcpNote, repos),
+    content: systemPrompt(policy, mcpNote, repos),
   };
   return [
     system,
@@ -194,10 +200,16 @@ export function historyMessages(
     .some((row) => row.kind === "user" && row.uploads?.length)
     ? `\n\n${UPLOADS_SUMMARY_LINE}`
     : "";
+  const said: Said = { note: null };
   return [
     { role: "user", content: `${leadOf(rows[cut]!)}${remembered}${uploads}` },
-    ...tail.messages,
-    ...renderRows(rows.slice(cut + 1), policy, lookups, turns),
+    // rendered whole, so a note goes only where it changes: the first
+    // turn after the summary says its own
+    ...withoutThinking(
+      room?.wire ?? null,
+      renderRows(rows.slice(tail.start, cut), policy, lookups, turns, said),
+    ),
+    ...renderRows(rows.slice(cut + 1), policy, lookups, turns, said),
   ];
 }
 

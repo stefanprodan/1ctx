@@ -3,6 +3,8 @@
 //
 // Milliseconds since the epoch, as a port so a test can move time.
 
+import { isTimeZone } from "../../shared/words.ts";
+
 export type Clock = (() => number) & {
   // the signal aborts when the sleep is cancelled
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
@@ -31,6 +33,28 @@ export function localMinute(timeZone: string): (ms: number) => string {
       format.formatToParts(ms).map((p) => [p.type, p.value]),
     );
     return `${part.year}-${part.month}-${part.day} ${part.hour}:${part.minute}`;
+  };
+}
+
+// a zone the runtime does not know reads as UTC, since Intl throws on it
+export const zoneOrUtc = (timeZone: string): string =>
+  isTimeZone(timeZone) ? timeZone : "UTC";
+
+// "Sunday, 2026-11-15" in the zone: an English weekday and the numbers,
+// so no runtime's locale moves a prompt
+export function localDay(timeZone: string): (ms: number) => string {
+  const format = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "long",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return (ms) => {
+    const part = Object.fromEntries(
+      format.formatToParts(ms).map((p) => [p.type, p.value]),
+    );
+    return `${part.weekday}, ${part.year}-${part.month}-${part.day}`;
   };
 }
 

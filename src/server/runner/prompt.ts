@@ -24,12 +24,17 @@ import {
 } from "../../shared/capabilities.ts";
 import { knowledgeBlock } from "../../shared/knowledge.ts";
 import { memoryBlock } from "../../shared/memory.ts";
-import { localMinute } from "../lib/clock.ts";
+import { localDay, localMinute, zoneOrUtc } from "../lib/clock.ts";
 import { offers, type SendPolicy } from "./policy.ts";
 
-// the UTC day, so the prefix holds until midnight for every author
-export function dateLine(now: number): string {
-  return `Today is ${new Date(now).toISOString().slice(0, 10)}.`;
+// the author's day in their zone, said before a turn rather than in the
+// system prompt, so midnight never moves the cached prefix. Day only,
+// so it changes at most once a day. A zone the runtime does not know
+// would throw inside the start's transaction, so the note names the
+// zone it used
+export function turnNote(now: number, tz: string): string {
+  const zone = zoneOrUtc(tz);
+  return `Today is ${localDay(zone)(now)} (${zone}).`;
 }
 
 // a personal project is only ever its owner's, who is the one talking,
@@ -122,7 +127,7 @@ export type PromptPolicy = Pick<
 
 // a subagent's prompt keeps only what doing its work needs: no memory,
 // automation, knowledge block, off lines, repository or MCP notes
-export function subagentPrompt(policy: PromptPolicy, now: number): string {
+export function subagentPrompt(policy: PromptPolicy): string {
   const parts = [projectLine(policy)];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
   parts.push(SUBAGENT_LINE);
@@ -135,17 +140,15 @@ export function subagentPrompt(policy: PromptPolicy, now: number): string {
   if (policy.offered.mcpPrompt.text !== "") {
     parts.push(policy.offered.mcpPrompt.text);
   }
-  parts.push(dateLine(now));
   return parts.join("\n\n");
 }
 
 export function systemPrompt(
   policy: PromptPolicy,
-  now: number,
   mcpNote = "",
   repos: RepoLines = NO_REPO_LINES,
 ): string {
-  if (policy.subagent) return subagentPrompt(policy, now);
+  if (policy.subagent) return subagentPrompt(policy);
   const parts = [projectLine(policy)];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
   if (policy.summoned !== null) parts.push(summonedLine(policy.summoned));
@@ -174,7 +177,6 @@ export function systemPrompt(
   if (bash && !docsOff) {
     parts.push(knowledgeBlock(policy.knowledge.empty));
   }
-  parts.push(dateLine(now));
   if (
     policy.disabledCapabilities.includes(WEB) &&
     policy.offered.tools.length > 0

@@ -23,6 +23,7 @@ import {
   ANTHROPIC_MODEL,
   type ChatApp,
   chatApp,
+  DAY_NOTE,
   ringing,
   sessionSettled,
 } from "../helpers/chat.ts";
@@ -126,6 +127,7 @@ describe("the anthropic wire in a chat", () => {
         {
           role: "user",
           content: [
+            { type: "text", text: DAY_NOTE },
             {
               type: "text",
               text: "[casey] add them",

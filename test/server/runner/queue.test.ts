@@ -16,6 +16,7 @@ import { MAX_MESSAGE_BYTES } from "../../../src/shared/words.ts";
 import { hashPassword, testApp } from "../../helpers/app.ts";
 import { createAutomation, settleRun } from "../../helpers/automations.ts";
 import {
+  authored,
   type ChatApp,
   chatApp,
   FLASH,
@@ -90,7 +91,7 @@ const rows = (chat: ChatApp, sessionId: string) =>
 
 const userMessages = (script: Script) =>
   (script.body.messages as { role: string; content: string; name?: string }[])
-    .filter((message) => message.role === "user")
+    .filter(authored)
     .map(({ content, name }) => ({ content, name }));
 
 const archive = () => new Bun.Archive({ "readme.md": "nested" }).bytes();

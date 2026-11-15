@@ -55,7 +55,8 @@ Posting and parallel turns are in `docs/sessions.md`, pending turns in
   other agents' answer marks and asks for sources, paths and key figures.
 - **One request-local user message follows the frozen stream.** It holds
   the summoner's name, zone and about, the current project memory note,
-  the start's date, the repositories' commits and moves
+  the turn's note in the summoner's zone (`turnNote()`,
+  `docs/repos.md`), the repositories' commits and moves
   (`reposBlock()`, `docs/repos.md`) and the MCP change note. The turn's
   own question and rows follow it. The message is fixed before the first
   request and reused each round, never moved to the end like the exhaustion

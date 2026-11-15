@@ -29,7 +29,7 @@ import { childResult } from "./child-result.ts";
 import { freeSlot, type SlotPort, takeSlot } from "./child-slots.ts";
 import { type EndingDeps, finalize } from "./ending.ts";
 import { offers, type SendPolicy, type ToolResult } from "./policy.ts";
-import { reposBlock } from "./prompt.ts";
+import { reposBlock, turnNote } from "./prompt.ts";
 import type { Registry } from "./registry.ts";
 import { type ActiveSend, type ChildLink, claim, newSend } from "./send.ts";
 import { type LoopDeps, toolLoop } from "./tool-loop.ts";
@@ -201,6 +201,8 @@ function startChild(
       moved: [],
     });
     if (block !== "") deps.sessions.mounts.setReposBlock(taskId, block);
+    // the parent author's day, which no subagent prompt says
+    deps.sessions.mounts.setTurnNote(taskId, turnNote(now, policy.tz));
     const reply = deps.sessions.addReply({
       id: replyId,
       sessionId,

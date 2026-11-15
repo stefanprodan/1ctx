@@ -10,10 +10,10 @@ import type {
 } from "../../shared/api/directory.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
 import { parseNoQuery } from "../lib/body.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, zoneOrUtc } from "../lib/clock.ts";
 import { NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import { usageWindow, zoneOrUtc } from "../usage/index.ts";
+import { usageWindow } from "../usage/index.ts";
 import { summary, type UserRow } from "../users/index.ts";
 import { parseUsername } from "./parse.ts";
 import type { VisitStore } from "./visits.ts";
