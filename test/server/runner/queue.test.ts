@@ -18,6 +18,7 @@ import { createAutomation, settleRun } from "../../helpers/automations.ts";
 import {
   type ChatApp,
   chatApp,
+  DAY_NOTE,
   FLASH,
   type Script,
   setLimits,
@@ -88,9 +89,12 @@ const rows = (chat: ChatApp, sessionId: string) =>
     )
     .all(sessionId);
 
+// the authors' messages, the day note before the turn left out
 const userMessages = (script: Script) =>
   (script.body.messages as { role: string; content: string; name?: string }[])
-    .filter((message) => message.role === "user")
+    .filter(
+      (message) => message.role === "user" && message.content !== DAY_NOTE,
+    )
     .map(({ content, name }) => ({ content, name }));
 
 const archive = () => new Bun.Archive({ "readme.md": "nested" }).bytes();

@@ -459,9 +459,8 @@ describe("skills in a send", () => {
     }[];
     const system = messages[0]!.content;
     expect(system).toContain("<name>ops</name>");
-    expect(system.indexOf("<available_skills>")).toBeLessThan(
-      system.indexOf("Today is "),
-    );
+    expect(system).toContain("<available_skills>");
+    expect(system).not.toContain("Today is ");
     expect(system).toContain("<name>runbooks</name>");
     const tools = script.body.tools as {
       function: {

@@ -12,11 +12,11 @@ import type { ActiveSend } from "./send.ts";
 // refusal rolls them back and the images stay staged
 export const refuseUnfit =
   (
-    deps: Pick<RoundDeps, "lookups" | "clock">,
+    deps: Pick<RoundDeps, "lookups">,
     historyOf: (send: ActiveSend) => Message[],
   ) =>
   (send: ActiveSend, fresh: number): void => {
-    const req = buildRequest(send, historyOf(send), deps.lookups, deps.clock());
+    const req = buildRequest(send, historyOf(send), deps.lookups);
     const unfit = unfitImages(req, send.policy, fresh);
     if (unfit !== null) throw new BadRequest(unfit);
   };

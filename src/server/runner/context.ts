@@ -29,6 +29,7 @@ import {
   type RenderPolicy,
   renderRows,
   roundComplete,
+  type Said,
   type Turn,
 } from "./render.ts";
 import { lastSummary, tailBudget, tailImages, tailOf } from "./tail.ts";
@@ -116,13 +117,12 @@ export function history(
     RenderPolicy &
     Pick<SendPolicy, "contextLength" | "limits" | "wire">,
   lookups: ContextLookups,
-  now: number,
   mcpNote = "",
   repos: RepoLines = NO_REPO_LINES,
 ): ChatMessageIn[] {
   const system: ChatMessageIn = {
     role: "system",
-    content: systemPrompt(policy, now, mcpNote, repos),
+    content: systemPrompt(policy, mcpNote, repos),
   };
   return [
     system,
@@ -165,7 +165,7 @@ export function historyMessages(
     rows.length === 0 ? new Map() : lookups.turnsOf(rows[0]!.sessionId);
   const cut = lastSummary(rows);
   if (cut < 0) return renderRows(rows, policy, lookups, turns);
-  const tailAt = (at: number) =>
+  const tailAt = (at: number, said?: Said) =>
     tailOf(
       rows,
       at,
@@ -175,8 +175,11 @@ export function historyMessages(
       turns,
       room?.wire ?? null,
       room === null ? 0 : tailImages(room.imagesPerRequest),
+      said,
     );
-  const tail = tailAt(cut);
+  // the first turn after the summary has no note before it but its own
+  const said: Said = { note: null };
+  const tail = tailAt(cut, said);
   const previous = lastSummary(rows, cut);
   const names = loadedSkills(
     rows,
@@ -197,7 +200,7 @@ export function historyMessages(
   return [
     { role: "user", content: `${leadOf(rows[cut]!)}${remembered}${uploads}` },
     ...tail.messages,
-    ...renderRows(rows.slice(cut + 1), policy, lookups, turns),
+    ...renderRows(rows.slice(cut + 1), policy, lookups, turns, said),
   ];
 }
 

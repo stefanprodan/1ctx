@@ -103,17 +103,9 @@ export function buildRequest(
   send: ActiveSend,
   rows: Message[],
   lookups: ContextLookups,
-  now: number,
 ): ChatRequest {
   const historyOf = (of: Message[]) =>
-    history(
-      of,
-      send.policy,
-      lookups,
-      now,
-      send.mcpNote,
-      send.repos ?? undefined,
-    );
+    history(of, send.policy, lookups, send.mcpNote, send.repos ?? undefined);
   const messages =
     send.channel === null
       ? historyOf(rows)
@@ -232,8 +224,7 @@ async function streamRound(
         ? null
         : send.startedAt + send.policy.deadlineMs;
   const req: ChatRequest = {
-    ...(options.request ??
-      buildRequest(send, rows, deps.lookups, deps.clock())),
+    ...(options.request ?? buildRequest(send, rows, deps.lookups)),
     cacheLife: cacheLife(send),
   };
   // the start checked the new message's images; this one catches a

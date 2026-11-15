@@ -8,7 +8,12 @@ import {
   uploadsBlock,
 } from "../../../src/shared/uploads.ts";
 import { createAutomation, startRun } from "../../helpers/automations.ts";
-import { type ChatApp, chatApp, waitScript } from "../../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  DAY_NOTE,
+  waitScript,
+} from "../../helpers/chat.ts";
 import {
   close,
   files,
@@ -40,7 +45,7 @@ describe("uploads in provider context", () => {
       const started = await start(chat, [item.id], "inspect this");
       const record = started.detail.messages[0]!.uploads!;
       const first = messages(started.script).find(
-        (row) => row.role === "user",
+        (row) => row.role === "user" && row.content !== DAY_NOTE,
       )!;
       expect(first.content).toBe(`inspect this\n\n${uploadsBlock(record)}`);
       expect(JSON.stringify(started.script.body)).not.toContain(
@@ -67,7 +72,9 @@ describe("uploads in provider context", () => {
         [replacement.id],
         "inspect the replacement",
       );
-      const users = messages(next.script).filter((row) => row.role === "user");
+      const users = messages(next.script).filter(
+        (row) => row.role === "user" && row.content !== DAY_NOTE,
+      );
       expect(users[0]).toEqual(first);
       expect(users[1]?.content).toBe(
         `inspect the replacement\n\n${uploadsBlock(
@@ -153,7 +160,7 @@ describe("uploads in provider context", () => {
         ).status,
       ).toBe(201);
       const regenerated = await waitScript(chat.scripted, 2);
-      expect(messages(regenerated)[1]?.content).toBe(
+      expect(messages(regenerated)[2]?.content).toBe(
         `${user.content}\n\n${uploadsBlock(user.uploads!)}`,
       );
       expect(chat.app.knowledge.uploads.read(started.sessionId)).toEqual(tree);

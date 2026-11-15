@@ -11,6 +11,8 @@ import { collectLogs } from "../helpers/app.ts";
 import type { ChatApp, Script } from "../helpers/chat.ts";
 import {
   chatApp,
+  DAY,
+  DAY_NOTE,
   sessionSettled,
   startChat,
   waitScript,
@@ -143,6 +145,7 @@ describe("compaction", () => {
         role: "user",
         content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Continue`,
       },
+      DAY,
       { role: "user", content: "the old question", name: "casey" },
       { role: "assistant", content: "the answer" },
       { role: "user", content: "the new question", name: "casey" },
@@ -413,6 +416,7 @@ describe("compaction", () => {
     };
     expect(body.slice(1, -1)).toEqual([
       lead,
+      DAY,
       { role: "user", content: "question", name: "casey" },
       { role: "assistant", content: "answer" },
       { role: "user", content: "next", name: "casey" },
@@ -436,7 +440,7 @@ describe("compaction", () => {
       (replacement.body.messages as { role: string; content: string }[])
         .slice(1)
         .map((message) => message.content),
-    ).toEqual([lead.content, "question", "answer", "next"]);
+    ).toEqual([lead.content, DAY_NOTE, "question", "answer", "next"]);
     expect(
       chat.app.db
         .query<{ n: number }, [string]>(

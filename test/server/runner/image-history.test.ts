@@ -35,8 +35,6 @@ import {
   NO_IMAGE_ROOM,
 } from "../../../src/shared/images.ts";
 
-const NOW = Date.UTC(2026, 8, 13, 10, 0, 0);
-
 const NONE: Offered = {
   tools: [],
   visuals: false,
@@ -182,7 +180,7 @@ const at = (
 });
 
 const requestOf = (rows: Message[], p: SendPolicy): ChatRequest =>
-  request(p, "s", history(rows, p, lookups, NOW));
+  request(p, "s", history(rows, p, lookups));
 
 describe("the check before a request", () => {
   test("at 32K the window binds, and a request past compactsAt is sent", () => {
@@ -289,14 +287,14 @@ describe("images in history", () => {
         ],
       }),
     ];
-    const blind = history(rows, { ...policy, images: false }, lookups, NOW);
+    const blind = history(rows, { ...policy, images: false }, lookups);
     expect(blind[1]).toEqual({
       role: "user",
       content:
         "look\n\n[image removed: gone0.png, 640x640]\n[image: live0.png, 640x640]",
       name: "casey",
     });
-    const sees = history(rows, policy, lookups, NOW);
+    const sees = history(rows, policy, lookups);
     expect(sees[1]).toEqual({
       role: "user",
       content: "look\n\n[image removed: gone0.png, 640x640]",
@@ -325,19 +323,19 @@ describe("images in history", () => {
     ];
     const claude = at(200_000, "anthropic", "claude-opus-5");
     // 8 MiB is past Anthropic's 10 MB of base64 for one image
-    expect(history(rows(8 * MiB), claude, lookups, NOW)[1]).toMatchObject({
+    expect(history(rows(8 * MiB), claude, lookups)[1]).toMatchObject({
       content: "look\n\n[image: big0.png, 640x640]",
     });
-    expect(imagePartsOf(history(rows(7 * MiB), claude, lookups, NOW))).toEqual([
+    expect(imagePartsOf(history(rows(7 * MiB), claude, lookups))).toEqual([
       expect.objectContaining({ id: "big0", bytes: 7 * MiB }),
     ]);
     const other = at(200_000, "openrouter", "qwen/qwen3-vl");
-    expect(
-      imagePartsOf(history(rows(8 * MiB), other, lookups, NOW)),
-    ).toHaveLength(1);
+    expect(imagePartsOf(history(rows(8 * MiB), other, lookups))).toHaveLength(
+      1,
+    );
     // past the request bound on every wire
     expect(
-      imagePartsOf(history(rows(IMAGE_REQUEST_BYTES + 1), other, lookups, NOW)),
+      imagePartsOf(history(rows(IMAGE_REQUEST_BYTES + 1), other, lookups)),
     ).toHaveLength(0);
   });
 
@@ -350,7 +348,7 @@ describe("images in history", () => {
     ];
     const p = at(200_000, "openai-compatible", "qwen3-vl");
     expect(
-      imagePartsOf(history(rows, p, lookups, NOW)).map((image) => image.id),
+      imagePartsOf(history(rows, p, lookups)).map((image) => image.id),
     ).toEqual(["b0"]);
     expect(IMAGE_TAIL_BYTES).toBe(2.5 * MiB);
   });
@@ -359,8 +357,8 @@ describe("images in history", () => {
     const p = at(200_000, "anthropic", "claude-opus-5");
     const first = [...turn("a", pictures("a", 3)), ...turn("b", [])];
     const second = [...first, ...turn("c", pictures("c", 2))];
-    const one = history(first, p, lookups, NOW);
-    const two = history(second, p, lookups, NOW);
+    const one = history(first, p, lookups);
+    const two = history(second, p, lookups);
     expect(two.slice(0, one.length)).toEqual(one);
     expect(imagePartsOf(one)).toHaveLength(3);
     expect(imagePartsOf(two)).toHaveLength(5);
@@ -374,7 +372,7 @@ describe("images in history", () => {
       row({ id: "n", kind: "user", content: "next" }),
     ];
     const wide = at(200_000, "openai-compatible", "qwen3-vl");
-    const replayed = history(rows, wide, lookups, NOW);
+    const replayed = history(rows, wide, lookups);
     expect(replayed[1]?.content).toStartWith(SUMMARY_LEAD);
     expect(imagePartsOf(replayed).map((image) => image.id)).toEqual([
       "a0",
@@ -384,7 +382,7 @@ describe("images in history", () => {
     // two a request: the tail keeps the newest turn's one
     const two = at(200_000, "openai-compatible", "qwen3-vl", 2);
     expect(
-      imagePartsOf(history(rows, two, lookups, NOW)).map((image) => image.id),
+      imagePartsOf(history(rows, two, lookups)).map((image) => image.id),
     ).toEqual(["b0"]);
     // at 32K the tail's 3,276 tokens take no 2048 image
     const big = [
@@ -393,7 +391,7 @@ describe("images in history", () => {
       row({ id: "n", kind: "user", content: "next" }),
     ];
     const small = at(32_768, "openai-compatible", "qwen3-vl");
-    const after = history(big, small, lookups, NOW);
+    const after = history(big, small, lookups);
     expect(imagePartsOf(after)).toHaveLength(0);
     expect(userOf(after, "a")).toBeUndefined();
   });
@@ -416,17 +414,17 @@ describe("images in history", () => {
       }) as unknown as ActiveSend;
     const rows = turn("a", pictures("a", 2, 640));
     const fits = at(200_000, "openai-compatible", "qwen3-vl", 2);
-    const read = buildRequest(summarizing(fits), rows, lookups, NOW);
+    const read = buildRequest(summarizing(fits), rows, lookups);
     expect(imagePartsOf(read.messages)).toHaveLength(2);
     expect(read).toEqual(
-      summaryRequest(fits, "s", history(rows, fits, lookups, NOW)),
+      summaryRequest(fits, "s", history(rows, fits, lookups)),
     );
     const one = at(200_000, "openai-compatible", "qwen3-vl", 1);
-    const lined = buildRequest(summarizing(one), rows, lookups, NOW);
+    const lined = buildRequest(summarizing(one), rows, lookups);
     expect(imagePartsOf(lined.messages)).toHaveLength(0);
     // past the byte bound too
     const heavy = turn("a", pictures("a", 2, 640, false, 7 * MiB));
-    const heavyRead = buildRequest(summarizing(fits), heavy, lookups, NOW);
+    const heavyRead = buildRequest(summarizing(fits), heavy, lookups);
     expect(imagePartsOf(heavyRead.messages)).toHaveLength(0);
     expect(
       userOf(

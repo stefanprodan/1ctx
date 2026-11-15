@@ -72,7 +72,7 @@ export type SessionsPort = {
     claim(id: string, sessionId: string, messageId: string): boolean;
   };
   setDisabledCapabilities(id: string, keys: readonly string[]): void;
-  mounts: Pick<MountsStore, "setReposBlock">;
+  mounts: Pick<MountsStore, "setReposBlock" | "setTurnNote">;
   create(fields: {
     id?: string;
     projectId: string;

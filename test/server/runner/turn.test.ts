@@ -19,6 +19,7 @@ import type { Wire } from "../../../src/shared/words.ts";
 import {
   type ChatApp,
   chatApp,
+  DAY_NOTE,
   type Script,
   sessionSettled,
   setLimits,
@@ -66,9 +67,12 @@ const turnOf = (chat: ChatApp, sessionId: string): Message[] => {
   return rows.filter((row) => row.sendId === last.sendId);
 };
 
+// the authors' messages, the day note before the turn left out
 const userMessages = (script: Script) =>
   (script.body.messages as { role: string; content: string; name?: string }[])
-    .filter((message) => message.role === "user")
+    .filter(
+      (message) => message.role === "user" && message.content !== DAY_NOTE,
+    )
     .map(({ content, name }) => ({ content, name }));
 
 describe("a turn of several user messages", () => {

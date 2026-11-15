@@ -10,6 +10,7 @@ import { adapter, threadJobs } from "../../../src/server/repos/index.ts";
 import {
   type ChatApp,
   chatApp,
+  DAY_NOTE,
   type Script,
   startChat,
   waitScript,
@@ -92,7 +93,7 @@ describe("a subagent's repositories", () => {
       // the commit the parent mounted, before the task, never a move
       const messages = child.body.messages as { content: string }[];
       expect(messages.slice(1, 3).map((m) => m.content)).toEqual([
-        BLOCK,
+        `${DAY_NOTE}\n\n${BLOCK}`,
         "Read the README.",
       ]);
       expect(bashOf(child)).not.toContain("open <file>");

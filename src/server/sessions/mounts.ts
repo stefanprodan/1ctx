@@ -45,6 +45,19 @@ export function setReposBlock(
   ).run(block === "" ? null : block, messageId);
 }
 
+// the author's day as the turn's first send read it, kept the same way
+// as the repository block
+export function setTurnNote(
+  db: Db,
+  messageId: string,
+  note: string,
+  replace = false,
+) {
+  db.query(
+    `update messages set turn_note = ? where id = ?${replace ? "" : " and turn_note is null"}`,
+  ).run(note, messageId);
+}
+
 // each earlier turn's mounted commits, newest first, from its first
 // message: the sends of a chat are few where its messages are many.
 // Every send that shares the turn's first message is the turn itself,
@@ -80,6 +93,10 @@ export class MountsStore {
 
   setReposBlock(messageId: string, block: string, replace = false): void {
     setReposBlock(this.db, messageId, block, replace);
+  }
+
+  setTurnNote(messageId: string, note: string, replace = false): void {
+    setTurnNote(this.db, messageId, note, replace);
   }
 
   mountedBefore(sessionId: string, firstMessageId: string): MountedRepos[] {

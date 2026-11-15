@@ -111,8 +111,9 @@ is its root.
   through their parent's send.
 - **Its system prompt is `subagentPrompt()`** (`runner/prompt.ts`): the
   project line, the agent's prompt, `SUBAGENT_LINE`, the skills
-  catalog, the MCP catalog and instructions, the date. Its one user
-  message is `task`, written by the parent's user.
+  catalog, the MCP catalog and instructions. Its one user message is
+  `task`, written by the parent's user, with the turn's note next to
+  its parent's commit lines.
 - **Its offer is `childOffered()`** (`tools/offer.ts`), taken with the
   parent's as `policy.childOffered`: the main offer less `delegate`,
   `memory_edit`, `email_user`, `visualize`, `attention`,

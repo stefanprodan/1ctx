@@ -26,6 +26,7 @@ import {
 import { lastLine } from "./envelope.ts";
 import { claimTurnImages, releaseHeld } from "./images.ts";
 import type { SendPolicy } from "./policy.ts";
+import { turnNote } from "./prompt.ts";
 import { applyChanges } from "./turn.ts";
 import type { ImagesPort, SessionsPort, UploadsPort } from "./writer-port.ts";
 
@@ -232,6 +233,21 @@ export function startSend(deps: StartDeps, fields: StartFields): Started {
       lastAuthor = turn.lastAuthor;
       // the rows that saved are gone, so the chat has seen only its snapshot
       deps.views.resetSeen(base.id);
+    }
+    // the day goes on the turn, never the system prompt, so midnight
+    // keeps the cached prefix. A run's own line says its start and a
+    // channel says the day in its request-local message. A regenerate
+    // says its own day: the cached prefix ends before this message
+    if (
+      !("posted" in turn) &&
+      (fields.kind ?? "chat") === "chat" &&
+      base.origin !== "channel"
+    ) {
+      deps.sessions.mounts.setTurnNote(
+        firstMessageId(turn),
+        turnNote(now, policy.tz),
+        "existing" in turn,
+      );
     }
     // a chat keeps the note its first send read; a run reads it live
     if ((fields.kind ?? "chat") === "chat") {

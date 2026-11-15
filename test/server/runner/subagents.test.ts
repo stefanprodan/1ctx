@@ -11,6 +11,7 @@ import { testApp } from "../../helpers/app.ts";
 import { createAutomation, startRun } from "../../helpers/automations.ts";
 import {
   chatApp,
+  DAY,
   freed,
   NO_TOOLS,
   setLimits,
@@ -83,6 +84,7 @@ describe("delegated work", () => {
       expect(system(child)).not.toContain("You talk to");
       expect(system(child)).not.toContain("knowledge base");
       expect(wire(child).slice(1)).toEqual([
+        DAY,
         {
           role: "user",
           content: "List the files under /repos.",

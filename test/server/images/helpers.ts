@@ -7,7 +7,12 @@
 import { expect } from "bun:test";
 import type { StagedImage } from "../../../src/shared/api/images.ts";
 import { hashPassword } from "../../helpers/app.ts";
-import { type ChatApp, chatApp, type Script } from "../../helpers/chat.ts";
+import {
+  type ChatApp,
+  chatApp,
+  DAY_NOTE,
+  type Script,
+} from "../../helpers/chat.ts";
 import { png } from "../../helpers/images.ts";
 import { createTeam } from "../../helpers/projects.ts";
 
@@ -138,10 +143,13 @@ export type { ChatApp };
 
 type Part = { type: string; text?: string; image_url?: { url: string } };
 
-// the user messages on the wire as text: an image part as <its type>
+// the user messages on the wire as text: an image part as <its type>,
+// the day note before the turn left out
 export const userTexts = (script: Script) =>
   (script.body.messages as { role: string; content: string | Part[] }[])
-    .filter((message) => message.role === "user")
+    .filter(
+      (message) => message.role === "user" && message.content !== DAY_NOTE,
+    )
     .map((message) =>
       typeof message.content === "string"
         ? message.content

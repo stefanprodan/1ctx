@@ -6,6 +6,7 @@ import { tokens } from "../../src/server/lib/tokens.ts";
 import { wireTools } from "../../src/server/providers/index.ts";
 import { EXHAUSTED_LINE } from "../../src/server/runner/context.ts";
 import { buildRequest } from "../../src/server/runner/round.ts";
+import { sendTurns } from "../../src/server/sessions/index.ts";
 import { collectLogs } from "../helpers/app.ts";
 import {
   createAutomation,
@@ -105,17 +106,12 @@ test("rounds without usage accumulate the request estimate without fabricating u
     const { script, sessionId } = await startChat(chat, " budget".repeat(6000));
     const send = (chat.app.runner.registry.inSession(sessionId)[0] ?? null)!;
     const estimate = () => {
-      const req = buildRequest(
-        send,
-        chat.app.sessions.messages(sessionId),
-        {
-          usernameOf: (id) => chat.app.users.byId(id)?.username ?? null,
-          reasoningDetailsOf: (id, providerId, model) =>
-            chat.app.sessions.reasoningDetails(id, providerId, model),
-          turnsOf: () => new Map(),
-        },
-        chat.app.now.value,
-      );
+      const req = buildRequest(send, chat.app.sessions.messages(sessionId), {
+        usernameOf: (id) => chat.app.users.byId(id)?.username ?? null,
+        reasoningDetailsOf: (id, providerId, model) =>
+          chat.app.sessions.reasoningDetails(id, providerId, model),
+        turnsOf: (id) => sendTurns(chat.app.db, id),
+      });
       return tokens(
         JSON.stringify({
           messages: req.messages,

@@ -5,10 +5,10 @@ import { knowledgeBlock } from "../../shared/knowledge.ts";
 import { memoryBlock } from "../../shared/memory.ts";
 import { offers, type SendPolicy } from "./policy.ts";
 import {
-  dateLine,
   projectLine,
   type RepoLines,
   reposBlock,
+  turnNote,
   userLine,
 } from "./prompt.ts";
 
@@ -32,7 +32,10 @@ export function channelSystem(policy: SendPolicy): string {
 }
 
 export function channelLocal(
-  policy: SendPolicy,
+  policy: Pick<
+    SendPolicy,
+    "fullName" | "username" | "about" | "tz" | "projectMemory"
+  >,
   now: number,
   mcpNote: string,
   repos: RepoLines,
@@ -40,7 +43,7 @@ export function channelLocal(
   return [
     userLine(policy),
     memoryBlock("project-memory", policy.projectMemory),
-    dateLine(now),
+    turnNote(now, policy.tz),
     reposBlock(repos),
     mcpNote,
   ]

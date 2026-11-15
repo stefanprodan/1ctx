@@ -32,6 +32,7 @@ import {
 import {
   type ChatApp,
   chatApp,
+  DAY,
   NO_TOOLS,
   type Script,
   startChat,
@@ -409,6 +410,7 @@ describe("POST /api/sessions/:id/fork", () => {
       expect(next.body.messages).toEqual([
         { role: "system", content: expect.any(String) },
         { role: "user", content: `${SUMMARY_LEAD}\n\n## Goal\n\n- Continue` },
+        DAY,
         { role: "user", content: "the old question", name: "casey" },
         { role: "assistant", content: "the old answer" },
         { role: "user", content: "the new question", name: "casey" },
@@ -469,6 +471,7 @@ describe("POST /api/sessions/:id/fork", () => {
       const next = await waitScript(chat.scripted, 4);
       expect(next.body.messages).toEqual([
         { role: "system", content: expect.any(String) },
+        DAY,
         { role: "user", content: "the first question", name: "casey" },
         { role: "assistant", content: "the original answer" },
         { role: "user", content: "the new question", name: "casey" },
@@ -635,6 +638,7 @@ describe("POST /api/sessions/:id/fork", () => {
       const next = await waitScript(chat.scripted, 2);
       expect(next.body.messages).toEqual([
         { role: "system", content: expect.any(String) },
+        DAY,
         { role: "user", content: "edited draft", name: "casey" },
       ]);
       await finish(chat, copied.session.id, next);
@@ -866,6 +870,7 @@ describe("POST /api/sessions/:id/fork", () => {
       expect(next.body.tools).toBeUndefined();
       expect(next.body.messages).toEqual([
         { role: "system", content: expect.any(String) },
+        DAY,
         { role: "user", content: "admin question", name: "admin" },
         {
           role: "assistant",
