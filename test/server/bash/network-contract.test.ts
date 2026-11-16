@@ -186,7 +186,7 @@ for (const target of [
   "data:text/plain,blocked",
 ]) {
   test.serial(
-    `a real worker refuses a private-host redirect to ${target}`,
+    `a real worker refuses a later redirect to ${target}`,
     async () => {
       const s = setup();
       try {
@@ -195,7 +195,7 @@ for (const target of [
             new Response(null, {
               status: 302,
               headers: {
-                location: url === URL ? "http://127.0.0.1/hop" : target,
+                location: url === URL ? "http://hop.example.test/hop" : target,
               },
             }),
           async (seen) => {
@@ -206,7 +206,7 @@ for (const target of [
             );
             expect(seen.map(({ url }) => url)).toEqual([
               URL,
-              "http://127.0.0.1/hop",
+              "http://hop.example.test/hop",
             ]);
           },
         );
@@ -264,7 +264,12 @@ test.serial(
   "a real worker strips caller credentials only after crossing origins",
   async () => {
     const s = setup();
-    const urls = [URL, `${URL}same`, "http://127.0.0.1/cross", `${URL}back`];
+    const urls = [
+      URL,
+      `${URL}same`,
+      "http://cross.example.test/cross",
+      `${URL}back`,
+    ];
     try {
       await transport(
         ({ url }) => {
@@ -371,6 +376,37 @@ test.serial(
           );
         }
       }
+    }
+  },
+);
+
+test.serial(
+  "a real worker refuses a private host, directly or on a redirect",
+  async () => {
+    const s = setup();
+    try {
+      await transport(
+        () =>
+          new Response(null, {
+            status: 302,
+            headers: { location: "http://169.254.169.254/latest/meta-data/" },
+          }),
+        async (seen) => {
+          const direct = await run(s, "curl -sS http://127.0.0.1:8080/", caps);
+          expect(direct.error).toBe(true);
+          expect(direct.content).toContain(
+            "curl: (7) Network access denied: private host refused: http://127.0.0.1:8080/",
+          );
+          const hop = await run(s, `curl -sSL ${URL}`, caps);
+          expect(hop.error).toBe(true);
+          expect(hop.content).toContain(
+            "private host refused: http://169.254.169.254/latest/meta-data/",
+          );
+          expect(seen.map(({ url }) => url)).toEqual([URL]);
+        },
+      );
+    } finally {
+      s.db.close();
     }
   },
 );

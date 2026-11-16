@@ -176,6 +176,46 @@ describe("fetch URL guard", () => {
     );
   });
 
+  test("refuses a private host unless the admin listed it", () => {
+    for (const url of [
+      "http://127.0.0.1/",
+      "http://[::1]/",
+      "http://169.254.169.254/",
+      "http://10.0.0.7/",
+      "http://2130706433/",
+      "http://localhost./",
+    ]) {
+      expect(() => parseFetchUrl(url), url).toThrow("private host refused");
+      expect(
+        () => parseFetchUrl(url, { mode: "all", domains: [] }),
+        url,
+      ).toThrow("private host refused");
+    }
+    expect(
+      parseFetchUrl("http://10.0.0.7/a", {
+        mode: "listed",
+        domains: ["10.0.0.7"],
+      }).href,
+    ).toBe("http://10.0.0.7/a");
+  });
+
+  test("refuses a redirect to a private host", async () => {
+    const requested: string[] = [];
+    await expect(
+      run(
+        { url: "https://docs.test/start" },
+        dependencies((url) => {
+          requested.push(url);
+          return new Response(null, {
+            status: 302,
+            headers: { location: "http://169.254.169.254/" },
+          });
+        }),
+      ),
+    ).rejects.toThrow("redirect refused: private host refused");
+    expect(requested).toEqual(["https://docs.test/start"]);
+  });
+
   test("rejects an empty url argument", async () => {
     await expect(
       run(

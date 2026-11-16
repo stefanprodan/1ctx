@@ -7,6 +7,7 @@ import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
 import { raceSignal } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
 import { messageOf, ToolError } from "../../lib/errors.ts";
+import { privateHost } from "../../lib/hosts.ts";
 import type { Tool, ToolContext } from "../types.ts";
 
 function cutNote(maxBytes: number): string {
@@ -131,6 +132,16 @@ export function parseFetchUrl(
   }
   const host = normalizedHost(url.hostname);
   if (host === "") throw new Error("URL has no host");
+  // the same rule as curl in bash: a private host only when listed
+  if (
+    privateHost(url.hostname) &&
+    !(web?.mode === "listed" && web.domains.includes(url.hostname))
+  ) {
+    throw new ToolError(
+      `private host refused: ${url.host}`,
+      "private host refused",
+    );
+  }
   url.hostname = host.includes(":") ? `[${host}]` : host;
   return url;
 }
