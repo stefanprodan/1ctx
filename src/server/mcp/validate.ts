@@ -16,10 +16,13 @@ export const MAX_VALIDATORS = 256;
 const MAX_LISTED = 40;
 // Ajv runs pattern and patternProperties with RegExp, which backtracks,
 // so a remote server's "^(a|a)*$" would hold the one thread on the
-// model's text; a schema holding either key anywhere is not compiled
-// and the server judges its calls. The walk keeps its own stack, so no
-// depth of nesting overflows it.
-function hasPattern(schema: unknown): boolean {
+// model's text, and some of its formats (url) backtrack too; a schema
+// holding any of these keys anywhere is not compiled and the server
+// judges its calls. The walk keeps its own stack, so no depth of
+// nesting overflows it.
+const REGEX_KEYWORDS = ["pattern", "patternProperties", "format"];
+
+function hasRegexKeyword(schema: unknown): boolean {
   const stack: unknown[] = [schema];
   const seen = new Set<object>();
   while (stack.length > 0) {
@@ -30,8 +33,7 @@ function hasPattern(schema: unknown): boolean {
     seen.add(node);
     if (
       !Array.isArray(node) &&
-      (Object.hasOwn(node, "pattern") ||
-        Object.hasOwn(node, "patternProperties"))
+      REGEX_KEYWORDS.some((key) => Object.hasOwn(node, key))
     ) {
       return true;
     }
@@ -43,8 +45,8 @@ function hasPattern(schema: unknown): boolean {
 let argumentValidator = new AjvJsonSchemaValidator();
 const validators = new Map<string, Validate | null>();
 
-// null when the schema holds a pattern, does not compile or the check
-// throws
+// null when the schema holds a regex keyword, does not compile or the
+// check throws
 function check(
   schema: Record<string, unknown>,
   input: Record<string, unknown>,
@@ -57,7 +59,7 @@ function check(
     }
     let validate: Validate | null = null;
     try {
-      if (!hasPattern(schema)) {
+      if (!hasRegexKeyword(schema)) {
         validate = argumentValidator.getValidator(schema as JsonSchemaType);
       }
     } catch {}

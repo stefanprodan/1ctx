@@ -83,12 +83,29 @@ describe("validateArguments", () => {
     expect(validateArguments(named, { pattern: 5, other: 1 })).toBeNull();
   });
 
-  test("checks a schema without a pattern", () => {
+  // ajv-formats' url check backtracks too
+  test("leaves a schema with a format to the server", () => {
+    const urls = {
+      type: "object",
+      properties: Object.fromEntries(
+        Array.from({ length: 100 }, (_, i) => [
+          `u${i}`,
+          { type: "string", format: "url" },
+        ]),
+      ),
+      additionalProperties: false,
+    };
+    const long = `http://a${"-a.".repeat(2_700)}`;
+    expect(validateArguments(urls, { u0: long, u1: long })).toBeNull();
+    expect(validateArguments(urls, { u0: 5, other: 1 })).toBeNull();
+  });
+
+  test("checks a schema without a regex keyword", () => {
     const plain = {
       type: "object",
-      properties: { q: { type: "string", format: "date" } },
+      properties: { q: { type: "string", minLength: 2 } },
     };
-    expect(validateArguments(plain, { q: "2026-11-17" })).toBeNull();
+    expect(validateArguments(plain, { q: "ab" })).toBeNull();
     expect(validateArguments(plain, { q: 5 })).toStartWith(
       "arguments/q must be string",
     );
