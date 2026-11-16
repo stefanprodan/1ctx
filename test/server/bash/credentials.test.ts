@@ -635,6 +635,35 @@ test.serial(
   },
 );
 
+test.serial("a signed request may not name a charset in Accept", async () => {
+  await withTransport(
+    () => new Response("ok"),
+    async (seen) => {
+      const fetch = commandFetch(ALL, [quotes()], limits);
+      for (const headers of [
+        { Accept: "text/plain; charset=utf-16le" },
+        new Headers({ accept: "application/json;CHARSET=utf-32" }),
+      ]) {
+        const refused = await fetch(`${PREFIX}q`, { headers }).catch(
+          (error) => error,
+        );
+        expect(refused.message).toBe(
+          `Network access denied: credential quotes refuses the accept header: ${PREFIX}q`,
+        );
+      }
+      expect(seen).toHaveLength(0);
+      await fetch(`${PREFIX}q`, { headers: { Accept: "application/json" } });
+      await fetch("https://docs.example.test/", {
+        headers: { Accept: "text/plain; charset=utf-16le" },
+      });
+      expect(seen.map((r) => r.headers.get("accept"))).toEqual([
+        "application/json",
+        "text/plain; charset=utf-16le",
+      ]);
+    },
+  );
+});
+
 test.serial("a signed request refuses a partial response", async () => {
   await withTransport(
     () =>

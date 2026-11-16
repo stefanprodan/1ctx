@@ -81,6 +81,21 @@ const SHAPING_HEADERS = new Set([
 
 const SIGNED_REFUSED = new Set([...ROUTING_HEADERS, ...SHAPING_HEADERS]);
 
+// an Accept naming a charset asks for another encoding of the body too
+function charsetAccept(
+  headers: SecureFetchOptions["headers"],
+): string | undefined {
+  if (headers === undefined) return undefined;
+  const entries =
+    headers instanceof Headers ? [...headers] : Object.entries(headers);
+  return entries.some(
+    ([name, value]) =>
+      name.toLowerCase() === "accept" && /;\s*charset\s*=/i.test(value),
+  )
+    ? "accept"
+    : undefined;
+}
+
 // a Host override reaches past Listed domains, so the web fetch refuses
 // the headers that name another host
 const HOST_HEADERS = new Set(["host", "forwarded", "x-forwarded-host"]);
@@ -356,7 +371,9 @@ export function commandFetch(
           `credential ${credential.name} ${REFUSALS[credential.refused]}`,
         );
       } else {
-        const header = refusedHeader(options.headers, SIGNED_REFUSED);
+        const header =
+          refusedHeader(options.headers, SIGNED_REFUSED) ??
+          charsetAccept(options.headers);
         if (header !== undefined) {
           throw new NetworkAccessDeniedError(
             url,
