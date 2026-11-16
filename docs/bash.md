@@ -111,8 +111,12 @@ that shell that shows a file on the chat page.
   `readKey()` then, so a replaced file applies to the next command.
 - **Refusals name the credential, never the key file.** Off, keyless,
   unusable, deleted or changed credentials, a subagent's write-only
-  one, a method it lacks and a routing header (`ROUTING_HEADERS`) are
-  refused before anything is sent. Keys ride only in the command caps.
+  one, a method it lacks, a routing header (`ROUTING_HEADERS`) and a
+  header asking for part of a body or another encoding of it
+  (`SHAPING_HEADERS`: Range, If-Range, Accept-Charset, Accept-Encoding)
+  are refused before anything is sent, since redaction matches only a
+  whole key. A signed request's 206 answer is refused too. Unsigned
+  requests send all four. Keys ride only in the command caps.
 - **A key never reaches the result.** Every key read, and its
   JSON-escaped forms (`escapedForms()`), is replaced by `[credential
   <name>]` in body, header values, status text, final URL and errors.

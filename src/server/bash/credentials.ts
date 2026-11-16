@@ -70,6 +70,17 @@ const ROUTING_HEADERS = new Set([
   "x-method-override",
 ]);
 
+// headers that make a server send part of a body or another encoding
+// of it, so an echoed key could come back in pieces redaction misses
+const SHAPING_HEADERS = new Set([
+  "range",
+  "if-range",
+  "accept-charset",
+  "accept-encoding",
+]);
+
+const SIGNED_REFUSED = new Set([...ROUTING_HEADERS, ...SHAPING_HEADERS]);
+
 // a Host override reaches past Listed domains, so the web fetch refuses
 // the headers that name another host
 const HOST_HEADERS = new Set(["host", "forwarded", "x-forwarded-host"]);
@@ -345,7 +356,7 @@ export function commandFetch(
           `credential ${credential.name} ${REFUSALS[credential.refused]}`,
         );
       } else {
-        const header = refusedHeader(options.headers, ROUTING_HEADERS);
+        const header = refusedHeader(options.headers, SIGNED_REFUSED);
         if (header !== undefined) {
           throw new NetworkAccessDeniedError(
             url,
@@ -359,6 +370,12 @@ export function commandFetch(
           );
         }
         result = await signedFetch(credential)(url, options);
+        if (result.status === 206) {
+          throw new NetworkAccessDeniedError(
+            url,
+            `credential ${credential.name} refuses a partial response`,
+          );
+        }
       }
       return redactResult(result, secrets, limits.maxResponseSize);
     } catch (error) {

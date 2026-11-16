@@ -602,3 +602,55 @@ test.serial(
     );
   },
 );
+
+test.serial(
+  "a signed request may not ask for part of a body or another encoding",
+  async () => {
+    const shaping = {
+      Range: "bytes=0-3",
+      "If-Range": '"tag"',
+      "Accept-Charset": "utf-16",
+      "Accept-Encoding": "identity;q=0, x-custom",
+    };
+    await withTransport(
+      () => new Response("ok"),
+      async (seen) => {
+        const fetch = commandFetch(ALL, [quotes()], limits);
+        for (const [name, value] of Object.entries(shaping)) {
+          const refused = await fetch(`${PREFIX}q`, {
+            headers: { [name]: value },
+          }).catch((error) => error);
+          expect(refused.message).toBe(
+            `Network access denied: credential quotes refuses the ${name.toLowerCase()} header: ${PREFIX}q`,
+          );
+        }
+        expect(seen).toHaveLength(0);
+        await fetch("https://docs.example.test/", { headers: shaping });
+        expect(seen).toHaveLength(1);
+        for (const [name, value] of Object.entries(shaping)) {
+          expect(seen[0]!.headers.get(name)).toBe(value);
+        }
+      },
+    );
+  },
+);
+
+test.serial("a signed request refuses a partial response", async () => {
+  await withTransport(
+    () =>
+      new Response(KEY.slice(0, 4), {
+        status: 206,
+        headers: { "content-range": "bytes 0-3/21" },
+      }),
+    async (seen) => {
+      const fetch = commandFetch(ALL, [quotes()], limits);
+      const refused = await fetch(`${PREFIX}q`).catch((error) => error);
+      expect(refused.message).toBe(
+        `Network access denied: credential quotes refuses a partial response: ${PREFIX}q`,
+      );
+      const unsigned = await fetch("https://docs.example.test/");
+      expect(unsigned.status).toBe(206);
+      expect(seen).toHaveLength(2);
+    },
+  );
+});
