@@ -6,10 +6,11 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { automationProject } from "../data/automations.ts";
 import { taskPage } from "../data/external-task.ts";
-import { projects } from "../data/projects.ts";
+import { projects, projectsError } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
+import { Bone } from "../ui/Bones.tsx";
 import { PathName } from "../ui/PathName.tsx";
 import {
   adminFace,
@@ -222,6 +223,11 @@ export function Rail({
                   <span>{route.nav!.label}</span>
                 </a>
                 {route.path === "/projects" &&
+                  projects.value === null &&
+                  projectsError.value === null && (
+                    <RailProjectsWaiting label="Loading projects" />
+                  )}
+                {route.path === "/projects" &&
                   (projects.value ?? []).map((p) => (
                     <Sub
                       key={p.id}
@@ -262,6 +268,67 @@ export function Rail({
           <Icon name="chevron" size={14} class="rail-user-chevron" />
         </button>
       </UserMenu>
+    </aside>
+  );
+}
+
+// the projects' rows before the list lands, a project's icon and name;
+// with a label they wait on their own, inside a rail already drawn
+function RailProjectsWaiting({
+  count = 3,
+  at = 0,
+  label,
+}: {
+  count?: number;
+  at?: number;
+  label?: string;
+}) {
+  const rows = Array.from({ length: count }, (_, i) => (
+    <span key={i} class="rail-sub rail-sub-icon" aria-hidden="true">
+      <Bone kind="icon" at={at + i * 2} />
+      <Bone kind="line" at={at + i * 2 + 1} width={[58, 44, 66][i % 3]} />
+    </span>
+  ));
+  if (label === undefined) return <>{rows}</>;
+  return (
+    <div class="rail-wait bones-wait" role="status" aria-label={label}>
+      {rows}
+    </div>
+  );
+}
+
+// the rail before the signed-in user is known: the mark, then a bone
+// for each entry's icon and name and a few projects, and the user's row
+export function RailWaiting() {
+  const entries = navEntries();
+  return (
+    <aside class="rail bones-wait" aria-hidden="true">
+      <div class="rail-top">
+        <div class="rail-head">
+          <span class="rail-logo">
+            <Logo height={26} />
+          </span>
+        </div>
+        <div class="rail-nav">
+          {entries.map((route, i) => (
+            <Fragment key={route.path}>
+              <span class="rail-item">
+                <Bone kind="glyph" at={i * 2} />
+                <Bone kind="line" at={i * 2 + 1} width={40} />
+              </span>
+              {route.path === "/projects" && (
+                <RailProjectsWaiting at={entries.length * 2} />
+              )}
+            </Fragment>
+          ))}
+        </div>
+      </div>
+      <div class="rail-user">
+        <span class="rail-user-row">
+          <Bone kind="avatar" at={0} />
+          <Bone kind="line" at={1} width={50} />
+        </span>
+      </div>
     </aside>
   );
 }

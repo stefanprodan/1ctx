@@ -35,6 +35,7 @@ import {
   RowsNew,
   RowsNote,
   RowsTree,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
 import { Frame } from "../projects/Frame.tsx";
@@ -95,7 +96,7 @@ function Base({ projectId }: { projectId: string }) {
     return (
       <Rows>
         <RowsCard label="Knowledge">
-          <RowsNote>Loading</RowsNote>
+          <RowsWaiting shape="icon" label="Loading knowledge" />
         </RowsCard>
       </Rows>
     );

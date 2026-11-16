@@ -25,13 +25,14 @@ import { useNow } from "../../lib/now.ts";
 import { at } from "../../lib/save.ts";
 import { countOf } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
-import { RowsNote } from "../../ui/Rows.tsx";
+import { RowsNote, RowsWaiting } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm, SettingStack } from "../../ui/Setting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { KeyRow } from "../keys/KeyRow.tsx";
 import { fullNameProblem } from "../profile/Profile.model.ts";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
+import { CardsWaiting, UsageBones } from "./AdminWaiting.tsx";
 import { teamsOf } from "./Credentials.model.ts";
 import { useDraftCard } from "./DraftCard.tsx";
 import { useShownRow } from "./drafts.ts";
@@ -88,6 +89,7 @@ export function UserPage({ params }: { params: Params }) {
       }
       split
       loading={list === null && error === null}
+      waiting={<UserWaiting />}
       empty={
         list !== null && user === null ? "No user by that name." : undefined
       }
@@ -101,6 +103,32 @@ export function UserPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the profile, role, projects and keys cards, as an admin sees them
+// on another user's page
+function UserWaiting() {
+  return (
+    <CardsWaiting
+      label="Loading the user"
+      aside={
+        <>
+          <UsageBones label="Personal, last 30 days" />
+          <AsideBones label="Account" lines={2} />
+        </>
+      }
+      cards={[
+        { fields: ["input", "input", "input", "input"], foot: 2 },
+        { title: "Role", action: "seg", foot: 2 },
+        { title: "Projects", action: true, rows: 2, foot: 2 },
+        {
+          title: "Access keys",
+          line: "Made on their profile. Revoke stops their agents at once.",
+          rows: 0,
+        },
+      ]}
+    />
   );
 }
 
@@ -276,9 +304,11 @@ function ProjectsCard({ user, saving }: CardProps) {
         foot={card.foot()}
       >
         {!loaded ? (
-          <RowsNote>
-            {projectsError.value !== null ? "Did not load." : "Loading"}
-          </RowsNote>
+          projectsError.value !== null ? (
+            <RowsNote>Did not load.</RowsNote>
+          ) : (
+            <RowsWaiting shape="plain" label="Loading projects" />
+          )
         ) : ids.length === 0 ? (
           <RowsNote>No projects yet.</RowsNote>
         ) : (
@@ -307,7 +337,7 @@ function KeysCard({ user }: { user: AdminUser }) {
       list
     >
       {keys === undefined ? (
-        <RowsNote>Loading</RowsNote>
+        <RowsWaiting shape="plain" label="Loading access keys" />
       ) : keys === null ? (
         <RowsNote>Did not load.</RowsNote>
       ) : keys.length === 0 ? (

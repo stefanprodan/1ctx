@@ -18,7 +18,7 @@ import {
 import { byName } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { SettingAlert, SettingStack } from "../../ui/Setting.tsx";
-import { AsideLine, AsideRead, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideRead, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import { AgentGeneral } from "./AgentGeneral.tsx";
@@ -28,6 +28,8 @@ import { AgentDrafts } from "./AgentPage.state.ts";
 import { AgentSkills } from "./AgentSkills.tsx";
 import { useRowDrafts, useShownRow } from "./drafts.ts";
 import "./agent-page.css";
+import { CardsWaiting } from "./AdminWaiting.tsx";
+import { NameFieldsWaiting } from "./NameFields.tsx";
 
 const STEPS = [zoneStep("Config"), { label: "Agents", href: AGENTS_HREF }];
 
@@ -74,6 +76,7 @@ export function AgentPage({ params }: { params: Params }) {
       }
       split
       loading={list === null && error === null}
+      waiting={<AgentWaiting name={params.name} tab={tab} />}
       empty={missing ? "No agent by that name." : undefined}
       error={error}
     >
@@ -83,6 +86,49 @@ export function AgentPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the tab's cards under the tabs, which wait with no count
+function AgentWaiting({ name, tab }: { name: string; tab: AgentTab }) {
+  return (
+    <CardsWaiting
+      label="Loading the agent"
+      usage
+      aside={<AsideBones label="Used in" lines={2} />}
+      lead={
+        <Tabs
+          tabs={TABS.map((t) => ({
+            label: t.label,
+            href: configAgentHref(name, t.tab),
+          }))}
+          active={configAgentHref(name, tab)}
+        />
+      }
+      cards={
+        tab === "general"
+          ? [
+              {
+                title: "Identity",
+                body: <NameFieldsWaiting fresh={false} />,
+                foot: 2,
+              },
+              {
+                title: "Model",
+                action: true,
+                fields: ["line", "input", "seg"],
+              },
+            ]
+          : [
+              {
+                title: tab === "mcp" ? "MCP" : "Skills",
+                line: true,
+                rows: 4,
+                foot: 2,
+              },
+            ]
+      }
+    />
   );
 }
 
@@ -160,6 +206,7 @@ function Aside({ agent }: { agent: AgentSummary }) {
       </UsageSection>
       <AsideRead
         label="Used in"
+        waiting="Loading where it is used"
         value={facts === undefined ? undefined : (facts?.impact ?? null)}
       >
         {(impact) => (

@@ -26,6 +26,7 @@ import {
   RowsNote,
   RowsTag,
   RowsTitle,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { rowState } from "./Automations.model.ts";
 import { Frame } from "./Frame.tsx";
@@ -55,7 +56,7 @@ export function Automations({ params }: { params: Params }) {
           {automationsError.value !== null ? (
             <RowsNote>{automationsError.value}</RowsNote>
           ) : list === null || agents === null ? (
-            <RowsNote>Loading</RowsNote>
+            <RowsWaiting label="Loading automations" />
           ) : list.length === 0 ? (
             <RowsNote>
               {agents.length === 0

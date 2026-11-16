@@ -4,6 +4,7 @@
 import { expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { Page, PageNotice } from "../../../src/client/ui/Page.tsx";
+import { withClass } from "../../helpers/classes.ts";
 
 test("a label, linked crumb, menu and failure keep their controls", () => {
   const labelled = render(
@@ -24,7 +25,9 @@ test("a label, linked crumb, menu and failure keep their controls", () => {
   );
   expect(loading).toMatch(/<h1\b[^>]*>[\s\S]*>Profile<[\s\S]*<\/h1>/);
   expect(loading).toMatch(/<a\b[^>]*href="\/profile"[^>]*>Account<\/a>/);
-  expect(loading).toContain(">Loading<");
+  expect(loading).not.toContain(">Loading<");
+  expect(loading.match(/role="status"/g)?.length).toBe(1);
+  expect(loading).toContain('aria-label="Loading Profile"');
   const empty = render(<Page crumb="" title="Home" empty="Nothing yet" />);
   expect(empty).toMatch(/<h1\b[^>]*>[\s\S]*>Home<[\s\S]*<\/h1>/);
   expect(empty).toContain(">Nothing yet<");
@@ -136,4 +139,99 @@ test("a notice spans the head after the actions, a refusal read out at once", ()
   const notice = render(<PageNotice words="An unsaved edit." />);
   expect(notice).toContain('role="status"');
   expect(notice).toContain("An unsaved edit.");
+});
+
+test("loading draws three rows in a card by default, the head kept", () => {
+  const html = render(
+    <Page crumb="" title="Agents" loading>
+      <p>rows</p>
+    </Page>,
+  );
+  expect(html).toMatch(/<h1\b[^>]*>[\s\S]*>Agents<[\s\S]*<\/h1>/);
+  expect(html).not.toContain("<p>rows</p>");
+  expect(withClass(html, "rows-card", "rows-waiting", "bones-wait")).toBe(1);
+  expect(html.split('class="rows-item" aria-hidden="true"').length - 1).toBe(3);
+  expect(html.match(/role="status"/g)?.length).toBe(1);
+  expect(html).toContain('aria-label="Loading Agents"');
+});
+
+test("loading draws the view's own waiting shape in place of the rows", () => {
+  const html = render(
+    <Page
+      title="Chat"
+      loading
+      waiting={<div role="status" aria-label="Loading the chat" />}
+    >
+      <p>rows</p>
+    </Page>,
+  );
+  expect(html).toContain('aria-label="Loading the chat"');
+  expect(html).not.toContain("rows-waiting");
+  expect(html).not.toContain("<p>rows</p>");
+  // a failure wins over the wait
+  const failed = render(<Page title="Chat" loading error="gone" />);
+  expect(failed).toContain("This page did not load");
+  expect(failed).not.toContain("rows-waiting");
+});
+
+test("a page that is not loading draws its children, no bones", () => {
+  const html = render(
+    <Page title="Agents" loading={false}>
+      <p>rows</p>
+    </Page>,
+  );
+  expect(html).toContain("<p>rows</p>");
+  expect(html).not.toContain("bones-bone");
+});
+
+test("a name not known yet is a bone in the crumb, gone with a failure", () => {
+  const html = render(
+    <Page
+      crumb={null}
+      steps={[{ label: null, href: "/projects/p1" }]}
+      title={null}
+      loading
+    />,
+  );
+  // one bone for the step, one for the title
+  expect(withClass(html, "page-crumb-bone", "bones-wait")).toBe(2);
+  expect(html).toContain('aria-label="Loading the page"');
+  const crumb = render(<Page crumb={null} title="New file" loading />);
+  expect(crumb).toContain("page-crumb-bone");
+  expect(crumb).toContain(">New file<");
+  // a failed page never learns the name: no bone that never lands
+  const failed = render(
+    <Page
+      steps={[{ label: null }, { label: "Knowledge" }]}
+      crumb={null}
+      title={null}
+      error="gone"
+    />,
+  );
+  expect(failed).not.toContain("page-crumb-bone");
+  expect(failed).toContain(">Knowledge<");
+  expect(failed).toContain("This page did not load");
+});
+
+test("a heading whose title is a bone still has a name", () => {
+  for (const html of [
+    render(<Page crumb="Projects" title={null} loading />),
+    render(<Page title={null} loading />),
+    render(<Page steps={[{ label: "Knowledge" }]} title={null} loading />),
+  ]) {
+    const h1 = html.slice(html.indexOf("<h1"), html.indexOf("</h1>"));
+    expect(h1).toContain('<span class="page-hidden">Loading</span>');
+  }
+  // a crumb's own bone adds no second name
+  const step = render(<Page steps={[{ label: null }]} title="Notes" loading />);
+  expect(step).not.toContain("page-hidden");
+});
+
+test("a step that will never be named is dropped, not a bone", () => {
+  const html = render(
+    <Page steps={[{ label: "" }, { label: "Knowledge" }]} title="Notes" />,
+  );
+  expect(html).not.toContain("page-crumb-bone");
+  expect(html.match(/page-crumb-sep/g)?.length).toBe(1);
+  expect(html).toContain(">Knowledge<");
 });

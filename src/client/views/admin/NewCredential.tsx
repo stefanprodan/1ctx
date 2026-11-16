@@ -31,7 +31,7 @@ import {
   problemOf,
   teamsOf,
 } from "./Credentials.model.ts";
-import { NewCard } from "./NewCard.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
 import "./credentials.css";
 
@@ -47,6 +47,12 @@ export function NewCredential() {
       steps={STEPS}
       title="New credential"
       loading={credentials.value === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the new credential form"
+          fields={["input", "input", "wide", "input", "input", "line"]}
+        />
+      }
       error={error}
     >
       <Form />

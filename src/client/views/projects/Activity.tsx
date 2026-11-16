@@ -16,6 +16,7 @@ import {
   MAX_WEEKS,
 } from "../../../shared/api/usage.ts";
 import { onResize } from "../../lib/resize.ts";
+import { Bone, waitRole } from "../../ui/Bones.tsx";
 import { RowsCard } from "../../ui/Rows.tsx";
 import {
   type ActivityCell,
@@ -327,7 +328,7 @@ export function GhostGrid({
   const lead = labels ? 1 : 0;
   return (
     <div
-      class={`activity-grid${labels ? "" : " activity-grid-compact"}`}
+      class={`activity-grid bones-wait${labels ? "" : " activity-grid-compact"}`}
       aria-hidden="true"
     >
       {labels && (
@@ -349,14 +350,13 @@ export function GhostGrid({
         )}
       {Array.from({ length: weeks }, (_, c) =>
         WEEKDAYS.map((_, row) => (
-          <span
+          <Bone
             key={`${c}-${row}`}
-            class="activity-cell activity-ghost"
-            style={{
-              gridColumn: c + 1 + lead,
-              gridRow: row + 1 + lead,
-              "--ghost": c,
-            }}
+            kind="cell"
+            class="activity-cell"
+            // a week's cells pulse together, the weeks one after another
+            at={c * 0.6}
+            place={{ column: c + 1 + lead, row: row + 1 + lead }}
           />
         )),
       )}
@@ -365,16 +365,16 @@ export function GhostGrid({
 }
 
 // The card while the year loads, measured as the loaded card is, so the
-// rows under it stay put.
-export function ActivityGhost() {
+// rows under it stay put. quiet inside a waiting page, whose body names
+// the wait.
+export function ActivityGhost({ quiet = false }: { quiet?: boolean }) {
   const { weeks, body } = useFitWeeks(MAX_WEEKS);
   return (
     <RowsCard label="Activity">
       <div
         class="activity-body"
         ref={body}
-        role="status"
-        aria-label="Loading activity"
+        {...waitRole(quiet ? undefined : "Loading activity")}
       >
         <GhostGrid weeks={weeks} />
         <Legend />

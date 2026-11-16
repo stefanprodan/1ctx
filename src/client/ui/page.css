@@ -73,6 +73,18 @@
   .page-crumb-sep {
     flex-shrink: 0;
   }
+  /* a crumb of bones keeps the words' line, so the head lands level */
+  .page-waiting-crumb {
+    min-height: 1lh;
+  }
+  /* a name not known yet: a short name's width on the words' line */
+  .page-crumb-bone {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    width: 10ch;
+    height: 1lh;
+  }
   /* a step never takes the row: a long name is cut, the hover says it,
      and a path's steps give way well before the title does; the page's
      own words (the project, Knowledge) stay whole */
@@ -243,6 +255,27 @@
     align-self: center;
     align-items: center;
     height: 0;
+  }
+
+  /* a wait past SLOW_MS, said once at the head's end */
+  .page-slow {
+    flex-shrink: 0;
+    align-self: center;
+    margin: 0 0 0 auto;
+    color: var(--faint);
+    font-size: var(--text-small);
+    white-space: nowrap;
+  }
+  /* the live region before it has words, and the heading's name while
+     it is a bone: there for a reader, out of the head's row */
+  .page-slow-quiet,
+  .page-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .page-state {

@@ -25,6 +25,7 @@ import {
   RowsLink,
   RowsNote,
   RowsTitle,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Frame } from "./Frame.tsx";
 
@@ -61,7 +62,7 @@ export function Members({ params }: { params: Params }) {
             action={admin && <RowsLink label="Manage" href={AGENTS_HREF} />}
           >
             {agents === null ? (
-              <RowsNote>Loading</RowsNote>
+              <RowsWaiting label="Loading agents" />
             ) : agents.length === 0 ? (
               <RowsNote>No agents yet. An admin adds one first.</RowsNote>
             ) : (

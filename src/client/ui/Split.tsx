@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type ComponentChildren, Fragment, isValidElement } from "preact";
+import { Bone, waitRole } from "./Bones.tsx";
 import "./split.css";
 
 export function Split({
@@ -242,14 +243,55 @@ export function AsideNote({
   );
 }
 
+// A section's lines while its read runs: a bone at a label's and a
+// value's place on each line, at a line's height, so the sections under
+// it stay put when the lines land.
+export function AsideWaiting({
+  label,
+  lines = 2,
+}: {
+  // what is loading, for a screen reader: "Loading usage"; none beside
+  // a waiting page, whose body says it
+  label?: string;
+  lines?: number;
+}) {
+  return (
+    <div class="split-waiting bones-wait" {...waitRole(label)}>
+      {Array.from({ length: lines }, (_, i) => (
+        <div key={i} class="split-line" aria-hidden="true">
+          <Bone kind="line" at={i * 2} width={[34, 42, 28][i % 3]} />
+          <Bone kind="line" at={i * 2 + 1} width={[22, 30, 18][i % 3]} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// an aside section's lines while the whole page loads, quiet: the
+// page's waiting body is the one a reader hears
+export function AsideBones({ label, lines }: { label: string; lines: number }) {
+  return (
+    <AsideSection label={label}>
+      <AsideWaiting lines={lines} />
+    </AsideSection>
+  );
+}
+
 // undefined while the read runs, null when it failed
 export function AsideRead<T>({
   label,
+  waiting,
+  lines,
   action,
   value,
   children,
 }: {
   label: string;
+  // what the read loads, for a screen reader: "Loading usage"; none
+  // beside a waiting page
+  waiting?: string;
+  // the lines it lands with, so the sections under it stay put
+  lines?: number;
   action?: ComponentChildren;
   value: T | null | undefined;
   children: (value: T) => ComponentChildren;
@@ -257,7 +299,7 @@ export function AsideRead<T>({
   return (
     <AsideSection label={label} action={action}>
       {value === undefined ? (
-        <p class="split-empty">Loading</p>
+        <AsideWaiting label={waiting} lines={lines} />
       ) : value === null ? (
         <p class="split-empty">Did not load.</p>
       ) : (

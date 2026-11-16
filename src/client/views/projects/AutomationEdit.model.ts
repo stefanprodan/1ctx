@@ -10,6 +10,15 @@ import {
 } from "../../../shared/contracts/automation.ts";
 import { failure, sentence } from "../../lib/format.ts";
 
+// the editor's sections' lines, the same while it waits and once it
+// lands
+export const EDITOR_TEXT = {
+  name: "Unique in this project",
+  instructions: "The first message of every run",
+  memory: "What a run remembers",
+  attention: "Who decides a run must be flagged",
+} as const;
+
 // a save that changes a field makes its editor the owner, so the save
 // row says so on an automation someone else owns
 export function ownerNote(

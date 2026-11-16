@@ -4,7 +4,8 @@ Governs `src/client/`: the data layer, the `ui/` primitives, forms,
 the stylesheets and the `lib/` helpers. The shell and the rail are in
 `docs/shell.md`. What each page draws is in `docs/views.md`, the
 admin pages in `docs/admin-pages.md`, the external task pages in
-`docs/external-task-pages.md`.
+`docs/external-task-pages.md`, a first load's bones in
+`docs/waits.md`.
 
 ## Data
 
@@ -95,7 +96,9 @@ open row's body or a meta. The shared shapes are below.
   `RowsMore` too. No infinite scroll.
 - **A growing list has a search:** `ui/Search.tsx` as `RowsCard`'s
   `search`, over `useListSearch()` in `lib/search.ts`
-  (`searchList()` outside a component).
+  (`searchList()` outside a component), its query held above the
+  wait; a box swapped for one over the same query signal hands over
+  focus and text, never one that only says the same.
 - **A card head is one line on a phone.** Its filters are
   `RowsFilters`, short words, and a small `Seg` in a head takes `head`;
   under 720 either is a compact outlined dropdown of the same choices
@@ -139,9 +142,10 @@ open row's body or a meta. The shared shapes are below.
 - **A dashboard is `ui/Tiles.tsx` over `ui/Chart.tsx` panels.** Plots
   over days are `ui/Plot.tsx` (uPlot), each with a key and a table for
   a screen reader. A plot reads its colour tokens at every draw, so a
-  theme flip needs no rebuild. A first load draws `ui/Bones.tsx` at
-  the loaded sizes, never a Loading line. A later load keeps the last
-  answer faded until the next lands.
+  theme flip needs no rebuild. A first load draws its bones (`docs/waits.md`);
+  a later load keeps the last answer faded until the next lands.
+- **A first load waits in bones in its landed shape,** never a
+  Loading line, and a later load never draws them: `docs/waits.md`.
 - **A text by its lines is `ui/Source.tsx`,** over `splitLines()` in
   `lib/lines.ts`, which balances each line's spans. A change between
   two texts is `ui/Diff.tsx` over `diffLines()` in `lib/diff.ts`. Past

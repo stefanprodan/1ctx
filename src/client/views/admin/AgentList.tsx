@@ -39,12 +39,13 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { AsideItem, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideItem, AsideSection, Split } from "../../ui/Split.tsx";
 import { overviewTotals, SpendLines, UsageSection } from "./AdminAside.tsx";
 import { failing, failingLine, lastUse } from "./AgentPage.model.ts";
 import { NewAgent } from "./NewAgent.tsx";
 import { costOf, tokensOf } from "./Overview.model.ts";
 import "./agent-list.css";
+import { ListWaiting, UsageBones } from "./AdminWaiting.tsx";
 
 export function AgentList() {
   if (new URLSearchParams(query.value).has("new")) return <NewAgent />;
@@ -90,6 +91,18 @@ function List() {
       split
       actions={<PageNew href={`${AGENTS_HREF}?new`} label="New agent" />}
       loading={(list === null || rows === null) && error === null}
+      waiting={
+        <ListWaiting
+          label="Agents"
+          search={<Search query={q} placeholder="Search agents" />}
+          aside={
+            <>
+              <UsageBones />
+              <AsideBones label="Providers" lines={3} />
+            </>
+          }
+        />
+      }
       error={error}
     >
       <Split aside={<Aside using={using} />}>

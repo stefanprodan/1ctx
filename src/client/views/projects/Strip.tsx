@@ -6,6 +6,7 @@
 // outlined square down every row is noise.
 
 import type { DaysUsageResponse } from "../../../shared/api/usage.ts";
+import { Bone } from "../../ui/Bones.tsx";
 import { projectStrip, STRIP_DAYS, stripAriaLabel } from "./Activity.model.ts";
 import "./activity.css";
 
@@ -34,13 +35,9 @@ export function Strip({
 // the strip while the year loads, its squares pulsing one after another
 export function StripGhost() {
   return (
-    <span class="activity-strip" aria-hidden="true">
+    <span class="activity-strip bones-wait" aria-hidden="true">
       {Array.from({ length: STRIP_DAYS }, (_, i) => (
-        <span
-          key={i}
-          class="activity-cell activity-ghost"
-          style={{ "--ghost": i }}
-        />
+        <Bone key={i} kind="cell" at={i * 0.6} class="activity-cell" />
       ))}
     </span>
   );

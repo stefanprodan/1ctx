@@ -38,6 +38,7 @@ import {
 import { byTitle, DECISION_WORDS, decisionMeta } from "./Decisions.model.ts";
 import { NewDecider } from "./NewDecider.tsx";
 import "./decider-list.css";
+import { ListWaiting, UsageBones } from "./AdminWaiting.tsx";
 
 function ListTabs({ on }: { on: "deciders" | "decisions" }) {
   return (
@@ -101,6 +102,15 @@ function Deciders() {
         canAdd && <PageNew href={`${DECIDERS_HREF}?new`} label="New decider" />
       }
       loading={(list === null || rows === null) && error === null}
+      waiting={
+        <ListWaiting
+          label="Deciders"
+          search={<Search query={q} placeholder="Search deciders" />}
+          aside={<UsageBones />}
+          lead={<ListTabs on="deciders" />}
+          class="decider-list"
+        />
+      }
       error={error}
     >
       <Split aside={<Aside />}>
@@ -174,6 +184,15 @@ export function DecisionList() {
       title="Decisions"
       split
       loading={(list === null || deciders.value === null) && error === null}
+      waiting={
+        <ListWaiting
+          label="Decisions"
+          search={<Search query={q} placeholder="Search decisions" />}
+          aside={<UsageBones />}
+          lead={<ListTabs on="decisions" />}
+          class="decider-list"
+        />
+      }
       error={error}
     >
       <Split aside={<Aside />}>

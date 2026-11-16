@@ -14,11 +14,18 @@ import {
   dropDraft,
   keepDraft,
 } from "../../../data/knowledge-local.ts";
+import type { Failure } from "../../../lib/format.ts";
 import { useFocusField, useSave } from "../../../lib/save.ts";
 import { touch } from "../../../lib/touch.ts";
 import { foldersOf } from "../../../lib/tree.ts";
+import { Bone } from "../../../ui/Bones.tsx";
 import { Page } from "../../../ui/Page.tsx";
-import { AsideLine, AsideSection, Split } from "../../../ui/Split.tsx";
+import {
+  AsideBones,
+  AsideLine,
+  AsideSection,
+  Split,
+} from "../../../ui/Split.tsx";
 import { fileHref, knowledgeWords, listHref } from "../Knowledge.model.ts";
 import {
   crumbSteps,
@@ -152,5 +159,68 @@ export function NewFile({
         </form>
       </Split>
     </Page>
+  );
+}
+
+// the page while its project loads: the head with its buttons, the
+// path's band and the empty text box, beside the aside's line; Create
+// waits disabled, as it does for an empty path
+export function NewFileWaiting({
+  projectId,
+  folder,
+  error,
+}: {
+  projectId: string;
+  folder: string;
+  error: Failure | null;
+}) {
+  return (
+    <Page
+      split
+      steps={crumbSteps(
+        projectId,
+        null,
+        folder === "" ? [] : foldersOf(`${folder}/`),
+      )}
+      title="New file"
+      titleMono
+      actions={
+        error === null && (
+          <>
+            <a class="btn btn-small" href={listHref(projectId, "files")}>
+              Cancel
+            </a>
+            <button type="button" class="btn btn-small btn-primary" disabled>
+              Create
+            </button>
+          </>
+        )
+      }
+      loading={error === null}
+      waiting={
+        <Split aside={<AsideBones label="About" lines={1} />}>
+          <section
+            class="card docpage-card bones-wait"
+            role="status"
+            aria-label="Loading the new file"
+          >
+            <div class="docpage-band" aria-hidden="true">
+              <span class="docpage-name">
+                <span class="label">Path</span>
+                <Bone kind="field" at={0} class="docpage-name-box" />
+              </span>
+              <span class="docpage-fact docpage-fact-waiting bones-lines-line">
+                <Bone kind="line" at={1} width={100} />
+              </span>
+            </div>
+            <div
+              class="docpage-editor docpage-editor-waiting"
+              aria-hidden="true"
+            />
+          </section>
+        </Split>
+      }
+      error={error}
+    />
   );
 }

@@ -426,6 +426,30 @@ describe("the projects entity", () => {
 });
 
 describe("the rail", () => {
+  test.serial("waits for the projects in their rows' bones", () => {
+    projects.value = null;
+    projectsError.value = null;
+    const html = render(<Rail user={casey} narrow={false} onHide={() => {}} />);
+    expect(html).toContain('role="status" aria-label="Loading projects"');
+    expect(
+      html.split('class="rail-sub rail-sub-icon" aria-hidden="true"').length -
+        1,
+    ).toBe(3);
+    // the entries above stay links, never bones
+    expect(html).toContain('href="/projects"');
+    // a list that did not load draws no rows and no bones
+    projectsError.value = { words: "boom", status: 500 };
+    const failed = render(
+      <Rail user={casey} narrow={false} onHide={() => {}} />,
+    );
+    expect(failed).not.toContain("Loading projects");
+    projectsError.value = null;
+    projects.value = [personal];
+    expect(
+      render(<Rail user={casey} narrow={false} onHide={() => {}} />),
+    ).not.toContain("Loading projects");
+  });
+
   test("lists the projects under Projects", () => {
     projects.value = [
       personal,
@@ -695,7 +719,7 @@ describe("the pages", () => {
       expect(html.match(/class="card rows-card"/g)).toHaveLength(2);
       expect(html).toContain('aria-label="Loading activity"');
       // and each row's strip pulses in its place
-      expect(html.match(/class="activity-strip"/g)).toHaveLength(2);
+      expect(html.match(/class="activity-strip[ "]/g)).toHaveLength(2);
       expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
         html.indexOf('href="/projects/p2"'),
       );
@@ -720,6 +744,23 @@ describe("the pages", () => {
       expect(html.match(/class="card rows-card"/g)).toHaveLength(1);
     },
   );
+
+  test.serial("Projects waits in its landed layout, each part in bones", () => {
+    projects.value = null;
+    projectsError.value = null;
+    projectAgents.value = null;
+    const html = render(<Projects />);
+    // the activity card, the list's own card with its search, the aside
+    expect(html).toContain('aria-label="Loading activity"');
+    expect(html).toContain('placeholder="Search projects"');
+    expect(html).toContain('role="status" aria-label="Loading projects"');
+    expect(html).toContain('class="split-aside"');
+    expect(html).toContain('aria-label="Loading the week"');
+    expect(html).toContain('aria-label="Loading agents"');
+    // never the page's generic rows over nothing
+    expect(html).not.toContain("card rows-card rows-waiting");
+    expect(html).not.toContain("No projects found");
+  });
 
   test.serial("Projects heads its card with the search", () => {
     projects.value = [personal];
@@ -775,7 +816,9 @@ describe("the pages", () => {
     expect(render(<Project params={{ id: "p1" }} />)).toContain(
       'placeholder="Start a chat in personal"',
     );
-    expect(render(<Project params={{ id: "p9" }} />)).toContain("Loading");
+    expect(render(<Project params={{ id: "p9" }} />)).toMatch(
+      /role="status" aria-label="Loading[^"]*"/,
+    );
   });
 
   test.serial("the About card leads with a team project's description", () => {
@@ -1162,7 +1205,7 @@ describe("the pages", () => {
     expect(html).toContain('class="avatar">CD<');
     expect(html).toContain('class="rows-sub">@casey<');
     expect(html).toContain('class="rows-line rows-go" href="/users/casey"');
-    expect(html).toContain("Loading");
+    expect(html).toMatch(/role="status" aria-label="Loading[^"]*"/);
     projectAgents.value = [
       {
         id: "a1",
@@ -1210,6 +1253,6 @@ describe("the pages", () => {
     ];
     const html = render(<Project params={{ id: "p9" }} />);
     expect(html).toContain('class="page-crumb-on">ops<');
-    expect(html).toContain("Loading");
+    expect(html).toMatch(/role="status" aria-label="Loading[^"]*"/);
   });
 });

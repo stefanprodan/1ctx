@@ -34,6 +34,16 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
 
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the feed lands on both.
+- **Every page waits in its landed layout,** not Page's three rows
+  (left only where the body is one card of rows): its tabs with no
+  counts, its aside's sections in bones and a live search, so nothing
+  pops in. Known words wait as words, fields as bones in the
+  landed grid (`SettingWaiting`, `SectionsWaiting`,
+  `views/admin/AdminWaiting.tsx`, `DirectoryWaiting`); a section that
+  lands only with data waits as nothing. Home waits for the project
+  list, a Feed tab for its row: the composer a bone at its
+  height, the feed's head over ghost rows, held as `Page` holds its
+  own; `/projects` with its activity, rows and aside in bones.
 - **The Not sent card reads its own route, never the feed.** `GET
   /api/me/not-sent` runs on Home's load and after Discard all. While the
   card is mounted (`watchNotSent()`), the user's `notSent` event, a
@@ -122,6 +132,11 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   line wraps at the hairline: the actions stay on the first row, the
   usage, time and model move to the second, where only the model gives
   way.
+- **A chat waits as a chat.** While its session or its code loads,
+  `ChatWaiting` draws three turns in bones (an author line over two or
+  three text lines) and the composer's place at its height; a run's
+  foot is its state line. The real composer is not mounted. A settled
+  chat opened again draws its kept copy at once, with no bones.
 - **A chat is `/chat/:id` and a run `/run/:id`.** Each shows the other
   origin as not found, so every link picks its page by origin. A channel
   opens at `/chat/:id`; its page is in `docs/channel-page.md`.
@@ -248,6 +263,10 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   While the run is one of its automation's open alert (`inOpenAlert()`:
   marked, ended at or after `alert.since`), the strip has Dismiss, a
   button beside the toggle, never inside it.
+- **A file page waits as one wait.** The file's waiting page, a
+  deleted file's last text and a `/knowledge/` path's page draw
+  `DocWaiting` under the file's `waitKey` (`fileWait()`), so the shape
+  and "Still loading" carry through each hand-over.
 - **Rename keeps the file's id and history.** Restore asks nothing: it
   saves the text as a new revision.
 

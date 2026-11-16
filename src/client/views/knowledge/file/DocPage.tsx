@@ -18,15 +18,19 @@ import {
   pathAnswer,
   pathKey,
 } from "../../../data/knowledge-path.ts";
-import { project, projectError } from "../../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectError,
+} from "../../../data/projects.ts";
 import { useNow } from "../../../lib/now.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
 import { Page } from "../../../ui/Page.tsx";
 import { fileHref } from "../Knowledge.model.ts";
-import { DeletedDoc, NotFound } from "./Deleted.tsx";
-import { crumbSteps, liveFolders } from "./DocPage.model.ts";
+import { DeletedDoc, DocWaiting, NotFound } from "./Deleted.tsx";
+import { crumbSteps, fileWait, liveFolders } from "./DocPage.model.ts";
 import { FileView } from "./FileView.tsx";
-import { NewFile } from "./NewFile.tsx";
+import { NewFile, NewFileWaiting } from "./NewFile.tsx";
 
 function projectNameOf(projectId: string): string | null {
   const held = project.value;
@@ -61,19 +65,32 @@ function DocView({ projectId, fileId }: { projectId: string; fileId: string }) {
   if (waiting || error !== null) {
     return (
       <Page
+        split
         steps={
-          name === null
-            ? []
-            : crumbSteps(
+          known
+            ? crumbSteps(
                 projectId,
-                name,
-                known ? foldersOf(known.name) : [],
+                name ?? knownProjectName(projectId),
+                foldersOf(known.name),
                 liveFolders(list?.files ?? []),
               )
+            : // a file is mostly kept in a folder: its step waits as a
+              // bone too, so a cold load's crumb keeps the landed one's
+              // steps rather than growing one as the name lands
+              [
+                ...crumbSteps(
+                  projectId,
+                  name ?? knownProjectName(projectId),
+                  [],
+                ),
+                { label: null },
+              ]
         }
-        title={known ? baseName(known.name) : "Knowledge"}
-        titleMono={known !== null}
+        title={known ? baseName(known.name) : null}
+        titleMono
         loading={error === null}
+        waiting={<DocWaiting />}
+        waitKey={fileWait(fileId)}
         error={error}
       />
     );
@@ -122,7 +139,9 @@ export function NewDoc({ params }: { params: Params }) {
   const name = projectNameOf(projectId);
   const error = projectError.value ?? listErrors.value.get(projectId) ?? null;
   if (name === null || error !== null) {
-    return <Page title="New file" loading={error === null} error={error} />;
+    return (
+      <NewFileWaiting projectId={projectId} folder={folder} error={error} />
+    );
   }
   return (
     <NewFile
@@ -151,5 +170,22 @@ export function PathDoc({ params }: { params: Params }) {
   if (answer.state === "missing" && projectName !== null && error === null) {
     return <NotFound projectId={projectId} projectName={projectName} />;
   }
-  return <Page title="Knowledge" loading={error === null} error={error} />;
+  // the file's page in waiting, under the file's wait once its id is
+  // known, so the move to its page keeps the shape and the slow line
+  return (
+    <Page
+      split
+      steps={crumbSteps(projectId, projectName, foldersOf(name))}
+      title={baseName(name)}
+      titleMono
+      loading={error === null}
+      waiting={<DocWaiting />}
+      waitKey={
+        fileId === null
+          ? `knowledge-path:${projectId}:${name}`
+          : fileWait(fileId)
+      }
+      error={error}
+    />
+  );
 }

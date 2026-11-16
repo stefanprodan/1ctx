@@ -32,12 +32,15 @@ export const startChat =
 export function Feed({
   path,
   projectName,
+  waiting = false,
 }: {
   path: string;
   projectName: (projectId: string) => string | null;
+  // the rows stay in bones while what names them loads
+  waiting?: boolean;
 }) {
   const held = list.value;
-  const rows = held?.rows ?? null;
+  const rows = waiting ? null : (held?.rows ?? null);
   const now = useNow(tickMs(rows));
   const q = searchOf(query.value);
   const pick = pickOf(query.value);

@@ -44,9 +44,10 @@
   .filecard-body-code.filecard-clip {
     max-height: calc(12lh + var(--space-3));
   }
-  .filecard-state {
-    color: var(--faint);
-    font-size: var(--text-small);
+  /* Source's padding round the lines, which a framed body's bones
+     take as their own */
+  .filecard-waiting.filecard-body-code {
+    padding: var(--space-3) var(--space-4);
   }
   .filecard-error {
     color: var(--failed);

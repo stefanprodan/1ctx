@@ -22,7 +22,7 @@ import { CREDENTIALS_HREF, configCredentialHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { countOf } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
-import { RowsNote } from "../../ui/Rows.tsx";
+import { RowsNote, RowsWaiting } from "../../ui/Rows.tsx";
 import {
   Setting,
   SettingAlert,
@@ -30,7 +30,7 @@ import {
   SettingForm,
   SettingStack,
 } from "../../ui/Setting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { KeyField, MethodsField, RequestFields } from "./CredentialFields.tsx";
 import {
   type CredentialDraft,
@@ -48,6 +48,7 @@ import {
 import { type DraftCard, useDraftCard } from "./DraftCard.tsx";
 import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
 import "./credentials.css";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 
 const STEPS = [
   zoneStep("Config"),
@@ -81,6 +82,7 @@ export function CredentialPage({ params }: { params: Params }) {
       }
       split
       loading={list === null && error === null}
+      waiting={<CredentialWaiting />}
       empty={
         list !== null && credential === null
           ? "No credential by that name."
@@ -94,6 +96,50 @@ export function CredentialPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// each card's line, the same while the page waits and once it lands
+const KEY_LINE = "The http- file whose value goes in the header.";
+const REQUEST_LINE = "curl adds the header to requests under the prefix.";
+const METHODS_LINE =
+  "What curl may use under the prefix. Other methods are refused.";
+const PROJECTS_LINE = "Chats and runs in these projects can use it.";
+
+// the key, request, methods and projects cards
+function CredentialWaiting() {
+  return (
+    <CardsWaiting
+      label="Loading the credential"
+      aside={<AsideBones label="Credential" lines={3} />}
+      cards={[
+        {
+          title: "Key",
+          line: KEY_LINE,
+          fields: ["input"],
+          foot: 2,
+        },
+        {
+          title: "Request",
+          line: REQUEST_LINE,
+          fields: ["wide", "input", "input"],
+          foot: 2,
+        },
+        {
+          title: "Methods",
+          line: METHODS_LINE,
+          fields: ["line"],
+          foot: 2,
+        },
+        {
+          title: "Projects",
+          line: PROJECTS_LINE,
+          action: true,
+          rows: 1,
+          foot: 2,
+        },
+      ]}
+    />
   );
 }
 
@@ -165,11 +211,7 @@ function KeyCard(props: CardProps) {
   const card = useCard(props, KEY);
   return (
     <CardForm card={card} keys={KEY}>
-      <Setting
-        title="Key"
-        line="The http- file whose value goes in the header."
-        foot={card.foot()}
-      >
+      <Setting title="Key" line={KEY_LINE} foot={card.foot()}>
         <div class="pair">
           <KeyField
             value={card.d.keyName}
@@ -188,11 +230,7 @@ function RequestCard(props: CardProps) {
   const card = useCard(props, REQUEST);
   return (
     <CardForm card={card} keys={REQUEST}>
-      <Setting
-        title="Request"
-        line="curl adds the header to requests under the prefix."
-        foot={card.foot()}
-      >
+      <Setting title="Request" line={REQUEST_LINE} foot={card.foot()}>
         <div class="pair">
           <RequestFields d={card.d} save={card.save} set={card.set} />
         </div>
@@ -205,11 +243,7 @@ function MethodsCard(props: CardProps) {
   const card = useCard(props, METHODS);
   return (
     <CardForm card={card} keys={METHODS}>
-      <Setting
-        title="Methods"
-        line="What curl may use under the prefix. Other methods are refused."
-        foot={card.foot()}
-      >
+      <Setting title="Methods" line={METHODS_LINE} foot={card.foot()}>
         <MethodsField
           value={card.d.methods}
           save={card.save}
@@ -231,7 +265,7 @@ function ProjectsCard(props: CardProps) {
       <Setting
         title="Projects"
         count={countOf(ids.length, ids.length)}
-        line="Chats and runs in these projects can use it."
+        line={PROJECTS_LINE}
         list
         action={
           loaded && (
@@ -249,9 +283,11 @@ function ProjectsCard(props: CardProps) {
         })}
       >
         {!loaded ? (
-          <RowsNote>
-            {projectsError.value !== null ? "Did not load." : "Loading"}
-          </RowsNote>
+          projectsError.value !== null ? (
+            <RowsNote>Did not load.</RowsNote>
+          ) : (
+            <RowsWaiting shape="plain" label="Loading projects" />
+          )
         ) : ids.length === 0 ? (
           <RowsNote>No projects yet.</RowsNote>
         ) : (

@@ -6,6 +6,7 @@ import { useRef } from "preact/hooks";
 import { type Save, useArrivalFocus, useFocusField } from "../../lib/save.ts";
 import { Foot } from "../../ui/Foot.tsx";
 import { Setting, SettingHint } from "../../ui/Setting.tsx";
+import { type FieldBones, SettingWaiting } from "../../ui/SettingWaiting.tsx";
 
 export function NewCard({
   label,
@@ -66,5 +67,24 @@ export function NewCard({
         {children}
       </Setting>
     </form>
+  );
+}
+
+// the form's one card while the page's list loads, a bone for each
+// field it lands with
+export function NewCardWaiting({
+  label,
+  fields,
+  hints,
+  body,
+}: {
+  label: string;
+  fields?: readonly FieldBones[];
+  hints?: readonly boolean[];
+  // the form's own bones, in place of the fields
+  body?: ComponentChildren;
+}) {
+  return (
+    <SettingWaiting label={label} cards={[{ fields, hints, body, foot: 2 }]} />
   );
 }

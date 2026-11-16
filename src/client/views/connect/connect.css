@@ -19,6 +19,17 @@
     flex-direction: column;
     gap: var(--space-4);
   }
+  /* a key row's More button, an icon button's square */
+  .connect .connect-more-bone {
+    width: 32px;
+  }
+  /* the scope's tag after the name, at a tag's own line and border */
+  .connect .connect-tag-bone {
+    height: calc(1lh + 2px);
+    margin-left: var(--space-2);
+    font-family: var(--mono);
+    font-size: var(--text-label);
+  }
   .connect-key-picks {
     display: flex;
     flex-direction: column;

@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSignal } from "@preact/signals";
-import type { WebToolSummary } from "../../../shared/contracts/tool.ts";
+import {
+  DEFAULT_VISUAL_HOSTS,
+  type WebToolSummary,
+} from "../../../shared/contracts/tool.ts";
 import { MAX_VISUAL_HOSTS } from "../../../shared/visual.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
@@ -14,6 +17,7 @@ import {
 } from "../../data/tools.ts";
 import { count } from "../../lib/format.ts";
 import { at, useSave } from "../../lib/save.ts";
+import { Bone } from "../../ui/Bones.tsx";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsSwitch } from "../../ui/Rows.tsx";
@@ -30,12 +34,14 @@ import {
   hostsFieldOf,
   hostsLine,
   hostsOf,
+  hostsRows,
   hostsText,
   isDefaultHosts,
   VISUAL_LIMITS,
   visualsLine,
 } from "./Visuals.model.ts";
 import "./visuals.css";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 
 export function Visuals() {
   const state = tools.value;
@@ -47,6 +53,41 @@ export function Visuals() {
       title="Visuals"
       split
       loading={(state === null || rows === null) && error === null}
+      waiting={
+        <CardsWaiting
+          label="Loading visuals"
+          usage
+          cards={[
+            { title: "Visuals", line: true, fields: ["line"], foot: 2 },
+            {
+              title: "CDNs",
+              // the defaults, as most servers keep them
+              line: { like: hostsLine(DEFAULT_VISUAL_HOSTS) },
+              action: true,
+              body: (
+                <span class="field visuals-hosts-waiting">
+                  <Bone
+                    kind="rows"
+                    at={4}
+                    rows={hostsRows(hostsText())}
+                    class="visuals-hosts-bone"
+                  />
+                </span>
+              ),
+              foot: 2,
+            },
+            {
+              title: "Limits",
+              line: "How much one turn may draw.",
+              action: true,
+              fields: VISUAL_LIMITS.map(() => "input" as const),
+              grid: "limits-setting-grid",
+              hints: true,
+              foot: 2,
+            },
+          ]}
+        />
+      }
       error={error}
     >
       {state && rows && (
@@ -169,7 +210,7 @@ function Hosts({ tool }: { tool: WebToolSummary }) {
             name="hosts"
             class="visuals-hosts"
             aria-label="CDNs"
-            rows={Math.max(4, typed.split("\n").length + 1)}
+            rows={hostsRows(typed)}
             spellcheck={false}
             autocomplete="off"
             placeholder="https://cdn.example.com"

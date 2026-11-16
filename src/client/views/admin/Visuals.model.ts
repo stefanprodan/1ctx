@@ -24,6 +24,11 @@ export function hostsText(
   return hosts.join("\n");
 }
 
+// a free line under the last host, and never fewer than four
+export function hostsRows(text: string): number {
+  return Math.max(4, text.split("\n").length + 1);
+}
+
 export function hostsDirty(text: string, saved: readonly string[]): boolean {
   return text.trim() !== hostsText(saved);
 }

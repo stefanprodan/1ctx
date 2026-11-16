@@ -30,7 +30,11 @@ import {
 import { switchable, switchablesOf } from "../../data/capabilities.ts";
 import { emailOn, me } from "../../data/me.ts";
 import { startingAgent } from "../../data/project-agents.ts";
-import { project, projectError } from "../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectError,
+} from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { automationHref } from "../../lib/hrefs.ts";
 import { toggledId } from "../../lib/ids.ts";
@@ -46,7 +50,12 @@ import { AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
 import { automationEmailItem } from "./Access.model.ts";
 import { AccessSection } from "./AccessSection.tsx";
 import { AttentionSection } from "./AttentionSection.tsx";
-import { ownerNote, staleFailure, staleWords } from "./AutomationEdit.model.ts";
+import {
+  EDITOR_TEXT,
+  ownerNote,
+  staleFailure,
+  staleWords,
+} from "./AutomationEdit.model.ts";
 import { EditorStart } from "./AutomationEditorStart.tsx";
 import {
   automationFieldOf,
@@ -60,6 +69,7 @@ import {
   requestOf,
   retiredPick,
 } from "./Automations.model.ts";
+import { EditorWaiting } from "./EditorWaiting.tsx";
 import { NameField } from "./ProjectFields.tsx";
 import { RestartSection } from "./RestartSection.tsx";
 import { WhenSection } from "./WhenSection.tsx";
@@ -180,7 +190,7 @@ function Editor({
   const kind = (key: string) => switchItem(key, input);
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
-      <Section title="Name" text="Unique in this project">
+      <Section title="Name" text={EDITOR_TEXT.name}>
         <NameField
           disabled={off}
           error={save.fieldError("name")}
@@ -188,7 +198,7 @@ function Editor({
           onInput={(name) => set({ name })}
         />
       </Section>
-      <Section title="Instructions" text="The first message of every run">
+      <Section title="Instructions" text={EDITOR_TEXT.instructions}>
         <div class="field">
           <div
             class={`automations-instructions${invalid("instructions") || invalid("agent") ? " automations-instructions-invalid" : ""}`}
@@ -226,7 +236,7 @@ function Editor({
           <FieldError save={save} field="agent" />
         </div>
       </Section>
-      <Section title="Memory" text="What a run remembers">
+      <Section title="Memory" text={EDITOR_TEXT.memory}>
         <div class="field">
           <Seg
             label="Memory"
@@ -419,10 +429,11 @@ export function NewAutomation({ params }: { params: Params }) {
   const ready = shown !== null && agents !== null && limit !== null;
   return (
     <Page
-      crumb={shown?.name ?? "Project"}
+      crumb={knownProjectName(id)}
       crumbHref={`/projects/${id}/automations`}
       title="New automation"
       loading={!ready && error === null}
+      waiting={<EditorWaiting aside={aside} />}
       error={error}
       empty={
         ready && agents.length === 0
@@ -463,10 +474,11 @@ export function EditAutomation({ params }: { params: Params }) {
     row !== null && shown !== null && agents !== null && limit !== null;
   return (
     <Page
-      crumb={row?.name ?? "Automation"}
+      crumb={row?.name ?? null}
       crumbHref={automationHref(id)}
       title="Edit"
       loading={!ready && error === null}
+      waiting={<EditorWaiting aside={aside} row={row} />}
       error={error}
     >
       {ready && (

@@ -199,3 +199,16 @@ export function onProjectsSocket(event: SocketEvent): void {
 }
 
 onSocketEvent(onProjectsSocket);
+
+// a project's name as far as it is known: the page's row, else the
+// rail's list; null until either lands, for a crumb to draw a bone, and
+// "" once the list failed, so the crumb drops a bone that would never
+// land (a page that loads the row still names it when the row does)
+export function knownProjectName(id: string | null): string | null {
+  const row = project.value;
+  if (id !== null && row !== null && row.id === id) return row.name;
+  const listed =
+    id === null ? undefined : projects.value?.find((p) => p.id === id)?.name;
+  if (listed !== undefined) return listed;
+  return projectsError.value === null ? null : "";
+}

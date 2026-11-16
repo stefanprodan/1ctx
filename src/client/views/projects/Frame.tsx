@@ -16,8 +16,16 @@ import { knowledgeCount, knowledgeOf } from "../../data/knowledge.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgentCount } from "../../data/sessions.ts";
 import { longDate } from "../../lib/format.ts";
-import { Page, PageLoading } from "../../ui/Page.tsx";
-import { AsideLine, AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
+import { useWaiting } from "../../lib/wait.ts";
+import { Page } from "../../ui/Page.tsx";
+import { RowsWaiting } from "../../ui/Rows.tsx";
+import {
+  AsideBones,
+  AsideLine,
+  AsideNote,
+  AsideSection,
+  Split,
+} from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { knowledgeWords } from "../knowledge/Knowledge.model.ts";
 import { ActivityAside } from "./ActivityAside.tsx";
@@ -33,6 +41,8 @@ import "./projects.css";
 export function Frame({
   id,
   tab,
+  waiting,
+  busy = false,
   children,
 }: {
   id: string;
@@ -44,6 +54,12 @@ export function Frame({
     | "knowledge"
     | "members"
     | "settings";
+  // the tab's own first-load shape, drawn while the row loads too, so
+  // the wait keeps one shape until the tab lands; rows when none
+  waiting?: ComponentChildren;
+  // the tab's own first load still runs past the row's, so the head
+  // keeps saying "Still loading"
+  busy?: boolean;
   children: (shown: ProjectDetail) => ComponentChildren;
 }) {
   const row = project.value;
@@ -61,6 +77,10 @@ export function Frame({
       agents: projectAgentCount(id),
     }),
   );
+  // held as Page holds its own, so a row landing just past the reveal
+  // never flashes the tab's bones away
+  const wait = useWaiting(shown === null && projectError.value === null);
+  const bones = waiting ?? <RowsWaiting card label="Loading the project" />;
   const about = shown === null ? null : aboutLine(shown);
   // the list, once the tab loaded it, is fresher than the project row
   const knowledge = knowledgeOf(id)?.totals ??
@@ -69,47 +89,50 @@ export function Frame({
     <Page
       crumb="Projects"
       crumbHref="/projects"
-      title={shown?.name ?? listed?.name ?? "Project"}
-      loading={
-        shown === null && listed === undefined && projectError.value === null
-      }
+      title={shown?.name ?? listed?.name ?? null}
+      pending={(shown === null || busy) && projectError.value === null}
       error={projectError.value}
     >
-      {(shown !== null || listed !== undefined) && (
-        <Split
-          aside={
-            shown !== null && (
-              <>
-                <AsideSection label="About">
-                  {about !== null && <AsideNote links>{about}</AsideNote>}
-                  {knowledge.files > 0 && (
-                    <AsideLine label="Knowledge">
-                      {knowledgeWords(knowledge)}
-                    </AsideLine>
-                  )}
-                  <AsideLine label="Created">
-                    {longDate(shown.createdAt)}
+      {/* drawn on a cold load too, before the rail's list names the
+          project, so the tabs and the aside never land under the bones */}
+      <Split
+        aside={
+          shown === null ? (
+            <>
+              <AsideBones label="About" lines={3} />
+              <ActivityAside projectId={id} quiet />
+            </>
+          ) : (
+            <>
+              <AsideSection label="About">
+                {about !== null && <AsideNote links>{about}</AsideNote>}
+                {knowledge.files > 0 && (
+                  <AsideLine label="Knowledge">
+                    {knowledgeWords(knowledge)}
                   </AsideLine>
-                </AsideSection>
-                <ActivityAside projectId={shown.id} />
-                <LatestAside
-                  projectId={shown.id}
-                  files={latestFiles(
-                    knowledgeOf(id)?.files ?? null,
-                    shown.latestFiles,
-                  )}
-                />
-              </>
-            )
-          }
-        >
-          <Tabs
-            tabs={tabs}
-            active={tab === "feed" ? tabs[0].href : `/projects/${id}/${tab}`}
-          />
-          {shown === null ? <PageLoading /> : children(shown)}
-        </Split>
-      )}
+                )}
+                <AsideLine label="Created">
+                  {longDate(shown.createdAt)}
+                </AsideLine>
+              </AsideSection>
+              <ActivityAside projectId={shown.id} />
+              <LatestAside
+                projectId={shown.id}
+                files={latestFiles(
+                  knowledgeOf(id)?.files ?? null,
+                  shown.latestFiles,
+                )}
+              />
+            </>
+          )
+        }
+      >
+        <Tabs
+          tabs={tabs}
+          active={tab === "feed" ? tabs[0].href : `/projects/${id}/${tab}`}
+        />
+        {shown === null || wait ? bones : children(shown)}
+      </Split>
     </Page>
   );
 }

@@ -18,7 +18,11 @@ import {
   taskFiles,
 } from "../../../src/client/data/external-task-files.ts";
 import { rememberTasksView } from "../../../src/client/data/external-tasks.ts";
-import { project } from "../../../src/client/data/projects.ts";
+import {
+  project,
+  projects,
+  projectsError,
+} from "../../../src/client/data/projects.ts";
 import { Icon } from "../../../src/client/lib/icons.tsx";
 import { Save } from "../../../src/client/lib/save.ts";
 import {
@@ -136,6 +140,7 @@ const PROJECT: ProjectDetail = {
 
 afterEach(() => {
   project.value = null;
+  projects.value = null;
   taskPage.value = null;
   taskFiles.value = new Map();
 });
@@ -159,6 +164,46 @@ describe("the crumb", () => {
       expect(crumb(state)).toBe(tab);
     }
   });
+
+  test.serial(
+    "names the project from the rail's list, a bone till then",
+    () => {
+      // this route never loads the project's row
+      taskPage.value = page(row({ state: "todo", projectId: "p1" }));
+      const bare = render(<ExternalTask params={{ id: "t1" }} />);
+      expect(bare).toContain("page-crumb-bone");
+      expect(bare).not.toContain(">Project<");
+      projects.value = [
+        { id: "p1", kind: "team", name: "infra", createdAt: 0, memberCount: 1 },
+      ];
+      const named = render(<ExternalTask params={{ id: "t1" }} />);
+      expect(named).toContain('href="/projects/p1/external-tasks">infra</a>');
+      expect(named).not.toContain("page-crumb-bone");
+      // the new task's form, before its row lands, the same
+      projects.value = null;
+      const form = render(<NewExternalTask params={{ id: "p1" }} />);
+      expect(form).toContain("page-crumb-bone");
+      expect(form).not.toContain(">Project<");
+    },
+  );
+
+  test.serial(
+    "a failed project list drops the bone that would not land",
+    () => {
+      taskPage.value = page(row({ state: "todo", projectId: "p1" }));
+      projectsError.value = { words: "down", status: 500 };
+      try {
+        const task = render(<ExternalTask params={{ id: "t1" }} />);
+        expect(task).not.toContain("page-crumb-bone");
+        expect(task).toContain(">External tasks<");
+        const form = render(<NewExternalTask params={{ id: "p1" }} />);
+        expect(form).not.toContain("page-crumb-bone");
+        expect(form).toContain(">New external task<");
+      } finally {
+        projectsError.value = null;
+      }
+    },
+  );
 
   test.serial("returns to the tab as it was left, the form too", () => {
     const tab = "/projects/p7/external-tasks";

@@ -137,6 +137,8 @@ describe("Profile", () => {
 
   test("shows the loading line before the row arrives", () => {
     profile.value = null;
-    expect(render(<Profile />)).toContain("Loading");
+    expect(render(<Profile />)).toMatch(
+      /role="status" aria-label="Loading[^"]*"/,
+    );
   });
 });

@@ -109,6 +109,10 @@ import {
 } from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
 import { tasksAddressOf } from "../views/projects/ExternalTasks.model.ts";
+import {
+  ChatPageWaiting,
+  RunPageWaiting,
+} from "../views/sessions/ChatWaiting.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
 import type { Params } from "./params.ts";
 
@@ -264,7 +268,12 @@ export const ALIASES: Record<string, string> = {
 export const ROUTES: Route[] = [
   {
     path: "/login",
-    view: lazy(async () => Login),
+    // in the first bundle, so its code is there in a microtask and the
+    // form draws with no page's bones before it
+    view: lazy(
+      async () => Login,
+      () => null,
+    ),
     title: () => "Sign in",
     role: "public",
   },
@@ -454,14 +463,22 @@ export const ROUTES: Route[] = [
     // ?name= is the file's name, from a /knowledge/ path in a reply;
     // the view moves to the file's page once the name is read
     path: "/projects/:id/knowledge/path",
+    // the file's page is ready by the time the link moves to it, so the
+    // move never draws the generic page between their waits
     view: lazy(() =>
-      import("../views/knowledge/file/DocPage.tsx").then((m) => m.PathDoc),
+      Promise.all([
+        import("../views/knowledge/file/DocPage.tsx"),
+        docView.load(),
+      ]).then(([m]) => m.PathDoc),
     ),
     title: () => "Knowledge",
     role: "authenticated",
     load: async (params, query) => {
+      // the list too, so the file's page it moves to names the file
+      // at once rather than a bone
       await Promise.all([
         loadProject(params.id),
+        loadKnowledge(params.id),
         loadKnowledgePath(params.id, query.get("name") ?? ""),
       ]);
     },
@@ -585,14 +602,20 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/chat/:id",
-    view: lazy(() => import("../views/sessions/Chat.tsx").then((m) => m.Chat)),
+    view: lazy(
+      () => import("../views/sessions/Chat.tsx").then((m) => m.Chat),
+      ChatPageWaiting,
+    ),
     title: () => "Chat",
     role: "authenticated",
     load: (params) => sessionPage(params.id, "chat"),
   },
   {
     path: "/run/:id",
-    view: lazy(() => import("../views/sessions/Chat.tsx").then((m) => m.Run)),
+    view: lazy(
+      () => import("../views/sessions/Chat.tsx").then((m) => m.Run),
+      RunPageWaiting,
+    ),
     title: () => "Run",
     role: "authenticated",
     load: (params) => sessionPage(params.id, "automation"),

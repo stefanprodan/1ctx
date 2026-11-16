@@ -67,6 +67,7 @@ import {
   thinkingText,
 } from "./Directory.model.ts";
 import "./directory.css";
+import { DirectoryWaiting } from "./DirectoryWaiting.tsx";
 
 // the agent's turns per day, the Projects page's card over one series;
 // its ghost while they load, nothing when their first load failed
@@ -286,6 +287,16 @@ export function Agent({ params }: { params: Params }) {
         ) : undefined
       }
       loading={shown === null && agentPageError.value === null}
+      waiting={
+        <DirectoryWaiting
+          label="Loading the agent"
+          aside="Settings"
+          lines={5}
+          card={agentTabs(name, null)[tab].label}
+          tabs={agentTabs(name, null)}
+          active={agentTabs(name, null)[tab].href}
+        />
+      }
       error={agentPageError.value}
     >
       {shown && (

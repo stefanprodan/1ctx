@@ -338,7 +338,7 @@ describe("the pages", () => {
     me.value = admin;
     deciders.value = [judge];
     decisions.value = [plain];
-    expect(page()).toContain("Loading");
+    expect(page()).toContain('aria-label="Loading usage"');
     const asked: string[] = [];
     answer = (url) => {
       asked.push(url);

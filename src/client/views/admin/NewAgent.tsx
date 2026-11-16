@@ -15,12 +15,13 @@ import {
 import { nameProblem, nameTaken } from "../../lib/names.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { byName } from "../../lib/search.ts";
+import { Bone } from "../../ui/Bones.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { cardFieldOf } from "./AgentPage.model.ts";
 import { AgentDrafts } from "./AgentPage.state.ts";
 import { ModelFields } from "./ModelFields.tsx";
-import { NameFields } from "./NameFields.tsx";
-import { NewCard } from "./NewCard.tsx";
+import { LabelledBone, NameFields, NameFieldsWaiting } from "./NameFields.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import "./agent-new.css";
 
 const STEPS = [zoneStep("Config"), { label: "Agents", href: AGENTS_HREF }];
@@ -33,6 +34,12 @@ export function NewAgent() {
       steps={STEPS}
       title="New agent"
       loading={rows === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the new agent form"
+          body={<FormBones />}
+        />
+      }
       error={error}
     >
       {rows !== null &&
@@ -54,6 +61,24 @@ export function NewAgent() {
           />
         ))}
     </Page>
+  );
+}
+
+// the form's parts in bones, so they wrap as the name, the avatars and
+// the model's two fields do on a phone
+function FormBones() {
+  return (
+    <>
+      <NameFieldsWaiting />
+      <div class="agent-new-model">
+        <LabelledBone at={10}>
+          <div class="model-picker-change">
+            <Bone kind="field" at={11} class="model-picker-search" />
+            <Bone kind="field" at={12} class="model-picker-picker" />
+          </div>
+        </LabelledBone>
+      </div>
+    </>
   );
 }
 

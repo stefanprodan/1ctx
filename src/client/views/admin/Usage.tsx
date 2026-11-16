@@ -18,7 +18,7 @@ import { BarsGhost } from "../../ui/Bones.tsx";
 import { BarsPanel, ChartPanel } from "../../ui/Chart.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { RowsFilters } from "../../ui/RowsControls.tsx";
-import { DaysTiles, TokensGhost, TokensPanel } from "./Days.tsx";
+import { DaysGhost, DaysTiles, TokensPanel } from "./Days.tsx";
 import { OverviewGhost } from "./OverviewNow.tsx";
 import {
   agentBars,
@@ -115,9 +115,9 @@ function BoardGhost() {
   return (
     <>
       <OverviewGhost at={0} />
-      <div class="chart-grid chart-board-ghost" aria-hidden="true">
+      <div class="chart-grid chart-board-ghost bones-wait" aria-hidden="true">
         <div class="chart-wide">
-          <TokensGhost at={16} />
+          <DaysGhost label="Tokens per day" at={16} />
         </div>
         <div class="chart-wide">
           <ChartPanel label="Usage">
@@ -180,6 +180,9 @@ export function Usage() {
       steps={[zoneStep("Monitor")]}
       title="Usage"
       actions={<MonthSteps month={month} first={first} />}
+      // no Loaded in its head, so the page's own line says a slow
+      // first load runs
+      pending={answer === null && busy}
       error={answer === null && !busy ? error : null}
     >
       <div

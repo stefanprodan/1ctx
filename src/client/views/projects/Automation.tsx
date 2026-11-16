@@ -21,9 +21,9 @@ import {
   type AutomationSummary,
   ranOnce,
 } from "../../../shared/contracts/automation.ts";
-import { DEFERRED_BY_RESTART, type RunFilter } from "../../../shared/words.ts";
+import { DEFERRED_BY_RESTART, isRunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
-import { navigate, path } from "../../app/router.ts";
+import { navigate, path, query } from "../../app/router.ts";
 import {
   automationError,
   automationProject,
@@ -35,7 +35,11 @@ import {
   runDeadlineMs,
 } from "../../data/automations.ts";
 import { keyOf, noteErrors, notes } from "../../data/memory.ts";
-import { project, projectError } from "../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectError,
+} from "../../data/projects.ts";
 import { closeRunsOf, loadMoreRuns, runs } from "../../data/runs.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { ShowMore } from "../../feed/FeedCard.tsx";
@@ -53,12 +57,13 @@ import { useCut } from "../../lib/resize.ts";
 import { browserZone } from "../../lib/zone.ts";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { RowsCard, RowsFilters, RowsNote } from "../../ui/Rows.tsx";
+import { RowsCard, RowsNote, RowsWaiting } from "../../ui/Rows.tsx";
 import {
   AsideItem,
   AsideLine,
   AsideNote,
   AsideSection,
+  AsideWaiting,
   Split,
 } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
@@ -75,17 +80,12 @@ import {
   suspendedText,
   urlParts,
 } from "./Automations.model.ts";
+import { AutomationWaiting, RunFilters } from "./AutomationWaiting.tsx";
 import { OpenAttention } from "./OpenAttention.tsx";
 import { deadlineText } from "./Run.model.ts";
 import { RunRow } from "./RunRow.tsx";
 import { fireLabel, scheduleTitle } from "./Schedule.model.ts";
 import "./automations.css";
-
-const FILTERS: { value: RunFilter | null; label: string }[] = [
-  { value: null, label: "All" },
-  { value: "manual", label: "Manual" },
-  { value: "attention", label: "Flagged" },
-];
 
 // the instructions cut to a few lines, Show all in the fade once they
 // run past them; measured again when the width moves the cut
@@ -182,6 +182,7 @@ export function Automation({ params }: { params: Params }) {
   });
   // the Memory tab is there only while the automation keeps its own note
   const memoryPath = path.value.endsWith("/memory");
+  const filterAsked = new URLSearchParams(query.value).get("runs");
   const tab = memoryPath && row?.ownMemory ? "memory" : "runs";
   useEffect(() => {
     if (memoryPath && row !== null && !row.ownMemory) {
@@ -216,12 +217,19 @@ export function Automation({ params }: { params: Params }) {
   const check = row === null ? null : checkLine(row, now);
   return (
     <Page
-      crumb={shown?.name ?? "Project"}
+      crumb={knownProjectName(projectId)}
       crumbHref={
         projectId === null ? undefined : `/projects/${projectId}/automations`
       }
-      title={row?.name ?? "Automation"}
+      title={row?.name ?? (error === null ? null : "Automation")}
       loading={!ready && error === null}
+      waiting={
+        <AutomationWaiting
+          id={id}
+          memory={memoryPath}
+          filter={isRunFilter(filterAsked) ? filterAsked : null}
+        />
+      }
       error={error}
     >
       {ready && (
@@ -233,7 +241,7 @@ export function Automation({ params }: { params: Params }) {
               </AsideSection>
               <AsideSection label="History">
                 {tally === null ? (
-                  <p class="split-empty">Loading</p>
+                  <AsideWaiting label="Loading the runs" />
                 ) : (
                   <>
                     <AsideNote>
@@ -407,21 +415,10 @@ export function Automation({ params }: { params: Params }) {
           ) : (
             <RowsCard
               label="Runs"
-              action={
-                <RowsFilters
-                  label="Filter runs"
-                  filters={FILTERS.map((f) => ({
-                    label: f.label,
-                    on: f.value === filter,
-                    href: `${automationHref(id)}${
-                      f.value === null ? "" : `?runs=${f.value}`
-                    }`,
-                  }))}
-                />
-              }
+              action={<RunFilters id={id} filter={filter} />}
             >
               {held === null || held.rows === null ? (
-                <RowsNote>Loading</RowsNote>
+                <RowsWaiting shape="icon" label="Loading runs" />
               ) : held.rows.length === 0 ? (
                 <RowsNote>
                   {filter === "manual"
@@ -451,6 +448,7 @@ export function Automation({ params }: { params: Params }) {
                       error: held.more.error,
                     }}
                     onMore={() => void loadMoreRuns()}
+                    label="Loading runs"
                   />
                 </>
               )}

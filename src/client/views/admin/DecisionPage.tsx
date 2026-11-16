@@ -4,7 +4,10 @@
 import { type Signal, signal, useSignal } from "@preact/signals";
 import { useMemo, useRef } from "preact/hooks";
 import type { DeciderSummary } from "../../../shared/contracts/decider.ts";
-import type { DecisionSummary } from "../../../shared/contracts/decision.ts";
+import {
+  type DecisionSummary,
+  isDecisionId,
+} from "../../../shared/contracts/decision.ts";
 import type { Params } from "../../app/params.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { deciders, decidersError, decisionUsage } from "../../data/deciders.ts";
@@ -44,6 +47,7 @@ import {
 import { DraftFoot } from "./DraftFoot.tsx";
 import { holding, useLatest } from "./drafts.ts";
 import "./decider-page.css";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 
 const STEPS = [
   zoneStep("Config"),
@@ -58,8 +62,16 @@ const SWITCH = [
 export function DecisionPage({ params }: { params: Params }) {
   const list = decisions.value;
   const decision = list?.find((d) => d.id === params.id) ?? null;
+  // the words are the client's own, so a known id is named before the
+  // list lands; an unknown one waits as a bone, then names the miss
   const title =
-    decision === null ? params.id : DECISION_WORDS[decision.id].title;
+    decision !== null
+      ? DECISION_WORDS[decision.id].title
+      : isDecisionId(params.id)
+        ? DECISION_WORDS[params.id].title
+        : list === null
+          ? null
+          : params.id;
   const error = decisionsError.value ?? decidersError.value;
   return (
     <Page
@@ -70,7 +82,7 @@ export function DecisionPage({ params }: { params: Params }) {
           <PageSwitcher
             label="Decisions"
             current={decision.id}
-            name={title}
+            name={DECISION_WORDS[decision.id].title}
             items={byTitle(list ?? []).map((d) => ({
               id: d.id,
               label: DECISION_WORDS[d.id].title,
@@ -84,6 +96,16 @@ export function DecisionPage({ params }: { params: Params }) {
       }
       split
       loading={(list === null || deciders.value === null) && error === null}
+      waiting={
+        <CardsWaiting
+          label="Loading the decision"
+          usage
+          cards={[
+            { title: "Status", line: true, fields: ["seg", "input"], foot: 2 },
+            { title: "Options", fields: ["wide", "text"], foot: 2 },
+          ]}
+        />
+      }
       empty={
         list !== null && decision === null ? "No such decision." : undefined
       }

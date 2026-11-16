@@ -26,7 +26,11 @@ import {
 } from "../../data/external-task.ts";
 import { tasksTabHref } from "../../data/external-tasks.ts";
 import { knowledgeOf, listErrors } from "../../data/knowledge.ts";
-import { project, projectError } from "../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectError,
+} from "../../data/projects.ts";
 import { externalTaskHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useArrivalFocus, useFocusField, useSave } from "../../lib/save.ts";
@@ -42,7 +46,7 @@ import {
   RowsRemove,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { Section } from "../../ui/Section.tsx";
+import { Section, SectionsWaiting } from "../../ui/Section.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { NewTaskFile } from "./ExternalTaskNewFile.tsx";
 import {
@@ -60,6 +64,13 @@ import {
   withFile,
 } from "./ExternalTasks.model.ts";
 import "./external-tasks.css";
+
+// the sections' lines, the same while the new task's form waits
+const FORM_TEXT = {
+  task: "The agent's goal",
+  labels: "What kind of work it is",
+  files: "Knowledge files the agent reads",
+} as const;
 
 export function TaskForm({
   projectId,
@@ -155,7 +166,7 @@ export function TaskForm({
   };
   return (
     <form class="external-tasks-form" ref={form} onSubmit={submit}>
-      <Section title="Task" text="The agent's goal">
+      <Section title="Task" text={FORM_TEXT.task}>
         <div class="pair">
           <label class="field">
             <span class="label label-required">Title</span>
@@ -175,7 +186,7 @@ export function TaskForm({
           </label>
         </div>
       </Section>
-      <Section title="Labels" text="What kind of work it is">
+      <Section title="Labels" text={FORM_TEXT.labels}>
         <div class="field">
           <RowsList>
             {d.labels.length === 0 && <RowsNote>No labels picked.</RowsNote>}
@@ -230,7 +241,7 @@ export function TaskForm({
           )}
         </div>
       </Section>
-      <Section title="Files" text="Knowledge files the agent reads">
+      <Section title="Files" text={FORM_TEXT.files}>
         <div class="field">
           <RowsList>
             {d.fileIds.length === 0 && <RowsNote>No files linked.</RowsNote>}
@@ -325,10 +336,37 @@ export function NewExternalTask({ params }: { params: Params }) {
   const error = projectError.value;
   return (
     <Page
-      crumb={shown?.name ?? "Project"}
+      crumb={knownProjectName(id)}
       crumbHref={tasksTabHref(id)}
       title="New external task"
       loading={shown === null && error === null}
+      waiting={
+        <Split aside={null}>
+          <SectionsWaiting
+            label="Loading the form"
+            class="external-tasks-form"
+            sections={[
+              {
+                title: "Task",
+                text: FORM_TEXT.task,
+                fields: ["input"],
+              },
+              {
+                title: "Labels",
+                text: FORM_TEXT.labels,
+                fields: ["box", "button"],
+                bare: true,
+              },
+              {
+                title: "Files",
+                text: FORM_TEXT.files,
+                fields: ["box", "button"],
+                bare: true,
+              },
+            ]}
+          />
+        </Split>
+      }
       error={error}
     >
       {shown !== null && (

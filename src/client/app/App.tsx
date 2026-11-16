@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The root: a public route renders at once; anything else waits for
-// the first load of me, with a retry when that load fails; the login
+// the first load of me in the shell's shape, with a retry when that
+// load fails; the login
 // view when nobody is signed in and the route needs someone; otherwise
 // the shell, the rail beside the view.
 
@@ -12,8 +13,11 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { loadMe, me, meError } from "../data/me.ts";
 import { Icon } from "../lib/icons.tsx";
+import { type HandedWait, HandOver, useHandOver } from "../lib/wait.ts";
+import { Bone } from "../ui/Bones.tsx";
+import { PageWaiting } from "../ui/PageWaiting.tsx";
 import { Login } from "../views/home/Login.tsx";
-import { Rail } from "./Rail.tsx";
+import { Rail, RailWaiting } from "./Rail.tsx";
 import { navigate, path, query } from "./router.ts";
 import { ALIASES, match } from "./routes.ts";
 import {
@@ -25,14 +29,25 @@ import {
   railHidden,
 } from "./shell.ts";
 import "./shell.css";
-import { Strip } from "./Strip.tsx";
+import { PageCodeWaiting } from "./lazy.ts";
+import { Strip, StripWaiting } from "./Strip.tsx";
 
 // wide: the rail is a column beside the view, or folded to the strip of
 // its entries as icons. Narrow or short: the rail is a full screen over
 // the view, opened by the same button floating at the top left of the
 // view; while it is open the view under it is inert, and when it closes
-// the focus comes back to that button.
-function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
+// the focus comes back to that button. Before the user is known it is
+// the same frame in bones, with nothing to open.
+function Shell({
+  user,
+  waited,
+  children,
+}: {
+  user: Me | undefined;
+  // the shell's wait while it is carried (useHandOver)
+  waited: HandedWait;
+  children: ComponentChildren;
+}) {
   const phone = railDrawer.value;
   const railShown = phone ? drawerOpen.value : !railHidden.value;
   const covered = phone && drawerOpen.value;
@@ -69,20 +84,40 @@ function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
 
   return (
     <div class="shell">
-      {railShown && (
-        <Rail
-          user={user}
-          narrow={phone}
-          onHide={phone ? closeDrawer : hideRail}
-        />
-      )}
-      {!railShown && !phone && <Strip user={user} />}
+      {railShown &&
+        (user === undefined ? (
+          <RailWaiting />
+        ) : (
+          <Rail
+            user={user}
+            narrow={phone}
+            onHide={phone ? closeDrawer : hideRail}
+          />
+        ))}
+      {!railShown &&
+        !phone &&
+        (user === undefined ? <StripWaiting /> : <Strip user={user} />)}
       <main
         ref={main}
-        class={`shell-main${railShown ? "" : " shell-main-bare"}`}
+        class={`shell-main${railShown ? "" : " shell-main-bare"}${
+          waited.waited === null ? "" : " bones-waited"
+        }`}
+        style={
+          waited.waited === null
+            ? undefined
+            : { "--waited": `${waited.waited}ms` }
+        }
         inert={covered}
       >
-        {!railShown && phone && (
+        {!railShown && phone && user === undefined && (
+          <span
+            class="btn-icon shell-show shell-show-float bones-wait"
+            aria-hidden="true"
+          >
+            <Bone kind="glyph" at={0} />
+          </span>
+        )}
+        {!railShown && phone && user !== undefined && (
           <button
             ref={show}
             type="button"
@@ -93,7 +128,7 @@ function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
             <Icon name="sidebar" />
           </button>
         )}
-        {children}
+        <HandOver.Provider value={waited.since}>{children}</HandOver.Provider>
       </main>
     </div>
   );
@@ -107,6 +142,17 @@ export function App() {
   useEffect(() => {
     void loadMe();
   }, []);
+  // the shell waits for me, then for the view's code, as one wait
+  const shellWaits =
+    m?.route.bare !== true &&
+    ((user === undefined && needsUser && meError.value === null) ||
+      (user != null && m !== null && !m.route.view.settled()));
+  // the view's code loads beside me, not once me lands, and loads even
+  // where the shell draws no view, so the wait always ends
+  if (shellWaits && m !== null && !m.route.view.settled()) {
+    void m.route.view.load();
+  }
+  const waited = useHandOver(shellWaits, path.value);
 
   // one who must change the password they were handed lands on the
   // profile, where the server lets them go
@@ -133,7 +179,23 @@ export function App() {
       const View = m.route.view;
       return <View params={m.params} />;
     }
-    if (meError.value === null) return null;
+    if (meError.value === null) {
+      // a route with a shape of its own (a chat) waits in it already,
+      // so the shape does not change when the user lands
+      const Shape =
+        m !== null && m.route.view.waiting !== PageCodeWaiting
+          ? m.route.view.waiting
+          : null;
+      return (
+        <Shell user={undefined} waited={waited}>
+          {Shape !== null && m !== null ? (
+            <Shape params={m.params} />
+          ) : (
+            <PageWaiting label="Loading 1ctx" />
+          )}
+        </Shell>
+      );
+    }
     return (
       <main class="shell-fail">
         <p class="error">{meError.value}</p>
@@ -152,14 +214,14 @@ export function App() {
   if (user.mustChangePassword && m.route.path !== "/profile") return null;
   if (m.route.role === "admin" && user.role !== "admin") {
     return (
-      <Shell user={user}>
+      <Shell user={user} waited={waited}>
         <p class="error">This page is for admins.</p>
       </Shell>
     );
   }
   const View = m.route.view;
   return (
-    <Shell user={user}>
+    <Shell user={user} waited={waited}>
       <View params={m.params} />
     </Shell>
   );

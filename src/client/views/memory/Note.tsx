@@ -27,6 +27,7 @@ import {
 } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useFocusField, useSave } from "../../lib/save.ts";
+import { LinesWaiting } from "../../ui/Bones.tsx";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Rows, RowsCard, RowsHandle } from "../../ui/Rows.tsx";
@@ -248,6 +249,22 @@ function Editor({
   );
 }
 
+// the card before the note lands, also the Memory tab's shape while its
+// project loads, so the wait keeps one shape
+// quiet as a piece of a waiting page, whose body names the wait
+export function NoteWaiting({ quiet = false }: { quiet?: boolean }) {
+  return (
+    <Rows>
+      <RowsCard label="Memory">
+        <LinesWaiting
+          class="note-empty"
+          label={quiet ? undefined : "Loading the memory"}
+        />
+      </RowsCard>
+    </Rows>
+  );
+}
+
 export function Note({
   memory,
   memoryKey,
@@ -270,14 +287,11 @@ export function Note({
   const notice = undo.notice();
   const label = "Memory";
   if (memory === null) {
+    if (error === null) return <NoteWaiting />;
     return (
       <Rows>
         <RowsCard label={label}>
-          <p class="note-empty">
-            {error === null
-              ? "Loading"
-              : `Did not load. ${sentence(error.words)}`}
-          </p>
+          <p class="note-empty">Did not load. {sentence(error.words)}</p>
         </RowsCard>
       </Rows>
     );

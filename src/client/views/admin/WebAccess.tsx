@@ -27,7 +27,14 @@ import { CREDENTIALS_HREF } from "../../lib/hrefs.ts";
 import { at, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Page, PageNew } from "../../ui/Page.tsx";
-import { RowsLine, RowsMeta, RowsRadio, RowsTitle } from "../../ui/Rows.tsx";
+import {
+  RowsCard,
+  RowsLine,
+  RowsMeta,
+  RowsRadio,
+  RowsTitle,
+  RowsWaiting,
+} from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm } from "../../ui/Setting.tsx";
 import { AsideLine, Split } from "../../ui/Split.tsx";
@@ -59,6 +66,8 @@ import {
   webTab,
 } from "./WebAccess.model.ts";
 import "./web-access.css";
+import { SettingWaiting } from "../../ui/SettingWaiting.tsx";
+import { UsageBones } from "./AdminWaiting.tsx";
 
 export function WebAccess() {
   const tab = webTab(path.value);
@@ -86,6 +95,7 @@ function Tabbed({ tab }: { tab: "general" | "credentials" }) {
         ) : undefined
       }
       loading={(state === null || rows === null) && error === null}
+      waiting={<WebWaiting tab={tab} />}
       error={error}
     >
       {state && rows && (
@@ -119,6 +129,49 @@ function Tabbed({ tab }: { tab: "general" | "credentials" }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the tab's cards under the tabs, which wait with no count
+function WebWaiting({ tab }: { tab: "general" | "credentials" }) {
+  return (
+    <Split aside={<UsageBones />}>
+      <div class="web-access">
+        <Tabs
+          tabs={WEB_TABS.map(({ label, href }) => ({ label, href }))}
+          active={WEB_TABS.find((t) => t.tab === tab)!.href}
+        />
+        {tab === "general" ? (
+          <SettingWaiting
+            label="Loading web access"
+            cards={[
+              {
+                title: "Access",
+                // the mode a new server lands with
+                line: { like: ACCESS_WORDS.all },
+                action: "seg",
+                pick: "web-access-pick",
+                foot: 2,
+              },
+              { title: "Search", line: true, rows: 4, foot: 2 },
+              {
+                title: "Limits",
+                line: "How much agents may fetch and search.",
+                action: true,
+                fields: WEB_LIMITS.map(() => "input" as const),
+                grid: "limits-setting-grid",
+                hints: true,
+                foot: 2,
+              },
+            ]}
+          />
+        ) : (
+          <RowsCard label="Credentials">
+            <RowsWaiting shape="plain" label="Loading credentials" />
+          </RowsCard>
+        )}
+      </div>
+    </Split>
   );
 }
 

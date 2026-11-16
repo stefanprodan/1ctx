@@ -11,6 +11,7 @@
 import type { FeedRow } from "../../shared/api/sessions.ts";
 import type { Failure } from "../lib/format.ts";
 import type { IconName } from "../lib/icons.tsx";
+import { Bone } from "../ui/Bones.tsx";
 import {
   RowsCard,
   RowsFailed,
@@ -94,7 +95,7 @@ export function FeedCard({
       }
     >
       {rows === null ? (
-        <Ghosts count={6} />
+        <Ghosts count={6} label="Loading sessions" />
       ) : rows.length === 0 ? (
         <RowsNote>{empty}</RowsNote>
       ) : (
@@ -109,7 +110,7 @@ export function FeedCard({
               now={now}
             />
           ))}
-          <ShowMore more={more} onMore={onMore} />
+          <ShowMore more={more} onMore={onMore} label="Loading sessions" />
         </>
       )}
     </RowsCard>
@@ -121,12 +122,15 @@ export function FeedCard({
 export function ShowMore({
   more,
   onMore,
+  label,
 }: {
   more: MoreState;
   onMore: () => void;
+  // what the later page is, for a screen reader: "Loading runs"
+  label: string;
 }) {
   if (!more.next) return null;
-  if (more.loading) return <Ghosts count={3} />;
+  if (more.loading) return <Ghosts count={3} label={label} />;
   return (
     <>
       <RowsMore onClick={onMore}>Show more</RowsMore>
@@ -135,32 +139,38 @@ export function ShowMore({
   );
 }
 
+// the title's and the line's widths, varied so the rows read as words
+const GHOSTS: readonly [number, number][] = [
+  [62, 44],
+  [48, 56],
+  [70, 34],
+];
+
 // placeholder rows in the shape of the real ones while rows load, so
-// the rows land where the shapes were
-function Ghosts({ count }: { count: number }) {
+// the rows land where the shapes were; a row's bones pulse together
+function Ghosts({ count, label }: { count: number; label: string }) {
   return (
-    <div class="feed-ghosts" role="status" aria-label="Loading sessions">
-      {Array.from({ length: count }, (_, i) => (
-        <div
-          key={i}
-          class={`feed-row feed-ghost feed-ghost-${"abc"[i % 3]}`}
-          style={{ "--ghost": i }}
-          aria-hidden="true"
-        >
-          <span class="feed-bone feed-bone-icon" />
-          <span class="feed-text">
-            <span class="feed-title">
-              <span class="feed-bone feed-bone-title" />
+    <div class="feed-ghosts bones-wait" role="status" aria-label={label}>
+      {Array.from({ length: count }, (_, i) => {
+        const [title, line] = GHOSTS[i % GHOSTS.length];
+        const at = i * 2;
+        return (
+          <div key={i} class="feed-row feed-ghost" aria-hidden="true">
+            <Bone kind="glyph" at={at} />
+            <span class="feed-text">
+              <span class="feed-title">
+                <Bone kind="line" at={at} width={title} />
+              </span>
+              <span class="feed-line">
+                <Bone kind="line" at={at} width={line} />
+              </span>
             </span>
-            <span class="feed-line">
-              <span class="feed-bone feed-bone-line" />
+            <span class="feed-when">
+              <Bone kind="chip" at={at} class="feed-ghost-when" />
             </span>
-          </span>
-          <span class="feed-when">
-            <span class="feed-bone feed-bone-when" />
-          </span>
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }

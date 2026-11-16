@@ -34,6 +34,7 @@ import { NewProvider } from "./NewProvider.tsx";
 import { costOf, tokensOf } from "./Overview.model.ts";
 import { keyLine, preset } from "./Providers.model.ts";
 import "./provider-list.css";
+import { ListWaiting, UsageBones } from "./AdminWaiting.tsx";
 
 export function Providers() {
   if (new URLSearchParams(query.value).has("new")) return <NewProvider />;
@@ -69,6 +70,13 @@ function List() {
       split
       actions={<PageNew href={`${PROVIDERS_HREF}?new`} label="New provider" />}
       loading={(list === null || rows === null) && error === null}
+      waiting={
+        <ListWaiting
+          label="Providers"
+          search={<Search query={q} placeholder="Search providers" />}
+          aside={<UsageBones />}
+        />
+      }
       error={error}
     >
       <Split aside={<Aside providers={all} />}>

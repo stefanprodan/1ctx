@@ -10,7 +10,13 @@ import type { KnowledgeFileView } from "../../../../shared/contracts/knowledge.t
 import type { DocHistory } from "../../../data/knowledge-history.ts";
 import { ShowMore } from "../../../feed/FeedCard.tsx";
 import { ago, plural, sentence } from "../../../lib/format.ts";
-import { RowsGo, RowsMeta, RowsNote, RowsTitle } from "../../../ui/Rows.tsx";
+import {
+  RowsGo,
+  RowsMeta,
+  RowsNote,
+  RowsTitle,
+  RowsWaiting,
+} from "../../../ui/Rows.tsx";
 import { AuthorText } from "../Author.tsx";
 import { authorOf, revisionHref } from "../Knowledge.model.ts";
 import {
@@ -45,7 +51,7 @@ export function History({
         </span>
       </div>
       {history.state === "loading" ? (
-        <RowsNote>Loading</RowsNote>
+        <RowsWaiting shape="plain" label="Loading the history" />
       ) : history.state === "failed" ? (
         <RowsNote>
           <span class="error">
@@ -84,6 +90,7 @@ export function History({
             onMore={() => {
               pages.value++;
             }}
+            label="Loading revisions"
           />
           {shown.length === versions.length && dropped > 0 && (
             <RowsNote>{droppedWords(dropped)}</RowsNote>

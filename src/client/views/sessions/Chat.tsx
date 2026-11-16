@@ -24,6 +24,7 @@
 import { useEffect } from "preact/hooks";
 import type { SessionOrigin } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
+import { recent } from "../../app/Recent.state.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { archiveSession } from "../../data/archive.ts";
 import { automations, dismissAlert } from "../../data/automations.ts";
@@ -41,7 +42,7 @@ import {
 import { inView } from "../../data/channel-pages.ts";
 import { forkSession } from "../../data/fork.ts";
 import { me } from "../../data/me.ts";
-import { project, projects } from "../../data/projects.ts";
+import { knownProjectName, project } from "../../data/projects.ts";
 import { editQueued, sendMessage } from "../../data/queued.ts";
 import {
   compactSession,
@@ -70,6 +71,7 @@ import { agentMarked } from "../../transcript/Work.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RESTARTED_LINE } from "../projects/Run.model.ts";
 import { archivedLine, forkAgents } from "./Chat.model.ts";
+import { ChatWaiting } from "./ChatWaiting.tsx";
 import { menuItems } from "./Menu.model.ts";
 import { Menu } from "./Menu.tsx";
 import { queueActions } from "./queue.ts";
@@ -110,13 +112,17 @@ function SessionPage({
     ? { words: origin === "chat" ? "no such chat" : "no such run", status: 404 }
     : sessionError.value;
   useEffect(() => () => leaveSession(id), [id]);
-  const projectId = shown?.session.projectId ?? null;
-  const row = project.value;
+  // the rail's Recent row names the page and its project before the
+  // detail lands; a channel's row holds its project's name, not its own
   const listed =
-    (row !== null && row.id === projectId ? row : null) ??
-    projects.value?.find((p) => p.id === projectId) ??
-    null;
-  const projectName = listed?.name ?? "Project";
+    shown === null
+      ? (recent.value.find(
+          (r) => r.id === id && r.kind === (origin === "chat" ? "chat" : "run"),
+        ) ?? null)
+      : null;
+  const projectId = shown?.session.projectId ?? listed?.projectId ?? null;
+  const row = project.value;
+  const projectName = knownProjectName(projectId);
   const user = me.value;
   const members = row !== null && row.id === projectId ? row.members : [];
   const authors = shown?.authors ?? [];
@@ -193,9 +199,11 @@ function SessionPage({
       crumbHref={projectId === null ? undefined : `/projects/${projectId}`}
       title={
         shown === null
-          ? origin === "chat"
-            ? "Chat"
-            : "Run"
+          ? error === null
+            ? (listed?.title ?? null)
+            : origin === "chat"
+              ? "Chat"
+              : "Run"
           : channel
             ? channelName(shown.session.title)
             : shown.session.title
@@ -227,6 +235,7 @@ function SessionPage({
         ) : undefined
       }
       loading={shown === null && error === null}
+      waiting={<ChatWaiting run={origin === "automation"} />}
       error={error}
       flush
     >

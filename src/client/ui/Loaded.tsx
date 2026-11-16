@@ -7,6 +7,7 @@
 import type { Failure } from "../lib/format.ts";
 import { clock } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
+import { useSlow } from "../lib/slow.ts";
 import "./loaded.css";
 import { CodeTag } from "./CodeTag.tsx";
 
@@ -23,11 +24,16 @@ export function Loaded({
   onRefresh: () => void;
 }) {
   const held = readAt !== null;
+  // a first load's bones say it runs; the word joins them only once
+  // it is slow
+  const slow = useSlow(busy && !held);
   const failed = !busy && error !== null && held;
   const status = busy
     ? held
       ? "Refreshing"
-      : "Loading"
+      : slow
+        ? "Loading"
+        : ""
     : failed
       ? "Did not refresh"
       : held

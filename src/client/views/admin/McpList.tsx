@@ -24,6 +24,7 @@ import { KeyFilesSection, TopSection, UsageSection } from "./AdminAside.tsx";
 import { grantWords, sidesLine } from "./Mcp.model.ts";
 import { NewMcpServer } from "./NewMcpServer.tsx";
 import "./mcp-page.css";
+import { ListWaiting, UsageBones } from "./AdminWaiting.tsx";
 
 export function McpList() {
   if (new URLSearchParams(query.value).has("new")) return <NewMcpServer />;
@@ -47,6 +48,13 @@ function List() {
       split
       actions={<PageNew href={`${MCP_HREF}?new`} label="New server" />}
       loading={rows === null && error === null}
+      waiting={
+        <ListWaiting
+          label="MCP Servers"
+          search={<Search query={q} placeholder="Search servers" />}
+          aside={<UsageBones lines={2} />}
+        />
+      }
       error={error}
     >
       <Split aside={<Aside list={all} />}>
@@ -101,7 +109,7 @@ function Aside({ list }: { list: McpServerSummary[] }) {
   const live = new Set(list.map((s) => s.name));
   return (
     <>
-      <UsageSection value={usage}>
+      <UsageSection value={usage} lines={2}>
         {(u) => (
           <>
             <AsideLine label="Calls">{count(u.calls)}</AsideLine>

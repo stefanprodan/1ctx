@@ -11,6 +11,7 @@ import {
   RowsMeta,
   RowsNote,
   RowsTitle,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
 import { keyLine, projectsLine, WEB_OFF_NOTE } from "./Credentials.model.ts";
@@ -28,7 +29,7 @@ export function CredentialList() {
   if (all === null) {
     return (
       <RowsCard label="Credentials">
-        <RowsNote>Loading</RowsNote>
+        <RowsWaiting shape="plain" label="Loading credentials" />
       </RowsCard>
     );
   }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useSignal } from "@preact/signals";
+import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import type { SkillSummary } from "../../../shared/contracts/skill.ts";
 import {
@@ -12,10 +13,18 @@ import {
   readSkillFile,
 } from "../../data/skills.ts";
 import { says, size } from "../../lib/format.ts";
+import { useCut } from "../../lib/resize.ts";
+import { LinesWaiting } from "../../ui/Bones.tsx";
 import { Fold } from "../../ui/Fold.tsx";
 import { RowsMeta, RowsNote, RowsOpen, RowsTitle } from "../../ui/Rows.tsx";
 import { Setting } from "../../ui/Setting.tsx";
-import { droppedLine, textBox } from "./Skills.model.ts";
+import { droppedLine, TEXT_LINES, textBox } from "./Skills.model.ts";
+
+// SKILL.md's box while it loads, at the cut box's lines, so the Files
+// card under it stays put when the text lands cut with Show all
+export function SkillTextWaiting({ label }: { label?: string }) {
+  return <LinesWaiting class="textbox" lines={TEXT_LINES} label={label} />;
+}
 
 export function SkillFiles({ skill }: { skill: SkillSummary }) {
   const open = useSignal<string | null>(null);
@@ -24,9 +33,11 @@ export function SkillFiles({ skill }: { skill: SkillSummary }) {
     <>
       <Setting title="SKILL.md" count={size(skill.bodyBytes)}>
         <Text
+          name="SKILL.md"
           load={() => readSkill(skill.id)}
           held={bodies.value[skill.id]}
           ground="card"
+          waiting={<SkillTextWaiting label="Loading SKILL.md" />}
         />
       </Setting>
       {(skill.files.length > 0 || dropped !== "") && (
@@ -48,6 +59,7 @@ export function SkillFiles({ skill }: { skill: SkillSummary }) {
               }
             >
               <Text
+                name={file.path}
                 load={() => readSkillFile(skill.id, file.path)}
                 held={files.value[fileKey(skill.id, file.path)]}
               />
@@ -61,16 +73,21 @@ export function SkillFiles({ skill }: { skill: SkillSummary }) {
 }
 
 function Text({
+  name,
   load,
   held,
   ground,
+  waiting,
 }: {
+  name: string;
   load: () => Promise<string>;
   held: string | undefined;
   ground?: "card";
+  // its own shape while it loads, else a few lines
+  waiting?: ComponentChildren;
 }) {
   const failure = useSignal<string | null>(null);
-  const expanded = useSignal(false);
+  const { el, open, long } = useCut<HTMLPreElement>([held]);
   useEffect(() => {
     failure.value = null;
     if (held !== undefined) return;
@@ -85,21 +102,34 @@ function Text({
   if (failure.value) {
     return <p class="skill-page-state error">{failure.value}</p>;
   }
-  if (held === undefined) return <p class="skill-page-state">Loading</p>;
+  if (held === undefined) {
+    if (waiting !== undefined) return waiting;
+    return (
+      <LinesWaiting
+        class="skill-page-state"
+        lines={6}
+        label={`Loading ${name}`}
+      />
+    );
+  }
   // cut, not scrolled: a box scrolling inside the page leaves the
-  // sticky head behind
-  const box = textBox(held, expanded.value);
+  // sticky head behind. Cut at its first lines and at their height
+  // too, so a long line wrapping on a phone never makes the box taller
+  // than its wait
+  const box = textBox(held, open.value);
   return (
     <Fold
-      cut={box.cut && !expanded.value}
+      cut={(box.cut || long.value) && !open.value}
       onOpen={() => {
-        expanded.value = true;
+        open.value = true;
       }}
       label={box.label}
       framed
       ground={ground}
     >
-      <pre class="textbox">{box.text}</pre>
+      <pre ref={el} class={`textbox${open.value ? "" : " skill-page-clip"}`}>
+        {box.text}
+      </pre>
     </Fold>
   );
 }

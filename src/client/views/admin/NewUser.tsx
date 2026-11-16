@@ -12,7 +12,7 @@ import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { fullNameProblem } from "../profile/Profile.model.ts";
-import { NewCard } from "./NewCard.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import { PasswordField } from "./PasswordField.tsx";
 import { UserFields, type Who } from "./UserFields.tsx";
 import {
@@ -36,6 +36,12 @@ export function NewUser() {
       steps={STEPS}
       title="New user"
       loading={users.value === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the new user form"
+          fields={["input", "input", "input", "input", "seg", "seg"]}
+        />
+      }
       error={error}
     >
       <Form />

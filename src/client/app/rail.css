@@ -78,6 +78,14 @@
     scrollbar-width: thin;
   }
 
+  /* the projects' bones in the nav's own column and gap */
+  .rail-wait {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    gap: 2px;
+  }
+
   .rail-item {
     display: flex;
     align-items: center;

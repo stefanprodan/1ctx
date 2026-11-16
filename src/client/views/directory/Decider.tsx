@@ -42,6 +42,7 @@ import { ANSWER_WORDS, activityModel } from "../projects/Activity.model.ts";
 import { Activity, ActivityGhost } from "../projects/Activity.tsx";
 import { deciderAnswer, deciderLine } from "./Directory.model.ts";
 import "./directory.css";
+import { DirectoryWaiting } from "./DirectoryWaiting.tsx";
 
 // the decider's answers per day, the agent page's card in its words;
 // its ghost while they load, nothing when their first load failed
@@ -89,6 +90,14 @@ export function Decider({ params }: { params: Params }) {
       title={name}
       titleMono
       loading={shown === null && deciderPageError.value === null}
+      waiting={
+        <DirectoryWaiting
+          label="Loading the decider"
+          aside="Decider"
+          lines={3}
+          card="Decisions"
+        />
+      }
       error={deciderPageError.value}
     >
       {shown && (

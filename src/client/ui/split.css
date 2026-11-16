@@ -62,6 +62,16 @@
     color: var(--dim);
     font-size: var(--text-ui);
   }
+  /* a section's lines in waiting, spaced as its pairs are: the
+     section's row gap between them and a pair's own padding */
+  .split-waiting {
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--space-2);
+  }
+  .split-waiting > .split-line {
+    padding: 2px 0;
+  }
   .split-pair {
     display: grid;
     grid-template-columns: subgrid;

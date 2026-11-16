@@ -5,6 +5,7 @@ import { useEffect } from "preact/hooks";
 import { loadToolResult, toolResults } from "../data/sessions.ts";
 import { Icon } from "../lib/icons.tsx";
 import { useCut } from "../lib/resize.ts";
+import { LinesWaiting } from "../ui/Bones.tsx";
 import { Fold } from "../ui/Fold.tsx";
 import { folds } from "./fold.ts";
 import type { CallNode } from "./rows.ts";
@@ -40,6 +41,17 @@ export function Value({ text, failed }: { text: string; failed?: boolean }) {
         {text}
       </div>
     </Fold>
+  );
+}
+
+// a result's lines while it comes off the wire, at the value's font
+export function ResultWaiting() {
+  return (
+    <LinesWaiting
+      class="transcript-tool-value"
+      lines={2}
+      label="Loading the result"
+    />
   );
 }
 
@@ -88,7 +100,12 @@ export function Tool({ node }: { node: CallNode }) {
         <div class="transcript-tool-label">arguments</div>
         <Value text={prettyArguments(node.call.arguments)} />
         <div class="transcript-tool-label">{shown.label}</div>
-        <Value text={shown.text} failed={shown.err} />
+        {/* mounted on opening, so a fast answer never flashes them */}
+        {shown.waiting ? (
+          open && <ResultWaiting />
+        ) : (
+          <Value text={shown.text} failed={shown.err} />
+        )}
       </div>
     </details>
   );

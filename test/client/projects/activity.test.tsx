@@ -73,7 +73,7 @@ describe("the Activity card", () => {
     const html = render(<ActivityGhost />);
     expect(html).toContain(">Activity<");
     expect(html).toContain('aria-label="Loading activity"');
-    expect(html.match(/activity-ghost/g)).toHaveLength(26 * 7);
+    expect(html.match(/bones-bone-cell/g)).toHaveLength(26 * 7);
     expect(html).not.toContain("data-index");
     expect(html).not.toContain('role="slider"');
     // the labels the loaded card draws, so it lands where the ghost was
@@ -98,7 +98,7 @@ describe("the Activity card", () => {
 
   test("a strip's ghost is 14 squares with no levels", () => {
     const html = render(<StripGhost />);
-    expect(html.match(/activity-ghost/g)).toHaveLength(14);
+    expect(html.match(/bones-bone-cell/g)).toHaveLength(14);
     expect(html).not.toContain("activity-level");
     expect(html).toContain('aria-hidden="true"');
   });
@@ -147,8 +147,8 @@ describe("the Activity card", () => {
     recentDays.value = null;
     const ghost = render(<ActivityAside projectId="p1" />);
     expect(ghost).toContain('aria-label="Loading activity"');
-    expect(ghost).toContain('class="activity-grid activity-grid-compact"');
-    expect(ghost.match(/activity-ghost/g)).toHaveLength(16 * 7);
+    expect(ghost).toMatch(/class="activity-grid [^"]*activity-grid-compact/);
+    expect(ghost.match(/bones-bone-cell/g)).toHaveLength(16 * 7);
     expect(ghost).not.toContain("activity-weekday");
     recentDaysFailed.value = true;
     expect(render(<ActivityAside projectId="p1" />)).toBe("");

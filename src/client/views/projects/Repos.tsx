@@ -40,6 +40,7 @@ import {
   RowsNew,
   RowsNote,
   RowsTitle,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { Seg } from "../../ui/Seg.tsx";
@@ -124,7 +125,15 @@ export function Repos({
           {head && <div class="repos-head">{head}</div>}
           {list !== null || repoErrorOf(projectId) !== null ? (
             <RowsList>{rows}</RowsList>
-          ) : null}
+          ) : (
+            <RowsList>
+              <RowsWaiting
+                count={1}
+                shape="plain"
+                label="Loading the repositories"
+              />
+            </RowsList>
+          )}
           {full && <span class="hint">{CAP_LINE}</span>}
         </div>
       </Section>

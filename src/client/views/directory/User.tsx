@@ -51,6 +51,7 @@ import {
   userTabs,
 } from "./Directory.model.ts";
 import "./directory.css";
+import { DirectoryWaiting } from "./DirectoryWaiting.tsx";
 
 // the user's actions per day, the Projects page's card in their
 // words; its ghost while they load, nothing when their first load
@@ -171,6 +172,18 @@ export function User({ params }: { params: Params }) {
         ) : undefined
       }
       loading={shown === null && userPageError.value === null}
+      waiting={
+        <DirectoryWaiting
+          label="Loading the user"
+          aside="Account"
+          lines={5}
+          // the email and the local time
+          narrow={2}
+          card={tab === 0 ? "About" : "Projects"}
+          tabs={userTabs(username, null)}
+          active={userTabs(username, null)[tab].href}
+        />
+      }
       error={userPageError.value}
     >
       {shown && (

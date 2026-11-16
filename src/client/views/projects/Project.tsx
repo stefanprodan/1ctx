@@ -8,13 +8,25 @@
 import type { Params } from "../../app/params.ts";
 import { Composer } from "../../composer/Composer.tsx";
 import { projectAgents, sending } from "../../data/sessions.ts";
+import { ComposerWaiting } from "../home/ComposerWaiting.tsx";
 import { Feed, startChat } from "../home/Feed.tsx";
 import { Frame } from "./Frame.tsx";
 
 export function Project({ params }: { params: Params }) {
   const id = params.id ?? "";
+  const path = `/projects/${id}`;
   return (
-    <Frame id={id} tab="feed">
+    <Frame
+      id={id}
+      tab="feed"
+      // the composer waits quiet: the feed's rows say the page loads
+      waiting={
+        <>
+          <ComposerWaiting />
+          <Feed path={path} projectName={() => null} waiting />
+        </>
+      }
+    >
       {(shown) => (
         <>
           <Composer
@@ -28,7 +40,7 @@ export function Project({ params }: { params: Params }) {
             onSend={startChat(shown.id)}
             onStop={async () => {}}
           />
-          <Feed path={`/projects/${shown.id}`} projectName={() => null} />
+          <Feed path={path} projectName={() => null} />
         </>
       )}
     </Frame>

@@ -36,6 +36,7 @@ import {
 } from "../../ui/Setting.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 import { keyLine, preset, providerDeleteLine } from "./Providers.model.ts";
 
 const STEPS = [
@@ -80,6 +81,7 @@ export function ProviderPage({ params }: { params: Params }) {
           dictation.value === null) &&
         error === null
       }
+      waiting={<ProviderWaiting name={params.name} />}
       empty={
         list !== null && provider === null
           ? "No provider by that name."
@@ -110,6 +112,21 @@ export function ProviderPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the connection's facts, the agents on it and its delete
+function ProviderWaiting({ name }: { name: string }) {
+  return (
+    <CardsWaiting
+      label="Loading the provider"
+      usage
+      cards={[
+        { title: "Connection", facts: 4 },
+        { title: "Used by", rows: 2, shape: "avatar" },
+        { title: `Delete ${name}`, line: true, foot: 1, danger: true },
+      ]}
+    />
   );
 }
 

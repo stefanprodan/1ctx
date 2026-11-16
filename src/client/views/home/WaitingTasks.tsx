@@ -41,6 +41,7 @@ export function WaitingTasks({ now }: { now: number }) {
           error: null,
         }}
         onMore={() => setShown((n) => n + MORE_ROWS)}
+        label="Loading tasks"
       />
     </RowsCard>
   );

@@ -24,6 +24,7 @@ import {
 import type { Failure } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
+import { LinesWaiting } from "../../ui/Bones.tsx";
 import { CodeTag } from "../../ui/CodeTag.tsx";
 import { Loaded } from "../../ui/Loaded.tsx";
 import { Page } from "../../ui/Page.tsx";
@@ -36,7 +37,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { RowsFilters } from "../../ui/RowsControls.tsx";
-import { ActivityPanel, DaysTiles, LengthPanel } from "./Days.tsx";
+import { ActivityPanel, DaysGhost, DaysTiles, LengthPanel } from "./Days.tsx";
 import { attentionRow, buildLine, staleWords } from "./Overview.model.ts";
 import { NowRow, OverviewGhost } from "./OverviewNow.tsx";
 import "./overview.css";
@@ -79,11 +80,23 @@ function Attention() {
   const answer = attention.value;
   const error = attentionError.value;
   if (answer === null) {
-    return error ? (
-      <RowsCard label="Needs attention" class="chart-stale">
-        <RowsNote>Did not load.</RowsNote>
+    // the card always lands, so its first load holds its place
+    return (
+      <RowsCard
+        label="Needs attention"
+        class={error ? "chart-stale" : undefined}
+      >
+        {error ? (
+          <RowsNote>Did not load.</RowsNote>
+        ) : (
+          <LinesWaiting
+            class="rows-note"
+            lines={1}
+            label="Loading what needs attention"
+          />
+        )}
       </RowsCard>
-    ) : null;
+    );
   }
   const rows = answer.items.map((item) =>
     attentionRow(item, now, answer.email),
@@ -164,7 +177,18 @@ function Stats({
           </div>
         </div>
       ) : (
-        <OverviewGhost at={16} />
+        // one box as the answer's, so the panels keep its spacing; they
+        // land under the tiles, so their place waits too
+        <div>
+          <OverviewGhost at={16} />
+          <div
+            class="chart-grid overview-charts chart-board-ghost bones-wait"
+            aria-hidden="true"
+          >
+            <DaysGhost label="Activity" at={24} />
+            <DaysGhost label="LLM response time" at={56} />
+          </div>
+        </div>
       )}
     </>
   );

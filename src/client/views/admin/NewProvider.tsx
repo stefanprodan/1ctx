@@ -20,7 +20,7 @@ import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Select } from "../../ui/Select.tsx";
 import { Choices } from "./Choices.tsx";
-import { NewCard } from "./NewCard.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import {
   baseUrlProblem,
   matchingKey,
@@ -44,6 +44,12 @@ export function NewProvider({ wire }: { wire?: Wire } = {}) {
       steps={STEPS}
       title="New provider"
       loading={providers.value === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the new provider form"
+          fields={["input", "input", "wide"]}
+        />
+      }
       error={error}
     >
       <Form initial={wire ?? PRESETS[0]!.wire} />

@@ -11,6 +11,17 @@
     animation: pulse 1.6s ease-in-out infinite;
     animation-delay: calc(var(--ghost) * 0.05s);
   }
+  /* each line of the words is a bone of its own, ending where it wraps,
+     a bar as thick as a line bone's */
+  .bones-words {
+    background:
+      linear-gradient(var(--line), var(--line)) 0 50% / 100% 0.7em no-repeat;
+    color: transparent;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    animation: pulse 1.6s ease-in-out infinite;
+    animation-delay: calc(var(--ghost) * 0.05s);
+  }
   .bones-bone-label {
     width: 72px;
     height: 14px;
@@ -59,9 +70,114 @@
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
+  /* a line keeps a line's height around its bar, so a row of bones
+     is as tall as the row of words that replaces it */
+  .bones-bone-line {
+    width: 60%;
+    margin-block: 0.25em;
+  }
+  .bones-bone-avatar {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+  }
+  .bones-bone-chip {
+    flex-shrink: 0;
+    width: 48px;
+  }
+  .bones-bone-glyph {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius);
+  }
+  .bones-bone-cell {
+    height: auto;
+    aspect-ratio: 1;
+    background: var(--heat-0);
+  }
+
+  /* a form's controls at their own heights (base.css's .field and
+     .btn, Seg's row) */
+  .bones-bone-field,
+  .bones-bone-box,
+  .bones-bone-area,
+  .bones-bone-prompt {
+    width: 100%;
+    height: 36px;
+    border-radius: var(--radius);
+  }
+  .bones-bone-box {
+    height: 44px;
+  }
+  .bones-bone-area {
+    height: 80px;
+  }
+  .bones-bone-prompt {
+    height: 160px;
+  }
+  /* as tall as base.css's textarea of --rows lines, which a phone's
+     larger font makes taller */
+  .bones-bone-rows {
+    width: 100%;
+    height: calc(var(--rows) * 1lh + var(--space-2) * 2 + 2px);
+    border-radius: var(--radius);
+    font-size: var(--text-input);
+    line-height: 1.5;
+  }
+  @media (pointer: coarse) {
+    .bones-bone-rows {
+      font-size: var(--text-touch);
+    }
+  }
+  .bones-bone-seg {
+    width: 220px;
+    max-width: 100%;
+    height: 34px;
+    border-radius: var(--radius);
+  }
+  .bones-bone-button {
+    flex-shrink: 0;
+    width: 66px;
+    height: 32px;
+    border-radius: var(--radius);
+  }
+  /* a switch of two short words in a card's head */
+  .bones-bone-pick {
+    width: 140px;
+  }
+  .bones-bone-small {
+    width: 72px;
+    height: 28px;
+  }
+
+  /* a line of a waiting text, as tall as the text's own line */
+  .bones-lines-line {
+    display: flex;
+    align-items: center;
+    height: 1lh;
+  }
+
+  /* a waiting body shows nothing for its first 200 ms (REVEAL_MS in
+     lib/wait.ts), so an answer that lands sooner never flashes bones */
+  .bones-wait {
+    animation: reveal 0.2s ease-out 0.2s backwards;
+  }
+  /* under a page whose wait already showed (Page's --waited), bones
+     drawn anew start that far into their reveal, so they never blink */
+  .bones-waited .bones-wait {
+    animation-delay: calc(0.2s - var(--waited));
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .bones-bone {
+    .bones-bone,
+    .bones-words {
       animation: none;
+    }
+    /* the wait still holds its delay, then shows at once */
+    .bones-wait {
+      animation-timing-function: step-start;
     }
   }
 }

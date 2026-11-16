@@ -5,7 +5,7 @@ import type { AgentSummary } from "../../shared/contracts/agent.ts";
 import { AvatarIcon } from "../lib/avatars.tsx";
 import { AGENTS_HREF, agentHref } from "../lib/hrefs.ts";
 import { Fit } from "../ui/Fit.tsx";
-import { AsideItem, AsideSection } from "../ui/Split.tsx";
+import { AsideItem, AsideSection, AsideWaiting } from "../ui/Split.tsx";
 import { shortModel } from "./meta.ts";
 
 export function AgentsAside({
@@ -27,7 +27,7 @@ export function AgentsAside({
       }
     >
       {agents === null ? (
-        <p class="split-empty">Loading</p>
+        <AsideWaiting label="Loading agents" />
       ) : agents.length === 0 ? (
         <p class="split-empty">No agents yet.</p>
       ) : (

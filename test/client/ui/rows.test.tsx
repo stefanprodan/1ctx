@@ -27,8 +27,10 @@ import {
   RowsSwitch,
   RowsTag,
   RowsTitle,
+  RowsWaiting,
 } from "../../../src/client/ui/Rows.tsx";
 import { Seg } from "../../../src/client/ui/Seg.tsx";
+import { withClass } from "../../helpers/classes.ts";
 
 const noop = () => {};
 
@@ -287,5 +289,47 @@ describe("the system's other parts", () => {
       <Seg label="Access" small options={options} value="a" onPick={noop} />,
     );
     expect(inRow).not.toContain("rows-filters");
+  });
+});
+
+describe("RowsWaiting", () => {
+  const rowsOf = (html: string) =>
+    html.split('class="rows-item" aria-hidden="true"').length - 1;
+
+  test("draws that many rows of bones as one named status", () => {
+    const html = render(<RowsWaiting count={4} label="Loading agents" />);
+    expect(rowsOf(html)).toBe(4);
+    expect(html.match(/role="status"/g)?.length).toBe(1);
+    expect(html).toContain('aria-label="Loading agents"');
+    expect(html).toContain("bones-wait");
+    expect(html).not.toContain(">Loading<");
+    // each row's parts sit in the row's own classes, so it is a row's
+    // height and wraps as one on a phone
+    for (const part of ["rows-line", "rows-title", "rows-name", "rows-sub"]) {
+      expect(html).toContain(part);
+    }
+    expect(html).toContain("rows-meta");
+    expect(html).toContain("bones-bone-avatar");
+    // every bone is hidden from a reader
+    const bones = html.match(/<span class="bones-bone[^>]*>/g) ?? [];
+    expect(bones.length).toBeGreaterThan(0);
+    for (const bone of bones) expect(bone).toContain('aria-hidden="true"');
+  });
+
+  test("three rows by default, led by the shape's lead", () => {
+    const icon = render(<RowsWaiting shape="icon" label="Loading runs" />);
+    expect(rowsOf(icon)).toBe(3);
+    expect(icon).toContain("rows-waiting-icon");
+    expect(icon).not.toContain("bones-bone-avatar");
+    const plain = render(<RowsWaiting shape="plain" label="Loading keys" />);
+    expect(plain).not.toContain("rows-waiting-icon");
+    expect(plain).not.toContain("bones-bone-avatar");
+  });
+
+  test("a card of its own carries a head, still one status", () => {
+    const html = render(<RowsWaiting card label="Loading the page" />);
+    expect(withClass(html, "rows-card", "rows-waiting", "bones-wait")).toBe(1);
+    expect(html).toContain('class="rows-head" aria-hidden="true"');
+    expect(html.match(/role="status"/g)?.length).toBe(1);
   });
 });

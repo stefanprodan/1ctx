@@ -21,7 +21,8 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { ListWaiting } from "./AdminWaiting.tsx";
 import { NewUser } from "./NewUser.tsx";
 import { metaLine, stateLine, userCounts } from "./Users.model.ts";
 
@@ -47,6 +48,13 @@ function List() {
       split
       actions={<PageNew href={`${USERS_HREF}?new`} label="New user" />}
       loading={list === null && error === null}
+      waiting={
+        <ListWaiting
+          label="Users"
+          search={<Search query={q} placeholder="Search users" />}
+          aside={<AsideBones label="Roles" lines={3} />}
+        />
+      }
       error={error}
     >
       {list !== null && (

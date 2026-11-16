@@ -10,6 +10,15 @@
     gap: var(--space-4);
     min-width: 0;
   }
+  /* the big avatar's place while the page loads */
+  .who .who-waiting-avatar {
+    width: 56px;
+    height: 56px;
+  }
+  /* the bones' widths are shares of the line, which words would fill */
+  .who .who-waiting-text {
+    flex: 1;
+  }
   .who-text {
     display: flex;
     flex-direction: column;

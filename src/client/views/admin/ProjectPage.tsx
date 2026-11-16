@@ -44,7 +44,7 @@ import {
   SettingForm,
   SettingStack,
 } from "../../ui/Setting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { McpServers } from "../projects/McpServers.tsx";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
 import { Repos } from "../projects/Repos.tsx";
@@ -56,6 +56,7 @@ import {
   memberOptions,
   projectFieldOf,
 } from "./AdminProjects.model.ts";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 import { useDraftCard } from "./DraftCard.tsx";
 
 const STEPS = [zoneStep("Access"), { label: "Projects", href: PROJECTS_HREF }];
@@ -74,7 +75,7 @@ export function ProjectPage({ params }: { params: Params }) {
   return (
     <Page
       steps={STEPS}
-      title={listed?.name ?? detail?.name ?? "Project"}
+      title={listed?.name ?? detail?.name ?? (missing ? "Project" : null)}
       titleMono
       menu={
         listed !== null ? (
@@ -98,6 +99,7 @@ export function ProjectPage({ params }: { params: Params }) {
         (list === null ? listError === null : detail === null) &&
         detailError === null
       }
+      waiting={<ProjectWaiting />}
       empty={missing ? "No team project by that id." : undefined}
       // a failed read after a save keeps the page: the card that saved
       // says what went wrong
@@ -117,6 +119,23 @@ export function ProjectPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the about, members, labels and repositories cards
+function ProjectWaiting() {
+  return (
+    <CardsWaiting
+      label="Loading the project"
+      usage
+      aside={<AsideBones label="Project" lines={4} />}
+      cards={[
+        { fields: ["input", "text"], foot: 2 },
+        { title: "Members", action: true, rows: 1, shape: "avatar", foot: 2 },
+        { title: "Labels", action: true, rows: 3 },
+        { title: "Repositories", action: true, rows: 1 },
+      ]}
+    />
   );
 }
 

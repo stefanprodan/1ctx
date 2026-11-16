@@ -599,6 +599,12 @@
       opacity: 0.45;
     }
   }
+  /* a waiting body fading in after its delay */
+  @keyframes reveal {
+    from {
+      opacity: 0;
+    }
+  }
 
   /* the one turn a spinner needs */
   @keyframes spin {

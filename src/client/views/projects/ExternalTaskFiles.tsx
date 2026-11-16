@@ -21,6 +21,7 @@ import {
 } from "../../data/external-task-files.ts";
 import { ago } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
+import { LinesWaiting } from "../../ui/Bones.tsx";
 import { PathName } from "../../ui/PathName.tsx";
 import { RowsCard, RowsFailed } from "../../ui/Rows.tsx";
 import { fileHref, fileIcon } from "../knowledge/Knowledge.model.ts";
@@ -89,7 +90,10 @@ function FileRow({
       {open.value && read !== undefined && (
         <div class="external-tasks-file-body">
           {read.state === "loading" ? (
-            <p class="external-tasks-file-note">Loading</p>
+            <LinesWaiting
+              class="external-tasks-file-note"
+              label={`Loading ${name}`}
+            />
           ) : read.state === "failed" ? (
             <RowsFailed failure={read.failure} />
           ) : read.html !== null ? (

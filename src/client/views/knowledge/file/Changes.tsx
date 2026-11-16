@@ -20,6 +20,7 @@ import {
 } from "../../../data/knowledge-history.ts";
 import { diffLines, type LineDiff } from "../../../lib/diff.ts";
 import { sentence } from "../../../lib/format.ts";
+import { LinesWaiting } from "../../../ui/Bones.tsx";
 import { Diff, DiffStat } from "../../../ui/Diff.tsx";
 
 export function Changes({
@@ -104,7 +105,13 @@ export function LatestChanges({ file }: { file: KnowledgeFileView }) {
     );
   }
   if (history.state === "loading" || held?.state === "loading") {
-    return <p class="docpage-state">Loading</p>;
+    return (
+      <LinesWaiting
+        class="docpage-state"
+        lines={6}
+        label="Loading the changes"
+      />
+    );
   }
   if (before === null || held === null) {
     return <p class="docpage-state">No earlier revision is kept.</p>;

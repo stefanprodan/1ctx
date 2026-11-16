@@ -98,45 +98,9 @@
   .feed-ghost {
     pointer-events: none;
   }
-  .feed-bone {
-    display: inline-block;
-    height: 0.7em;
-    vertical-align: middle;
-    border-radius: var(--radius-cell);
-    background: var(--line);
-    animation: pulse 1.6s ease-in-out infinite;
-    animation-delay: calc(var(--ghost) * 0.1s);
-  }
-  .feed-bone-icon {
-    flex-shrink: 0;
-    width: 16px;
-    height: 16px;
-    border-radius: var(--radius);
-  }
-  .feed-bone-title {
-    width: 62%;
-  }
-  .feed-bone-line {
-    width: 44%;
-  }
-  .feed-bone-when {
+  /* the chip at the time's place, its right edge where the time ends */
+  .feed-ghost-when {
     width: 36px;
-  }
-  .feed-ghost-b .feed-bone-title {
-    width: 48%;
-  }
-  .feed-ghost-b .feed-bone-line {
-    width: 56%;
-  }
-  .feed-ghost-c .feed-bone-title {
-    width: 70%;
-  }
-  .feed-ghost-c .feed-bone-line {
-    width: 34%;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .feed-bone {
-      animation: none;
-    }
+    margin-left: auto;
   }
 }

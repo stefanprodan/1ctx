@@ -26,7 +26,7 @@ import {
   reachHint,
 } from "./Mcp.model.ts";
 import { PersonalSeg, ProjectsPicks, ReachSeg } from "./McpProjects.tsx";
-import { NewCard } from "./NewCard.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import "./mcp-page.css";
 
 const STEPS = [zoneStep("Config"), { label: "MCP Servers", href: MCP_HREF }];
@@ -38,6 +38,12 @@ export function NewMcpServer() {
       steps={STEPS}
       title="New server"
       loading={servers.value === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the new server form"
+          fields={["input", "input", "wide", "seg-row", "seg-row"]}
+        />
+      }
       error={error}
     >
       <Form />

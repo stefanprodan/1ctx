@@ -170,8 +170,9 @@ describe("tool summaries", () => {
   test("shows the fetched result with its size and the server's cut", () => {
     expect(displayResult(result(), undefined)).toEqual({
       label: "result, untrusted",
-      text: "loading",
+      text: "",
       err: false,
+      waiting: true,
     });
     expect(
       displayResult(result(), {
@@ -184,6 +185,7 @@ describe("tool summaries", () => {
       label: "result, untrusted · 8 B",
       text: "<b>x</b>",
       err: false,
+      waiting: false,
     });
     expect(
       displayResult(result(), {
@@ -196,10 +198,16 @@ describe("tool summaries", () => {
       label: "result, untrusted · 40.0 KB",
       text: "x\n...",
       err: false,
+      waiting: false,
     });
     expect(
       displayResult(result(), { status: "failed", error: "not found" }),
-    ).toEqual({ label: "result, untrusted", text: "not found", err: true });
+    ).toEqual({
+      label: "result, untrusted",
+      text: "not found",
+      err: true,
+      waiting: false,
+    });
     expect(displayResult(result({ status: "streaming" }), undefined).text).toBe(
       "",
     );

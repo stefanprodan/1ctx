@@ -29,8 +29,9 @@ import {
   watchScreen,
   watchViewport,
 } from "../../../src/client/app/shell.ts";
-import { me } from "../../../src/client/data/me.ts";
+import { me, meError } from "../../../src/client/data/me.ts";
 import { MONITOR_HREF } from "../../../src/client/lib/hrefs.ts";
+import { withClass } from "../../helpers/classes.ts";
 
 const store = new Map<string, string>();
 const fakeStorage = {
@@ -121,6 +122,56 @@ describe("the shell on a phone", () => {
     expect(render(<App />)).not.toContain("inert");
     openDrawer();
     expect(render(<App />)).toContain('<main class="shell-main" inert');
+  });
+});
+
+describe("the shell before the user is known", () => {
+  beforeEach(() => {
+    me.value = undefined;
+    meError.value = null;
+  });
+  afterEach(() => {
+    meError.value = null;
+  });
+
+  test.serial("draws the rail and a page in bones, not nothing", () => {
+    const html = render(<App />);
+    expect(html).toContain('class="shell"');
+    expect(withClass(html, "rail", "bones-wait")).toBe(1);
+    expect(html).toMatch(
+      /class="(?:[^"]* )?rail(?: [^"]*)?" aria-hidden="true"/,
+    );
+    // a bone for each entry's icon and a few projects
+    expect(html.split('class="rail-item"').length - 1).toBeGreaterThan(1);
+    expect(html.split('class="rail-sub rail-sub-icon"').length - 1).toBe(3);
+    expect(html).not.toContain("Casey");
+    expect(html.match(/role="status"/g)?.length).toBe(1);
+    expect(html).toContain('aria-label="Loading 1ctx"');
+    expect(html).toContain("page-waiting-crumb");
+  });
+
+  test.serial("a folded rail waits as the strip, its button live", () => {
+    hideRail();
+    const html = render(<App />);
+    expect(withClass(html, "strip", "bones-wait")).toBe(1);
+    expect(html).toContain('aria-label="Show the menu"');
+    expect(html).not.toContain('class="rail');
+  });
+
+  test.serial("a phone keeps the floating button's place", () => {
+    railDrawer.value = true;
+    const html = render(<App />);
+    expect(withClass(html, "shell-main", "shell-main-bare")).toBe(1);
+    expect(withClass(html, "shell-show-float", "bones-wait")).toBe(1);
+    expect(html).not.toContain('aria-label="Show the menu"');
+    expect(html).not.toContain('class="rail');
+  });
+
+  test.serial("a failed first load says so with a retry, no bones", () => {
+    meError.value = { words: "server busy", status: 503 };
+    const html = render(<App />);
+    expect(html).toContain("Try again");
+    expect(html).not.toContain("bones-bone");
   });
 });
 

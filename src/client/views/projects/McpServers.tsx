@@ -27,6 +27,7 @@ import {
   RowsNew,
   RowsNote,
   RowsTitle,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Section } from "../../ui/Section.tsx";
 import { Select } from "../../ui/Select.tsx";
@@ -101,7 +102,15 @@ export function McpServers({
           {add && <div class="mcp-servers-head">{add}</div>}
           {list !== null || projectMcpErrorOf(projectId) !== null ? (
             <RowsList>{rows}</RowsList>
-          ) : null}
+          ) : (
+            <RowsList>
+              <RowsWaiting
+                count={1}
+                shape="plain"
+                label="Loading the MCP servers"
+              />
+            </RowsList>
+          )}
           {failed}
         </div>
       </Section>

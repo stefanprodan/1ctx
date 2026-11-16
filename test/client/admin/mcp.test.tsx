@@ -495,7 +495,7 @@ describe("a server's page", () => {
       servers.value = [flux];
       path.value = "/admin/config/mcp/flux";
       const page = () => render(<McpPage params={{ name: "flux" }} />);
-      expect(page()).toContain("Loading");
+      expect(page()).toContain('aria-label="Loading usage"');
       answer = () =>
         Response.json({
           since: 0,

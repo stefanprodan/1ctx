@@ -157,7 +157,7 @@ describe("the Visuals page", () => {
     expect(html).not.toContain('type="number"');
     expect(html).toContain('inputmode="decimal"');
     expect(html).toContain("Last 30 days");
-    expect(html).toContain("Loading");
+    expect(html).toContain('aria-label="Loading usage"');
   });
 
   test.serial("Use defaults waits while a card holds the defaults", () => {
@@ -229,7 +229,9 @@ describe("the Visuals page", () => {
   test.serial("says it is loading, then the failure", () => {
     tools.value = null;
     limits.value = null;
-    expect(render(<Visuals />)).toContain("Loading");
+    expect(render(<Visuals />)).toMatch(
+      /role="status" aria-label="Loading[^"]*"/,
+    );
     toolsError.value = {
       words: "the server failed while answering",
       status: 500,

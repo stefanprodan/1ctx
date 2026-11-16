@@ -121,6 +121,24 @@
     color: var(--faint);
   }
 
+  /* rows of bones while a list loads (RowsWaiting) */
+  .rows-waiting-line {
+    pointer-events: none;
+  }
+  .rows-waiting-icon {
+    flex-shrink: 0;
+  }
+  /* a bone keeps its text's line, so a waiting row is a loaded row's
+     height; .rows-name is a centring flex row already */
+  .rows-waiting-line .rows-name,
+  .rows-waiting-line .rows-sub {
+    min-height: 1lh;
+  }
+  .rows-waiting-line .rows-sub {
+    display: flex;
+    align-items: center;
+  }
+
   /* what reveal() keeps clear when a row opens: the sticky page head
      above and its card's edge below */
   .rows-item {
@@ -719,7 +737,8 @@
       padding-left: 0;
     }
     .rows-line:has(> .avatar) > .rows-meta,
-    .rows-go-part:has(> .avatar) > .rows-meta {
+    .rows-go-part:has(> .avatar) > .rows-meta,
+    .rows-waiting-line:has(> .rows-waiting-avatar) > .rows-meta {
       padding-left: calc(28px + var(--space-3));
     }
     .rows-toggle:has(> .avatar) > .rows-meta {

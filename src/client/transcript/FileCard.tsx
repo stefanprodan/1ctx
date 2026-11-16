@@ -10,6 +10,7 @@ import { useEffect } from "preact/hooks";
 import { loadOpened, openedFiles } from "../data/session-values.ts";
 import { showAll } from "../lib/format.ts";
 import { useCut } from "../lib/resize.ts";
+import { LinesWaiting } from "../ui/Bones.tsx";
 import { Fold } from "../ui/Fold.tsx";
 import { Source } from "../ui/Source.tsx";
 import { CopyButton } from "./Copy.tsx";
@@ -43,7 +44,15 @@ export function FileCard({ card }: { card: Card }) {
         {done !== null && <CopyButton text={done.text} />}
       </div>
       {stored === undefined || stored.status === "loading" ? (
-        <div class="filecard-state">Loading</div>
+        // the body's own box at the lines the cut will show, so the
+        // card is its loaded size before the text lands
+        <LinesWaiting
+          class={`filecard-body filecard-waiting${
+            code ? " filecard-body-code" : ""
+          }`}
+          lines={Math.max(1, Math.min(card.file.lines, FOLD_LINES))}
+          label={`Loading ${card.file.path}`}
+        />
       ) : stored.status === "failed" ? (
         <div class="filecard-error">{stored.error}</div>
       ) : (

@@ -102,18 +102,21 @@ export function bytesWord(bytes: number): string {
 export function displayResult(
   result: Message | null,
   held: ToolResult | undefined,
-): { label: string; text: string; err: boolean } {
+): { label: string; text: string; err: boolean; waiting: boolean } {
   const label = "result, untrusted";
   if (result === null || result.status === "streaming") {
-    return { label, text: "", err: false };
+    return { label, text: "", err: false, waiting: false };
   }
+  // the text's lines wait in bones, never a word
   if (held === undefined || held.status === "loading") {
-    return { label, text: "loading", err: false };
+    return { label, text: "", err: false, waiting: true };
   }
-  if (held.status === "failed") return { label, text: held.error, err: true };
+  if (held.status === "failed") {
+    return { label, text: held.error, err: true, waiting: false };
+  }
   const size = held.bytes > 0 ? `${label} · ${bytesWord(held.bytes)}` : label;
   const text = held.cut ? `${held.content}\n...` : held.content;
-  return { label: size, text, err: false };
+  return { label: size, text, err: false, waiting: false };
 }
 
 export type ToolSummary = {

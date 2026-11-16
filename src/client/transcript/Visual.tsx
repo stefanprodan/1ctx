@@ -12,6 +12,7 @@ import {
   toolResults,
   toolVisuals,
 } from "../data/session-values.ts";
+import { Bone } from "../ui/Bones.tsx";
 import {
   deviceWidth,
   readTheme,
@@ -164,6 +165,12 @@ export function Visual({
       stored?.status === "done" ? stored.html : card.preview?.html,
     );
   const drawing = !["finalized", "failed", "navigated"].includes(current.state);
+  // nothing painted yet: a box at the frame's height stands in for it,
+  // and the word waits for a paint the reader can watch
+  const blank =
+    (current.state === "loading" || current.state === "ready") &&
+    !failed &&
+    current.error === null;
   return (
     <div
       class={`visual-card${current.state === "failed" ? " visual-failed" : ""}${fluid.current ? " visual-fluid" : ""}`}
@@ -175,7 +182,7 @@ export function Visual({
           <span class="visual-title">
             {stored?.status === "done" ? stored.title : card.title}
           </span>
-          {drawing && (
+          {drawing && !blank && (
             <span class="visual-state">
               {failed ? "Loading failure" : "Drawing"}
             </span>
@@ -183,6 +190,15 @@ export function Visual({
         </div>
       )}
       <div class="visual-scroll">
+        {blank && (
+          <div
+            class="visual-waiting bones-wait"
+            role="status"
+            aria-label={`Loading ${card.title}`}
+          >
+            <Bone kind="fill" at={0} height={100} />
+          </div>
+        )}
         {current.state !== "navigated" && (
           <iframe
             ref={iframe}
