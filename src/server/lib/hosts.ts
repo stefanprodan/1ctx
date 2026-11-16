@@ -73,8 +73,13 @@ const embedded = (high: number, low: number): V4 => [
 function privateV6(h: number[]): boolean {
   const zeros = (from: number, to: number) =>
     h.slice(from, to).every((x) => x === 0);
-  // ::/96 holds :: and ::1; ::ffff:0:0/96 is IPv4-mapped
-  if (zeros(0, 6) || (zeros(0, 5) && h[5] === 0xffff)) {
+  // ::/96 holds :: and ::1; ::ffff:0:0/96 is IPv4-mapped and
+  // ::ffff:0:0:0/96 IPv4-translated (RFC 6145)
+  if (
+    zeros(0, 6) ||
+    (zeros(0, 5) && h[5] === 0xffff) ||
+    (zeros(0, 4) && h[4] === 0xffff && h[5] === 0)
+  ) {
     return privateV4(embedded(h[6], h[7]));
   }
   if (h[0] === 0x64 && h[1] === 0xff9b) {
