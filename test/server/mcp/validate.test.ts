@@ -51,6 +51,49 @@ describe("validateArguments", () => {
     ).toBeNull();
   });
 
+  // Ajv's RegExp backtracks, so a pattern anywhere is the server's
+  test("leaves a schema with a pattern to the server", () => {
+    const text = `${"a".repeat(40)}!`;
+    const nested = {
+      type: "object",
+      properties: { q: { type: "string", pattern: "^(a|a)*$" } },
+    };
+    expect(validateArguments(nested, { q: text })).toBeNull();
+    expect(validateArguments(nested, { q: 5, other: 1 })).toBeNull();
+    const deep = {
+      type: "object",
+      properties: {
+        list: {
+          type: "array",
+          items: [{ anyOf: [{ patternProperties: { "^(a|a)*$": {} } }] }],
+        },
+      },
+      additionalProperties: false,
+    };
+    expect(validateArguments(deep, { list: [{ [text]: 1 }] })).toBeNull();
+    expect(validateArguments(deep, { unknown: 1 })).toBeNull();
+  });
+
+  test("leaves a property named pattern to the server", () => {
+    const named = {
+      type: "object",
+      properties: { pattern: { type: "string" } },
+      additionalProperties: false,
+    };
+    expect(validateArguments(named, { pattern: 5, other: 1 })).toBeNull();
+  });
+
+  test("checks a schema without a pattern", () => {
+    const plain = {
+      type: "object",
+      properties: { q: { type: "string", format: "date" } },
+    };
+    expect(validateArguments(plain, { q: "2026-11-17" })).toBeNull();
+    expect(validateArguments(plain, { q: 5 })).toStartWith(
+      "arguments/q must be string",
+    );
+  });
+
   // each send parses its offer afresh, so a schema object lives one send
   test.serial("keeps no schema object past its check", async () => {
     const check = (schemas: Record<string, unknown>[]) =>
