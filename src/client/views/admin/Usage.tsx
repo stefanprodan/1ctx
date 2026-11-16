@@ -115,7 +115,7 @@ function BoardGhost() {
   return (
     <>
       <OverviewGhost at={0} />
-      <div class="chart-grid chart-board-ghost" aria-hidden="true">
+      <div class="chart-grid chart-board-ghost bones-wait" aria-hidden="true">
         <div class="chart-wide">
           <TokensGhost at={16} />
         </div>

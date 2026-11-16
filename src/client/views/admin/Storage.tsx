@@ -335,7 +335,7 @@ function BoardGhost() {
     </div>
   );
   return (
-    <div class="chart-board-ghost" aria-hidden="true">
+    <div class="chart-board-ghost bones-wait" aria-hidden="true">
       <TilesGhost at={0} />
       <div class="chart-grid">
         <ChartPanel label="Areas">

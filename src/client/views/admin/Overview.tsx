@@ -24,6 +24,7 @@ import {
 import type { Failure } from "../../lib/format.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
+import { LinesWaiting } from "../../ui/Bones.tsx";
 import { CodeTag } from "../../ui/CodeTag.tsx";
 import { Loaded } from "../../ui/Loaded.tsx";
 import { Page } from "../../ui/Page.tsx";
@@ -79,11 +80,23 @@ function Attention() {
   const answer = attention.value;
   const error = attentionError.value;
   if (answer === null) {
-    return error ? (
-      <RowsCard label="Needs attention" class="chart-stale">
-        <RowsNote>Did not load.</RowsNote>
+    // the card always lands, so its first load holds its place
+    return (
+      <RowsCard
+        label="Needs attention"
+        class={error ? "chart-stale" : undefined}
+      >
+        {error ? (
+          <RowsNote>Did not load.</RowsNote>
+        ) : (
+          <LinesWaiting
+            class="rows-note"
+            lines={1}
+            label="Loading what needs attention"
+          />
+        )}
       </RowsCard>
-    ) : null;
+    );
   }
   const rows = answer.items.map((item) =>
     attentionRow(item, now, answer.email),

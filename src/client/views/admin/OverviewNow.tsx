@@ -119,7 +119,7 @@ export function NowRow() {
 
 export function OverviewGhost({ at }: { at: number }) {
   return (
-    <div class="chart-board-ghost" aria-hidden="true">
+    <div class="chart-board-ghost bones-wait" aria-hidden="true">
       <TilesGhost at={at} />
     </div>
   );
