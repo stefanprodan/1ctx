@@ -146,14 +146,16 @@ open row's body or a meta. The shared shapes are below.
   of each word and mark, pulsing in turn (`--ghost`), still under
   reduced motion. While `me` loads the shell draws its skeleton
   (`RailWaiting`, `StripWaiting`, the phone's button's place) around
-  `PageWaiting`; a public page and the sign-in form draw at once.
+  the route's own shape when it has one (a chat), else `PageWaiting`;
+  a public page and the sign-in form draw at once.
   While a view's code loads `lazy()` draws `PageWaiting`, or the
   route's own shape, its second argument in `app/routes.ts`; a failed
   chunk keeps its Try again. A list waits as `RowsWaiting` (Rows.tsx)
   with its row's shape; `Page`'s `loading` draws its `waiting`, or
   three rows. `RowsNote` is for real notes.
   An aside's section waits as `AsideWaiting` (Split.tsx), a box of
-  text (a revision, a diff, a note, a skill's file) as `LinesWaiting`
+  text (a revision, a diff, a note, a skill's file, an opened tool's
+  result or a subagent's work) as `LinesWaiting`
   (Bones.tsx) in its owner's class, the file card and a Visual at
   their body's and frame's size, the rail's projects as
   `RailProjectsWaiting`. A failure stays words; so does a button's
@@ -166,7 +168,9 @@ open row's body or a meta. The shared shapes are below.
 - **Words only after a second.** `useSlow()` (`lib/slow.ts`, on the
   waits' clock) turns true once a load has held `SLOW_MS`, 1 s, and
   false when it ends. `Page` then says "Still loading" in its head, a
-  `role="status"`, and a board's `Loaded` its first-load Loading.
+  `role="status"`, for its `loading` or a `pending` body that waits
+  in its own bones (`Frame`'s tab while the project row loads), and a
+  board's `Loaded` its first-load Loading.
   `test/helpers/mount.ts` mounts a view so such hooks run.
 - **A later load never draws bones.** A reload, the socket's
   `reload()` or a Refresh keeps the rows drawn until the answer lands;

@@ -78,6 +78,7 @@ export function Frame({
       loading={
         shown === null && listed === undefined && projectError.value === null
       }
+      pending={shown === null && projectError.value === null}
       error={projectError.value}
     >
       {(shown !== null || listed !== undefined) && (

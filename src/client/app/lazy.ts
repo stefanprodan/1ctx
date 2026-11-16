@@ -22,7 +22,7 @@ export type Lazy<P> = ComponentType<P> & {
 };
 
 // the generic page while a view's code loads
-function Waiting() {
+export function PageCodeWaiting() {
   return h(PageWaiting, { label: "Loading the page" });
 }
 
@@ -30,7 +30,7 @@ export function lazy<P>(
   loader: () => Promise<ComponentType<P>>,
   // the view's own shape while its code loads, for a page whose shape
   // is not a list's
-  waiting: ComponentType<P> = Waiting,
+  waiting: ComponentType<P> = PageCodeWaiting,
 ): Lazy<P> {
   const ready = signal<ComponentType<P> | null>(null);
   const failure = signal<string | null>(null);

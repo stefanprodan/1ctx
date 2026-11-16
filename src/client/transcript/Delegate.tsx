@@ -11,6 +11,7 @@ import { filesPart } from "../../shared/subagents.ts";
 import { childWork, loadChild } from "../data/session-children.ts";
 import { loadToolResult, toolResults } from "../data/session-values.ts";
 import { Icon } from "../lib/icons.tsx";
+import { LinesWaiting } from "../ui/Bones.tsx";
 import {
   childGone,
   childHead,
@@ -23,7 +24,7 @@ import { folds } from "./fold.ts";
 import { Rounds } from "./Rounds.tsx";
 import type { CallNode } from "./rows.ts";
 import { displayResult, wantsResult } from "./Tool.model.ts";
-import { Tool, Value } from "./Tool.tsx";
+import { ResultWaiting, Tool, Value } from "./Tool.tsx";
 
 const { useFoldOpen } = folds();
 const NO_LIVE = new Map();
@@ -113,7 +114,11 @@ export function Delegate({
           </div>
         )}
         {entry?.loading === true && work === null && (
-          <div class="transcript-work-plain">loading</div>
+          <LinesWaiting
+            class="transcript-work-plain"
+            lines={2}
+            label="Loading the work"
+          />
         )}
         {entry?.error != null && (
           <div class="transcript-work-plain transcript-tool-failed">
@@ -135,7 +140,11 @@ export function Delegate({
         {row.status !== "streaming" && !answered && !gone && (
           <div class="transcript-tool-detail">
             <div class="transcript-tool-label">{shown.label}</div>
-            <Value text={shown.text} failed={shown.err} />
+            {shown.waiting ? (
+              open && <ResultWaiting />
+            ) : (
+              <Value text={shown.text} failed={shown.err} />
+            )}
           </div>
         )}
       </div>

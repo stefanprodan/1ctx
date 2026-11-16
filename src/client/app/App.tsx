@@ -28,6 +28,7 @@ import {
   railHidden,
 } from "./shell.ts";
 import "./shell.css";
+import { PageCodeWaiting } from "./lazy.ts";
 import { Strip, StripWaiting } from "./Strip.tsx";
 
 // wide: the rail is a column beside the view, or folded to the strip of
@@ -157,9 +158,19 @@ export function App() {
       return <View params={m.params} />;
     }
     if (meError.value === null) {
+      // a route with a shape of its own (a chat) waits in it already,
+      // so the shape does not change when the user lands
+      const Shape =
+        m !== null && m.route.view.waiting !== PageCodeWaiting
+          ? m.route.view.waiting
+          : null;
       return (
         <Shell user={undefined}>
-          <PageWaiting label="Loading 1ctx" />
+          {Shape !== null && m !== null ? (
+            <Shape params={m.params} />
+          ) : (
+            <PageWaiting label="Loading 1ctx" />
+          )}
         </Shell>
       );
     }

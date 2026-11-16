@@ -34,6 +34,7 @@ export function Page({
   actions,
   notice,
   loading,
+  pending,
   waiting,
   empty,
   error,
@@ -55,6 +56,9 @@ export function Page({
   actions?: ComponentChildren;
   notice?: ComponentChildren;
   loading?: boolean;
+  // a first load the body draws in its own bones, as a project's tab
+  // does under the head it already has: only the head's words wait
+  pending?: boolean;
   // the body's shape while loading holds, one role="status" with its
   // own label; three rows when none is given
   waiting?: ComponentChildren;
@@ -77,7 +81,7 @@ export function Page({
       : (error ?? null);
   const stuck = useSignal(false);
   const wait = useWaiting(loading === true);
-  const slow = useSlow(loading === true);
+  const slow = useSlow(loading === true || pending === true);
   useEffect(() => {
     const el = head.current;
     const scroller = el ? scrollParent(el) : null;
