@@ -294,7 +294,7 @@ test.serial(
       render(
         <DeletedDoc projectId="p1" projectName="personal" row={file} now={0} />,
       ),
-      "Loading its text",
+      "Loading the file",
     );
   },
 );

@@ -35,7 +35,11 @@ import {
   runDeadlineMs,
 } from "../../data/automations.ts";
 import { keyOf, noteErrors, notes } from "../../data/memory.ts";
-import { project, projectError } from "../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectError,
+} from "../../data/projects.ts";
 import { closeRunsOf, loadMoreRuns, runs } from "../../data/runs.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { ShowMore } from "../../feed/FeedCard.tsx";
@@ -222,7 +226,7 @@ export function Automation({ params }: { params: Params }) {
   const check = row === null ? null : checkLine(row, now);
   return (
     <Page
-      crumb={shown?.name ?? "Project"}
+      crumb={knownProjectName(projectId)}
       crumbHref={
         projectId === null ? undefined : `/projects/${projectId}/automations`
       }

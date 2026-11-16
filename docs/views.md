@@ -34,6 +34,12 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
 
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the feed lands on both.
+- **Home waits for the project list in its own layout.** The list
+  picks the composer's project and names each row's, so until it lands
+  the composer's place is a bone at its height and the feed's head
+  sits over its ghost rows, held as `Page` holds its own. `/projects`
+  waits the same way: the activity card, its card's rows and the
+  aside each in bones.
 - **The Not sent card reads its own route, never the feed.** `GET
   /api/me/not-sent` runs on Home's load and after Discard all. While the
   card is mounted (`watchNotSent()`), the user's `notSent` event, a
@@ -253,6 +259,10 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   While the run is one of its automation's open alert (`inOpenAlert()`:
   marked, ended at or after `alert.since`), the strip has Dismiss, a
   button beside the toggle, never inside it.
+- **A file page waits as one wait.** The file's waiting page, a
+  deleted file's last text and a `/knowledge/` path's page draw
+  `DocWaiting` under the file's `waitKey` (`fileWait()`), so the shape
+  and "Still loading" carry through each hand-over.
 - **Rename keeps the file's id and history.** Restore asks nothing: it
   saves the text as a new revision.
 

@@ -26,7 +26,11 @@ import {
 } from "../../data/external-task.ts";
 import { tasksTabHref } from "../../data/external-tasks.ts";
 import { knowledgeOf, listErrors } from "../../data/knowledge.ts";
-import { project, projectError } from "../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectError,
+} from "../../data/projects.ts";
 import { externalTaskHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useArrivalFocus, useFocusField, useSave } from "../../lib/save.ts";
@@ -325,7 +329,7 @@ export function NewExternalTask({ params }: { params: Params }) {
   const error = projectError.value;
   return (
     <Page
-      crumb={shown?.name ?? "Project"}
+      crumb={knownProjectName(id)}
       crumbHref={tasksTabHref(id)}
       title="New external task"
       loading={shown === null && error === null}

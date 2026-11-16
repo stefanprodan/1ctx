@@ -73,6 +73,18 @@ class FakeNode {
   remove(): void {
     this.parentNode?.removeChild(this);
   }
+  after(node: FakeNode): void {
+    const parent = this.parentNode;
+    if (parent !== null) parent.insertBefore(node, this.nextSibling);
+  }
+  // no focus to move, no layout to measure
+  focus(): void {}
+  get offsetWidth(): number {
+    return 0;
+  }
+  get scrollWidth(): number {
+    return 0;
+  }
   setAttribute(name: string, value: unknown): void {
     this.attributes.set(name, String(value));
   }

@@ -21,6 +21,8 @@ import {
   sending,
 } from "../../data/sessions.ts";
 import { useNow } from "../../lib/now.ts";
+import { useWaiting } from "../../lib/wait.ts";
+import { Bone } from "../../ui/Bones.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { Feed, startChat } from "./Feed.tsx";
@@ -28,6 +30,24 @@ import { composeProjectOf, dateLine, greeting } from "./Home.model.ts";
 import { NotSent } from "./NotSent.tsx";
 import { WaitingTasks } from "./WaitingTasks.tsx";
 import { WeekAside } from "./WeekAside.tsx";
+import "./home.css";
+
+// the composer's place while the list that picks its project loads
+function ComposerWaiting() {
+  return (
+    <div
+      class="card home-composer bones-wait"
+      role="status"
+      aria-label="Loading the composer"
+    >
+      <Bone kind="line" at={0} width={36} />
+      <span class="home-composer-row" aria-hidden="true">
+        <Bone kind="chip" at={1} class="home-composer-chip" />
+        <Bone kind="chip" at={2} class="home-composer-chip" />
+      </span>
+    </div>
+  );
+}
 
 export function Home() {
   const user = me.value!;
@@ -36,10 +56,15 @@ export function Home() {
     projects.value?.find((p) => p.id === id)?.name ?? null;
   const agents = projectAgents.value;
   const now = useNow(60_000);
+  // held as Page holds its own, so a list landing just past the reveal
+  // never flashes the bones away
+  const listing = projects.value === null && projectsError.value === null;
+  const wait = useWaiting(listing);
   return (
     <Page
       label={dateLine(new Date())}
       title={greeting(new Date(), user.fullName)}
+      pending={listing}
     >
       <Split
         aside={
@@ -49,7 +74,8 @@ export function Home() {
           </>
         }
       >
-        {target !== null && (
+        {wait && <ComposerWaiting />}
+        {!wait && target !== null && (
           <Composer
             scope={{ projectId: "home" }}
             filesProjectId={target.id}
@@ -69,11 +95,9 @@ export function Home() {
         )}
         <NotSent now={now} />
         <WaitingTasks now={now} />
-        {/* the feed waits for the list that places the composer above it
-            and names each row's project, or it draws twice and jumps */}
-        {(projects.value !== null || projectsError.value !== null) && (
-          <Feed path="/" projectName={projectName} />
-        )}
+        {/* the feed's rows wait for the list that names each row's
+            project, or they draw twice and jump; its head is drawn */}
+        <Feed path="/" projectName={projectName} waiting={wait} />
       </Split>
     </Page>
   );

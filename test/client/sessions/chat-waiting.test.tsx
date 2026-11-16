@@ -12,6 +12,7 @@ import { render } from "preact-render-to-string";
 import { path, query } from "../../../src/client/app/router.ts";
 import { match } from "../../../src/client/app/routes.ts";
 import { me } from "../../../src/client/data/me.ts";
+import { projects } from "../../../src/client/data/projects.ts";
 import {
   leaveSession,
   loadSession,
@@ -115,8 +116,10 @@ test.serial("a chat loading draws its turns and composer in bones", () => {
   const html = render(<Chat params={{ id: "s1" }} />);
   expectWaiting(html, "Loading the chat");
   expect(html).toContain("card chat-waiting-composer");
-  // the head stays the page's own
+  // the head stays the page's own, the project a bone until it is known
   expect(html).toContain(">Chat<");
+  expect(html).toContain("page-crumb-bone");
+  expect(html).not.toContain(">Project<");
   // a run's foot is its state line, no composer
   const run = render(<Run params={{ id: "s1" }} />);
   expectWaiting(run, "Loading the run");
@@ -131,9 +134,15 @@ test.serial("a kept chat draws at once, with no bones", async () => {
   // away to another chat keeps the settled one
   void loadSession("s2");
   expect(render(<Chat params={{ id: "s2" }} />)).toContain("chat-waiting");
-  // back again: its kept copy is on screen before the answer
+  // back again: its kept copy is on screen before the answer, under
+  // the project the rail's list names
+  projects.value = [
+    { id: "p1", kind: "team", name: "infra", createdAt: 0, memberCount: 1 },
+  ];
   void loadSession("s1");
   const html = render(<Chat params={{ id: "s1" }} />);
+  projects.value = null;
+  expect(html).toContain(">infra<");
   expect(html).toContain(">chat s1<");
   expect(html).toContain('name="message"');
   expect(html).not.toContain("chat-waiting");

@@ -745,6 +745,23 @@ describe("the pages", () => {
     },
   );
 
+  test.serial("Projects waits in its landed layout, each part in bones", () => {
+    projects.value = null;
+    projectsError.value = null;
+    projectAgents.value = null;
+    const html = render(<Projects />);
+    // the activity card, the list's own card with its search, the aside
+    expect(html).toContain('aria-label="Loading activity"');
+    expect(html).toContain('placeholder="Search projects"');
+    expect(html).toContain('role="status" aria-label="Loading projects"');
+    expect(html).toContain('class="split-aside"');
+    expect(html).toContain('aria-label="Loading the week"');
+    expect(html).toContain('aria-label="Loading agents"');
+    // never the page's generic rows over nothing
+    expect(html).not.toContain("card rows-card rows-waiting");
+    expect(html).not.toContain("No projects found");
+  });
+
   test.serial("Projects heads its card with the search", () => {
     projects.value = [personal];
     const html = render(<Projects />);

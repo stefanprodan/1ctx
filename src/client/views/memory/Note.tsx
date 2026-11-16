@@ -249,6 +249,18 @@ function Editor({
   );
 }
 
+// the card before the note lands, also the Memory tab's shape while its
+// project loads, so the wait keeps one shape
+export function NoteWaiting() {
+  return (
+    <Rows>
+      <RowsCard label="Memory">
+        <LinesWaiting class="note-empty" label="Loading the memory" />
+      </RowsCard>
+    </Rows>
+  );
+}
+
 export function Note({
   memory,
   memoryKey,
@@ -271,14 +283,11 @@ export function Note({
   const notice = undo.notice();
   const label = "Memory";
   if (memory === null) {
+    if (error === null) return <NoteWaiting />;
     return (
       <Rows>
         <RowsCard label={label}>
-          {error === null ? (
-            <LinesWaiting class="note-empty" label="Loading the memory" />
-          ) : (
-            <p class="note-empty">Did not load. {sentence(error.words)}</p>
-          )}
+          <p class="note-empty">Did not load. {sentence(error.words)}</p>
         </RowsCard>
       </Rows>
     );

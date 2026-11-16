@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, test } from "bun:test";
+import { act } from "preact/test-utils";
 import { render } from "preact-render-to-string";
 import { query } from "../../../src/client/app/router.ts";
 import { me } from "../../../src/client/data/me.ts";
@@ -14,12 +15,18 @@ import {
 } from "../../../src/client/data/sessions.ts";
 import { week } from "../../../src/client/data/usage.ts";
 import {
+  REVEAL_MS,
+  SHOW_MS,
+  setWaitClock,
+} from "../../../src/client/lib/wait.ts";
+import {
   dateLine,
   greeting,
 } from "../../../src/client/views/home/Home.model.ts";
 import { Home } from "../../../src/client/views/home/Home.tsx";
 import { Login } from "../../../src/client/views/home/Login.tsx";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
+import { fakeClock, mount } from "../../helpers/mount.ts";
 
 describe("Home.model", () => {
   test("greets by the hour", () => {
@@ -272,12 +279,55 @@ describe("Home", () => {
     },
   );
 
-  test("the composer and the feed wait for the project list", () => {
+  test("the composer and the feed wait for the project list in bones", () => {
     projects.value = null;
+    // rows held already wait too: they name projects the list knows
+    list.value = {
+      next: null,
+      more: { loading: false, error: null },
+      rows: [chatRow()],
+    };
     const html = render(<Home />);
     expect(html).not.toContain('class="composer');
-    expect(html).not.toContain('placeholder="Search sessions"');
+    expect(html).toContain('class="card home-composer bones-wait"');
+    expect(html).toContain('aria-label="Loading the composer"');
+    // the feed's own head over its ghost rows, never the rows yet
+    expect(html).toContain('placeholder="Search sessions"');
+    expect(html).toContain('aria-label="Loading sessions"');
+    expect(html).not.toContain('href="/chat/s1"');
   });
+
+  test.serial(
+    "a list landing past the reveal keeps the bones SHOW_MS",
+    async () => {
+      const clock = fakeClock();
+      const was = setWaitClock(clock);
+      projects.value = null;
+      list.value = {
+        next: null,
+        more: { loading: false, error: null },
+        rows: [chatRow()],
+      };
+      const view = await mount(<Home />);
+      try {
+        expect(view.html()).toContain("home-composer");
+        await clock.advance(REVEAL_MS + 10);
+        // a list with no project to compose in, so no real composer
+        // mounts over the plain document
+        await act(() => {
+          projects.value = [];
+        });
+        expect(view.html()).toContain("home-composer");
+        expect(view.html()).not.toContain('href="/chat/s1"');
+        await clock.advance(SHOW_MS - 10);
+        expect(view.html()).not.toContain("home-composer");
+        expect(view.html()).toContain('href="/chat/s1"');
+      } finally {
+        await view.unmount();
+        setWaitClock(was);
+      }
+    },
+  );
 
   test("a failed project list still draws the feed", () => {
     projects.value = null;

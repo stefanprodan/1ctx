@@ -99,6 +99,11 @@
   .bones-wait {
     animation: reveal 0.2s ease-out 0.2s backwards;
   }
+  /* under a page whose wait already showed (Page's --waited), bones
+     drawn anew start that far into their reveal, so they never blink */
+  .bones-waited .bones-wait {
+    animation-delay: calc(0.2s - var(--waited));
+  }
 
   @media (prefers-reduced-motion: reduce) {
     .bones-bone {

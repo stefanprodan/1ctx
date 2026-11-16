@@ -8,7 +8,12 @@
 
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import type { DayClock } from "../../../src/client/lib/now.ts";
-import { SLOW_MS, useSlow } from "../../../src/client/lib/slow.ts";
+import {
+  CARRY_MS,
+  dropCarried,
+  SLOW_MS,
+  useSlow,
+} from "../../../src/client/lib/slow.ts";
 import { setWaitClock } from "../../../src/client/lib/wait.ts";
 import { Loaded } from "../../../src/client/ui/Loaded.tsx";
 import { Page } from "../../../src/client/ui/Page.tsx";
@@ -24,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setWaitClock(was);
+  dropCarried();
 });
 
 function Probe({ loading }: { loading: boolean }) {
@@ -99,3 +105,33 @@ test.serial("a board's first load says Loading only once slow", async () => {
   expect(view.html()).toContain(">Refreshing<");
   await view.unmount();
 });
+
+function Carried({ loading }: { loading: boolean }) {
+  return <p>{useSlow(loading, "wait") ? "slow" : "quick"}</p>;
+}
+
+test.serial(
+  "a named wait taken up by the next page keeps its start",
+  async () => {
+    const first = await mount(<Carried loading />);
+    await clock.advance(SLOW_MS - 100);
+    await first.unmount();
+    // the next page takes it up within CARRY_MS: slow at the old start
+    const next = await mount(<Carried loading />);
+    expect(next.html()).toBe("<p>quick</p>");
+    await clock.advance(100);
+    expect(next.html()).toBe("<p>slow</p>");
+    // an ended wait leaves nothing to carry
+    await next.update(<Carried loading={false} />);
+    await next.update(<Carried loading />);
+    await clock.advance(SLOW_MS - 1);
+    expect(next.html()).toBe("<p>quick</p>");
+    await next.unmount();
+    // left past CARRY_MS, the name is a new wait's
+    await clock.advance(CARRY_MS + 1);
+    const late = await mount(<Carried loading />);
+    await clock.advance(SLOW_MS - 1);
+    expect(late.html()).toBe("<p>quick</p>");
+    await late.unmount();
+  },
+);

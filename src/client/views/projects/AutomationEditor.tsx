@@ -30,7 +30,11 @@ import {
 import { switchable, switchablesOf } from "../../data/capabilities.ts";
 import { emailOn, me } from "../../data/me.ts";
 import { startingAgent } from "../../data/project-agents.ts";
-import { project, projectError } from "../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectError,
+} from "../../data/projects.ts";
 import { projectAgents } from "../../data/sessions.ts";
 import { automationHref } from "../../lib/hrefs.ts";
 import { toggledId } from "../../lib/ids.ts";
@@ -419,7 +423,7 @@ export function NewAutomation({ params }: { params: Params }) {
   const ready = shown !== null && agents !== null && limit !== null;
   return (
     <Page
-      crumb={shown?.name ?? "Project"}
+      crumb={knownProjectName(id)}
       crumbHref={`/projects/${id}/automations`}
       title="New automation"
       loading={!ready && error === null}

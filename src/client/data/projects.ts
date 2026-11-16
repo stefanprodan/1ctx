@@ -199,3 +199,12 @@ export function onProjectsSocket(event: SocketEvent): void {
 }
 
 onSocketEvent(onProjectsSocket);
+
+// a project's name as far as it is known: the page's row, else the
+// rail's list; null until either lands, for a crumb to draw a bone
+export function knownProjectName(id: string | null): string | null {
+  if (id === null) return null;
+  const row = project.value;
+  if (row !== null && row.id === id) return row.name;
+  return projects.value?.find((p) => p.id === id)?.name ?? null;
+}

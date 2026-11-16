@@ -128,6 +128,14 @@
   .rows-waiting-icon {
     flex-shrink: 0;
   }
+  /* a bone keeps its text's line, so a waiting row is a loaded row's
+     height */
+  .rows-waiting-line .rows-name,
+  .rows-waiting-line .rows-sub {
+    display: flex;
+    align-items: center;
+    min-height: 1lh;
+  }
 
   /* what reveal() keeps clear when a row opens: the sticky page head
      above and its card's edge below */

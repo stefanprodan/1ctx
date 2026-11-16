@@ -16,6 +16,10 @@ export const HISTORY_PAGE = 10;
 // the outline is offered from this many headings
 export const OUTLINE_FROM = 3;
 
+// the name of a file page's wait, which the path link's page, the
+// file's waiting page and its deleted page share (Page's waitKey)
+export const fileWait = (fileId: string): string => `knowledge-file:${fileId}`;
+
 // the tab with a folder of the tree open, as a crumb's step leads
 export const folderHref = (projectId: string, folder: string): string =>
   `${listHref(projectId, "files")}?folder=${encodeURIComponent(folder)}`;
@@ -45,7 +49,8 @@ export function liveFolders(
 // that no longer draws it
 export function crumbSteps(
   projectId: string,
-  projectName: string,
+  // null while the project's row loads: a bone in its place
+  projectName: string | null,
   folders: readonly string[],
   live: ReadonlySet<string> | null = null,
 ): PageStep[] {

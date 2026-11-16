@@ -160,6 +160,12 @@ open row's body or a meta. The shared shapes are below.
   their body's and frame's size, the rail's projects as
   `RailProjectsWaiting`. A failure stays words; so does a button's
   state (Show older's Loading) and an input's placeholder.
+- **A name not known yet is a bone, never a stand-in word.** `Page`'s
+  `crumb`, `title` or a step's `label` is null until the name lands
+  (`knownProjectName()`: the row, else the rail's list); a failed page
+  drops the bone. A project tab whose body has its own shape passes it
+  as `Frame`'s `waiting`, drawn while the row loads too, so the wait
+  keeps one shape; `busy` keeps the slow line past the row.
 - **A wait never flashes.** A waiting body (`bones-wait`) fades in
   after `REVEAL_MS`, 200 ms, and once shown `Page` and `Frame`'s tab
   hold it `SHOW_MS`, 300 ms (`lib/wait.ts`, its clock set by
@@ -170,7 +176,11 @@ open row's body or a meta. The shared shapes are below.
   false when it ends. `Page` then says "Still loading" in its head, a
   `role="status"`, for its `loading` or a `pending` body that waits
   in its own bones (`Frame`'s tab while the project row loads), and a
-  board's `Loaded` its first-load Loading.
+  board's `Loaded` its first-load Loading. A wait one page hands to
+  the next (a path link's page to the file's, a file's waiting page
+  to its deleted one) is named by `Page`'s `waitKey`: its start
+  carries over for `CARRY_MS`, and bones drawn anew under a shown wait
+  skip their reveal (`bones-waited`).
   `test/helpers/mount.ts` mounts a view so such hooks run.
 - **A later load never draws bones.** A reload, the socket's
   `reload()` or a Refresh keeps the rows drawn until the answer lands;

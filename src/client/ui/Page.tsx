@@ -8,15 +8,17 @@ import type { Failure } from "../lib/format.ts";
 import { sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
-import { useSlow } from "../lib/slow.ts";
-import { useWaiting } from "../lib/wait.ts";
+import { useWaited } from "../lib/slow.ts";
+import { REVEAL_MS, SHOW_MS, useWaiting, waitClock } from "../lib/wait.ts";
 import "./page.css";
+import { Bone } from "./Bones.tsx";
 import { CodeTag } from "./CodeTag.tsx";
 import { Finder } from "./Finder.tsx";
 import { RowsWaiting } from "./RowsWaiting.tsx";
 
 export type PageStep = {
-  label: string;
+  // null while the name is not known yet: a bone in its place
+  label: string | null;
   href?: string;
   mono?: boolean;
   title?: string;
@@ -36,6 +38,7 @@ export function Page({
   loading,
   pending,
   waiting,
+  waitKey,
   empty,
   error,
   flush,
@@ -43,13 +46,15 @@ export function Page({
   children,
 }: {
   label?: string;
-  // an empty crumb is the one-line head with the title alone
-  crumb?: string;
+  // an empty crumb is the one-line head with the title alone; null is
+  // a name not known yet, drawn as a bone, never a stand-in word
+  crumb?: string | null;
   crumbHref?: string;
   steps?: PageStep[];
   titleMono?: boolean;
   titleHref?: string;
-  title: string;
+  // null, as crumb's, while the name is not known yet
+  title: string | null;
   // the view renders the title text and its heading, since what the
   // control opens is no part of it
   menu?: ComponentChildren;
@@ -62,6 +67,9 @@ export function Page({
   // the body's shape while loading holds, one role="status" with its
   // own label; three rows when none is given
   waiting?: ComponentChildren;
+  // names a wait that goes on in the next page drawn, so its start, and
+  // with it "Still loading", carries over (lib/slow.ts)
+  waitKey?: string;
   empty?: string;
   error?: Failure | string | null;
   // the view has a foot stuck to the bottom and spends the inset there
@@ -81,7 +89,22 @@ export function Page({
       : (error ?? null);
   const stuck = useSignal(false);
   const wait = useWaiting(loading === true);
-  const slow = useSlow(loading === true || pending === true);
+  const waited = useWaited(loading === true || pending === true, waitKey);
+  const slow = waited.slow;
+  const now = waitClock().now();
+  const last = useRef<{ since: number; end: number | null } | null>(null);
+  if (waited.since !== null) last.current = { since: waited.since, end: null };
+  else if (last.current !== null && last.current.end === null) {
+    last.current.end = now;
+  }
+  // bones drawn anew under a wait already shown (a carried one, or the
+  // tab's under the tabs once they land) skip their reveal, else they
+  // blink out for REVEAL_MS; kept through the holds after the end
+  const held = last.current;
+  const shownFor =
+    held !== null && (held.end === null || now - held.end < SHOW_MS)
+      ? now - held.since
+      : 0;
   useEffect(() => {
     const el = head.current;
     const scroller = el ? scrollParent(el) : null;
@@ -93,16 +116,22 @@ export function Page({
     scroller.addEventListener("scroll", onScroll);
     return () => scroller.removeEventListener("scroll", onScroll);
   }, [stuck]);
+  // a failed page never learns the name, so its bone goes with it
+  const nameBone = failed === null ? <NameBone /> : null;
+  const shownSteps =
+    failed === null ? steps : steps?.filter((step) => step.label !== null);
   const row = (
     <>
-      {steps !== undefined ? (
+      {shownSteps !== undefined ? (
         <Crumb class="page-crumb">
-          {steps.map((step, i) => {
-            const far = i < steps.length - 1 ? " page-crumb-far" : "";
+          {shownSteps.map((step, i) => {
+            const far = i < shownSteps.length - 1 ? " page-crumb-far" : "";
             const mono = step.mono ? " page-crumb-path" : "";
             return (
               <Fragment key={`${i}:${step.label}`}>
-                {step.href ? (
+                {step.label === null ? (
+                  nameBone
+                ) : step.href ? (
                   <a
                     class={`page-crumb-up${mono}${far}`}
                     href={step.href}
@@ -118,7 +147,9 @@ export function Page({
             );
           })}
           {menu === undefined ? (
-            titleHref !== undefined ? (
+            title === null ? (
+              nameBone
+            ) : titleHref !== undefined ? (
               <a
                 class={`page-crumb-on page-crumb-link${
                   titleMono ? " page-crumb-path" : ""
@@ -142,9 +173,11 @@ export function Page({
         </Crumb>
       ) : crumb !== undefined ? (
         <Crumb class="page-crumb">
-          {crumb !== "" && (
+          {crumb !== "" && (crumb !== null || failed === null) && (
             <>
-              {crumbHref ? (
+              {crumb === null ? (
+                nameBone
+              ) : crumbHref ? (
                 <a class="page-crumb-up" href={crumbHref}>
                   {crumb}
                 </a>
@@ -155,7 +188,11 @@ export function Page({
             </>
           )}
           {menu === undefined ? (
-            <span class="page-crumb-on">{title}</span>
+            title === null ? (
+              nameBone
+            ) : (
+              <span class="page-crumb-on">{title}</span>
+            )
           ) : (
             <div class="page-crumb-on page-crumb-menu">{menu}</div>
           )}
@@ -163,7 +200,7 @@ export function Page({
       ) : (
         <div class="page-heading">
           {label && <span class="label">{label}</span>}
-          <h1 class="page-title">{title}</h1>
+          <h1 class="page-title">{title ?? nameBone}</h1>
         </div>
       )}
       {actions && <div class="page-actions">{actions}</div>}
@@ -171,7 +208,14 @@ export function Page({
     </>
   );
   return (
-    <div class={`page${flush ? " page-flush" : ""}`}>
+    <div
+      class={`page${flush ? " page-flush" : ""}${
+        shownFor >= REVEAL_MS ? " bones-waited" : ""
+      }`}
+      style={
+        shownFor >= REVEAL_MS ? { "--waited": `${shownFor}ms` } : undefined
+      }
+    >
       <div
         class={`page-head${stuck.value ? " page-head-stuck" : ""}${
           notice ? " page-head-notice" : ""
@@ -205,13 +249,27 @@ export function Page({
           </button>
         </div>
       ) : wait ? (
-        (waiting ?? <RowsWaiting card label={`Loading ${title}`} />)
+        (waiting ?? (
+          <RowsWaiting
+            card
+            label={title === null ? "Loading the page" : `Loading ${title}`}
+          />
+        ))
       ) : empty ? (
         <p class="page-state">{empty}</p>
       ) : (
         children
       )}
     </div>
+  );
+}
+
+// a name the head shows once it is known, at a short name's width
+function NameBone() {
+  return (
+    <span class="page-crumb-bone bones-wait">
+      <Bone kind="line" at={0} width={100} />
+    </span>
   );
 }
 

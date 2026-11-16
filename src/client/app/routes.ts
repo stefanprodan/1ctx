@@ -463,14 +463,22 @@ export const ROUTES: Route[] = [
     // ?name= is the file's name, from a /knowledge/ path in a reply;
     // the view moves to the file's page once the name is read
     path: "/projects/:id/knowledge/path",
+    // the file's page is ready by the time the link moves to it, so the
+    // move never draws the generic page between their waits
     view: lazy(() =>
-      import("../views/knowledge/file/DocPage.tsx").then((m) => m.PathDoc),
+      Promise.all([
+        import("../views/knowledge/file/DocPage.tsx"),
+        docView.load(),
+      ]).then(([m]) => m.PathDoc),
     ),
     title: () => "Knowledge",
     role: "authenticated",
     load: async (params, query) => {
+      // the list too, so the file's page it moves to names the file
+      // at once rather than a bone
       await Promise.all([
         loadProject(params.id),
+        loadKnowledge(params.id),
         loadKnowledgePath(params.id, query.get("name") ?? ""),
       ]);
     },

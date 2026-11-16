@@ -23,8 +23,8 @@ import { useNow } from "../../../lib/now.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
 import { Page } from "../../../ui/Page.tsx";
 import { fileHref } from "../Knowledge.model.ts";
-import { DeletedDoc, NotFound } from "./Deleted.tsx";
-import { crumbSteps, liveFolders } from "./DocPage.model.ts";
+import { DeletedDoc, DocWaiting, NotFound } from "./Deleted.tsx";
+import { crumbSteps, fileWait, liveFolders } from "./DocPage.model.ts";
 import { FileView } from "./FileView.tsx";
 import { NewFile } from "./NewFile.tsx";
 
@@ -61,19 +61,18 @@ function DocView({ projectId, fileId }: { projectId: string; fileId: string }) {
   if (waiting || error !== null) {
     return (
       <Page
-        steps={
-          name === null
-            ? []
-            : crumbSteps(
-                projectId,
-                name,
-                known ? foldersOf(known.name) : [],
-                liveFolders(list?.files ?? []),
-              )
-        }
-        title={known ? baseName(known.name) : "Knowledge"}
-        titleMono={known !== null}
+        split
+        steps={crumbSteps(
+          projectId,
+          name,
+          known ? foldersOf(known.name) : [],
+          liveFolders(list?.files ?? []),
+        )}
+        title={known ? baseName(known.name) : null}
+        titleMono
         loading={error === null}
+        waiting={<DocWaiting />}
+        waitKey={fileWait(fileId)}
         error={error}
       />
     );
@@ -151,5 +150,22 @@ export function PathDoc({ params }: { params: Params }) {
   if (answer.state === "missing" && projectName !== null && error === null) {
     return <NotFound projectId={projectId} projectName={projectName} />;
   }
-  return <Page title="Knowledge" loading={error === null} error={error} />;
+  // the file's page in waiting, under the file's wait once its id is
+  // known, so the move to its page keeps the shape and the slow line
+  return (
+    <Page
+      split
+      steps={crumbSteps(projectId, projectName, foldersOf(name))}
+      title={baseName(name)}
+      titleMono
+      loading={error === null}
+      waiting={<DocWaiting />}
+      waitKey={
+        fileId === null
+          ? `knowledge-path:${projectId}:${name}`
+          : fileWait(fileId)
+      }
+      error={error}
+    />
+  );
 }

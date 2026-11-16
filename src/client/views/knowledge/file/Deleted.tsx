@@ -26,7 +26,7 @@ import {
   listHref,
   restoredHref,
 } from "../Knowledge.model.ts";
-import { crumbSteps, liveFolders } from "./DocPage.model.ts";
+import { crumbSteps, fileWait, liveFolders } from "./DocPage.model.ts";
 import { keptFor, ProblemNotice } from "./Notices.tsx";
 import "./docpage.css";
 
@@ -65,6 +65,8 @@ export function DeletedDoc({
       )}
       title={baseName(row.name)}
       titleMono
+      pending={last.state === "loading"}
+      waitKey={fileWait(row.id)}
       actions={
         <button
           type="button"
@@ -98,38 +100,52 @@ export function DeletedDoc({
         )
       }
     >
-      <Split aside={null}>
-        <section class="card docpage-card" aria-label={row.name}>
-          {last.state === "done" ? (
-            <>
-              <div class="docpage-band">
-                <span class="docpage-band-words">
-                  Revision {last.version.revision} ·{" "}
-                  <Author words={authorOf(last.version.author)} />
-                </span>
-              </div>
-              <Source text={last.version.text} html={last.version.code} />
-            </>
-          ) : last.state === "loading" ? (
-            <LinesWaiting
-              class="docpage-state"
-              lines={6}
-              label="Loading its text"
-            />
-          ) : (
-            <p class="docpage-state">
-              {last.state === "none" ? (
-                "Its text is no longer kept."
-              ) : (
-                <span class="error">
-                  Its text did not load. {sentence(last.failure.words)}
-                </span>
-              )}
-            </p>
-          )}
-        </section>
-      </Split>
+      {last.state === "loading" ? (
+        <DocWaiting />
+      ) : (
+        <Split aside={null}>
+          <section class="card docpage-card" aria-label={row.name}>
+            {last.state === "done" ? (
+              <>
+                <div class="docpage-band">
+                  <span class="docpage-band-words">
+                    Revision {last.version.revision} ·{" "}
+                    <Author words={authorOf(last.version.author)} />
+                  </span>
+                </div>
+                <Source text={last.version.text} html={last.version.code} />
+              </>
+            ) : (
+              <p class="docpage-state">
+                {last.state === "none" ? (
+                  "Its text is no longer kept."
+                ) : (
+                  <span class="error">
+                    Its text did not load. {sentence(last.failure.words)}
+                  </span>
+                )}
+              </p>
+            )}
+          </section>
+        </Split>
+      )}
     </Page>
+  );
+}
+
+// a file's text in bones, the page's one shape from the first load to
+// a deleted file's last text, so the wait never changes shape
+export function DocWaiting() {
+  return (
+    <Split aside={null}>
+      <section class="card docpage-card">
+        <LinesWaiting
+          class="docpage-state"
+          lines={6}
+          label="Loading the file"
+        />
+      </section>
+    </Split>
   );
 }
 

@@ -77,6 +77,14 @@
   .page-waiting-crumb {
     min-height: 1lh;
   }
+  /* a name not known yet: a short name's width on the words' line */
+  .page-crumb-bone {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    width: 10ch;
+    height: 1lh;
+  }
   /* a step never takes the row: a long name is cut, the hover says it,
      and a path's steps give way well before the title does; the page's
      own words (the project, Knowledge) stay whole */

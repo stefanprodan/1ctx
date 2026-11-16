@@ -74,7 +74,7 @@ export function ProjectPage({ params }: { params: Params }) {
   return (
     <Page
       steps={STEPS}
-      title={listed?.name ?? detail?.name ?? "Project"}
+      title={listed?.name ?? detail?.name ?? (missing ? "Project" : null)}
       titleMono
       menu={
         listed !== null ? (

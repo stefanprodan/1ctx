@@ -182,3 +182,32 @@ test("a page that is not loading draws its children, no bones", () => {
   expect(html).toContain("<p>rows</p>");
   expect(html).not.toContain("bones-bone");
 });
+
+test("a name not known yet is a bone in the crumb, gone with a failure", () => {
+  const html = render(
+    <Page
+      crumb={null}
+      steps={[{ label: null, href: "/projects/p1" }]}
+      title={null}
+      loading
+    />,
+  );
+  // one bone for the step, one for the title
+  expect(html.split('class="page-crumb-bone bones-wait"').length - 1).toBe(2);
+  expect(html).toContain('aria-label="Loading the page"');
+  const crumb = render(<Page crumb={null} title="New file" loading />);
+  expect(crumb).toContain("page-crumb-bone");
+  expect(crumb).toContain(">New file<");
+  // a failed page never learns the name: no bone that never lands
+  const failed = render(
+    <Page
+      steps={[{ label: null }, { label: "Knowledge" }]}
+      crumb={null}
+      title={null}
+      error="gone"
+    />,
+  );
+  expect(failed).not.toContain("page-crumb-bone");
+  expect(failed).toContain(">Knowledge<");
+  expect(failed).toContain("This page did not load");
+});

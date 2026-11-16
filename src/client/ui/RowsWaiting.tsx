@@ -6,6 +6,7 @@
 // a loaded row's height, wraps as one does on a phone, and nothing
 // moves when the rows land.
 
+import type { ComponentChildren } from "preact";
 import "./rows.css";
 import { Bone } from "./Bones.tsx";
 
@@ -25,6 +26,7 @@ export function RowsWaiting({
   shape = "avatar",
   label,
   card,
+  end,
 }: {
   count?: number;
   shape?: RowsShape;
@@ -32,6 +34,9 @@ export function RowsWaiting({
   label: string;
   // a card of its own with a head, for a page whose card waits too
   card?: boolean;
+  // the meta's own bones, for a row whose end is no short word (the
+  // projects' activity strip); a chip when none is given
+  end?: ComponentChildren;
 }) {
   const rows = Array.from({ length: count }, (_, i) => {
     const [title, sub] = WIDTHS[i % WIDTHS.length];
@@ -54,7 +59,7 @@ export function RowsWaiting({
             </span>
           </span>
           <span class="rows-meta rows-meta-keep">
-            <Bone kind="chip" at={at + 3} />
+            {end ?? <Bone kind="chip" at={at + 3} />}
           </span>
         </div>
       </div>

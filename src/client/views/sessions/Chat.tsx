@@ -41,7 +41,11 @@ import {
 import { inView } from "../../data/channel-pages.ts";
 import { forkSession } from "../../data/fork.ts";
 import { me } from "../../data/me.ts";
-import { project, projects } from "../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectsError,
+} from "../../data/projects.ts";
 import { editQueued, sendMessage } from "../../data/queued.ts";
 import {
   compactSession,
@@ -113,11 +117,10 @@ function SessionPage({
   useEffect(() => () => leaveSession(id), [id]);
   const projectId = shown?.session.projectId ?? null;
   const row = project.value;
-  const listed =
-    (row !== null && row.id === projectId ? row : null) ??
-    projects.value?.find((p) => p.id === projectId) ??
-    null;
-  const projectName = listed?.name ?? "Project";
+  // a bone until the name is known; a list that failed leaves the
+  // title alone rather than a bone that never lands
+  const projectName =
+    knownProjectName(projectId) ?? (projectsError.value === null ? null : "");
   const user = me.value;
   const members = row !== null && row.id === projectId ? row.members : [];
   const authors = shown?.authors ?? [];

@@ -35,6 +35,8 @@ import "./projects.css";
 export function Frame({
   id,
   tab,
+  waiting,
+  busy = false,
   children,
 }: {
   id: string;
@@ -46,6 +48,12 @@ export function Frame({
     | "knowledge"
     | "members"
     | "settings";
+  // the tab's own first-load shape, drawn while the row loads too, so
+  // the wait keeps one shape until the tab lands; rows when none
+  waiting?: ComponentChildren;
+  // the tab's own first load still runs past the row's, so the head
+  // keeps saying "Still loading"
+  busy?: boolean;
   children: (shown: ProjectDetail) => ComponentChildren;
 }) {
   const row = project.value;
@@ -66,6 +74,7 @@ export function Frame({
   // held as Page holds its own, so a row landing just past the reveal
   // never flashes the tab's bones away
   const wait = useWaiting(shown === null && projectError.value === null);
+  const bones = waiting ?? <RowsWaiting card label="Loading the project" />;
   const about = shown === null ? null : aboutLine(shown);
   // the list, once the tab loaded it, is fresher than the project row
   const knowledge = knowledgeOf(id)?.totals ??
@@ -74,11 +83,12 @@ export function Frame({
     <Page
       crumb="Projects"
       crumbHref="/projects"
-      title={shown?.name ?? listed?.name ?? "Project"}
+      title={shown?.name ?? listed?.name ?? null}
       loading={
         shown === null && listed === undefined && projectError.value === null
       }
-      pending={shown === null && projectError.value === null}
+      pending={(shown === null || busy) && projectError.value === null}
+      waiting={bones}
       error={projectError.value}
     >
       {(shown !== null || listed !== undefined) && (
@@ -113,11 +123,7 @@ export function Frame({
             tabs={tabs}
             active={tab === "feed" ? tabs[0].href : `/projects/${id}/${tab}`}
           />
-          {shown === null || wait ? (
-            <RowsWaiting card label="Loading the project" />
-          ) : (
-            children(shown)
-          )}
+          {shown === null || wait ? bones : children(shown)}
         </Split>
       )}
     </Page>

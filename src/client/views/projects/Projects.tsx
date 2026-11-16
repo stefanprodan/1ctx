@@ -18,6 +18,7 @@ import { projectAgents } from "../../data/sessions.ts";
 import { days, daysFailed } from "../../data/usage.ts";
 import { PROJECTS_HREF } from "../../lib/hrefs.ts";
 import { Icon, projectIcon } from "../../lib/icons.tsx";
+import { useWaiting } from "../../lib/wait.ts";
 import { Page } from "../../ui/Page.tsx";
 import {
   Rows,
@@ -28,6 +29,7 @@ import {
   RowsMeta,
   RowsNote,
   RowsTitle,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
 import { Split } from "../../ui/Split.tsx";
@@ -78,11 +80,16 @@ export function Projects() {
   const admin = me.value?.role === "admin";
   const answer = days.value;
   const model = answer === null ? null : activityModel(answer);
+  // the page waits in its landed layout, the activity, the card and the
+  // aside each in bones, so nothing jumps when the list lands; held as
+  // Page holds its own
+  const listing = list === null && projectsError.value === null;
+  const wait = useWaiting(listing);
   return (
     <Page
       crumb=""
       title="Projects"
-      loading={list === null && projectsError.value === null}
+      pending={listing}
       error={projectsError.value}
     >
       <Split
@@ -116,17 +123,21 @@ export function Projects() {
               ) : undefined
             }
           >
-            {list !== null && shown.length === 0 && (
+            {wait && (
+              <RowsWaiting label="Loading projects" end={<StripGhost />} />
+            )}
+            {!wait && list !== null && shown.length === 0 && (
               <RowsNote>No projects found</RowsNote>
             )}
-            {shown.map((p) => (
-              <ProjectRow
-                key={p.id}
-                project={p}
-                answer={answer}
-                population={model?.rowPopulation ?? []}
-              />
-            ))}
+            {!wait &&
+              shown.map((p) => (
+                <ProjectRow
+                  key={p.id}
+                  project={p}
+                  answer={answer}
+                  population={model?.rowPopulation ?? []}
+                />
+              ))}
           </RowsCard>
         </Rows>
       </Split>

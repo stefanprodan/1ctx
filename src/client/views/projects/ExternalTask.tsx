@@ -22,7 +22,7 @@ import {
   taskPage,
 } from "../../data/external-task.ts";
 import { tasksTabHref } from "../../data/external-tasks.ts";
-import { project } from "../../data/projects.ts";
+import { knownProjectName } from "../../data/projects.ts";
 import { ago, longDate } from "../../lib/format.ts";
 import { externalTasksHref, userHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
@@ -231,10 +231,6 @@ function TaskScreen({ id }: { id: string }) {
   const moves = useMoveState();
   const now = useNow(60_000);
   const task = page?.detail.task ?? null;
-  const shown =
-    task !== null && project.value?.id === task.projectId
-      ? project.value
-      : null;
   const tab = task === null ? undefined : externalTasksHref(task.projectId);
   // back to the tab as it was left, else to the view the task is
   // listed on, which a move changes
@@ -244,7 +240,8 @@ function TaskScreen({ id }: { id: string }) {
       : tasksTabHref(task.projectId, showOf(task.state));
   return (
     <Page
-      steps={[{ label: shown?.name ?? "Project", href: tab }]}
+      // the row this route never loads, else the rail's list
+      steps={[{ label: knownProjectName(task?.projectId ?? null), href: tab }]}
       split
       title="External tasks"
       titleHref={view}

@@ -3,19 +3,23 @@
 //
 // A project's tab waits in RowsWaiting under the tabs while its row
 // loads, and holds those bones as Page holds its own: a row landing
-// just past the reveal keeps them SHOW_MS, so they never flash. Every
-// step is on the fake clock, the frame mounted so its hooks run.
+// just past the reveal keeps them SHOW_MS, so they never flash. A tab
+// with a shape of its own (Memory) waits in it from the first paint.
+// Every step is on the fake clock, the frame mounted so its hooks run.
 
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { act } from "preact/test-utils";
+import { notes } from "../../../src/client/data/memory.ts";
 import { project, projects } from "../../../src/client/data/projects.ts";
 import type { DayClock } from "../../../src/client/lib/now.ts";
+import { SLOW_MS } from "../../../src/client/lib/slow.ts";
 import {
   REVEAL_MS,
   SHOW_MS,
   setWaitClock,
 } from "../../../src/client/lib/wait.ts";
 import { Frame } from "../../../src/client/views/projects/Frame.tsx";
+import { Memory } from "../../../src/client/views/projects/Memory.tsx";
 import type {
   ProjectDetail,
   ProjectSummary,
@@ -54,6 +58,7 @@ afterEach(() => {
   setWaitClock(was);
   projects.value = null;
   project.value = null;
+  notes.value = new Map();
 });
 
 const frame = () => (
@@ -94,6 +99,38 @@ test.serial(
     });
     expect(view.html()).toContain("the tab");
     expect(view.html()).not.toContain("rows-waiting");
+    await view.unmount();
+  },
+);
+
+test.serial(
+  "the Memory tab waits as its note from the start, the name a bone",
+  async () => {
+    projects.value = null;
+    const view = await mount(<Memory params={{ id: "p1" }} />);
+    const cold = view.html();
+    // nothing known: the name is a bone, never a stand-in word
+    expect(cold).toContain("page-crumb-bone");
+    expect(cold).not.toContain(">Project<");
+    expect(cold).toContain('aria-label="Loading the memory"');
+    expect(cold).not.toContain("rows-waiting");
+    await clock.advance(400);
+    await act(() => {
+      projects.value = [listed];
+    });
+    // the list names it and draws the tabs; the tab keeps its shape
+    expect(view.html()).toContain(">infra<");
+    expect(view.html()).toContain('aria-label="Loading the memory"');
+    expect(view.html()).not.toContain("rows-waiting");
+    expect(view.html()).toContain("bones-waited");
+    await act(() => {
+      project.value = detail;
+    });
+    await clock.advance(SHOW_MS);
+    // the row landed, the note has not: one wait still, saying so
+    expect(view.html()).toContain('aria-label="Loading the memory"');
+    await clock.advance(SLOW_MS - 400 - SHOW_MS);
+    expect(view.html()).toContain(">Still loading<");
     await view.unmount();
   },
 );
