@@ -122,6 +122,11 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   line wraps at the hairline: the actions stay on the first row, the
   usage, time and model move to the second, where only the model gives
   way.
+- **A chat waits as a chat.** While its session or its code loads,
+  `ChatWaiting` draws three turns in bones (an author line over two or
+  three text lines) and the composer's place at its height; a run's
+  foot is its state line. The real composer is not mounted. A settled
+  chat opened again draws its kept copy at once, with no bones.
 - **A chat is `/chat/:id` and a run `/run/:id`.** Each shows the other
   origin as not found, so every link picks its page by origin. A channel
   opens at `/chat/:id`; its page is in `docs/channel-page.md`.

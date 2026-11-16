@@ -25,6 +25,7 @@ import {
   skillUsage,
 } from "../../../src/client/data/skills.ts";
 import { NewSkill } from "../../../src/client/views/admin/NewSkill.tsx";
+import { SkillFiles } from "../../../src/client/views/admin/SkillFiles.tsx";
 import { SkillList } from "../../../src/client/views/admin/SkillList.tsx";
 import {
   SkillPage,
@@ -451,7 +452,7 @@ describe("the list", () => {
     expect(html).toContain("No agents");
     expect(html).toContain("1 agent");
     expect(html).toContain('href="/admin/config/skills?new"');
-    expect(html).toContain("Loading");
+    expect(html).toContain('aria-label="Loading usage"');
   });
 
   test.serial("a failed refresh takes the sentence's place, in red", () => {
@@ -589,7 +590,7 @@ describe("a skill's page", () => {
       path.value = "/admin/config/skills/gitops-knowledge";
       const page = () =>
         render(<SkillPage params={{ name: "gitops-knowledge" }} />);
-      expect(page()).toContain("Loading");
+      expect(page()).toContain('aria-label="Loading usage"');
       answer = () =>
         Response.json({
           since: 0,
@@ -601,7 +602,7 @@ describe("a skill's page", () => {
         });
       // another skill's answer is not this one's
       await loadSkillUsage("s1");
-      expect(page()).toContain("Loading");
+      expect(page()).toContain('aria-label="Loading usage"');
       await loadSkillUsage("s2");
       expect(page()).toMatch(/Loads[\s\S]*?3/);
       expect(page()).toContain("Most read");
@@ -646,5 +647,19 @@ describe("a skill's page", () => {
     const html = render(<SkillList />);
     expect(html).toContain("The server did not answer.");
     expect(html).not.toContain("HTTP");
+  });
+});
+
+describe("the files tab", () => {
+  test.serial("SKILL.md waits in line bones until its text is read", () => {
+    answer = () => Response.json({ error: "held" }, { status: 500 });
+    const html = render(<SkillFiles skill={gitops} />);
+    expect(html).toContain('role="status" aria-label="Loading SKILL.md"');
+    expect(html).toContain("bones-lines-line");
+    expect(html).not.toContain(">Loading<");
+    bodies.value = { s2: "# Flux" };
+    const read = render(<SkillFiles skill={gitops} />);
+    expect(read).not.toContain("Loading SKILL.md");
+    expect(read).toContain("# Flux");
   });
 });

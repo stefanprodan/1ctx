@@ -7,14 +7,14 @@
 
 import { week } from "../../data/usage.ts";
 import { count } from "../../lib/format.ts";
-import { AsideLine, AsideSection } from "../../ui/Split.tsx";
+import { AsideLine, AsideSection, AsideWaiting } from "../../ui/Split.tsx";
 
 export function WeekAside() {
   const spent = week.value;
   return (
     <AsideSection label="This week">
       {spent === null ? (
-        <p class="split-empty">Loading</p>
+        <AsideWaiting label="Loading the week" lines={3} />
       ) : (
         <>
           <AsideLine label="Sessions">{count(spent.sessions)}</AsideLine>

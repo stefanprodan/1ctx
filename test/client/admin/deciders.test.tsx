@@ -346,7 +346,7 @@ describe("the pages", () => {
     providers.value = [router];
     deciders.value = [judge, small];
     decisions.value = [];
-    expect(page("judge")).toContain("Loading");
+    expect(page("judge")).toContain('aria-label="Loading usage"');
     answer = (url) =>
       url === "/api/deciders/d1/usage"
         ? Response.json({

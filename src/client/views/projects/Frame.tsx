@@ -16,6 +16,7 @@ import { knowledgeCount, knowledgeOf } from "../../data/knowledge.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgentCount } from "../../data/sessions.ts";
 import { longDate } from "../../lib/format.ts";
+import { useWaiting } from "../../lib/wait.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RowsWaiting } from "../../ui/Rows.tsx";
 import { AsideLine, AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
@@ -62,6 +63,9 @@ export function Frame({
       agents: projectAgentCount(id),
     }),
   );
+  // held as Page holds its own, so a row landing just past the reveal
+  // never flashes the tab's bones away
+  const wait = useWaiting(shown === null && projectError.value === null);
   const about = shown === null ? null : aboutLine(shown);
   // the list, once the tab loaded it, is fresher than the project row
   const knowledge = knowledgeOf(id)?.totals ??
@@ -108,7 +112,7 @@ export function Frame({
             tabs={tabs}
             active={tab === "feed" ? tabs[0].href : `/projects/${id}/${tab}`}
           />
-          {shown === null ? (
+          {shown === null || wait ? (
             <RowsWaiting card label="Loading the project" />
           ) : (
             children(shown)

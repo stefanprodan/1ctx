@@ -17,6 +17,7 @@ import { revisionPair } from "../../../data/knowledge-rows.ts";
 import { diffLines } from "../../../lib/diff.ts";
 import { ago, sentence } from "../../../lib/format.ts";
 import { Icon, type IconName } from "../../../lib/icons.tsx";
+import { LinesWaiting } from "../../../ui/Bones.tsx";
 import { Seg } from "../../../ui/Seg.tsx";
 import { Source } from "../../../ui/Source.tsx";
 import { Author } from "../Author.tsx";
@@ -78,16 +79,15 @@ export function Revision({
         : diffLines(beforeText, afterText),
     [beforeText, afterText],
   );
+  if (history.state === "loading") {
+    return <LinesWaiting class="docpage-state" label="Loading the revision" />;
+  }
   if (history.state !== "done") {
     return (
       <p class="docpage-state">
-        {history.state === "loading" ? (
-          "Loading"
-        ) : (
-          <span class="error">
-            The history did not load. {sentence(history.failure.words)}
-          </span>
-        )}
+        <span class="error">
+          The history did not load. {sentence(history.failure.words)}
+        </span>
       </p>
     );
   }
@@ -172,7 +172,11 @@ export function Revision({
       </div>
       {view.state === "loading" ||
       (showing === "changes" && before?.state === "loading") ? (
-        <p class="docpage-state">Loading</p>
+        <LinesWaiting
+          class="docpage-state"
+          lines={6}
+          label="Loading the revision"
+        />
       ) : view.state === "failed" ? (
         <p class="docpage-state">
           <span class="error">

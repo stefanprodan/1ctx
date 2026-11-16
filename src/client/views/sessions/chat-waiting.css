@@ -1,0 +1,72 @@
+/* The chat's shape before its session lands, at the transcript's and
+   the composer's sizes, so nothing moves when the turns draw. */
+
+@layer tokens, base, owners;
+
+@layer owners {
+  /* the chat's column: .chat's width, the foot at the bottom */
+  .chat-waiting {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    width: 860px;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  .chat-waiting-rows {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    gap: var(--space-5);
+    padding: var(--space-2) 0 var(--space-4);
+  }
+  .chat-waiting-turn {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  /* the author line: a 24px avatar beside the name */
+  .chat-waiting-author {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-small);
+  }
+  .chat-waiting-avatar {
+    width: 24px;
+    height: 24px;
+  }
+  /* a message's card and a reply's text, at the transcript's font */
+  .chat-waiting-card,
+  .chat-waiting-text {
+    font-size: var(--text-input);
+    line-height: 1.55;
+  }
+  .chat-waiting-card {
+    padding: var(--space-3) 14px;
+  }
+  .chat-waiting-line {
+    display: flex;
+    align-items: center;
+    height: 1lh;
+  }
+  /* stuck to the window's edge as the transcript's foot is */
+  .chat-waiting-foot {
+    position: sticky;
+    bottom: 0;
+    padding-bottom: var(--shell-inset-bottom, 0px);
+    background: var(--page);
+  }
+  /* the composer at rest: one line of text over its row of controls */
+  .chat-waiting-composer {
+    height: 82px;
+  }
+  /* a run's foot: its state on one line */
+  .chat-waiting-state {
+    display: flex;
+    align-items: center;
+    min-height: 52px;
+    padding: var(--space-2) 14px;
+    font-size: var(--text-ui);
+  }
+}

@@ -157,7 +157,7 @@ describe("the Visuals page", () => {
     expect(html).not.toContain('type="number"');
     expect(html).toContain('inputmode="decimal"');
     expect(html).toContain("Last 30 days");
-    expect(html).toContain("Loading");
+    expect(html).toContain('aria-label="Loading usage"');
   });
 
   test.serial("Use defaults waits while a card holds the defaults", () => {

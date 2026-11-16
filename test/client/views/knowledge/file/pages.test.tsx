@@ -239,3 +239,62 @@ test("no file: the ways back", () => {
   expect(html).toContain('href="/projects/p1/knowledge?list=deleted"');
   expect(html).toContain('href="/projects/p1/knowledge"');
 });
+
+test.serial(
+  "a revision, its changes and a deleted file wait in line bones",
+  () => {
+    // one status each, named for what loads, the words only on a failure
+    const waits = (html: string, label: string) => {
+      expect(html.split(`role="status" aria-label="${label}"`).length - 1).toBe(
+        1,
+      );
+      expect(html).toContain("bones-lines-line");
+      expect(html).not.toContain(">Loading<");
+    };
+    const revision = (history: Parameters<typeof Revision>[0]["history"]) =>
+      render(
+        <Revision
+          file={fileView()}
+          history={history}
+          revision={2}
+          latest={3}
+          now={0}
+        />,
+      );
+    waits(revision({ state: "loading" }), "Loading the revision");
+    expect(
+      revision({ state: "failed", failure: { words: "gone", status: 500 } }),
+    ).toContain("The history did not load. Gone.");
+    // the history known, the revision's own text not yet
+    hold({});
+    const listed = {
+      state: "done" as const,
+      versions: versions.map(({ text: _, ...v }) => v),
+    };
+    const text = revision(listed);
+    expect(text).toContain("Revision 2 of 3");
+    waits(text, "Loading the revision");
+    waits(
+      render(<LatestChanges file={fileView({ text: "a: 3\n" })} />),
+      "Loading the changes",
+    );
+    lists.value = new Map([["p1", list()]]);
+    const {
+      text: _t,
+      language: _l,
+      html: _h,
+      code: _c,
+      ...file
+    } = {
+      ...fileView(),
+      deletedBy: sre,
+      deletedAt: 0,
+    };
+    waits(
+      render(
+        <DeletedDoc projectId="p1" projectName="personal" row={file} now={0} />,
+      ),
+      "Loading its text",
+    );
+  },
+);

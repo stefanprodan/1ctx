@@ -30,6 +30,7 @@
   /* the gutter is kept, so a scrollbar never narrows the frame and
      sets off a resize and a remeasure */
   .visual-scroll {
+    position: relative;
     overflow: auto;
     scrollbar-gutter: stable;
     min-height: 80px;
@@ -44,6 +45,11 @@
   /* a page with the device-width viewport meta fits any width */
   .visual-fluid .visual-frame {
     min-width: 0;
+  }
+  /* over the frame, which keeps its height while it is blank */
+  .visual-waiting {
+    position: absolute;
+    inset: 0;
   }
   .visual-unloaded {
     visibility: hidden;

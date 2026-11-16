@@ -1086,7 +1086,7 @@ describe("a provider's page", () => {
       deciders.value = [];
       dictation.value = { enabled: false, settings: null };
       const page = () => render(<ProviderPage params={{ name: "router" }} />);
-      expect(page()).toContain('split-empty">Loading');
+      expect(page()).toContain('aria-label="Loading usage"');
       let asked = "";
       answer = (url) => {
         asked = url;
@@ -1131,7 +1131,7 @@ describe("a provider's page", () => {
       overviewError.value = { words: "boom", status: 500 };
       expect(render(<Providers />)).toContain("Did not load.");
       overviewError.value = null;
-      expect(render(<Providers />)).toContain("Loading");
+      expect(render(<Providers />)).toContain('aria-label="Loading usage"');
     },
   );
 

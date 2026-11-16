@@ -109,6 +109,10 @@ import {
 } from "../views/home/Home.model.ts";
 import { Login } from "../views/home/Login.tsx";
 import { tasksAddressOf } from "../views/projects/ExternalTasks.model.ts";
+import {
+  ChatPageWaiting,
+  RunPageWaiting,
+} from "../views/sessions/ChatWaiting.tsx";
 import { type Lazy, lazy } from "./lazy.ts";
 import type { Params } from "./params.ts";
 
@@ -590,14 +594,20 @@ export const ROUTES: Route[] = [
   },
   {
     path: "/chat/:id",
-    view: lazy(() => import("../views/sessions/Chat.tsx").then((m) => m.Chat)),
+    view: lazy(
+      () => import("../views/sessions/Chat.tsx").then((m) => m.Chat),
+      ChatPageWaiting,
+    ),
     title: () => "Chat",
     role: "authenticated",
     load: (params) => sessionPage(params.id, "chat"),
   },
   {
     path: "/run/:id",
-    view: lazy(() => import("../views/sessions/Chat.tsx").then((m) => m.Run)),
+    view: lazy(
+      () => import("../views/sessions/Chat.tsx").then((m) => m.Run),
+      RunPageWaiting,
+    ),
     title: () => "Run",
     role: "authenticated",
     load: (params) => sessionPage(params.id, "automation"),

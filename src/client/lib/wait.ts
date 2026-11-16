@@ -14,6 +14,11 @@ export const SHOW_MS = 300;
 
 let clock: DayClock = browserClock;
 
+// the clock the waits read, for useSlow beside them
+export function waitClock(): DayClock {
+  return clock;
+}
+
 // the tests' fake clock; returns the one it replaces
 export function setWaitClock(next: DayClock): DayClock {
   const was = clock;

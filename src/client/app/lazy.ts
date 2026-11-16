@@ -14,7 +14,12 @@ import "./lazy.css";
 import { says } from "../lib/format.ts";
 import { PageWaiting } from "../ui/PageWaiting.tsx";
 
-export type Lazy<P> = ComponentType<P> & { load(): Promise<void> };
+export type Lazy<P> = ComponentType<P> & {
+  load(): Promise<void>;
+  // the shape drawn until the code lands, named for the route table's
+  // tests, since a chunk another test loaded draws the view at once
+  waiting: ComponentType<P>;
+};
 
 // the generic page while a view's code loads
 function Waiting() {
@@ -62,5 +67,6 @@ export function lazy<P>(
     return h(waiting, props as Attributes & P);
   }) as Lazy<P>;
   Lazy.load = load;
+  Lazy.waiting = waiting;
   return Lazy;
 }

@@ -6,7 +6,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { automationProject } from "../data/automations.ts";
 import { taskPage } from "../data/external-task.ts";
-import { projects } from "../data/projects.ts";
+import { projects, projectsError } from "../data/projects.ts";
 import { session } from "../data/sessions.ts";
 import { initials } from "../lib/format.ts";
 import { Icon, type IconName, Logo, projectIcon } from "../lib/icons.tsx";
@@ -223,6 +223,11 @@ export function Rail({
                   <span>{route.nav!.label}</span>
                 </a>
                 {route.path === "/projects" &&
+                  projects.value === null &&
+                  projectsError.value === null && (
+                    <RailProjectsWaiting label="Loading projects" />
+                  )}
+                {route.path === "/projects" &&
                   (projects.value ?? []).map((p) => (
                     <Sub
                       key={p.id}
@@ -267,23 +272,28 @@ export function Rail({
   );
 }
 
-// the projects' rows before the list lands, a project's icon and name
+// the projects' rows before the list lands, a project's icon and name;
+// with a label they wait on their own, inside a rail already drawn
 export function RailProjectsWaiting({
   count = 3,
   at = 0,
+  label,
 }: {
   count?: number;
   at?: number;
+  label?: string;
 }) {
+  const rows = Array.from({ length: count }, (_, i) => (
+    <span key={i} class="rail-sub rail-sub-icon" aria-hidden="true">
+      <Bone kind="icon" at={at + i * 2} />
+      <Bone kind="line" at={at + i * 2 + 1} width={[58, 44, 66][i % 3]} />
+    </span>
+  ));
+  if (label === undefined) return <>{rows}</>;
   return (
-    <>
-      {Array.from({ length: count }, (_, i) => (
-        <span key={i} class="rail-sub rail-sub-icon" aria-hidden="true">
-          <Bone kind="icon" at={at + i * 2} />
-          <Bone kind="line" at={at + i * 2 + 1} width={[58, 44, 66][i % 3]} />
-        </span>
-      ))}
-    </>
+    <div class="rail-wait bones-wait" role="status" aria-label={label}>
+      {rows}
+    </div>
   );
 }
 

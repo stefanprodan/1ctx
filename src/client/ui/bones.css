@@ -87,6 +87,13 @@
     background: var(--heat-0);
   }
 
+  /* a line of a waiting text, as tall as the text's own line */
+  .bones-lines-line {
+    display: flex;
+    align-items: center;
+    height: 1lh;
+  }
+
   /* a waiting body shows nothing for its first 200 ms (REVEAL_MS in
      lib/wait.ts), so an answer that lands sooner never flashes bones */
   .bones-wait {

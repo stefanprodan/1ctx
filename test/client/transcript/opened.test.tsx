@@ -145,7 +145,16 @@ test.serial(
   () => {
     openedFiles.value = new Map([[code.key, { status: "loading" as const }]]);
     const loading = render(<FileCard card={code} />);
-    expect(loading).toContain("Loading");
+    // the body's box in bones at the lines the cut shows, framed as
+    // code is, under the path the card already knows
+    expect(loading).not.toContain(">Loading<");
+    expect(loading.match(/role="status"/g)?.length).toBe(1);
+    expect(loading).toContain(`aria-label="Loading ${code.file.path}"`);
+    expect(loading).toContain("filecard-body-code");
+    expect(loading).toContain(`>${code.file.path}<`);
+    expect(loading.split('class="bones-lines-line"').length - 1).toBe(
+      Math.min(code.file.lines, 12),
+    );
     expect(loading).not.toContain('title="Copy"');
     openedFiles.value = new Map([
       [

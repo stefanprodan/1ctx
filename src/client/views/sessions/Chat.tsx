@@ -70,6 +70,7 @@ import { agentMarked } from "../../transcript/Work.model.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RESTARTED_LINE } from "../projects/Run.model.ts";
 import { archivedLine, forkAgents } from "./Chat.model.ts";
+import { ChatWaiting } from "./ChatWaiting.tsx";
 import { menuItems } from "./Menu.model.ts";
 import { Menu } from "./Menu.tsx";
 import { queueActions } from "./queue.ts";
@@ -227,6 +228,7 @@ function SessionPage({
         ) : undefined
       }
       loading={shown === null && error === null}
+      waiting={<ChatWaiting run={origin === "automation"} />}
       error={error}
       flush
     >

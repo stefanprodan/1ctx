@@ -426,6 +426,30 @@ describe("the projects entity", () => {
 });
 
 describe("the rail", () => {
+  test.serial("waits for the projects in their rows' bones", () => {
+    projects.value = null;
+    projectsError.value = null;
+    const html = render(<Rail user={casey} narrow={false} onHide={() => {}} />);
+    expect(html).toContain('role="status" aria-label="Loading projects"');
+    expect(
+      html.split('class="rail-sub rail-sub-icon" aria-hidden="true"').length -
+        1,
+    ).toBe(3);
+    // the entries above stay links, never bones
+    expect(html).toContain('href="/projects"');
+    // a list that did not load draws no rows and no bones
+    projectsError.value = { words: "boom", status: 500 };
+    const failed = render(
+      <Rail user={casey} narrow={false} onHide={() => {}} />,
+    );
+    expect(failed).not.toContain("Loading projects");
+    projectsError.value = null;
+    projects.value = [personal];
+    expect(
+      render(<Rail user={casey} narrow={false} onHide={() => {}} />),
+    ).not.toContain("Loading projects");
+  });
+
   test("lists the projects under Projects", () => {
     projects.value = [
       personal,

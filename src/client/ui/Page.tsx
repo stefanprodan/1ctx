@@ -8,6 +8,7 @@ import type { Failure } from "../lib/format.ts";
 import { sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
+import { useSlow } from "../lib/slow.ts";
 import { useWaiting } from "../lib/wait.ts";
 import "./page.css";
 import { CodeTag } from "./CodeTag.tsx";
@@ -76,6 +77,7 @@ export function Page({
       : (error ?? null);
   const stuck = useSignal(false);
   const wait = useWaiting(loading === true);
+  const slow = useSlow(loading === true);
   useEffect(() => {
     const el = head.current;
     const scroller = el ? scrollParent(el) : null;
@@ -173,6 +175,11 @@ export function Page({
         ref={head}
       >
         {split ? <div class="page-head-main">{row}</div> : row}
+        {slow && (
+          <p class="page-slow" role="status">
+            Still loading
+          </p>
+        )}
       </div>
       {failed ? (
         <div class="notice-failed page-failed" role="alert">

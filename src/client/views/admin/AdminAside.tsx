@@ -25,6 +25,7 @@ export function UsageSection<T>({
   return (
     <AsideRead
       label={label}
+      waiting="Loading usage"
       action={
         <a class="split-link" href={USAGE_HREF}>
           Usage

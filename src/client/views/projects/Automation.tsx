@@ -64,6 +64,7 @@ import {
   AsideLine,
   AsideNote,
   AsideSection,
+  AsideWaiting,
   Split,
 } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
@@ -238,7 +239,7 @@ export function Automation({ params }: { params: Params }) {
               </AsideSection>
               <AsideSection label="History">
                 {tally === null ? (
-                  <p class="split-empty">Loading</p>
+                  <AsideWaiting label="Loading the runs" />
                 ) : (
                   <>
                     <AsideNote>

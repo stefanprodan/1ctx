@@ -249,6 +249,16 @@
     height: 0;
   }
 
+  /* a wait past SLOW_MS, said once at the head's end */
+  .page-slow {
+    flex-shrink: 0;
+    align-self: center;
+    margin: 0 0 0 auto;
+    color: var(--faint);
+    font-size: var(--text-small);
+    white-space: nowrap;
+  }
+
   .page-state {
     margin: 0;
     color: var(--faint);

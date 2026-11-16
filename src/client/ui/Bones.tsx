@@ -92,3 +92,38 @@ export function BarsGhost({
     </div>
   );
 }
+
+// line widths varied so the bones read as a paragraph's words
+const LINES = [88, 72, 94, 46, 80, 60];
+
+// A box of text while it loads, a line bone for each line: a file, a
+// revision, a note. The caller's class gives the box its padding and
+// font, so the lines are as tall as the text that replaces them.
+export function LinesWaiting({
+  label,
+  lines = 3,
+  class: extra,
+}: {
+  // what is loading, for a screen reader: "Loading the revision"
+  label: string;
+  lines?: number;
+  class?: string;
+}) {
+  return (
+    <div
+      class={`bones-lines bones-wait${extra ? ` ${extra}` : ""}`}
+      role="status"
+      aria-label={label}
+    >
+      {Array.from({ length: lines }, (_, i) => (
+        <span key={i} class="bones-lines-line" aria-hidden="true">
+          <Bone
+            kind="line"
+            at={i}
+            width={i === lines - 1 && lines > 1 ? 40 : LINES[i % LINES.length]}
+          />
+        </span>
+      ))}
+    </div>
+  );
+}

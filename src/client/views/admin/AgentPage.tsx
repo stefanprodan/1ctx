@@ -160,6 +160,7 @@ function Aside({ agent }: { agent: AgentSummary }) {
       </UsageSection>
       <AsideRead
         label="Used in"
+        waiting="Loading where it is used"
         value={facts === undefined ? undefined : (facts?.impact ?? null)}
       >
         {(impact) => (

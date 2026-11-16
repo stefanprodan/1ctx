@@ -14,6 +14,7 @@ import { ago, sentence } from "../../../lib/format.ts";
 import { Icon } from "../../../lib/icons.tsx";
 import { useSave } from "../../../lib/save.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
+import { LinesWaiting } from "../../../ui/Bones.tsx";
 import { Page, PageNotice } from "../../../ui/Page.tsx";
 import { RowsCard, RowsNote } from "../../../ui/Rows.tsx";
 import { Source } from "../../../ui/Source.tsx";
@@ -109,11 +110,15 @@ export function DeletedDoc({
               </div>
               <Source text={last.version.text} html={last.version.code} />
             </>
+          ) : last.state === "loading" ? (
+            <LinesWaiting
+              class="docpage-state"
+              lines={6}
+              label="Loading its text"
+            />
           ) : (
             <p class="docpage-state">
-              {last.state === "loading" ? (
-                "Loading"
-              ) : last.state === "none" ? (
+              {last.state === "none" ? (
                 "Its text is no longer kept."
               ) : (
                 <span class="error">

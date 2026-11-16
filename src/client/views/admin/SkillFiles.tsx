@@ -12,6 +12,7 @@ import {
   readSkillFile,
 } from "../../data/skills.ts";
 import { says, size } from "../../lib/format.ts";
+import { LinesWaiting } from "../../ui/Bones.tsx";
 import { Fold } from "../../ui/Fold.tsx";
 import { RowsMeta, RowsNote, RowsOpen, RowsTitle } from "../../ui/Rows.tsx";
 import { Setting } from "../../ui/Setting.tsx";
@@ -24,6 +25,7 @@ export function SkillFiles({ skill }: { skill: SkillSummary }) {
     <>
       <Setting title="SKILL.md" count={size(skill.bodyBytes)}>
         <Text
+          name="SKILL.md"
           load={() => readSkill(skill.id)}
           held={bodies.value[skill.id]}
           ground="card"
@@ -48,6 +50,7 @@ export function SkillFiles({ skill }: { skill: SkillSummary }) {
               }
             >
               <Text
+                name={file.path}
                 load={() => readSkillFile(skill.id, file.path)}
                 held={files.value[fileKey(skill.id, file.path)]}
               />
@@ -61,10 +64,12 @@ export function SkillFiles({ skill }: { skill: SkillSummary }) {
 }
 
 function Text({
+  name,
   load,
   held,
   ground,
 }: {
+  name: string;
   load: () => Promise<string>;
   held: string | undefined;
   ground?: "card";
@@ -85,7 +90,15 @@ function Text({
   if (failure.value) {
     return <p class="skill-page-state error">{failure.value}</p>;
   }
-  if (held === undefined) return <p class="skill-page-state">Loading</p>;
+  if (held === undefined) {
+    return (
+      <LinesWaiting
+        class="skill-page-state"
+        lines={6}
+        label={`Loading ${name}`}
+      />
+    );
+  }
   // cut, not scrolled: a box scrolling inside the page leaves the
   // sticky head behind
   const box = textBox(held, expanded.value);

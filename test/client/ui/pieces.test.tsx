@@ -95,7 +95,7 @@ test("a Finder's add draws the plus and its words as the trigger", () => {
 describe("AsideRead", () => {
   const read = (value: number | null | undefined) =>
     render(
-      <AsideRead label="Last 30 days" value={value}>
+      <AsideRead label="Last 30 days" waiting="Loading usage" value={value}>
         {(n) => <p>{n}</p>}
       </AsideRead>,
     );
@@ -103,9 +103,15 @@ describe("AsideRead", () => {
     '<section class="split-section"><div class="split-section-head"><span class="label">Last 30 days</span></div>';
 
   test("loading, failed, then the lines", () => {
-    expect(read(undefined)).toBe(
-      `${head}<p class="split-empty">Loading</p></section>`,
-    );
+    const waiting = read(undefined);
+    expect(waiting.startsWith(head)).toBe(true);
+    expect(waiting).not.toContain(">Loading<");
+    expect(waiting.match(/role="status"/g)?.length).toBe(1);
+    expect(waiting).toContain('aria-label="Loading usage"');
+    expect(waiting).toContain("bones-wait");
+    expect(
+      waiting.split('class="split-line" aria-hidden="true"').length - 1,
+    ).toBe(2);
     expect(read(null)).toBe(
       `${head}<p class="split-empty">Did not load.</p></section>`,
     );

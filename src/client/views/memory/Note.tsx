@@ -27,6 +27,7 @@ import {
 } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { noticeOf, useFocusField, useSave } from "../../lib/save.ts";
+import { LinesWaiting } from "../../ui/Bones.tsx";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Foot } from "../../ui/Foot.tsx";
 import { Rows, RowsCard, RowsHandle } from "../../ui/Rows.tsx";
@@ -273,11 +274,11 @@ export function Note({
     return (
       <Rows>
         <RowsCard label={label}>
-          <p class="note-empty">
-            {error === null
-              ? "Loading"
-              : `Did not load. ${sentence(error.words)}`}
-          </p>
+          {error === null ? (
+            <LinesWaiting class="note-empty" label="Loading the memory" />
+          ) : (
+            <p class="note-empty">Did not load. {sentence(error.words)}</p>
+          )}
         </RowsCard>
       </Rows>
     );

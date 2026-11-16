@@ -244,7 +244,7 @@ describe("the Web access page", () => {
     expect(html).not.toContain(">bash<");
     expect(html).toMatch(/setting-count">200 tokens</);
     expect(html).toContain("Last 30 days");
-    expect(html).toContain("Loading");
+    expect(html).toContain('aria-label="Loading usage"');
   });
 
   test.serial("Listed domains shows the saved hosts and their count", () => {
