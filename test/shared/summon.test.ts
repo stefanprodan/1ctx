@@ -5,6 +5,7 @@ import { describe, expect, test } from "bun:test";
 import {
   noAgentNamed,
   readSummon,
+  summonName,
   summonWord,
 } from "../../src/shared/summon.ts";
 
@@ -30,6 +31,15 @@ describe("summon", () => {
     expect(read("@Glm: check")).toEqual({ kind: "summon", name: "glm" });
     expect(read("@coder, go on")).toEqual({ kind: "none" });
     expect(read("@, hi")).toEqual({ kind: "none" });
+    expect(summonName("@glm?!.,;: check")).toBe("glm");
+    expect(summonName("@a.b, check")).toBe("a.b");
+  });
+
+  test("a word of long punctuation runs", () => {
+    const dots = ".".repeat(262_000);
+    expect(summonName(`@${dots}x`)).toBe(`${dots}x`);
+    expect(summonName(`@G${dots}`)).toBe("g");
+    expect(read(`@${dots}`)).toEqual({ kind: "none" });
   });
 
   test("the chat's own agent is an ordinary turn", () => {

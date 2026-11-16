@@ -3,6 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { MAX_OPENS_PER_COMMAND } from "../../../src/server/bash/commands.ts";
+import { openedRecord } from "../../../src/server/bash/open.ts";
 import { VISUAL_FRAME_BYTES } from "../../../src/shared/words.ts";
 import { afterMountRead, callCaps, run, setup, untilPhase } from "./helpers.ts";
 
@@ -334,5 +335,30 @@ describe("open command", () => {
     } finally {
       s.db.close();
     }
+  });
+});
+
+describe("visual title", () => {
+  const titleOf = (html: string) =>
+    openedRecord("/tmp/p.html", html, true).title;
+
+  test.each([
+    ["<TITLE lang=en>A</Title \n>", "A"],
+    ["<titles>no</titles><title>B</title>", "B"],
+    ["<title>C</titlex></title>", "C</titlex>"],
+    ["<title>D</ title><p></title\t>", "D</ title><p>"],
+    ["<title>E</title><title>F</title>", "E"],
+    ["<title x='>'>G</title>", "'>G"],
+    ["<title>H", "p.html"],
+    ["<title", "p.html"],
+  ])("reads %j", (html, title) => {
+    expect(titleOf(html)).toBe(title);
+  });
+
+  test("reads a file of many unclosed openers", () => {
+    const openers = "<title>".repeat(70_000);
+    expect(titleOf(openers)).toBe("p.html");
+    expect(titleOf(`${openers}</title>`)).toBe("p.html");
+    expect(titleOf(`<title>T${"</title ".repeat(60_000)}`)).toBe("p.html");
   });
 });

@@ -70,7 +70,7 @@ spec:
             - --provision
             - /provision
             {{- end }}
-            {{- if .Values.trustProxy }}
+            {{- if eq (include "onectx.trustProxy" .) "true" }}
             - --trust-proxy
             {{- end }}
             {{- if .Values.secureCookie }}

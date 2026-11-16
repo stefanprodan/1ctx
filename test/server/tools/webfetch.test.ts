@@ -176,6 +176,46 @@ describe("fetch URL guard", () => {
     );
   });
 
+  test("refuses a private host unless the admin listed it", () => {
+    for (const url of [
+      "http://127.0.0.1/",
+      "http://[::1]/",
+      "http://169.254.169.254/",
+      "http://10.0.0.7/",
+      "http://2130706433/",
+      "http://localhost./",
+    ]) {
+      expect(() => parseFetchUrl(url), url).toThrow("private host refused");
+      expect(
+        () => parseFetchUrl(url, { mode: "all", domains: [] }),
+        url,
+      ).toThrow("private host refused");
+    }
+    expect(
+      parseFetchUrl("http://10.0.0.7/a", {
+        mode: "listed",
+        domains: ["10.0.0.7"],
+      }).href,
+    ).toBe("http://10.0.0.7/a");
+  });
+
+  test("refuses a redirect to a private host", async () => {
+    const requested: string[] = [];
+    await expect(
+      run(
+        { url: "https://docs.test/start" },
+        dependencies((url) => {
+          requested.push(url);
+          return new Response(null, {
+            status: 302,
+            headers: { location: "http://169.254.169.254/" },
+          });
+        }),
+      ),
+    ).rejects.toThrow("redirect refused: private host refused");
+    expect(requested).toEqual(["https://docs.test/start"]);
+  });
+
   test("rejects an empty url argument", async () => {
     await expect(
       run(
@@ -402,6 +442,34 @@ describe("fetch extraction and slicing", () => {
     ]) {
       expect(text).not.toContain(hidden);
     }
+  });
+
+  test("trims the blanks that end a block", async () => {
+    const base = new URL("https://example.com/");
+    expect(
+      await extractHtml(
+        "<pre>a \t </pre><p>b</p><pre> \t</pre><ul><li>c <li>d</ul>",
+        base,
+      ),
+    ).toBe("a\n\nb\n\n- c\n- d");
+    expect(await extractHtml("<title> T  </title><pre>x  y</pre>", base)).toBe(
+      "T\n\nx  y",
+    );
+  });
+
+  test("extracts a page of long blank runs and many blocks", async () => {
+    const base = new URL("https://example.com/");
+    const blocks = "<p>a</p>".repeat(20_000);
+    const lead = await extractHtml(
+      `<pre>${" ".repeat(1_000_000)}x</pre>${blocks}`,
+      base,
+    );
+    expect(lead).toBe(`x${"\n\na".repeat(20_000)}`);
+    const trailing = await extractHtml(
+      `<pre>x${" \t".repeat(500_000)}</pre>${"<pre> </pre><p>a</p>".repeat(20_000)}`,
+      base,
+    );
+    expect(trailing).toBe(`x${"\n\na".repeat(20_000)}`);
   });
 
   test("extracts a fetched HTML page through fetchText", async () => {

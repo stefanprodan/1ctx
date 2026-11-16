@@ -164,6 +164,9 @@ from `emailOn` in `GET /api/me`.
   frame and refuses `watch`. A create sets the flag by default, a reset
   always; the profile's password change and a reset or invite link
   clear it.
+- **A write after a body re-reads its caller** (`actingUser()`) in
+  its transaction: a key create, an admin's user create, patch or reset.
+  A gone login is 401; disabled, must-change or demoted 403.
 - **An admin cannot demote, disable, reset or invite their own row.**
   Demoting or disabling the last enabled admin is a 409 too.
 - **With email on an admin is offered links in place of a typed

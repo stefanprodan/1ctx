@@ -49,10 +49,48 @@ function baseName(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
+// whether text holds `word` at `at`, ASCII letters in any case, as a
+// regex's i flag reads them
+function wordAt(text: string, at: number, word: string): boolean {
+  for (let i = 0; i < word.length; i++) {
+    const code = text.charCodeAt(at + i);
+    const lower = code >= 0x41 && code <= 0x5a ? code + 0x20 : code;
+    if (lower !== word.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+// The title as /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i finds it, by
+// indexOf scans: the regex retries every opener against the rest of a
+// file that never closes one. Only the first opener counts, since a
+// later one's > is never before the first's, so no closer follows it
+// that does not follow the first.
+function titleText(text: string): string | null {
+  let open = text.indexOf("<");
+  while (open !== -1) {
+    if (wordAt(text, open + 1, "title") && !/\w/.test(text[open + 6] ?? "")) {
+      break;
+    }
+    open = text.indexOf("<", open + 1);
+  }
+  if (open === -1) return null;
+  const start = text.indexOf(">", open + 6) + 1;
+  if (start === 0) return null;
+  for (let close = text.indexOf("</", start); close !== -1; ) {
+    if (wordAt(text, close + 2, "title")) {
+      let end = close + 7;
+      while (end < text.length && /\s/.test(text[end]!)) end++;
+      if (text[end] === ">") return text.slice(start, close);
+    }
+    close = text.indexOf("</", close + 2);
+  }
+  return null;
+}
+
 function visualTitle(text: string, path: string): string {
-  const found = /<title\b[^>]*>([\s\S]*?)<\/title\s*>/i.exec(text);
-  if (found) {
-    const title = entity(found[1]!).trim();
+  const found = titleText(text);
+  if (found !== null) {
+    const title = entity(found).trim();
     if (title !== "" && title.length <= MAX_TITLE && !hasLineBreak(title)) {
       return title;
     }

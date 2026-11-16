@@ -501,7 +501,9 @@ describe("admin users", () => {
         url: new URL(request.url),
         address: "127.0.0.1",
       }),
-    ).rejects.toThrow("last admin");
+      // a caller without a live admin login is refused before any guard
+    ).rejects.toThrow("sign in");
+    expect(app.users.byId(adminUser.id)!.role).toBe("admin");
   });
 
   test.serial(
@@ -765,6 +767,7 @@ describe("disabled accounts", () => {
     const callAs = async (
       caller: { id: string; username: string },
       body: { role?: "member"; disabled?: boolean },
+      login = "stale",
     ) => {
       const request = new Request(`${ORIGIN}/api/users/${bootstrap.id}`, {
         method: "PATCH",
@@ -777,19 +780,20 @@ describe("disabled accounts", () => {
           fullName: caller.username,
           role: "admin",
           mustChangePassword: false,
-          via: { kind: "login", id: "stale" },
+          via: { kind: "login", id: login },
         },
         params: { id: bootstrap.id },
         url: new URL(request.url),
         address: "127.0.0.1",
       });
     };
+    // a caller without a live admin login is refused before any guard
     const outsider = { id: "other", username: "other" };
     await expect(callAs(outsider, { disabled: true })).rejects.toThrow(
-      "last admin",
+      "sign in",
     );
     await expect(callAs(outsider, { role: "member" })).rejects.toThrow(
-      "last admin",
+      "sign in",
     );
 
     const second = await create(client, "casey");
@@ -801,10 +805,19 @@ describe("disabled accounts", () => {
       ).status,
     ).toBe(200);
     expect(app.users.countAdmins()).toBe(2);
-    expect((await callAs(second, { disabled: true }))?.status).toBe(200);
+    app.users.setMustChangePassword(second.id, false);
+    expect((await app.client().login("casey", "longenough")).status).toBe(200);
+    const login = app.db
+      .query<{ id: string }, [string]>(
+        "select id from logins where user_id = ?",
+      )
+      .get(second.id)!.id;
+    const as = (body: { role?: "member"; disabled?: boolean }) =>
+      callAs(second, body, login);
+    expect((await as({ disabled: true }))?.status).toBe(200);
     expect(app.users.countAdmins()).toBe(1);
-    expect((await callAs(second, { disabled: false }))?.status).toBe(200);
-    expect((await callAs(second, { role: "member" }))?.status).toBe(200);
+    expect((await as({ disabled: false }))?.status).toBe(200);
+    expect((await as({ role: "member" }))?.status).toBe(200);
     expect(app.users.countAdmins()).toBe(1);
   });
 });

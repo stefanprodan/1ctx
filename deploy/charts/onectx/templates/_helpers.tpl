@@ -10,6 +10,15 @@
 {{- $name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{/* trustProxy, or when unset whether the chart puts a proxy in front. */}}
+{{- define "onectx.trustProxy" -}}
+{{- if kindIs "invalid" .Values.trustProxy -}}
+{{- or .Values.ingress.enabled .Values.httpRoute.enabled -}}
+{{- else -}}
+{{- .Values.trustProxy -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "onectx.version" -}}
 {{- .Values.image.tag | default .Chart.AppVersion -}}
 {{- end -}}

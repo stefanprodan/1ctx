@@ -500,3 +500,186 @@ test.serial("a key echoed JSON-escaped is redacted too", async () => {
     },
   );
 });
+
+const PRIVATE_URLS = [
+  "http://127.0.0.1/",
+  "http://[::1]/",
+  "http://169.254.169.254/latest/meta-data/",
+  "http://10.1.2.3/",
+  "http://192.168.1.1/",
+  "http://100.64.0.1/",
+  "http://[fd00::1]/",
+  "http://[::ffff:127.0.0.1]/",
+  "http://2130706433/",
+  "http://0x7f.1/",
+  "http://0/",
+  "http://localhost:8080/",
+  "http://LOCALHOST./",
+  "http://api.localhost/",
+];
+
+test.serial(
+  "an unsigned request to a private host is refused before it leaves",
+  async () => {
+    await withTransport(
+      () => new Response("must not reach"),
+      async (seen) => {
+        for (const web of [ALL, LISTED]) {
+          const fetch = commandFetch(web, [quotes()], limits);
+          for (const url of PRIVATE_URLS) {
+            const refused = await fetch(url).catch((error) => error);
+            expect(refused.message, url).toStartWith(
+              "Network access denied: private host refused: ",
+            );
+          }
+        }
+        expect(seen).toHaveLength(0);
+        const fetch = commandFetch(ALL, [quotes()], limits);
+        expect(text((await fetch("https://docs.example.test/")).body)).toBe(
+          "must not reach",
+        );
+        expect(seen.map((r) => r.url)).toEqual(["https://docs.example.test/"]);
+      },
+    );
+  },
+);
+
+test.serial(
+  "a redirect hop to a private host is refused before it leaves",
+  async () => {
+    for (const target of [
+      "http://127.0.0.1/admin",
+      "http://[::1]/",
+      "http://169.254.169.254/",
+      "http://localhost/",
+    ]) {
+      await withTransport(
+        (url) =>
+          url === "https://docs.example.test/start"
+            ? new Response(null, { status: 302, headers: { location: target } })
+            : new Response("must not reach"),
+        async (seen) => {
+          const fetch = commandFetch(ALL, [quotes()], limits);
+          const refused = await fetch("https://docs.example.test/start").catch(
+            (error) => error,
+          );
+          expect(refused.message, target).toContain("private host refused");
+          expect(seen.map((r) => r.url)).toEqual([
+            "https://docs.example.test/start",
+          ]);
+        },
+      );
+    }
+  },
+);
+
+test.serial(
+  "a private host an admin named is reached, by listing or by a credential",
+  async () => {
+    await withTransport(
+      () => new Response("ok"),
+      async (seen) => {
+        const listed = commandFetch(
+          { mode: "listed", domains: ["10.0.0.7", "intranet.localhost"] },
+          [],
+          limits,
+        );
+        await listed("http://10.0.0.7/a");
+        await listed("https://intranet.localhost/b");
+        const signed = commandFetch(
+          ALL,
+          [quotes({ prefix: "https://10.0.0.5/api/" })],
+          limits,
+        );
+        await signed("https://10.0.0.5/api/q");
+        expect(seen.map((r) => r.url)).toEqual([
+          "http://10.0.0.7/a",
+          "https://intranet.localhost/b",
+          "https://10.0.0.5/api/q",
+        ]);
+        expect(seen[2]!.headers.get("x-api-key")).toBe(`Token ${KEY}`);
+      },
+    );
+  },
+);
+
+test.serial(
+  "a signed request may not ask for part of a body or another encoding",
+  async () => {
+    const shaping = {
+      Range: "bytes=0-3",
+      "If-Range": '"tag"',
+      "Accept-Charset": "utf-16",
+      "Accept-Encoding": "identity;q=0, x-custom",
+    };
+    await withTransport(
+      () => new Response("ok"),
+      async (seen) => {
+        const fetch = commandFetch(ALL, [quotes()], limits);
+        for (const [name, value] of Object.entries(shaping)) {
+          const refused = await fetch(`${PREFIX}q`, {
+            headers: { [name]: value },
+          }).catch((error) => error);
+          expect(refused.message).toBe(
+            `Network access denied: credential quotes refuses the ${name.toLowerCase()} header: ${PREFIX}q`,
+          );
+        }
+        expect(seen).toHaveLength(0);
+        await fetch("https://docs.example.test/", { headers: shaping });
+        expect(seen).toHaveLength(1);
+        for (const [name, value] of Object.entries(shaping)) {
+          expect(seen[0]!.headers.get(name)).toBe(value);
+        }
+      },
+    );
+  },
+);
+
+test.serial("a signed request may not name a charset in Accept", async () => {
+  await withTransport(
+    () => new Response("ok"),
+    async (seen) => {
+      const fetch = commandFetch(ALL, [quotes()], limits);
+      for (const headers of [
+        { Accept: "text/plain; charset=utf-16le" },
+        new Headers({ accept: "application/json;CHARSET=utf-32" }),
+      ]) {
+        const refused = await fetch(`${PREFIX}q`, { headers }).catch(
+          (error) => error,
+        );
+        expect(refused.message).toBe(
+          `Network access denied: credential quotes refuses the accept header: ${PREFIX}q`,
+        );
+      }
+      expect(seen).toHaveLength(0);
+      await fetch(`${PREFIX}q`, { headers: { Accept: "application/json" } });
+      await fetch("https://docs.example.test/", {
+        headers: { Accept: "text/plain; charset=utf-16le" },
+      });
+      expect(seen.map((r) => r.headers.get("accept"))).toEqual([
+        "application/json",
+        "text/plain; charset=utf-16le",
+      ]);
+    },
+  );
+});
+
+test.serial("a signed request refuses a partial response", async () => {
+  await withTransport(
+    () =>
+      new Response(KEY.slice(0, 4), {
+        status: 206,
+        headers: { "content-range": "bytes 0-3/21" },
+      }),
+    async (seen) => {
+      const fetch = commandFetch(ALL, [quotes()], limits);
+      const refused = await fetch(`${PREFIX}q`).catch((error) => error);
+      expect(refused.message).toBe(
+        `Network access denied: credential quotes refuses a partial response: ${PREFIX}q`,
+      );
+      const unsigned = await fetch("https://docs.example.test/");
+      expect(unsigned.status).toBe(206);
+      expect(seen).toHaveLength(2);
+    },
+  );
+});

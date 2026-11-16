@@ -14,10 +14,39 @@ type Validate = (input: unknown) => { valid: boolean; errorMessage?: string };
 // schema's text, and a full cache drops the engine with them
 export const MAX_VALIDATORS = 256;
 const MAX_LISTED = 40;
+// Ajv runs pattern and patternProperties with RegExp, which backtracks,
+// so a remote server's "^(a|a)*$" would hold the one thread on the
+// model's text, and some of its formats (url) backtrack too; a schema
+// holding any of these keys anywhere is not compiled and the server
+// judges its calls. The walk keeps its own stack, so no depth of
+// nesting overflows it.
+const REGEX_KEYWORDS = ["pattern", "patternProperties", "format"];
+
+function hasRegexKeyword(schema: unknown): boolean {
+  const stack: unknown[] = [schema];
+  const seen = new Set<object>();
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (typeof node !== "object" || node === null || seen.has(node)) {
+      continue;
+    }
+    seen.add(node);
+    if (
+      !Array.isArray(node) &&
+      REGEX_KEYWORDS.some((key) => Object.hasOwn(node, key))
+    ) {
+      return true;
+    }
+    for (const value of Object.values(node)) stack.push(value);
+  }
+  return false;
+}
+
 let argumentValidator = new AjvJsonSchemaValidator();
 const validators = new Map<string, Validate | null>();
 
-// null when the schema does not compile or the check throws
+// null when the schema holds a regex keyword, does not compile or the
+// check throws
 function check(
   schema: Record<string, unknown>,
   input: Record<string, unknown>,
@@ -30,7 +59,9 @@ function check(
     }
     let validate: Validate | null = null;
     try {
-      validate = argumentValidator.getValidator(schema as JsonSchemaType);
+      if (!hasRegexKeyword(schema)) {
+        validate = argumentValidator.getValidator(schema as JsonSchemaType);
+      }
     } catch {}
     validators.set(text, validate);
   }

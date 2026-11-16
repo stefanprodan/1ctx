@@ -120,7 +120,9 @@ words.
   and all keep the saved hosts. Web off (admin or chat) removes
   webfetch, websearch, bash's network and every credential. Websearch
   also needs a provider, null on a fresh instance. Webfetch checks every
-  redirect against the listed origins. The send keeps its web snapshot.
+  redirect against the listed origins and refuses a private host the
+  list does not name, as bash's curl does (`docs/bash.md`). The send
+  keeps its web snapshot.
 - **Websearch needs no key.** Every provider answers keyless; a
   `search-<provider>.key` file only raises the rate.
 - **Only the `visualize`, `email_user`, `automation` and

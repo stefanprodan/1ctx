@@ -156,6 +156,8 @@ export function valuesYaml(files: Record<string, string>): string {
     .join("\n");
   return `# the load harness's release, written by scripts/load/provision.ts
 secureCookie: false
+# the driver signs each user in from its own forwarded address
+trustProxy: true
 secrets:
   existingSecret: onectx
 persistence:

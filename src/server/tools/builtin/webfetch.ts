@@ -7,6 +7,7 @@ import { originAllowed, type WebSnapshot } from "../../../shared/web.ts";
 import { raceSignal } from "../../lib/body.ts";
 import { bytesWords } from "../../lib/bytes.ts";
 import { messageOf, ToolError } from "../../lib/errors.ts";
+import { privateHost } from "../../lib/hosts.ts";
 import type { Tool, ToolContext } from "../types.ts";
 
 function cutNote(maxBytes: number): string {
@@ -18,48 +19,82 @@ type MediaType = {
   charset: string;
 };
 
+const isBlank = (code: number) => code === 0x20 || code === 0x09;
+
+// The text is kept in pieces with its last two characters and the
+// count of blanks that end it: a page's every block rule asks about the
+// end, and reading the end of one joined string copies all of it, or
+// rescans a long <pre> run of blanks, each time.
 class TextWriter {
-  private value = "";
+  private parts: string[] = [];
+  private tail = "";
+  private blanks = 0;
   private pendingSpace = false;
 
+  private append(text: string): void {
+    if (text === "") return;
+    this.parts.push(text);
+    this.tail = (this.tail + text.slice(-2)).slice(-2);
+    let end = text.length;
+    while (end > 0 && isBlank(text.charCodeAt(end - 1))) end--;
+    this.blanks = end === 0 ? this.blanks + text.length : text.length - end;
+  }
+
+  private trimBlanks(): void {
+    if (this.blanks === 0) return;
+    let drop = this.blanks;
+    this.blanks = 0;
+    while (drop > 0) {
+      const last = this.parts.pop()!;
+      if (last.length > drop) {
+        this.parts.push(last.slice(0, last.length - drop));
+        break;
+      }
+      drop -= last.length;
+    }
+    this.tail = "";
+    for (let i = this.parts.length - 1; i >= 0 && this.tail.length < 2; i--) {
+      this.tail = this.parts[i]!.slice(this.tail.length - 2) + this.tail;
+    }
+  }
+
   text(text: string): void {
+    let run = "";
+    let last = this.tail.slice(-1);
     for (const character of text) {
       if (/\s/u.test(character)) {
         this.pendingSpace = true;
       } else {
-        if (
-          this.pendingSpace &&
-          this.value !== "" &&
-          !this.value.endsWith("\n") &&
-          !this.value.endsWith(" ")
-        ) {
-          this.value += " ";
+        if (this.pendingSpace && last !== "" && last !== "\n" && last !== " ") {
+          run += " ";
         }
         this.pendingSpace = false;
-        this.value += character;
+        run += character;
+        last = character;
       }
     }
+    this.append(run);
   }
 
   raw(text: string): void {
     this.pendingSpace = false;
-    this.value += text;
+    this.append(text);
   }
 
   line(): void {
     this.pendingSpace = false;
-    this.value = this.value.replace(/[ \t]+$/u, "");
-    if (!this.value.endsWith("\n\n")) this.value += "\n";
+    this.trimBlanks();
+    if (this.tail !== "\n\n") this.append("\n");
   }
 
   singleLine(): void {
     this.pendingSpace = false;
-    this.value = this.value.replace(/[ \t]+$/u, "");
-    if (!this.value.endsWith("\n")) this.value += "\n";
+    this.trimBlanks();
+    if (!this.tail.endsWith("\n")) this.append("\n");
   }
 
   result(): string {
-    return this.value.trim();
+    return this.parts.join("").trim();
   }
 }
 
@@ -97,6 +132,16 @@ export function parseFetchUrl(
   }
   const host = normalizedHost(url.hostname);
   if (host === "") throw new Error("URL has no host");
+  // the same rule as curl in bash: a private host only when listed
+  if (
+    privateHost(url.hostname) &&
+    !(web?.mode === "listed" && web.domains.includes(url.hostname))
+  ) {
+    throw new ToolError(
+      `private host refused: ${url.host}`,
+      "private host refused",
+    );
+  }
   url.hostname = host.includes(":") ? `[${host}]` : host;
   return url;
 }

@@ -76,9 +76,17 @@ that shell that shows a file on the chat page.
 - **Only the send's web snapshot opens the network.** No snapshot, no
   network. curl only, never wget. All mode allows the internet, listed
   mode `urlPrefixes()`. `denyPrivateRanges` is false since Bun cannot
-  enforce guarded-fetch's connect-time dispatcher. The adapter loads
-  eagerly; permitted requests still use the current ambient fetch.
-- **Every redirect stays on HTTP or HTTPS**, private hosts included.
+  enforce guarded-fetch's connect-time dispatcher, and with it on every
+  host takes a DNS lookup. The adapter loads eagerly; permitted
+  requests still use the current ambient fetch.
+- **Private hosts are refused on every hop.** `privateHost()`
+  (`lib/hosts.ts`) judges the URL's host alone, never DNS: loopback,
+  RFC 1918, link-local and metadata, CGNAT, ULA, multicast, unspecified,
+  IPv4 inside IPv6 and `localhost` names. `commandFetch()` checks the
+  first hop and the web fetch's transport (`_fetch`) every redirect.
+  Exempt are a host the listed mode names and a credential's prefix,
+  both admin choices. Webfetch follows the same rule.
+- **Every redirect stays on HTTP or HTTPS.**
   A body refused for its declared size or malformed redirect location
   is cancelled without waiting for cleanup.
 - **Request bodies keep their bytes.** `--data-binary @file` and `@-`
@@ -103,8 +111,12 @@ that shell that shows a file on the chat page.
   `readKey()` then, so a replaced file applies to the next command.
 - **Refusals name the credential, never the key file.** Off, keyless,
   unusable, deleted or changed credentials, a subagent's write-only
-  one, a method it lacks and a routing header (`ROUTING_HEADERS`) are
-  refused before anything is sent. Keys ride only in the command caps.
+  one, a method it lacks, a routing header (`ROUTING_HEADERS`) and a
+  header asking for part of a body or another encoding of it
+  (`SHAPING_HEADERS`: Range, If-Range, Accept-Charset, Accept-Encoding,
+  and an Accept naming a charset) are refused before anything is sent, since redaction matches only a
+  whole key. A signed request's 206 answer is refused too. Unsigned
+  requests send them all. Keys ride only in the command caps.
 - **A key never reaches the result.** Every key read, and its
   JSON-escaped forms (`escapedForms()`), is replaced by `[credential
   <name>]` in body, header values, status text, final URL and errors.

@@ -16,6 +16,7 @@ import {
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import { urlPrefixes, type WebSnapshot } from "../../shared/web.ts";
 import { messageOf } from "../lib/errors.ts";
+import { privateHost } from "../lib/hosts.ts";
 
 const ALL_METHODS: HttpMethod[] = [
   "GET",
@@ -69,6 +70,32 @@ const ROUTING_HEADERS = new Set([
   "x-method-override",
 ]);
 
+// headers that make a server send part of a body or another encoding
+// of it, so an echoed key could come back in pieces redaction misses
+const SHAPING_HEADERS = new Set([
+  "range",
+  "if-range",
+  "accept-charset",
+  "accept-encoding",
+]);
+
+const SIGNED_REFUSED = new Set([...ROUTING_HEADERS, ...SHAPING_HEADERS]);
+
+// an Accept naming a charset asks for another encoding of the body too
+function charsetAccept(
+  headers: SecureFetchOptions["headers"],
+): string | undefined {
+  if (headers === undefined) return undefined;
+  const entries =
+    headers instanceof Headers ? [...headers] : Object.entries(headers);
+  return entries.some(
+    ([name, value]) =>
+      name.toLowerCase() === "accept" && /;\s*charset\s*=/i.test(value),
+  )
+    ? "accept"
+    : undefined;
+}
+
 // a Host override reaches past Listed domains, so the web fetch refuses
 // the headers that name another host
 const HOST_HEADERS = new Set(["host", "forwarded", "x-forwarded-host"]);
@@ -85,6 +112,31 @@ const refusedHeader = (
   refused: ReadonlySet<string>,
 ): string | undefined => headerNames(headers).find((name) => refused.has(name));
 
+// a private host the admin did not list by name is refused; Bun cannot
+// pin the address a name resolves to, so only the URL's host is judged
+function refusePrivateHost(url: string, web: WebSnapshot): void {
+  const host = URL.parse(url)?.hostname;
+  if (host === undefined || !privateHost(host)) return;
+  const named = host.endsWith(".") ? host.slice(0, -1) : host;
+  if (web.mode === "listed" && web.domains.includes(named)) return;
+  throw new NetworkAccessDeniedError(url, "private host refused");
+}
+
+// the transport under the web fetch: every hop, redirects included,
+// passes the private host rule, then the current ambient fetch
+function webTransport(web: WebSnapshot): typeof fetch {
+  const transport = (input: string | URL | Request, init?: RequestInit) => {
+    refusePrivateHost(
+      input instanceof Request ? input.url : String(input),
+      web,
+    );
+    return globalThis.fetch(input, init);
+  };
+  return Object.assign(transport, {
+    preconnect: (url: string | URL) => globalThis.fetch.preconnect(url),
+  });
+}
+
 export function webNetwork(
   web: WebSnapshot,
   limits: FetchLimits,
@@ -97,8 +149,9 @@ export function webNetwork(
           allowedMethods: ALL_METHODS,
         }),
     // Bun's fetch ignores the guarded dispatcher, so connect-time
-    // pinning is absent.
+    // pinning is absent and the transport refuses private hosts instead
     denyPrivateRanges: false,
+    _fetch: webTransport(web),
     timeoutMs: limits.timeoutMs,
     maxResponseSize: limits.maxResponseSize,
   };
@@ -309,6 +362,7 @@ export function commandFetch(
             `the ${header} header is not allowed`,
           );
         }
+        refusePrivateHost(url, web);
         webFetch ??= createSecureFetch(webNetwork(web, limits));
         result = await webFetch(url, options);
       } else if ("refused" in credential) {
@@ -317,7 +371,9 @@ export function commandFetch(
           `credential ${credential.name} ${REFUSALS[credential.refused]}`,
         );
       } else {
-        const header = refusedHeader(options.headers, ROUTING_HEADERS);
+        const header =
+          refusedHeader(options.headers, SIGNED_REFUSED) ??
+          charsetAccept(options.headers);
         if (header !== undefined) {
           throw new NetworkAccessDeniedError(
             url,
@@ -331,6 +387,12 @@ export function commandFetch(
           );
         }
         result = await signedFetch(credential)(url, options);
+        if (result.status === 206) {
+          throw new NetworkAccessDeniedError(
+            url,
+            `credential ${credential.name} refuses a partial response`,
+          );
+        }
       }
       return redactResult(result, secrets, limits.maxResponseSize);
     } catch (error) {

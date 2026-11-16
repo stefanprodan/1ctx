@@ -4,7 +4,8 @@
 // Admin user management. Identity conflicts are checked in the same
 // transaction as each write so the response names the field instead of
 // exposing a unique-index error. With email on, an admin is offered an
-// invite and a reset by link in place of typing a password.
+// invite and a reset by link in place of typing a password. A write
+// that awaits a body reads the acting admin again in its transaction.
 
 import type { LinkPurpose } from "../../shared/api/access.ts";
 import type { SendTotals } from "../../shared/api/admin.ts";
@@ -29,6 +30,7 @@ import {
   type UserFields,
   type UserRow,
 } from "../users/index.ts";
+import { actingUser } from "./acting.ts";
 import {
   type AccessKeyRow,
   type AccessKeyStore,
@@ -184,6 +186,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           invite ? newToken() : parsed.password!,
         );
         const user = transact(deps.db, () => {
+          actingUser(deps, ctx.principal!, "admin");
           usernameAvailable(parsed.username, null);
           emailAvailable(parsed.email, null);
           const created = deps.users.createUser({
@@ -217,6 +220,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         const patch = parseUserPatch(await jsonBody(req));
         const id = ctx.params.id;
         const changed = transact(deps.db, () => {
+          actingUser(deps, ctx.principal!, "admin");
           const user = find(id);
           let revokedKeys: AccessKeyRow[] = [];
           if (
@@ -321,6 +325,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         }
         const passwordHash = await deps.users.hashPassword(password);
         const changed = transact(deps.db, () => {
+          actingUser(deps, ctx.principal!, "admin");
           const user = find(id);
           deps.users.setPasswordHash(user.id, passwordHash);
           deps.users.setMustChangePassword(user.id, true);
