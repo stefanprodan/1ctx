@@ -11,6 +11,7 @@ export type Summon =
   | { kind: "unknown"; word: string };
 
 const FIRST = /^\s*@(\S+)/;
+const ENDS = new Set([".", ",", ":", ";", "!", "?"]);
 
 // the word after a leading @, as typed; null when the message does not
 // open with one
@@ -22,10 +23,13 @@ export function summonWord(text: string): string | null {
 // punctuation that ends it in "@glm, check" or "@glm: check"; null when
 // the message does not open with one
 export function summonName(text: string): string | null {
-  const name = summonWord(text)
-    ?.replace(/[.,:;!?]+$/, "")
-    .toLowerCase();
-  return name === undefined || name === "" ? null : name;
+  const word = summonWord(text);
+  if (word === null) return null;
+  // walked from the end: a regex anchored there rescans a long run of
+  // punctuation from each of its marks
+  let end = word.length;
+  while (end > 0 && ENDS.has(word[end - 1]!)) end--;
+  return end === 0 ? null : word.slice(0, end).toLowerCase();
 }
 
 // the chat's own agent is an ordinary turn

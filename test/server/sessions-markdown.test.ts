@@ -38,6 +38,45 @@ describe("chatMarkdown", () => {
   }
 });
 
+describe("chatMarkdown bodies", () => {
+  const [turn] = fixtures;
+  const write = (question: string, answer: string) =>
+    chatMarkdown(
+      "chat",
+      turn!.rows.map((row) =>
+        row.id === "m1-1"
+          ? { ...row, content: question }
+          : row.id === "m1-4"
+            ? { ...row, content: answer }
+            : row,
+      ),
+      "UTC",
+    );
+  const expected = (question: string, answer: string) =>
+    turn!.expected
+      .replace("what time is it?", question)
+      .replace("It is noon.", answer);
+
+  test("drops the blank lines that end a body", () => {
+    expect(write("  what?\r\n \n\t", "noon.  \n \r\n\t\n")).toBe(
+      expected("  what?", "noon.  "),
+    );
+    expect(write("what?\r", "noon.\n\r")).toBe(
+      expected("what?\r", "noon.\n\r"),
+    );
+  });
+
+  test("writes a body of long runs of line breaks", () => {
+    const breaks = "\n".repeat(262_000);
+    expect(write(`a${breaks}b`, `It is${breaks}`)).toBe(
+      expected(`a${breaks}b`, "It is"),
+    );
+    expect(write("what?", `noon.${"\r\n \t".repeat(100_000)}`)).toBe(
+      expected("what?", "noon."),
+    );
+  });
+});
+
 describe("markdownFilename", () => {
   test("slugs the title and falls back to chat", () => {
     expect(markdownFilename("Hello, World!")).toBe("hello-world.md");

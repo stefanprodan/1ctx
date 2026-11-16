@@ -404,6 +404,34 @@ describe("fetch extraction and slicing", () => {
     }
   });
 
+  test("trims the blanks that end a block", async () => {
+    const base = new URL("https://example.com/");
+    expect(
+      await extractHtml(
+        "<pre>a \t </pre><p>b</p><pre> \t</pre><ul><li>c <li>d</ul>",
+        base,
+      ),
+    ).toBe("a\n\nb\n\n- c\n- d");
+    expect(await extractHtml("<title> T  </title><pre>x  y</pre>", base)).toBe(
+      "T\n\nx  y",
+    );
+  });
+
+  test("extracts a page of long blank runs and many blocks", async () => {
+    const base = new URL("https://example.com/");
+    const blocks = "<p>a</p>".repeat(20_000);
+    const lead = await extractHtml(
+      `<pre>${" ".repeat(1_000_000)}x</pre>${blocks}`,
+      base,
+    );
+    expect(lead).toBe(`x${"\n\na".repeat(20_000)}`);
+    const trailing = await extractHtml(
+      `<pre>x${" \t".repeat(500_000)}</pre>${"<pre> </pre><p>a</p>".repeat(20_000)}`,
+      base,
+    );
+    expect(trailing).toBe(`x${"\n\na".repeat(20_000)}`);
+  });
+
   test("extracts a fetched HTML page through fetchText", async () => {
     const deps = dependencies(
       () =>

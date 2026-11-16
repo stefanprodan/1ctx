@@ -150,9 +150,22 @@ function heading(
 // only the blank lines around the text go: an indented first line is a
 // code block and trailing spaces are a line break
 function body(content: string): string {
-  return content
-    .replace(/^(?:[ \t]*\r?\n)+/, "")
-    .replace(/(?:\r?\n[ \t]*)+$/, "");
+  return withoutTrailingBlankLines(content.replace(/^(?:[ \t]*\r?\n)+/, ""));
+}
+
+// what /(?:\r?\n[ \t]*)+$/ removes, walked from the end, since the regex
+// rescans a long run of line breaks from each one: the cut is the
+// earliest break the walk reaches before a character that is not a
+// blank or a break, or a \r that does not start one
+function withoutTrailingBlankLines(text: string): string {
+  let cut = text.length;
+  for (let i = text.length - 1; i >= 0; i--) {
+    const char = text[i];
+    if (char === " " || char === "\t") continue;
+    if (char !== "\n") break;
+    cut = text[i - 1] === "\r" ? --i : i;
+  }
+  return text.slice(0, cut);
 }
 
 // a title or an error is plain text wherever the app shows it, so the

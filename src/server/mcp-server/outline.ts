@@ -5,6 +5,33 @@ import { cutSearchLine } from "../../shared/search.ts";
 
 type OutlineRow = { line: number; level: number; text: string };
 
+const isBlank = (char: string | undefined) => char === " " || char === "\t";
+
+// A line's ATX heading: one to six #, then blanks and text or nothing,
+// an optional \r at the end and no other line break, and a closing run
+// of # after a blank dropped. Regexes for these backtrack over a long
+// blank run, once per blank, so the line is walked.
+function atxHeading(line: string): { level: number; text: string } | null {
+  let level = 0;
+  while (line[level] === "#") level++;
+  if (level === 0 || level > 6) return null;
+  let start = level;
+  while (isBlank(line[start])) start++;
+  let end = line.endsWith("\r") ? line.length - 1 : line.length;
+  if (start === level && start < end) return null;
+  if (/[\r\u2028\u2029]/.test(line.slice(start, end))) return null;
+  // the closing run: blanks, at least one #, blanks, after a blank
+  let close = end;
+  while (close > start && isBlank(line[close - 1])) close--;
+  let hashes = close;
+  while (hashes > start && line[hashes - 1] === "#") hashes--;
+  if (hashes < close && hashes > start && isBlank(line[hashes - 1])) {
+    end = hashes - 1;
+    while (end > start && isBlank(line[end - 1])) end--;
+  }
+  return { level, text: line.slice(start, end) };
+}
+
 export function outlineRows(text: string): OutlineRow[] {
   const rows: OutlineRow[] = [];
   let fence: { marker: string; length: number } | null = null;
@@ -25,13 +52,12 @@ export function outlineRows(text: string): OutlineRow[] {
       fence = { marker: opening[1]![0]!, length: opening[1]!.length };
       continue;
     }
-    const heading = line.match(/^(#{1,6})(?:[ \t]+(.*)|[ \t]*)\r?$/);
+    const heading = atxHeading(line);
     if (heading === null) continue;
-    const headingText = (heading[2] ?? "").replace(/[ \t]+#+[ \t]*$/, "");
     rows.push({
       line: index + 1,
-      level: heading[1]!.length,
-      text: cutSearchLine(headingText, index + 1, { from: 0, to: 0 }).text,
+      level: heading.level,
+      text: cutSearchLine(heading.text, index + 1, { from: 0, to: 0 }).text,
     });
   }
   return rows;
