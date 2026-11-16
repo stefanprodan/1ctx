@@ -37,7 +37,7 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
 - **Every page waits in its landed layout,** not Page's three rows
   (left only where the body is one card of rows): its tabs with no
   counts, its aside's sections in bones and a live search, so nothing
-  pops in. Known card titles wait in words, fields as bones in the
+  pops in. Known words wait as words, fields as bones in the
   landed grid (`SettingWaiting`, `SectionsWaiting`,
   `views/admin/AdminWaiting.tsx`, `DirectoryWaiting`); a section that
   lands only with data waits as nothing. Home waits for the project

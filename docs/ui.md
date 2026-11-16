@@ -95,7 +95,8 @@ open row's body or a meta. The shared shapes are below.
   `RowsMore` too. No infinite scroll.
 - **A growing list has a search:** `ui/Search.tsx` as `RowsCard`'s
   `search`, over `useListSearch()` in `lib/search.ts`
-  (`searchList()` outside a component).
+  (`searchList()` outside a component), its query held above the
+  wait; a box swapped for a same-named one hands over focus and text.
 - **A card head is one line on a phone.** Its filters are
   `RowsFilters`, short words, and a small `Seg` in a head takes `head`;
   under 720 either is a compact outlined dropdown of the same choices
@@ -153,10 +154,10 @@ open row's body or a meta. The shared shapes are below.
   chunk keeps its Try again. A list waits as `RowsWaiting` (Rows.tsx)
   with its row's shape; `Page`'s `loading` draws its `waiting`, the
   page's landed layout (`docs/views.md`), cards as `SettingWaiting`, a
-  Section page as `SectionsWaiting`. `RowsNote` is for real notes.
+  Section page as `SectionsWaiting`, a textarea as a `rows` bone in
+  its font. `RowsNote` is for real notes.
   An aside's section waits as `AsideWaiting` (Split.tsx), a box of
-  text (a revision, a diff, a note, a skill's file, an opened tool's
-  result or a subagent's work) as `LinesWaiting`
+  text (a revision, a diff, a note, a tool's result) as `LinesWaiting`
   (Bones.tsx) in its owner's class, the file card and a Visual at
   their body's and frame's size, the rail's projects as
   `RailProjectsWaiting`. A failure stays words; so does a button's
@@ -184,7 +185,7 @@ open row's body or a meta. The shared shapes are below.
   to its deleted one) is named by `Page`'s `waitKey`: its start
   carries over for `CARRY_MS`, and bones drawn anew under a shown wait
   skip their reveal (`bones-waited`).
-  `test/helpers/mount.ts` mounts a view so such hooks run.
+  `test/helpers/mount.ts` runs such hooks.
 - **A later load never draws bones.** A reload, the socket's
   `reload()` or a Refresh keeps the rows drawn until the answer lands;
   only a new filter or search, whose rows would be another list's,

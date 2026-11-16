@@ -41,14 +41,17 @@ export type CardBones = {
   fields?: readonly FieldBones[];
   // the landed form's own grid class in place of two columns
   grid?: string;
-  // a hint's line under each field
-  hints?: boolean;
+  // a hint's line under each field, or under those marked true
+  hints?: boolean | readonly boolean[];
   // label and value lines, as SettingFacts draws them
   facts?: number;
   // a list card's rows under its head; 0 is the note an empty list
   // lands with
   rows?: number;
   shape?: RowsShape;
+  // the card's own bones after the fields, for a form whose landed
+  // parts no field bone draws
+  body?: ComponentChildren;
   // the foot's buttons: Discard and Save, or one alone
   foot?: 1 | 2;
   danger?: boolean;
@@ -153,11 +156,14 @@ function Card({ card, at }: { card: CardBones; at: number }) {
               key={i}
               kind={kind}
               at={at + 2 + i * 2}
-              hint={card.hints}
+              hint={
+                typeof card.hints === "boolean" ? card.hints : card.hints?.[i]
+              }
             />
           ))}
         </div>
       )}
+      {card.body}
       {card.facts !== undefined && (
         <div class="setting-facts">
           {Array.from({ length: card.facts }, (_, i) => (

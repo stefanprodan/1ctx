@@ -2,11 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type Signal, useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import { Icon } from "../lib/icons.tsx";
 import "./search.css";
 
 const SEARCH_DELAY = 200;
+
+// A box swapped for another of the same name in one render (a list's
+// waiting card for its landed one) hands over its focus, caret and any
+// text still waiting to be written, so typing goes on through the swap.
+// Dropped once that render is done, so no later box takes it.
+type Handoff = {
+  placeholder: string;
+  text: string;
+  start: number;
+  end: number;
+};
+let handoff: Handoff | null = null;
 
 export function Search(
   props: { placeholder: string } & (
@@ -24,6 +36,7 @@ export function Search(
       : props.onChange;
   const text = useSignal(value);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const box = useRef<HTMLInputElement>(null);
   // the query moved under the box (back, a link): the box follows,
   // and a write still pending would only put the old text back
   useEffect(() => {
@@ -37,6 +50,31 @@ export function Search(
     },
     [],
   );
+  useLayoutEffect(() => {
+    const el = box.current;
+    const held = handoff;
+    if (el !== null && held !== null && held.placeholder === placeholder) {
+      handoff = null;
+      el.focus();
+      el.setSelectionRange(held.start, held.end);
+      if (held.text !== text.value) {
+        text.value = held.text;
+        onChange(held.text);
+      }
+    }
+    return () => {
+      if (el === null || document.activeElement !== el) return;
+      handoff = {
+        placeholder,
+        text: text.value,
+        start: el.selectionStart ?? 0,
+        end: el.selectionEnd ?? 0,
+      };
+      queueMicrotask(() => {
+        handoff = null;
+      });
+    };
+  }, []);
   const settle = (q: string, atOnce = false) => {
     if (timer.current !== null) clearTimeout(timer.current);
     if (atOnce) {
@@ -53,6 +91,7 @@ export function Search(
     <label class="search">
       <Icon name="search" size={14} class="search-icon" />
       <input
+        ref={box}
         class="search-input"
         type="search"
         name="q"

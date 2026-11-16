@@ -5,8 +5,23 @@
 // first sections under their own words, beside the aside it lands with.
 
 import type { ComponentChildren } from "preact";
+import { Bone } from "../../ui/Bones.tsx";
 import { SectionsWaiting } from "../../ui/Section.tsx";
 import { Split } from "../../ui/Split.tsx";
+import "./automations.css";
+
+// a switch over the box of guidance it opens, as the Memory and Needs
+// attention sections land
+function Guided({ at, rows }: { at: number; rows: number }) {
+  return (
+    <div class="field">
+      <Bone kind="seg" at={at} />
+      <span class="field automations-guidance">
+        <Bone kind="rows" at={at + 1} rows={rows} />
+      </span>
+    </div>
+  );
+}
 
 export function EditorWaiting({ aside }: { aside: ComponentChildren }) {
   return (
@@ -19,20 +34,31 @@ export function EditorWaiting({ aside }: { aside: ComponentChildren }) {
           {
             title: "Instructions",
             text: "The first message of every run",
-            fields: ["prompt"],
-            bare: true,
+            body: (
+              <div class="field">
+                <div class="automations-instructions">
+                  <Bone
+                    kind="rows"
+                    at={4}
+                    rows={5}
+                    class="automations-instructions-bone"
+                  />
+                  <div class="automations-instructions-bar">
+                    <Bone kind="button" at={5} class="automations-agent-bone" />
+                  </div>
+                </div>
+              </div>
+            ),
           },
           {
             title: "Memory",
             text: "What a run remembers",
-            fields: ["seg-row", "text"],
-            bare: true,
+            body: <Guided at={8} rows={4} />,
           },
           {
             title: "Needs attention",
             text: "Who decides a run must be flagged",
-            fields: ["seg-row", "text"],
-            bare: true,
+            body: <Guided at={12} rows={3} />,
           },
         ]}
       />

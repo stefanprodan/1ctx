@@ -71,6 +71,9 @@ export function passwordProblem(
 }
 
 // where email from agents goes, or why none can
+export const EMAIL_HINT =
+  "Agents may email you about chats and runs you can open, and your automations when they need attention.";
+
 export function emailSectionText(
   user: Pick<Profile, "email" | "emailPlaceholder">,
 ): string {

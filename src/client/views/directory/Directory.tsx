@@ -6,6 +6,7 @@
 // tab, each row leading to their page. A tab is an address, so the
 // head's tabs are links and every list loads on each.
 
+import { type Signal, useSignal } from "@preact/signals";
 import { AgentRow } from "../../agents/AgentRow.tsx";
 import { shortModel } from "../../agents/meta.ts";
 import { path } from "../../app/router.ts";
@@ -22,7 +23,7 @@ import { count, initials } from "../../lib/format.ts";
 import { agentHref, deciderHref, userHref } from "../../lib/hrefs.ts";
 import { Icon } from "../../lib/icons.tsx";
 import { useNow } from "../../lib/now.ts";
-import { useListSearch } from "../../lib/search.ts";
+import { searchList } from "../../lib/search.ts";
 import { Fit } from "../../ui/Fit.tsx";
 import { Page } from "../../ui/Page.tsx";
 import {
@@ -51,10 +52,10 @@ type ListedUser = NonNullable<typeof directoryUsers.value>[number];
 type ListedAgent = NonNullable<typeof directoryAgents.value>[number];
 type ListedDecider = NonNullable<typeof directoryDeciders.value>[number];
 
-function UsersCard({ list }: { list: ListedUser[] }) {
+function UsersCard({ list, q }: { list: ListedUser[]; q: Signal<string> }) {
   const now = useNow(60_000);
   const meId = me.value?.id;
-  const { q, shown, count } = useListSearch(list, (u) => [
+  const { shown, count } = searchList(list, q.value, (u) => [
     u.username,
     u.fullName,
   ]);
@@ -84,8 +85,8 @@ function UsersCard({ list }: { list: ListedUser[] }) {
   );
 }
 
-function AgentsCard({ list }: { list: ListedAgent[] }) {
-  const { q, shown, count } = useListSearch(list, (a) => [a.name, a.model]);
+function AgentsCard({ list, q }: { list: ListedAgent[]; q: Signal<string> }) {
+  const { shown, count } = searchList(list, q.value, (a) => [a.name, a.model]);
   return (
     <RowsCard
       label="Agents"
@@ -107,8 +108,14 @@ function AgentsCard({ list }: { list: ListedAgent[] }) {
 
 // a decider is never an actor, so it has no @ and keeps the admin
 // lists' fixed avatar
-function DecidersCard({ list }: { list: ListedDecider[] }) {
-  const { q, shown, count } = useListSearch(list, deciderFields);
+function DecidersCard({
+  list,
+  q,
+}: {
+  list: ListedDecider[];
+  q: Signal<string>;
+}) {
+  const { shown, count } = searchList(list, q.value, deciderFields);
   return (
     <RowsCard
       label="Deciders"
@@ -188,6 +195,10 @@ export function Directory() {
   const tabs = directoryTabs(users?.length, agents?.length, deciders?.length);
   const at = { users: 0, agents: 1, deciders: 2 }[tab];
   const list = [users, agents, deciders][at];
+  // held here, not in the cards, so what is typed while the list loads
+  // is the landed card's query
+  const queries = [useSignal(""), useSignal(""), useSignal("")];
+  const q = queries[at];
   const error = [
     directoryUsersError.value,
     directoryAgentsError.value,
@@ -202,14 +213,7 @@ export function Directory() {
       waiting={
         <ListWaiting
           label={["Users", "Agents", "Deciders"][at]}
-          // the card's own query is held by its rows, which land with it
-          search={
-            <Search
-              value=""
-              onChange={() => {}}
-              placeholder={`Search ${tab}`}
-            />
-          }
+          search={<Search query={q} placeholder={`Search ${tab}`} />}
           aside={
             <>
               <AsideBones label="Users" lines={2} />
@@ -225,10 +229,14 @@ export function Directory() {
       <Split aside={<Aside users={users} agents={agents} />}>
         <div class="directory-list">
           <Tabs tabs={tabs} active={tabs[at].href} />
-          {tab === "users" && users !== null && <UsersCard list={users} />}
-          {tab === "agents" && agents !== null && <AgentsCard list={agents} />}
+          {tab === "users" && users !== null && (
+            <UsersCard list={users} q={q} />
+          )}
+          {tab === "agents" && agents !== null && (
+            <AgentsCard list={agents} q={q} />
+          )}
           {tab === "deciders" && deciders !== null && (
-            <DecidersCard list={deciders} />
+            <DecidersCard list={deciders} q={q} />
           )}
         </div>
       </Split>

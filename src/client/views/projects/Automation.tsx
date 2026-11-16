@@ -21,9 +21,9 @@ import {
   type AutomationSummary,
   ranOnce,
 } from "../../../shared/contracts/automation.ts";
-import { DEFERRED_BY_RESTART, type RunFilter } from "../../../shared/words.ts";
+import { DEFERRED_BY_RESTART, isRunFilter } from "../../../shared/words.ts";
 import type { Params } from "../../app/params.ts";
-import { navigate, path } from "../../app/router.ts";
+import { navigate, path, query } from "../../app/router.ts";
 import {
   automationError,
   automationProject,
@@ -57,12 +57,7 @@ import { useCut } from "../../lib/resize.ts";
 import { browserZone } from "../../lib/zone.ts";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
-import {
-  RowsCard,
-  RowsFilters,
-  RowsNote,
-  RowsWaiting,
-} from "../../ui/Rows.tsx";
+import { RowsCard, RowsNote, RowsWaiting } from "../../ui/Rows.tsx";
 import {
   AsideItem,
   AsideLine,
@@ -85,17 +80,12 @@ import {
   suspendedText,
   urlParts,
 } from "./Automations.model.ts";
+import { AutomationWaiting, RunFilters } from "./AutomationWaiting.tsx";
 import { OpenAttention } from "./OpenAttention.tsx";
 import { deadlineText } from "./Run.model.ts";
 import { RunRow } from "./RunRow.tsx";
 import { fireLabel, scheduleTitle } from "./Schedule.model.ts";
 import "./automations.css";
-
-const FILTERS: { value: RunFilter | null; label: string }[] = [
-  { value: null, label: "All" },
-  { value: "manual", label: "Manual" },
-  { value: "attention", label: "Flagged" },
-];
 
 // the instructions cut to a few lines, Show all in the fade once they
 // run past them; measured again when the width moves the cut
@@ -192,6 +182,7 @@ export function Automation({ params }: { params: Params }) {
   });
   // the Memory tab is there only while the automation keeps its own note
   const memoryPath = path.value.endsWith("/memory");
+  const filterAsked = new URLSearchParams(query.value).get("runs");
   const tab = memoryPath && row?.ownMemory ? "memory" : "runs";
   useEffect(() => {
     if (memoryPath && row !== null && !row.ownMemory) {
@@ -230,8 +221,15 @@ export function Automation({ params }: { params: Params }) {
       crumbHref={
         projectId === null ? undefined : `/projects/${projectId}/automations`
       }
-      title={row?.name ?? "Automation"}
+      title={row?.name ?? (error === null ? null : "Automation")}
       loading={!ready && error === null}
+      waiting={
+        <AutomationWaiting
+          id={id}
+          memory={memoryPath}
+          filter={isRunFilter(filterAsked) ? filterAsked : null}
+        />
+      }
       error={error}
     >
       {ready && (
@@ -417,18 +415,7 @@ export function Automation({ params }: { params: Params }) {
           ) : (
             <RowsCard
               label="Runs"
-              action={
-                <RowsFilters
-                  label="Filter runs"
-                  filters={FILTERS.map((f) => ({
-                    label: f.label,
-                    on: f.value === filter,
-                    href: `${automationHref(id)}${
-                      f.value === null ? "" : `?runs=${f.value}`
-                    }`,
-                  }))}
-                />
-              }
+              action={<RunFilters id={id} filter={filter} />}
             >
               {held === null || held.rows === null ? (
                 <RowsWaiting shape="icon" label="Loading runs" />

@@ -75,9 +75,16 @@ export function NewCard({
 export function NewCardWaiting({
   label,
   fields,
+  hints,
+  body,
 }: {
   label: string;
-  fields: readonly FieldBones[];
+  fields?: readonly FieldBones[];
+  hints?: readonly boolean[];
+  // the form's own bones, in place of the fields
+  body?: ComponentChildren;
 }) {
-  return <SettingWaiting label={label} cards={[{ fields, foot: 2 }]} />;
+  return (
+    <SettingWaiting label={label} cards={[{ fields, hints, body, foot: 2 }]} />
+  );
 }

@@ -130,7 +130,7 @@ export function Page({
             return (
               <Fragment key={`${i}:${step.label}`}>
                 {step.label === null ? (
-                  nameBone
+                  failed === null && <NameBone far={far} />
                 ) : step.href ? (
                   <a
                     class={`page-crumb-up${mono}${far}`}
@@ -264,10 +264,11 @@ export function Page({
   );
 }
 
-// a name the head shows once it is known, at a short name's width
-function NameBone() {
+// a name the head shows once it is known, at a short name's width; a
+// far step's bone goes where its name would on a phone
+function NameBone({ far = "" }: { far?: string }) {
   return (
-    <span class="page-crumb-bone bones-wait">
+    <span class={`page-crumb-bone bones-wait${far}`}>
       <Bone kind="line" at={0} width={100} />
     </span>
   );

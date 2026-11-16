@@ -106,6 +106,20 @@
   .bones-bone-prompt {
     height: 160px;
   }
+  /* as tall as base.css's textarea of --rows lines, which a phone's
+     larger font makes taller */
+  .bones-bone-rows {
+    width: 100%;
+    height: calc(var(--rows) * 1lh + var(--space-2) * 2 + 2px);
+    border-radius: var(--radius);
+    font-size: var(--text-input);
+    line-height: 1.5;
+  }
+  @media (pointer: coarse) {
+    .bones-bone-rows {
+      font-size: var(--text-touch);
+    }
+  }
   .bones-bone-seg {
     width: 220px;
     max-width: 100%;

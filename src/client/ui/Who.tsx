@@ -7,6 +7,7 @@
 // what the aside would say.
 
 import type { ComponentChildren } from "preact";
+import { Bone } from "./Bones.tsx";
 import "./who.css";
 
 export function Who({
@@ -63,5 +64,46 @@ export function WhoLine({
     >
       {children}
     </span>
+  );
+}
+
+// the head while the page loads: the avatar and the name's two lines
+// in bones; with a label it is a wait of its own, else part of its
+// caller's
+export function WhoWaiting({
+  label,
+  narrow,
+  class: extra,
+}: {
+  // what is loading, for a screen reader: "Loading the user"
+  label?: string;
+  // a line the head shows only where the aside is hidden
+  narrow?: boolean;
+  class?: string;
+}) {
+  const bones = (
+    <>
+      <Bone kind="avatar" at={0} class="who-waiting-avatar" />
+      <div class="who-text who-waiting-text" aria-hidden="true">
+        <span class="who-name bones-lines-line">
+          <Bone kind="line" at={1} width={30} />
+        </span>
+        <span class="who-line bones-lines-line">
+          <Bone kind="line" at={2} width={16} />
+        </span>
+        {narrow && (
+          <span class="who-line who-narrow bones-lines-line">
+            <Bone kind="line" at={3} width={24} />
+          </span>
+        )}
+      </div>
+    </>
+  );
+  const owner = `who${extra ? ` ${extra}` : ""}`;
+  if (label === undefined) return <div class={owner}>{bones}</div>;
+  return (
+    <div class={`${owner} bones-wait`} role="status" aria-label={label}>
+      {bones}
+    </div>
   );
 }

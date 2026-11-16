@@ -137,6 +137,16 @@
     resize: none;
     overflow: hidden;
   }
+  /* the empty editor's 18 rows while the page loads, in a phone's
+     larger font too */
+  .docpage-editor-waiting {
+    height: calc(18lh + var(--space-3) * 2);
+  }
+  @media (pointer: coarse) {
+    .docpage-editor-waiting {
+      font-size: var(--text-touch);
+    }
+  }
   /* the ring drawn inside, since the card clips what is outside */
   .docpage-editor:focus-visible {
     outline-offset: -2px;
@@ -146,6 +156,10 @@
     font-size: var(--text-small);
     color: var(--faint);
     white-space: nowrap;
+  }
+  /* the size's place while the cap loads: "0 B of 256 KB" */
+  .docpage-fact-waiting {
+    width: 13ch;
   }
   .docpage-fact-over {
     color: var(--failed);

@@ -42,11 +42,13 @@ import { roleWords } from "../directory/Directory.model.ts";
 import {
   aboutProblem,
   detailsFieldOf,
+  EMAIL_HINT,
   emailSectionText,
   fullNameProblem,
   passwordFieldOf,
   passwordFieldProblem,
 } from "./Profile.model.ts";
+import { ProfileWaiting } from "./ProfileWaiting.tsx";
 import "./profile.css";
 
 function DetailsForm({ user }: { user: ProfileRow }) {
@@ -158,10 +160,7 @@ function EmailForm({ user }: { user: ProfileRow }) {
             />
           </RowsLine>
         </RowsList>
-        <span class="hint">
-          Agents may email you about chats and runs you can open, and your
-          automations when they need attention.
-        </span>
+        <span class="hint">{EMAIL_HINT}</span>
       </div>
       <Foot
         save={save}
@@ -247,6 +246,7 @@ export function Profile() {
       crumb="Account"
       title="Profile"
       loading={user === null && profileError.value === null}
+      waiting={<ProfileWaiting />}
       error={profileError.value}
     >
       {user && (

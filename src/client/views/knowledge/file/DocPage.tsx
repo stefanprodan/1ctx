@@ -30,7 +30,7 @@ import { fileHref } from "../Knowledge.model.ts";
 import { DeletedDoc, DocWaiting, NotFound } from "./Deleted.tsx";
 import { crumbSteps, fileWait, liveFolders } from "./DocPage.model.ts";
 import { FileView } from "./FileView.tsx";
-import { NewFile } from "./NewFile.tsx";
+import { NewFile, NewFileWaiting } from "./NewFile.tsx";
 
 function projectNameOf(projectId: string): string | null {
   const held = project.value;
@@ -139,7 +139,9 @@ export function NewDoc({ params }: { params: Params }) {
   const name = projectNameOf(projectId);
   const error = projectError.value ?? listErrors.value.get(projectId) ?? null;
   if (name === null || error !== null) {
-    return <Page title="New file" loading={error === null} error={error} />;
+    return (
+      <NewFileWaiting projectId={projectId} folder={folder} error={error} />
+    );
   }
   return (
     <NewFile

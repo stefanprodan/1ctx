@@ -126,8 +126,22 @@ export type Mounted = {
   html(): string;
   // draws the component again with new props, its hooks' state kept
   update(node: VNode): Promise<void>;
+  // types into the first input of the class, and presses Enter there
+  type(className: string, text: string): Promise<void>;
   unmount(): Promise<void>;
 };
+
+type Handlers = Record<string, (event: unknown) => void>;
+
+function inputOf(node: FakeNode, className: string): FakeNode | null {
+  const classes = node.attributes.get("class")?.split(" ") ?? [];
+  if (node.nodeName === "input" && classes.includes(className)) return node;
+  for (const child of node.childNodes) {
+    const found = inputOf(child, className);
+    if (found !== null) return found;
+  }
+  return null;
+}
 
 // what a view's effects reach for beyond the document, none of which
 // measures or schedules anything here
@@ -154,6 +168,22 @@ export async function mount(node: VNode): Promise<Mounted> {
   return {
     html: () => root.childNodes.map((c) => c.outerHTML).join(""),
     update: (next) => act(() => render(next, into)),
+    async type(className, text) {
+      const box = inputOf(root, className);
+      if (box === null) throw new Error(`no input .${className}`);
+      // Preact keeps a node's handlers under __e, by prop name; the
+      // fake document has no events to dispatch
+      const on = (box as unknown as { __e?: Handlers }).__e ?? {};
+      const target = Object.assign(box, { value: text });
+      await act(() => on.onInput?.({ currentTarget: target, target }));
+      await act(() =>
+        on.onKeyDown?.({
+          key: "Enter",
+          currentTarget: target,
+          preventDefault() {},
+        }),
+      );
+    },
     async unmount() {
       await act(() => render(null, into));
       for (const [key, value] of Object.entries(held)) {

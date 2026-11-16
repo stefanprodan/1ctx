@@ -109,6 +109,10 @@
     gap: var(--space-2);
     min-height: 20px;
   }
+  /* the foot shrinks to its words, so its bone has a width of its own */
+  .automations-summary-foot .automations-next-bone {
+    width: 200px;
+  }
   .automations-check-failed {
     color: var(--failed);
   }
@@ -210,6 +214,16 @@
   /* the guidance under its box, apart from the next box */
   .automations-guidance {
     margin: var(--space-1) 0 var(--space-2);
+  }
+  /* the bone in the box's own textarea's place: its line and padding */
+  .automations-instructions .automations-instructions-bone {
+    height: calc(var(--rows) * 1lh + var(--space-1) * 2);
+    line-height: 1.6;
+  }
+  /* the agent's chip under the box, as tall as composer.css draws it */
+  .automations-instructions-bar .automations-agent-bone {
+    width: 120px;
+    height: 26px;
   }
   .automations-instructions .automations-instructions-text {
     min-width: 0;

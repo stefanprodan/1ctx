@@ -36,6 +36,8 @@ export type BoneKind =
   | "box"
   | "area"
   | "prompt"
+  // a textarea's box at its rows, in the field's own font
+  | "rows"
   // a segmented switch, and a button
   | "seg"
   | "button";
@@ -49,6 +51,7 @@ export function Bone({
   height,
   class: extra,
   place,
+  rows,
 }: {
   kind: BoneKind;
   at: number;
@@ -59,6 +62,8 @@ export function Bone({
   class?: string;
   // a grid cell, for a bone that stands in a grid's place
   place?: { column: number; row: number };
+  // a "rows" bone's textarea rows
+  rows?: number;
 }) {
   return (
     <span
@@ -71,6 +76,7 @@ export function Bone({
         ...(place === undefined
           ? {}
           : { gridColumn: place.column, gridRow: place.row }),
+        ...(rows === undefined ? {} : { "--rows": rows }),
       }}
     />
   );
