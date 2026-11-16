@@ -36,6 +36,7 @@ import {
   visualsLine,
 } from "./Visuals.model.ts";
 import "./visuals.css";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 
 export function Visuals() {
   const state = tools.value;
@@ -47,6 +48,31 @@ export function Visuals() {
       title="Visuals"
       split
       loading={(state === null || rows === null) && error === null}
+      waiting={
+        <CardsWaiting
+          label="Loading visuals"
+          usage
+          cards={[
+            { title: "Visuals", line: true, fields: ["line"], foot: 2 },
+            {
+              title: "CDNs",
+              line: true,
+              action: true,
+              fields: ["text"],
+              foot: 2,
+            },
+            {
+              title: "Limits",
+              line: "How much one turn may draw.",
+              action: true,
+              fields: VISUAL_LIMITS.map(() => "input" as const),
+              grid: "limits-setting-grid",
+              hints: true,
+              foot: 2,
+            },
+          ]}
+        />
+      }
       error={error}
     >
       {state && rows && (

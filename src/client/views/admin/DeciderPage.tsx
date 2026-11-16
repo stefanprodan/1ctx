@@ -50,6 +50,7 @@ import { DECISION_WORDS } from "./Decisions.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { holding, useLatest, useRowDrafts, useShownRow } from "./drafts.ts";
 import "./decider-page.css";
+import { AsideBones, CardsWaiting } from "./AdminWaiting.tsx";
 
 const STEPS = [zoneStep("Config"), { label: "Deciders", href: DECIDERS_HREF }];
 
@@ -87,6 +88,7 @@ export function DeciderPage({ params }: { params: Params }) {
       }
       split
       loading={list === null && error === null}
+      waiting={<DeciderWaiting name={params.name} />}
       empty={
         list !== null && decider === null && !leaving
           ? "No decider by that name."
@@ -125,6 +127,27 @@ export function DeciderPage({ params }: { params: Params }) {
 }
 
 // the mark only when flipped, so a save never moves a mark set since
+// the identity, model, check and delete cards
+function DeciderWaiting({ name }: { name: string }) {
+  return (
+    <CardsWaiting
+      label="Loading the decider"
+      usage
+      aside={<AsideBones label="Asked by" lines={1} />}
+      cards={[
+        { title: "Identity", fields: ["input", "line"], foot: 2 },
+        { title: "Model", fields: ["line", "line"], foot: 2 },
+        {
+          title: "Check",
+          line: "Asks one yes or no question. Shows how long it took and what it cost.",
+          foot: 1,
+        },
+        { title: `Delete ${name}`, line: true, foot: 1, danger: true },
+      ]}
+    />
+  );
+}
+
 const body = (d: DeciderSummary, over: Partial<DeciderSummary>) => {
   const next = { ...d, ...over };
   return {

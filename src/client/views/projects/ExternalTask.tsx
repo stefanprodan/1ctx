@@ -26,12 +26,15 @@ import { knownProjectName } from "../../data/projects.ts";
 import { ago, longDate } from "../../lib/format.ts";
 import { externalTasksHref, userHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
+import { Bone, LinesWaiting } from "../../ui/Bones.tsx";
 import { Page, PageNotice } from "../../ui/Page.tsx";
+import { RowsCard } from "../../ui/Rows.tsx";
 import {
   AsideHandle,
   AsideLine,
   AsideNames,
   AsideSection,
+  AsideWaiting,
   Split,
 } from "../../ui/Split.tsx";
 import { TaskFiles } from "./ExternalTaskFiles.tsx";
@@ -217,6 +220,53 @@ export function TaskBody({
   );
 }
 
+// the title, where it stands, its files and its activity, beside the
+// aside it lands with
+function TaskWaiting() {
+  return (
+    <Split
+      aside={
+        <AsideSection label="Task">
+          <AsideWaiting label="Loading the task's facts" lines={2} />
+        </AsideSection>
+      }
+    >
+      <div
+        class="external-tasks-head bones-wait"
+        role="status"
+        aria-label="Loading the task"
+      >
+        <span class="external-tasks-title bones-lines-line" aria-hidden="true">
+          <Bone kind="line" at={0} width={48} />
+        </span>
+        <p class="external-tasks-status" aria-hidden="true">
+          <Bone kind="glyph" at={1} />
+          <span class="bones-lines-line external-tasks-waiting-words">
+            <Bone kind="line" at={2} width={100} />
+          </span>
+        </p>
+      </div>
+      <RowsCard label="Files">
+        {/* a file's one line, as its row lands */}
+        <div class="rows-item external-tasks-file" aria-hidden="true">
+          <div class="external-tasks-file-row">
+            <span class="external-tasks-file-go">
+              <Bone kind="icon" at={3} />
+              <span class="bones-lines-line external-tasks-waiting-words">
+                <Bone kind="line" at={4} width={100} />
+              </span>
+            </span>
+          </div>
+        </div>
+      </RowsCard>
+      <section class="external-tasks-activity" aria-label="Activity">
+        <h2 class="label external-tasks-activity-label">Activity</h2>
+        <LinesWaiting lines={1} label="Loading the activity" />
+      </section>
+    </Split>
+  );
+}
+
 // keyed by the task, so a box, an answer's draft or an open form never
 // follows the reader to another task
 export function ExternalTask({ params }: { params: Params }) {
@@ -261,6 +311,7 @@ function TaskScreen({ id }: { id: string }) {
         )
       }
       loading={page === null && error === null}
+      waiting={<TaskWaiting />}
       error={page === null ? error : null}
     >
       {page !== null && (

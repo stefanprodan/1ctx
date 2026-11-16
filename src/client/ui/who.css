@@ -10,6 +10,11 @@
     gap: var(--space-4);
     min-width: 0;
   }
+  /* the big avatar's place while the page loads */
+  .who .who-waiting-avatar {
+    width: 56px;
+    height: 56px;
+  }
   .who-text {
     display: flex;
     flex-direction: column;

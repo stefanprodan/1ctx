@@ -22,7 +22,7 @@ import {
   WEB_HREF,
 } from "../../lib/hrefs.ts";
 
-type ConfigTab = "overview" | "limits" | "storage";
+export type ConfigTab = "overview" | "limits" | "storage";
 
 export const CONFIG_TABS: { tab: ConfigTab; label: string; href: string }[] = [
   { tab: "overview", label: "Overview", href: CONFIG_HREF },

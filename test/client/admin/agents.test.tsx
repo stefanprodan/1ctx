@@ -1117,7 +1117,8 @@ describe("a provider's page", () => {
     agents.value = [];
     deciders.value = null;
     const html = render(<ProviderPage params={{ name: "router" }} />);
-    expect(html).not.toContain("Used by");
+    expect(html).toContain('aria-label="Loading the provider"');
+    expect(html).not.toContain("Used by</h2><span");
     expect(html).not.toContain("Nothing runs on it.");
     deciders.value = [];
   });

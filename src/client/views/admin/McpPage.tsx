@@ -28,6 +28,7 @@ import { McpDrafts } from "./McpPage.state.ts";
 import { McpTools } from "./McpTools.tsx";
 import { refreshLine } from "./refresh.ts";
 import "./mcp-page.css";
+import { CardsWaiting, UsageBones } from "./AdminWaiting.tsx";
 
 const STEPS = [zoneStep("Config"), { label: "MCP Servers", href: MCP_HREF }];
 
@@ -82,6 +83,7 @@ export function McpPage({ params }: { params: Params }) {
       }
       split
       loading={list === null && error === null}
+      waiting={<McpWaiting name={params.name} tab={tab} />}
       empty={
         list !== null && server === null
           ? "No MCP Server by that name."
@@ -101,6 +103,42 @@ export function McpPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the tab's cards under the tabs, which wait with no count
+function McpWaiting({ name, tab }: { name: string; tab: McpTab }) {
+  return (
+    <CardsWaiting
+      label="Loading the server"
+      // the top list lands under it only when there is one
+      aside={<UsageBones lines={2} />}
+      lead={
+        <Tabs
+          tabs={[
+            { label: "General", href: configMcpHref(name) },
+            { label: "Tools", href: configMcpHref(name, "tools") },
+          ]}
+          active={configMcpHref(name, tab)}
+        />
+      }
+      cards={
+        tab === "tools"
+          ? [
+              { title: "Matchers", fields: ["wide", "wide"], foot: 2 },
+              { rows: 4 },
+            ]
+          : [
+              { title: "About", action: true, facts: 3 },
+              { title: "Endpoint", fields: ["input", "input"], foot: 2 },
+              {
+                title: "Access",
+                fields: ["seg-row", "seg-row", "seg-row"],
+                foot: 2,
+              },
+            ]
+      }
+    />
   );
 }
 
@@ -148,7 +186,7 @@ function Aside({ server }: { server: McpServerSummary }) {
   const usage = serverUsage.valueFor(server.id);
   return (
     <>
-      <UsageSection value={usage}>
+      <UsageSection value={usage} lines={2}>
         {(u) => (
           <>
             <AsideLine label="Calls">{count(u.calls)}</AsideLine>

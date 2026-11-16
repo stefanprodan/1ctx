@@ -211,6 +211,10 @@
     font-size: var(--text-small);
     color: var(--dim);
   }
+  /* the key's place while the panel loads */
+  .chart-key-waiting {
+    width: 30%;
+  }
   .chart-key-item {
     display: flex;
     align-items: center;

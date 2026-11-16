@@ -64,6 +64,7 @@ import {
   requestOf,
   retiredPick,
 } from "./Automations.model.ts";
+import { EditorWaiting } from "./EditorWaiting.tsx";
 import { NameField } from "./ProjectFields.tsx";
 import { RestartSection } from "./RestartSection.tsx";
 import { WhenSection } from "./WhenSection.tsx";
@@ -427,6 +428,7 @@ export function NewAutomation({ params }: { params: Params }) {
       crumbHref={`/projects/${id}/automations`}
       title="New automation"
       loading={!ready && error === null}
+      waiting={<EditorWaiting aside={aside} />}
       error={error}
       empty={
         ready && agents.length === 0
@@ -471,6 +473,7 @@ export function EditAutomation({ params }: { params: Params }) {
       crumbHref={automationHref(id)}
       title="Edit"
       loading={!ready && error === null}
+      waiting={<EditorWaiting aside={aside} />}
       error={error}
     >
       {ready && (

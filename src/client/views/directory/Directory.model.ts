@@ -176,13 +176,17 @@ export function agentTabHref(name: string, tab: number): string {
   return `${agentHref(name)}${AGENT_TABS[tab] ?? ""}`;
 }
 
-export function agentTabs(name: string, shown: DirectoryAgentResponse): Tab[] {
+// null while the page loads: the tabs wait with no count
+export function agentTabs(
+  name: string,
+  shown: DirectoryAgentResponse | null,
+): Tab[] {
   const base = agentHref(name);
   return [
     { label: "Prompt", href: base },
-    { label: "Tools", href: `${base}/tools`, count: shown.tools.length },
-    { label: "Skills", href: `${base}/skills`, count: shown.skills.length },
-    { label: "MCP", href: `${base}/mcp`, count: shown.mcp.servers.length },
+    { label: "Tools", href: `${base}/tools`, count: shown?.tools.length },
+    { label: "Skills", href: `${base}/skills`, count: shown?.skills.length },
+    { label: "MCP", href: `${base}/mcp`, count: shown?.mcp.servers.length },
   ];
 }
 
@@ -221,9 +225,10 @@ export function userTabHref(username: string, tab: number): string {
   return `${userHref(username)}${USER_TABS[tab] ?? ""}`;
 }
 
+// null while the page loads: the tabs wait with no count
 export function userTabs(
   username: string,
-  shown: DirectoryUserResponse,
+  shown: DirectoryUserResponse | null,
 ): Tab[] {
   const base = userHref(username);
   return [
@@ -231,7 +236,7 @@ export function userTabs(
     {
       label: "Projects",
       href: `${base}/projects`,
-      count: shown.projects.length,
+      count: shown?.projects.length,
     },
   ];
 }

@@ -16,16 +16,20 @@ import {
 export function UsageSection<T>({
   value,
   label = "Last 30 days",
+  lines = 3,
   children,
 }: {
   value: T | null | undefined;
   label?: string;
+  // a count, the tokens and the cost, as SpendLines draws them
+  lines?: number;
   children: (value: T) => ComponentChildren;
 }) {
   return (
     <AsideRead
       label={label}
       waiting="Loading usage"
+      lines={lines}
       action={
         <a class="split-link" href={USAGE_HREF}>
           Usage

@@ -37,7 +37,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { RowsFilters } from "../../ui/RowsControls.tsx";
-import { ActivityPanel, DaysTiles, LengthPanel } from "./Days.tsx";
+import { ActivityPanel, DaysGhost, DaysTiles, LengthPanel } from "./Days.tsx";
 import { attentionRow, buildLine, staleWords } from "./Overview.model.ts";
 import { NowRow, OverviewGhost } from "./OverviewNow.tsx";
 import "./overview.css";
@@ -177,7 +177,18 @@ function Stats({
           </div>
         </div>
       ) : (
-        <OverviewGhost at={16} />
+        // one box as the answer's, so the panels keep its spacing; they
+        // land under the tiles, so their place waits too
+        <div>
+          <OverviewGhost at={16} />
+          <div
+            class="chart-grid overview-charts chart-board-ghost bones-wait"
+            aria-hidden="true"
+          >
+            <DaysGhost label="Activity" at={24} />
+            <DaysGhost label="LLM response time" at={56} />
+          </div>
+        </div>
       )}
     </>
   );

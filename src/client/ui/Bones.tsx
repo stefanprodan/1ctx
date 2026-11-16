@@ -30,7 +30,15 @@ export type BoneKind =
   // the feed's state icon
   | "glyph"
   // an activity cell, a square in the grid's own empty colour
-  | "cell";
+  | "cell"
+  // a form's one-line field, its box of text and a prompt's tall box
+  | "field"
+  | "box"
+  | "area"
+  | "prompt"
+  // a segmented switch, and a button
+  | "seg"
+  | "button";
 
 // A placeholder where a word or a mark goes, at its size. at orders
 // the pulse, so the bones light one after another.

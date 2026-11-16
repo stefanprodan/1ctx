@@ -18,7 +18,11 @@ import {
   pathAnswer,
   pathKey,
 } from "../../../data/knowledge-path.ts";
-import { project, projectError } from "../../../data/projects.ts";
+import {
+  knownProjectName,
+  project,
+  projectError,
+} from "../../../data/projects.ts";
 import { useNow } from "../../../lib/now.ts";
 import { baseName, foldersOf } from "../../../lib/tree.ts";
 import { Page } from "../../../ui/Page.tsx";
@@ -62,12 +66,26 @@ function DocView({ projectId, fileId }: { projectId: string; fileId: string }) {
     return (
       <Page
         split
-        steps={crumbSteps(
-          projectId,
-          name,
-          known ? foldersOf(known.name) : [],
-          liveFolders(list?.files ?? []),
-        )}
+        steps={
+          known
+            ? crumbSteps(
+                projectId,
+                name ?? knownProjectName(projectId),
+                foldersOf(known.name),
+                liveFolders(list?.files ?? []),
+              )
+            : // a file is mostly kept in a folder: its step waits as a
+              // bone too, so a cold load's crumb keeps the landed one's
+              // steps rather than growing one as the name lands
+              [
+                ...crumbSteps(
+                  projectId,
+                  name ?? knownProjectName(projectId),
+                  [],
+                ),
+                { label: null },
+              ]
+        }
         title={known ? baseName(known.name) : null}
         titleMono
         loading={error === null}

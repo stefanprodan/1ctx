@@ -23,6 +23,7 @@ import { RowsSwitch } from "../../ui/Rows.tsx";
 import { Setting, SettingForm, SettingStack } from "../../ui/Setting.tsx";
 import { AsideLine, Split } from "../../ui/Split.tsx";
 import { overviewTotals, UsageSection } from "./AdminAside.tsx";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 import { audioMinutes, dictationLine, switchCheck } from "./Dictation.model.ts";
 import { DictationCard } from "./DictationCard.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
@@ -39,6 +40,16 @@ export function Dictation() {
       title="Dictation"
       split
       loading={(state === null || providers.value === null) && error === null}
+      waiting={
+        <CardsWaiting
+          label="Loading dictation"
+          usage
+          cards={[
+            { title: "Dictation", line: true, foot: 2 },
+            { title: "Model", line: true, fields: ["wide"], foot: 2 },
+          ]}
+        />
+      }
       error={error}
     >
       {state && providers.value && (

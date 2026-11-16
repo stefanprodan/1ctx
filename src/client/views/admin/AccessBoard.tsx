@@ -31,6 +31,7 @@ import {
   RowsMeta,
   RowsNote,
   RowsTitle,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Split } from "../../ui/Split.tsx";
@@ -43,6 +44,8 @@ import {
   signedInHint,
 } from "./AccessBoard.model.ts";
 import { ProjectCountsSection, ProjectRow } from "./AdminProjects.tsx";
+import { AsideBones } from "./AdminWaiting.tsx";
+import { DaysGhost } from "./Days.tsx";
 import { lastActive } from "./Users.model.ts";
 import { RolesSection } from "./Users.tsx";
 
@@ -60,6 +63,7 @@ export function AccessBoard() {
       title="Access"
       split
       loading={!ready && error === null}
+      waiting={<BoardWaiting />}
       error={ready ? null : error}
     >
       {ready && (
@@ -75,6 +79,33 @@ export function AccessBoard() {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the chart, the recently active and the inactive cards, beside the
+// aside's counts
+function BoardWaiting() {
+  return (
+    <Split
+      aside={
+        <>
+          <AsideBones label="Users" lines={3} />
+          <AsideBones label="Projects" lines={2} />
+        </>
+      }
+    >
+      <Rows>
+        <div class="chart-board-ghost bones-wait" aria-hidden="true">
+          <DaysGhost label="Signed in" at={0} keyed={false} />
+        </div>
+        <RowsCard label="Recently active">
+          <RowsWaiting count={2} label="Loading who was active" />
+        </RowsCard>
+        <RowsCard label="Inactive">
+          <RowsWaiting count={4} label="Loading who was not" />
+        </RowsCard>
+      </Rows>
+    </Split>
   );
 }
 

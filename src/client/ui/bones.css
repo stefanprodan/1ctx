@@ -87,6 +87,46 @@
     background: var(--heat-0);
   }
 
+  /* a form's controls at their own heights (base.css's .field and
+     .btn, Seg's row) */
+  .bones-bone-field,
+  .bones-bone-box,
+  .bones-bone-area,
+  .bones-bone-prompt {
+    width: 100%;
+    height: 36px;
+    border-radius: var(--radius);
+  }
+  .bones-bone-box {
+    height: 44px;
+  }
+  .bones-bone-area {
+    height: 80px;
+  }
+  .bones-bone-prompt {
+    height: 160px;
+  }
+  .bones-bone-seg {
+    width: 220px;
+    max-width: 100%;
+    height: 34px;
+    border-radius: var(--radius);
+  }
+  .bones-bone-button {
+    flex-shrink: 0;
+    width: 66px;
+    height: 32px;
+    border-radius: var(--radius);
+  }
+  /* a switch of two short words in a card's head */
+  .bones-bone-pick {
+    width: 140px;
+  }
+  .bones-bone-small {
+    width: 72px;
+    height: 28px;
+  }
+
   /* a line of a waiting text, as tall as the text's own line */
   .bones-lines-line {
     display: flex;

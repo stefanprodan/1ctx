@@ -296,13 +296,29 @@ const DAY_HEIGHTS = [
   18, 64, 62, 58, 96, 50, 20, 10, 46, 64, 70,
 ];
 
-export function TokensGhost({ at }: { at: number }) {
+// a day panel while its first answer loads, under the label it lands
+// with; a plot of one series lands with no key over it
+export function DaysGhost({
+  label,
+  at,
+  keyed = true,
+}: {
+  label: string;
+  at: number;
+  keyed?: boolean;
+}) {
   return (
-    <ChartPanel label="Tokens per day" hintBelow>
+    <ChartPanel label={label} hintBelow>
       <div class="chart-days">
-        <div class="chart-key">
-          <Bone kind="title" at={at} width={30} />
-        </div>
+        {keyed && (
+          // a line of the key's own height, so the plot under it sits
+          // where the landed one does
+          <div class="chart-key">
+            <span class="bones-lines-line chart-key-waiting">
+              <Bone kind="title" at={at} width={100} />
+            </span>
+          </div>
+        )}
         <div class="chart-plot chart-ghost-days">
           {DAY_HEIGHTS.map((h, i) => (
             <Bone key={i} kind="column" at={at + 1 + i} height={h} />

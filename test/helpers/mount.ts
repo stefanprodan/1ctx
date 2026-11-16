@@ -115,6 +115,10 @@ const fakeDocument = {
   createElement: (name: string) => new FakeNode(name),
   createElementNS: (_ns: string, name: string) => new FakeNode(name),
   createTextNode: (data: string) => new FakeNode("#text", data),
+  // a tab always in view, for a board that polls while it is seen
+  visibilityState: "visible",
+  addEventListener() {},
+  removeEventListener() {},
 };
 
 export type Mounted = {

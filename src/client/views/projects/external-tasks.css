@@ -86,6 +86,10 @@
   .external-tasks-status-jump {
     color: var(--attention);
   }
+  /* where "Opened 2h ago" lands while the task loads */
+  .external-tasks-waiting-words {
+    width: 12rem;
+  }
   .external-tasks-status-faint {
     color: var(--faint);
   }

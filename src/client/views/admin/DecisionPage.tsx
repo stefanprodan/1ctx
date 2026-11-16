@@ -47,6 +47,7 @@ import {
 import { DraftFoot } from "./DraftFoot.tsx";
 import { holding, useLatest } from "./drafts.ts";
 import "./decider-page.css";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 
 const STEPS = [
   zoneStep("Config"),
@@ -95,6 +96,16 @@ export function DecisionPage({ params }: { params: Params }) {
       }
       split
       loading={(list === null || deciders.value === null) && error === null}
+      waiting={
+        <CardsWaiting
+          label="Loading the decision"
+          usage
+          cards={[
+            { title: "Status", line: true, fields: ["seg", "input"], foot: 2 },
+            { title: "Options", fields: ["wide", "text"], foot: 2 },
+          ]}
+        />
+      }
       empty={
         list !== null && decision === null ? "No such decision." : undefined
       }

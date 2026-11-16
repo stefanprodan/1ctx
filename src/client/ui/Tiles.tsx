@@ -76,7 +76,10 @@ export function TileMeter({ share, full }: { share: number; full?: boolean }) {
 export function TileGhost({ at }: { at: number }) {
   return (
     <section class="card tiles-tile tiles-ghost" aria-hidden="true">
-      <Bone kind="label" at={at} />
+      {/* on the label's own line, so the tile is the landed one's height */}
+      <span class="label bones-lines-line">
+        <Bone kind="label" at={at} />
+      </span>
       <Bone kind="figure" at={at + 1} />
       <Bone kind="sub" at={at + 2} />
       <Bone kind="trend" at={at + 3} />

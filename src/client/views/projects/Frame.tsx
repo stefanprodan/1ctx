@@ -19,7 +19,13 @@ import { longDate } from "../../lib/format.ts";
 import { useWaiting } from "../../lib/wait.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RowsWaiting } from "../../ui/Rows.tsx";
-import { AsideLine, AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
+import {
+  AsideLine,
+  AsideNote,
+  AsideSection,
+  AsideWaiting,
+  Split,
+} from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { knowledgeWords } from "../knowledge/Knowledge.model.ts";
 import { ActivityAside } from "./ActivityAside.tsx";
@@ -84,48 +90,51 @@ export function Frame({
       crumb="Projects"
       crumbHref="/projects"
       title={shown?.name ?? listed?.name ?? null}
-      loading={
-        shown === null && listed === undefined && projectError.value === null
-      }
       pending={(shown === null || busy) && projectError.value === null}
-      waiting={bones}
       error={projectError.value}
     >
-      {(shown !== null || listed !== undefined) && (
-        <Split
-          aside={
-            shown !== null && (
-              <>
-                <AsideSection label="About">
-                  {about !== null && <AsideNote links>{about}</AsideNote>}
-                  {knowledge.files > 0 && (
-                    <AsideLine label="Knowledge">
-                      {knowledgeWords(knowledge)}
-                    </AsideLine>
-                  )}
-                  <AsideLine label="Created">
-                    {longDate(shown.createdAt)}
+      {/* drawn on a cold load too, before the rail's list names the
+          project, so the tabs and the aside never land under the bones */}
+      <Split
+        aside={
+          shown === null ? (
+            <>
+              <AsideSection label="About">
+                <AsideWaiting label="Loading the project" lines={3} />
+              </AsideSection>
+              <ActivityAside projectId={id} />
+            </>
+          ) : (
+            <>
+              <AsideSection label="About">
+                {about !== null && <AsideNote links>{about}</AsideNote>}
+                {knowledge.files > 0 && (
+                  <AsideLine label="Knowledge">
+                    {knowledgeWords(knowledge)}
                   </AsideLine>
-                </AsideSection>
-                <ActivityAside projectId={shown.id} />
-                <LatestAside
-                  projectId={shown.id}
-                  files={latestFiles(
-                    knowledgeOf(id)?.files ?? null,
-                    shown.latestFiles,
-                  )}
-                />
-              </>
-            )
-          }
-        >
-          <Tabs
-            tabs={tabs}
-            active={tab === "feed" ? tabs[0].href : `/projects/${id}/${tab}`}
-          />
-          {shown === null || wait ? bones : children(shown)}
-        </Split>
-      )}
+                )}
+                <AsideLine label="Created">
+                  {longDate(shown.createdAt)}
+                </AsideLine>
+              </AsideSection>
+              <ActivityAside projectId={shown.id} />
+              <LatestAside
+                projectId={shown.id}
+                files={latestFiles(
+                  knowledgeOf(id)?.files ?? null,
+                  shown.latestFiles,
+                )}
+              />
+            </>
+          )
+        }
+      >
+        <Tabs
+          tabs={tabs}
+          active={tab === "feed" ? tabs[0].href : `/projects/${id}/${tab}`}
+        />
+        {shown === null || wait ? bones : children(shown)}
+      </Split>
     </Page>
   );
 }

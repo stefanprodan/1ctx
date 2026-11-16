@@ -45,6 +45,7 @@ import {
   roleWords,
 } from "./Directory.model.ts";
 import "./directory.css";
+import { AsideBones, ListWaiting } from "../admin/AdminWaiting.tsx";
 
 type ListedUser = NonNullable<typeof directoryUsers.value>[number];
 type ListedAgent = NonNullable<typeof directoryAgents.value>[number];
@@ -198,6 +199,27 @@ export function Directory() {
       title="Directory"
       split
       loading={list === null && error === null}
+      waiting={
+        <ListWaiting
+          label={["Users", "Agents", "Deciders"][at]}
+          // the card's own query is held by its rows, which land with it
+          search={
+            <Search
+              value=""
+              onChange={() => {}}
+              placeholder={`Search ${tab}`}
+            />
+          }
+          aside={
+            <>
+              <AsideBones label="Users" lines={2} />
+              <AsideBones label="Agents" lines={2} />
+            </>
+          }
+          lead={<Tabs tabs={tabs} active={tabs[at].href} />}
+          class="directory-list"
+        />
+      }
       error={error}
     >
       <Split aside={<Aside users={users} agents={agents} />}>

@@ -32,6 +32,7 @@ import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { KeyRow } from "../keys/KeyRow.tsx";
 import { fullNameProblem } from "../profile/Profile.model.ts";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
+import { AsideBones, CardsWaiting, UsageBones } from "./AdminWaiting.tsx";
 import { teamsOf } from "./Credentials.model.ts";
 import { useDraftCard } from "./DraftCard.tsx";
 import { useShownRow } from "./drafts.ts";
@@ -88,6 +89,7 @@ export function UserPage({ params }: { params: Params }) {
       }
       split
       loading={list === null && error === null}
+      waiting={<UserWaiting />}
       empty={
         list !== null && user === null ? "No user by that name." : undefined
       }
@@ -101,6 +103,32 @@ export function UserPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the profile, role, projects and keys cards, as an admin sees them
+// on another user's page
+function UserWaiting() {
+  return (
+    <CardsWaiting
+      label="Loading the user"
+      aside={
+        <>
+          <UsageBones label="Personal, last 30 days" />
+          <AsideBones label="Account" lines={2} />
+        </>
+      }
+      cards={[
+        { fields: ["input", "input", "input", "input"], foot: 2 },
+        { title: "Role", action: "seg", foot: 2 },
+        { title: "Projects", action: true, rows: 2, foot: 2 },
+        {
+          title: "Access keys",
+          line: "Made on their profile. Revoke stops their agents at once.",
+          rows: 0,
+        },
+      ]}
+    />
   );
 }
 

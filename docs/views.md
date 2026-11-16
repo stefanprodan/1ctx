@@ -34,12 +34,16 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
 
 - **Home and a project's Feed are one `views/home/Feed.tsx`.** A change
   to the feed lands on both.
-- **Home waits for the project list in its own layout.** The list
-  picks the composer's project and names each row's, so until it lands
-  the composer's place is a bone at its height and the feed's head
-  sits over its ghost rows, held as `Page` holds its own. `/projects`
-  waits the same way: the activity card, its card's rows and the
-  aside each in bones.
+- **Every page waits in its landed layout,** not Page's three rows
+  (left only where the body is one card of rows): its tabs with no
+  counts, its aside's sections in bones and a live search, so nothing
+  pops in. Known card titles wait in words, fields as bones in the
+  landed grid (`SettingWaiting`, `SectionsWaiting`,
+  `views/admin/AdminWaiting.tsx`, `DirectoryWaiting`); a section that
+  lands only with data waits as nothing. Home waits for the project
+  list this way: the composer a bone at its height, the feed's head
+  over ghost rows, held as `Page` holds its own; `/projects` with its
+  activity, rows and aside in bones.
 - **The Not sent card reads its own route, never the feed.** `GET
   /api/me/not-sent` runs on Home's load and after Discard all. While the
   card is mounted (`watchNotSent()`), the user's `notSent` event, a

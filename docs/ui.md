@@ -151,8 +151,9 @@ open row's body or a meta. The shared shapes are below.
   While a view's code loads `lazy()` draws `PageWaiting`, or the
   route's own shape, its second argument in `app/routes.ts`; a failed
   chunk keeps its Try again. A list waits as `RowsWaiting` (Rows.tsx)
-  with its row's shape; `Page`'s `loading` draws its `waiting`, or
-  three rows. `RowsNote` is for real notes.
+  with its row's shape; `Page`'s `loading` draws its `waiting`, the
+  page's landed layout (`docs/views.md`), cards as `SettingWaiting`, a
+  Section page as `SectionsWaiting`. `RowsNote` is for real notes.
   An aside's section waits as `AsideWaiting` (Split.tsx), a box of
   text (a revision, a diff, a note, a skill's file, an opened tool's
   result or a subagent's work) as `LinesWaiting`
@@ -163,9 +164,11 @@ open row's body or a meta. The shared shapes are below.
 - **A name not known yet is a bone, never a stand-in word.** `Page`'s
   `crumb`, `title` or a step's `label` is null until the name lands
   (`knownProjectName()`: the row, else the rail's list); a failed page
-  drops the bone. A project tab whose body has its own shape passes it
-  as `Frame`'s `waiting`, drawn while the row loads too, so the wait
-  keeps one shape; `busy` keeps the slow line past the row.
+  drops the bone. `Frame` draws the tabs and the aside's bones even
+  before the rail's list names the project; a tab whose body has its
+  own shape passes it as `waiting`, drawn while the row loads too, so
+  the wait keeps one shape; `busy` keeps the slow line past the row. A
+  file's crumb waits with a folder's bone and the name's.
 - **A wait never flashes.** A waiting body (`bones-wait`) fades in
   after `REVEAL_MS`, 200 ms, and once shown `Page` and `Frame`'s tab
   hold it `SHOW_MS`, 300 ms (`lib/wait.ts`, its clock set by
@@ -175,8 +178,8 @@ open row's body or a meta. The shared shapes are below.
   waits' clock) turns true once a load has held `SLOW_MS`, 1 s, and
   false when it ends. `Page` then says "Still loading" in its head, a
   `role="status"`, for its `loading` or a `pending` body that waits
-  in its own bones (`Frame`'s tab while the project row loads), and a
-  board's `Loaded` its first-load Loading. A wait one page hands to
+  in its own bones (`Frame`'s tab while the project row loads, Usage),
+  and a board's `Loaded` its first-load Loading. A wait one page hands to
   the next (a path link's page to the file's, a file's waiting page
   to its deleted one) is named by `Page`'s `waitKey`: its start
   carries over for `CARRY_MS`, and bones drawn anew under a shown wait

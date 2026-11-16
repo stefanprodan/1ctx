@@ -36,6 +36,7 @@ import {
   withSecurity,
 } from "./Smtp.model.ts";
 import "./smtp.css";
+import { SettingWaiting } from "../../ui/SettingWaiting.tsx";
 
 // Send test email's last result; a null line while it is out. Each
 // test is its own object, so a save that clears it drops its answer too
@@ -51,6 +52,26 @@ export function Smtp() {
       steps={[zoneStep("Config")]}
       title="SMTP"
       loading={state === null && error === null}
+      waiting={
+        <SettingWaiting
+          label="Loading the SMTP settings"
+          cards={[
+            {
+              title: "Server",
+              line: "The SMTP server every email goes through.",
+              fields: ["input", "input", "input", "input", "input", "input"],
+              foot: 2,
+            },
+            { title: "Send test email", line: true, action: true },
+            {
+              title: "Agents email users",
+              line: true,
+              fields: ["line"],
+              foot: 2,
+            },
+          ]}
+        />
+      }
       error={error}
     >
       {state && <SmtpCards state={state} drafted={drafted} tested={tested} />}

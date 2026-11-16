@@ -27,7 +27,7 @@ import {
   descriptionProblem,
   projectFieldOf,
 } from "./AdminProjects.model.ts";
-import { NewCard } from "./NewCard.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 
 const STEPS = [zoneStep("Access"), { label: "Projects", href: PROJECTS_HREF }];
 
@@ -38,6 +38,12 @@ export function NewProject() {
       steps={STEPS}
       title="New project"
       loading={adminProjects.value === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the new project form"
+          fields={["input", "text", "wide"]}
+        />
+      }
       error={error}
     >
       <Form />

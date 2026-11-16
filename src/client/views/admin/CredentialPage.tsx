@@ -48,6 +48,7 @@ import {
 import { type DraftCard, useDraftCard } from "./DraftCard.tsx";
 import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
 import "./credentials.css";
+import { AsideBones, CardsWaiting } from "./AdminWaiting.tsx";
 
 const STEPS = [
   zoneStep("Config"),
@@ -81,6 +82,7 @@ export function CredentialPage({ params }: { params: Params }) {
       }
       split
       loading={list === null && error === null}
+      waiting={<CredentialWaiting />}
       empty={
         list !== null && credential === null
           ? "No credential by that name."
@@ -94,6 +96,43 @@ export function CredentialPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the key, request, methods and projects cards
+function CredentialWaiting() {
+  return (
+    <CardsWaiting
+      label="Loading the credential"
+      aside={<AsideBones label="Credential" lines={3} />}
+      cards={[
+        {
+          title: "Key",
+          line: "The http- file whose value goes in the header.",
+          fields: ["input"],
+          foot: 2,
+        },
+        {
+          title: "Request",
+          line: "curl adds the header to requests under the prefix.",
+          fields: ["wide", "input", "input"],
+          foot: 2,
+        },
+        {
+          title: "Methods",
+          line: "What curl may use under the prefix. Other methods are refused.",
+          fields: ["line"],
+          foot: 2,
+        },
+        {
+          title: "Projects",
+          line: "Chats and runs in these projects can use it.",
+          action: true,
+          rows: 1,
+          foot: 2,
+        },
+      ]}
+    />
   );
 }
 

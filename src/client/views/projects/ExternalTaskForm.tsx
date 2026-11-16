@@ -46,7 +46,7 @@ import {
   RowsRemove,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { Section } from "../../ui/Section.tsx";
+import { Section, SectionsWaiting } from "../../ui/Section.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { NewTaskFile } from "./ExternalTaskNewFile.tsx";
 import {
@@ -333,6 +333,33 @@ export function NewExternalTask({ params }: { params: Params }) {
       crumbHref={tasksTabHref(id)}
       title="New external task"
       loading={shown === null && error === null}
+      waiting={
+        <Split aside={null}>
+          <SectionsWaiting
+            label="Loading the form"
+            class="external-tasks-form"
+            sections={[
+              {
+                title: "Task",
+                text: "The agent's goal",
+                fields: ["input"],
+              },
+              {
+                title: "Labels",
+                text: "What kind of work it is",
+                fields: ["box", "button"],
+                bare: true,
+              },
+              {
+                title: "Files",
+                text: "Knowledge files the agent reads",
+                fields: ["box", "button"],
+                bare: true,
+              },
+            ]}
+          />
+        </Split>
+      }
       error={error}
     >
       {shown !== null && (

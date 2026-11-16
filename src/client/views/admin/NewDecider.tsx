@@ -24,7 +24,7 @@ import {
   deciderProviders,
   heldProvider,
 } from "./Deciders.model.ts";
-import { NewCard } from "./NewCard.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import "./decider-page.css";
 
 const STEPS = [zoneStep("Config"), { label: "Deciders", href: DECIDERS_HREF }];
@@ -38,6 +38,12 @@ export function NewDecider() {
       steps={STEPS}
       title="New decider"
       loading={rows === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the new decider form"
+          fields={["input", "wide"]}
+        />
+      }
       error={error}
     >
       {rows !== null &&

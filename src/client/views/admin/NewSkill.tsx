@@ -26,7 +26,7 @@ import {
   RowsMeta,
   RowsTitle,
 } from "../../ui/Rows.tsx";
-import { NewCard } from "./NewCard.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import {
   formKind,
   pathProblem,
@@ -45,6 +45,12 @@ export function NewSkill() {
       steps={STEPS}
       title="Add skill"
       loading={skills.value === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the add skill form"
+          fields={["wide", "wide"]}
+        />
+      }
       error={error}
     >
       <Form />

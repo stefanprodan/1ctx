@@ -22,6 +22,7 @@ import {
 import { Search } from "../../ui/Search.tsx";
 import { Split } from "../../ui/Split.tsx";
 import { TopSection, UsageSection } from "./AdminAside.tsx";
+import { ListWaiting, UsageBones } from "./AdminWaiting.tsx";
 import { NewSkill } from "./NewSkill.tsx";
 import { LoadLines } from "./SkillLoads.tsx";
 import { carriersOf } from "./Skills.model.ts";
@@ -47,6 +48,13 @@ function List() {
       split
       actions={<PageNew href={`${SKILLS_HREF}?new`} label="Add skill" />}
       loading={(rows === null || agents.value === null) && error === null}
+      waiting={
+        <ListWaiting
+          label="Skills"
+          search={<Search query={q} placeholder="Search skills" />}
+          aside={<UsageBones />}
+        />
+      }
       error={error}
     >
       <Split aside={<Aside list={all} />}>

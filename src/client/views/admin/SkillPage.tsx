@@ -23,6 +23,7 @@ import { SkillFiles } from "./SkillFiles.tsx";
 import { SkillGeneral } from "./SkillGeneral.tsx";
 import { LoadLines } from "./SkillLoads.tsx";
 import "./skill-page.css";
+import { CardsWaiting, UsageBones } from "./AdminWaiting.tsx";
 
 const STEPS = [zoneStep("Config"), { label: "Skills", href: SKILLS_HREF }];
 
@@ -60,6 +61,7 @@ export function SkillPage({ params }: { params: Params }) {
       }
       split
       loading={(list === null || agents.value === null) && error === null}
+      waiting={<SkillWaiting name={params.name} tab={tab} />}
       empty={
         list !== null && skill === null ? "No skill by that name." : undefined
       }
@@ -71,6 +73,37 @@ export function SkillPage({ params }: { params: Params }) {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the tab's cards under the tabs, which wait with no count
+function SkillWaiting({ name, tab }: { name: string; tab: SkillTab }) {
+  return (
+    <CardsWaiting
+      label="Loading the skill"
+      // the top list lands under it only when there is one
+      aside={<UsageBones />}
+      lead={
+        <Tabs
+          tabs={[
+            { label: "General", href: configSkillHref(name) },
+            { label: "Files", href: configSkillHref(name, "files") },
+          ]}
+          active={configSkillHref(name, tab)}
+        />
+      }
+      cards={
+        tab === "files"
+          ? [
+              { title: "SKILL.md", fields: ["prompt"] },
+              { title: "Files", rows: 3 },
+            ]
+          : [
+              { title: "About", action: true, facts: 6 },
+              { title: "Used by", rows: 4, shape: "avatar" },
+            ]
+      }
+    />
   );
 }
 

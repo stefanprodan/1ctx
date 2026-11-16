@@ -134,3 +134,19 @@ test.serial(
     await view.unmount();
   },
 );
+
+test.serial(
+  "a cold load draws the tabs and the aside before any list names it",
+  async () => {
+    projects.value = null;
+    const view = await mount(frame());
+    const cold = view.html();
+    // the tab strip and the About section's bones, so neither lands
+    // under the bones and moves the card
+    expect(cold).toContain('aria-label="Sections"');
+    expect(cold).toContain(">About<");
+    expect(cold).toContain("split-aside");
+    expect(cold).toContain('aria-label="Loading the project"');
+    await view.unmount();
+  },
+);

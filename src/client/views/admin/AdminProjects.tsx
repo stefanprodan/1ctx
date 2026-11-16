@@ -24,6 +24,7 @@ import {
 import { Search } from "../../ui/Search.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { countLine } from "./AdminProjects.model.ts";
+import { AsideBones, ListWaiting } from "./AdminWaiting.tsx";
 import { NewProject } from "./NewProject.tsx";
 
 export function AdminProjects() {
@@ -42,6 +43,13 @@ function List() {
       split
       actions={<PageNew href={`${PROJECTS_HREF}?new`} label="New project" />}
       loading={list === null && error === null}
+      waiting={
+        <ListWaiting
+          label="Projects"
+          search={<Search query={q} placeholder="Search projects" />}
+          aside={<AsideBones label="Projects" lines={3} />}
+        />
+      }
       error={error}
     >
       {list !== null && (

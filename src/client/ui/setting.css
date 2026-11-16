@@ -91,6 +91,16 @@
     max-width: 960px;
   }
 
+  /* a waiting card stands in the stack as the card itself */
+  .setting-waiting-card {
+    display: contents;
+  }
+  .setting-waiting-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
   .setting-delete {
     display: flex;
     flex-wrap: wrap;

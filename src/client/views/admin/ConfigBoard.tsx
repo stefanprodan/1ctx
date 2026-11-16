@@ -13,14 +13,17 @@ import { skills } from "../../data/skills.ts";
 import { limits, tools, toolsError } from "../../data/tools.ts";
 import { tokensText } from "../../lib/format.ts";
 import { Page } from "../../ui/Page.tsx";
-import { RowsCard } from "../../ui/Rows.tsx";
+import { RowsCard, RowsWaiting } from "../../ui/Rows.tsx";
+import { SettingWaiting } from "../../ui/SettingWaiting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
+import { AsideBones } from "./AdminWaiting.tsx";
 import { ChatToolCard } from "./ChatToolCard.tsx";
 import {
   automationLine,
   builtinsOf,
   CONFIG_TABS,
+  type ConfigTab,
   configTab,
   externalTaskLine,
   instanceLines,
@@ -68,6 +71,7 @@ export function ConfigBoard() {
         ) : undefined
       }
       loading={(state === null || rows === null) && error === null}
+      waiting={<ConfigWaiting tab={tab} />}
       error={error}
     >
       {state && rows && (
@@ -99,6 +103,46 @@ export function ConfigBoard() {
         </Split>
       )}
     </Page>
+  );
+}
+
+// the tab's cards under the tabs and beside the aside it lands with;
+// the limits cards' titles and fields are the client's own
+function ConfigWaiting({ tab }: { tab: ConfigTab }) {
+  const cards = (groups: readonly LimitsGroup[]) => (
+    <SettingWaiting
+      label="Loading the limits"
+      cards={groups.map((g) => ({
+        title: g.title,
+        line: g.line,
+        action: true,
+        fields: g.names.map(() => "input" as const),
+        grid: "limits-setting-grid",
+        hints: true,
+        foot: 2,
+      }))}
+    />
+  );
+  return (
+    <Split aside={<AsideBones label="Instance" lines={9} />}>
+      <div class="config-board">
+        <Tabs
+          tabs={CONFIG_TABS}
+          active={CONFIG_TABS.find((t) => t.tab === tab)!.href}
+        />
+        {tab === "overview" && (
+          <RowsCard label="Built-in tools">
+            <RowsWaiting
+              count={12}
+              shape="icon"
+              label="Loading the built-in tools"
+            />
+          </RowsCard>
+        )}
+        {tab === "limits" && cards(LIMITS_CARDS)}
+        {tab === "storage" && cards(STORAGE_CARDS)}
+      </div>
+    </Split>
   );
 }
 

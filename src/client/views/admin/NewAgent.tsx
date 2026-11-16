@@ -20,7 +20,7 @@ import { cardFieldOf } from "./AgentPage.model.ts";
 import { AgentDrafts } from "./AgentPage.state.ts";
 import { ModelFields } from "./ModelFields.tsx";
 import { NameFields } from "./NameFields.tsx";
-import { NewCard } from "./NewCard.tsx";
+import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import "./agent-new.css";
 
 const STEPS = [zoneStep("Config"), { label: "Agents", href: AGENTS_HREF }];
@@ -33,6 +33,12 @@ export function NewAgent() {
       steps={STEPS}
       title="New agent"
       loading={rows === null && error === null}
+      waiting={
+        <NewCardWaiting
+          label="Loading the new agent form"
+          fields={["input", "prompt", "wide"]}
+        />
+      }
       error={error}
     >
       {rows !== null &&

@@ -255,7 +255,7 @@ export function AsideWaiting({
   lines?: number;
 }) {
   return (
-    <div class="bones-wait" role="status" aria-label={label}>
+    <div class="split-waiting bones-wait" role="status" aria-label={label}>
       {Array.from({ length: lines }, (_, i) => (
         <div key={i} class="split-line" aria-hidden="true">
           <Bone kind="line" at={i * 2} width={[34, 42, 28][i % 3]} />
@@ -270,6 +270,7 @@ export function AsideWaiting({
 export function AsideRead<T>({
   label,
   waiting,
+  lines,
   action,
   value,
   children,
@@ -277,6 +278,8 @@ export function AsideRead<T>({
   label: string;
   // what the read loads, for a screen reader: "Loading usage"
   waiting: string;
+  // the lines it lands with, so the sections under it stay put
+  lines?: number;
   action?: ComponentChildren;
   value: T | null | undefined;
   children: (value: T) => ComponentChildren;
@@ -284,7 +287,7 @@ export function AsideRead<T>({
   return (
     <AsideSection label={label} action={action}>
       {value === undefined ? (
-        <AsideWaiting label={waiting} />
+        <AsideWaiting label={waiting} lines={lines} />
       ) : value === null ? (
         <p class="split-empty">Did not load.</p>
       ) : (
