@@ -183,8 +183,13 @@ describe("App before the first load answers", () => {
       path.value = "/login";
       const html = render(<App />);
       expect(html).toContain("<form");
+      expect(html).not.toContain("bones-bone");
       path.value = "/";
-      expect(render(<App />)).toBe("");
+      const waiting = render(<App />);
+      // the shell's shape, not a blank page, and no form
+      expect(waiting).toContain('class="rail bones-wait"');
+      expect(waiting).toMatch(/role="status" aria-label="Loading 1ctx"/);
+      expect(waiting).not.toContain("<form");
     } finally {
       [me.value, path.value] = held;
     }

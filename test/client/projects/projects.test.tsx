@@ -775,7 +775,9 @@ describe("the pages", () => {
     expect(render(<Project params={{ id: "p1" }} />)).toContain(
       'placeholder="Start a chat in personal"',
     );
-    expect(render(<Project params={{ id: "p9" }} />)).toContain("Loading");
+    expect(render(<Project params={{ id: "p9" }} />)).toMatch(
+      /role="status" aria-label="Loading[^"]*"/,
+    );
   });
 
   test.serial("the About card leads with a team project's description", () => {
@@ -1162,7 +1164,7 @@ describe("the pages", () => {
     expect(html).toContain('class="avatar">CD<');
     expect(html).toContain('class="rows-sub">@casey<');
     expect(html).toContain('class="rows-line rows-go" href="/users/casey"');
-    expect(html).toContain("Loading");
+    expect(html).toMatch(/role="status" aria-label="Loading[^"]*"/);
     projectAgents.value = [
       {
         id: "a1",
@@ -1210,6 +1212,6 @@ describe("the pages", () => {
     ];
     const html = render(<Project params={{ id: "p9" }} />);
     expect(html).toContain('class="page-crumb-on">ops<');
-    expect(html).toContain("Loading");
+    expect(html).toMatch(/role="status" aria-label="Loading[^"]*"/);
   });
 });

@@ -930,7 +930,9 @@ describe("the Config board", () => {
   });
 
   test.serial("says it is loading, then the failure", () => {
-    expect(render(<ConfigBoard />)).toContain("Loading");
+    expect(render(<ConfigBoard />)).toMatch(
+      /role="status" aria-label="Loading[^"]*"/,
+    );
     toolsError.value = {
       words: "the server failed while answering",
       status: 500,

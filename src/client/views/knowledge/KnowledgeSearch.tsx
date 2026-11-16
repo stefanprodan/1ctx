@@ -133,6 +133,7 @@ export function SearchResults({
               error: search.more.failure,
             }}
             onMore={() => void loadMoreSearch(projectId)}
+            label="Loading matches"
           />
         </>
       )}

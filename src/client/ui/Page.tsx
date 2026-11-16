@@ -8,9 +8,11 @@ import type { Failure } from "../lib/format.ts";
 import { sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { scrollParent } from "../lib/scroll.ts";
+import { useWaiting } from "../lib/wait.ts";
 import "./page.css";
 import { CodeTag } from "./CodeTag.tsx";
 import { Finder } from "./Finder.tsx";
+import { RowsWaiting } from "./RowsWaiting.tsx";
 
 export type PageStep = {
   label: string;
@@ -31,6 +33,7 @@ export function Page({
   actions,
   notice,
   loading,
+  waiting,
   empty,
   error,
   flush,
@@ -51,6 +54,9 @@ export function Page({
   actions?: ComponentChildren;
   notice?: ComponentChildren;
   loading?: boolean;
+  // the body's shape while loading holds, one role="status" with its
+  // own label; three rows when none is given
+  waiting?: ComponentChildren;
   empty?: string;
   error?: Failure | string | null;
   // the view has a foot stuck to the bottom and spends the inset there
@@ -69,6 +75,7 @@ export function Page({
         : { words: error, status: null }
       : (error ?? null);
   const stuck = useSignal(false);
+  const wait = useWaiting(loading === true);
   useEffect(() => {
     const el = head.current;
     const scroller = el ? scrollParent(el) : null;
@@ -186,8 +193,8 @@ export function Page({
             Try again
           </button>
         </div>
-      ) : loading ? (
-        <PageLoading />
+      ) : wait ? (
+        (waiting ?? <RowsWaiting card label={`Loading ${title}`} />)
       ) : empty ? (
         <p class="page-state">{empty}</p>
       ) : (
@@ -195,10 +202,6 @@ export function Page({
       )}
     </div>
   );
-}
-
-export function PageLoading() {
-  return <p class="page-state">Loading</p>;
 }
 
 export function PageNotice({

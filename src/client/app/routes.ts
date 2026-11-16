@@ -264,7 +264,12 @@ export const ALIASES: Record<string, string> = {
 export const ROUTES: Route[] = [
   {
     path: "/login",
-    view: lazy(async () => Login),
+    // in the first bundle, so its code is there in a microtask and the
+    // form draws with no page's bones before it
+    view: lazy(
+      async () => Login,
+      () => null,
+    ),
     title: () => "Sign in",
     role: "public",
   },

@@ -617,7 +617,7 @@ describe("a skill's page", () => {
     agents.value = null;
     path.value = "/admin/config/skills/timoni";
     const html = render(<SkillPage params={{ name: "timoni" }} />);
-    expect(html).toContain("Loading");
+    expect(html).toMatch(/role="status" aria-label="Loading[^"]*"/);
     expect(html).not.toContain("Delete timoni");
   });
 
@@ -639,7 +639,9 @@ describe("a skill's page", () => {
 
   test.serial("says it is loading, then the failure", () => {
     agents.value = [];
-    expect(render(<SkillList />)).toContain("Loading");
+    expect(render(<SkillList />)).toMatch(
+      /role="status" aria-label="Loading[^"]*"/,
+    );
     skillsError.value = { words: "the server did not answer", status: null };
     const html = render(<SkillList />);
     expect(html).toContain("The server did not answer.");

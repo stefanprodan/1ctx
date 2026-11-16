@@ -9,6 +9,7 @@
 import type { Me } from "../../shared/contracts/user.ts";
 import { initials } from "../lib/format.ts";
 import { Icon, Mark } from "../lib/icons.tsx";
+import { Bone } from "../ui/Bones.tsx";
 import { adminFace, navLit, onPage } from "./Rail.model.ts";
 import { projectOnScreen } from "./Rail.tsx";
 import { path } from "./router.ts";
@@ -77,6 +78,39 @@ export function Strip({ user }: { user: Me }) {
             <span class="avatar">{initials(user.fullName)}</span>
           </button>
         </UserMenu>
+      </div>
+    </aside>
+  );
+}
+
+// the strip before the signed-in user is known: its button, which
+// needs nobody, the mark, and a bone for each entry and the avatar
+export function StripWaiting() {
+  return (
+    <aside class="strip bones-wait">
+      <button
+        type="button"
+        class="btn-icon strip-show"
+        aria-label="Show the menu"
+        title="Show the menu"
+        onClick={showRail}
+      >
+        <Icon name="sidebar" />
+      </button>
+      <span class="strip-mark" aria-hidden="true">
+        <Mark />
+      </span>
+      <div class="strip-nav" aria-hidden="true">
+        {navEntries().map((route, i) => (
+          <span key={route.path} class="strip-item">
+            <Bone kind="glyph" at={i * 2} />
+          </span>
+        ))}
+      </div>
+      <div class="strip-foot" aria-hidden="true">
+        <span class="strip-avatar">
+          <Bone kind="avatar" at={0} />
+        </span>
       </div>
     </aside>
   );

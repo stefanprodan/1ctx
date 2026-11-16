@@ -59,9 +59,47 @@
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
+  /* a line keeps a line's height around its bar, so a row of bones
+     is as tall as the row of words that replaces it */
+  .bones-bone-line {
+    width: 60%;
+    margin-block: 0.25em;
+  }
+  .bones-bone-avatar {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+  }
+  .bones-bone-chip {
+    flex-shrink: 0;
+    width: 48px;
+  }
+  .bones-bone-glyph {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: var(--radius);
+  }
+  .bones-bone-cell {
+    height: auto;
+    aspect-ratio: 1;
+    background: var(--heat-0);
+  }
+
+  /* a waiting body shows nothing for its first 200 ms (REVEAL_MS in
+     lib/wait.ts), so an answer that lands sooner never flashes bones */
+  .bones-wait {
+    animation: reveal 0.2s ease-out 0.2s backwards;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .bones-bone {
       animation: none;
+    }
+    /* the wait still holds its delay, then shows at once */
+    .bones-wait {
+      animation-timing-function: step-start;
     }
   }
 }

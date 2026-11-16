@@ -22,7 +22,7 @@ import { CREDENTIALS_HREF, configCredentialHref } from "../../lib/hrefs.ts";
 import { useNow } from "../../lib/now.ts";
 import { countOf } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
-import { RowsNote } from "../../ui/Rows.tsx";
+import { RowsNote, RowsWaiting } from "../../ui/Rows.tsx";
 import {
   Setting,
   SettingAlert,
@@ -249,9 +249,11 @@ function ProjectsCard(props: CardProps) {
         })}
       >
         {!loaded ? (
-          <RowsNote>
-            {projectsError.value !== null ? "Did not load." : "Loading"}
-          </RowsNote>
+          projectsError.value !== null ? (
+            <RowsNote>Did not load.</RowsNote>
+          ) : (
+            <RowsWaiting shape="plain" label="Loading projects" />
+          )
         ) : ids.length === 0 ? (
           <RowsNote>No projects yet.</RowsNote>
         ) : (

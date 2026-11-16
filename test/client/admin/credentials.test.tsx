@@ -570,7 +570,7 @@ describe("the pages", () => {
   test.serial("the pages wait for the list", () => {
     credentials.value = null;
     const waiting = render(<CredentialList />);
-    expect(waiting).toContain("Loading");
+    expect(waiting).toMatch(/role="status" aria-label="Loading[^"]*"/);
     expect(waiting).not.toContain("No credentials yet");
     expect(render(<CredentialPage params={{ name: "x" }} />)).toContain(
       "Loading",

@@ -139,9 +139,28 @@ open row's body or a meta. The shared shapes are below.
 - **A dashboard is `ui/Tiles.tsx` over `ui/Chart.tsx` panels.** Plots
   over days are `ui/Plot.tsx` (uPlot), each with a key and a table for
   a screen reader. A plot reads its colour tokens at every draw, so a
-  theme flip needs no rebuild. A first load draws `ui/Bones.tsx` at
-  the loaded sizes, never a Loading line. A later load keeps the last
-  answer faded until the next lands.
+  theme flip needs no rebuild. A first load draws its bones (below);
+  a later load keeps the last answer faded until the next lands.
+- **A first load waits in its own shape, never a Loading line.**
+  `ui/Bones.tsx` is the one placeholder: a `Bone` at the loaded size
+  of each word and mark, pulsing in turn (`--ghost`), still under
+  reduced motion. While `me` loads the shell draws its skeleton
+  (`RailWaiting`, `StripWaiting`, the phone's button's place) around
+  `PageWaiting`; a public page and the sign-in form draw at once.
+  While a view's code loads `lazy()` draws `PageWaiting`, or the
+  route's own shape, its second argument in `app/routes.ts`; a failed
+  chunk keeps its Try again. A list waits as `RowsWaiting` (Rows.tsx)
+  with its row's shape; `Page`'s `loading` draws its `waiting`, or
+  three rows. `RowsNote` is for real notes.
+- **A wait never flashes.** A waiting body (`bones-wait`) fades in
+  after `REVEAL_MS`, 200 ms, and once shown `Page` holds it `SHOW_MS`,
+  300 ms (`lib/wait.ts`, its clock set by `setWaitClock()` in tests).
+  Each is one `role="status"` with a label its caller names; bones are
+  `aria-hidden`.
+- **A later load never draws bones.** A reload, the socket's
+  `reload()` or a Refresh keeps the rows drawn until the answer lands;
+  only a new filter or search, whose rows would be another list's,
+  waits again.
 - **A text by its lines is `ui/Source.tsx`,** over `splitLines()` in
   `lib/lines.ts`, which balances each line's spans. A change between
   two texts is `ui/Diff.tsx` over `diffLines()` in `lib/diff.ts`. Past

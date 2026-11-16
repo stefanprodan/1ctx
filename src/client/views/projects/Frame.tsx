@@ -16,7 +16,8 @@ import { knowledgeCount, knowledgeOf } from "../../data/knowledge.ts";
 import { project, projectError, projects } from "../../data/projects.ts";
 import { projectAgentCount } from "../../data/sessions.ts";
 import { longDate } from "../../lib/format.ts";
-import { Page, PageLoading } from "../../ui/Page.tsx";
+import { Page } from "../../ui/Page.tsx";
+import { RowsWaiting } from "../../ui/Rows.tsx";
 import { AsideLine, AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { knowledgeWords } from "../knowledge/Knowledge.model.ts";
@@ -107,7 +108,11 @@ export function Frame({
             tabs={tabs}
             active={tab === "feed" ? tabs[0].href : `/projects/${id}/${tab}`}
           />
-          {shown === null ? <PageLoading /> : children(shown)}
+          {shown === null ? (
+            <RowsWaiting card label="Loading the project" />
+          ) : (
+            children(shown)
+          )}
         </Split>
       )}
     </Page>

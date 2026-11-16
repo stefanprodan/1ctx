@@ -3,18 +3,30 @@
 //
 // A view loaded on first use, so the route table names every view
 // without putting every view in the first bundle. The loader runs once
-// per attempt; until it answers the component renders nothing, then
-// re-renders through its signal. A loader that fails renders the reason
-// and a retry, and the next render or load() tries again.
+// per attempt; until it answers the component renders a page's shape in
+// bones (the route's own when it names one), then re-renders through
+// its signal. A loader that fails renders the reason and a retry, and
+// the next render or load() tries again.
 
 import { signal } from "@preact/signals";
 import { type Attributes, type ComponentType, h } from "preact";
 import "./lazy.css";
 import { says } from "../lib/format.ts";
+import { PageWaiting } from "../ui/PageWaiting.tsx";
 
 export type Lazy<P> = ComponentType<P> & { load(): Promise<void> };
 
-export function lazy<P>(loader: () => Promise<ComponentType<P>>): Lazy<P> {
+// the generic page while a view's code loads
+function Waiting() {
+  return h(PageWaiting, { label: "Loading the page" });
+}
+
+export function lazy<P>(
+  loader: () => Promise<ComponentType<P>>,
+  // the view's own shape while its code loads, for a page whose shape
+  // is not a list's
+  waiting: ComponentType<P> = Waiting,
+): Lazy<P> {
   const ready = signal<ComponentType<P> | null>(null);
   const failure = signal<string | null>(null);
   let pending: Promise<void> | null = null;
@@ -47,7 +59,7 @@ export function lazy<P>(loader: () => Promise<ComponentType<P>>): Lazy<P> {
       ]);
     }
     void load();
-    return null;
+    return h(waiting, props as Attributes & P);
   }) as Lazy<P>;
   Lazy.load = load;
   return Lazy;

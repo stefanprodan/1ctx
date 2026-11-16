@@ -18,6 +18,7 @@ export {
 } from "./RowsControls.tsx";
 export { RowsOpen } from "./RowsOpen.tsx";
 export { RowsTree, type RowsTreeNode } from "./RowsTree.tsx";
+export { type RowsShape, RowsWaiting } from "./RowsWaiting.tsx";
 
 export function Rows({ children }: { children: ComponentChildren }) {
   return <div class="rows">{children}</div>;

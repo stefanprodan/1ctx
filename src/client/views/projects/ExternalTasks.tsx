@@ -40,6 +40,7 @@ import {
   RowsFilters,
   RowsMore,
   RowsNote,
+  RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
 import { CONNECT_HREF } from "../connect/Setup.model.ts";
@@ -78,7 +79,7 @@ function ClosedRows({ now, searching }: { now: number; searching: boolean }) {
     return more.error !== null ? (
       <RowsFailed failure={more.error} />
     ) : (
-      <RowsNote>Loading</RowsNote>
+      <RowsWaiting shape="icon" label="Loading closed tasks" />
     );
   }
   if (pages.rows.length === 0) {
@@ -96,6 +97,7 @@ function ClosedRows({ now, searching }: { now: number; searching: boolean }) {
           error: more.error,
         }}
         onMore={() => void loadMoreClosed()}
+        label="Loading tasks"
       />
     </>
   );
@@ -115,7 +117,9 @@ function OpenRows({
   const error = externalTasksError.value;
   const limits = useSignal<Partial<Record<GroupState, number>>>({});
   if (error !== null) return <RowsFailed failure={error} />;
-  if (list === null) return <RowsNote>Loading</RowsNote>;
+  if (list === null) {
+    return <RowsWaiting shape="icon" label="Loading external tasks" />;
+  }
   if (list.length === 0) return <RowsNote>No open tasks.</RowsNote>;
   if (q.trim() !== "" && shown.length === 0) {
     return <RowsNote>No task matches.</RowsNote>;

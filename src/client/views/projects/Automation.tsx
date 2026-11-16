@@ -53,7 +53,12 @@ import { useCut } from "../../lib/resize.ts";
 import { browserZone } from "../../lib/zone.ts";
 import { Fold } from "../../ui/Fold.tsx";
 import { Page } from "../../ui/Page.tsx";
-import { RowsCard, RowsFilters, RowsNote } from "../../ui/Rows.tsx";
+import {
+  RowsCard,
+  RowsFilters,
+  RowsNote,
+  RowsWaiting,
+} from "../../ui/Rows.tsx";
 import {
   AsideItem,
   AsideLine,
@@ -421,7 +426,7 @@ export function Automation({ params }: { params: Params }) {
               }
             >
               {held === null || held.rows === null ? (
-                <RowsNote>Loading</RowsNote>
+                <RowsWaiting shape="icon" label="Loading runs" />
               ) : held.rows.length === 0 ? (
                 <RowsNote>
                   {filter === "manual"
@@ -451,6 +456,7 @@ export function Automation({ params }: { params: Params }) {
                       error: held.more.error,
                     }}
                     onMore={() => void loadMoreRuns()}
+                    label="Loading runs"
                   />
                 </>
               )}

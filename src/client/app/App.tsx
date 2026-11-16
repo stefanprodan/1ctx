@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The root: a public route renders at once; anything else waits for
-// the first load of me, with a retry when that load fails; the login
+// the first load of me in the shell's shape, with a retry when that
+// load fails; the login
 // view when nobody is signed in and the route needs someone; otherwise
 // the shell, the rail beside the view.
 
@@ -12,8 +13,10 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { loadMe, me, meError } from "../data/me.ts";
 import { Icon } from "../lib/icons.tsx";
+import { Bone } from "../ui/Bones.tsx";
+import { PageWaiting } from "../ui/PageWaiting.tsx";
 import { Login } from "../views/home/Login.tsx";
-import { Rail } from "./Rail.tsx";
+import { Rail, RailWaiting } from "./Rail.tsx";
 import { navigate, path, query } from "./router.ts";
 import { ALIASES, match } from "./routes.ts";
 import {
@@ -25,14 +28,21 @@ import {
   railHidden,
 } from "./shell.ts";
 import "./shell.css";
-import { Strip } from "./Strip.tsx";
+import { Strip, StripWaiting } from "./Strip.tsx";
 
 // wide: the rail is a column beside the view, or folded to the strip of
 // its entries as icons. Narrow or short: the rail is a full screen over
 // the view, opened by the same button floating at the top left of the
 // view; while it is open the view under it is inert, and when it closes
-// the focus comes back to that button.
-function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
+// the focus comes back to that button. Before the user is known it is
+// the same frame in bones, with nothing to open.
+function Shell({
+  user,
+  children,
+}: {
+  user: Me | undefined;
+  children: ComponentChildren;
+}) {
   const phone = railDrawer.value;
   const railShown = phone ? drawerOpen.value : !railHidden.value;
   const covered = phone && drawerOpen.value;
@@ -69,20 +79,33 @@ function Shell({ user, children }: { user: Me; children: ComponentChildren }) {
 
   return (
     <div class="shell">
-      {railShown && (
-        <Rail
-          user={user}
-          narrow={phone}
-          onHide={phone ? closeDrawer : hideRail}
-        />
-      )}
-      {!railShown && !phone && <Strip user={user} />}
+      {railShown &&
+        (user === undefined ? (
+          <RailWaiting />
+        ) : (
+          <Rail
+            user={user}
+            narrow={phone}
+            onHide={phone ? closeDrawer : hideRail}
+          />
+        ))}
+      {!railShown &&
+        !phone &&
+        (user === undefined ? <StripWaiting /> : <Strip user={user} />)}
       <main
         ref={main}
         class={`shell-main${railShown ? "" : " shell-main-bare"}`}
         inert={covered}
       >
-        {!railShown && phone && (
+        {!railShown && phone && user === undefined && (
+          <span
+            class="btn-icon shell-show shell-show-float bones-wait"
+            aria-hidden="true"
+          >
+            <Bone kind="glyph" at={0} />
+          </span>
+        )}
+        {!railShown && phone && user !== undefined && (
           <button
             ref={show}
             type="button"
@@ -133,7 +156,13 @@ export function App() {
       const View = m.route.view;
       return <View params={m.params} />;
     }
-    if (meError.value === null) return null;
+    if (meError.value === null) {
+      return (
+        <Shell user={undefined}>
+          <PageWaiting label="Loading 1ctx" />
+        </Shell>
+      );
+    }
     return (
       <main class="shell-fail">
         <p class="error">{meError.value}</p>

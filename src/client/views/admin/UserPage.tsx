@@ -25,7 +25,7 @@ import { useNow } from "../../lib/now.ts";
 import { at } from "../../lib/save.ts";
 import { countOf } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
-import { RowsNote } from "../../ui/Rows.tsx";
+import { RowsNote, RowsWaiting } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { Setting, SettingForm, SettingStack } from "../../ui/Setting.tsx";
 import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
@@ -276,9 +276,11 @@ function ProjectsCard({ user, saving }: CardProps) {
         foot={card.foot()}
       >
         {!loaded ? (
-          <RowsNote>
-            {projectsError.value !== null ? "Did not load." : "Loading"}
-          </RowsNote>
+          projectsError.value !== null ? (
+            <RowsNote>Did not load.</RowsNote>
+          ) : (
+            <RowsWaiting shape="plain" label="Loading projects" />
+          )
         ) : ids.length === 0 ? (
           <RowsNote>No projects yet.</RowsNote>
         ) : (
@@ -307,7 +309,7 @@ function KeysCard({ user }: { user: AdminUser }) {
       list
     >
       {keys === undefined ? (
-        <RowsNote>Loading</RowsNote>
+        <RowsWaiting shape="plain" label="Loading access keys" />
       ) : keys === null ? (
         <RowsNote>Did not load.</RowsNote>
       ) : keys.length === 0 ? (

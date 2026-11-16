@@ -16,6 +16,7 @@ import {
   MAX_WEEKS,
 } from "../../../shared/api/usage.ts";
 import { onResize } from "../../lib/resize.ts";
+import { Bone } from "../../ui/Bones.tsx";
 import { RowsCard } from "../../ui/Rows.tsx";
 import {
   type ActivityCell,
@@ -349,14 +350,13 @@ export function GhostGrid({
         )}
       {Array.from({ length: weeks }, (_, c) =>
         WEEKDAYS.map((_, row) => (
-          <span
+          <Bone
             key={`${c}-${row}`}
-            class="activity-cell activity-ghost"
-            style={{
-              gridColumn: c + 1 + lead,
-              gridRow: row + 1 + lead,
-              "--ghost": c,
-            }}
+            kind="cell"
+            class="activity-cell"
+            // a week's cells pulse together, the weeks one after another
+            at={c * 0.6}
+            place={{ column: c + 1 + lead, row: row + 1 + lead }}
           />
         )),
       )}

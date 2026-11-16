@@ -73,6 +73,10 @@
   .page-crumb-sep {
     flex-shrink: 0;
   }
+  /* a crumb of bones keeps the words' line, so the head lands level */
+  .page-waiting-crumb {
+    min-height: 1lh;
+  }
   /* a step never takes the row: a long name is cut, the hover says it,
      and a path's steps give way well before the title does; the page's
      own words (the project, Knowledge) stay whole */

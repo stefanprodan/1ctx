@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
 import { ShowMore } from "../../../src/client/feed/FeedCard.tsx";
 
-const ghosts = (html: string) => html.split("feed-ghost ").length - 1;
+const ghosts = (html: string) => html.split('feed-ghost"').length - 1;
 
 describe("Show more", () => {
   test("is not there at the end of the list", () => {
@@ -13,6 +13,7 @@ describe("Show more", () => {
       <ShowMore
         more={{ next: false, loading: false, error: null }}
         onMore={() => {}}
+        label="Loading runs"
       />,
     );
     expect(html).toBe("");
@@ -23,6 +24,7 @@ describe("Show more", () => {
       <ShowMore
         more={{ next: true, loading: false, error: null }}
         onMore={() => {}}
+        label="Loading runs"
       />,
     );
     expect(html).toContain("rows-more");
@@ -36,10 +38,17 @@ describe("Show more", () => {
       <ShowMore
         more={{ next: true, loading: true, error: null }}
         onMore={() => {}}
+        label="Loading runs"
       />,
     );
     expect(html).not.toContain("Show more");
     expect(ghosts(html)).toBe(3);
+    // one status named by the caller, its bones hidden
+    expect(html.match(/role="status"/g)?.length).toBe(1);
+    expect(html).toContain('aria-label="Loading runs"');
+    expect(html).not.toContain("Loading sessions");
+    expect(html).toContain("bones-bone");
+    expect(html).not.toContain("feed-bone");
   });
 
   test("says a failure under the button, words then the code", () => {
@@ -51,6 +60,7 @@ describe("Show more", () => {
           error: { words: "server busy", status: 503 },
         }}
         onMore={() => {}}
+        label="Loading runs"
       />,
     );
     expect(html).toContain("Show more");

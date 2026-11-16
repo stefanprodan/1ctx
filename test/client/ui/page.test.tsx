@@ -24,7 +24,9 @@ test("a label, linked crumb, menu and failure keep their controls", () => {
   );
   expect(loading).toMatch(/<h1\b[^>]*>[\s\S]*>Profile<[\s\S]*<\/h1>/);
   expect(loading).toMatch(/<a\b[^>]*href="\/profile"[^>]*>Account<\/a>/);
-  expect(loading).toContain(">Loading<");
+  expect(loading).not.toContain(">Loading<");
+  expect(loading.match(/role="status"/g)?.length).toBe(1);
+  expect(loading).toContain('aria-label="Loading Profile"');
   const empty = render(<Page crumb="" title="Home" empty="Nothing yet" />);
   expect(empty).toMatch(/<h1\b[^>]*>[\s\S]*>Home<[\s\S]*<\/h1>/);
   expect(empty).toContain(">Nothing yet<");
@@ -136,4 +138,47 @@ test("a notice spans the head after the actions, a refusal read out at once", ()
   const notice = render(<PageNotice words="An unsaved edit." />);
   expect(notice).toContain('role="status"');
   expect(notice).toContain("An unsaved edit.");
+});
+
+test("loading draws three rows in a card by default, the head kept", () => {
+  const html = render(
+    <Page crumb="" title="Agents" loading>
+      <p>rows</p>
+    </Page>,
+  );
+  expect(html).toMatch(/<h1\b[^>]*>[\s\S]*>Agents<[\s\S]*<\/h1>/);
+  expect(html).not.toContain("<p>rows</p>");
+  expect(html).toContain('class="card rows-card rows-waiting bones-wait"');
+  expect(html.split('class="rows-item" aria-hidden="true"').length - 1).toBe(3);
+  expect(html.match(/role="status"/g)?.length).toBe(1);
+  expect(html).toContain('aria-label="Loading Agents"');
+});
+
+test("loading draws the view's own waiting shape in place of the rows", () => {
+  const html = render(
+    <Page
+      title="Chat"
+      loading
+      waiting={<div role="status" aria-label="Loading the chat" />}
+    >
+      <p>rows</p>
+    </Page>,
+  );
+  expect(html).toContain('aria-label="Loading the chat"');
+  expect(html).not.toContain("rows-waiting");
+  expect(html).not.toContain("<p>rows</p>");
+  // a failure wins over the wait
+  const failed = render(<Page title="Chat" loading error="gone" />);
+  expect(failed).toContain("This page did not load");
+  expect(failed).not.toContain("rows-waiting");
+});
+
+test("a page that is not loading draws its children, no bones", () => {
+  const html = render(
+    <Page title="Agents" loading={false}>
+      <p>rows</p>
+    </Page>,
+  );
+  expect(html).toContain("<p>rows</p>");
+  expect(html).not.toContain("bones-bone");
 });
