@@ -9,10 +9,11 @@ import type { UserAccessKeysResponse } from "../../shared/api/users.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import type { Clock } from "../lib/clock.ts";
-import { Conflict, Forbidden, NotFound, Unauthorized } from "../lib/errors.ts";
+import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
+import { actingUser } from "./acting.ts";
 import type { Auth } from "./auth.ts";
 import {
   type AccessKeyStore,
@@ -76,22 +77,7 @@ export function keyRoutes(deps: KeyRoutesDeps): RouteDescriptor[] {
         const principal = ctx.principal!;
         const made = transact(deps.db, () => {
           // A reset while the body arrived must not mint a new credential.
-          const login =
-            principal.via.kind === "login"
-              ? deps.logins.byId(principal.via.id)
-              : null;
-          if (
-            login === null ||
-            login.userId !== principal.userId ||
-            login.expiresAt <= deps.clock()
-          ) {
-            throw new Unauthorized();
-          }
-          const owner = user(principal.userId);
-          if (owner.disabled) throw new Forbidden();
-          if (owner.mustChangePassword) {
-            throw new Forbidden("change your password first");
-          }
+          const owner = actingUser(deps, principal);
           const keys = deps.keys.list(owner.id);
           if (keys.some((key) => key.name === parsed.name)) {
             throw new Conflict("access key name is taken");
