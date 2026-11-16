@@ -20,10 +20,10 @@ import { useWaiting } from "../../lib/wait.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RowsWaiting } from "../../ui/Rows.tsx";
 import {
+  AsideBones,
   AsideLine,
   AsideNote,
   AsideSection,
-  AsideWaiting,
   Split,
 } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
@@ -99,10 +99,8 @@ export function Frame({
         aside={
           shown === null ? (
             <>
-              <AsideSection label="About">
-                <AsideWaiting label="Loading the project" lines={3} />
-              </AsideSection>
-              <ActivityAside projectId={id} />
+              <AsideBones label="About" lines={3} />
+              <ActivityAside projectId={id} quiet />
             </>
           ) : (
             <>

@@ -129,12 +129,14 @@
     flex-shrink: 0;
   }
   /* a bone keeps its text's line, so a waiting row is a loaded row's
-     height */
+     height; .rows-name is a centring flex row already */
   .rows-waiting-line .rows-name,
+  .rows-waiting-line .rows-sub {
+    min-height: 1lh;
+  }
   .rows-waiting-line .rows-sub {
     display: flex;
     align-items: center;
-    min-height: 1lh;
   }
 
   /* what reveal() keeps clear when a row opens: the sticky page head

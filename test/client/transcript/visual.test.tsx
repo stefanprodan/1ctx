@@ -34,6 +34,7 @@ import {
   visualFrame,
   visualRow,
 } from "../../fixtures/sessions/visual-client.ts";
+import { withClass } from "../../helpers/classes.ts";
 
 const theme = readTheme("dark", () => "token");
 function player() {
@@ -295,7 +296,8 @@ test("stored cards follow call order, never a failed whole call or memory row", 
     />,
   );
   // nothing painted yet: a box at the frame's height, no word
-  expect(markup).toContain('class="visual-waiting bones-wait" role="status"');
+  expect(withClass(markup, "visual-waiting", "bones-wait")).toBe(1);
+  expect(markup.match(/role="status"/g)?.length).toBe(1);
   expect(markup).toMatch(/aria-label="Loading [^"]+"/);
   expect(markup).not.toContain(">Drawing<");
   expect(markup).toContain('height="80"');

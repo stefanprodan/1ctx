@@ -50,7 +50,12 @@ import { AsideNote, AsideSection, Split } from "../../ui/Split.tsx";
 import { automationEmailItem } from "./Access.model.ts";
 import { AccessSection } from "./AccessSection.tsx";
 import { AttentionSection } from "./AttentionSection.tsx";
-import { ownerNote, staleFailure, staleWords } from "./AutomationEdit.model.ts";
+import {
+  EDITOR_TEXT,
+  ownerNote,
+  staleFailure,
+  staleWords,
+} from "./AutomationEdit.model.ts";
 import { EditorStart } from "./AutomationEditorStart.tsx";
 import {
   automationFieldOf,
@@ -185,7 +190,7 @@ function Editor({
   const kind = (key: string) => switchItem(key, input);
   return (
     <form class="automations-editor" ref={form} onSubmit={submit}>
-      <Section title="Name" text="Unique in this project">
+      <Section title="Name" text={EDITOR_TEXT.name}>
         <NameField
           disabled={off}
           error={save.fieldError("name")}
@@ -193,7 +198,7 @@ function Editor({
           onInput={(name) => set({ name })}
         />
       </Section>
-      <Section title="Instructions" text="The first message of every run">
+      <Section title="Instructions" text={EDITOR_TEXT.instructions}>
         <div class="field">
           <div
             class={`automations-instructions${invalid("instructions") || invalid("agent") ? " automations-instructions-invalid" : ""}`}
@@ -231,7 +236,7 @@ function Editor({
           <FieldError save={save} field="agent" />
         </div>
       </Section>
-      <Section title="Memory" text="What a run remembers">
+      <Section title="Memory" text={EDITOR_TEXT.memory}>
         <div class="field">
           <Seg
             label="Memory"

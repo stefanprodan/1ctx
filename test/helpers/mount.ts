@@ -77,8 +77,17 @@ class FakeNode {
     const parent = this.parentNode;
     if (parent !== null) parent.insertBefore(node, this.nextSibling);
   }
-  // no focus to move, no layout to measure
-  focus(): void {}
+  // the focus is the document's note of it, no layout to measure
+  selectionStart = 0;
+  selectionEnd = 0;
+  focus(): void {
+    fakeDocument.activeElement = this;
+  }
+  scrollTo(): void {}
+  setSelectionRange(start: number, end: number): void {
+    this.selectionStart = start;
+    this.selectionEnd = end;
+  }
   get offsetWidth(): number {
     return 0;
   }
@@ -105,13 +114,23 @@ class FakeNode {
   get outerHTML(): string {
     if (this.nodeName === "#text") return this.data;
     const attrs = [...this.attributes].map(([k, v]) => ` ${k}="${v}"`).join("");
+    // the style object's own properties, as render-to-string writes them
+    const rules = Object.entries(this.style)
+      .filter(([, v]) => typeof v === "string" && v !== "")
+      .map(([k, v]) => `${k}:${v};`)
+      .join("");
+    const style = rules === "" ? "" : ` style="${rules}"`;
     const inner =
       this.innerHTML || this.childNodes.map((c) => c.outerHTML).join("");
-    return `<${this.nodeName}${attrs}>${inner}</${this.nodeName}>`;
+    return `<${this.nodeName}${attrs}${style}>${inner}</${this.nodeName}>`;
   }
 }
 
-const fakeDocument = {
+const fakeDocument: {
+  activeElement: FakeNode | null;
+  [key: string]: unknown;
+} = {
+  activeElement: null,
   createElement: (name: string) => new FakeNode(name),
   createElementNS: (_ns: string, name: string) => new FakeNode(name),
   createTextNode: (data: string) => new FakeNode("#text", data),
@@ -126,8 +145,11 @@ export type Mounted = {
   html(): string;
   // draws the component again with new props, its hooks' state kept
   update(node: VNode): Promise<void>;
-  // types into the first input of the class, and presses Enter there
+  // types into the first input of the class, focused as a reader's
+  // typing does, and presses Enter there
   type(className: string, text: string): Promise<void>;
+  // whether the first input of the class holds the focus
+  focused(className: string): boolean;
   unmount(): Promise<void>;
 };
 
@@ -162,6 +184,7 @@ export async function mount(node: VNode): Promise<Mounted> {
     Object.keys(LAYOUTLESS).map((key) => [key, g[key]]),
   );
   Object.assign(g, LAYOUTLESS);
+  fakeDocument.activeElement = null;
   const root = new FakeNode("div");
   const into = root as unknown as HTMLElement;
   await act(() => render(node, into));
@@ -171,6 +194,7 @@ export async function mount(node: VNode): Promise<Mounted> {
     async type(className, text) {
       const box = inputOf(root, className);
       if (box === null) throw new Error(`no input .${className}`);
+      box.focus();
       // Preact keeps a node's handlers under __e, by prop name; the
       // fake document has no events to dispatch
       const on = (box as unknown as { __e?: Handlers }).__e ?? {};
@@ -183,6 +207,10 @@ export async function mount(node: VNode): Promise<Mounted> {
           preventDefault() {},
         }),
       );
+    },
+    focused: (className) => {
+      const box = inputOf(root, className);
+      return box !== null && fakeDocument.activeElement === box;
     },
     async unmount() {
       await act(() => render(null, into));

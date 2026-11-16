@@ -41,6 +41,7 @@ import { Profile } from "../../../src/client/views/profile/Profile.tsx";
 import { Automation } from "../../../src/client/views/projects/Automation.tsx";
 import { EditorWaiting } from "../../../src/client/views/projects/EditorWaiting.tsx";
 import { Settings } from "../../../src/client/views/projects/Settings.tsx";
+import { withClass } from "../../helpers/classes.ts";
 import { mount } from "../../helpers/mount.ts";
 
 const count = (html: string, part: string) => html.split(part).length - 1;
@@ -86,7 +87,9 @@ describe("an automation waits as its summary and tabs", () => {
     }
     // the asked filter is on before the runs land
     expect(html).toMatch(/seg-on[^>]*>Manual</);
-    expect(html).toContain('aria-label="Loading runs"');
+    // the runs' rows wait quiet: the summary is the page's one status
+    expect(html).toContain("rows-waiting");
+    expect(count(html, 'role="status"')).toBe(1);
     expect(html).not.toContain(">Memory<");
     // the name is a bone, never a stand-in word
     expect(html).not.toContain(">Automation<");
@@ -96,8 +99,9 @@ describe("an automation waits as its summary and tabs", () => {
     path.value = "/automations/a1/memory";
     const html = render(<Automation params={{ id: "a1" }} />);
     expect(html).toContain(">Memory<");
-    expect(html).toContain('aria-label="Loading the memory"');
-    expect(html).not.toContain('aria-label="Loading runs"');
+    expect(html).toContain("note-empty");
+    expect(html).not.toContain("rows-waiting");
+    expect(count(html, 'role="status"')).toBe(1);
   });
 });
 
@@ -130,7 +134,7 @@ describe("the profile waits as its sections", () => {
     expect(html).toContain(">About you<");
     expect(html).toContain(">Password<");
     expect(html).not.toContain(">Email<");
-    expect(count(html, 'class="foot"')).toBe(2);
+    expect(withClass(html, "foot")).toBe(2);
     expect(html).not.toContain(GENERIC);
   });
 
@@ -139,7 +143,7 @@ describe("the profile waits as its sections", () => {
     const html = render(<Profile />);
     expect(html).toContain(">Email<");
     expect(html).toContain(EMAIL_HINT);
-    expect(count(html, 'class="foot"')).toBe(3);
+    expect(withClass(html, "foot")).toBe(3);
   });
 });
 
@@ -172,7 +176,7 @@ describe("Connect agents waits as its keys and setup", () => {
     expect(count(html, "bones-bone-field")).toBe(1);
     expect(count(html, "bones-bone-seg")).toBe(3);
     // Expires after lands with no hint under it
-    expect(count(html, 'class="hint')).toBe(3);
+    expect(withClass(html, "hint")).toBe(3);
   });
 });
 

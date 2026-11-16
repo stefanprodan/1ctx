@@ -9,19 +9,11 @@
 import type { ComponentChildren } from "preact";
 import { Rows, RowsCard, type RowsShape, RowsWaiting } from "../../ui/Rows.tsx";
 import { type CardBones, SettingWaiting } from "../../ui/SettingWaiting.tsx";
-import { AsideSection, AsideWaiting, Split } from "../../ui/Split.tsx";
+import { Split } from "../../ui/Split.tsx";
 import { UsageSection } from "./AdminAside.tsx";
 
-// an aside section's lines while the page loads
-export function AsideBones({ label, lines }: { label: string; lines: number }) {
-  return (
-    <AsideSection label={label}>
-      <AsideWaiting label={`Loading ${label.toLowerCase()}`} lines={lines} />
-    </AsideSection>
-  );
-}
-
-// the usage section an object's aside leads with, with its link
+// the usage section an object's aside leads with, with its link, quiet
+// beside the page's waiting body
 export function UsageBones({
   label,
   lines,
@@ -30,7 +22,7 @@ export function UsageBones({
   lines?: number;
 }) {
   return (
-    <UsageSection value={undefined} label={label} lines={lines}>
+    <UsageSection value={undefined} label={label} lines={lines} quiet>
       {() => null}
     </UsageSection>
   );

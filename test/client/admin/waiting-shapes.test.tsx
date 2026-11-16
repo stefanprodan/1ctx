@@ -57,9 +57,10 @@ describe("a board waits in its landed layout", () => {
     for (const label of ["Signed in", "Recently active", "Inactive"]) {
       expect(html).toContain(`>${label}<`);
     }
-    // the aside's two sections, their lines in bones
-    expect(html).toContain('aria-label="Loading users"');
-    expect(html).toContain('aria-label="Loading projects"');
+    // the aside's two sections, their lines in bones, quiet beside the
+    // body's one status
+    expect(count(html, "split-waiting")).toBe(2);
+    expect(count(html, 'role="status"')).toBe(1);
     // never the generic card of three rows under a bone label
     expect(html).not.toContain("card rows-card rows-waiting");
   });
@@ -69,7 +70,9 @@ describe("a board waits in its landed layout", () => {
     let html = render(<ConfigBoard />);
     expect(html).toContain('aria-current="page"');
     expect(html).toContain(">Built-in tools<");
-    expect(html).toContain('aria-label="Loading instance"');
+    expect(html).toContain(">Instance<");
+    expect(html).toContain("split-waiting");
+    expect(count(html, 'role="status"')).toBe(1);
     path.value = "/admin/config/limits";
     html = render(<ConfigBoard />);
     // the limits cards' titles are the client's own, so they wait in
@@ -104,9 +107,11 @@ describe("an object or a new one waits as its cards", () => {
     expect(html).not.toContain("tabs-count");
     expect(html).toContain(">Identity<");
     expect(html).toContain("bones-bone-prompt");
-    // the aside's usage and Used in
+    // the aside's usage and Used in, quiet beside the cards' one status
     expect(html).toContain(">Last 30 days<");
     expect(html).toContain(">Used in<");
+    expect(count(html, 'role="status"')).toBe(1);
+    expect(html).not.toContain('aria-label="Loading usage"');
     path.value = "/";
   });
 
@@ -134,6 +139,8 @@ describe("a task and a file wait in their own shape", () => {
     expect(html).toContain(">Files<");
     expect(html).toContain(">Activity<");
     expect(html).toContain(">Task<");
+    // the head is the one status; the aside and the activity are quiet
+    expect(count(html, 'role="status"')).toBe(1);
   });
 
   test.serial("a cold file's crumb holds a folder's step and the name", () => {

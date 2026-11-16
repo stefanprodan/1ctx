@@ -21,6 +21,7 @@ import { me } from "../../../src/client/data/me.ts";
 import { loadProfile } from "../../../src/client/data/profile.ts";
 import { session } from "../../../src/client/data/sessions.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
+import { withClass } from "../../helpers/classes.ts";
 
 describe("the route table", () => {
   test("every path matches itself and no other route", () => {
@@ -187,7 +188,7 @@ describe("App before the first load answers", () => {
       path.value = "/";
       const waiting = render(<App />);
       // the shell's shape, not a blank page, and no form
-      expect(waiting).toContain('class="rail bones-wait"');
+      expect(withClass(waiting, "rail", "bones-wait")).toBe(1);
       expect(waiting).toMatch(/role="status" aria-label="Loading 1ctx"/);
       expect(waiting).not.toContain("<form");
     } finally {

@@ -5,8 +5,8 @@
 // a load runs; a word drawn at once beside them would flash on every
 // fast answer, so the words wait SLOW_MS, on the waits' own clock.
 
-import { useEffect, useRef, useState } from "preact/hooks";
-import { REVEAL_MS, waitClock } from "./wait.ts";
+import { useContext, useEffect, useRef, useState } from "preact/hooks";
+import { HandOver, REVEAL_MS, waitClock } from "./wait.ts";
 
 export const SLOW_MS = 1000;
 
@@ -41,15 +41,16 @@ export type Waited = {
 };
 
 // how long loading has held, from the start a carry names when one is
-// given and still fresh
+// given and still fresh, else the shell's wait it goes on with
 export function useWaited(loading: boolean, carry?: string): Waited {
   const since = useRef<number | null>(null);
+  const handed = useContext(HandOver);
   const [, redraw] = useState(0);
   const clock = waitClock();
   const now = clock.now();
   if (loading) {
     since.current ??=
-      (carry === undefined ? null : carriedSince(carry, now)) ?? now;
+      (carry === undefined ? null : carriedSince(carry, now)) ?? handed ?? now;
     if (carry !== undefined) {
       carried.set(carry, { since: since.current, left: null });
     }
@@ -79,6 +80,6 @@ export function useWaited(loading: boolean, carry?: string): Waited {
 }
 
 // true once loading has held SLOW_MS, false again as soon as it ends
-export function useSlow(loading: boolean, carry?: string): boolean {
-  return useWaited(loading, carry).slow;
+export function useSlow(loading: boolean): boolean {
+  return useWaited(loading).slow;
 }

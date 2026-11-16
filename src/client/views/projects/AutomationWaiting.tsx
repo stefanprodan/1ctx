@@ -11,13 +11,12 @@ import type { RunFilter } from "../../../shared/words.ts";
 import { automationHref } from "../../lib/hrefs.ts";
 import { Bone } from "../../ui/Bones.tsx";
 import { RowsCard, RowsFilters, RowsWaiting } from "../../ui/Rows.tsx";
-import { Split } from "../../ui/Split.tsx";
+import { AsideBones, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
-import { AsideBones } from "../admin/AdminWaiting.tsx";
 import { NoteWaiting } from "../memory/Note.tsx";
 import "./automations.css";
 
-export const RUN_FILTERS: { value: RunFilter | null; label: string }[] = [
+const FILTERS: { value: RunFilter | null; label: string }[] = [
   { value: null, label: "All" },
   { value: "manual", label: "Manual" },
   { value: "attention", label: "Flagged" },
@@ -34,7 +33,7 @@ export function RunFilters({
   return (
     <RowsFilters
       label="Filter runs"
-      filters={RUN_FILTERS.map((f) => ({
+      filters={FILTERS.map((f) => ({
         label: f.label,
         on: f.value === filter,
         href: `${automationHref(id)}${f.value === null ? "" : `?runs=${f.value}`}`,
@@ -104,10 +103,10 @@ export function AutomationWaiting({
         active={memory ? `${runs}/memory` : runs}
       />
       {memory ? (
-        <NoteWaiting />
+        <NoteWaiting quiet />
       ) : (
         <RowsCard label="Runs" action={<RunFilters id={id} filter={filter} />}>
-          <RowsWaiting shape="icon" label="Loading runs" />
+          <RowsWaiting shape="icon" />
         </RowsCard>
       )}
     </Split>

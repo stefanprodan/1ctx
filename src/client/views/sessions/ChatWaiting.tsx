@@ -38,7 +38,7 @@ export function ChatWaiting({ run = false }: { run?: boolean }) {
               class={turn.user ? "card chat-waiting-card" : "chat-waiting-text"}
             >
               {turn.lines.map((width, j) => (
-                <span key={j} class="chat-waiting-line">
+                <span key={j} class="bones-lines-line">
                   <Bone kind="line" at={at++} width={width} />
                 </span>
               ))}

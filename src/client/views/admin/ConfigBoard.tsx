@@ -15,9 +15,8 @@ import { tokensText } from "../../lib/format.ts";
 import { Page } from "../../ui/Page.tsx";
 import { RowsCard, RowsWaiting } from "../../ui/Rows.tsx";
 import { SettingWaiting } from "../../ui/SettingWaiting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
-import { AsideBones } from "./AdminWaiting.tsx";
 import { ChatToolCard } from "./ChatToolCard.tsx";
 import {
   automationLine,

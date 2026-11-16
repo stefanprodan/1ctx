@@ -6,10 +6,9 @@
 // the aside's lines, so the page lands in the shape it waited in.
 
 import { Rows, RowsCard, RowsWaiting } from "../../ui/Rows.tsx";
-import { Split } from "../../ui/Split.tsx";
+import { AsideBones, Split } from "../../ui/Split.tsx";
 import { type Tab, Tabs } from "../../ui/Tabs.tsx";
 import { WhoWaiting } from "../../ui/Who.tsx";
-import { AsideBones } from "../admin/AdminWaiting.tsx";
 import { ActivityGhost } from "../projects/Activity.tsx";
 
 export function DirectoryWaiting({
@@ -35,7 +34,7 @@ export function DirectoryWaiting({
       <div class="directory">
         <WhoWaiting label={label} />
         <Rows>
-          <ActivityGhost />
+          <ActivityGhost quiet />
         </Rows>
         <Rows>
           <RowsCard
@@ -46,7 +45,7 @@ export function DirectoryWaiting({
               )
             }
           >
-            <RowsWaiting count={3} shape="plain" label={`Loading ${card}`} />
+            <RowsWaiting count={3} shape="plain" />
           </RowsCard>
         </Rows>
       </div>

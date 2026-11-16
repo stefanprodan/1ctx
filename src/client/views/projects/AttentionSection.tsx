@@ -15,6 +15,7 @@ import {
   attentionOptions,
   guidanceShown,
 } from "./Attention.model.ts";
+import { EDITOR_TEXT } from "./AutomationEdit.model.ts";
 import type { Draft } from "./Automations.model.ts";
 
 export function AttentionSection({
@@ -34,7 +35,7 @@ export function AttentionSection({
   const hint = attentionHint({ takesTools, deciderOn: on });
   const invalid = (field: string) => save.fieldError(field) !== null;
   return (
-    <Section title="Needs attention" text="Who decides a run must be flagged">
+    <Section title="Needs attention" text={EDITOR_TEXT.attention}>
       <div class="field">
         <Seg
           label="Needs attention"

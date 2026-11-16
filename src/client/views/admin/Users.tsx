@@ -21,8 +21,8 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
-import { AsideBones, ListWaiting } from "./AdminWaiting.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { ListWaiting } from "./AdminWaiting.tsx";
 import { NewUser } from "./NewUser.tsx";
 import { metaLine, stateLine, userCounts } from "./Users.model.ts";
 

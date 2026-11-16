@@ -14,6 +14,10 @@ import {
 } from "../../../shared/words.ts";
 import type { Problem } from "../../lib/save.ts";
 
+// the sections' lines, the same while the profile waits and once it lands
+export const ABOUT_TEXT = "What agents should know about you.";
+export const PASSWORD_TEXT = "Changing it signs out every other device.";
+
 export function fullNameProblem(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed === "") return "Enter a name";

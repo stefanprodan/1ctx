@@ -22,9 +22,9 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { countLine } from "./AdminProjects.model.ts";
-import { AsideBones, ListWaiting } from "./AdminWaiting.tsx";
+import { ListWaiting } from "./AdminWaiting.tsx";
 import { NewProject } from "./NewProject.tsx";
 
 export function AdminProjects() {

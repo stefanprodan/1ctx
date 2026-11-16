@@ -44,7 +44,7 @@ import {
   SettingForm,
   SettingStack,
 } from "../../ui/Setting.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { McpServers } from "../projects/McpServers.tsx";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
 import { Repos } from "../projects/Repos.tsx";
@@ -56,7 +56,7 @@ import {
   memberOptions,
   projectFieldOf,
 } from "./AdminProjects.model.ts";
-import { AsideBones, CardsWaiting } from "./AdminWaiting.tsx";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 import { useDraftCard } from "./DraftCard.tsx";
 
 const STEPS = [zoneStep("Access"), { label: "Projects", href: PROJECTS_HREF }];

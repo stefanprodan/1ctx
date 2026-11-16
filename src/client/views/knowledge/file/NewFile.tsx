@@ -20,8 +20,12 @@ import { touch } from "../../../lib/touch.ts";
 import { foldersOf } from "../../../lib/tree.ts";
 import { Bone } from "../../../ui/Bones.tsx";
 import { Page } from "../../../ui/Page.tsx";
-import { AsideLine, AsideSection, Split } from "../../../ui/Split.tsx";
-import { AsideBones } from "../../admin/AdminWaiting.tsx";
+import {
+  AsideBones,
+  AsideLine,
+  AsideSection,
+  Split,
+} from "../../../ui/Split.tsx";
 import { fileHref, knowledgeWords, listHref } from "../Knowledge.model.ts";
 import {
   crumbSteps,

@@ -45,11 +45,6 @@
   .chat-waiting-card {
     padding: var(--space-3) 14px;
   }
-  .chat-waiting-line {
-    display: flex;
-    align-items: center;
-    height: 1lh;
-  }
   /* stuck to the window's edge as the transcript's foot is */
   .chat-waiting-foot {
     position: sticky;

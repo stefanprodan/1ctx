@@ -136,6 +136,7 @@ change it in the same commit as the code that changes a rule.
 | Doc | Governs |
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, themes, helpers |
+| `docs/waits.md` | a client first load: bones, their reveal and hold, hand-overs, statuses, slow words |
 | `docs/shell.md` | the shell, the rail and its Recent list, the drawer, the installed app, app links and `/knowledge/` paths in replies |
 | `docs/views.md` | what a page draws: `views/`, the session list (feed) |
 | `docs/project-settings.md` | a project's repositories and MCP servers lists, on its Settings tab and admin page |

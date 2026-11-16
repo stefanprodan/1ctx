@@ -8,6 +8,7 @@ import type { ComponentChildren } from "preact";
 import { Bone } from "../../ui/Bones.tsx";
 import { SectionsWaiting } from "../../ui/Section.tsx";
 import { Split } from "../../ui/Split.tsx";
+import { EDITOR_TEXT } from "./AutomationEdit.model.ts";
 import "./automations.css";
 
 // a switch over the box of guidance it opens, as the Memory and Needs
@@ -30,10 +31,10 @@ export function EditorWaiting({ aside }: { aside: ComponentChildren }) {
         label="Loading the editor"
         class="automations-editor"
         sections={[
-          { title: "Name", text: "Unique in this project", fields: ["wide"] },
+          { title: "Name", text: EDITOR_TEXT.name, fields: ["wide"] },
           {
             title: "Instructions",
-            text: "The first message of every run",
+            text: EDITOR_TEXT.instructions,
             body: (
               <div class="field">
                 <div class="automations-instructions">
@@ -52,12 +53,12 @@ export function EditorWaiting({ aside }: { aside: ComponentChildren }) {
           },
           {
             title: "Memory",
-            text: "What a run remembers",
+            text: EDITOR_TEXT.memory,
             body: <Guided at={8} rows={4} />,
           },
           {
             title: "Needs attention",
-            text: "Who decides a run must be flagged",
+            text: EDITOR_TEXT.attention,
             body: <Guided at={12} rows={3} />,
           },
         ]}

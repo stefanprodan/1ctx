@@ -266,6 +266,17 @@
     font-size: var(--text-small);
     white-space: nowrap;
   }
+  /* the live region before it has words, and the heading's name while
+     it is a bone: there for a reader, out of the head's row */
+  .page-slow-quiet,
+  .page-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 
   .page-state {
     margin: 0;

@@ -34,7 +34,7 @@ import {
   RowsWaiting,
 } from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
-import { Split } from "../../ui/Split.tsx";
+import { AsideBones, Split } from "../../ui/Split.tsx";
 import {
   accountGroups,
   BOARD_DAYS,
@@ -44,7 +44,6 @@ import {
   signedInHint,
 } from "./AccessBoard.model.ts";
 import { ProjectCountsSection, ProjectRow } from "./AdminProjects.tsx";
-import { AsideBones } from "./AdminWaiting.tsx";
 import { DaysGhost } from "./Days.tsx";
 import { lastActive } from "./Users.model.ts";
 import { RolesSection } from "./Users.tsx";
@@ -102,7 +101,7 @@ function BoardWaiting() {
           <RowsWaiting count={2} label="Loading who was active" />
         </RowsCard>
         <RowsCard label="Inactive">
-          <RowsWaiting count={4} label="Loading who was not" />
+          <RowsWaiting count={4} />
         </RowsCard>
       </Rows>
     </Split>

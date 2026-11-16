@@ -16,6 +16,9 @@ import { PageWaiting } from "../ui/PageWaiting.tsx";
 
 export type Lazy<P> = ComponentType<P> & {
   load(): Promise<void>;
+  // whether the code landed or failed, read from its signals so the
+  // shell redraws when it does: until then the shell's wait goes on
+  settled(): boolean;
   // the shape drawn until the code lands, named for the route table's
   // tests, since a chunk another test loaded draws the view at once
   waiting: ComponentType<P>;
@@ -67,6 +70,7 @@ export function lazy<P>(
     return h(waiting, props as Attributes & P);
   }) as Lazy<P>;
   Lazy.load = load;
+  Lazy.settled = () => ready.value !== null || failure.value !== null;
   Lazy.waiting = waiting;
   return Lazy;
 }

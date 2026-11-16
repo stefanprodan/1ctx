@@ -251,11 +251,15 @@ function Editor({
 
 // the card before the note lands, also the Memory tab's shape while its
 // project loads, so the wait keeps one shape
-export function NoteWaiting() {
+// quiet as a piece of a waiting page, whose body names the wait
+export function NoteWaiting({ quiet = false }: { quiet?: boolean }) {
   return (
     <Rows>
       <RowsCard label="Memory">
-        <LinesWaiting class="note-empty" label="Loading the memory" />
+        <LinesWaiting
+          class="note-empty"
+          label={quiet ? undefined : "Loading the memory"}
+        />
       </RowsCard>
     </Rows>
   );

@@ -274,7 +274,7 @@ export function Rail({
 
 // the projects' rows before the list lands, a project's icon and name;
 // with a label they wait on their own, inside a rail already drawn
-export function RailProjectsWaiting({
+function RailProjectsWaiting({
   count = 3,
   at = 0,
   label,

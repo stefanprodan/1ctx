@@ -13,6 +13,7 @@ import {
   dropCarried,
   SLOW_MS,
   useSlow,
+  useWaited,
 } from "../../../src/client/lib/slow.ts";
 import { setWaitClock } from "../../../src/client/lib/wait.ts";
 import { Loaded } from "../../../src/client/ui/Loaded.tsx";
@@ -76,12 +77,14 @@ test.serial("Page says Still loading in its head once slow", async () => {
     </Page>
   );
   const view = await mount(page(true));
+  // the live region is there from the start, empty, so a reader hears
+  // the words land in it
+  expect(view.html()).toContain('aria-live="polite"></p>');
   expect(view.html()).not.toContain("Still loading");
   await clock.advance(SLOW_MS);
   const slow = view.html();
-  expect(slow).toContain(
-    '<p class="page-slow" role="status">Still loading</p>',
-  );
+  expect(slow).toContain('aria-live="polite">Still loading</p>');
+  expect(slow.match(/role="status"/g)?.length).toBe(1);
   // in the head, beside the body's own status
   const head = slow.slice(0, slow.indexOf('class="card rows-card'));
   expect(head).toContain("page-slow");
@@ -107,7 +110,7 @@ test.serial("a board's first load says Loading only once slow", async () => {
 });
 
 function Carried({ loading }: { loading: boolean }) {
-  return <p>{useSlow(loading, "wait") ? "slow" : "quick"}</p>;
+  return <p>{useWaited(loading, "wait").slow ? "slow" : "quick"}</p>;
 }
 
 test.serial(

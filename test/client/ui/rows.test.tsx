@@ -30,6 +30,7 @@ import {
   RowsWaiting,
 } from "../../../src/client/ui/Rows.tsx";
 import { Seg } from "../../../src/client/ui/Seg.tsx";
+import { withClass } from "../../helpers/classes.ts";
 
 const noop = () => {};
 
@@ -327,7 +328,7 @@ describe("RowsWaiting", () => {
 
   test("a card of its own carries a head, still one status", () => {
     const html = render(<RowsWaiting card label="Loading the page" />);
-    expect(html).toContain('class="card rows-card rows-waiting bones-wait"');
+    expect(withClass(html, "rows-card", "rows-waiting", "bones-wait")).toBe(1);
     expect(html).toContain('class="rows-head" aria-hidden="true"');
     expect(html.match(/role="status"/g)?.length).toBe(1);
   });

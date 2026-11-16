@@ -18,7 +18,7 @@ import {
 import { byName } from "../../lib/search.ts";
 import { Page, PageSwitcher } from "../../ui/Page.tsx";
 import { SettingAlert, SettingStack } from "../../ui/Setting.tsx";
-import { AsideLine, AsideRead, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideRead, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import { AgentGeneral } from "./AgentGeneral.tsx";
@@ -28,7 +28,7 @@ import { AgentDrafts } from "./AgentPage.state.ts";
 import { AgentSkills } from "./AgentSkills.tsx";
 import { useRowDrafts, useShownRow } from "./drafts.ts";
 import "./agent-page.css";
-import { AsideBones, CardsWaiting } from "./AdminWaiting.tsx";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 
 const STEPS = [zoneStep("Config"), { label: "Agents", href: AGENTS_HREF }];
 

@@ -82,7 +82,7 @@ describe("the wait's hold", () => {
     ).toEqual([true, true, true, true, true, false]);
   });
 
-  test("the clock is the caller's to replace", () => {
+  test.serial("the clock is the caller's to replace", () => {
     const fake = { now: () => 0, after: () => () => {} };
     const was = setWaitClock(fake);
     expect(setWaitClock(was)).toBe(fake);

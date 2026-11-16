@@ -118,8 +118,12 @@ export function Page({
   }, [stuck]);
   // a failed page never learns the name, so its bone goes with it
   const nameBone = failed === null ? <NameBone /> : null;
-  const shownSteps =
-    failed === null ? steps : steps?.filter((step) => step.label !== null);
+  // the title's bone names the heading, which has no other words yet
+  const titleBone = failed === null ? <NameBone named /> : null;
+  // an empty label is a name that never lands (knownProjectName)
+  const shownSteps = steps?.filter(
+    (step) => step.label !== "" && (failed === null || step.label !== null),
+  );
   const row = (
     <>
       {shownSteps !== undefined ? (
@@ -148,7 +152,7 @@ export function Page({
           })}
           {menu === undefined ? (
             title === null ? (
-              nameBone
+              titleBone
             ) : titleHref !== undefined ? (
               <a
                 class={`page-crumb-on page-crumb-link${
@@ -189,7 +193,7 @@ export function Page({
           )}
           {menu === undefined ? (
             title === null ? (
-              nameBone
+              titleBone
             ) : (
               <span class="page-crumb-on">{title}</span>
             )
@@ -200,7 +204,7 @@ export function Page({
       ) : (
         <div class="page-heading">
           {label && <span class="label">{label}</span>}
-          <h1 class="page-title">{title ?? nameBone}</h1>
+          <h1 class="page-title">{title ?? titleBone}</h1>
         </div>
       )}
       {actions && <div class="page-actions">{actions}</div>}
@@ -223,11 +227,14 @@ export function Page({
         ref={head}
       >
         {split ? <div class="page-head-main">{row}</div> : row}
-        {slow && (
-          <p class="page-slow" role="status">
-            Still loading
-          </p>
-        )}
+        {/* a live region mounted from the start, so a reader hears the
+            words that fill it, and no second status beside the body's */}
+        <p
+          class={`page-slow${slow ? "" : " page-slow-quiet"}`}
+          aria-live="polite"
+        >
+          {slow ? "Still loading" : ""}
+        </p>
       </div>
       {failed ? (
         <div class="notice-failed page-failed" role="alert">
@@ -266,10 +273,11 @@ export function Page({
 
 // a name the head shows once it is known, at a short name's width; a
 // far step's bone goes where its name would on a phone
-function NameBone({ far = "" }: { far?: string }) {
+function NameBone({ far = "", named }: { far?: string; named?: boolean }) {
   return (
     <span class={`page-crumb-bone bones-wait${far}`}>
       <Bone kind="line" at={0} width={100} />
+      {named && <span class="page-hidden">Loading</span>}
     </span>
   );
 }

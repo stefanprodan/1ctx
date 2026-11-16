@@ -13,6 +13,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { loadMe, me, meError } from "../data/me.ts";
 import { Icon } from "../lib/icons.tsx";
+import { type HandedWait, HandOver, useHandOver } from "../lib/wait.ts";
 import { Bone } from "../ui/Bones.tsx";
 import { PageWaiting } from "../ui/PageWaiting.tsx";
 import { Login } from "../views/home/Login.tsx";
@@ -39,9 +40,12 @@ import { Strip, StripWaiting } from "./Strip.tsx";
 // the same frame in bones, with nothing to open.
 function Shell({
   user,
+  waited,
   children,
 }: {
   user: Me | undefined;
+  // the shell's wait while it is carried (useHandOver)
+  waited: HandedWait;
   children: ComponentChildren;
 }) {
   const phone = railDrawer.value;
@@ -95,7 +99,14 @@ function Shell({
         (user === undefined ? <StripWaiting /> : <Strip user={user} />)}
       <main
         ref={main}
-        class={`shell-main${railShown ? "" : " shell-main-bare"}`}
+        class={`shell-main${railShown ? "" : " shell-main-bare"}${
+          waited.waited === null ? "" : " bones-waited"
+        }`}
+        style={
+          waited.waited === null
+            ? undefined
+            : { "--waited": `${waited.waited}ms` }
+        }
         inert={covered}
       >
         {!railShown && phone && user === undefined && (
@@ -117,7 +128,7 @@ function Shell({
             <Icon name="sidebar" />
           </button>
         )}
-        {children}
+        <HandOver.Provider value={waited.since}>{children}</HandOver.Provider>
       </main>
     </div>
   );
@@ -131,6 +142,17 @@ export function App() {
   useEffect(() => {
     void loadMe();
   }, []);
+  // the shell waits for me, then for the view's code, as one wait
+  const shellWaits =
+    m?.route.bare !== true &&
+    ((user === undefined && needsUser && meError.value === null) ||
+      (user != null && m !== null && !m.route.view.settled()));
+  // the view's code loads beside me, not once me lands, and loads even
+  // where the shell draws no view, so the wait always ends
+  if (shellWaits && m !== null && !m.route.view.settled()) {
+    void m.route.view.load();
+  }
+  const waited = useHandOver(shellWaits, path.value);
 
   // one who must change the password they were handed lands on the
   // profile, where the server lets them go
@@ -165,7 +187,7 @@ export function App() {
           ? m.route.view.waiting
           : null;
       return (
-        <Shell user={undefined}>
+        <Shell user={undefined} waited={waited}>
           {Shape !== null && m !== null ? (
             <Shape params={m.params} />
           ) : (
@@ -192,14 +214,14 @@ export function App() {
   if (user.mustChangePassword && m.route.path !== "/profile") return null;
   if (m.route.role === "admin" && user.role !== "admin") {
     return (
-      <Shell user={user}>
+      <Shell user={user} waited={waited}>
         <p class="error">This page is for admins.</p>
       </Shell>
     );
   }
   const View = m.route.view;
   return (
-    <Shell user={user}>
+    <Shell user={user} waited={waited}>
       <View params={m.params} />
     </Shell>
   );

@@ -147,7 +147,7 @@ describe("the Activity card", () => {
     recentDays.value = null;
     const ghost = render(<ActivityAside projectId="p1" />);
     expect(ghost).toContain('aria-label="Loading activity"');
-    expect(ghost).toContain('class="activity-grid activity-grid-compact"');
+    expect(ghost).toMatch(/class="activity-grid [^"]*activity-grid-compact/);
     expect(ghost.match(/bones-bone-cell/g)).toHaveLength(16 * 7);
     expect(ghost).not.toContain("activity-weekday");
     recentDaysFailed.value = true;

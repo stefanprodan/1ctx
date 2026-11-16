@@ -8,7 +8,7 @@
 
 import type { ComponentChildren } from "preact";
 import "./rows.css";
-import { Bone } from "./Bones.tsx";
+import { Bone, waitRole } from "./Bones.tsx";
 
 // what leads a row: an avatar (a member, an agent, an automation's
 // clock), a chevron's icon, or nothing
@@ -27,19 +27,23 @@ export function RowsWaiting({
   label,
   card,
   end,
+  sub = true,
 }: {
   count?: number;
   shape?: RowsShape;
-  // what is loading, for a screen reader: "Loading automations"
-  label: string;
+  // what is loading, for a screen reader: "Loading automations"; none
+  // for a piece of a wait whose outer body says it
+  label?: string;
   // a card of its own with a head, for a page whose card waits too
   card?: boolean;
   // the meta's own bones, for a row whose end is no short word (the
   // projects' activity strip); a chip when none is given
   end?: ComponentChildren;
+  // false for rows of a name alone (a switch's row)
+  sub?: boolean;
 }) {
   const rows = Array.from({ length: count }, (_, i) => {
-    const [title, sub] = WIDTHS[i % WIDTHS.length];
+    const [title, subWidth] = WIDTHS[i % WIDTHS.length];
     const at = i * 4;
     return (
       <div key={i} class="rows-item" aria-hidden="true">
@@ -54,9 +58,11 @@ export function RowsWaiting({
             <span class="rows-name">
               <Bone kind="line" at={at + 1} width={title} />
             </span>
-            <span class="rows-sub">
-              <Bone kind="line" at={at + 2} width={sub} />
-            </span>
+            {sub && (
+              <span class="rows-sub">
+                <Bone kind="line" at={at + 2} width={subWidth} />
+              </span>
+            )}
           </span>
           <span class="rows-meta rows-meta-keep">
             {end ?? <Bone kind="chip" at={at + 3} />}
@@ -67,17 +73,13 @@ export function RowsWaiting({
   });
   if (!card) {
     return (
-      <div class="rows-waiting bones-wait" role="status" aria-label={label}>
+      <div class="rows-waiting bones-wait" {...waitRole(label)}>
         {rows}
       </div>
     );
   }
   return (
-    <div
-      class="card rows-card rows-waiting bones-wait"
-      role="status"
-      aria-label={label}
-    >
+    <div class="card rows-card rows-waiting bones-wait" {...waitRole(label)}>
       <div class="rows-head" aria-hidden="true">
         <Bone kind="label" at={0} />
       </div>

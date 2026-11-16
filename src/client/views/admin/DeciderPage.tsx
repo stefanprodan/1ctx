@@ -36,7 +36,7 @@ import {
   SettingForm,
   SettingStack,
 } from "../../ui/Setting.tsx";
-import { AsideItem, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideItem, AsideSection, Split } from "../../ui/Split.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import { DeciderModelFields } from "./DeciderModelFields.tsx";
 import { DeciderDrafts } from "./DeciderPage.state.ts";
@@ -50,7 +50,7 @@ import { DECISION_WORDS } from "./Decisions.model.ts";
 import { DraftFoot } from "./DraftFoot.tsx";
 import { holding, useLatest, useRowDrafts, useShownRow } from "./drafts.ts";
 import "./decider-page.css";
-import { AsideBones, CardsWaiting } from "./AdminWaiting.tsx";
+import { CardsWaiting } from "./AdminWaiting.tsx";
 
 const STEPS = [zoneStep("Config"), { label: "Deciders", href: DECIDERS_HREF }];
 

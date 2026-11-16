@@ -65,6 +65,13 @@ import {
 } from "./ExternalTasks.model.ts";
 import "./external-tasks.css";
 
+// the sections' lines, the same while the new task's form waits
+const FORM_TEXT = {
+  task: "The agent's goal",
+  labels: "What kind of work it is",
+  files: "Knowledge files the agent reads",
+} as const;
+
 export function TaskForm({
   projectId,
   detail,
@@ -159,7 +166,7 @@ export function TaskForm({
   };
   return (
     <form class="external-tasks-form" ref={form} onSubmit={submit}>
-      <Section title="Task" text="The agent's goal">
+      <Section title="Task" text={FORM_TEXT.task}>
         <div class="pair">
           <label class="field">
             <span class="label label-required">Title</span>
@@ -179,7 +186,7 @@ export function TaskForm({
           </label>
         </div>
       </Section>
-      <Section title="Labels" text="What kind of work it is">
+      <Section title="Labels" text={FORM_TEXT.labels}>
         <div class="field">
           <RowsList>
             {d.labels.length === 0 && <RowsNote>No labels picked.</RowsNote>}
@@ -234,7 +241,7 @@ export function TaskForm({
           )}
         </div>
       </Section>
-      <Section title="Files" text="Knowledge files the agent reads">
+      <Section title="Files" text={FORM_TEXT.files}>
         <div class="field">
           <RowsList>
             {d.fileIds.length === 0 && <RowsNote>No files linked.</RowsNote>}
@@ -341,18 +348,18 @@ export function NewExternalTask({ params }: { params: Params }) {
             sections={[
               {
                 title: "Task",
-                text: "The agent's goal",
+                text: FORM_TEXT.task,
                 fields: ["input"],
               },
               {
                 title: "Labels",
-                text: "What kind of work it is",
+                text: FORM_TEXT.labels,
                 fields: ["box", "button"],
                 bare: true,
               },
               {
                 title: "Files",
-                text: "Knowledge files the agent reads",
+                text: FORM_TEXT.files,
                 fields: ["box", "button"],
                 bare: true,
               },

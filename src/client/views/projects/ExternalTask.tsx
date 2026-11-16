@@ -30,11 +30,11 @@ import { Bone, LinesWaiting } from "../../ui/Bones.tsx";
 import { Page, PageNotice } from "../../ui/Page.tsx";
 import { RowsCard } from "../../ui/Rows.tsx";
 import {
+  AsideBones,
   AsideHandle,
   AsideLine,
   AsideNames,
   AsideSection,
-  AsideWaiting,
   Split,
 } from "../../ui/Split.tsx";
 import { TaskFiles } from "./ExternalTaskFiles.tsx";
@@ -224,13 +224,7 @@ export function TaskBody({
 // aside it lands with
 function TaskWaiting() {
   return (
-    <Split
-      aside={
-        <AsideSection label="Task">
-          <AsideWaiting label="Loading the task's facts" lines={2} />
-        </AsideSection>
-      }
-    >
+    <Split aside={<AsideBones label="Task" lines={2} />}>
       <div
         class="external-tasks-head bones-wait"
         role="status"
@@ -261,7 +255,7 @@ function TaskWaiting() {
       </RowsCard>
       <section class="external-tasks-activity" aria-label="Activity">
         <h2 class="label external-tasks-activity-label">Activity</h2>
-        <LinesWaiting lines={1} label="Loading the activity" />
+        <LinesWaiting lines={1} />
       </section>
     </Split>
   );

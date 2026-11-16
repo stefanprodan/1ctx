@@ -719,7 +719,7 @@ describe("the pages", () => {
       expect(html.match(/class="card rows-card"/g)).toHaveLength(2);
       expect(html).toContain('aria-label="Loading activity"');
       // and each row's strip pulses in its place
-      expect(html.match(/class="activity-strip"/g)).toHaveLength(2);
+      expect(html.match(/class="activity-strip[ "]/g)).toHaveLength(2);
       expect(html.indexOf('href="/projects/p1"')).toBeLessThan(
         html.indexOf('href="/projects/p2"'),
       );

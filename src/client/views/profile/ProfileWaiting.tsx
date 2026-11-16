@@ -7,13 +7,12 @@
 
 import { emailOn } from "../../data/me.ts";
 import { Bone } from "../../ui/Bones.tsx";
-import { RowsList } from "../../ui/Rows.tsx";
+import { RowsList, RowsWaiting } from "../../ui/Rows.tsx";
 import { SectionsWaiting } from "../../ui/Section.tsx";
 import { FieldBone } from "../../ui/SettingWaiting.tsx";
-import { Split } from "../../ui/Split.tsx";
+import { AsideBones, Split } from "../../ui/Split.tsx";
 import { WhoWaiting } from "../../ui/Who.tsx";
-import { AsideBones } from "../admin/AdminWaiting.tsx";
-import { EMAIL_HINT } from "./Profile.model.ts";
+import { ABOUT_TEXT, EMAIL_HINT, PASSWORD_TEXT } from "./Profile.model.ts";
 import "./profile.css";
 
 export function ProfileWaiting() {
@@ -26,7 +25,7 @@ export function ProfileWaiting() {
         sections={[
           {
             title: "About you",
-            text: "What agents should know about you.",
+            text: ABOUT_TEXT,
             body: (
               <div class="profile-fields">
                 <FieldBone kind="wide" at={0} />
@@ -51,19 +50,7 @@ export function ProfileWaiting() {
                   body: (
                     <div class="field">
                       <RowsList>
-                        <div class="rows-line rows-waiting-line">
-                          <Bone
-                            kind="avatar"
-                            at={6}
-                            class="rows-waiting-avatar"
-                          />
-                          <span class="rows-title">
-                            <span class="rows-name">
-                              <Bone kind="line" at={7} width={34} />
-                            </span>
-                          </span>
-                          <Bone kind="chip" at={8} />
-                        </div>
+                        <RowsWaiting count={1} sub={false} />
                       </RowsList>
                       <span class="hint">{EMAIL_HINT}</span>
                     </div>
@@ -74,7 +61,7 @@ export function ProfileWaiting() {
             : []),
           {
             title: "Password",
-            text: "Changing it signs out every other device.",
+            text: PASSWORD_TEXT,
             body: (
               <div class="profile-fields">
                 <FieldBone kind="wide" at={12} />

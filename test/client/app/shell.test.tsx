@@ -31,6 +31,7 @@ import {
 } from "../../../src/client/app/shell.ts";
 import { me, meError } from "../../../src/client/data/me.ts";
 import { MONITOR_HREF } from "../../../src/client/lib/hrefs.ts";
+import { withClass } from "../../helpers/classes.ts";
 
 const store = new Map<string, string>();
 const fakeStorage = {
@@ -136,7 +137,10 @@ describe("the shell before the user is known", () => {
   test.serial("draws the rail and a page in bones, not nothing", () => {
     const html = render(<App />);
     expect(html).toContain('class="shell"');
-    expect(html).toContain('class="rail bones-wait" aria-hidden="true"');
+    expect(withClass(html, "rail", "bones-wait")).toBe(1);
+    expect(html).toMatch(
+      /class="(?:[^"]* )?rail(?: [^"]*)?" aria-hidden="true"/,
+    );
     // a bone for each entry's icon and a few projects
     expect(html.split('class="rail-item"').length - 1).toBeGreaterThan(1);
     expect(html.split('class="rail-sub rail-sub-icon"').length - 1).toBe(3);
@@ -149,7 +153,7 @@ describe("the shell before the user is known", () => {
   test.serial("a folded rail waits as the strip, its button live", () => {
     hideRail();
     const html = render(<App />);
-    expect(html).toContain('class="strip bones-wait"');
+    expect(withClass(html, "strip", "bones-wait")).toBe(1);
     expect(html).toContain('aria-label="Show the menu"');
     expect(html).not.toContain('class="rail');
   });
@@ -157,10 +161,8 @@ describe("the shell before the user is known", () => {
   test.serial("a phone keeps the floating button's place", () => {
     railDrawer.value = true;
     const html = render(<App />);
-    expect(html).toContain('class="shell-main shell-main-bare"');
-    expect(html).toMatch(
-      /<span class="btn-icon shell-show shell-show-float bones-wait" aria-hidden="true">/,
-    );
+    expect(withClass(html, "shell-main", "shell-main-bare")).toBe(1);
+    expect(withClass(html, "shell-show-float", "bones-wait")).toBe(1);
     expect(html).not.toContain('aria-label="Show the menu"');
     expect(html).not.toContain('class="rail');
   });

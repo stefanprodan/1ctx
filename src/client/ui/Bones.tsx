@@ -107,6 +107,17 @@ export function BarsGhost({
   );
 }
 
+// A waiting body is one role="status" named by its label. A piece of a
+// wait whose outer body already says so (an aside's bones beside a
+// waiting page) passes none and is hidden, so a reader hears one wait.
+export function waitRole(
+  label: string | undefined,
+): { role: "status"; "aria-label": string } | { "aria-hidden": "true" } {
+  return label === undefined
+    ? { "aria-hidden": "true" }
+    : { role: "status", "aria-label": label };
+}
+
 // line widths varied so the bones read as a paragraph's words
 const LINES = [88, 72, 94, 46, 80, 60];
 
@@ -118,16 +129,16 @@ export function LinesWaiting({
   lines = 3,
   class: extra,
 }: {
-  // what is loading, for a screen reader: "Loading the revision"
-  label: string;
+  // what is loading, for a screen reader: "Loading the revision"; none
+  // for a piece of a wait whose outer body says it
+  label?: string;
   lines?: number;
   class?: string;
 }) {
   return (
     <div
       class={`bones-lines bones-wait${extra ? ` ${extra}` : ""}`}
-      role="status"
-      aria-label={label}
+      {...waitRole(label)}
     >
       {Array.from({ length: lines }, (_, i) => (
         <span key={i} class="bones-lines-line" aria-hidden="true">

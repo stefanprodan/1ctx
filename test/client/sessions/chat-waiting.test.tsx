@@ -9,6 +9,7 @@
 
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { recent } from "../../../src/client/app/Recent.state.ts";
 import { path, query } from "../../../src/client/app/router.ts";
 import { match } from "../../../src/client/app/routes.ts";
 import { me } from "../../../src/client/data/me.ts";
@@ -20,6 +21,7 @@ import {
   projectAgents,
 } from "../../../src/client/data/sessions.ts";
 import { Chat, Run } from "../../../src/client/views/sessions/Chat.tsx";
+import type { ProjectSummary } from "../../../src/shared/contracts/project.ts";
 import type {
   SessionDetail,
   SessionSummary,
@@ -107,7 +109,10 @@ function expectWaiting(html: string, label: string) {
   expect(html.match(/role="status"/g)?.length).toBe(1);
   expect(html).toContain(`aria-label="${label}"`);
   expect(html.split('class="chat-waiting-turn"').length - 1).toBe(3);
-  expect(html).not.toContain(">Loading<");
+  // no Loading line: the title bone's hidden name is for a reader
+  expect(
+    html.replaceAll('<span class="page-hidden">Loading</span>', ""),
+  ).not.toContain(">Loading<");
   expect(html).not.toContain('name="message"');
 }
 
@@ -116,14 +121,50 @@ test.serial("a chat loading draws its turns and composer in bones", () => {
   const html = render(<Chat params={{ id: "s1" }} />);
   expectWaiting(html, "Loading the chat");
   expect(html).toContain("card chat-waiting-composer");
-  // the head stays the page's own, the project a bone until it is known
-  expect(html).toContain(">Chat<");
-  expect(html).toContain("page-crumb-bone");
+  // the project and the title are bones until known, never a stand-in
+  // word, and the heading still has a name
+  expect(html).not.toContain(">Chat<");
+  expect(html.split("page-crumb-bone").length - 1).toBe(2);
+  expect(html).toContain('<span class="page-hidden">Loading</span>');
   expect(html).not.toContain(">Project<");
   // a run's foot is its state line, no composer
   const run = render(<Run params={{ id: "s1" }} />);
   expectWaiting(run, "Loading the run");
   expect(run).not.toContain("chat-waiting-composer");
+});
+
+test.serial("the rail's Recent row names the chat and its project", () => {
+  projects.value = [
+    {
+      id: "p1",
+      name: "Platform",
+      kind: "team",
+      members: [],
+    } as unknown as ProjectSummary,
+  ];
+  recent.value = [
+    {
+      kind: "chat",
+      id: "s1",
+      projectId: "p1",
+      automationId: null,
+      title: "Deploy notes",
+    },
+  ];
+  try {
+    void loadSession("s1");
+    const html = render(<Chat params={{ id: "s1" }} />);
+    expectWaiting(html, "Loading the chat");
+    expect(html).toContain(">Deploy notes<");
+    expect(html).toContain(">Platform<");
+    expect(html).not.toContain("page-crumb-bone");
+    // a run's page never takes a chat's row
+    const run = render(<Run params={{ id: "s1" }} />);
+    expect(run).not.toContain(">Deploy notes<");
+  } finally {
+    recent.value = [];
+    projects.value = null;
+  }
 });
 
 test.serial("a kept chat draws at once, with no bones", async () => {

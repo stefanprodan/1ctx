@@ -13,6 +13,7 @@ import {
   recentDays,
   recentDaysFailed,
 } from "../../data/usage.ts";
+import { waitRole } from "../../ui/Bones.tsx";
 import { AsideSection } from "../../ui/Split.tsx";
 import { activityModel, projectAnswer } from "./Activity.model.ts";
 import { ActivityGrid, GhostGrid, useDaySelection } from "./Activity.tsx";
@@ -42,7 +43,14 @@ function Recent({ answer }: { answer: DaysUsageResponse }) {
   );
 }
 
-export function ActivityAside({ projectId }: { projectId: string }) {
+export function ActivityAside({
+  projectId,
+  quiet = false,
+}: {
+  projectId: string;
+  // its wait is a waiting page's piece, which the page's body names
+  quiet?: boolean;
+}) {
   const all = recentDays.value;
   // the same object until the answer or the project changes: a new one
   // is a new window, and the selection lets go of its day
@@ -57,7 +65,10 @@ export function ActivityAside({ projectId }: { projectId: string }) {
         <>
           <GhostGrid weeks={RECENT_WEEKS} labels={false} />
           {/* the line the total goes on, so the sections under it stay put */}
-          <p class="split-empty" role="status" aria-label="Loading activity">
+          <p
+            class="split-empty"
+            {...waitRole(quiet ? undefined : "Loading activity")}
+          >
             {"\u00a0"}
           </p>
         </>

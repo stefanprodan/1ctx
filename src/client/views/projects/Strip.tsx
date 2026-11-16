@@ -35,7 +35,7 @@ export function Strip({
 // the strip while the year loads, its squares pulsing one after another
 export function StripGhost() {
   return (
-    <span class="activity-strip" aria-hidden="true">
+    <span class="activity-strip bones-wait" aria-hidden="true">
       {Array.from({ length: STRIP_DAYS }, (_, i) => (
         <Bone key={i} kind="cell" at={i * 0.6} class="activity-cell" />
       ))}

@@ -8,12 +8,16 @@ import "./search.css";
 
 const SEARCH_DELAY = 200;
 
-// A box swapped for another of the same name in one render (a list's
-// waiting card for its landed one) hands over its focus, caret and any
-// text still waiting to be written, so typing goes on through the swap.
-// Dropped once that render is done, so no later box takes it.
+// A box swapped for another over the same query in one render (a list's
+// waiting card for its landed one, both bound to the signal held above
+// the wait) hands over its focus, caret and any text still waiting to be
+// written, so typing goes on through the swap. Matched on the signal,
+// never the words: two pages' boxes say the same (Search sessions), and
+// a route change must not move text into the next page's. A box bound
+// by value hands nothing over. Dropped once that render is done, so no
+// later box takes it.
 type Handoff = {
-  placeholder: string;
+  query: Signal<string>;
   text: string;
   start: number;
   end: number;
@@ -27,6 +31,7 @@ export function Search(
   ),
 ) {
   const { placeholder } = props;
+  const query = "query" in props ? props.query : null;
   const value = "query" in props ? props.query.value : props.value;
   const onChange =
     "query" in props
@@ -53,7 +58,7 @@ export function Search(
   useLayoutEffect(() => {
     const el = box.current;
     const held = handoff;
-    if (el !== null && held !== null && held.placeholder === placeholder) {
+    if (el !== null && held !== null && held.query === query) {
       handoff = null;
       el.focus();
       el.setSelectionRange(held.start, held.end);
@@ -63,9 +68,11 @@ export function Search(
       }
     }
     return () => {
-      if (el === null || document.activeElement !== el) return;
+      if (el === null || query === null || document.activeElement !== el) {
+        return;
+      }
       handoff = {
-        placeholder,
+        query,
         text: text.value,
         start: el.selectionStart ?? 0,
         end: el.selectionEnd ?? 0,

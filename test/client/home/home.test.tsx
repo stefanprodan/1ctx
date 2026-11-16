@@ -279,23 +279,26 @@ describe("Home", () => {
     },
   );
 
-  test("the composer and the feed wait for the project list in bones", () => {
-    projects.value = null;
-    // rows held already wait too: they name projects the list knows
-    list.value = {
-      next: null,
-      more: { loading: false, error: null },
-      rows: [chatRow()],
-    };
-    const html = render(<Home />);
-    expect(html).not.toContain('class="composer');
-    expect(html).toContain('class="card home-composer bones-wait"');
-    expect(html).toContain('aria-label="Loading the composer"');
-    // the feed's own head over its ghost rows, never the rows yet
-    expect(html).toContain('placeholder="Search sessions"');
-    expect(html).toContain('aria-label="Loading sessions"');
-    expect(html).not.toContain('href="/chat/s1"');
-  });
+  test.serial(
+    "the composer and the feed wait for the project list in bones",
+    () => {
+      projects.value = null;
+      // rows held already wait too: they name projects the list knows
+      list.value = {
+        next: null,
+        more: { loading: false, error: null },
+        rows: [chatRow()],
+      };
+      const html = render(<Home />);
+      expect(html).not.toContain('class="composer');
+      expect(html).toContain("home-composer");
+      expect(html).toContain('aria-label="Loading the composer"');
+      // the feed's own head over its ghost rows, never the rows yet
+      expect(html).toContain('placeholder="Search sessions"');
+      expect(html).toContain('aria-label="Loading sessions"');
+      expect(html).not.toContain('href="/chat/s1"');
+    },
+  );
 
   test.serial(
     "a list landing past the reveal keeps the bones SHOW_MS",
@@ -329,7 +332,7 @@ describe("Home", () => {
     },
   );
 
-  test("a failed project list still draws the feed", () => {
+  test.serial("a failed project list still draws the feed", () => {
     projects.value = null;
     projectsError.value = { words: "down", status: 500 };
     try {

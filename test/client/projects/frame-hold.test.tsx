@@ -147,6 +147,9 @@ test.serial(
     expect(cold).toContain(">About<");
     expect(cold).toContain("split-aside");
     expect(cold).toContain('aria-label="Loading the project"');
+    // the tab's bones are the one status, the aside's pieces quiet
+    expect(cold.match(/role="status"/g)?.length).toBe(1);
+    expect(cold.match(/aria-label="Loading the project"/g)?.length).toBe(1);
     await view.unmount();
   },
 );

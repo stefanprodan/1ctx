@@ -36,7 +36,7 @@ import {
   RowsTitle,
 } from "../../ui/Rows.tsx";
 import { Search } from "../../ui/Search.tsx";
-import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
+import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import {
   deciderFields,
@@ -46,7 +46,7 @@ import {
   roleWords,
 } from "./Directory.model.ts";
 import "./directory.css";
-import { AsideBones, ListWaiting } from "../admin/AdminWaiting.tsx";
+import { ListWaiting } from "../admin/AdminWaiting.tsx";
 
 type ListedUser = NonNullable<typeof directoryUsers.value>[number];
 type ListedAgent = NonNullable<typeof directoryAgents.value>[number];
