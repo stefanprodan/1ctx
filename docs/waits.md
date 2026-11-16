@@ -18,7 +18,13 @@ hears and the slow words. The primitives and the data layer are in
   (`ui/RowsWaiting.tsx`) with its row's shape; `Page`'s `loading`
   draws its `waiting`, the page's landed layout (`docs/views.md`),
   cards as `SettingWaiting`, a Section page as `SectionsWaiting`, a
-  textarea as a `rows` bone in its font. `RowsNote` is for real notes.
+  textarea as a `rows` bone in its font, a box of text cut at its
+  first lines (a skill's file) as that many lines, the box cut at their
+  height too so a phone's wrapped lines never outgrow its wait. A line
+  whose words the answer picks (a mode's) is a `WordsBone` over the
+  likeliest words, unseen, so its bones wrap as they would; a shape the
+  row sets (an editor's guidance boxes) follows the row once it is in,
+  else the form most pages land with. `RowsNote` is for real notes.
   An aside's section waits as `AsideWaiting` (Split.tsx), beside a
   waiting page as `AsideBones`, a box of text (a revision, a diff, a
   note, a tool's result) as `LinesWaiting` (Bones.tsx) in its owner's

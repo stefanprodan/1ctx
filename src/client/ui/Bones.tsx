@@ -82,6 +82,17 @@ export function Bone({
   );
 }
 
+// A line of words known only with the answer, drawn as bones over the
+// likeliest words, unseen, so its bones wrap onto as many lines as the
+// landed words on any width.
+export function WordsBone({ at, words }: { at: number; words: string }) {
+  return (
+    <span class="bones-words" aria-hidden="true" style={{ "--ghost": at }}>
+      {words}
+    </span>
+  );
+}
+
 // the bar rows while they load
 export function BarsGhost({
   widths,

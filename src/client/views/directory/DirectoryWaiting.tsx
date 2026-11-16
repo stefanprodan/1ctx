@@ -18,6 +18,7 @@ export function DirectoryWaiting({
   card,
   tabs,
   active,
+  narrow,
 }: {
   // what is loading, for a screen reader: "Loading the user"
   label: string;
@@ -28,11 +29,13 @@ export function DirectoryWaiting({
   card: string;
   tabs?: Tab[];
   active?: string;
+  // the head's lines shown only where the aside is hidden
+  narrow?: number;
 }) {
   return (
     <Split aside={<AsideBones label={aside} lines={lines} />}>
       <div class="directory">
-        <WhoWaiting label={label} />
+        <WhoWaiting label={label} narrow={narrow} />
         <Rows>
           <ActivityGhost quiet />
         </Rows>

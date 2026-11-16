@@ -22,32 +22,15 @@ import {
 } from "../../data/sessions.ts";
 import { useNow } from "../../lib/now.ts";
 import { useWaiting } from "../../lib/wait.ts";
-import { Bone } from "../../ui/Bones.tsx";
 import { Page } from "../../ui/Page.tsx";
 import { Split } from "../../ui/Split.tsx";
+import { ComposerWaiting } from "./ComposerWaiting.tsx";
 import { Feed, startChat } from "./Feed.tsx";
 import { composeProjectOf, dateLine, greeting } from "./Home.model.ts";
 import { NotSent } from "./NotSent.tsx";
 import { WaitingTasks } from "./WaitingTasks.tsx";
 import { WeekAside } from "./WeekAside.tsx";
 import "./home.css";
-
-// the composer's place while the list that picks its project loads
-function ComposerWaiting() {
-  return (
-    <div
-      class="card home-composer bones-wait"
-      role="status"
-      aria-label="Loading the composer"
-    >
-      <Bone kind="line" at={0} width={36} />
-      <span class="home-composer-row" aria-hidden="true">
-        <Bone kind="chip" at={1} class="home-composer-chip" />
-        <Bone kind="chip" at={2} class="home-composer-chip" />
-      </span>
-    </div>
-  );
-}
 
 export function Home() {
   const user = me.value!;
@@ -74,7 +57,7 @@ export function Home() {
           </>
         }
       >
-        {wait && <ComposerWaiting />}
+        {wait && <ComposerWaiting label="Loading the composer" />}
         {!wait && target !== null && (
           <Composer
             scope={{ projectId: "home" }}

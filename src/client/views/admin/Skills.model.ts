@@ -117,7 +117,9 @@ export function metadataLines(metadata: Record<string, string>): string[] {
     .map((key) => `${key}: ${metadata[key]}`);
 }
 
-const TEXT_LINES = 12;
+// a text box's lines before Show all, skill-page.css's clip in lines;
+// its wait draws as many, since a skill's text is seldom shorter
+export const TEXT_LINES = 12;
 
 export function textBox(
   text: string,

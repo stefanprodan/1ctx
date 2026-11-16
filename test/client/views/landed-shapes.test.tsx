@@ -3,7 +3,8 @@
 //
 // The pages whose body is no card of rows wait in the shape they land
 // in: an automation's summary, actions, tabs and tab card; the profile's
-// sections; Connect agents' keys and setup and its new key form; a new
+// sections; a project's Feed tab its composer over the feed; a user's
+// head its lines; Connect agents' keys and setup and its new key form; a new
 // file's band and box; a project's Settings sections. The editor's
 // Memory and Needs attention wait as a switch over its box, and the
 // Directory's search keeps what is typed while the list loads.
@@ -25,7 +26,9 @@ import {
   directoryDeciders,
   directoryUsers,
   directoryUsersError,
+  userPage,
 } from "../../../src/client/data/directory.ts";
+import { list } from "../../../src/client/data/feed.ts";
 import { emailOn, me } from "../../../src/client/data/me.ts";
 import { profile, profileError } from "../../../src/client/data/profile.ts";
 import {
@@ -35,11 +38,14 @@ import {
 } from "../../../src/client/data/projects.ts";
 import { Connect } from "../../../src/client/views/connect/Connect.tsx";
 import { Directory } from "../../../src/client/views/directory/Directory.tsx";
+import { User } from "../../../src/client/views/directory/User.tsx";
 import { NewDoc } from "../../../src/client/views/knowledge/file/DocPage.tsx";
 import { EMAIL_HINT } from "../../../src/client/views/profile/Profile.model.ts";
 import { Profile } from "../../../src/client/views/profile/Profile.tsx";
 import { Automation } from "../../../src/client/views/projects/Automation.tsx";
+import { EditAutomation } from "../../../src/client/views/projects/AutomationEditor.tsx";
 import { EditorWaiting } from "../../../src/client/views/projects/EditorWaiting.tsx";
+import { Project } from "../../../src/client/views/projects/Project.tsx";
 import { Settings } from "../../../src/client/views/projects/Settings.tsx";
 import { withClass } from "../../helpers/classes.ts";
 import { mount } from "../../helpers/mount.ts";
@@ -114,6 +120,58 @@ describe("the editor's guided sections", () => {
     expect(count(html, "automations-guidance")).toBe(2);
     // the instructions' box with its agent's chip under the text
     expect(html).toContain("automations-instructions-bar");
+  });
+
+  test("a row in hand draws the switch alone where it keeps none", () => {
+    const html = render(
+      <EditorWaiting
+        aside={null}
+        row={{ ownMemory: false, attentionMode: "off" }}
+      />,
+    );
+    expect(html).not.toContain("--rows:4");
+    expect(html).not.toContain("--rows:3");
+    expect(count(html, "automations-guidance")).toBe(0);
+  });
+
+  test.serial("the edit page's crumb is a bone until the name lands", () => {
+    automations.value = null;
+    automationProject.value = null;
+    automationError.value = null;
+    const html = render(<EditAutomation params={{ id: "a1" }} />);
+    expect(html).toContain("page-crumb-bone");
+    expect(html).not.toContain(">Automation<");
+  });
+});
+
+describe("a project's Feed tab waits as its composer over the feed", () => {
+  afterEach(() => {
+    list.value = null;
+  });
+
+  test.serial("the composer's bone, the feed's head and its rows", () => {
+    path.value = "/projects/p1";
+    const html = render(<Project params={{ id: "p1" }} />);
+    expect(html).toContain("home-composer");
+    expect(html).toContain('placeholder="Search sessions"');
+    expect(html).toContain("feed-ghosts");
+    expect(html).not.toContain(GENERIC);
+    // the composer waits quiet: the rows say the page loads
+    expect(count(html, 'role="status"')).toBe(1);
+  });
+});
+
+describe("a user's page waits with the head's lines", () => {
+  afterEach(() => {
+    userPage.value = null;
+  });
+
+  test.serial("the email and the local time a phone shows", () => {
+    userPage.value = null;
+    path.value = "/users/ada";
+    const html = render(<User params={{ username: "ada" }} />);
+    expect(html).toContain('aria-label="Loading the user"');
+    expect(count(html, "who-line who-narrow")).toBe(2);
   });
 });
 

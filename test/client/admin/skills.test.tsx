@@ -41,6 +41,7 @@ import {
   skillDeleteLine,
   sourceLine,
   submitLabel,
+  TEXT_LINES,
   textBox,
   urlProblem,
 } from "../../../src/client/views/admin/Skills.model.ts";
@@ -655,11 +656,16 @@ describe("the files tab", () => {
     answer = () => Response.json({ error: "held" }, { status: 500 });
     const html = render(<SkillFiles skill={gitops} />);
     expect(html).toContain('role="status" aria-label="Loading SKILL.md"');
-    expect(html).toContain("bones-lines-line");
+    // as many lines as the cut box, in its own class
+    expect(html).toContain("bones-wait textbox");
+    expect(html.split("bones-lines-line").length - 1).toBe(TEXT_LINES);
     expect(html).not.toContain(">Loading<");
     bodies.value = { s2: "# Flux" };
     const read = render(<SkillFiles skill={gitops} />);
     expect(read).not.toContain("Loading SKILL.md");
     expect(read).toContain("# Flux");
+    // cut at the lines' height too, so a long line wrapping on a phone
+    // never makes the box taller than its wait
+    expect(read).toContain("textbox skill-page-clip");
   });
 });

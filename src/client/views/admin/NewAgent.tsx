@@ -1,9 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import type { ComponentChildren } from "preact";
 import { useRef } from "preact/hooks";
-import { AVATARS } from "../../../shared/words.ts";
 import { address, navigate, query } from "../../app/router.ts";
 import { zoneStep } from "../../app/zones.ts";
 import { agents, createAgent } from "../../data/agents.ts";
@@ -22,7 +20,7 @@ import { Page } from "../../ui/Page.tsx";
 import { cardFieldOf } from "./AgentPage.model.ts";
 import { AgentDrafts } from "./AgentPage.state.ts";
 import { ModelFields } from "./ModelFields.tsx";
-import { NameFields } from "./NameFields.tsx";
+import { LabelledBone, NameFields, NameFieldsWaiting } from "./NameFields.tsx";
 import { NewCard, NewCardWaiting } from "./NewCard.tsx";
 import "./agent-new.css";
 
@@ -66,61 +64,19 @@ export function NewAgent() {
   );
 }
 
-// a label's line over the form's own parts, so the bones wrap as the
-// name, the avatars and the model's two fields do on a phone
-function Labelled({
-  at,
-  children,
-}: {
-  at: number;
-  children: ComponentChildren;
-}) {
-  return (
-    <>
-      <span class="label bones-lines-line">
-        <Bone kind="line" at={at} width={14} />
-      </span>
-      {children}
-    </>
-  );
-}
-
+// the form's parts in bones, so they wrap as the name, the avatars and
+// the model's two fields do on a phone
 function FormBones() {
   return (
     <>
-      <div class="agent-page-pair">
-        <div class="field agent-page-name">
-          <Labelled at={0}>
-            <Bone kind="field" at={1} />
-          </Labelled>
-        </div>
-        <div class="field">
-          <Labelled at={2}>
-            <div class="agent-page-avatars">
-              {AVATARS.map((a, i) => (
-                <Bone
-                  key={a}
-                  kind="avatar"
-                  at={3 + i}
-                  class="agent-page-avatar-bone"
-                />
-              ))}
-            </div>
-          </Labelled>
-        </div>
-      </div>
-      <div class="field">
-        <Labelled at={8}>
-          <Bone kind="rows" at={9} rows={6} class="agent-page-prompt" />
-        </Labelled>
-      </div>
+      <NameFieldsWaiting />
       <div class="agent-new-model">
-        <Labelled at={10}>
+        <LabelledBone at={10}>
           <div class="model-picker-change">
             <Bone kind="field" at={11} class="model-picker-search" />
             <Bone kind="field" at={12} class="model-picker-picker" />
           </div>
-        </Labelled>
+        </LabelledBone>
       </div>
     </>
   );

@@ -9,7 +9,7 @@
 
 import { type ComponentChildren, Fragment } from "preact";
 import "./setting.css";
-import { Bone, LinesWaiting } from "./Bones.tsx";
+import { Bone, LinesWaiting, WordsBone } from "./Bones.tsx";
 import { type RowsShape, RowsWaiting } from "./RowsWaiting.tsx";
 
 // one field's place in the card's two columns
@@ -34,10 +34,15 @@ export type FieldBones =
 export type CardBones = {
   // a title the page knows before the answer: drawn in words
   title?: string;
-  // the words under the title, or true for a bone in their place
-  line?: string | true;
+  // the words under the title, or true for a bone in their place, or
+  // the likeliest words of a line the answer picks, drawn as bones that
+  // wrap as they would
+  line?: string | true | { like: string };
   // a small button in the head, or a segmented switch
   action?: boolean | "seg";
+  // the switch's own class for its landed width, which decides whether
+  // the head wraps it under the words
+  pick?: string;
   fields?: readonly FieldBones[];
   // the landed form's own grid class in place of two columns
   grid?: string;
@@ -132,12 +137,20 @@ function Card({ card, at }: { card: CardBones; at: number }) {
           <p class="setting-line bones-lines-line">
             <Bone kind="line" at={at} width={52} />
           </p>
+        ) : typeof card.line === "object" ? (
+          <p class="setting-line">
+            <WordsBone at={at} words={card.line.like} />
+          </p>
         ) : (
           card.line !== undefined && <p class="setting-line">{card.line}</p>
         )}
       </div>
       {card.action === "seg" ? (
-        <Bone kind="seg" at={at + 1} class="bones-bone-pick" />
+        <Bone
+          kind="seg"
+          at={at + 1}
+          class={`bones-bone-pick${card.pick ? ` ${card.pick}` : ""}`}
+        />
       ) : (
         card.action && (
           <Bone kind="button" at={at + 1} class="bones-bone-small" />

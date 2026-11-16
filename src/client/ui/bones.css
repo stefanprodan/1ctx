@@ -11,6 +11,17 @@
     animation: pulse 1.6s ease-in-out infinite;
     animation-delay: calc(var(--ghost) * 0.05s);
   }
+  /* each line of the words is a bone of its own, ending where it wraps,
+     a bar as thick as a line bone's */
+  .bones-words {
+    background:
+      linear-gradient(var(--line), var(--line)) 0 50% / 100% 0.7em no-repeat;
+    color: transparent;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    animation: pulse 1.6s ease-in-out infinite;
+    animation-delay: calc(var(--ghost) * 0.05s);
+  }
   .bones-bone-label {
     width: 72px;
     height: 14px;
@@ -160,7 +171,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .bones-bone {
+    .bones-bone,
+    .bones-words {
       animation: none;
     }
     /* the wait still holds its delay, then shows at once */

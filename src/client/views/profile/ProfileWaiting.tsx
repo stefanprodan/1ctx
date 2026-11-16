@@ -21,7 +21,7 @@ export function ProfileWaiting() {
       <SectionsWaiting
         label="Loading your profile"
         class="profile"
-        lead={<WhoWaiting class="profile-head" narrow />}
+        lead={<WhoWaiting class="profile-head" narrow={1} />}
         sections={[
           {
             title: "About you",

@@ -4,7 +4,7 @@
 // A first load waits in the page's landed layout, not three rows in a
 // card: the board's charts and cards under their own labels, the tabs
 // and the aside it lands with, an object's cards and a new object's
-// form in bones, a task's head, files and activity, and a file's crumb
+// form in bones, each card's bones the fields it lands with, a task's head, files and activity, and a file's crumb
 // in the steps it lands with. Usage, with no Loaded in its head, says a
 // slow first load in the page's own line on the waits' clock.
 
@@ -21,6 +21,8 @@ import {
   usageLoading,
 } from "../../../src/client/data/overview.ts";
 import { project, projects } from "../../../src/client/data/projects.ts";
+import { skills } from "../../../src/client/data/skills.ts";
+import { smtp, smtpError } from "../../../src/client/data/smtp.ts";
 import { limits, tools } from "../../../src/client/data/tools.ts";
 import { users } from "../../../src/client/data/users.ts";
 import type { DayClock } from "../../../src/client/lib/now.ts";
@@ -32,9 +34,22 @@ import { LIMITS_CARDS } from "../../../src/client/views/admin/Config.model.ts";
 import { ConfigBoard } from "../../../src/client/views/admin/ConfigBoard.tsx";
 import { NewUser } from "../../../src/client/views/admin/NewUser.tsx";
 import { Overview } from "../../../src/client/views/admin/Overview.tsx";
+import { SkillPage } from "../../../src/client/views/admin/SkillPage.tsx";
+import { TEXT_LINES } from "../../../src/client/views/admin/Skills.model.ts";
+import { Smtp } from "../../../src/client/views/admin/Smtp.tsx";
 import { Usage } from "../../../src/client/views/admin/Usage.tsx";
+import {
+  hostsLine,
+  hostsRows,
+  hostsText,
+} from "../../../src/client/views/admin/Visuals.model.ts";
+import { Visuals } from "../../../src/client/views/admin/Visuals.tsx";
+import { ACCESS_WORDS } from "../../../src/client/views/admin/WebAccess.model.ts";
+import { WebAccess } from "../../../src/client/views/admin/WebAccess.tsx";
 import { DocPage } from "../../../src/client/views/knowledge/file/DocPage.tsx";
 import { ExternalTask } from "../../../src/client/views/projects/ExternalTask.tsx";
+import { DEFAULT_VISUAL_HOSTS } from "../../../src/shared/contracts/tool.ts";
+import { AVATARS } from "../../../src/shared/words.ts";
 import { fakeClock, mount } from "../../helpers/mount.ts";
 
 const count = (html: string, part: string) => html.split(part).length - 1;
@@ -106,7 +121,11 @@ describe("an object or a new one waits as its cards", () => {
     expect(html).toContain(">General<");
     expect(html).not.toContain("tabs-count");
     expect(html).toContain(">Identity<");
-    expect(html).toContain("bones-bone-prompt");
+    // the name, the avatars that wrap under it on a phone, the prompt's
+    // box and the default's line, as the landed fields
+    expect(count(html, "agent-page-avatar-bone")).toBe(AVATARS.length);
+    expect(html).toContain("agent-page-prompt");
+    expect(html).not.toContain("bones-bone-prompt");
     // the aside's usage and Used in, quiet beside the cards' one status
     expect(html).toContain(">Last 30 days<");
     expect(html).toContain(">Used in<");
@@ -121,6 +140,55 @@ describe("an object or a new one waits as its cards", () => {
     expect(count(html, "bones-bone-field")).toBe(4);
     expect(count(html, "bones-bone-seg")).toBe(2);
     expect(count(html, "bones-bone-button")).toBe(2);
+  });
+});
+
+describe("a settings card's bones are its landed fields", () => {
+  beforeEach(() => {
+    tools.value = null;
+    limits.value = null;
+    smtp.value = null;
+    smtpError.value = null;
+    skills.value = null;
+    agents.value = null;
+  });
+  afterEach(() => {
+    path.value = "/";
+  });
+
+  test.serial(
+    "SMTP: Security across, the key file's hint, Public address",
+    () => {
+      const html = render(<Smtp />);
+      expect(html).toContain('aria-label="Loading the SMTP settings"');
+      // Host, Port, Username, the key file, the From pair, Public address
+      expect(count(html, "bones-bone-field")).toBe(7);
+      expect(count(html, "bones-bone-seg")).toBe(1);
+      expect(count(html, '<span class="hint')).toBe(1);
+    },
+  );
+
+  test.serial("Web access: the likely mode's words, the switch's width", () => {
+    const html = render(<WebAccess />);
+    // words bones wrap where the landed line does on a phone
+    expect(html).toContain(`class="bones-words"`);
+    expect(html).toContain(ACCESS_WORDS.all);
+    expect(html).toContain("web-access-pick");
+  });
+
+  test.serial("Visuals: the CDNs' line and box as the defaults land", () => {
+    const html = render(<Visuals />);
+    expect(html).toContain(hostsLine(DEFAULT_VISUAL_HOSTS));
+    expect(html).toContain("visuals-hosts-bone");
+    expect(html).toContain(`--rows:${hostsRows(hostsText())}`);
+  });
+
+  test.serial("a skill's files: SKILL.md at the cut box's lines", () => {
+    path.value = "/admin/config/skills/gitops/files";
+    const html = render(<SkillPage params={{ name: "gitops" }} />);
+    expect(html).toContain("bones-wait textbox");
+    expect(count(html, "bones-lines-line")).toBeGreaterThanOrEqual(TEXT_LINES);
+    expect(html).not.toContain("bones-bone-prompt");
   });
 });
 

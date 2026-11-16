@@ -177,6 +177,8 @@ export function User({ params }: { params: Params }) {
           label="Loading the user"
           aside="Account"
           lines={5}
+          // the email and the local time
+          narrow={2}
           card={tab === 0 ? "About" : "Projects"}
           tabs={userTabs(username, null)}
           active={userTabs(username, null)[tab].href}

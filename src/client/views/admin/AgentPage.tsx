@@ -29,6 +29,7 @@ import { AgentSkills } from "./AgentSkills.tsx";
 import { useRowDrafts, useShownRow } from "./drafts.ts";
 import "./agent-page.css";
 import { CardsWaiting } from "./AdminWaiting.tsx";
+import { NameFieldsWaiting } from "./NameFields.tsx";
 
 const STEPS = [zoneStep("Config"), { label: "Agents", href: AGENTS_HREF }];
 
@@ -109,7 +110,7 @@ function AgentWaiting({ name, tab }: { name: string; tab: AgentTab }) {
           ? [
               {
                 title: "Identity",
-                fields: ["input", "prompt", "line"],
+                body: <NameFieldsWaiting fresh={false} />,
                 foot: 2,
               },
               {

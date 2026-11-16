@@ -145,7 +145,14 @@ function WebWaiting({ tab }: { tab: "general" | "credentials" }) {
           <SettingWaiting
             label="Loading web access"
             cards={[
-              { title: "Access", line: true, action: "seg", foot: 2 },
+              {
+                title: "Access",
+                // the mode a new server lands with
+                line: { like: ACCESS_WORDS.all },
+                action: "seg",
+                pick: "web-access-pick",
+                foot: 2,
+              },
               { title: "Search", line: true, rows: 4, foot: 2 },
               {
                 title: "Limits",

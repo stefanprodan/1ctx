@@ -59,7 +59,17 @@ export function Smtp() {
             {
               title: "Server",
               line: "The SMTP server every email goes through.",
-              fields: ["input", "input", "input", "input", "input", "input"],
+              fields: [
+                "input",
+                "input",
+                "seg-row",
+                "input",
+                "input",
+                "input",
+                "input",
+                "wide",
+              ],
+              hints: [false, false, false, false, true],
               foot: 2,
             },
             { title: "Send test email", line: true, action: true },

@@ -41,9 +41,9 @@ and runs, one row each, under the filters All, Chats, Runs and Flagged.
   landed grid (`SettingWaiting`, `SectionsWaiting`,
   `views/admin/AdminWaiting.tsx`, `DirectoryWaiting`); a section that
   lands only with data waits as nothing. Home waits for the project
-  list this way: the composer a bone at its height, the feed's head
-  over ghost rows, held as `Page` holds its own; `/projects` with its
-  activity, rows and aside in bones.
+  list, a Feed tab for its row: the composer a bone at its
+  height, the feed's head over ghost rows, held as `Page` holds its
+  own; `/projects` with its activity, rows and aside in bones.
 - **The Not sent card reads its own route, never the feed.** `GET
   /api/me/not-sent` runs on Home's load and after Discard all. While the
   card is mounted (`watchNotSent()`), the user's `notSent` event, a

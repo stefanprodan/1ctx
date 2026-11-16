@@ -19,7 +19,7 @@ import { Split } from "../../ui/Split.tsx";
 import { Tabs } from "../../ui/Tabs.tsx";
 import { TopSection, UsageSection } from "./AdminAside.tsx";
 import { refreshLine } from "./refresh.ts";
-import { SkillFiles } from "./SkillFiles.tsx";
+import { SkillFiles, SkillTextWaiting } from "./SkillFiles.tsx";
 import { SkillGeneral } from "./SkillGeneral.tsx";
 import { LoadLines } from "./SkillLoads.tsx";
 import "./skill-page.css";
@@ -95,7 +95,7 @@ function SkillWaiting({ name, tab }: { name: string; tab: SkillTab }) {
       cards={
         tab === "files"
           ? [
-              { title: "SKILL.md", fields: ["prompt"] },
+              { title: "SKILL.md", body: <SkillTextWaiting /> },
               { title: "Files", rows: 3 },
             ]
           : [

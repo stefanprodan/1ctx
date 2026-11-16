@@ -67,8 +67,11 @@ export function WhoLine({
   );
 }
 
-// the head while the page loads: the avatar and the name's two lines
-// in bones; with a label it is a wait of its own, else part of its
+// the narrow lines' widths, varied so they read as words
+const NARROW_WIDTHS = [24, 34];
+
+// the head while the page loads: the avatar, the name and its lines in
+// bones; with a label it is a wait of its own, else part of its
 // caller's
 export function WhoWaiting({
   label,
@@ -77,8 +80,8 @@ export function WhoWaiting({
 }: {
   // what is loading, for a screen reader: "Loading the user"
   label?: string;
-  // a line the head shows only where the aside is hidden
-  narrow?: boolean;
+  // the lines the head shows only where the aside is hidden
+  narrow?: number;
   class?: string;
 }) {
   const bones = (
@@ -91,11 +94,11 @@ export function WhoWaiting({
         <span class="who-line bones-lines-line">
           <Bone kind="line" at={2} width={16} />
         </span>
-        {narrow && (
-          <span class="who-line who-narrow bones-lines-line">
-            <Bone kind="line" at={3} width={24} />
+        {Array.from({ length: narrow ?? 0 }, (_, i) => (
+          <span key={i} class="who-line who-narrow bones-lines-line">
+            <Bone kind="line" at={3 + i} width={NARROW_WIDTHS[i % 2]} />
           </span>
-        )}
+        ))}
       </div>
     </>
   );

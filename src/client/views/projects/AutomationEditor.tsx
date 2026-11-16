@@ -474,11 +474,11 @@ export function EditAutomation({ params }: { params: Params }) {
     row !== null && shown !== null && agents !== null && limit !== null;
   return (
     <Page
-      crumb={row?.name ?? "Automation"}
+      crumb={row?.name ?? null}
       crumbHref={automationHref(id)}
       title="Edit"
       loading={!ready && error === null}
-      waiting={<EditorWaiting aside={aside} />}
+      waiting={<EditorWaiting aside={aside} row={row} />}
       error={error}
     >
       {ready && (
