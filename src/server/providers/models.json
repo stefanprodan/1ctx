@@ -24,6 +24,17 @@
           "cacheWrite": 12.5
         }
       },
+      "claude-fable-5-2": {
+        "window": 1000000,
+        "tools": true,
+        "images": true,
+        "price": {
+          "input": 8,
+          "output": 40,
+          "cacheRead": 0.2,
+          "cacheWrite": 10
+        }
+      },
       "claude-haiku-4-5": {
         "window": 200000,
         "tools": true,
@@ -215,6 +226,17 @@
           "output": 50,
           "cacheRead": 0.25,
           "cacheWrite": 12.5
+        }
+      },
+      "claude-fable-5-2": {
+        "window": 1000000,
+        "tools": true,
+        "images": true,
+        "price": {
+          "input": 8,
+          "output": 40,
+          "cacheRead": 0.2,
+          "cacheWrite": 10
         }
       },
       "claude-haiku-4-5": {
@@ -795,30 +817,10 @@
         "canonical": "gpt-5.5-instant",
         "price": { "input": 5, "output": 30, "cacheRead": 0.5 }
       },
-      "gpt-image-1": {
-        "tools": false,
-        "images": true,
-        "price": { "input": 5, "output": 40, "cacheRead": 1.25 }
-      },
       "gpt-image-1.5": {
         "tools": false,
         "images": true,
-        "price": { "input": 5, "output": 32, "cacheRead": 1.25 }
-      },
-      "gpt-image-2": {
-        "tools": false,
-        "images": true,
-        "price": { "input": 5, "output": 30, "cacheRead": 1.25 }
-      },
-      "gpt-image-2.5-flare": {
-        "tools": false,
-        "images": true,
-        "price": { "input": 5, "output": 30, "cacheRead": 1.25 }
-      },
-      "gpt-image-2.5-sunburst": {
-        "tools": false,
-        "images": true,
-        "price": { "input": 5, "output": 30, "cacheRead": 1.25 }
+        "price": { "input": 5, "output": 10, "cacheRead": 1.25 }
       },
       "grok-4-1-fast-non-reasoning": {
         "window": 128000,
@@ -992,7 +994,7 @@
     },
     "google": {
       "deep-research-max-preview-04-2026": {
-        "window": 131072,
+        "window": 1048576,
         "tools": true,
         "images": true,
         "price": {
@@ -1005,7 +1007,7 @@
         }
       },
       "deep-research-preview-04-2026": {
-        "window": 131072,
+        "window": 1048576,
         "tools": true,
         "images": true,
         "price": {
@@ -1021,11 +1023,7 @@
         "window": 128000,
         "tools": true,
         "images": true,
-        "price": {
-          "input": 1.25,
-          "output": 10,
-          "tiers": [{ "above": 200000, "input": 2.5, "output": 15 }]
-        }
+        "price": { "input": 1.25, "output": 10 }
       },
       "gemini-2.5-flash": {
         "window": 1048576,
@@ -1037,7 +1035,7 @@
         "window": 32768,
         "tools": false,
         "images": true,
-        "price": { "input": 0.3, "output": 30, "cacheRead": 0.075 }
+        "price": { "input": 0.3, "output": 2.5, "cacheRead": 0.075 }
       },
       "gemini-2.5-flash-lite": {
         "window": 1048576,
@@ -1080,13 +1078,13 @@
         "window": 65536,
         "tools": false,
         "images": true,
-        "price": { "input": 2, "output": 120 }
+        "price": { "input": 2, "output": 12 }
       },
       "gemini-3.1-flash-image": {
         "window": 131072,
         "tools": false,
         "images": true,
-        "price": { "input": 0.5, "output": 60 }
+        "price": { "input": 0.5, "output": 3 }
       },
       "gemini-3.1-flash-lite": {
         "window": 1048576,
@@ -1098,7 +1096,7 @@
         "window": 65536,
         "tools": true,
         "images": true,
-        "price": { "input": 0.25, "output": 30 }
+        "price": { "input": 0.25, "output": 1.5 }
       },
       "gemini-3.1-flash-lite-preview": {
         "window": 1048576,
@@ -1186,6 +1184,18 @@
         "images": true,
         "price": { "input": 2, "output": 10, "cacheRead": 0.1 }
       },
+      "gemini-4-carbon": {
+        "window": 1048576,
+        "tools": true,
+        "images": true,
+        "price": { "input": 2, "output": 10, "cacheRead": 0.1 }
+      },
+      "gemini-4-hydrogen": {
+        "window": 1048576,
+        "tools": true,
+        "images": true,
+        "price": { "input": 1.5, "output": 7.5, "cacheRead": 0.075 }
+      },
       "gemini-embedding-001": {
         "window": 2048,
         "tools": false,
@@ -1230,8 +1240,18 @@
           ]
         }
       },
-      "gemma-4-26b-a4b-it": { "window": 262144, "tools": true, "images": true },
-      "gemma-4-31b-it": { "window": 262144, "tools": true, "images": true },
+      "gemma-4-26b-a4b-it": {
+        "window": 262144,
+        "tools": true,
+        "images": true,
+        "price": { "input": 0, "output": 0 }
+      },
+      "gemma-4-31b-it": {
+        "window": 262144,
+        "tools": true,
+        "images": true,
+        "price": { "input": 0, "output": 0 }
+      },
       "lyria-3-clip-preview": {
         "window": 1048576,
         "tools": false,
@@ -1254,11 +1274,17 @@
       },
       "cat-jam-free": { "window": 1048576, "tools": true, "images": false },
       "claude-haiku-5-5": { "window": 1000000, "tools": true, "images": true },
+      "crouton-alpha-free": {
+        "window": 1048576,
+        "tools": true,
+        "images": true
+      },
       "deepseek-v4-pro": { "window": 1000000, "tools": true, "images": false },
       "deepseek-v4.1-flash": {
         "window": 1000000,
         "tools": true,
-        "images": true
+        "images": true,
+        "canonical": "deepseek-v4.1-flash-1017"
       },
       "gemini-4-argon": { "window": 1048576, "tools": true, "images": true },
       "gemini-4-argon-contributor": {
@@ -1274,6 +1300,13 @@
       "gpt-6-luna": { "window": 922000, "tools": true, "images": true },
       "grok-4.7": { "window": 500000, "tools": true, "images": true },
       "hy3": { "window": 192000, "tools": true, "images": false },
+      "hy4": { "window": 983010, "tools": true, "images": true },
+      "hy4-flash-free": {
+        "window": 983040,
+        "tools": true,
+        "images": true,
+        "canonical": "hy4-flash"
+      },
       "hy4-preview": { "window": 1024000, "tools": true, "images": false },
       "iceman-contributor-free": {
         "window": 262144,
@@ -1284,6 +1317,12 @@
       "kimi-k3": { "window": 1048576, "tools": true, "images": true },
       "kimi-k3.1-pro": { "window": 1048576, "tools": true, "images": true },
       "longcat-2.0": { "window": 1000000, "tools": true, "images": false },
+      "longcat-2.5-free": {
+        "window": 1000000,
+        "tools": true,
+        "images": true,
+        "canonical": "longcat-2.5"
+      },
       "longcat-2.5-preview-free": {
         "window": 1000000,
         "tools": true,
@@ -1322,6 +1361,7 @@
       "qwen3.7-plus": { "window": 1000000, "tools": true, "images": true },
       "qwen3.8-flash": { "window": 1000000, "tools": true, "images": true },
       "qwen3.8-max": { "window": 1000000, "tools": true, "images": true },
+      "qwen4-max": { "window": 1000000, "tools": true, "images": true },
       "space-bunny": { "window": 524288, "tools": true, "images": true },
       "step-5-preview": { "window": 1000000, "tools": true, "images": true },
       "step-5-preview-free": {
