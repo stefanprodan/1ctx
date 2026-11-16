@@ -137,6 +137,12 @@ Set `httpRoute.enabled` to create a Gateway API `HTTPRoute`.
 It attaches to the Gateways in `httpRoute.parentRefs`. Configure TLS on
 the Gateway.
 
+With either one on, 1ctx reads the client address and scheme from the
+proxy's `X-Forwarded-*` headers. Without them it does not, since any
+pod that reaches the Service could forge the address and dodge the
+per-address login limit. Behind a proxy the chart does not create, set
+`trustProxy: true`.
+
 ### Graceful shutdown
 
 On termination, 1ctx waits up to `drain` seconds for active chats and
@@ -190,7 +196,7 @@ can evict the pod. Leave enough headroom for active agent work.
 | Name | Description | Value |
 |---|---|---|
 | `drain` | Seconds to wait for active chats and runs during shutdown. Valid range is 0 to 3600 | `10` |
-| `trustProxy` | Read the client address and scheme from `X-Forwarded-*` headers | `true` |
+| `trustProxy` | Read the client address and scheme from `X-Forwarded-*` headers. Empty turns it on only with `ingress.enabled` or `httpRoute.enabled`; set `true` behind a proxy the chart does not make | `null` |
 | `secureCookie` | Mark the login cookie as `Secure`. Disable only when serving plain HTTP | `true` |
 | `secrets.existingSecret` | Existing Secret mounted at `/secrets` | `onectx` |
 | `provision.existingConfigMap` | Existing ConfigMap containing YAML objects applied at start | `""` |

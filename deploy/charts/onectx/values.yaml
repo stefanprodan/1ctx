@@ -13,8 +13,10 @@ imagePullSecrets: []
 drain: 10
 
 # take the client address and scheme from the X-Forwarded-* headers of
-# the ingress controller in front
-trustProxy: true
+# the proxy in front. Empty trusts them only with ingress or httpRoute
+# on: behind a bare Service any pod could forge them and dodge the
+# per-address login limit
+trustProxy: null
 
 # mark the login cookie Secure, for 1ctx served over TLS
 secureCookie: true

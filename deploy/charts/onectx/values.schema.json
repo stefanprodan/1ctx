@@ -57,7 +57,7 @@
       "minimum": 0,
       "maximum": 3600
     },
-    "trustProxy": { "type": "boolean" },
+    "trustProxy": { "type": ["boolean", "null"] },
     "secureCookie": { "type": "boolean" },
     "secrets": {
       "type": "object",

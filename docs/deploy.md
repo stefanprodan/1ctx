@@ -124,6 +124,10 @@ Flux. Its README holds the values; these are the rules.
   passed only when one of them is set.
 - **An Ingress and a Gateway API `HTTPRoute` are both optional.** The
   Gateway is the cluster's; the chart only attaches a route.
+- **`--trust-proxy` follows the chart's proxy.** `trustProxy` unset
+  passes it only with `ingress.enabled` or `httpRoute.enabled`, since
+  behind a bare Service any pod could forge `X-Forwarded-For` and dodge
+  the per-address login limit; `true` or `false` is used as set.
 - **The chart is named `onectx`,** since a Service name must start with
   a letter; the names helper fails a release name that starts with a
   digit rather than rename it.
