@@ -92,7 +92,7 @@ describe("a subagent's prompt", () => {
     );
   });
 
-  test("the built-in line stays byte for byte, and the sandbox's says /tmp is its own", () => {
+  test("the built-in line stays byte for byte, and the sandbox's says it shares its parent's", () => {
     expect(
       new Bun.CryptoHasher("sha256").update(SUBAGENT_LINE).digest("hex"),
     ).toBe("e2c7f567ba11b5ac85c1fcda3c42ec66052b41100c61e3f4785a171b0606d3c3");
@@ -102,10 +102,14 @@ describe("a subagent's prompt", () => {
     });
     expect(sandboxed).toContain(SANDBOX_SUBAGENT_LINE);
     expect(sandboxed).not.toContain(SUBAGENT_LINE);
-    expect(SANDBOX_SUBAGENT_LINE).toContain(
-      "Your /tmp is your own and never reaches the other agent",
+    expect(SANDBOX_SUBAGENT_LINE).toBe(
+      "You are a subagent: another agent gave you this task and reads only your answer, and nobody can answer questions. You share its sandbox: /tmp, $HOME and /knowledge are the same files. Do the task, then reply briefly with what it asked for; put a long result in a file and say where.",
     );
-    expect(SANDBOX_SUBAGENT_LINE).not.toContain("reach the other agent");
+    expect(
+      new Bun.CryptoHasher("sha256")
+        .update(SANDBOX_SUBAGENT_LINE)
+        .digest("hex"),
+    ).toBe("d0982d87aa4c6b0cfa86ae9cbd2a60cf3ea23992e31f3abdbd1fa3538ec61f50");
   });
 
   test("is what systemPrompt answers for a subagent, notes and lines left out", () => {

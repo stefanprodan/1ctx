@@ -10,6 +10,7 @@ import type { ShellCall, ShellRepo } from "../../../src/server/bash/index.ts";
 import { MINUTE_MS } from "../../../src/server/lib/clock.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
+import { SANDBOX_COMMANDS } from "../../../src/server/sandbox/holders.ts";
 import {
   DELETE_RETRY_MS,
   DELETE_TIMEOUT_MS,
@@ -53,6 +54,7 @@ function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
   const call = (id: string, repos: ShellRepo[] = []): ShellCall => ({
     projectId: "project",
     workspace: { id, sessionId: id.split(":")[0]! },
+    root: id,
     sendId: "send",
     subagent: false,
     repos,
@@ -85,8 +87,8 @@ describe("sandbox leases", () => {
     const spec = t.fake.creates[0]!;
     expect(spec.labels).toEqual({ [INSTANCE_LABEL]: INSTANCE });
     expect(spec.command).toEqual(KEEP_ALIVE);
-    expect(spec.cpus).toBe(2);
-    expect(spec.memoryMiB).toBe(2048);
+    expect(spec.cpus).toBe(4);
+    expect(spec.memoryMiB).toBe(4096);
     expect(spec.mounts.map((mount) => mount.target)).toEqual([
       "/knowledge",
       "/uploads",
@@ -265,6 +267,22 @@ describe("sandbox leases", () => {
     t.leases.close();
   });
 
+  test("a sandboxWarm lowered while warm ones are made trims them as they land", async () => {
+    const t = setup({ sandboxWarm: 2 });
+    const resume = t.fake.pause("create");
+    await t.leases.start();
+    await until(() => t.fake.paused === 2);
+    t.limits.sandboxWarm = 1;
+    t.leases.poke();
+    resume();
+    await until(() => t.fake.deletes.length === 1);
+    await settle();
+    expect(t.leases.rows().filter((row) => row.state === "warm")).toHaveLength(
+      1,
+    );
+    t.leases.close();
+  });
+
   test("a raised cap admits a command waiting at it", async () => {
     const t = setup({ sandboxesMax: 1 });
     await t.acquire("a");
@@ -310,6 +328,38 @@ describe("sandbox leases", () => {
     expect(await got).toBe("busy");
     expect(t.fake.creates).toHaveLength(0);
     t.leases.close();
+  });
+
+  test("a sandbox runs SANDBOX_COMMANDS commands at once; the next waits for a release, or ends busy", async () => {
+    const t = setup();
+    const holds: SandboxHold[] = [];
+    for (let n = 0; n < SANDBOX_COMMANDS; n++)
+      holds.push(await t.acquire("chat"));
+    const next = t.leases.acquire(
+      t.call("chat"),
+      t.time.now() + 5_000,
+      new AbortController().signal,
+    );
+    let got: SandboxHold | "busy" | null = null;
+    void next.then((value) => {
+      got = value;
+    });
+    await settle();
+    expect(got).toBeNull();
+    holds.pop()!.release();
+    const joined = (await next) as SandboxHold;
+    expect(joined.sandbox).toBe(holds[0]!.sandbox);
+    holds.push(joined);
+    const late = t.leases.acquire(
+      t.call("chat"),
+      t.time.now() + 5_000,
+      new AbortController().signal,
+    );
+    await until(() => t.time.sleeping().includes(t.time.now() + 5_000));
+    t.time.advance(5_000);
+    expect(await late).toBe("busy");
+    for (const hold of holds) hold.release();
+    expect(t.fake.creates).toHaveLength(1);
   });
 
   test("at the cap a warm sandbox goes before an idle one", async () => {
@@ -498,16 +548,45 @@ describe("sandbox leases", () => {
     t.leases.close();
   });
 
-  test("a start sweep that could not list providers runs at the next probe", async () => {
+  test("a start sweep that could not list keeps commands and the pool out until a sweep lists", async () => {
+    const t = setup({ sandboxWarm: 1 });
+    t.fake.fail("list");
+    await t.leases.start();
+    const got = t.leases.acquire(
+      t.call("chat"),
+      t.time.now() + 5_000,
+      new AbortController().signal,
+    );
+    await until(() => t.time.sleeping().includes(t.time.now() + 5_000));
+    t.time.advance(5_000);
+    expect(await got).toBe("busy");
+    expect(t.fake.creates).toHaveLength(0);
+    t.fake.unfail("list");
+    t.time.advance(HEALTH_MS - 5_000);
+    // the probe's sweep lists, which opens the gate and fills the pool
+    await until(() => t.fake.creates.length === 1);
+    const hold = await t.acquire("chat");
+    hold.release();
+    t.leases.close();
+  });
+
+  test("a start sweep that could not list providers runs at the next probe, every lease kept", async () => {
     const t = setup();
     t.fake.providers.set("1ctx-left-provider", { [INSTANCE_LABEL]: INSTANCE });
     t.fake.fail("providerList");
     await t.leases.start();
     expect(t.fake.providerDeletes).toEqual([]);
     t.fake.unfail("providerList");
-    // the first probe that lists finds the gateway lost, so it sweeps
+    const idle = await t.acquire("idle");
+    idle.release();
+    const held = await t.acquire("held");
+    // the first probe that lists sweeps again; a blip is no restart
     t.time.advance(HEALTH_MS);
     await until(() => t.fake.providerDeletes.includes("1ctx-left-provider"));
+    expect(t.fake.deletes).toEqual([]);
+    expect(t.state(idle.sandbox)).toBe("idle");
+    expect(t.state(held.sandbox)).toBe("leased");
+    held.release();
     t.leases.close();
   });
 

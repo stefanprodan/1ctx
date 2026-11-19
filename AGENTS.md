@@ -178,6 +178,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/dictation.md` | `dictation/`: the Dictation setting, `POST /api/transcribe`, its WAV check, cap, call and usage row |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/sandbox.md` | `sandbox/`: the sandbox shell's settings, the gateway port, leases, the pool, the sweeps |
+| `docs/sandbox-commands.md` | a command in the sandbox: its base, push, fence, walk, read back and settle; the sandbox a chat shares with its subagents |
 | `docs/sandbox-network.md` | the sandbox's network: its hosts, OpenShell's policy, credentials as providers, the scrub, differences from the built-in curl |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |

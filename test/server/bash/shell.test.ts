@@ -6,7 +6,7 @@
 // thrown or skipped, and acquire taken before the process slot, its
 // hold given back when the command never ran.
 
-import { describe, expect, spyOn, test } from "bun:test";
+import { describe, expect, jest, test } from "bun:test";
 import type {
   SettleOutcome,
   ShellBackend,
@@ -14,6 +14,7 @@ import type {
   ShellContext,
   ShellHold,
 } from "../../../src/server/bash/index.ts";
+import { SHELL_SWITCHED } from "../../../src/server/bash/mount.ts";
 import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
 import { freeSlots } from "../../helpers/slots.ts";
@@ -120,12 +121,17 @@ describe("the shell port", () => {
       const doc = create(s, "a.md", "old\n");
       await run(s, "true");
       expect(seen.contexts).toHaveLength(1);
-      const { stored, ...context } = seen.contexts[0]!;
+      const { stored, docs, ...context } = seen.contexts[0]!;
       // the totals a shell sizes its trees by, before the mount
       expect(stored?.()).toEqual({ docs: 4, uploads: 0, kept: 0 });
+      // the rows as they stand, for a shell that reads them at its save
+      expect(docs?.().map((row) => [row.name, row.revision])).toEqual([
+        ["a.md", 1],
+      ]);
       expect(context).toEqual({
         projectId: s.projectId,
         workspace: { id: s.session.id, sessionId: s.session.id },
+        root: s.session.id,
         sendId: SEND_ID,
         subagent: false,
         repos: [],
@@ -155,6 +161,55 @@ describe("the shell port", () => {
       });
     } finally {
       s.db.close();
+    }
+  });
+
+  test("a subagent runs in its parent's workspace's shell only when the shell shares it", async () => {
+    const { seen, shell } = watched();
+    for (const shared of [false, true]) {
+      const s = setup({}, undefined, undefined, (builtin) => ({
+        ...shell(builtin),
+        ...(shared ? { sharedWithSubagents: true as const } : {}),
+      }));
+      try {
+        await run(s, "true", {
+          ...callCaps,
+          // offered for the shell it runs in
+          ...(shared ? { sandboxCommandMs: 4000 } : {}),
+          subagent: { uploadsFrom: "parent", workspace: "parent" },
+        });
+        expect(seen.contexts.at(-1)!.root).toBe(
+          shared ? "parent" : s.session.id,
+        );
+      } finally {
+        s.db.close();
+      }
+    }
+  });
+
+  test("a subagent offered for another shell than the one now on runs nothing", async () => {
+    const { seen, shell } = watched();
+    for (const shared of [false, true]) {
+      const s = setup({}, undefined, undefined, (builtin) => ({
+        ...shell(builtin),
+        ...(shared ? { sharedWithSubagents: true as const } : {}),
+      }));
+      try {
+        const result = await run(s, "true", {
+          ...callCaps,
+          // the sandbox's offer gives its own time; the builtin's none
+          ...(shared ? {} : { sandboxCommandMs: 4000 }),
+          subagent: { uploadsFrom: "parent", workspace: "parent" },
+        });
+        expect(result).toMatchObject({
+          content: `nothing saved: ${SHELL_SWITCHED}`,
+          error: true,
+          ended: { phase: "queue", cause: "error" },
+        });
+        expect(seen.contexts).toHaveLength(0);
+      } finally {
+        s.db.close();
+      }
     }
   });
 
@@ -275,7 +330,7 @@ describe("the shell port", () => {
     }
   });
 
-  test("a commit that throws settles once as thrown", async () => {
+  test("a commit that throws settles once as thrown, naming a doc another write moved", async () => {
     const { seen, shell } = watched();
     const s = setup({}, undefined, undefined, shell);
     try {
@@ -285,7 +340,30 @@ describe("the shell port", () => {
       );
       const result = await run(s, "echo edit > a.md");
       expect(result.content).toContain("a.md changed while the command ran");
-      expect(seen.settles).toEqual([{ landed: false, why: "thrown" }]);
+      expect(seen.settles).toEqual([
+        { landed: false, why: "thrown", moved: "a.md" },
+      ]);
+    } finally {
+      s.db.close();
+    }
+  });
+
+  test("a thrown commit shows the words its settle answers", async () => {
+    const words = "a.md changed while the command ran, so it was put back";
+    const s = setup({}, undefined, undefined, (builtin) => ({
+      async run(job, context, hooks, stops) {
+        const ran = await builtin.run(job, context, hooks, stops);
+        return { settled: ran.settled, settle: () => words };
+      },
+    }));
+    try {
+      const file = create(s, "a.md", "old\n");
+      afterMountRead(s, () =>
+        s.knowledge.store.replace(file, s.author, "racing", 101),
+      );
+      const result = await run(s, "echo edit > a.md");
+      expect(result.content).toContain(words);
+      expect(result.content).not.toContain("read it again");
     } finally {
       s.db.close();
     }
@@ -424,17 +502,6 @@ const untilAborted =
       });
     });
 
-// Date.now as the mount reads it, moved on by the test; the worker's
-// own clock is its thread's
-function shiftedClock() {
-  const real = Date.now.bind(Date);
-  const clock = { offset: 0 };
-  const spy = spyOn(Date, "now").mockImplementation(
-    () => real() + clock.offset,
-  );
-  return { clock, restore: () => spy.mockRestore() };
-}
-
 describe("acquire and its hold, when things go wrong", () => {
   test("a run that releases the hold then rejects releases it once", async () => {
     let released = 0;
@@ -475,22 +542,32 @@ describe("acquire and its hold, when things go wrong", () => {
     }
   });
 
-  test("the deadline inside acquire is busy for a free shell", async () => {
-    const { seen, shell } = watched(untilAborted());
-    const s = setup({}, undefined, 1, shell);
-    try {
-      const result = await run(s, "true", { ...callCaps, callTimeoutMs: 50 });
-      expect(result).toEqual({
-        content:
-          "command not run: waited 0 s for a free shell, the server is busy",
-        error: true,
-        ended: { phase: "queue", cause: "busy" },
-      });
-      expect(seen.contexts).toEqual([]);
-    } finally {
-      s.db.close();
-    }
-  });
+  test.serial(
+    "the deadline inside acquire is busy for a free shell",
+    async () => {
+      const entered = Promise.withResolvers<void>();
+      const { seen, shell } = watched(untilAborted(entered.resolve));
+      const s = setup({}, undefined, 1, shell);
+      // the deadline's timer moved by hand, never waited for
+      jest.useFakeTimers();
+      try {
+        const pending = run(s, "true", { ...callCaps, callTimeoutMs: 50 });
+        await entered.promise;
+        jest.advanceTimersByTime(51);
+        const result = await pending;
+        expect(result).toEqual({
+          content:
+            "command not run: waited 0 s for a free shell, the server is busy",
+          error: true,
+          ended: { phase: "queue", cause: "busy" },
+        });
+        expect(seen.contexts).toEqual([]);
+      } finally {
+        jest.useRealTimers();
+        s.db.close();
+      }
+    },
+  );
 
   test.serial(
     "an abort waiting for a slot after the hold releases it once",
@@ -521,44 +598,42 @@ describe("acquire and its hold, when things go wrong", () => {
     },
   );
 
-  test.serial(
-    "a long wait for the shell names the shell, not the slot",
-    async () => {
-      const { clock, restore } = shiftedClock();
-      let released = 0;
-      const s = setup({}, undefined, undefined, () => ({
-        acquire: async () => {
-          clock.offset += 3960;
-          return { release: () => released++ };
-        },
-        run: async () => {
-          throw new Error("never run");
-        },
-      }));
-      try {
-        // under MIN_RUN_MS of the call left once the shell is held
-        const result = await run(s, "true", {
-          ...callCaps,
-          callTimeoutMs: 4000,
-        });
-        expect(result).toEqual({
-          content:
-            "command not run: waited 4 s for a free shell, the server is busy",
-          error: true,
-          ended: { phase: "queue", cause: "busy" },
-        });
-        expect(released).toBe(1);
-      } finally {
-        restore();
-        s.db.close();
-      }
-    },
-  );
+  test("a long wait for the shell names the shell, not the slot", async () => {
+    let released = 0;
+    const timer = new AbortController();
+    const s = setup({}, undefined, undefined, () => ({
+      acquire: async () => {
+        s.now.value += 3960;
+        // the registry's timer ends the call once the shell is held
+        timer.abort(new DOMException("timed out", "TimeoutError"));
+        return { release: () => released++ };
+      },
+      run: async () => {
+        throw new Error("never run");
+      },
+    }));
+    try {
+      const result = await run(
+        s,
+        "true",
+        { ...callCaps, callTimeoutMs: 4000 },
+        timer.signal,
+      );
+      expect(result).toEqual({
+        content:
+          "command not run: waited 4 s for a free shell, the server is busy",
+        error: true,
+        ended: { phase: "queue", cause: "busy" },
+      });
+      expect(released).toBe(1);
+    } finally {
+      s.db.close();
+    }
+  });
 
-  test.serial("a late start after a long shell wait says so", async () => {
-    const { clock, restore } = shiftedClock();
+  test("a late start after a long shell wait says so", async () => {
     const { shell } = watched(async () => {
-      clock.offset += 3000;
+      s.now.value += 3000;
       return { release: () => {} };
     });
     const s = setup({}, undefined, undefined, shell);
@@ -571,7 +646,6 @@ describe("acquire and its hold, when things go wrong", () => {
         "waited 3 s for a free shell, so the command had 1 s to run\n",
       );
     } finally {
-      restore();
       s.db.close();
     }
   });

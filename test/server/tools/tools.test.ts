@@ -561,7 +561,7 @@ describe("bash at dispatch", () => {
     });
     const offered = tools.offered(now, "");
     const bash = offered.tools.find((tool) => tool.name === "bash");
-    expect(bash?.description).toContain("A command may run up to 15 minutes.");
+    expect(bash?.description).toContain("A call may run 15 minutes;");
     // the limit and the shell move after the offer
     seconds = 60;
     shell = null;

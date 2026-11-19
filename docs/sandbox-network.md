@@ -3,7 +3,8 @@
 Governs the sandbox shell's network and credentials:
 `src/server/sandbox/netpolicy.ts`, `network.ts`, `rules.ts`,
 `scrub.ts`, `shared/sandbox-net.ts` and `scripts/sandbox-net-check.ts`.
-The rest of the sandbox shell is in `docs/sandbox.md`.
+The rest of the sandbox shell is in `docs/sandbox.md` and
+`docs/sandbox-commands.md`.
 
 OpenShell's own policy and credential injection, no proxy of ours.
 `netpolicy.ts` makes the policy, pure; `network.ts` applies it in
@@ -25,7 +26,9 @@ what the bash tool's description shares with it.
   (Web access off, or the chat's or automation's own switch off), so
   `ShellCall.network` is false: no endpoint, no credential, a sandbox
   that had hosts recycled (`network`), and the tool description says
-  "No network.", as the prompt does.
+  "No network.", as the prompt does. With a network it names the
+  admin's list by kind and the examples it holds of pypi.org,
+  registry.npmjs.org and github.com, never the other hosts.
 - **A credential is a provider, in hosts mode only.** One endpointless
   profile per credential shape (`1ctx-` and a hash of the instance, the
   variable and the placement, annotated with the instance id) and one
@@ -37,16 +40,21 @@ what the bash tool's description shares with it.
   `/v1/**`) with `credentialBinding.provider`. OpenShell's endpoint
   glob selects `/v1` too, a rule's `/v1/**` never does, so the rules
   name both `/v1` and `/v1/**`: its methods allowed, every other
-  denied, a subagent's read-only one included. Its host joins even
-  when not listed. Credentials come with Web access on, as for the
-  built-in shell.
+  denied. Its host joins even when not listed. Credentials come with
+  Web access on, as for the built-in shell. A subagent runs in its
+  parent's sandbox and is offered its parent's credentials, so one
+  policy serves both. Its offer reads the shell at its send's start;
+  once the setting moved to the other shell, `mount.ts` runs none of
+  its commands (`SHELL_SWITCHED`), so its credentials never meet a
+  shell they were not offered for.
 - **The order is attach, bind, ready.** Providers are attached first
   (withheld until bound, never an error), the policy binds them, then
   each provider's current state is polled until `ready`, at most
   `READY_MS` (10 s). An attach waits for another attach or delete of
-  its provider only until the command's deadline. A failure recycles
-  the lease and fails the command; the profile and key are asked again
-  next time.
+  its provider only until the command's deadline. A failure fails the
+  command and retires the lease (`retire()`): doomed, so no command
+  joins it, it goes at its last release while the commands beside it
+  run on. The profile and key are asked again next time.
 - **Placeholders are the provider's variable**, `ONECTX_CRED_<NAME>`,
   which OpenShell's supervisor puts in every new exec's environment.
   `Authorization` takes any template (bearer style); another header
@@ -69,10 +77,11 @@ what the bash tool's description shares with it.
   pulled files before they commit and in open's copies. A doc or
   scratch name or an opened path holding one, in any of those forms,
   saves nothing and recycles.
-- **Providers go with their last sandbox.** One no lease uses is
-  deleted once its sandbox's delete is observed (it cannot go while
-  attached; a failed delete is asked again after 5 and 15 s), then its profile once no provider of any manager uses it,
-  one still attaching included. The sweeps keep providers and profiles
+- **Providers go with their last sandbox.** One no lease of any
+  manager uses is deleted once its sandbox's delete is observed (it
+  cannot go while attached; a failed delete is asked again after 5 and
+  15 s), then its profile once no provider of any manager uses it, one
+  still attaching included. The sweeps keep providers and profiles
   a lease of any manager uses and delete the rest of the instance's,
   each asked again right before its delete under the attach's lock:
   one per provider name and one per profile, across managers.
@@ -90,7 +99,7 @@ what the bash tool's description shares with it.
   bun and npm ask for a scoped package as `@scope%2fname`. A host a
   credential of the send binds never takes the exception, so its
   prefix check keeps refusing `%2F`.
-- A read-only credential holds only on servers that ignore
+- A credential's methods hold only on servers that ignore
   method-override headers (`X-HTTP-Method-Override`), which the
   builtin refuses on a signed request.
 - The sandbox reaches its own hosts alone, on ports 80 and 443, never

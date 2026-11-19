@@ -33,9 +33,9 @@ const DELEGATE_HEAD =
 
 export const DELEGATE_DESCRIPTION = `${DELEGATE_HEAD} It sees nothing but task and a copy of your /tmp, so put everything it needs in task: the goal, where to look, what to return. Files it writes come back under /tmp/<name>/, listed in the result.`;
 
-// under the sandbox shell each /tmp is its own sandbox's, so nothing
-// passes through it either way
-export const SANDBOX_DELEGATE_DESCRIPTION = `${DELEGATE_HEAD} Its /tmp is its own: nothing in yours reaches it and nothing in its comes back. Put everything it needs in task, or in a file under /knowledge, which it reads: the goal, where to look, what to return. It answers in its reply alone.`;
+// under the sandbox shell the subagent works in this chat's sandbox
+export const SANDBOX_DELEGATE_DESCRIPTION =
+  "Hand a task to a subagent: a fresh copy of you with its own context, working in this chat's sandbox. It cannot see this chat, so put the goal, where to look and what to return in task; it answers in its reply. Calls in one reply run in parallel, so split independent work that way. Delegate work that would flood your context (exploring a repository, many files, web research); keep small questions and work that needs this conversation.";
 
 export function makeDelegateTool(sandbox = false): Tool {
   return {

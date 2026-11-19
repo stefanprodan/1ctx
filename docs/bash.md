@@ -40,14 +40,15 @@ that shell that shows a file on the chat page.
   the credentials, and `mounted`: each doc's id and revision, the
   scratch revision and `used_at` (the pair, since a dropped row
   restarts the revision at 0), the uploads' session revision (the
-  parent's for a subagent; a file's time can repeat) and each kept
-  file's row.
+  parent's for a subagent; a file's time can repeat), each kept
+  file's row, and `docs()`, the doc rows as they stand. A run may
+  answer `rows`, those it read again, which the commit checks against.
 - **`settle()` is called exactly once after the command ran.** Landed
   carries what the transaction wrote: each doc's id, revision,
-  `updated_at` and stored text (null for a delete), the scratch
-  revision and `used_at`. Thrown: a check or the commit threw. Skipped:
-  nothing was committed. A settle that throws is logged and changes no
-  result.
+  `updated_at` and stored text (null when deleted), the scratch
+  revision and `used_at`. Thrown: a check or the commit threw
+  (`moved`: a conflict's doc); its returned string replaces the error.
+  Skipped: nothing committed. Its throw is logged only.
 - **`acquire()` runs under the workspace's queue, before the process
   slot,** so a command waiting for its shell holds no slot. `busy` at
   the deadline ends it in phase `queue`, cause `busy`. Its hold goes to
@@ -59,13 +60,17 @@ that shell that shows a file on the chat page.
   shared write and the cwd. `test/fixtures/bash/tree-cases.ts` is the
   one fixture set every listing runs against.
 - **The sandbox backend keeps its tree between commands**
-  (`docs/sandbox.md`): it settles a landed commit by putting the
-  sandbox back to the stored rows, and recycles on anything else.
+  (`docs/sandbox-commands.md`): it settles a landed commit by putting the
+  sandbox back to the stored rows, and alone recycles on anything else.
+  Its exits are the command's own (`ownExits`): only the answer's
+  `stopped` says it stopped one, where another shell's 124 or 126 does.
 - **A backend with `ownTmp` keeps `/tmp` itself.** The mount reads no
   scratch file and drops none, and an answer with a scratch file
   change is out of protocol; the commit saves the cwd alone
-  (`writeCwd()`, `used_at` kept), with no scratch cap or name check.
-  Only the sandbox says it.
+  (`writeCwd()`, `used_at` kept, the last commit's winning, no revision
+  checked), with no scratch cap or name check. Only the sandbox says it,
+  and `atOnce`: its workspace's commands run at once, held but never
+  queued (`bash/queue.ts`).
 
 ## The command
 
@@ -178,10 +183,8 @@ that shell that shows a file on the chat page.
   follows the sandbox's own network setting, and is off while the
   send has no web access. Its
   policy, placeholders, scrub of pulled files and the accepted
-  differences from `commandFetch()` are in `docs/sandbox-network.md`;
-  the tool description says them, and the setting's hosts, when the
-  sandbox shell is on, and the built-in shell's description is
-  unchanged.
+  differences from `commandFetch()` are in `docs/sandbox-network.md`,
+  with its description's words; the built-in shell's is unchanged.
 
 ## The writable trees
 
@@ -202,9 +205,10 @@ that shell that shows a file on the chat page.
   logged at `startup`. The per-workspace queue (`bash/queue.ts`) is
   taken before a process slot (`acquireProcess()`, shared with uploads)
   and released after it. Channel agents therefore never wait behind one
-  another's commands. A sandbox command frees its slot for the remote
-  exec (`hooks.slot`) and takes one again for its read back and
-  commit; `sandboxesMax` bounds those commands.
+  another's commands. A sandbox command frees its slot (`hooks.slot`)
+  before its sandbox's turn and takes one in its save's turn;
+  `sandboxesMax` times `SANDBOX_COMMANDS` bounds their mounts. Waits
+  are read on `deps.clock`, the deadline on the wall.
 - **Written doc paths go on the tool row.** `finishTool` stores them as
   `savedDocs` for another agent's trace (`docs/sessions.md`). A command
   that completed keeps them even when a cut writes its row; one the
@@ -317,14 +321,8 @@ that shell that shows a file on the chat page.
 
 ## Subagents
 
-- **A subagent's command carries `subagent` in its caps.** It mounts
-  `/uploads` of `uploadsFrom`, its parent's session, and its job's
-  `subagent` flag leaves `open` out of the worker. A change under
-  `/knowledge` (the docs on or off) or `/uploads` is refused at commit
-  with `READ_ONLY_TO_SUBAGENT`, nothing saved, by the worker and, for
-  docs, by the server; `checkOpened()` refuses any opened record. Its
-  `/tmp` comes and goes by copy (`bash/handoff.ts`,
-  `docs/subagents.md`).
+A subagent's command, its caps and its shell are in
+`docs/subagents.md`.
 
 ## The open command
 

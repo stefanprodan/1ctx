@@ -238,7 +238,11 @@ export function openedOf(
     } catch {
       throw new StepFailure("records", "text");
     }
-    out.push(openedRecord(path.path, text, visuals));
+    const record = openedRecord(path.path, text, visuals);
+    // a visual's title decodes entities, which the byte scrub never saw
+    if (forms.some((form) => record.title?.includes(form)))
+      throw new StepFailure("records", "credential");
+    out.push(record);
   }
   return out;
 }

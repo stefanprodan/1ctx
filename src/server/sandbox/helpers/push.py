@@ -3,12 +3,15 @@
 # file. Paths are percent-escaped bytes, as frames.ts writes them. It
 # writes only regular files and folders under the roots, and walks every
 # parent by a folder handle opened without following a link, so a link
-# the workload left can never send a write elsewhere.
-import errno, json, os, re, stat, sys
+# the workload left can never send a write elsewhere. A frame with `was`
+# applies only while its path still holds those bytes (null: nothing),
+# so a command running beside the push keeps what it wrote.
+import errno, hashlib, json, os, re, stat, sys
 
 PIECE = 1 << 16
 HEADER = 1 << 16
 ESCAPED = re.compile(rb"(?:[\x21-\x24\x26-\x7e]|%[0-9A-F]{2})+")
+SHA = re.compile(r"[0-9a-f]{64}")
 SEARCH = getattr(os, "O_PATH", os.O_RDONLY)
 # milliseconds whose nanoseconds still fit utime's 64 bits, year 2255
 MAX_MTIME = 9 * 10**12
@@ -137,6 +140,37 @@ def settle(name, fd, h):
     os.utime(name, ns=times(h), dir_fd=fd, follow_symlinks=False)
 
 
+def drain(size):
+    left = size
+    while left:
+        b = sys.stdin.buffer.read(min(left, PIECE))
+        if not b:
+            raise Refused("short", b"")
+        left -= len(b)
+
+
+# the path holds what the frame expects: a regular file with these
+# bytes, or nothing for None
+def same(name, fd, st, was):
+    if st is None or was is None:
+        return st is None and was is None
+    if not stat.S_ISREG(st.st_mode):
+        return False
+    try:
+        f = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+    except OSError:
+        return False
+    try:
+        h = hashlib.sha256()
+        while True:
+            b = os.read(f, PIECE)
+            if not b:
+                return h.hexdigest() == was
+            h.update(b)
+    finally:
+        os.close(f)
+
+
 def copy(fd, size):
     left = size
     while left:
@@ -165,6 +199,10 @@ def header(line):
     ok = ok and type(size) is int and size >= 0
     ok = ok and (h["op"] == "file" or size == 0)
     ok = ok and type(h.get("append", False)) is bool
+    if ok and "was" in h:
+        v = h["was"]
+        ok = h["op"] in ("rm", "file")
+        ok = ok and (v is None or (type(v) is str and SHA.fullmatch(v) is not None))
     if not ok:
         raise Refused("header", b"")
     h["size"] = size
@@ -185,7 +223,9 @@ def apply(h):
     name = parts[-1]
     try:
         st = lstat_at(name, fd)
-        if op == "rm":
+        if "was" in h and not same(name, fd, st, h["was"]):
+            drain(h["size"])
+        elif op == "rm":
             if st is None:
                 return
             writable(fd)

@@ -134,22 +134,17 @@ export class ScratchStore {
 
   // The cwd alone, for a shell that keeps /tmp itself: the files and
   // the last use stay, so the rows age out as if no command ran. A new
-  // row takes now as its last use. Answers the revision written.
-  writeCwd(
-    workspace: Workspace,
-    expectedRevision: number,
-    cwd: string,
-    now: number,
-  ): number {
+  // row takes now as its last use. Its commands may run at once, so the
+  // last to commit sets the cwd and no revision is checked. Answers the
+  // revision written.
+  writeCwd(workspace: Workspace, cwd: string, now: number): number {
     const id = workspaceId(workspace);
     const current = this.db
       .query<{ revision: number }, [string]>(
         "select revision from session_scratch where workspace_id = ?",
       )
       .get(id);
-    if ((current?.revision ?? 0) !== expectedRevision) {
-      throw new Conflict("the scratch changed while the command ran");
-    }
+    const revision = (current?.revision ?? 0) + 1;
     this.db
       .query(
         `insert into session_scratch
@@ -158,8 +153,8 @@ export class ScratchStore {
          on conflict (workspace_id) do update set
            cwd = excluded.cwd, revision = excluded.revision`,
       )
-      .run(id, workspaceSession(workspace), cwd, expectedRevision + 1, now);
-    return expectedRevision + 1;
+      .run(id, workspaceSession(workspace), cwd, revision, now);
+    return revision;
   }
 
   // the stored names and sizes, which a commit checks inside its

@@ -8,11 +8,13 @@
 import type {
   Answer,
   CommandCredential,
+  CommandHooks,
   Job,
   Mounted,
   Settled,
   SettleOutcome,
   ShellCall,
+  ShellContext,
 } from "../../../src/server/bash/index.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
@@ -43,6 +45,8 @@ export type Rows = {
   uploadsRevision?: number;
   kept?: Record<string, string>;
   subagent?: boolean;
+  // the command's own workspace; every command runs in chat's sandbox
+  workspace?: string;
   resultCut?: number;
   visuals?: boolean;
   // the sandbox network the command runs under, off when not given
@@ -76,11 +80,28 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
     log: silent,
     limits: () => limits,
   });
+  // each command's effect by its text, so overlapping ones play their own
+  const effects = new WeakMap<
+    FakeFs,
+    Map<string, (call: CommandCall) => CommandEffect | Promise<CommandEffect>>
+  >();
+  const effectsOf = (fs: FakeFs) => {
+    let map = effects.get(fs);
+    if (map === undefined) {
+      map = new Map();
+      effects.set(fs, map);
+    }
+    return map;
+  };
   const call = (rows: Rows = {}): ShellCall => {
     net = rows.net ?? { mode: "off", hosts: [] };
     return {
       projectId: "project",
-      workspace: { id: "chat", sessionId: "chat" },
+      workspace: {
+        id: rows.workspace ?? "chat",
+        sessionId: rows.workspace ?? "chat",
+      },
+      root: "chat",
       sendId: "send",
       subagent: rows.subagent ?? false,
       repos: [],
@@ -167,13 +188,23 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
       reads?: number[];
       // the kept file's read throws, as a failed store read does
       keptFails?: boolean;
+      // the command's text, which picks its effect when commands overlap
+      command?: string;
+      // the doc rows as they stand at the save
+      docs?: ShellContext["docs"];
+      // a hold acquired before, for a command that read its rows later
+      hold?: SandboxHold;
+      // the mount's process slot, as mount.ts hands it
+      slot?: CommandHooks["slot"];
     } = {},
   ) {
-    const hold = (await leases.acquire(
-      call(rows),
-      time.now() + 20_000,
-      new AbortController().signal,
-    )) as SandboxHold;
+    const hold =
+      options.hold ??
+      ((await leases.acquire(
+        call(rows),
+        time.now() + 20_000,
+        new AbortController().signal,
+      )) as SandboxHold);
     const fs = fake.files.get(hold.sandbox)!;
     const failed = { count: 0 };
     const original = hold.failed;
@@ -181,13 +212,23 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
       failed.count++;
       original();
     };
-    fs.onCommand = typeof effect === "function" ? effect : () => effect;
-    const { job, mounted } = jobOf(rows, "cmd");
+    const command = options.command ?? "cmd";
+    effectsOf(fs).set(
+      command,
+      typeof effect === "function" ? effect : () => effect,
+    );
+    fs.onCommand = (played) => effectsOf(fs).get(played.command)!(played);
+    const { job, mounted } = jobOf(rows, command);
     const kept = Object.values(rows.kept ?? {});
     const phases: string[] = [];
     const ran = await backend.run(
       job,
-      { ...call(rows), mounted, hold },
+      {
+        ...call(rows),
+        mounted,
+        hold,
+        ...(options.docs ? { docs: options.docs } : {}),
+      },
       {
         kept: (index) => {
           options.reads?.push(index);
@@ -195,6 +236,7 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
           return bytes(kept[index]!);
         },
         fetch: null,
+        ...(options.slot ? { slot: options.slot } : {}),
       },
       {
         signal: (options.stop ?? new AbortController()).signal,

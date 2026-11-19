@@ -120,9 +120,9 @@ is its root.
   `automation` and `external_task` when the parent is a run (the
   scope's `origin`), the write actions of both otherwise, its MCP
   servers on the read side alone so `offeredServers()` drops the
-  write side, a bash that says nothing of `open`, and each credential
-  signing `GET` and `HEAD` alone (`readOnly`), refused as `writes`
-  when it had neither.
+  write side, a bash that says nothing of `open`, and, outside the
+  sandbox shell, each credential signing `GET` and `HEAD` alone
+  (`readOnly`), refused as `writes` when it had neither.
   Sending the parent's array and refusing the cut names at dispatch is
   a swap inside that function.
 
@@ -145,23 +145,29 @@ is its root.
 
 ## The workspace
 
-- **A child's `/tmp`, cwd, `/mcp` and command queue are its own
-  session's.** At its start the exact parent workspace is copied in:
+- **In the built-in shell a child's `/tmp`, cwd, `/mcp` and command
+  queue are its own session's.** At its start the exact parent workspace is copied in:
   for a channel this is the summoned agent's workspace, never another
   agent's. The child starts in `/tmp` (`bash/handoff.ts`). It mounts
   `/knowledge`, `/repos` (the parent's trees) and the parent's
   `/uploads` (`subagent.uploadsFrom` on the call's context).
-- **Under the sandbox shell nothing passes through `/tmp`.** An offer
-  made with the sandbox shell says `sandbox`: the child's setup copies
-  nothing in, so nothing comes back, and the delegate description and
-  the subagent's line say so (share through `/knowledge`, answer in
-  the reply). The built-in words are unchanged.
-- **`/knowledge` and `/uploads` are read-only to a child.** Its worker
-  refuses a command that changed either, with the docs on or off, and
-  the server refuses any doc change itself; nothing is saved, `/tmp`
-  included. Its worker has
-  no `open`, and the server refuses an opened record from it.
-- **At its end what it added or changed comes back** under the parent's
+- **Under the sandbox shell a child runs in its parent's sandbox.** An
+  offer made with the sandbox shell says `sandbox`. The child's
+  commands run in the root's sandbox, at once with the parent's and its
+  siblings' (`docs/sandbox-commands.md`): the same `/tmp`, `$HOME`,
+  installs, network and credentials. It saves `/knowledge` as the
+  parent does, its setup copies nothing in, nothing comes back, its end
+  recycles nothing, and its kept folders take the parent's numbers. Its
+  cwd and command queue stay its own. The delegate description and the
+  subagent's line say it shares the sandbox; the built-in words are
+  unchanged.
+- **In the built-in shell `/knowledge` and `/uploads` are read-only to
+  a child.** Its worker refuses a command that changed either, with the
+  docs on or off, and the server refuses any doc change itself; nothing
+  is saved, `/tmp` included. In either shell it has no `open`, and the
+  server refuses an opened record from it.
+- **In the built-in shell, at its end what it added or changed comes
+  back** under the parent's
   `/tmp/<folder>/`: `sub-N`, the first that no file of the parent's
   stands at and no sibling took, chosen then, under the parent's
   command queue, so a folder the parent wrote meanwhile is never
@@ -170,6 +176,14 @@ is its root.
   result. The child's scratch goes in the
   same transaction, or alone when the copy fails, since a child is
   never continued.
+- **A subagent's command carries `subagent` in its caps.** It mounts
+  `/uploads` of `uploadsFrom`, its parent's session, its job's
+  `subagent` flag leaves `open` out, and `checkOpened()` refuses any
+  opened record. A shell that says `sharedWithSubagents` runs it in its
+  parent's (`ShellCall.root`) and saves its docs. Otherwise a change
+  under `/knowledge` (docs on or off) or `/uploads` is refused with
+  `READ_ONLY_TO_SUBAGENT` by the worker and, for docs, the server, and
+  its `/tmp` comes and goes by copy (`bash/handoff.ts`).
 - **Its bash description is the parent's after `mountRepos()`,** less
   the `open` text and with its own credential words (`asSubagent()`),
   so it names the same repositories. Their commits go before its task

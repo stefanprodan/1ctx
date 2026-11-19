@@ -263,6 +263,55 @@ describe("push helper", () => {
     chmodSync(shut, 0o755);
   });
 
+  test("apply a frame only while its path holds what it expects, a skipped file's later parts too", async () => {
+    const { roots } = scratch();
+    const tmp = roots[1]!;
+    const sha = (text: string | Uint8Array) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    for (const name of ["kept", "gone", "moved", "over"])
+      writeFileSync(join(tmp, name), name);
+    // a command wrote "moved" and "fresh" since the server read them
+    writeFileSync(join(tmp, "fresh"), "theirs");
+    const big = Uint8Array.from({ length: 200_000 }, (_, i) => i % 251);
+    const data = new TextEncoder().encode("ours");
+    const at = (name: string) => join(tmp, name);
+    const chunks = encodePush(
+      {
+        remove: [at("gone"), at("moved")],
+        files: [
+          { path: at("over"), mode: 0o644, mtime: 1, data },
+          { path: at("new"), mode: 0o644, mtime: 1, data },
+          { path: at("fresh"), mode: 0o644, mtime: 1, data: big },
+          { path: at("big"), mode: 0o644, mtime: 1, data: big },
+        ],
+        was: new Map([
+          [at("gone"), sha("gone")],
+          [at("moved"), sha("before")],
+          [at("over"), sha("over")],
+          [at("new"), null],
+          [at("fresh"), null],
+          [at("big"), null],
+        ]),
+      },
+      { roots, limit: 64 * 1024 },
+    );
+    expect(chunks.length).toBeGreaterThan(2);
+    for (const chunk of chunks)
+      expect((await push(roots, chunk)).text).toStartWith("PUSH ok");
+    expect(existsSync(at("gone"))).toBe(false);
+    expect(readFileSync(at("moved"), "utf8")).toBe("moved");
+    expect(readFileSync(at("over"), "utf8")).toBe("ours");
+    expect(readFileSync(at("new"), "utf8")).toBe("ours");
+    expect(readFileSync(at("fresh"), "utf8")).toBe("theirs");
+    expect(new Uint8Array(readFileSync(at("big")))).toEqual(big);
+    expect(readFileSync(at("kept"), "utf8")).toBe("kept");
+    const bad = await push(
+      roots,
+      frame({ op: "rm", path: escapePath(at("kept")), was: "ABC" }),
+    );
+    expect(bad.text).toStartWith("PUSH refused header");
+  });
+
   test("refuse a mode on a hard-linked file, which would reach its other name", async () => {
     const { base, roots } = scratch();
     writeFileSync(join(base, "secret"), "s");

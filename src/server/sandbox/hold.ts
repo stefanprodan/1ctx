@@ -1,8 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// What a command holds of its workspace's sandbox, and why a sandbox
-// goes.
+// What a command holds of its chat's sandbox, and why a sandbox goes.
 
 import type { ShellHold } from "../bash/index.ts";
 import type { Gateway } from "./gateway.ts";
@@ -15,7 +14,6 @@ export type RecycleReason =
   | "archive"
   | "delete"
   | "run"
-  | "child"
   | "restart"
   | "settings"
   | "failed"
@@ -23,7 +21,8 @@ export type RecycleReason =
   | "credentials"
   | "network";
 
-// a workspace's sandbox, held by one command from acquire to settle
+// a chat's sandbox, held by each of its commands and its subagents'
+// from acquire to settle
 export type SandboxHold = ShellHold & {
   sandbox: string;
   // the sandbox's own process, which the fence spares
@@ -38,8 +37,17 @@ export type SandboxHold = ShellHold & {
   network: { value: unknown };
   // what the network leaves out, named in this command's result
   notice: string;
-  // drops the lease and deletes the sandbox, in place of release
+  // aborted when another holder recycled the sandbox
+  lost: AbortSignal;
+  // the sandbox's next turn for a push or a save; call what it gives
+  // to pass the turn on
+  turn(signal: AbortSignal): Promise<() => void>;
+  // drops the lease and deletes the sandbox once no command holds it,
+  // stopping the others, in place of release
   recycle(reason: RecycleReason): void;
+  // the same, in place of release, but the others run on: the sandbox
+  // goes once the last of them lets go, and no new command joins it
+  retire(reason: RecycleReason): void;
   // an exec found the sandbox not ready or the gateway unavailable;
   // recycle or release still ends the hold
   failed(): void;

@@ -287,8 +287,8 @@ describe("limits area", () => {
     expect(of("sandboxesMax")).toEqual([20, 1, 256, "count"]);
     expect(of("sandboxWarm")).toEqual([0, 0, 32, "count"]);
     expect(of("sandboxIdleMinutes")).toEqual([30, 1, 240, "minutes"]);
-    expect(of("sandboxCpus")).toEqual([2, 1, 64, "count"]);
-    expect(of("sandboxMemoryMiB")).toEqual([2048, 256, 65_536, "mebibytes"]);
+    expect(of("sandboxCpus")).toEqual([4, 1, 64, "count"]);
+    expect(of("sandboxMemoryMiB")).toEqual([4096, 256, 65_536, "mebibytes"]);
     expect(of("sandboxCommandSeconds")).toEqual([600, 20, 3600, "seconds"]);
     const db = memoryDb();
     try {

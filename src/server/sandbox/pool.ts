@@ -76,7 +76,10 @@ export class WarmPool {
     const { lease, built } = this.deps.build(ctl.signal);
     try {
       await built;
-      if (lease.doomed || this.deps.stopped()) {
+      // a sandboxWarm lowered while it was made: the trim above could
+      // not take it then
+      const over = this.deps.book.warm() > this.deps.limits().sandboxWarm;
+      if (lease.doomed || this.deps.stopped() || over) {
         this.deps.deletes.destroy(lease, "settings");
       } else lease.state = "warm";
     } catch (error) {

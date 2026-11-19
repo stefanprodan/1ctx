@@ -23,6 +23,7 @@ import {
 import { builtinCatalog } from "../../../src/server/tools/catalog.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
+import { SANDBOX_DEFAULT_HOSTS } from "../../../src/shared/sandbox-net.ts";
 import { settleRun } from "../../helpers/automations.ts";
 import { chatApp, startChat, waitScript } from "../../helpers/chat.ts";
 import { freshSignal, type Setup, setup } from "../bash/helpers.ts";
@@ -605,37 +606,42 @@ describe("bash's description under the sandbox shell", () => {
     domains: ["api.github.test", "pypi.test"],
   };
 
-  const hosts = {
-    mode: "hosts" as const,
-    hosts: ["api.github.test", "pypi.test"],
-  };
+  const hosts = { mode: "hosts" as const, hosts: SANDBOX_DEFAULT_HOSTS };
 
-  test("it names the placeholder, the header it goes in and the differences", () => {
+  // the words as the user wrote them: a call's time and the idle time
+  // from the limits, then the network and each credential
+  const WORDS =
+    "Run a bash command in this chat's Linux sandbox: Python 3.15 with uv, Bun, git, jq, yq and rg; no node. /knowledge is the project's shared docs, saved as a new version when the command ends; if someone else changed a file meanwhile, nothing is saved: read it again and retry. /uploads holds the user's attachments, read-only. /tmp and $HOME are yours until the sandbox is recycled (after 30 idle minutes, a restart, a timeout or a failed save), so keep what must last in /knowledge. Search before reading: rg -il 'word' /knowledge, grep -n, sed -n '40,120p'. Never print whole files or trees; long output is cut. Each call is a new shell in the last directory: chain one task's steps in one call, and make independent calls in parallel. A call may run 10 minutes; send a background job's output to a file. Install with uv run --with pkg, a venv under $HOME, or bun add in a project under $HOME. open <file> shows a file to the user: HTML and SVG as visuals, Markdown rendered. Network: HTTP and HTTPS to the admin's list only: package and container registries, code hosts, docs, news and public APIs (pypi.org, registry.npmjs.org, github.com…); anything else is refused. Never write secrets.";
+
+  test("its words are the short ones, byte for byte", () => {
+    const hash = (text: string) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    const words = makeBashTool({ web: listed, sandbox: hosts }).description;
+    expect(words).toBe(WORDS);
+    expect(hash(words)).toBe(
+      "89f76173d949afc6e9a79e568dd3557036a435bef4795f7ad4a39aefa88c2a02",
+    );
+    expect(hash(makeBashTool({ web: null, sandbox: hosts }).description)).toBe(
+      "a74885d876fdd6a2a0eb3991b9694d12e00c870b2f2be20dd293a0033226d3cf",
+    );
+    expect(
+      hash(
+        makeBashTool({ web: listed, sandbox: hosts, subagent: true })
+          .description,
+      ),
+    ).toBe("0f9671be33052b1e11364b50024afef77664e36e156649b7cd5f3fb018a37300");
+  });
+
+  test("each credential it can place follows the network, its header named", () => {
     const words = makeBashTool({
       web: listed,
       credentials: { offered: [github, cookie], off: [] },
       sandbox: hosts,
     }).description;
     expect(words).toContain(
-      'For https://api.github.test/ (gh-api) send -H "Authorization: token $ONECTX_CRED_GH_API", a placeholder the key replaces there alone.',
+      'anything else is refused. For https://api.github.test/ (gh-api) send -H "Authorization: token $ONECTX_CRED_GH_API", a placeholder the key replaces there alone. Never write secrets.',
     );
     expect(words).not.toContain("session");
-    expect(words).toContain(
-      "curl, python, uv and bun reach HTTP and HTTPS on ports 80 and 443 of these hosts only: api.github.test, pypi.test. Save downloads in /tmp.",
-    );
-    expect(words).toContain("run Python with uv run or uvx, never pip");
-    expect(words).toContain("into a venv under $HOME, or with bun add");
-    expect(words).toContain("in a project under $HOME, never in /knowledge");
-    expect(words).toContain(
-      "/tmp and $HOME hold any bytes but last only while this chat's sandbox does: it is recycled after 30 idle minutes, on a restart, and when a command times out or its files cannot be saved, so put what must last in /knowledge.",
-    );
-    expect(words).not.toContain("kept between commands");
-    expect(words).not.toContain("in /tmp or /knowledge");
-    expect(words).toContain("TypeScript with bun file.ts");
-    expect(words).toContain("Redirect a background job's output");
-    expect(words).toContain("A hard link or an unreadable file");
-    expect(words).toContain("responses are never redacted");
-    expect(words).not.toContain(";");
     expect(words).not.toContain("send no key");
   });
 
@@ -656,17 +662,30 @@ describe("bash's description under the sandbox shell", () => {
     expect(words).not.toContain("send -H");
   });
 
-  test("the sandbox's own hosts, never Web access's: ten named, then how many more", () => {
+  test("the admin's list is named by kind, never by its hosts", () => {
     const many = Array.from({ length: 13 }, (_, i) => `h${i + 10}.test`);
     const words = makeBashTool({
       web: { mode: "all", domains: [] },
       sandbox: { mode: "hosts", hosts: many },
     }).description;
-    expect(words).toContain(
-      `these hosts only: ${many.slice(0, 10).join(", ")} and 3 more.`,
+    expect(words).toBe(
+      WORDS.replace(" (pypi.org, registry.npmjs.org, github.com…)", ""),
     );
+    expect(words).not.toContain("h10.test");
     expect(words).not.toContain("any host");
-    expect(words).not.toContain("unsigned");
+  });
+
+  test("its examples are only those the admin's list holds, in their order", () => {
+    const words = makeBashTool({
+      web: { mode: "all", domains: [] },
+      sandbox: { mode: "hosts", hosts: ["github.com", "x.test", "pypi.org"] },
+    }).description;
+    expect(words).toBe(
+      WORDS.replace(
+        "(pypi.org, registry.npmjs.org, github.com…)",
+        "(pypi.org, github.com…)",
+      ),
+    );
   });
 
   test("a send without web access says no network, whatever the sandbox's hosts", () => {
@@ -675,8 +694,9 @@ describe("bash's description under the sandbox shell", () => {
       credentials: { offered: [github], off: [] },
       sandbox: hosts,
     }).description;
-    expect(words.endsWith(" No network.")).toBe(true);
-    expect(words).not.toContain("pypi.test");
+    expect(words.endsWith(" No network. Never write secrets.")).toBe(true);
+    expect(words).not.toContain("Network:");
+    expect(words).not.toContain("ONECTX_CRED");
     expect(words).toContain("uv run");
   });
 
@@ -686,12 +706,12 @@ describe("bash's description under the sandbox shell", () => {
       credentials: { offered: [github], off: [] },
       sandbox: { mode: "off", hosts: ["pypi.test"] },
     }).description;
-    expect(words.endsWith(" No network.")).toBe(true);
+    expect(words.endsWith(" No network. Never write secrets.")).toBe(true);
     expect(words).not.toContain("ONECTX_CRED");
     expect(words).toContain("uv run");
   });
 
-  test("the built-in shell's words are untouched, and a subagent's follow the sandbox's", () => {
+  test("the built-in shell's words are untouched, and a subagent's are its parent's less open", () => {
     const options = {
       web: listed,
       credentials: { offered: [github], off: [] },
@@ -703,38 +723,15 @@ describe("bash's description under the sandbox shell", () => {
       "jq, yq, awk and diff are there, git, python and node are not.",
     );
     const parent = makeBashTool({ ...options, sandbox: hosts }).description;
-    const child = asSubagent(
-      `${parent}\n\nrepos`,
-      listed,
-      [github],
-      [{ ...github, readOnly: true }],
+    // a subagent in its parent's sandbox has its parent's credentials
+    const child = asSubagent(`${parent}\n\nrepos`, listed, [github], [github]);
+    expect(child).toBe(
+      `${parent.replace("open <file> shows a file to the user: HTML and SVG as visuals, Markdown rendered. ", "")}\n\nrepos`,
     );
-    expect(child).toContain("(gh-api, GET and HEAD only) send -H");
-    expect(child).toContain("these hosts only: api.github.test, pypi.test.");
-    expect(child).toContain("refused connection.\n\nrepos");
-    // a subagent with none of its parent's credentials keeps the rest
-    const bare = asSubagent(parent, listed, [github], []);
-    expect(bare).not.toContain("ONECTX_CRED");
-    expect(bare).toContain(
-      "Save downloads in /tmp. Each redirect is checked as a new request",
-    );
-  });
-
-  test("the built-in shell's words stay byte for byte", () => {
-    const hash = (text: string) =>
-      new Bun.CryptoHasher("sha256").update(text).digest("hex");
-    expect(hash(makeBashTool().description)).toBe(
-      "27825f49251f64e13747dcbde4c2bd6667d9e50a1a42fb22198b17f96b33036f",
-    );
+    expect(child).toContain("(gh-api) send -H");
     expect(
-      hash(makeBashTool({ web: { mode: "all", domains: [] } }).description),
-    ).toBe("4d18abed7e696ad9463068295b1bf452f2e0f17d2f9eac7a7eb4bd7d3ff5bf12");
-    expect(hash(makeBashTool({ subagent: true }).description)).toBe(
-      "61c60fd5537e8b6553d29e1e5acd38cd099c819367d29fb83db0a7e0bda64338",
-    );
-    expect(makeBashTool().description).toContain(
-      "/tmp is this chat's scratch for any bytes, kept between commands.",
-    );
+      makeBashTool({ ...options, sandbox: hosts, subagent: true }).description,
+    ).toBe(asSubagent(parent, listed, [github], [github]));
   });
 
   test("a sandbox command has its own time, said in the words and passed on", async () => {
@@ -765,29 +762,27 @@ describe("bash's description under the sandbox shell", () => {
     });
     const sandboxed = makeBashTool({ bash: bash(true) });
     expect(sandboxed.timeoutMs).toBe(900_000);
+    expect(sandboxed.description).toContain("A call may run 15 minutes;");
     expect(sandboxed.description).toContain(
-      "A command may run up to 15 minutes.",
-    );
-    expect(sandboxed.description).toContain(
-      "it is recycled after 45 idle minutes, on a restart, and when",
+      "recycled (after 45 idle minutes, a restart,",
     );
     expect(
       makeBashTool({ sandbox: hosts, idleMinutes: 1 }).description,
-    ).toContain("recycled after 1 idle minute, on");
+    ).toContain("(after 1 idle minute, a restart");
     // a run's deadline under the command's own time caps the words
     expect(
       makeBashTool({ sandbox: hosts, deadlineMs: 300_000 }).description,
-    ).toContain("A command may run up to 5 minutes.");
+    ).toContain("A call may run 5 minutes;");
     expect(
       makeBashTool({ sandbox: hosts, deadlineMs: 1_800_000 }).description,
-    ).toContain("A command may run up to 10 minutes.");
+    ).toContain("A call may run 10 minutes;");
     await new Registry([sandboxed], undefined, timer).run(
       call({ command: "make test" }),
       context(),
     );
     const builtin = makeBashTool({ bash: bash(false) });
     expect(builtin.timeoutMs).toBeUndefined();
-    expect(builtin.description).not.toContain("A command may run");
+    expect(builtin.description).not.toContain("A call may run");
     await new Registry([builtin], undefined, timer).run(
       call({ command: "ls" }),
       context(),
@@ -805,7 +800,24 @@ describe("bash's description under the sandbox shell", () => {
       expect.not.objectContaining({ sandboxCommandMs: expect.anything() }),
     ]);
     expect(makeBashTool({ sandbox: hosts }).description).toContain(
-      "A command may run up to 10 minutes.",
+      "A call may run 10 minutes;",
+    );
+  });
+
+  test("the built-in shell's words stay byte for byte", () => {
+    const hash = (text: string) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    expect(hash(makeBashTool().description)).toBe(
+      "27825f49251f64e13747dcbde4c2bd6667d9e50a1a42fb22198b17f96b33036f",
+    );
+    expect(
+      hash(makeBashTool({ web: { mode: "all", domains: [] } }).description),
+    ).toBe("4d18abed7e696ad9463068295b1bf452f2e0f17d2f9eac7a7eb4bd7d3ff5bf12");
+    expect(hash(makeBashTool({ subagent: true }).description)).toBe(
+      "61c60fd5537e8b6553d29e1e5acd38cd099c819367d29fb83db0a7e0bda64338",
+    );
+    expect(makeBashTool().description).toContain(
+      "/tmp is this chat's scratch for any bytes, kept between commands.",
     );
   });
 
@@ -838,18 +850,6 @@ describe("bash's description under the sandbox shell", () => {
     send.abort(new Error("the send's deadline"));
     const result = await pending;
     expect(result).toMatchObject({ error: true, interrupted: true });
-  });
-
-  test("a subagent's sandbox words send what lasts to its answer", () => {
-    const own = makeBashTool({ sandbox: hosts, subagent: true }).description;
-    const parent = makeBashTool({ sandbox: hosts }).description;
-    const child = asSubagent(parent, null, [], []);
-    for (const words of [own, child]) {
-      expect(words).toContain(
-        "/tmp and $HOME hold any bytes but last only while your sandbox does, which ends with your task, so put what the other agent needs in your answer.",
-      );
-      expect(words).not.toContain("what must last in /knowledge");
-    }
   });
 
   test("bash's own word picks the variant", () => {

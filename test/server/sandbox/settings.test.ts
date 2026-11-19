@@ -5,10 +5,12 @@
 // endpoint, the key files by presence alone, and the shell bash gets.
 
 import { describe, expect, test } from "bun:test";
+import type { ShellCall } from "../../../src/server/bash/index.ts";
 import { publish } from "../../../src/server/lib/bus.ts";
 import {
   defaultImage,
   INSTANCE_LABEL,
+  type Leases,
 } from "../../../src/server/sandbox/index.ts";
 import type {
   SandboxLeasesResponse,
@@ -221,6 +223,7 @@ describe("sandbox settings", () => {
           {
             projectId: "project",
             workspace: { id: "chat-gone", sessionId: "chat-gone" },
+            root: "chat-gone",
             sendId: "send",
             subagent: false,
             repos: [],
@@ -260,6 +263,7 @@ describe("sandbox settings", () => {
           {
             projectId: "project",
             workspace: { id: "chat", sessionId: "chat" },
+            root: "chat",
             sendId: "send",
             subagent: false,
             repos: [],
@@ -287,6 +291,87 @@ describe("sandbox settings", () => {
     );
   });
 
+  test("a new image's old manager never deletes a provider the new one attached", async () => {
+    const fake = fakeGateway();
+    // every provider delete asked, before the fake refuses an attached
+    // one, and each client closed, which a drained manager's ends with
+    const asks: string[] = [];
+    let closed = 0;
+    const connect: typeof fake.connect = (config) => {
+      const gateway = fake.connect(config);
+      const remove = gateway.providers.delete;
+      gateway.providers.delete = (name, signal) => {
+        asks.push(name);
+        return remove(name, signal);
+      };
+      const close = gateway.close;
+      gateway.close = () => {
+        closed++;
+        close();
+      };
+      return gateway;
+    };
+    const key = "made-up-key-0123456789abcdef";
+    const call = (id: string): ShellCall => ({
+      projectId: "project",
+      workspace: { id, sessionId: id },
+      root: id,
+      sendId: "send",
+      subagent: false,
+      repos: [],
+      repoFileBytes: 0,
+      network: true,
+      credentials: [
+        {
+          name: "quotes",
+          prefix: "https://api.example.test/v1/",
+          key,
+          header: "Authorization",
+          template: "Bearer {key}",
+          value: `Bearer ${key}`,
+          methods: ["GET", "HEAD"],
+        },
+      ],
+    });
+    const acquire = async (leases: Leases, id: string, now: number) => {
+      const hold = await leases.acquire(
+        call(id),
+        now + 20_000,
+        new AbortController().signal,
+      );
+      if (hold === "busy") throw new Error("busy");
+      return hold;
+    };
+    const app = await testApp({ secrets: KEYS, sandboxGateway: connect });
+    try {
+      const admin = app.client();
+      await admin.login("admin", "hunter2-test");
+      await admin.call("PUT", "/api/admin/sandbox", {
+        body: {
+          shell: "sandbox",
+          endpoint: ENDPOINT,
+          hosts: ["api.example.test"],
+        },
+      });
+      const old = app.sandbox.leases()!;
+      const hold = await acquire(old, "a", app.now.value);
+      await admin.call("PUT", "/api/admin/sandbox", {
+        body: { image: "registry.test/sbx:2" },
+      });
+      const next = app.sandbox.leases()!;
+      await app.sandbox.start();
+      const other = await acquire(next, "b", app.now.value);
+      hold.release();
+      await until(() => closed > 0);
+      expect(fake.deletes).toEqual([hold.sandbox]);
+      expect(asks).toEqual([]);
+      other.release();
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+
   test("an image that fails its root check is named on the leases route", async () => {
     const fake = fakeGateway();
     fake.rootProblems = ["missing /repos"];
@@ -304,6 +389,7 @@ describe("sandbox settings", () => {
             {
               projectId: "project",
               workspace: { id: "chat", sessionId: "chat" },
+              root: "chat",
               sendId: "send",
               subagent: false,
               repos: [],

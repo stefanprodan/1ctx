@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The area's pure parts: the create spec from the caps, the keep-alive's
-// pid, and which bus events recycle which session.
+// pid, which bus events recycle which session, and what a save leaves in
+// place.
 
 import { describe, expect, test } from "bun:test";
 import type { BusEvent } from "../../../src/server/lib/bus.ts";
@@ -13,6 +14,7 @@ import {
   KEEP_ALIVE_COMMAND,
   keepAlivePid,
 } from "../../../src/server/sandbox/index.ts";
+import { within } from "../../../src/server/sandbox/shared.ts";
 import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 
 const MiB = 1024 * 1024;
@@ -107,7 +109,7 @@ const changed = (
   }) as BusEvent;
 
 describe("the bus events that recycle", () => {
-  test("a clear, an archive, a delete, a run's and a child's end", () => {
+  test("a clear, an archive, a delete and a run's end, never a child's", () => {
     expect(recyclesOf(changed({}, { cleared: true }))).toEqual([
       { sessionId: "s1", reason: "clear" },
     ]);
@@ -142,13 +144,31 @@ describe("the bus events that recycle", () => {
           child: { sessionId: "c1", status, tokens: 0, rows: [] },
         },
       }) as BusEvent;
+    // a subagent's commands ran in its chat's sandbox, which stays
     expect(recyclesOf(child("running"))).toEqual([]);
-    expect(recyclesOf(child("failed"))).toEqual([
-      { sessionId: "c1", reason: "child" },
-    ]);
+    expect(recyclesOf(child("failed"))).toEqual([]);
+    expect(recyclesOf(child("done"))).toEqual([]);
   });
 
   test("a fork leaves its source's sandbox alone", () => {
     expect(recyclesOf(changed({ id: "f1", forkedFromId: "s1" }))).toEqual([]);
+  });
+});
+
+describe("what a save leaves in place", () => {
+  test("covers a path and what is under it, asked by ancestor, never by walking the set", () => {
+    // a set the check may only look up: a walk of it throws
+    class LookupOnly extends Set<string> {
+      override [Symbol.iterator](): SetIterator<string> {
+        throw new Error("walked");
+      }
+    }
+    const left = new LookupOnly();
+    for (let n = 0; n < 1000; n++) left.add(`/knowledge/l${n}`);
+    expect(within(left, "/knowledge/l7")).toBe(true);
+    expect(within(left, "/knowledge/l7/deep/x.md")).toBe(true);
+    expect(within(left, "/knowledge/l7x")).toBe(false);
+    expect(within(left, "/knowledge")).toBe(false);
+    expect(within(new LookupOnly(), "/knowledge/a.md")).toBe(false);
   });
 });

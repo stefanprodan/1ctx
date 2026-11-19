@@ -41,7 +41,7 @@ export type SweepDeps = {
 // not listed is swept again
 export async function sweepLabelled(
   deps: SweepDeps,
-  when: "start" | "restart",
+  when: "start" | "restart" | "again",
 ): Promise<{ globalPolicy: boolean | null; listed: boolean }> {
   const { clock, log, gateway } = deps;
   const labels = { [INSTANCE_LABEL]: deps.instanceId };

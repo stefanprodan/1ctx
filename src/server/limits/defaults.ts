@@ -273,9 +273,9 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   // a warm one is a sandbox too, so the pool stays under the cap
   sandboxWarm: limit(0, 0, 32, "count", "sandbox"),
   sandboxIdleMinutes: limit(30, 1, 240, "minutes", "sandbox"),
-  sandboxCpus: limit(2, 1, 64, "count", "sandbox"),
+  sandboxCpus: limit(4, 1, 64, "count", "sandbox"),
   // the trees' tmpfs bytes count against it too
-  sandboxMemoryMiB: limit(2048, 256, 65_536, "mebibytes", "sandbox"),
+  sandboxMemoryMiB: limit(4096, 256, 65_536, "mebibytes", "sandbox"),
   sandboxCommandSeconds: limit(600, 20, 3600, "seconds", "sandbox"),
 };
 

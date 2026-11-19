@@ -23,6 +23,9 @@ export const STUCK_CHECK_MS = 5 * MINUTE_MS;
 // this, then three and nine times this, then it is stuck
 export const DELETE_RETRY_MS = 5_000;
 export const DELETE_TRIES = 3;
+// a retired manager asks a stuck sandbox's phase this many times, then
+// lets it go to the sweeps, so its drain settles and frees what it holds
+export const RETIRED_STUCK_CHECKS = 3;
 
 export type DeletesDeps = {
   clock: Clock;
@@ -32,6 +35,8 @@ export type DeletesDeps = {
   cuts: Cuts;
   // shut down: no retry and no phase check
   closed(): boolean;
+  // the settings moved off this manager
+  retired(): boolean;
   // a record went, its delete observed
   forgot(): void;
   // a delete ended, either way
@@ -93,6 +98,7 @@ export class Deletes {
       }
       lease.state = "stuck";
       lease.evicted = false;
+      lease.tries = 0;
       this.deps.log.warn("sandbox delete stuck", {
         sandbox: lease.name,
         ...errorFields(error, false),
@@ -127,6 +133,12 @@ export class Deletes {
     }
     if (phase !== null) lease.phase = phase;
     if (this.deps.closed()) return;
+    if (this.deps.retired() && ++lease.tries >= RETIRED_STUCK_CHECKS) {
+      log.warn("sandbox delete given up", { sandbox: lease.name });
+      this.forget(lease);
+      this.deps.ended();
+      return;
+    }
     lease.timer = after(clock, STUCK_CHECK_MS, () => {
       lease.timer = null;
       void this.stuck(lease);

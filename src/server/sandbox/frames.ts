@@ -92,6 +92,10 @@ export type PushManifest = {
   files?: readonly PushFile[];
   // a mode and time for a file or folder already there
   meta?: readonly PushFolder[];
+  // what a removed or written path held when the server last read it:
+  // its sha256, null for nothing. A path holding anything else now is
+  // skipped, since a command beside the push wrote it since
+  was?: ReadonlyMap<string, string | null>;
 };
 
 const depth = (path: string) => path.split("/").length;
@@ -213,11 +217,15 @@ function* chunksOf(
     used += size;
     return full;
   };
+  const was = manifest.was ?? new Map<string, string | null>();
+  const held = (path: string) => (was.has(path) ? { was: was.get(path) } : {});
   const remove = [...(manifest.remove ?? [])].sort(
     (a, b) => depth(b) - depth(a),
   );
   for (const path of remove) {
-    const full = add(header({ op: "rm", path: escapePath(path) }));
+    const full = add(
+      header({ op: "rm", path: escapePath(path), ...held(path) }),
+    );
     if (full) yield full;
   }
   const folders = [...(manifest.folders ?? [])].sort(
@@ -238,6 +246,9 @@ function* chunksOf(
     const path = escapePath(file.path);
     const total = file.data.byteLength;
     let sent = 0;
+    // an appended part holds to the parts before it, so one skipped in
+    // an earlier exec skips the rest
+    const parts = was.has(file.path) ? new Bun.CryptoHasher("sha256") : null;
     // a header with the widest fields is never shorter than the one
     // written, so a part sized by it always fits
     const widest = header({
@@ -247,6 +258,7 @@ function* chunksOf(
       mtime: file.mtime,
       size: limit,
       append: true,
+      ...(parts === null ? {} : { was: "0".repeat(64) }),
     }).byteLength;
     do {
       let room = limit - 1 - used - widest;
@@ -263,8 +275,15 @@ function* chunksOf(
         mtime: file.mtime,
         size,
         ...(sent > 0 ? { append: true } : {}),
+        ...(parts === null
+          ? {}
+          : {
+              was: sent > 0 ? parts.copy().digest("hex") : was.get(file.path),
+            }),
       };
-      const full = add(header(fields), file.data.subarray(sent, sent + size));
+      const part = file.data.subarray(sent, sent + size);
+      parts?.update(part);
+      const full = add(header(fields), part);
       if (full) yield full;
       sent += size;
     } while (sent < total);

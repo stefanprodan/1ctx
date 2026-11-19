@@ -152,6 +152,7 @@ function rows(workspace: string, repos: ShellRepo[] = []): Rows {
 const callOf = (r: Rows): ShellCall => ({
   projectId: "check",
   workspace: { id: r.workspace, sessionId: r.workspace },
+  root: r.workspace,
   sendId: "check",
   subagent: false,
   repos: r.repos,

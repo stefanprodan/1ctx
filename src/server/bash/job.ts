@@ -35,9 +35,10 @@ export type CommandCaps = {
   // false while the send has the project docs off: no /knowledge
   knowledge: boolean;
   repos?: CommandRepos;
-  // a subagent's command: /uploads is its parent's, and nothing under
-  // /knowledge or /uploads may change and nothing be opened
-  subagent?: { uploadsFrom: string };
+  // a subagent's command: /uploads is its parent's, nothing is opened,
+  // and in a shell of its own nothing under /knowledge or /uploads may
+  // change. workspace is its parent's, whose shell a shared one runs in
+  subagent?: { uploadsFrom: string; workspace?: string };
 } & (
   | { web?: null }
   | {

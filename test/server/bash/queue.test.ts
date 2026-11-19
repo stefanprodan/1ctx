@@ -12,6 +12,20 @@ import { callCaps, freshSignal, run, scratchState, setup } from "./helpers.ts";
 
 describe("command admission", () => {
   test.serial(
+    "a shell that runs a workspace's commands at once never queues them, and still holds the workspace",
+    async () => {
+      const workspace = { id: "atonce-ws", sessionId: "atonce-ws" };
+      const one = await acquireSession(workspace, freshSignal(), true);
+      const two = await acquireSession(workspace, freshSignal(), true);
+      expect(heldWorkspaces().has("atonce-ws")).toBe(true);
+      one();
+      expect(heldWorkspaces().has("atonce-ws")).toBe(true);
+      two();
+      expect(heldWorkspaces().has("atonce-ws")).toBe(false);
+    },
+  );
+
+  test.serial(
     "one session runs in call order against the prior command's scratch",
     async () => {
       const s = setup();
@@ -209,15 +223,14 @@ describe("command admission", () => {
         { id: s.session.id, sessionId: s.session.id },
         freshSignal(),
       );
-      const realNow = Date.now;
       const pending = run(s, "while :; do sleep 0.05; done", {
         ...callCaps,
         callTimeoutMs: 2000,
       });
       try {
-        // the wait is read from this thread's clock, moved past a second
+        // the wait is read from the mount's clock, moved past a second
         // rather than slept through
-        Date.now = () => realNow() + 1200;
+        s.now.value += 1200;
         release();
         const result = await pending;
         expect(result.ended).toEqual({ phase: "run", cause: "deadline" });
@@ -226,7 +239,6 @@ describe("command admission", () => {
         );
         expect(result.content).toEndWith("exit 124");
       } finally {
-        Date.now = realNow;
         release();
         await pending;
         s.db.close();

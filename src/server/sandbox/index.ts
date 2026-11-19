@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The sandbox shell: bash's commands in an OpenShell sandbox per
-// workspace, when an admin picks it and the gateway is set up. The
+// The sandbox shell: bash's commands in an OpenShell sandbox per chat,
+// its subagents' included, when an admin picks it and the gateway is set up. The
 // area keeps the settings row, one gateway's leases at a time, and the
 // ShellBackend bash asks for at each command.
 
@@ -49,6 +49,7 @@ export {
   DELETE_TIMEOUT_MS,
   Leases,
   REFILL_BACKOFF_MS,
+  RETIRED_STUCK_CHECKS,
   type RecycleReason,
   type SandboxHold,
   STUCK_CHECK_MS,
@@ -161,7 +162,11 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       image,
       limits: deps.limits,
       repos: deps.repos,
-      others: () => retired.map((old) => old.leases),
+      // every other manager, the replacement included once this retires
+      others: () => [
+        ...retired.map((old) => old.leases),
+        ...(current === null ? [] : [current.leases]),
+      ],
       // a retired manager's delete frees room under the instance's cap
       freed: () => current?.leases.poke(),
       locks,
@@ -190,6 +195,9 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
   const backend: ShellBackend = {
     ownTmp: true,
     sandboxTimeout: true,
+    ownExits: true,
+    sharedWithSubagents: true,
+    atOnce: true,
     acquire(call, deadline, signal) {
       const leases = ensure();
       if (leases === null) throw new Error("the sandbox shell is not set up");

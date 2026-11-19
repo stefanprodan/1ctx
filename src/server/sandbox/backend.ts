@@ -1,12 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A command in its workspace's sandbox. The rows' difference from what
-// the sandbox holds is pushed, the command runs once through the fixed
-// wrapper, a fence stops all it started, and a complete walk, with the
-// changed files pulled, is read by the same rules as just-bash's tree.
-// After a landed commit the sandbox is put back to the stored rows; any
-// doubt instead recycles it, so its trees commit once or not at all.
+// A command in its chat's sandbox, which its subagents' commands share
+// and run in at once (shared.ts). In the sandbox's turn the rows'
+// difference from what it holds is pushed; the command runs once
+// through the fixed wrapper; in the sandbox's turn again, a fence stops
+// every process when no other command runs, and a complete walk, with
+// the changed files pulled, is read by the same rules as just-bash's
+// tree. After a landed commit the sandbox is put back to the stored
+// rows, still in that turn. Beside other commands a save that did not
+// land puts back only the docs a conflict names, and a stop of its own
+// retires the sandbox, which goes after them; any other doubt recycles
+// it, which stops them, so its trees commit once or not at all.
 
 import type {
   Answer,
@@ -18,57 +23,45 @@ import type {
   ShellBackend,
   ShellContext,
 } from "../bash/index.ts";
-import {
-  discardNotices,
-  exitAt,
-  MAX_OPENS_PER_COMMAND,
-  readBack,
-  savedCwd,
-  startNotice,
-} from "../bash/index.ts";
+import { savedCwd, startNotice } from "../bash/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import {
-  committedTree,
   emptyManifest,
   KEPT_FAILED,
   KeptUnreadable,
   manifestOf,
-  type Tree,
   type Wanted,
   wantedOf,
 } from "./baseline.ts";
-import { walkBounds } from "./bounds.ts";
-import {
-  Capped,
-  drain,
-  type Execs,
-  fence,
-  isFolder,
-  pull,
-  push,
-  refusal,
-  removeRecords,
-  StepFailure,
-  walk,
-} from "./execs.ts";
-import { SANDBOX_ROOTS } from "./frames.ts";
+import { type Execs, isFolder, push, refusal, StepFailure } from "./execs.ts";
 import { SandboxUnavailable } from "./gateway.ts";
-import { wrapperArgv } from "./helpers.ts";
+import { commandId, launch } from "./launch.ts";
 import type { RecycleReason, SandboxHold } from "./leases.ts";
+import type { Readout } from "./readout.ts";
 import {
-  fill,
-  openedOf,
-  RECORD_ROOTS,
-  type Readout,
-  readout,
-  recordBounds,
-  recordedCwd,
-  recordRequests,
-} from "./readout.ts";
-import { outputBytes, scrubPulled } from "./scrub.ts";
-import { SANDBOX_ENV } from "./spec.ts";
+  type Docs,
+  docsNow,
+  movedAtCommit,
+  type Printed,
+  putBack,
+  RECYCLED,
+  type Rows,
+  readSaved,
+} from "./save.ts";
+
+export { RECYCLED } from "./save.ts";
+
+import {
+  alone,
+  enter,
+  freshTree,
+  pushTarget,
+  type Shared,
+  sharedOf,
+  withDocs,
+} from "./shared.ts";
 import { bounded } from "./waits.ts";
 
 export type BackendDeps = {
@@ -79,24 +72,37 @@ export type BackendDeps = {
 
 export type SandboxRun = ShellBackend["run"];
 
-// a fresh 128-bit id per command, base64url: no command guesses the next
-export function commandId(): string {
-  return Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString(
-    "base64url",
-  );
-}
-
 type Ended = Extract<Settled, { ok: false }>;
+type Landed = Extract<SettleOutcome, { landed: true }>;
 
 class Command {
   private wanted: Wanted | null = null;
+  // the docs the push read, which the save keeps unless the base moved
+  private docs: Docs | null = null;
   private read: Readout | null = null;
+  // the rows' docs as the save read them, for the put-back
+  private fresh: Wanted | null = null;
+  // what the save left in place beside other commands
+  private left = new Set<string>();
+  // beside other commands, what a conflict puts back; null for all
+  private only: Set<string> | null = null;
+  // a docs-off save that left /knowledge, so has none to put back
+  private blind = false;
+  // the rows the answer's changes were read against, for the commit
+  rows: Rows | undefined;
   // recycle at settle, whatever lands
   private dirty = true;
   private settled = false;
   private reported = false;
+  // the sandbox's turn, held from the save's walk to the put-back
+  private pass: (() => void) | null = null;
+  // the base's versions this command's rows are as new as and its push
+  private seen: number;
+  private pushed = 0;
   normalized: Promise<void> = Promise.resolve();
   private readonly hold: SandboxHold;
+  private readonly shared: Shared;
+  private readonly entered: ReturnType<typeof enter>;
   private readonly stop: { signal: AbortSignal; dispose(): void };
   private readonly on: Execs;
 
@@ -108,10 +114,14 @@ class Command {
     private readonly stops: CommandStops,
   ) {
     this.hold = context.hold as SandboxHold;
+    this.shared = sharedOf(this.hold.synced);
+    this.entered = enter(this.shared, context.workspace.id, job.docs);
+    // the job's rows were read just before, with no turn between
+    this.seen = this.shared.version;
     this.stop = bounded(
       deps.clock,
       job.endsAt,
-      AbortSignal.any([stops.signal, stops.deadline]),
+      AbortSignal.any([stops.signal, stops.deadline, this.hold.lost]),
       "the command's time ran out",
     );
     this.on = {
@@ -123,7 +133,7 @@ class Command {
 
   private late = () => this.deps.clock() >= this.job.endsAt;
 
-  // a step's throw: the caller's stop, the deadline's 124, or a failure
+  // a step's throw: a stop, the deadline's 124, a recycle or a failure
   private ended(
     error: unknown,
     phase: "mount" | "run",
@@ -143,34 +153,28 @@ class Command {
           exitCode: 124,
           changes: null,
           refused: null,
+          stopped: "deadline",
         },
       };
+    const failed = (words: string): Ended => ({
+      ok: false,
+      phase,
+      cause: "error",
+      notice,
+      error: new Error(words),
+    });
+    if (this.hold.lost.aborted) return failed(RECYCLED);
     this.log(error);
-    if (error instanceof KeptUnreadable)
-      return {
-        ok: false,
-        phase,
-        cause: "error",
-        notice,
-        error: new Error(KEPT_FAILED),
-      };
+    if (error instanceof KeptUnreadable) return failed(KEPT_FAILED);
     if (printed !== undefined && error instanceof StepFailure)
       return {
         ok: true,
         answer: { ...printed, changes: null, refused: refusal(error) },
       };
-    const failed: Ended = {
-      ok: false,
-      phase,
-      cause: "error",
-      notice,
-      error: new Error("the sandbox failed, so the command saved nothing"),
-    };
-    return failed;
+    return failed("the sandbox failed, so the command saved nothing");
   }
 
-  // the gateway's word that the sandbox is gone: its lease goes now,
-  // whatever else the step's throw means for the command
+  // the gateway's word that the sandbox is gone: its lease goes now
   private lost(error: unknown) {
     if (!(error instanceof SandboxUnavailable) || this.reported) return;
     this.reported = true;
@@ -192,8 +196,15 @@ class Command {
       });
   }
 
-  // a folder before the command: the pushed tree's, or one the sandbox
-  // holds alone, asked by an exec
+  // the sandbox's turn; past a recycle nothing more goes to it
+  private async turn(): Promise<() => void> {
+    const pass = await this.hold.turn(this.stop.signal);
+    if (!this.shared.broken) return pass;
+    pass();
+    throw new Error(RECYCLED);
+  }
+
+  // a folder before the command: the pushed tree's, or asked of the sandbox
   private async before(path: string): Promise<boolean> {
     const { job } = this;
     if (path === "/uploads") return true;
@@ -215,23 +226,50 @@ class Command {
   }
 
   async run(): Promise<Settled> {
-    const { job, hold } = this;
+    const { job, hold, shared } = this;
     const caps = this.deps.limits();
-    const before = hold.synced.value as Tree | null;
     let notice = "";
     let started = false;
+    // waiting for the turn and running in the sandbox hold no process
+    // slot; the read back takes one again, in its turn
+    this.hooks.slot?.free();
     try {
-      this.wanted = wantedOf(
-        job,
-        this.context.mounted,
-        this.hooks.kept,
-        before,
-      );
-      const manifest = manifestOf(before ?? new Map(), this.wanted);
-      // what the sandbox holds is unknown until the push has ended
-      hold.synced.value = null;
-      if (!emptyManifest(manifest)) await push(this.on, manifest);
-      hold.synced.value = this.wanted.tree;
+      const pass = await this.turn();
+      try {
+        const mounted = wantedOf(
+          job,
+          this.context.mounted,
+          this.hooks.kept,
+          shared.base,
+        );
+        this.docs = job.docs
+          ? docsNow({ shared, seen: this.seen, context: this.context, job })
+          : null;
+        this.wanted =
+          this.docs === null ? mounted : withDocs(mounted, this.docs.wanted);
+        const { target, owners } = pushTarget(
+          shared,
+          this.wanted,
+          this.context.workspace.id,
+          hold.workspace,
+          job.docs,
+        );
+        const manifest = manifestOf(shared.base ?? new Map(), target);
+        try {
+          if (!emptyManifest(manifest)) await push(this.on, manifest);
+        } catch (error) {
+          // what the sandbox holds is unknown now
+          shared.broken = true;
+          throw error;
+        }
+        shared.base = target.tree;
+        shared.owners = owners;
+        this.seen = ++shared.version;
+        this.pushed = this.seen;
+        this.entered.pushed(this.pushed);
+      } finally {
+        pass();
+      }
       const start = await savedCwd(job.cwd, job.docs, (path) =>
         this.before(path),
       );
@@ -249,71 +287,38 @@ class Command {
     notice: string,
     caps: KnowledgeCaps,
   ): Promise<Settled> {
-    const { job } = this;
     const id = commandId();
-    const open = !job.subagent;
-    const kept = outputBytes(job.resultCut, this.context.credentials);
-    const stdout = new Capped(kept);
-    const stderr = new Capped(kept);
-    let code: number;
-    // the command runs in the sandbox, so its wait holds no process
-    // slot; the read back takes one again
-    this.hooks.slot?.free();
-    try {
-      code = await drain(
-        this.on.gateway.exec({
-          sandbox: this.on.sandbox,
-          command: wrapperArgv({
-            cwd: start,
-            id,
-            command: job.command,
-            open: open
-              ? {
-                  docs: job.docs,
-                  maxFiles: MAX_OPENS_PER_COMMAND,
-                  knowledgeFileBytes: job.knowledgeFileBytes,
-                  ...(job.repos.length > 0
-                    ? { repoFileBytes: job.repoFileBytes }
-                    : {}),
-                }
-              : null,
-          }),
-          environment: { ...SANDBOX_ENV },
-          signal: this.on.signal,
-        }),
-        (stream, data) => (stream === "stdout" ? stdout : stderr).push(data),
-      );
-    } catch (error) {
-      // a lost launch is never tried again: the sandbox goes instead
-      return this.ended(error, "run", notice, {
-        stdout: stdout.text(),
-        stderr: stderr.text(),
+    const ran = await launch(
+      this.on,
+      this.job,
+      start,
+      id,
+      this.context.credentials,
+    );
+    const shown = { stdout: ran.stdout, stderr: ran.stderr, notice };
+    // a lost launch is never tried again: the sandbox goes instead
+    if (ran.code === null)
+      return this.ended(ran.error, "run", notice, {
+        ...shown,
         exitCode: 1,
-        notice,
         opened: [],
       });
-    }
-    const exitCode = exitAt(code, this.deps.clock(), job.endsAt);
-    const printed = {
-      stdout: stdout.text(),
-      stderr: stderr.text(),
-      exitCode,
-      notice,
-      opened: [] as Answer["opened"],
-    };
-    if (exitCode === 124)
-      return { ok: true, answer: { ...printed, changes: null, refused: null } };
+    // our deadline is the clock's, never the command's own exit 124
+    const ours = this.late();
+    const printed = { ...shown, exitCode: ours ? 124 : ran.code, opened: [] };
+    const stop = ours ? "deadline" : ran.refusedStart ? "limit" : null;
+    if (stop !== null)
+      return {
+        ok: true,
+        answer: { ...printed, changes: null, refused: null, stopped: stop },
+      };
     try {
+      // held until the settle's put-back, so saves never overlap; the
+      // slot comes after, so no command waits for the turn holding one
+      this.pass = await this.turn();
       await this.hooks.slot?.take(this.on.signal);
       return await this.readBack(id, start, printed, caps);
     } catch (error) {
-      if (exitCode === 126 && !this.stops.signal.aborted && !this.late()) {
-        this.lost(error);
-        return {
-          ok: true,
-          answer: { ...printed, changes: null, refused: null },
-        };
-      }
       return this.ended(error, "run", notice, printed);
     }
   }
@@ -321,116 +326,133 @@ class Command {
   private async readBack(
     id: string,
     start: string,
-    printed: Omit<Answer, "changes" | "refused">,
+    printed: Printed,
     caps: KnowledgeCaps,
   ): Promise<Settled> {
-    const { job, hold } = this;
-    const wanted = this.wanted!;
-    await fence(this.on, hold.keepAlivePid, hold.keepAliveStart);
-    const { limits, bounds } = walkBounds(caps, wanted.tree);
-    const walked = await walk(this.on, limits, bounds, SANDBOX_ROOTS);
-    const read = readout(walked, job, wanted, this.context.credentials);
-    this.read = read;
-    const notice = discardNotices(read.entries, job) + printed.notice;
-    this.stops.phase?.("diff");
-    const shown = { ...printed, notice };
-    if (printed.exitCode === 126)
-      return { ok: true, answer: { ...shown, changes: null, refused: null } };
-    const open = !job.subagent;
-    const records = recordRequests(id, open);
-    // a record is read with its own bound, never a tree's file bound
-    const openBytes = Math.max(
-      job.knowledgeFileBytes,
-      job.repos.length > 0 ? job.repoFileBytes : 0,
-    );
-    const paths = recordBounds(id, open, openBytes);
-    const named = [...paths.values()].reduce((sum, at) => sum + at, 0);
-    const frames = await pull(
-      this.on,
-      [...read.pulls.keys(), ...records],
+    const saved = await readSaved(
       {
-        fileBytes: Math.max(limits.fileBytes, openBytes),
-        totalBytes: limits.totalBytes + named,
-        paths,
+        on: this.on,
+        hold: this.hold,
+        job: this.job,
+        context: this.context,
+        shared: this.shared,
+        wanted: this.wanted!,
+        docs: this.docs,
+        seen: this.seen,
+        pushed: this.pushed,
+        caps,
+        phase: this.stops.phase,
+        own: (path) => this.own(path),
+        fenced: () => this.entered.fenced(),
+        late: () => this.late(),
       },
-      [...SANDBOX_ROOTS, ...RECORD_ROOTS],
+      id,
+      start,
+      printed,
     );
-    fill(read, frames);
-    // a key the command was handed is never saved or shown
-    const scrubbed = scrubPulled(read, frames, this.context.credentials);
-    const pwd = recordedCwd(id, scrubbed) ?? start;
-    const opened = open
-      ? openedOf(id, scrubbed, job.visuals, this.context.credentials)
-      : [];
-    // every record goes, not only this command's: one command runs in
-    // a sandbox at a time, and what a command left there would fill it
-    await removeRecords(this.on);
-    // no scratch file is mounted or read back: /tmp is the sandbox's
-    const back = await readBack(
-      read.entries,
-      { ...job, scratch: [] },
-      {
-        exitCode: printed.exitCode,
-        start,
-        pwd,
-        isDirectory: (path) => this.own(path) ?? read.folders.has(path),
-      },
-    );
-    // the read back is the server's own work and may pass the deadline
-    // after the last exec: what ends late saves nothing, as a late exec
-    if (this.late())
-      return {
-        ok: true,
-        answer: { ...printed, exitCode: 124, changes: null, refused: null },
-      };
-    // a change that cannot commit leaves a tree the rows do not hold
-    this.dirty = back.changes === null || read.discarded;
-    return { ok: true, answer: { ...shown, opened, ...back } };
+    this.read = saved.read;
+    this.fresh = saved.fresh;
+    this.rows = saved.rows;
+    this.dirty = saved.dirty;
+    this.left = saved.left;
+    this.only = saved.only;
+    this.blind = saved.blind;
+    return saved.settled;
   }
 
-  settle(outcome: SettleOutcome): void {
+  settle(outcome: SettleOutcome): string | undefined {
     if (this.settled) return;
     this.settled = true;
     this.stop.dispose();
-    if (!outcome.landed || this.dirty) {
-      this.recycle("discard");
+    const { shared, hold } = this;
+    if (outcome.landed && !this.dirty && !shared.broken) {
+      if (this.blind) this.release();
+      else this.normalized = this.putBack(outcome.docs);
       return;
     }
-    this.normalized = this.normalize(outcome).then(
-      () => this.hold.release(),
+    // a sibling's recycle leaves nothing to put back; alone, doubt recycles
+    if (shared.broken || alone(shared)) {
+      this.recycle("discard");
+      this.done();
+      return;
+    }
+    // beside others only a conflict puts back, never a sibling's work
+    if (
+      this.read !== null &&
+      !this.read.discarded &&
+      this.pass !== null &&
+      !this.late()
+    ) {
+      const moved = movedAtCommit(outcome, this.context, shared.base!);
+      if (moved !== null) ({ only: this.only, fresh: this.fresh } = moved);
+      if (this.only === null) this.release();
+      else this.normalized = this.putBack([]);
+      return moved?.words;
+    }
+    // a stop of its own ends this command alone: what it started may run
+    // on, so the sandbox goes once the others let go
+    if (
+      this.stops.signal.aborted ||
+      this.stops.deadline.aborted ||
+      this.late()
+    ) {
+      hold.retire("discard");
+      this.done();
+      return;
+    }
+    this.recycle("discard");
+    this.done();
+  }
+
+  private release() {
+    this.done();
+    this.hold.release();
+  }
+
+  private putBack(docs: Landed["docs"]): Promise<void> {
+    return this.normalize(docs).then(
+      () => this.release(),
       (error: unknown) => {
         this.log(error);
         this.recycle("failed");
+        this.done();
       },
     );
   }
 
+  // the turn passed on and the command out of the sandbox's count
+  private done() {
+    this.pass?.();
+    this.pass = null;
+    this.entered.leave();
+  }
+
   private recycle(reason: RecycleReason) {
-    this.hold.synced.value = null;
+    this.shared.broken = true;
+    this.shared.base = null;
     this.hold.recycle(reason);
   }
 
-  // the stored rows again: a doc as stored, empty folders gone, every
-  // mode and time rebuilt
-  private async normalize(
-    landed: Extract<SettleOutcome, { landed: true }>,
-  ): Promise<void> {
-    const after = committedTree(this.wanted!, landed);
-    const manifest = manifestOf(this.read!.held, after, ["/knowledge"]);
-    this.hold.synced.value = null;
+  // the stored rows again: docs as stored, empty folders gone, modes rebuilt
+  private normalize(docs: Landed["docs"]): Promise<void> {
     const step = bounded(
       this.deps.clock,
       this.job.endsAt,
-      new AbortController().signal,
+      this.hold.lost,
       "the command's time ran out",
     );
-    try {
-      if (!emptyManifest(manifest))
-        await push({ ...this.on, signal: step.signal }, manifest);
-    } finally {
-      step.dispose();
-    }
-    this.hold.synced.value = after.tree;
+    return putBack(
+      { ...this.on, signal: step.signal },
+      this.shared,
+      this.read!,
+      freshTree(this.shared.base!, this.fresh!, this.wanted!.bytes),
+      docs,
+      {
+        alone: alone(this.shared),
+        left: this.left,
+        only: this.only,
+      },
+    ).finally(() => step.dispose());
   }
 }
 
@@ -454,17 +476,19 @@ export function sandboxBackend(deps: BackendDeps): SandboxBackend {
             notice: "",
             error: new Error("no sandbox is held for the command"),
           },
-          settle: () => given?.release(),
+          settle: () => void given?.release(),
         };
       const command = new Command(deps, job, context, hooks, stops);
       const settled = await command.run();
       return {
         settled,
+        ...(command.rows === undefined ? {} : { rows: command.rows }),
         settle(outcome) {
-          command.settle(outcome);
+          const words = command.settle(outcome);
           const done = command.normalized;
           pending.add(done);
           void done.finally(() => pending.delete(done));
+          return words;
         },
       };
     },

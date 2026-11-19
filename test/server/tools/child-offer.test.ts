@@ -139,7 +139,7 @@ describe("a subagent's offer", () => {
     expect(links).toEqual([]);
   });
 
-  test("under the sandbox shell says /tmp passes neither way, the built-in words unchanged", () => {
+  test("under the sandbox shell says it works in this chat's sandbox, the built-in words unchanged", () => {
     const hash = (text: string) =>
       new Bun.CryptoHasher("sha256").update(text).digest("hex");
     expect(hash(DELEGATE_DESCRIPTION)).toBe(
@@ -169,11 +169,12 @@ describe("a subagent's offer", () => {
       });
       expect(child.sandbox).toBe(sandbox ? true : undefined);
     }
-    expect(SANDBOX_DELEGATE_DESCRIPTION).toContain(
-      "nothing in yours reaches it and nothing in its comes back",
+    expect(SANDBOX_DELEGATE_DESCRIPTION).toBe(
+      "Hand a task to a subagent: a fresh copy of you with its own context, working in this chat's sandbox. It cannot see this chat, so put the goal, where to look and what to return in task; it answers in its reply. Calls in one reply run in parallel, so split independent work that way. Delegate work that would flood your context (exploring a repository, many files, web research); keep small questions and work that needs this conversation.",
     );
-    expect(SANDBOX_DELEGATE_DESCRIPTION).toContain("under /knowledge");
-    expect(SANDBOX_DELEGATE_DESCRIPTION).not.toContain("copy of your /tmp");
+    expect(hash(SANDBOX_DELEGATE_DESCRIPTION)).toBe(
+      "a11c624d730452207646c2d3250de69545bdf366e73b172a4d631be70f351131",
+    );
   });
 
   test("marks credentials read-only, one with no read method off", () => {
@@ -200,6 +201,17 @@ describe("a subagent's offer", () => {
     ]);
     expect(main.credentialsOff).toEqual([]);
     expect(child.credentialsOff.map((c) => c.name)).toEqual(["c-w"]);
+    // in its parent's sandbox a subagent has its parent's network
+    const shared = offered(
+      { ...deps, sandbox: () => true },
+      0,
+      "a",
+      false,
+      "auto",
+      { ...scope, phase: "child" },
+    );
+    expect(methods(shared)).toEqual(methods(main));
+    expect(shared.credentialsOff).toEqual([]);
   });
 
   test("a main offer without the switch carries no delegate", () => {

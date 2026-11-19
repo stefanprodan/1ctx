@@ -77,9 +77,10 @@ export type ToolContext = {
   keep?: KeepPort | null;
   repos?: SendRepos | null;
   // set in a subagent's own calls: the session whose /uploads its
-  // commands read, and that nothing may be written to /knowledge or
-  // /uploads or opened onto a page
-  subagent?: { uploadsFrom: string } | null;
+  // commands read and its parent's workspace, and that nothing may be
+  // opened onto a page, nor written to /knowledge or /uploads in a
+  // shell of its own
+  subagent?: { uploadsFrom: string; workspace?: string } | null;
 };
 
 export type ToolResult = CommandResult & {

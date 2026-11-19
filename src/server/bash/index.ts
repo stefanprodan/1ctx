@@ -48,6 +48,8 @@ export type BashDeps = {
   sandboxNet?(): SandboxNet;
   // each phase a command's worker reports, by chat; a test waits on it
   onCommandPhase?(sessionId: string, phase: "run" | "diff"): void;
+  // a process slot, acquireProcess unless a test watches the waits
+  acquireProcess?(signal: AbortSignal): Promise<() => void>;
   // BACKSTOP_MS unless a test needs the deadline alone to decide
   backstopMs?: number;
   knowledge: DocsPort;
@@ -135,6 +137,7 @@ export function bashArea(deps: BashDeps): BashArea {
           current: () => deps.limits.current(),
           ...(deps.onCommandPhase ? { onPhase: deps.onCommandPhase } : {}),
           ...(deps.backstopMs ? { backstopMs: deps.backstopMs } : {}),
+          ...(deps.acquireProcess ? { acquire: deps.acquireProcess } : {}),
         },
         projectId,
         workspace,

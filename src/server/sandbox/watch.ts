@@ -5,7 +5,9 @@
 // HEALTH_MS and whenever an exec saw a sandbox fail. A list that fails
 // marks the gateway lost and the next that answers is a restart, since
 // a crashed gateway comes back with every sandbox in error; every ready
-// sandbox in error says the same even when no probe saw it down.
+// sandbox in error says the same even when no probe saw it down. A
+// sweep that could not list is run again by the next probe that
+// answers, which drops no lease.
 
 import { after, type Clock } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
@@ -29,6 +31,8 @@ export type WatchDeps = {
   mark(): number;
   gone(lease: Lease): void;
   restarted(): Promise<void>;
+  // the sweep again, after one that could not list
+  sweep(): Promise<void>;
   // what the list found, for the creates a signal cut
   reap(found: SandboxInfo[]): void;
 };
@@ -60,6 +64,7 @@ export function judge(
 
 export class Watch {
   private lost = false;
+  private again = false;
   private timer: (() => void) | null = null;
   private running: Promise<void> | null = null;
   private closed = false;
@@ -67,8 +72,9 @@ export class Watch {
   constructor(private readonly deps: WatchDeps) {}
 
   // a sweep that could not list: the next probe that answers runs it
-  markLost(): void {
-    this.lost = true;
+  // again, a blip of one list never read as a restart
+  sweepAgain(): void {
+    this.again = true;
   }
 
   arm(): void {
@@ -113,8 +119,14 @@ export class Watch {
       return;
     }
     if (this.lost) {
+      // the restart sweeps, and marks it again if it cannot list
       this.lost = false;
+      this.again = false;
       return this.deps.restarted();
+    }
+    if (this.again) {
+      this.again = false;
+      await this.deps.sweep();
     }
     this.deps.reap(found);
     const verdict = judge(this.deps.live(), found, since);

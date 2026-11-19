@@ -47,10 +47,16 @@ export function toolContext(
     now: clock,
     budget: send.toolBudget,
     caps: send.policy.toolCaps,
-    // a subagent reads its parent's uploads and writes only its /tmp
+    // a subagent reads its parent's uploads; a shared shell runs its
+    // commands in its parent's workspace's
     ...(send.child === null
       ? {}
-      : { subagent: { uploadsFrom: send.child.parent.sessionId } }),
+      : {
+          subagent: {
+            uploadsFrom: send.child.parent.sessionId,
+            workspace: send.child.parent.workspace.id,
+          },
+        }),
     ...extra,
   };
 }

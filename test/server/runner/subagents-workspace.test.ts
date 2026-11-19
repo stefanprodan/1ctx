@@ -83,7 +83,7 @@ describe("a subagent's /tmp", () => {
     }
   });
 
-  test("under the sandbox shell neither copies in nor comes back, and the words say so", async () => {
+  test("under the sandbox shell nothing is copied in or back, and the subagent is told it shares the sandbox", async () => {
     const chat = await subagentApp();
     // the offer reads bash's word on the shell; the commands still run
     // in the built-in one, whose rows show what the handoff did

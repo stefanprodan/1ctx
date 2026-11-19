@@ -389,6 +389,7 @@ function setup() {
     return {
       projectId: "project",
       workspace: { id: workspace, sessionId: workspace },
+      root: workspace,
       sendId,
       subagent: false,
       repos: [],
@@ -649,6 +650,24 @@ describe("a sandbox's network", () => {
     t.time.advance(DELETE_RETRY_MS);
     await until(() => t.fake.profileDeletes.length === 1);
     expect(t.fake.providerDeletes).toEqual([one!.provider]);
+  });
+
+  test("a provider's failed drop is not asked again once the manager closed", async () => {
+    const t = setup();
+    const a = await t.acquire(LISTED, [signed()]);
+    a.release();
+    t.fake.fail("providerDelete");
+    t.leases.recycle("chat", "clear");
+    await until(() =>
+      t.time.sleeping().includes(t.time.now() + DELETE_RETRY_MS),
+    );
+    t.leases.close();
+    t.fake.unfail("providerDelete");
+    const asked = t.fake.calls.length;
+    t.time.advance(DELETE_RETRY_MS * 13);
+    await settle();
+    expect(t.fake.providerDeletes).toEqual([]);
+    expect(t.fake.calls.length).toBe(asked);
   });
 
   test("the start sweep deletes this instance's profiles, never another's", async () => {

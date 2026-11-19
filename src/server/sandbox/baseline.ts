@@ -48,6 +48,9 @@ export type Held = Map<
   }
 >;
 
+// a doc's bytes by its row: the same id and revision, the same bytes
+export const docKey = (id: string, revision: number) => `d:${id}:${revision}`;
+
 export const sha256 = (data: Uint8Array) =>
   new Bun.CryptoHasher("sha256").update(data).digest("hex");
 
@@ -63,7 +66,7 @@ type Source = {
 };
 
 // a folder takes its newest file's time, as command.worker.ts sets it
-function withFolders(tree: Tree): Tree {
+export function withFolders(tree: Tree): Tree {
   const times = new Map<string, number>();
   for (const [path, node] of tree) {
     if (node.kind !== "file") continue;
@@ -137,7 +140,7 @@ export function wantedOf(
         path: `/knowledge/${file.name}`,
         mode: FILE_MODE,
         mtime: file.mtime,
-        key: row?.name === file.name ? `d:${row.id}:${row.revision}` : null,
+        key: row?.name === file.name ? docKey(row.id, row.revision) : null,
         data: file.data,
       };
     }),
@@ -173,13 +176,40 @@ export function wantedOf(
   return wanted;
 }
 
+// The docs as the rows hold them now, each keyed by its id and
+// revision, hashed only where the key differs from what is held.
+export function docsWanted(
+  docs: readonly {
+    id: string;
+    name: string;
+    revision: number;
+    updatedAt: number;
+    data: Uint8Array;
+  }[],
+  before: Tree | null,
+): Wanted {
+  const wanted: Wanted = { tree: new Map(), bytes: new Map() };
+  place(
+    wanted,
+    docs.map((doc) => ({
+      path: `/knowledge/${doc.name}`,
+      mode: FILE_MODE,
+      mtime: doc.updatedAt,
+      key: docKey(doc.id, doc.revision),
+      data: doc.data,
+    })),
+    before,
+  );
+  return wanted;
+}
+
 type Landed = Extract<SettleOutcome, { landed: true }>;
 
 // The tree after a landed commit: each doc the commit wrote as it
 // stored it (its text, which may drop a BOM, and its time), folders
 // rebuilt from the files, so an empty folder goes. /uploads and /mcp
 // stay as they were.
-export function committedTree(wanted: Wanted, landed: Landed): Wanted {
+export function committedTree(wanted: Wanted, written: Landed["docs"]): Wanted {
   const out: Wanted = { tree: new Map(), bytes: new Map() };
   const encoder = new TextEncoder();
   const files: Source[] = [];
@@ -202,7 +232,7 @@ export function committedTree(wanted: Wanted, landed: Landed): Wanted {
       known: node,
     });
   }
-  for (const doc of landed.docs) {
+  for (const doc of written) {
     const path = `/knowledge/${doc.name}`;
     if (doc.text === null) docs.delete(path);
     else
@@ -210,7 +240,7 @@ export function committedTree(wanted: Wanted, landed: Landed): Wanted {
         path,
         mode: FILE_MODE,
         mtime: doc.updatedAt,
-        key: `d:${doc.id}:${doc.revision}`,
+        key: docKey(doc.id, doc.revision),
         data: encoder.encode(doc.text),
       });
   }

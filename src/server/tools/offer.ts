@@ -106,7 +106,8 @@ type OfferDeps = {
 };
 
 // credentials ride on the network: none without it, and none outside a
-// project. A subagent's are read-only, so curl never writes through one.
+// project. A subagent's are read-only outside the sandbox shell, so
+// curl never writes through one.
 function credentialsFor(
   port: CredentialsPort | undefined,
   projectId: string | null | undefined,
@@ -288,8 +289,8 @@ export function offered(
   requestedMode: McpMode = "auto",
   scope?: MemoryScope,
   disabledCapabilities: readonly string[] = [],
-  // building a subagent's offer: its bash says nothing of open and its
-  // credentials are read-only
+  // building a subagent's offer: its bash says nothing of open and,
+  // outside the sandbox shell, its credentials are read-only
   subagent = false,
 ): Offered {
   if (scope?.phase === "child") {
@@ -333,12 +334,15 @@ export function offered(
           domains: [...access.hosts],
         };
   const search = web === null ? null : deps.store.row("websearch").provider;
+  const sandbox = deps.sandbox?.() === true;
+  // a subagent in its parent's sandbox has its parent's credentials,
+  // since the sandbox's network is the parent's
   const credentials = credentialsFor(
     deps.credentials,
     scope?.projectId,
     web,
     disabledCapabilities,
-    subagent,
+    subagent && !sandbox,
   );
   // a chat's main rounds, a summoned agent's and a chat's subagents: a
   // run's subagent offer has no automation of its own, so its origin
@@ -386,7 +390,6 @@ export function offered(
     });
   }
   const skills = { block: skillCatalog.text, skills: agentSkills };
-  const sandbox = deps.sandbox?.() === true;
   // read once, so the description and every dispatch agree
   const commandSeconds = sandbox ? deps.commandSeconds?.() : undefined;
   const baseTools = fillYear(

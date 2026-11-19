@@ -6,6 +6,7 @@
 // answers as the command worker does. The context is the server's and
 // never reaches the command.
 
+import type { MountedDoc } from "../knowledge/index.ts";
 import type { Landed } from "./commit.ts";
 import type { CommandCredential } from "./credentials.ts";
 import type { Job } from "./protocol.ts";
@@ -26,6 +27,9 @@ export type ShellRepo = { name: string; tree: string };
 export type ShellCall = {
   projectId: string;
   workspace: Workspace;
+  // the workspace whose shell the command runs in: its own, or its
+  // parent's for a subagent of a shell that shares it
+  root: string;
   sendId: string;
   subagent: boolean;
   repos: readonly ShellRepo[];
@@ -75,6 +79,9 @@ export type ShellHold = { release(): void };
 export type ShellContext = ShellCall & {
   mounted: Mounted;
   hold: ShellHold | null;
+  // the doc rows as they stand now, for a shell that reads them again
+  // when it saves
+  docs?(): readonly MountedDoc[];
 };
 
 // How a command ended for the store, given once after it ran. Landed:
@@ -82,15 +89,21 @@ export type ShellContext = ShellCall & {
 // from the file's bytes (a leading BOM is dropped). Skipped: nothing
 // was committed (an exit at a deadline or limit, a refused tree, a
 // failed or cancelled run). Thrown: a check or the commit threw, so
-// nothing was written.
+// nothing was written; moved names the doc another write moved since
+// the rows the changes were read against.
 export type SettleOutcome =
   | ({ landed: true } & Landed)
-  | { landed: false; why: "skipped" | "thrown" };
+  | { landed: false; why: "skipped" }
+  | { landed: false; why: "thrown"; moved?: string };
 
 export type ShellRun = {
   settled: Settled;
-  // called exactly once, after the commit landed, threw or was skipped
-  settle(outcome: SettleOutcome): void;
+  // the doc rows the answer's changes were read against, when the shell
+  // read them again in place of the mount's
+  rows?: readonly MountedDoc[];
+  // called exactly once, after the commit landed, threw or was skipped;
+  // it may answer the words a thrown commit's result shows instead
+  settle(outcome: SettleOutcome): string | undefined;
 };
 
 export type ShellBackend = {
@@ -100,6 +113,15 @@ export type ShellBackend = {
   // a command may run to its caps' sandboxCommandMs, when the call
   // gives one, instead of the call timeout
   sandboxTimeout?: true;
+  // a real shell's exit 124 or 126 is the command's own: only the
+  // answer's stopped says the shell stopped it
+  ownExits?: true;
+  // a subagent's command runs in its parent's shell and saves
+  // /knowledge as the parent's does
+  sharedWithSubagents?: true;
+  // a workspace's commands run at once, the shell keeping its own
+  // order where they meet, rather than one at a time
+  atOnce?: true;
   // Under the workspace's queue and before the process slot, so a
   // command waiting for its shell holds no slot. busy: none was free by
   // the deadline (ms since the epoch). Without it, nothing is held.

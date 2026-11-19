@@ -9,11 +9,11 @@ import { silent } from "../../../src/server/lib/log.ts";
 import {
   afterMountRead,
   callCaps,
-  freshSignal,
   run,
   type Setup,
   setup,
   untilPhase,
+  untilSlotsAsked,
 } from "./helpers.ts";
 
 const create = (s: Setup, name: string, text: string) =>
@@ -437,17 +437,25 @@ describe("bash command mounts", () => {
           finished = true;
           return result;
         });
-        const expired = await run(
+        // the registry's timer ends it while it waits for a slot, the
+        // wait moved on the mount's clock
+        const timer = new AbortController();
+        const expiring = run(
           second,
           "echo no > expired",
-          { ...callCaps, callTimeoutMs: 20 },
-          freshSignal(),
+          callCaps,
+          timer.signal,
           second.makeSession().id,
         );
+        // the queued command and this one both wait for a slot
+        await untilSlotsAsked(second, 2);
+        second.now.value += 2000;
+        timer.abort(new DOMException("timed out", "TimeoutError"));
+        const expired = await expiring;
         expect(expired.error).toBe(true);
         expect(expired.ended).toEqual({ phase: "queue", cause: "busy" });
-        expect(expired.content).toMatch(
-          /^command not run: waited \d+ s for a free slot, the server is busy$/,
+        expect(expired.content).toBe(
+          "command not run: waited 2 s for a free slot, the server is busy",
         );
         expect(finished).toBe(false);
         expect(second.knowledge.list(second.projectId).files).toEqual([]);

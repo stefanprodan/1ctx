@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The keep-alive's pid, read once when a sandbox is made, before any
-// command of a workspace ran in it: the fence after each command spares
-// it and pid 1, and stops every other process of the workload's user.
+// command ran in it: the fence after a command that ran alone spares it
+// and pid 1, and stops every other process of the workload's user.
 
 import type { Gateway } from "./gateway.ts";
 import { startTimeOf } from "./helpers.ts";

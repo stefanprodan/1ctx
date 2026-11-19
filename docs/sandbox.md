@@ -3,10 +3,13 @@
 Governs `src/server/sandbox/`: the sandbox shell, its settings, the
 gateway port, leases, the pool and the sweeps, and the wire contracts
 in `shared/contracts/sandbox.ts` and `shared/api/sandbox.ts`. Its
-network and credentials are in `docs/sandbox-network.md`.
+network and credentials are in `docs/sandbox-network.md`, a command and
+the sandbox a chat shares with its subagents in
+`docs/sandbox-commands.md`.
 
 The sandbox shell runs the bash tool's commands in an OpenShell
-sandbox per workspace instead of just-bash in a worker. OpenShell's
+sandbox per chat instead of just-bash in a worker; a chat's subagents
+run theirs in the same one. OpenShell's
 gateway runs the sandboxes (Docker containers on macOS); 1ctx talks
 only to the gateway, over gRPC with mutual TLS.
 
@@ -55,8 +58,8 @@ only to the gateway, over gRPC with mutual TLS.
 ## Limits
 
 `sandboxesMax` (20), `sandboxWarm` (0, never above the cap),
-`sandboxIdleMinutes` (30), `sandboxCpus` (2), `sandboxMemoryMiB`
-(2048) and `sandboxCommandSeconds` (600, a command's time in place of
+`sandboxIdleMinutes` (30), `sandboxCpus` (4), `sandboxMemoryMiB`
+(4096) and `sandboxCommandSeconds` (600, a command's time in place of
 the call timeout, `docs/bash.md`), scope `sandbox`. `toolMs` (20
 minutes) holds a full command and ends under a chat's deadline; an automation run is still bounded by
 `runDeadlineMs` (10 minutes by default), and a chat turn by
@@ -100,8 +103,6 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   is never pushed, walked or pulled (`SANDBOX_ROOTS`), the read back
   sees it as an empty scratch the command left alone, and a cwd under
   it is checked by an exec. Its files go when the sandbox is recycled.
-  A subagent's sandbox is its own too, and no `/tmp` file passes
-  between it and its parent (`docs/subagents.md`).
 - **The image's first sandbox is checked for every root** (`roots.ts`),
   since Landlock skips a missing path: each writable root a folder that
   takes a file, `/repos` a folder. Each manager checks until one
@@ -130,12 +131,21 @@ sizes of when it was made. No limit of ours bounds its disk (below).
 
 ## Leases
 
-- **One sandbox per workspace, never shared.** `acquire()` runs under
-  the workspace's queue, before the process slot: the workspace's idle
-  lease when its repository mounts equal the call's, else that one is
-  recycled; a warm one for a call without repositories; else a create.
-  Every step counts against the command's deadline; past it the
-  answer is `busy`.
+- **One sandbox per root workspace.** A call's `root` is its own
+  workspace, or a subagent's parent's (the backend says
+  `sharedWithSubagents`). `acquire()` runs under the workspace's queue,
+  before the process slot: the root's lease, idle or held, when its
+  repository mounts equal the call's and nothing doomed it, else an
+  idle one is recycled. A lease takes at most `SANDBOX_COMMANDS` (6,
+  `holders.ts`) holders, since each command keeps its mount in memory
+  to its end; one past it waits for a release; a warm one for a call without repositories;
+  else a create. A held lease that differs or is doomed is waited for.
+  Every step counts against the command's deadline; past it the answer
+  is `busy`.
+- **A lease counts its holders.** It goes idle at the last release,
+  and the idle clock starts there. The network is set up in the
+  sandbox's turn (below), since its holders run at once; a recycle
+  while a command waits for that turn sends it on to a fresh sandbox.
 - **The keep-alive's pid is read once at create,** by bash builtins
   over `/proc`, and a sandbox without exactly one is never leased.
 - **The cap counts creating, warm, leased, idle and deleting
@@ -146,10 +156,15 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   observed. No more deletes are pending for the cap than commands
   wait.
 - **A recycle deletes; it never repairs.** A held lease is doomed and
-  goes at its release; one doomed while it was made is deleted, never
-  handed out. Clears, archives, deletes, a run's and a subagent's end
-  recycle by the bus events (`events.ts`); a fork leaves its source's
-  sandbox alone. An idle lease goes after `sandboxIdleMinutes`.
+  goes at its last release; one doomed while it was made is deleted,
+  never handed out. A holder's own recycle (a failed step or put-back,
+  a hostile record) also aborts `lost`, so the others stop at once and
+  save nothing. Beside other holders, a command's own stop or deadline
+  and a failed network setup retire the lease instead (`retire()`):
+  doomed, never joined, deleted at the last release, `lost` left alone.
+  Clears, archives, deletes and a run's end recycle by the bus
+  events (`events.ts`); a subagent's end does not, and a fork leaves its
+  source's sandbox alone. An idle lease goes after `sandboxIdleMinutes`.
 - **Deletes never block a command.** A delete waits for the gateway to
   forget the name, at most 60 s; past that the record is `stuck`, kept
   in memory, its phase asked every 5 minutes. A delete that fails
@@ -165,24 +180,34 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   past the cap or while a command waits for room, and again when an
   acquire ends; a failed create waits 30 s (`pool.ts`). A save of the
   limits wakes the commands waiting at the cap and deletes the warm
-  sandboxes past a lowered `sandboxWarm`.
+  sandboxes past a lowered `sandboxWarm`, and one still being made when
+  it lands.
 - **At start, every sandbox, then provider, under the instance label
   that no lease holds is deleted.** A command waits, at most to its
-  deadline, until the start sweep has listed and recorded them, so they
-  count against the cap. A sweep that cannot list the
-  sandboxes, providers or profiles marks the gateway lost, so the next
-  probe that answers sweeps. A manager the
+  deadline, until a sweep has listed and recorded them, so they count
+  against the cap. A start sweep that cannot list the sandboxes keeps
+  commands waiting and the pool empty until a later sweep lists. A
+  sweep that cannot list the
+  sandboxes, providers or profiles marks itself to run again, and the
+  next probe that answers sweeps, dropping no lease: a blip of one list
+  is never read as a restart. A manager the
   settings moved off (retired) leases nothing, refuses the commands
   waiting in it, keeps its held sandboxes, which no other manager's
   sweep takes, and deletes each as its command ends, retries included.
   A stuck one it keeps, trees and phase checks included, until the
-  gateway forgets it, since the replacement's start sweep skipped it
-  while it was deleting; a later sweep asks its delete again. It closes
-  its client once no record is left and its providers' deletes ended.
+  gateway forgets it or three phase checks (`RETIRED_STUCK_CHECKS`)
+  passed, since the replacement's start sweep skipped it while it was
+  deleting; a later sweep asks its delete again, and the name it then
+  holds counts once against the cap. A stuck sandbox it gave up on is
+  looked at again only by a start sweep, a restart or an "again"
+  sweep. It closes its client once no
+  record is left and its providers' deletes ended; after a close a
+  failed provider delete is not asked again.
 - **A gateway restart drops every lease** (`watch.ts`). A probe lists
-  the labelled sandboxes every 30 s: a failure, then a success, is a
-  restart, and so is every ready sandbox (two at least) listed in
-  `error`, since a crashed gateway leaves them all there. Any other
+  the labelled sandboxes every 30 s: a failed probe marks the gateway
+  lost, and the next that answers is a restart, and so is every ready
+  sandbox (two at least) listed in `error`, since a crashed gateway
+  leaves them all there. Any other
   sandbox in `error` or not listed goes alone, a held one at its
   release. On a restart every lease is recycled and the labelled
   sandboxes swept again, stuck ones included. The backend calls
@@ -197,89 +222,6 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   gateway port.
 - **A create or list the RPC cannot cancel** is waited for only until
   the step's signal; what the gateway still does is the next sweep's.
-
-## A command
-
-- **`backend.ts` runs the command; the rules stay bash's.** It lists
-  the trees as `TreeEntry` rows and calls `discardNotices()`,
-  `savedCwd()` and `readBack()` exactly as `command.worker.ts` does,
-  and answers the same `Settled`, so `mount.ts` checks and commits as
-  for just-bash. `test/server/sandbox/tree-cases.test.ts` runs the
-  shared fixtures through it.
-- **The baseline is what was pushed plus what committed** (`baseline.ts`),
-  kept with the lease and never read from the sandbox. Each file is
-  keyed by the identity its bytes came from (a doc's id and revision,
-  the uploads' session revision, a kept file's row), so only a file whose key changed is hashed. The
-  next command pushes the difference: removes, folders, files, and a
-  mode and time for every folder holding a change. A fresh sandbox
-  pushes everything; kept MCP files are pushed, never read lazily. A
-  push is one exec per chunk under 1,000 KiB, each chunk made once the
-  one before it applied, so a push holds one chunk beside its rows. A
-  kept file the store cannot read runs no command and saves nothing,
-  with the builtin shell's words.
-- **Modes and times are the builtin shell's:** docs and uploads `0644`,
-  folders `0755`; a doc its `updated_at`, an upload its `created_at`, a
-  folder its newest file's time, a kept file 0.
-- **Every exec is one attempt** on a signal bounded by `job.endsAt` and
-  the command's stops; a failed push, fence, walk, pull or records
-  removal saves nothing and recycles. The command's exec is never
-  retried.
-- **The command runs through the wrapper** with a fresh 128-bit id and
-  `SANDBOX_ENV`, as every exec of ours, since OpenShell passes none of
-  the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH`, uv's
-  and bun's, nothing secret. Each of stdout and stderr keeps four
-  bytes a character of the result cut plus the longest form of a key
-  the send read, so a key the cut crosses is whole for the scrub; the
-  rest is drained. At `job.endsAt` the exec is stopped and the answer
-  is exit 124.
-- **An exec the gateway answers `sandbox is not ready` or unavailable**
-  calls the leases' `sandboxFailed()` (never awaited), then recycles.
-- **After the command, the fence, then a complete walk.** The fence
-  spares pid 1 and the keep-alive by pid and start time (read at
-  create). A process whose leader is a zombie is alive while any of its
-  threads is not. The walk's bounds are the caps or what the pushed trees held,
-  whichever is more, plus 8 MiB a tree; a doc counts as
-  `MAX_KNOWLEDGE_SEGMENTS` entries, its folders and itself. A file whose hash differs from
-  the baseline is pulled and its hash checked; an unchanged one reads
-  its bytes from the job. `/uploads` and `/mcp` are only compared. The
-  pull goes in batches of paths, each exec's stdin under 1,000 KiB; the
-  helper is given the file bound and refuses a file past it before its
-  bytes, and an exec ends at the decoder's first refusal. A doc name
-  that is not UTF-8 saves nothing and recycles.
-- **The records are hostile.** The cwd record and open's copies are
-  pulled with the changed files, the cwd and each opened path within a
-  path's bound (8 KiB, escaped three times over) and each copy within
-  what open reads (the larger file cap of docs and repositories), never
-  a tree's file bound; an opened path naming a key, read unescaped,
-  saves nothing and recycles. A
-  missing or non-UTF-8 cwd keeps the start, open's copies are made again with `openedRecord()` for
-  `checkOpened()`, and a subagent's are never read. After each command
-  the records folder is emptied, its contents only and no link
-  followed, since one command runs in a sandbox at a time and anything
-  left there would fill it. A cwd under `/repos` is checked by an exec.
-- **The deadline holds to the end.** A read back that ends past
-  `job.endsAt`, after its last exec, answers 124 and saves nothing.
-- **Settle.** Landed: the sandbox is put back to the stored rows (a
-  doc's stored text, empty folders removed, every mode rebuilt, a
-  frame only for a time the rows moved),
-  then released; a failed
-  put-back recycles and leaves the commit. Anything else recycles: exit
-  124 or 126, an abort, a refused tree, a thrown commit, and a change
-  under `/uploads`, `/mcp` or a docs-off `/knowledge` (mode included),
-  after the rest committed.
-- **Accepted differences:** a hard link, or a file the walk cannot
-  read (`chmod 000`), saves nothing and recycles; a real shell's exit
-  124 or 126 reads as a deadline or a limit; a background job that
-  holds stdout or stderr keeps the command to its deadline (124,
-  nothing saved, recycled), since the gateway waits for the stream; a
-  time a command set on a file it left unchanged stays until the rows
-  move it, since the walk reads no times.
-- **No disk cap of ours.** `/tmp`, HOME and `/sandbox/tmp` share the
-  Docker VM's disk with every sandbox: tmpfs is charged to the memory
-  limit, Docker Desktop accepts `--storage-opt size` without enforcing
-  it, and OpenShell's Docker driver has no disk size. One runaway
-  command can fill that disk until its sandbox is recycled; the Docker
-  Desktop disk size bounds the host.
 
 ## Where the gateway runs
 

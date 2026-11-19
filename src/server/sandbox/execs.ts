@@ -280,14 +280,35 @@ export async function isFolder(on: Execs, path: string): Promise<boolean> {
   throw new StepFailure("check", "exit");
 }
 
-// The records folder emptied, its contents only: find deletes depth
-// first and follows no link, the starting point included.
-export async function removeRecords(on: Execs): Promise<void> {
+// The records folder emptied, its contents only, or only one command's
+// records while others run there: find deletes depth first and follows
+// no link, the starting point included. An id is base64url, which no
+// pattern reads.
+export async function removeRecords(
+  on: Execs,
+  id: string | null,
+): Promise<void> {
+  const only =
+    id === null
+      ? []
+      : [
+          "(",
+          "-path",
+          `${RECORDS}/${id}.cwd`,
+          "-o",
+          "-path",
+          `${RECORDS}/${id}.opened`,
+          "-o",
+          "-path",
+          `${RECORDS}/${id}.opened/*`,
+          ")",
+        ];
   const { code } = await small(on, "records", [
     "/usr/bin/find",
     RECORDS,
     "-mindepth",
     "1",
+    ...only,
     "-delete",
   ]);
   if (code !== 0) throw new StepFailure("records", "exit");

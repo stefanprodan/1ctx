@@ -175,10 +175,25 @@ export class FakeFs {
   ): { stdout: Uint8Array[]; exit: number } {
     const argv = request.command;
     switch (step) {
-      case "records":
+      case "records": {
+        // every record, or only the paths of one command's -path tests
+        const only = argv.flatMap((arg, at) =>
+          argv[at - 1] === "-path" ? [arg] : [],
+        );
+        const named = (path: string) =>
+          only.some((pattern) =>
+            pattern.endsWith("/*")
+              ? path.startsWith(pattern.slice(0, -1))
+              : path === pattern,
+          );
         for (const path of [...this.nodes.keys()])
-          if (path.startsWith(`${argv[1]}/`)) this.nodes.delete(path);
+          if (
+            path.startsWith(`${argv[1]}/`) &&
+            (only.length === 0 || named(path))
+          )
+            this.nodes.delete(path);
         return { stdout: [], exit: 0 };
+      }
       case "check": {
         const node = this.nodes.get(argv[6]!);
         return { stdout: [], exit: node?.kind === "dir" ? 0 : 1 };
@@ -226,6 +241,15 @@ export class FakeFs {
       if (this.nodes.get(parentOf(path))?.kind !== "dir")
         return done(`PUSH refused missing ${h.path}`, 2);
       const node = this.nodes.get(path);
+      // as push.py, a frame whose path no longer holds what it expects
+      const holds =
+        node === undefined ? null : node.kind === "file" ? sha(node.data) : "";
+      if ("was" in h && holds !== h.was) {
+        at += h.size ?? 0;
+        this.frames.push(`skip ${path}`);
+        n++;
+        continue;
+      }
       if (h.op === "rm") {
         if (node?.kind === "dir" && this.children(path).length > 0)
           return done(`PUSH refused notempty ${h.path}`, 2);

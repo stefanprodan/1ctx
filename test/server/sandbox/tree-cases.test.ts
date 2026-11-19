@@ -5,9 +5,12 @@
 // pushed, its tree left by the command, the walk and pull read back by
 // the same rules, the answer as the builtin shell's but for /tmp, which
 // is the sandbox's own: never read back, so no scratch change and no
-// refusal from it.
+// refusal from it. A subagent shares its parent's sandbox and saves as
+// its parent does, so its cases save rather than refuse. A real shell's
+// exit 124 or 126 is the command's own, so those cases read back too.
 
 import { describe, expect, test } from "bun:test";
+import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/index.ts";
 import { TREE_CASES } from "../../fixtures/bash/tree-cases.ts";
 import { ROOT_PATHS } from "../../helpers/sandbox-fs.ts";
 import { answerOf, type Rows, setup } from "./backend-helpers.ts";
@@ -27,8 +30,39 @@ const REPOS =
 
 type Expected = (typeof TREE_CASES)[number]["expected"];
 
+// what a subagent's case saves in the shared sandbox
+const SUBAGENT_SAVES: Record<string, { name: string; text: string }[]> = {
+  "a subagent's upload change refuses its save": [],
+  "a subagent's doc change refuses its save": [
+    { name: "a.md", text: "world\n" },
+  ],
+};
+
+// what an exit case saves in the sandbox, where the exit is the command's
+const OWN_EXITS: Record<string, { name: string; text: string }[]> = {
+  "an exit at a deadline reads nothing back": [],
+  "an exit at a limit reads nothing back": [{ name: "a.md", text: "world\n" }],
+};
+
 // the builtin's answer with /tmp left alone
-function sandboxed(expected: Expected, cwd: string): Expected {
+function sandboxed(name: string, expected: Expected, cwd: string): Expected {
+  const own = OWN_EXITS[name];
+  if (own !== undefined)
+    return {
+      changes: { knowledge: own, written: [], removed: [], cwd },
+      refused: null,
+    };
+  if (
+    !("refusedContains" in expected) &&
+    expected.refused === READ_ONLY_TO_SUBAGENT
+  ) {
+    const knowledge = SUBAGENT_SAVES[name];
+    if (knowledge === undefined) throw new Error(`no sandbox save for ${name}`);
+    return {
+      changes: { knowledge, written: [], removed: [], cwd },
+      refused: null,
+    };
+  }
   if ("refusedContains" in expected) {
     if (!expected.refusedContains.startsWith("/tmp/")) return expected;
     return {
@@ -98,7 +132,11 @@ describe("the tree fixtures through the sandbox", () => {
       });
       const answer = answerOf(ran.settled);
       expect(answer.notice).toBe(item.notice.replace(REPOS, ""));
-      const expected = sandboxed(item.expected, item.pwd ?? mount.cwd);
+      const expected = sandboxed(
+        item.name,
+        item.expected,
+        item.pwd ?? mount.cwd,
+      );
       if ("refusedContains" in expected) {
         expect(answer.changes).toBeNull();
         expect(answer.refused).toContain(expected.refusedContains);

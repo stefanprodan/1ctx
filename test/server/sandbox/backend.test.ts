@@ -7,7 +7,6 @@
 // back to the rows or recycles it.
 
 import { describe, expect, test } from "bun:test";
-import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/index.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { manifestOf, wantedOf } from "../../../src/server/sandbox/baseline.ts";
 import { walkBounds } from "../../../src/server/sandbox/bounds.ts";
@@ -266,14 +265,38 @@ describe("the sandbox backend", () => {
     }
   });
 
-  test("an exit at a limit, a refused tree, an abort and a lost launch recycle", async () => {
+  test("a command's own exit 124 or 126 saves as any other", async () => {
     const t = setup();
-    const limit = await t.run(ROWS, { exit: 126 });
+    for (const exit of [124, 126]) {
+      const ran = await t.run(ROWS, ({ fs }) => {
+        fs.write("/knowledge/a.md", `${exit}\n`);
+        return { exit, stderr: "Permission denied\n" };
+      });
+      const answer = answerOf(ran.settled);
+      expect(answer).toMatchObject({ exitCode: exit, refused: null });
+      expect(answer.stopped).toBeUndefined();
+      expect(answer.changes?.knowledge).toEqual([
+        { name: "a.md", text: `${exit}\n` },
+      ]);
+      ran.settle(t.landed(ROWS, answer));
+      expect(await t.settled(ran.hold)).toBe("idle");
+    }
+  });
+
+  test("a planted record, a refused tree, an abort and a lost launch recycle", async () => {
+    const t = setup();
+    // the wrapper's own refusal, which says nothing else
+    const limit = await t.run(ROWS, {
+      exit: 126,
+      stderr: "WRAPPER records exist\n",
+    });
     expect(answerOf(limit.settled)).toMatchObject({
       exitCode: 126,
       changes: null,
       refused: null,
+      stopped: "limit",
     });
+    expect(limit.fs.calls).not.toContain("walk");
     limit.settle({ landed: false, why: "skipped" });
     expect(await t.settled(limit.hold)).not.toBe("idle");
 
@@ -329,6 +352,7 @@ describe("the sandbox backend", () => {
       exitCode: 124,
       changes: null,
       refused: null,
+      stopped: "deadline",
     });
     expect(ran.fs.calls).not.toContain("walk");
     ran.settle({ landed: false, why: "skipped" });
@@ -430,19 +454,21 @@ describe("the sandbox backend", () => {
     gone.settle({ landed: false, why: "skipped" });
   });
 
-  test("a subagent's write to the shared trees refuses its save and recycles", async () => {
+  test("a subagent's write to /knowledge saves as its parent's, and its sandbox stays", async () => {
     const t = setup();
     const ran = await t.run({ ...ROWS, subagent: true }, ({ fs }) => {
       fs.write("/knowledge/a.md", "mine\n");
       fs.write("/tmp/x", "y");
       return {};
     });
-    expect(answerOf(ran.settled)).toMatchObject({
-      changes: null,
-      refused: READ_ONLY_TO_SUBAGENT,
-    });
-    ran.settle({ landed: false, why: "skipped" });
-    expect(await t.settled(ran.hold)).not.toBe("idle");
+    const answer = answerOf(ran.settled);
+    expect(answer).toMatchObject({ refused: null });
+    expect(answer.changes?.knowledge).toEqual([
+      { name: "a.md", text: "mine\n" },
+    ]);
+    ran.settle(t.landed(ROWS, answer));
+    expect(await t.settled(ran.hold)).toBe("idle");
+    expect(ran.fs.tree()["/tmp/x"]).toBe("644 0 y");
   });
 
   test("output keeps four bytes a result character of each stream and drains the rest", async () => {
@@ -513,7 +539,7 @@ describe("records, kept reads, put-back frames and a lost sandbox", () => {
     expect(second.fs.tree()["/knowledge/a.md"]).toBe("644 950 new\n");
   });
 
-  test("an unavailable sandbox is reported on the deadline's path and after an exit 126", async () => {
+  test("an unavailable sandbox is reported on the deadline's path and after a command's exit", async () => {
     const t = setup();
     t.fake.onFiles = (_, fs) => {
       fs.walkLines = () => {
@@ -529,10 +555,7 @@ describe("records, kept reads, put-back frames and a lost sandbox", () => {
     const limit = setup();
     limit.fake.onFiles = (_, fs) => fs.broken.set("fence", "unavailable");
     const ran = await limit.run(ROWS, { exit: 126 });
-    expect(answerOf(ran.settled)).toMatchObject({
-      exitCode: 126,
-      changes: null,
-    });
+    expect(ran.settled).toMatchObject({ ok: false, cause: "error" });
     expect(ran.failed.count).toBe(1);
     ran.settle({ landed: false, why: "skipped" });
   });

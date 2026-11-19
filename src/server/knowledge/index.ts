@@ -372,7 +372,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
 }
 
 export { checkFile, checkNames, checkTotals } from "./check.ts";
-export type { Change } from "./commit.ts";
+export { type Change, DocConflict } from "./commit.ts";
 export { type KnowledgeEdit, MAX_EDITS } from "./edit.ts";
 export {
   MAX_KNOWLEDGE_BODY,

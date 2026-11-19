@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The record of every sandbox one gateway runs for this instance, by
-// name and by workspace: what counts against the cap and what may go
+// name and by root workspace: what counts against the cap and what may go
 // first at it.
 
 import type { LeaseRow, LeaseState } from "../../shared/contracts/sandbox.ts";
 import type { SandboxPhase } from "./gateway.ts";
+import type { RecycleReason } from "./hold.ts";
+import { Turns } from "./turns.ts";
 
 export type Lease = {
   name: string;
@@ -17,8 +19,16 @@ export type Lease = {
   // the repository cache's holds on the trees mounted
   holds: (() => void)[];
   state: LeaseState;
+  // the commands holding it: a chat's and its subagents' at once
+  holders: number;
   // a command holds it, or its create runs: deleted when that ends
   doomed: boolean;
+  // why a holder recycled it, the delete's reason at the last release
+  recycled: RecycleReason | null;
+  // aborted when a holder recycles it, so the others stop at once
+  lost: AbortController;
+  // its network setup, pushes and saves, one at a time
+  turns: Turns;
   // deleted to make room at the cap, until its delete is observed
   evicted: boolean;
   // deletes that failed before its timeout
@@ -65,7 +75,11 @@ export class Book {
       mounts,
       holds: [],
       state: "creating",
+      holders: 0,
       doomed: false,
+      recycled: null,
+      lost: new AbortController(),
+      turns: new Turns(),
       evicted: false,
       tries: 0,
       ready: 0,
@@ -104,10 +118,12 @@ export class Book {
   }
 
   // what counts against sandboxesMax: everything the gateway may still
-  // run, a stuck one too unless its container has exited
-  counted(): number {
+  // run, a stuck one too unless its container has exited; skip names a
+  // record elsewhere counts already
+  counted(skip: (name: string) => boolean = () => false): number {
     let n = 0;
     for (const lease of this.records.values()) {
+      if (skip(lease.name)) continue;
       if (lease.state !== "stuck" || lease.phase !== "error") n++;
     }
     return n;

@@ -162,12 +162,7 @@ export function commit(
       now,
     );
     const revision = scratch.owned
-      ? deps.scratch.writeCwd(
-          scratch.workspace,
-          scratch.before.revision,
-          scratch.changes.cwd,
-          now,
-        )
+      ? deps.scratch.writeCwd(scratch.workspace, scratch.changes.cwd, now)
       : deps.scratch.write(
           scratch.workspace,
           scratch.before.revision,

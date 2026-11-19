@@ -10,6 +10,7 @@ import {
   type CommandCredential,
   escapedForms,
   scrubBytes,
+  scrubKeys,
 } from "../bash/index.ts";
 import type { PullFrame } from "./pull.ts";
 import type { Readout } from "./readout.ts";
@@ -46,4 +47,29 @@ export function outputBytes(
       for (const form of escapedForms(credential.key))
         longest = Math.max(longest, Buffer.byteLength(form));
   return 4 * resultCut + longest;
+}
+
+// A stream's kept bytes when it was cut: the cut may end inside a key,
+// whose start no form matches, so a tail that begins any form is
+// dropped. The scrub shortens what it replaces, so that tail could
+// otherwise reach the result. Whole keys are scrubbed first, since one
+// whose last character starts a form would lose it to the trim.
+export function keptText(
+  text: string,
+  cut: boolean,
+  credentials: readonly CommandCredential[],
+): string {
+  if (!cut) return text;
+  text = scrubKeys(text, credentials);
+  let drop = 0;
+  for (const credential of credentials) {
+    if (!("key" in credential)) continue;
+    for (const form of escapedForms(credential.key))
+      for (let n = Math.min(form.length - 1, text.length); n > drop; n--)
+        if (text.endsWith(form.slice(0, n))) {
+          drop = n;
+          break;
+        }
+  }
+  return text.slice(0, text.length - drop);
 }

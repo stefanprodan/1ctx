@@ -280,6 +280,9 @@ export async function readBack(
   mount: TreeMount & Pick<Job, "cwd">,
   ran: {
     exitCode: number;
+    // whether the shell stopped the command; an exit 124 or 126 when
+    // not given
+    stopped?: boolean;
     // where the command started, from savedCwd()
     start: string;
     // the shell's PWD when it ended
@@ -287,7 +290,7 @@ export async function readBack(
     isDirectory: (path: string) => boolean | Promise<boolean>;
   },
 ): Promise<ReadBack> {
-  if (ran.exitCode === 124 || ran.exitCode === 126)
+  if (ran.stopped ?? (ran.exitCode === 124 || ran.exitCode === 126))
     return { changes: null, refused: null };
   let changes: Omit<Changes, "cwd">;
   try {

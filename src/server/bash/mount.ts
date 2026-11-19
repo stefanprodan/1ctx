@@ -5,7 +5,11 @@
 
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
 import type { Db } from "../db/index.ts";
-import { acquireProcess, type Change } from "../knowledge/index.ts";
+import {
+  acquireProcess,
+  type Change,
+  DocConflict,
+} from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
@@ -71,6 +75,8 @@ type MountDeps = {
   onPhase?(sessionId: string, phase: "run" | "diff"): void;
   // BACKSTOP_MS unless a test needs the deadline alone to decide
   backstopMs?: number;
+  // a process slot, acquireProcess unless a test watches the waits
+  acquire?(signal: AbortSignal): Promise<() => void>;
 };
 
 const seconds = (ms: number) => Math.round(ms / 1000);
@@ -101,15 +107,29 @@ function scrubbedAnswer(
   };
 }
 
-// 124 is the interpreter's own deadline, 126 another of its limits: the
-// exit decides, whatever changes came with it
+export const SHELL_SWITCHED =
+  "the shell changed during this turn, so the command did not run: finish with what you have";
+
+// 124 is the interpreter's own deadline, 126 another of its limits,
+// unless the shell's exits are the command's own: the stop decides,
+// whatever changes came with it
+function stopOf(
+  shell: ShellBackend,
+  answer: Answer,
+): "deadline" | "limit" | undefined {
+  if (shell.ownExits) return answer.stopped;
+  if (answer.exitCode === 124) return "deadline";
+  return answer.exitCode === 126 ? "limit" : undefined;
+}
+
 function stopped(
   answer: Answer,
+  stop: "deadline" | "limit",
   late: string,
   notice: string,
   resultCut: number,
 ): CommandResult {
-  const head = answer.exitCode === 124 ? late + notice : notice;
+  const head = stop === "deadline" ? late + notice : notice;
   const printed = refused(
     answer.stdout,
     answer.stderr,
@@ -123,7 +143,7 @@ function stopped(
     error: true,
     ended: {
       phase: "run",
-      cause: answer.exitCode === 124 ? "deadline" : "limit",
+      cause: stop,
     },
   };
 }
@@ -139,9 +159,24 @@ export async function run(
   sendId: string,
 ): Promise<CommandResult> {
   const sessionId = workspaceSession(workspace);
+  // the deadline is wall time, which a worker's thread and the timer
+  // keep; the waits a result names are the clock's, so a test moves them
   const started = Date.now();
+  const began = deps.clock();
+  const slotOf = deps.acquire ?? acquireProcess;
   // the shell is picked once, before the timers its deadline sets
   const shell = deps.shell();
+  // a subagent's credentials were offered for the shell of its send's
+  // start (tools/offer.ts): another one runs none of its commands
+  if (
+    given.subagent &&
+    (given.sandboxCommandMs !== undefined) !==
+      (shell.sharedWithSubagents === true)
+  )
+    return {
+      ...failed(new Error(SHELL_SWITCHED), given.resultCut),
+      ended: { phase: "queue", cause: "error" },
+    };
   const ownTmp = shell.ownTmp === true;
   const caps: CommandCaps =
     shell.sandboxTimeout && given.sandboxCommandMs !== undefined
@@ -159,12 +194,12 @@ export async function run(
   let hold: ShellHold | null = null;
   // the run whose settle is owed, given once
   let ran: ShellRun | null = null;
-  const settle = (outcome: SettleOutcome) => {
+  const settle = (outcome: SettleOutcome): string | undefined => {
     const owed = ran;
     ran = null;
     if (owed === null) return;
     try {
-      owed.settle(outcome);
+      return owed.settle(outcome);
     } catch (error) {
       deps.log.warn("shell settle failed", {
         chat: sessionId,
@@ -193,7 +228,7 @@ export async function run(
   const longest = (now: number): Wait => {
     const turn = turnAt ?? now;
     const held = heldAt ?? now;
-    const queued = turn - started;
+    const queued = turn - began;
     const shellWait = held - turn;
     // a shell that was not free names itself unless the chat's own
     // commands took longer
@@ -203,9 +238,9 @@ export async function run(
     return shellWait > slotWait ? "shell" : "slot";
   };
   const busyResult = (): CommandResult => {
-    const now = Date.now();
+    const now = deps.clock();
     return {
-      content: notice + busy(now - started, caps.callTimeoutMs, longest(now)),
+      content: notice + busy(now - began, caps.callTimeoutMs, longest(now)),
       error: true,
       ended: { phase: "queue", cause: "busy" },
     };
@@ -224,6 +259,10 @@ export async function run(
   const call: ShellCall = {
     projectId,
     workspace,
+    root:
+      shell.sharedWithSubagents && caps.subagent?.workspace !== undefined
+        ? caps.subagent.workspace
+        : workspace.id,
     sendId,
     subagent: Boolean(caps.subagent),
     repos: (caps.repos?.mounts ?? []).map((repo) => ({
@@ -236,8 +275,12 @@ export async function run(
     stored: () => storedBytes(deps, caps, projectId, workspace),
   };
   try {
-    releaseSession = await acquireSession(workspace, combined);
-    turnAt = Date.now();
+    releaseSession = await acquireSession(
+      workspace,
+      combined,
+      shell.atOnce === true,
+    );
+    turnAt = deps.clock();
     if (shell.acquire) {
       inShell = true;
       const got = await shell.acquire(
@@ -250,14 +293,15 @@ export async function run(
       inShell = false;
     }
     // without an acquire no time goes to the shell
-    heldAt = shell.acquire ? Date.now() : turnAt;
-    release = await acquireProcess(combined);
+    heldAt = shell.acquire ? deps.clock() : turnAt;
+    release = await slotOf(combined);
     combined.throwIfAborted();
-    const now = Date.now();
-    const waitedMs = now - started;
+    const now = deps.clock();
+    const waitedMs = now - began;
     // the slots came with the call's time spent: running would only end
-    // at once at the deadline
-    if (caps.callTimeoutMs - waitedMs < MIN_RUN_MS) return busyResult();
+    // at once at the deadline, which is the wall's
+    if (started + caps.callTimeoutMs - Date.now() < MIN_RUN_MS)
+      return busyResult();
     if (waitedMs > 1000) {
       const wait = longest(now);
       const behind =
@@ -276,7 +320,12 @@ export async function run(
     hold = null;
     ran = await shell.run(
       job,
-      { ...call, mounted, hold: handed },
+      {
+        ...call,
+        mounted,
+        hold: handed,
+        docs: () => (docs ? deps.knowledge.mountedDocs(projectId) : []),
+      },
       {
         // MCP results past the cut, read from the database on first read
         kept: (index) =>
@@ -294,7 +343,7 @@ export async function run(
             held?.();
           },
           async take(waiting) {
-            if (release === undefined) release = await acquireProcess(waiting);
+            if (release === undefined) release = await slotOf(waiting);
           },
         },
       },
@@ -318,12 +367,17 @@ export async function run(
     phase = "diff";
     notice = left + answer.notice;
     combined.throwIfAborted();
-    if (answer.exitCode === 124 || answer.exitCode === 126) {
-      return stopped(answer, late, notice, caps.resultCut);
+    const stop = stopOf(shell, answer);
+    if (stop !== undefined) {
+      return stopped(answer, stop, late, notice, caps.resultCut);
     }
     if (answer.refused !== null) throw new Error(answer.refused);
     committing = true;
-    const before = new Map(rows.map(({ data: _, ...row }) => [row.name, row]));
+    // a shell that read the rows again at its save diffs against those
+    const against = ran.rows ?? rows;
+    const before = new Map(
+      against.map(({ data: _, ...row }) => [row.name, row]),
+    );
     const answered = checked(
       answer.changes,
       before,
@@ -339,7 +393,11 @@ export async function run(
       throw new Error("the command worker answered out of protocol");
     }
     // the worker's own refusal is only words; the server's is this
-    if (caps.subagent && answered.knowledge.length > 0) {
+    if (
+      caps.subagent &&
+      !shell.sharedWithSubagents &&
+      answered.knowledge.length > 0
+    ) {
       throw new Error(READ_ONLY_TO_SUBAGENT);
     }
     const opened = checkOpened(answer.opened, {
@@ -393,14 +451,21 @@ export async function run(
       opened,
     };
   } catch (error) {
-    settle({ landed: false, why: committing ? "thrown" : "skipped" });
+    const words = settle(
+      !committing
+        ? { landed: false, why: "skipped" }
+        : error instanceof DocConflict
+          ? { landed: false, why: "thrown", moved: error.doc }
+          : { landed: false, why: "thrown" },
+    );
     const why = cause();
     if (why === "busy") return busyResult();
     if (why === "deadline") notice = late + notice;
     const cut = caps.resultCut - notice.length;
+    const shown = words === undefined ? error : new Error(words);
     const result = answer
-      ? refused(answer.stdout, answer.stderr, answer.exitCode, error, cut)
-      : failed(error, cut);
+      ? refused(answer.stdout, answer.stderr, answer.exitCode, shown, cut)
+      : failed(shown, cut);
     return {
       ...result,
       content: notice + result.content,

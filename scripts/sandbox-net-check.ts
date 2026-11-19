@@ -199,6 +199,7 @@ async function command(
   const call: ShellCall = {
     projectId: "net-check",
     workspace: { id: "net-check", sessionId: "net-check" },
+    root: "net-check",
     sendId: send,
     subagent: false,
     repos: [],
@@ -290,10 +291,17 @@ const brief = (text: string) =>
 // curl's status and body head, for a line each
 const probe = (label: string, args: string) =>
   `: > /tmp/b; printf '%s ' ${label}; curl -s -m 15 -o /tmp/b -w '%{http_code}' ${args}; printf ' '; head -c 160 /tmp/b | tr '\\n' ' '; echo`;
+// curl's status and the proxy's answer to a CONNECT: 000 alone is also
+// an address nobody answers, never proof of a refusal
+const refusalProbe = (label: string, url: string) =>
+  `printf '%s ' ${label}; curl -s -m 15 -o /dev/null -w '%{http_code} %{http_connect}' ${url}; echo`;
 const lineOf = (out: string, label: string) =>
   out.split("\n").find((line) => line.startsWith(`${label} `)) ?? "";
 const status = (out: string, label: string) =>
   lineOf(out, label).split(" ")[1] ?? "";
+// the proxy's 403, to the request itself or to its CONNECT
+const proxyRefused = (out: string, label: string) =>
+  lineOf(out, label).split(" ").slice(1).includes("403");
 
 async function main() {
   const A = `$${envName(SIGNED.name)}`;
@@ -574,7 +582,7 @@ async function main() {
       probe("unlisted", "https://www.example.com/"),
       probe("literal", "https://1.1.1.1/"),
       probe("port-8443", "https://httpbin.org:8443/get"),
-      probe("metadata", "http://169.254.169.254/latest/meta-data/"),
+      refusalProbe("metadata", "http://169.254.169.254/latest/meta-data/"),
     ].join("\n"),
   );
   const w = wild.raw;
@@ -589,11 +597,12 @@ async function main() {
   );
   report(
     "unlisted names, raw addresses, metadata and other ports are refused",
-    ["two-label", "unlisted", "literal", "port-8443", "metadata"].every(
+    ["two-label", "unlisted", "literal", "port-8443"].every(
       (label) => status(w, label) === "000",
-    ),
-    ["two-label", "unlisted", "literal", "port-8443", "metadata"]
+    ) && proxyRefused(w, "metadata"),
+    ["two-label", "unlisted", "literal", "port-8443"]
       .map((label) => `${label} ${status(w, label)}`)
+      .concat(lineOf(w, "metadata"))
       .join(", "),
   );
 
@@ -707,7 +716,9 @@ async function cleanup() {
       await real.delete(box.name, AbortSignal.timeout(10_000)).catch(() => {});
     await Bun.sleep(1000);
   }
-  // a provider goes once no sandbox names it, then its profile
+  // a provider goes once no sandbox names it, then its profile; its own
+  // time, whatever the sandboxes took
+  const providersBy = Date.now() + 120_000;
   for (let tries = 0; ; tries++) {
     const providers = await real.providers
       .list(labels, AbortSignal.timeout(10_000))
@@ -724,7 +735,7 @@ async function cleanup() {
         .deleteProfile(id, AbortSignal.timeout(10_000))
         .catch(() => {});
     if (providers?.length === 0 && profiles?.length === 0) break;
-    if (tries === 9 || Date.now() > deadline) {
+    if (tries === 9 || Date.now() > providersBy) {
       report(
         "cleanup",
         false,

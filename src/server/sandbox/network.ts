@@ -57,10 +57,13 @@ export type NetworkDeps = {
   // by provider name and by profile, shared by every manager of the
   // instance, so an attach and a delete of one never overlap
   locks?: Map<string, Promise<unknown>>;
-  // another manager's lease still uses the profile
+  // another manager's lease still uses the profile, or the provider
   profileElsewhere?(id: string): boolean;
+  providerElsewhere?(name: string): boolean;
   // what a command's check found: a global policy set, or none
   globalPolicy?(set: boolean): void;
+  // shut down: a failed provider delete is not asked again
+  closed?(): boolean;
 };
 
 export class Network {
@@ -141,8 +144,10 @@ export class Network {
     } catch (error) {
       if (error instanceof Error && error.message === GLOBAL_POLICY_REFUSAL)
         throw error;
-      hold.recycle("failed");
-      // what the gateway holds is unknown now: asked again next time
+      // what the gateway holds is unknown now: asked again next time.
+      // The sandbox goes once no command holds it, so commands beside
+      // this one run on
+      hold.retire("failed");
       for (const one of fresh) {
         this.imported.delete(one.profile.id);
         this.providers.delete(one.provider);
@@ -300,7 +305,9 @@ export class Network {
         this.drop(provider, profile),
       );
       if (done || tries >= DELETE_TRIES - 1) return;
+      if (this.deps.closed?.()) return;
       await sleep(this.deps.clock, DELETE_RETRY_MS * 3 ** tries).promise;
+      if (this.deps.closed?.()) return;
     }
   }
 
@@ -314,6 +321,8 @@ export class Network {
     const { clock, log, gateway } = this.deps;
     this.profileOf.delete(provider);
     this.providers.delete(provider);
+    // a replacement manager attached it since: its delete is that one's
+    if (this.deps.providerElsewhere?.(provider)) return true;
     const done = await ask(clock, log, STEP_MS, async (signal) => {
       await gateway.providers.delete(provider, signal);
       return true;

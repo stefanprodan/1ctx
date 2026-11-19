@@ -23,6 +23,7 @@ import {
   GLOBAL_POLICY_REFUSAL,
   INSTANCE_LABEL,
   Leases,
+  RETIRED_STUCK_CHECKS,
   type SandboxHold,
   STUCK_CHECK_MS,
 } from "../../../src/server/sandbox/index.ts";
@@ -101,6 +102,7 @@ function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
   const call = (id: string, fields: Partial<ShellCall> = {}): ShellCall => ({
     projectId: "project",
     workspace: { id, sessionId: id },
+    root: id,
     sendId: "send",
     subagent: false,
     repos: [],
@@ -200,6 +202,56 @@ describe("managers of one gateway", () => {
     next.close();
   });
 
+  test("a drained manager gives a stuck delete it cannot ask up after a few checks, and settles", async () => {
+    const t = setup();
+    const old = t.manager();
+    const hold = await t.acquire(old, "chat", { repos: [REPO] });
+    t.fake.deleteMode = "stuck";
+    let drained = false;
+    void old.drain().then(() => {
+      drained = true;
+    });
+    hold.release();
+    await until(() => t.fake.deletes.length === 1);
+    // its gateway no longer answers
+    t.fake.fail("phase");
+    t.time.advance(DELETE_TIMEOUT_MS);
+    await until(() => old.rows()[0]?.state === "stuck");
+    for (let check = 1; check < RETIRED_STUCK_CHECKS; check++) {
+      t.time.advance(STUCK_CHECK_MS);
+      await settle();
+      expect(drained).toBe(false);
+    }
+    t.time.advance(STUCK_CHECK_MS);
+    await until(() => drained);
+    expect(old.rows()).toEqual([]);
+    expect(t.held.get(REPO.tree)).toBe(0);
+  });
+
+  test("a stuck sandbox the replacement adopted counts once against the cap", async () => {
+    const t = setup({ sandboxesMax: 2 });
+    const old = t.manager();
+    const hold = await t.acquire(old, "chat");
+    t.fake.deleteMode = "stuck";
+    void old.drain();
+    hold.release();
+    await until(() => t.fake.deletes.length === 1);
+    t.time.advance(DELETE_TIMEOUT_MS);
+    await until(() => old.rows()[0]?.state === "stuck");
+    t.fake.deleteMode = "pending";
+    const next = t.manager("img:2");
+    // its sweep adopts the name and waits on the pending delete
+    void next.start();
+    await until(() => next.counted() === 1);
+    expect(old.counted()).toBe(1);
+    // the one name counts once, so a second sandbox fits under two
+    const made = await t.acquire(next, "b");
+    expect(made.sandbox).not.toBe(hold.sandbox);
+    made.release();
+    next.close();
+    old.close();
+  });
+
   test("a drained manager's sandboxes count against the cap until their deletes are observed", async () => {
     const t = setup({ sandboxesMax: 1 });
     t.fake.deleteMode = "pending";
@@ -296,6 +348,20 @@ describe("managers of one gateway", () => {
     await drained;
     expect(t.fake.providerDeletes).toEqual([PROVIDER]);
     expect(t.fake.profileDeletes).toEqual([]);
+    other.release();
+    next.close();
+  });
+
+  test("a drained manager never deletes a provider the replacement attached since", async () => {
+    const t = setup();
+    const old = t.manager();
+    const hold = await t.acquire(old, "a", { credentials: [CREDENTIAL] });
+    const drained = old.drain();
+    const next = t.manager("img:2");
+    const other = await t.acquire(next, "b", { credentials: [CREDENTIAL] });
+    hold.release();
+    await drained;
+    expect(t.providerAsks).toEqual([]);
     other.release();
     next.close();
   });

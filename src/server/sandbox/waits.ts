@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Waits on the clock port, so a test moves them with its fake clock:
-// a step bounded by a deadline, a call bounded on its own, and a wait
-// for the leases to change.
+// a step bounded by a deadline, a call bounded on its own, a wait for
+// the leases to change, and a gate that holds commands until it opens.
 
 import { after, type Clock, sleepUnless } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
@@ -102,5 +102,33 @@ export class Changes {
     }
     signal.throwIfAborted();
     return this.clock() < deadline;
+  }
+}
+
+// shut until opened; a wait ends at the opening or at the deadline
+export class Gate {
+  private opened: (() => void) | null = null;
+  private promise: Promise<void> | null = null;
+
+  get shut(): boolean {
+    return this.promise !== null;
+  }
+
+  close(): void {
+    this.promise ??= new Promise<void>((resolve) => {
+      this.opened = resolve;
+    });
+  }
+
+  open(): void {
+    this.opened?.();
+    this.opened = null;
+    this.promise = null;
+  }
+
+  // false at the deadline; a throw when the command was stopped
+  pass(clock: Clock, deadline: number, signal: AbortSignal): Promise<boolean> {
+    if (this.promise === null) return Promise.resolve(true);
+    return within(clock, this.promise, deadline, signal);
   }
 }

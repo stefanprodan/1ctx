@@ -20,6 +20,7 @@ import type { CommandEffect, FakeFs } from "../../helpers/sandbox-fs.ts";
 import { freeSlots } from "../../helpers/slots.ts";
 import {
   callCaps,
+  freshSignal,
   run,
   scratchState,
   seedScratch,
@@ -56,6 +57,9 @@ function sandboxed(
   });
   const s = setup({}, undefined, undefined, () => ({
     ownTmp: true,
+    ownExits: true,
+    sharedWithSubagents: true,
+    atOnce: true,
     acquire: (call, deadline, signal) => leases.acquire(call, deadline, signal),
     run: backend.run,
   }));
@@ -206,6 +210,118 @@ describe("the sandbox behind the mount", () => {
       }
     },
   );
+
+  test("a subagent's command runs in its parent's sandbox at once, and both save their docs", async () => {
+    let started = () => {};
+    const running = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const t = sandboxed({
+      parent: async (fs) => {
+        fs.write("/knowledge/p.md", "p\n");
+        started();
+        await released;
+        fs.write("/knowledge/p.md", "p2\n");
+        return {};
+      },
+      child: (fs) => {
+        fs.write("/knowledge/c.md", "c\n");
+        fs.write("/tmp/shared.txt", "both");
+        return {};
+      },
+    });
+    try {
+      const child = t.s.makeSession();
+      const parent = run(t.s, "parent", callCaps);
+      await running;
+      const own = await run(
+        t.s,
+        "child",
+        {
+          ...callCaps,
+          sandboxCommandMs: 4000,
+          subagent: { uploadsFrom: t.s.session.id, workspace: t.s.session.id },
+        },
+        freshSignal(),
+        child.id,
+      );
+      // the parent's file midway through its command saves with it
+      expect(own.error).toBe(false);
+      expect(own.content).toContain("wrote c.md (rev 1");
+      expect(own.content).toContain("wrote p.md (rev 1");
+      release();
+      const done = await parent;
+      expect(done.error).toBe(false);
+      expect(done.content).toContain("wrote p.md (rev 2");
+      await t.backend.idle();
+      expect(t.fake.creates).toHaveLength(1);
+      expect(t.leases.rows()).toMatchObject([
+        { workspace: t.s.session.id, state: "idle" },
+      ]);
+      const text = (name: string) =>
+        new TextDecoder().decode(
+          t.s.knowledge.store
+            .mounted(t.s.projectId)
+            .find((doc) => doc.name === name)!.data,
+        );
+      expect(text("p.md")).toBe("p2\n");
+      expect(text("c.md")).toBe("c\n");
+      expect(t.files().tree()["/tmp/shared.txt"]).toBe("644 0 both");
+    } finally {
+      t.leases.close();
+      t.s.db.close();
+    }
+  });
+
+  test("a chat's own commands run at once, and both save their docs", async () => {
+    let started = () => {};
+    const running = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let release = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const t = sandboxed({
+      slow: async (fs) => {
+        started();
+        await released;
+        fs.write("/knowledge/slow.md", "slow\n");
+        return {};
+      },
+      fast: (fs) => {
+        fs.write("/knowledge/fast.md", "fast\n");
+        return {};
+      },
+    });
+    try {
+      const slow = run(t.s, "slow", callCaps);
+      await running;
+      // the second runs and saves while the first is still running
+      const fast = await run(t.s, "fast", callCaps);
+      expect(fast.error).toBe(false);
+      expect(fast.content).toContain("wrote fast.md (rev 1");
+      release();
+      const done = await slow;
+      expect(done.error).toBe(false);
+      expect(done.content).toContain("wrote slow.md (rev 1");
+      await t.backend.idle();
+      expect(t.fake.creates).toHaveLength(1);
+      expect(
+        t.s.knowledge.store
+          .mounted(t.s.projectId)
+          .map((doc) => doc.name)
+          .sort(),
+      ).toEqual(["fast.md", "slow.md"]);
+    } finally {
+      t.leases.close();
+      t.s.db.close();
+    }
+  });
 
   test("a command never writes or deletes a scratch row, whatever the cap", async () => {
     const t = sandboxed({

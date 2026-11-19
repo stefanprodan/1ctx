@@ -1,7 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The sandboxes of one gateway, by workspace. A sandbox is a cache of
+// The sandboxes of one gateway, by root workspace: a chat's commands
+// and its subagents' share one. A sandbox is a cache of
 // the rows: any of them may be deleted between two commands and made
 // again, so every doubt (a mismatch, a clear, a lost gateway) deletes
 // rather than repairs. Deletes run in the background (deletes.ts) and
@@ -17,18 +18,20 @@ import { buildSandbox } from "./create.ts";
 import { Deletes } from "./deletes.ts";
 import type { Gateway } from "./gateway.ts";
 import type { RecycleReason, SandboxHold } from "./hold.ts";
+import { configureInTurn, holdOf, SANDBOX_COMMANDS } from "./holders.ts";
 import { GLOBAL_POLICY_REFUSAL, Network, type NetworkDeps } from "./network.ts";
 import { PolicyGate } from "./policy.ts";
 import { WarmPool } from "./pool.ts";
 import { ImageCheck, ImageRefused } from "./roots.ts";
 import { fitsCaps, mountsKey, sandboxName } from "./spec.ts";
 import { Cuts, sweepLabelled } from "./sweep.ts";
-import { bounded, Changes, within } from "./waits.ts";
+import { bounded, Changes, Gate } from "./waits.ts";
 import { Watch } from "./watch.ts";
 
 export {
   DELETE_RETRY_MS,
   DELETE_TIMEOUT_MS,
+  RETIRED_STUCK_CHECKS,
   STUCK_CHECK_MS,
 } from "./deletes.ts";
 export type { RecycleReason, SandboxHold } from "./hold.ts";
@@ -58,6 +61,8 @@ export class Leases {
   private readonly book = new Book((lease) => this.net.forgot(lease.name));
   private readonly net: Network;
   private readonly changes: Changes;
+  // a command waiting for a sandbox past SANDBOX_COMMANDS: any release
+  private readonly seats: Changes;
   private closed = false;
   // the settings moved off: no lease, every delete run to its end
   private draining = false;
@@ -68,16 +73,20 @@ export class Leases {
   private readonly cuts = new Cuts();
   private readonly deletes: Deletes;
   private readonly pool: WarmPool;
-  // the start sweep until it recorded what an earlier run left, so no
-  // create passes the cap before those count
-  private starting: Promise<void> | null = null;
+  // shut from start until a sweep recorded what an earlier run left, so
+  // no create passes the cap before those count
+  private readonly starting = new Gate();
 
   constructor(private readonly deps: LeasesDeps) {
     this.changes = new Changes(deps.clock);
+    this.seats = new Changes(deps.clock);
     this.net = new Network({
       ...deps,
       profileElsewhere: (id) => this.others().some((o) => o.holdsProfile(id)),
+      providerElsewhere: (name) =>
+        this.others().some((o) => o.holdsProvider(name)),
       globalPolicy: (set) => this.policy.seen(set),
+      closed: () => this.closed,
     });
     this.image = new ImageCheck(deps.image, deps.log);
     this.deletes = new Deletes({
@@ -85,6 +94,7 @@ export class Leases {
       book: this.book,
       cuts: this.cuts,
       closed: () => this.closed,
+      retired: () => this.draining,
       forgot: () => {
         this.deps.freed?.();
         this.settleDrain();
@@ -97,7 +107,10 @@ export class Leases {
       book: this.book,
       deletes: this.deletes,
       stopped: () => this.closed || this.draining,
-      blocked: () => this.policy.blocked || this.image.refused !== null,
+      blocked: () =>
+        this.policy.blocked ||
+        this.image.refused !== null ||
+        this.starting.shut,
       total: () => this.total(),
       waiting: () => this.changes.waiting,
       build: (signal) => {
@@ -112,6 +125,7 @@ export class Leases {
       mark: () => this.book.tick(),
       gone: (lease) => this.remove(lease, "failed"),
       restarted: () => this.restarted(),
+      sweep: () => this.sweep("again").then(() => this.pool.refill()),
       reap: (found) => {
         const due = this.cuts.due(found, (name) => this.book.holds(name));
         for (const info of due) void this.deletes.adopt(info.name, info.phase);
@@ -128,7 +142,14 @@ export class Leases {
       for (;;) {
         const hold = await this.lease(call, deadline, signal);
         if (hold === "busy") return hold;
-        const net = await this.net.configure(hold, call, deadline, signal);
+        const net = await configureInTurn(
+          this.net,
+          this.deps.clock,
+          hold,
+          call,
+          deadline,
+          signal,
+        );
         if (net !== "recycled") return net === "busy" ? net : hold;
       }
     } finally {
@@ -142,15 +163,12 @@ export class Leases {
     deadline: number,
     signal: AbortSignal,
   ): Promise<SandboxHold | "busy"> {
-    const key = call.workspace.id;
+    const key = call.root;
     const want = mountsKey(call.repos);
     // read once, and only when a sandbox is taken or made for the call
     let stored: StoredBytes | undefined;
-    if (this.starting !== null) {
-      const { clock } = this.deps;
-      if (!(await within(clock, this.starting, deadline, signal)))
-        return "busy";
-    }
+    if (!(await this.starting.pass(this.deps.clock, deadline, signal)))
+      return "busy";
     for (;;) {
       signal.throwIfAborted();
       if (this.closed) throw new Error("the sandbox shell is stopping");
@@ -163,8 +181,12 @@ export class Leases {
       }
       if (this.deps.clock() >= deadline) return "busy";
       const own = this.book.byWorkspace.get(key);
-      if (own?.state === "idle" && own.mounts === want && !own.doomed) {
-        return this.take(own);
+      // a chat's subagents join its commands in their sandbox
+      const open = own?.state === "idle" || own?.state === "leased";
+      if (open && own!.mounts === want && !own!.doomed) {
+        if (own!.holders < SANDBOX_COMMANDS) return this.take(own!);
+        if (!(await this.seats.wait(deadline, signal))) return "busy";
+        continue;
       }
       if (own?.state === "idle") {
         this.remove(own, "mounts");
@@ -206,7 +228,8 @@ export class Leases {
     }
   }
 
-  // the workspace's sandbox goes; a command holding it keeps it to its end
+  // the root workspace's sandbox goes; the commands holding it keep it
+  // to their end
   recycle(workspace: string, reason: RecycleReason): void {
     const lease = this.book.byWorkspace.get(workspace);
     if (lease !== undefined) this.remove(lease, reason);
@@ -221,17 +244,16 @@ export class Leases {
     }
   }
 
-  // at start: what an earlier run left, then the pool and the probe
+  // at start: what an earlier run left, then the pool and the probe. A
+  // sweep that could not list keeps the gate shut and the pool empty
+  // until one that can, which the next probe that answers runs
   async start(): Promise<void> {
-    let counted = () => {};
-    this.starting = new Promise<void>((resolve) => {
-      counted = resolve;
-    });
+    this.starting.close();
     try {
-      await this.sweep("start", counted);
-    } finally {
-      counted();
-      this.starting = null;
+      await this.sweep("start");
+    } catch (error) {
+      this.starting.open();
+      throw error;
     }
     this.pool.refill();
     this.watch.arm();
@@ -266,8 +288,8 @@ export class Leases {
   }
 
   // this manager's own sandboxes against the cap
-  counted(): number {
-    return this.book.counted();
+  counted(skip?: (name: string) => boolean): number {
+    return this.book.counted(skip);
   }
 
   holds(name: string): boolean {
@@ -329,7 +351,9 @@ export class Leases {
   // every manager's sandboxes, since the cap is the instance's
   private total(): number {
     const own = this.book.counted();
-    return this.others().reduce((n, other) => n + other.counted(), own);
+    // a name this manager adopted from a retired one counts once
+    const mine = (name: string) => this.book.records.has(name);
+    return this.others().reduce((n, other) => n + other.counted(mine), own);
   }
 
   private others(): Leases[] {
@@ -340,33 +364,27 @@ export class Leases {
     lease.timer?.();
     lease.timer = null;
     lease.state = "leased";
+    lease.holders++;
     lease.usedAt = this.deps.clock();
-    let done = false;
-    return {
-      sandbox: lease.name,
-      keepAlivePid: lease.pid!,
-      keepAliveStart: lease.started!,
-      workspace: lease.workspace!,
-      gateway: this.deps.gateway,
-      synced: lease.synced,
-      network: lease.network,
-      notice: "",
+    // a command waiting for this lease's create may join it now
+    this.changes.changed();
+    return holdOf(lease, this.deps.gateway, {
       failed: () => void this.sandboxFailed(lease.workspace!),
-      release: () => {
-        if (done) return;
-        done = true;
-        this.release(lease);
-      },
-      recycle: (reason) => {
-        if (done) return;
-        done = true;
-        this.deletes.destroy(lease, reason);
-      },
-    };
+      release: () => this.release(lease),
+    });
   }
 
+  // the last holder out: idle, or deleted when anything doomed it
   private release(lease: Lease): void {
     if (lease.state !== "leased") return;
+    lease.holders--;
+    this.seats.changed();
+    lease.usedAt = this.deps.clock();
+    if (lease.holders > 0) return;
+    if (lease.recycled !== null) {
+      this.deletes.destroy(lease, lease.recycled);
+      return;
+    }
     if (lease.doomed || this.closed || this.draining) {
       this.deletes.destroy(lease, "discard");
       return;
@@ -457,10 +475,7 @@ export class Leases {
     this.deletes.destroy(lease, reason);
   }
 
-  private async sweep(
-    when: "start" | "restart",
-    counted?: () => void,
-  ): Promise<void> {
+  private async sweep(when: "start" | "restart" | "again"): Promise<void> {
     const { globalPolicy, listed } = await sweepLabelled(
       {
         ...this.deps,
@@ -473,12 +488,12 @@ export class Leases {
           ),
         dropProfile: (id) => this.net.sweepProfile(id),
         adopt: (name, phase) => this.deletes.adopt(name, phase),
-        counted,
+        counted: () => this.starting.open(),
       },
       when,
     );
     // a sweep that could not list runs again at the next good probe
-    if (!listed) this.watch.markLost();
+    if (!listed) this.watch.sweepAgain();
     this.policy.seen(globalPolicy);
   }
 }
