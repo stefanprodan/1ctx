@@ -51,8 +51,10 @@ only to the gateway, over gRPC with mutual TLS.
   whenever a gateway is saved, so its sweep takes what an earlier run
   left. A save that changes the endpoint, a key or the image drains the
   old gateway's leases: every sandbox deleted, and so does a key file
-  gone, at the next command, and the instance's switch to `builtin`
-  while no project runs `openshell`. A project's change drains nothing:
+  gone, at the next command, and any save while nothing runs
+  `openshell`, once a sweep of the manager listed every kind; a new
+  gateway then gets a manager whose start sweep takes what was left. A
+  project's change drains nothing:
   its next command takes the other shell, `$HOME` and `/tmp` of the old
   one stay behind, and an unused sandbox goes by the idle sweep. While
   nothing runs `openshell` the warm pool empties and makes none, and the

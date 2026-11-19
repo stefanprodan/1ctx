@@ -21,6 +21,7 @@ import {
   parseSandboxHosts,
   SANDBOX_DEFAULT_HOSTS,
 } from "../../../shared/sandbox-net.ts";
+import { BACKEND_OPTIONS } from "../../lib/backends.ts";
 import { ago, plural } from "../../lib/format.ts";
 import { hostsCount, lineError } from "./Tools.model.ts";
 
@@ -32,11 +33,6 @@ export type SandboxDraft = {
 };
 
 export type SandboxField = keyof SandboxDraft;
-
-export const BACKEND_OPTIONS: { value: SandboxBackend; label: string }[] = [
-  { value: "builtin", label: "Built-in" },
-  { value: "openshell", label: "OpenShell" },
-];
 
 export function draftOf(settings: SandboxSettings): SandboxDraft {
   return {
@@ -150,7 +146,7 @@ export function offLine(state: SandboxResponse): string | null {
       missing.length === 1 ? "is" : "are"
     } missing.`;
   }
-  return `${plural(projects, "project")} on openshell ${
+  return `${plural(projects, "project")} on OpenShell ${
     projects === 1 ? "runs" : "run"
   } the built-in shell until a gateway is saved.`;
 }

@@ -316,6 +316,11 @@ describe("who sets a project's shell", () => {
         body: { backend: "builtin" },
       });
       expect(Object.keys(await res.json())).toEqual(["project"]);
+      // a bad word is refused as on any project
+      res = await admin.call("PATCH", `/api/projects/${own.id}`, {
+        body: { backend: "docker" },
+      });
+      expect(res.status).toBe(400);
       // and nothing else of a personal project is
       for (const body of [
         { name: "renamed" },
@@ -492,6 +497,11 @@ describe("the one manager, as projects come and go", () => {
         const kept = again.sandbox.leases();
         expect(kept).not.toBeNull();
         again.sandbox.projectsChanged();
+        expect(again.sandbox.leases()).toBe(kept);
+        // nor does an admin's save of the Sandbox page drain it
+        const later = again.client();
+        await later.login("admin", "hunter2-test");
+        await instance(later, { backend: "builtin" });
         expect(again.sandbox.leases()).toBe(kept);
         expect(fake.sandboxes.has(sandbox)).toBe(true);
         // the gateway answers again: the next probe sweeps, then it goes

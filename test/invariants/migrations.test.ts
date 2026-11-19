@@ -2152,6 +2152,28 @@ describe("the schema", () => {
       expect(db.query("select id, backend from projects").all()).toEqual([
         { id: "p", backend: null },
       ]);
+      // the partial index the sandbox's frequent question reads
+      expect(
+        db
+          .query(
+            "select name, sql from sqlite_master where type = 'index' and tbl_name = 'projects' and name = 'projects_openshell'",
+          )
+          .all(),
+      ).toEqual([
+        {
+          name: "projects_openshell",
+          sql: expect.stringContaining("where backend = 'openshell'"),
+        },
+      ]);
+      expect(
+        db
+          .query(
+            "explain query plan select 1 from projects where backend = 'openshell' limit 1",
+          )
+          .all()
+          .map((row) => (row as { detail: string }).detail)
+          .join(" "),
+      ).toContain("projects_openshell");
       db.query("update projects set backend = 'openshell'").run();
       db.query("update projects set backend = 'builtin'").run();
       expect(() =>

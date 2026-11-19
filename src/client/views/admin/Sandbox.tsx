@@ -20,6 +20,7 @@ import {
   saveSandbox,
   watchSandboxLeases,
 } from "../../data/sandbox.ts";
+import { BACKEND_OPTIONS } from "../../lib/backends.ts";
 import { count } from "../../lib/format.ts";
 import { useNow } from "../../lib/now.ts";
 import { browserTab, type PollDriver } from "../../lib/poll.ts";
@@ -46,7 +47,6 @@ import { DraftFoot } from "./DraftFoot.tsx";
 import "./sandbox.css";
 import { useLatest } from "./drafts.ts";
 import {
-  BACKEND_OPTIONS,
   backendLine,
   draftOf,
   gatewayShown,

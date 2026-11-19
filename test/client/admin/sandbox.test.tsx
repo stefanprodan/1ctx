@@ -21,9 +21,9 @@ import {
   sandboxRefused,
   watchSandboxLeases,
 } from "../../../src/client/data/sandbox.ts";
+import { BACKEND_OPTIONS } from "../../../src/client/lib/backends.ts";
 import { Save } from "../../../src/client/lib/save.ts";
 import {
-  BACKEND_OPTIONS,
   backendLine,
   draftOf,
   gatewayShown,
@@ -243,7 +243,7 @@ describe("the Sandbox words", () => {
         }),
       ),
     ).toBe(
-      "1 project on openshell runs the built-in shell until a gateway is saved.",
+      "1 project on OpenShell runs the built-in shell until a gateway is saved.",
     );
     expect(
       offLine(
@@ -253,7 +253,7 @@ describe("the Sandbox words", () => {
         }),
       ),
     ).toBe(
-      "2 projects on openshell run the built-in shell until a gateway is saved.",
+      "2 projects on OpenShell run the built-in shell until a gateway is saved.",
     );
     const keyless = builtinWith({
       overrides: one,

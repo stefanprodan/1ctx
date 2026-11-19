@@ -287,12 +287,20 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
         ],
         refused: current?.leases.refused() ?? null,
       }),
-      // the instance's switch off drains the sandboxes, unless a project
-      // still runs on openshell
+      // a save while nothing runs openshell drains the sandboxes, but a
+      // manager that never listed stays for its probe, and a new gateway
+      // gets one whose start sweep takes what an earlier run left
       saved: () => {
-        const want = wanted();
-        ensure(want);
-        if (!want) drop();
+        if (wanted()) return void ensure(true);
+        const next = config();
+        const key = next === null ? "" : JSON.stringify(next);
+        if (current === null) return;
+        if (current.key === key) {
+          if (current.swept) drop();
+          return;
+        }
+        drop();
+        if (next !== null) ensure(true, next);
       },
     }),
     shell: (builtin, projectId) => {
@@ -321,7 +329,11 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       tidy();
     },
     poke: () => current?.leases.poke(),
-    projectsChanged: () => tidy(),
+    // a project back on openshell refills a pool emptied meanwhile
+    projectsChanged: () => {
+      if (wanted()) current?.leases.poke();
+      else tidy();
+    },
     idle: () => commands.idle(),
     close() {
       running = false;

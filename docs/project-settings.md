@@ -76,5 +76,6 @@ its MCP servers (`views/projects/McpServers.tsx`,
   shows another user's personal project, so its shell is set through
   the API alone.
 - **Anyone else reads the value,** a personal project's owner included,
-  in the same select, disabled, with "An admin sets it." under it. A refused write is the hint's
-  error line on the tab, the card's line on the admin page.
+  in the same select, disabled, with "An admin sets it." under it. A
+  refused write is the hint's error line on the tab, the card's line on
+  the admin page.

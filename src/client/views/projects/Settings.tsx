@@ -6,8 +6,9 @@
 // user who sees the project writes its description and labels. A
 // personal project's owner writes its repositories, an admin a team
 // project's, through the admin page's routes and entities, and a member
-// reads them. Only an admin sets a project's shell. An admin adds and removes a team project's listed
-// MCP servers. The name of a team project is changed on the admin page.
+// reads them. Only an admin sets a project's shell. An admin adds and
+// removes a team project's listed MCP servers. The name of a team
+// project is changed on the admin page.
 
 import { useSignal } from "@preact/signals";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
