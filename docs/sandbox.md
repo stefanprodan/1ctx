@@ -34,11 +34,26 @@ only to the gateway, over gRPC with mutual TLS.
 - **Image null runs the default**, `ghcr.io/stefanprodan/1ctx-shell`
   tagged with the binary's version for a release, `dev` for a source
   run or a dev build, so an upgrade moves it along.
-- **The shell is on when the backend is `openshell`, an endpoint is saved
-  and every key file is there.** `compose.ts` passes bash a closure
-  asked at each command: builtin until then. A save that changes the
-  endpoint, a key or the image drains the old gateway's leases: every
-  sandbox deleted.
+- **A project may pick its own backend** (`projects.backend`,
+  `builtin` or `openshell`); null follows the instance's. The sandbox
+  area reads it through a port from `compose.ts`, since projects sit
+  above it.
+- **A project's shell is on when its backend is `openshell`, an
+  endpoint is saved and every key file is there.** `compose.ts` passes
+  bash a closure asked at each command with the project: builtin until
+  then. The tool offer's `sandbox()` asks the same with the send's
+  project, so a turn's offer and its commands agree. `active` in the
+  GET answer is the instance's alone; `overrides` counts the projects
+  that pick each backend.
+- **One gateway manager serves every project,** keyed by the endpoint,
+  the keys and the image. It is made when a command needs it, or at
+  start or a save while the instance or a project runs `openshell`. A
+  save that changes the endpoint, a key or the image drains the old
+  gateway's leases: every sandbox deleted, and so does the instance's
+  switch to `builtin` while no project runs `openshell`. A project's
+  change drains nothing: its next command takes the other shell, `$HOME`
+  and `/tmp` of the old one stay behind, and an unused sandbox goes by
+  the idle sweep.
 - **The hosts are the sandbox's own, never Web access's list.**
   `shared/sandbox-net.ts` parses them for the page and the route: at
   most 200, each a host name (an IDN in its ASCII form) or an OpenShell

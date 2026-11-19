@@ -162,6 +162,8 @@ const shown = {
   chats: 2,
   knowledge: { files: 1, tokens: 620 },
   latestFiles: [],
+  backend: null,
+  instanceBackend: "builtin" as const,
 };
 
 const realFetch = globalThis.fetch;

@@ -12,6 +12,7 @@ import type {
   KnowledgeFile,
 } from "../../shared/contracts/knowledge.ts";
 import type { ProjectDetail } from "../../shared/contracts/project.ts";
+import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { LATEST_FILES } from "../../shared/knowledge.ts";
 import { RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
@@ -27,6 +28,7 @@ import { metadataRoutes } from "./metadata.ts";
 import {
   parseAddMember,
   parseCreateProject,
+  parseUpdateOwnProject,
   parseUpdateProject,
 } from "./parse.ts";
 import {
@@ -75,6 +77,12 @@ export type UsagePort = {
   projectTotal(projectId: string, since: number, until: number): SendTotals;
 };
 
+// the instance's sandbox setting, which a project without a backend of
+// its own follows: an area built later
+export type ShellPort = {
+  instanceBackend(): SandboxBackend;
+};
+
 export type RoutesDeps = {
   db: Db;
   store: ProjectStore;
@@ -85,6 +93,7 @@ export type RoutesDeps = {
   taskLabels: TaskLabelsPort;
   knowledge: KnowledgePort;
   usage: UsagePort;
+  shell: ShellPort;
   clock: Clock;
 };
 
@@ -117,6 +126,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       chats: deps.sessions.count(project.id),
       knowledge: deps.knowledge.counts(project.id),
       latestFiles: deps.knowledge.latest(project.id, LATEST_FILES),
+      backend: project.backend,
+      instanceBackend: deps.shell.instanceBackend(),
     };
   };
   // a reserved name reads as taken, since a personal project holds it
@@ -207,21 +218,44 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const change = parseUpdateProject(await jsonBody(req));
         const project = transact(deps.db, () => {
           const current = findTeam(ctx.params.id);
-          const name = change.name ?? current.name;
-          nameAvailable(name, current.id);
-          const updated = writeName(() =>
-            deps.store.update(current.id, {
-              name,
-              description: change.description ?? current.description,
-            }),
-          );
+          let updated: ProjectRow | null = current;
+          let events: BusEvent[] = [];
+          if (change.name !== undefined || change.description !== undefined) {
+            const name = change.name ?? current.name;
+            nameAvailable(name, current.id);
+            updated = writeName(() =>
+              deps.store.update(current.id, {
+                name,
+                description: change.description ?? current.description,
+              }),
+            );
+            if (updated !== null) {
+              events = deps.sessions.renameChannel(updated.id, updated.name);
+            }
+          }
+          // the next command picks the shell: nothing to drain
+          if (updated !== null && change.backend !== undefined) {
+            updated = deps.store.setBackend(current.id, change.backend);
+          }
           if (updated === null) throw new NotFound("no such project");
-          return {
-            result: detail(updated),
-            events: deps.sessions.renameChannel(updated.id, updated.name),
-          };
+          return { result: detail(updated), events };
         });
         const body: ProjectResponse = { project };
+        return json(body);
+      },
+    },
+    {
+      // the caller's own personal project, whoever they are
+      method: "PATCH",
+      path: "/api/profile/project",
+      policy: "authenticated",
+      async handle(req, ctx) {
+        const { backend } = parseUpdateOwnProject(await jsonBody(req));
+        const own = deps.store.personal(ctx.principal!.userId);
+        if (own === null) throw new NotFound("no personal project");
+        const updated = deps.store.setBackend(own.id, backend);
+        if (updated === null) throw new NotFound("no personal project");
+        const body: ProjectResponse = { project: detail(updated) };
         return json(body);
       },
     },

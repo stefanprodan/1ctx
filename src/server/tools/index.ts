@@ -240,6 +240,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     chatMain = false,
     deadlineMs: number | null = null,
     shell?: OfferedShell,
+    projectId: string | null = null,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
@@ -265,7 +266,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       docs: knowledge,
       subagent,
       deadlineMs,
-      ...offeredShell(deps.bash, shell),
+      ...offeredShell(deps.bash, shell, projectId),
     }),
   ];
 
@@ -379,7 +380,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           emailOn,
           automationOn,
           externalTaskOn,
-          sandbox: () => (deps.bash?.sandbox?.() ?? null) !== null,
+          sandbox: (projectId) =>
+            (deps.bash?.sandbox?.(projectId) ?? null) !== null,
           commandSeconds: () => deps.bash?.sandboxCommandSeconds?.(),
           toolsFor,
           log: deps.log,
@@ -450,6 +452,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           offered.chatMain === true,
           null,
           offered,
+          ctx.actor?.projectId ?? null,
         )
           .filter((tool) => allowed.has(tool.name))
           .map((tool) =>

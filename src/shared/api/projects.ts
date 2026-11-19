@@ -5,6 +5,7 @@
 
 import type { LabelInput } from "../contracts/label.ts";
 import type { ProjectDetail, ProjectSummary } from "../contracts/project.ts";
+import type { SandboxBackend } from "../contracts/sandbox.ts";
 
 // GET /api/projects: the caller's projects, the personal one first
 export type ProjectsResponse = { projects: ProjectSummary[] };
@@ -18,8 +19,14 @@ export type CreateProjectRequest = {
   description: string;
   labels?: LabelInput[];
 };
-// at least one of the two
-export type UpdateProjectRequest = { name?: string; description?: string };
+// at least one field. backend null follows the instance's sandbox setting
+export type UpdateProjectRequest = {
+  name?: string;
+  description?: string;
+  backend?: SandboxBackend | null;
+};
+// PATCH /api/profile/project: the caller's personal project
+export type UpdateOwnProjectRequest = { backend: SandboxBackend | null };
 // PATCH /api/projects/:id/about: any user who sees the project
 export type UpdateAboutRequest = { description: string };
 // POST /api/projects/:id/labels

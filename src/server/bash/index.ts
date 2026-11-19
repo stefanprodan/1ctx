@@ -40,10 +40,10 @@ export type BashDeps = {
   log: Log;
   // the command worker entry, built where the binary resolves it
   worker: URL;
-  // the shell of the next command, asked once per command so a setting
-  // can switch it between commands; without it every command runs in
-  // the builtin one, just-bash in that worker
-  shell?(builtin: ShellBackend): ShellBackend;
+  // the shell of a project's next command, asked once per command so a
+  // setting can switch it between commands; without it every command
+  // runs in the builtin one, just-bash in that worker
+  shell?(builtin: ShellBackend, projectId: string | null): ShellBackend;
   // the sandbox shell's network setting; off without it
   sandboxNet?(): SandboxNet;
   // each phase a command's worker reports, by chat; a test waits on it
@@ -55,9 +55,10 @@ export type BashDeps = {
   knowledge: DocsPort;
 };
 export type BashCapability = {
-  // the network of the sandbox shell the next command runs in, so the
-  // tool's description says what differs; null under just-bash
-  sandbox?(): SandboxNet | null;
+  // the network of the sandbox shell a project's next command runs in,
+  // so the tool's description says what differs; null under just-bash.
+  // Without a project, the instance's shell
+  sandbox?(projectId?: string | null): SandboxNet | null;
   // how long a command may run under the sandbox shell, and an unused
   // sandbox is kept
   sandboxCommandSeconds?(): number;
@@ -119,8 +120,8 @@ export function bashArea(deps: BashDeps): BashArea {
   const pick = deps.shell;
   return {
     scratch,
-    sandbox: () =>
-      pick !== undefined && pick(builtin) !== builtin
+    sandbox: (projectId) =>
+      pick !== undefined && pick(builtin, projectId ?? null) !== builtin
         ? (deps.sandboxNet?.() ?? { mode: "off", hosts: [] })
         : null,
     sandboxCommandSeconds: () => deps.limits.current().sandboxCommandSeconds,
@@ -133,7 +134,7 @@ export function bashArea(deps: BashDeps): BashArea {
           scratch,
           clock: deps.clock,
           log: deps.log,
-          shell: pick ? () => pick(builtin) : () => builtin,
+          shell: pick ? (id) => pick(builtin, id) : () => builtin,
           current: () => deps.limits.current(),
           ...(deps.onCommandPhase ? { onPhase: deps.onCommandPhase } : {}),
           ...(deps.backstopMs ? { backstopMs: deps.backstopMs } : {}),

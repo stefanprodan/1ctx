@@ -33,7 +33,7 @@ that shell that shows a file on the chat page.
   and the commit; the backend runs the `Job` and answers a `Settled`.
   `shell` in `BashDeps` picks one per command; without it every command
   runs on `builtinShell`, the worker below, whose settle does nothing.
-  `compose.ts` passes the sandbox area's, builtin until the sandbox
+  `compose.ts` passes the sandbox area's, builtin until the project's
   shell is on (`docs/sandbox.md`).
 - **A backend gets a trusted context the command never sees.** Project,
   workspace, send id, each repository's tree folder, the web snapshot,

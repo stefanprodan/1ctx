@@ -98,6 +98,8 @@ describe("the projects entity", () => {
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
+        backend: null,
+        instanceBackend: "builtin" as const,
         members: [casey],
         labels: [{ id: "l1", name: "build", description: "", tasks: 1 }],
       };
@@ -130,6 +132,8 @@ describe("the projects entity", () => {
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
+        backend: null,
+        instanceBackend: "builtin" as const,
         members: [casey],
         labels: [{ id: "l1", name: "build", description: "", tasks: 1 }],
       };
@@ -175,6 +179,8 @@ describe("the projects entity", () => {
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
+        backend: null,
+        instanceBackend: "builtin" as const,
         members: [casey],
         labels: [],
       };
@@ -196,6 +202,8 @@ describe("the projects entity", () => {
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
+        backend: null,
+        instanceBackend: "builtin" as const,
         members: [casey],
         labels: [{ id: "l1", name: "build", description: "", tasks: 0 }],
       };
@@ -231,6 +239,8 @@ describe("the projects entity", () => {
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
+        backend: null,
+        instanceBackend: "builtin" as const,
         members: [casey],
         labels: [{ id: "l1", name: "build", description: "", tasks: 0 }],
       };
@@ -285,6 +295,8 @@ describe("the projects entity", () => {
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
+      backend: null,
+      instanceBackend: "builtin" as const,
       members: [casey],
       labels: [],
     };
@@ -372,6 +384,8 @@ describe("the projects entity", () => {
                   chats: 0,
                   knowledge: { files: 0, tokens: 0 },
                   latestFiles: [],
+                  backend: null,
+                  instanceBackend: "builtin" as const,
                   members: [],
                 },
               }),
@@ -408,6 +422,8 @@ describe("the projects entity", () => {
                     chats: 0,
                     knowledge: { files: 0, tokens: 0 },
                     latestFiles: [],
+                    backend: null,
+                    instanceBackend: "builtin" as const,
                     members: [],
                   },
                 }),
@@ -794,6 +810,8 @@ describe("the pages", () => {
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
+      backend: null,
+      instanceBackend: "builtin" as const,
       members: [casey],
       labels: [],
     };
@@ -829,6 +847,8 @@ describe("the pages", () => {
       chats: 12,
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
+      backend: null,
+      instanceBackend: "builtin" as const,
       members: [casey],
       labels: [],
     };
@@ -857,6 +877,8 @@ describe("the pages", () => {
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
+      backend: null,
+      instanceBackend: "builtin" as const,
       members: [casey],
       labels: [],
     };
@@ -886,6 +908,8 @@ describe("the pages", () => {
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
+      backend: null,
+      instanceBackend: "builtin" as const,
       members: [casey],
       labels: [],
     });
@@ -1155,6 +1179,8 @@ describe("the pages", () => {
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
+      backend: null,
+      instanceBackend: "builtin" as const,
       members: [casey],
       labels: [],
     };
@@ -1174,6 +1200,8 @@ describe("the pages", () => {
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
+        backend: null,
+        instanceBackend: "builtin" as const,
         members: [casey],
         labels: [],
       };
@@ -1194,6 +1222,8 @@ describe("the pages", () => {
       chats: 0,
       knowledge: { files: 0, tokens: 0 },
       latestFiles: [],
+      backend: null,
+      instanceBackend: "builtin" as const,
       members: [casey],
       labels: [],
     };

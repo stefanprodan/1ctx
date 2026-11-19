@@ -48,6 +48,8 @@ const detail: ProjectDetail = {
   chats: 0,
   knowledge: { files: 0, tokens: 0 },
   latestFiles: [],
+  backend: null,
+  instanceBackend: "builtin" as const,
 };
 
 const { text: _t, language: _l, html: _h, code: _c, ...row } = fileView();

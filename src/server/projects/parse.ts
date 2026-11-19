@@ -7,6 +7,7 @@ import type {
   CreateProjectRequest,
   UpdateAboutRequest,
   UpdateLabelRequest,
+  UpdateOwnProjectRequest,
   UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import {
@@ -19,6 +20,10 @@ import {
   MAX_LABELS_PER_PROJECT,
   shapeLabelName,
 } from "../../shared/contracts/label.ts";
+import {
+  isSandboxBackend,
+  type SandboxBackend,
+} from "../../shared/contracts/sandbox.ts";
 import {
   isDescription,
   isRecord,
@@ -113,17 +118,35 @@ export function parseCreateProject(body: unknown): Required<
   };
 }
 
+export function parseBackend(value: unknown): SandboxBackend | null {
+  if (value !== null && !isSandboxBackend(value)) {
+    throw new BadRequest("backend must be builtin, openshell or null");
+  }
+  return value;
+}
+
 export function parseUpdateProject(body: unknown): UpdateProjectRequest {
-  const b = fields(body, ["name", "description"]);
-  if (b.name === undefined && b.description === undefined) {
-    throw new BadRequest("name or description is required");
+  const b = fields(body, ["name", "description", "backend"]);
+  if (
+    b.name === undefined &&
+    b.description === undefined &&
+    b.backend === undefined
+  ) {
+    throw new BadRequest("name, description or backend is required");
   }
   return {
     ...(b.name === undefined ? {} : { name: parseName(b.name) }),
     ...(b.description === undefined
       ? {}
       : { description: parseTeamDescription(b.description) }),
+    ...(b.backend === undefined ? {} : { backend: parseBackend(b.backend) }),
   };
+}
+
+export function parseUpdateOwnProject(body: unknown): UpdateOwnProjectRequest {
+  const b = fields(body, ["backend"]);
+  if (b.backend === undefined) throw new BadRequest("backend is required");
+  return { backend: parseBackend(b.backend) };
 }
 
 // a team project's description is required, a personal one's not

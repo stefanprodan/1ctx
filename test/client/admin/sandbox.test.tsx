@@ -76,6 +76,7 @@ const response = (over: Partial<SandboxResponse> = {}): SandboxResponse => ({
   gatewayLabel: "1ctx-abc123",
   keys: { ca: true, cert: true, key: true },
   active: true,
+  overrides: { builtin: 0, openshell: 0 },
   ...over,
 });
 

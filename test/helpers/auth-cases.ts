@@ -310,8 +310,19 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "PATCH",
     path: "/api/projects/:id",
-    body: { name: "matrix-team", description: "A team project." },
+    body: {
+      name: "matrix-team",
+      description: "A team project.",
+      backend: "builtin",
+    },
     expect: { anonymous: 401, member: 403, admin: 404 },
+  },
+  {
+    // the caller's own personal project's shell, whoever they are
+    method: "PATCH",
+    path: "/api/profile/project",
+    body: { backend: null },
+    expect: { anonymous: 401, member: 200, admin: 200 },
   },
   {
     method: "DELETE",

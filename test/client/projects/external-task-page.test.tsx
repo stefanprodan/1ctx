@@ -136,6 +136,8 @@ const PROJECT: ProjectDetail = {
   chats: 0,
   knowledge: { files: 0, tokens: 0 },
   latestFiles: [],
+  backend: null,
+  instanceBackend: "builtin" as const,
 };
 
 afterEach(() => {

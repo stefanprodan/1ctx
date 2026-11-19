@@ -85,8 +85,8 @@ type OfferDeps = {
   // the admin's external_task row is on and the external tasks are wired
   // to act on
   externalTaskOn?(): boolean;
-  // the sandbox shell runs the next command
-  sandbox?(): boolean;
+  // the sandbox shell runs the project's next command
+  sandbox?(projectId: string | null): boolean;
   // how long a sandbox command may run
   commandSeconds?(): number | undefined;
   toolsFor(
@@ -101,6 +101,8 @@ type OfferDeps = {
     // the send's own deadline, which a command's time never passes
     deadlineMs?: number | null,
     shell?: OfferedShell,
+    // the send's project, whose shell the bash words describe
+    projectId?: string | null,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
@@ -334,7 +336,8 @@ export function offered(
           domains: [...access.hosts],
         };
   const search = web === null ? null : deps.store.row("websearch").provider;
-  const sandbox = deps.sandbox?.() === true;
+  // the shell of the send's project, which its commands ask again
+  const sandbox = deps.sandbox?.(scope?.projectId ?? null) === true;
   // a subagent in its parent's sandbox has its parent's credentials,
   // since the sandbox's network is the parent's
   const credentials = credentialsFor(
@@ -409,6 +412,7 @@ export function offered(
             sandbox,
             ...(commandSeconds === undefined ? {} : { commandSeconds }),
           },
+          scope?.projectId ?? null,
         )
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),

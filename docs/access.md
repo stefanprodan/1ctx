@@ -261,7 +261,10 @@ from `emailOn` in `GET /api/me`.
   split: admins add, remove and choose a team project's on
   `/api/projects/:id/mcp` (`PUT .../:serverId/side`), an owner chooses
   their personal project's on `/api/profile/project/mcp/:serverId/side`
-  (`docs/mcp.md`).
+  (`docs/mcp.md`). A project's shell backend too: an admin sets a team
+  project's with `backend` on `PATCH /api/projects/:id`, an owner their
+  personal project's with `PATCH /api/profile/project`, and anyone who
+  sees the project reads it, with the instance's, in the detail.
 - **Removing a member drops their waiting messages in the same
   transaction.** If they lose visibility, it also unclaims their
   external tasks there. An admin made a member unclaims external tasks

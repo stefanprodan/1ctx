@@ -228,10 +228,13 @@ export type BashToolOptions = {
 export function offeredShell(
   bash: BashToolPort | undefined,
   shell: OfferedShell | undefined,
+  // the send's project, whose shell gives the network
+  projectId: string | null = null,
 ): Pick<BashToolOptions, "sandbox" | "commandSeconds"> {
   if (shell === undefined) return {};
   return {
-    sandbox: shell.sandbox === true ? (bash?.sandbox?.() ?? NO_NET) : null,
+    sandbox:
+      shell.sandbox === true ? (bash?.sandbox?.(projectId) ?? NO_NET) : null,
     ...(shell.commandSeconds === undefined
       ? {}
       : { commandSeconds: shell.commandSeconds }),

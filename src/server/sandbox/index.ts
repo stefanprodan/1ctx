@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The sandbox shell: bash's commands in an OpenShell sandbox per chat,
-// its subagents' included, when an admin picks it and the gateway is set up. The
-// area keeps the settings row, one gateway's leases at a time, and the
-// ShellBackend bash asks for at each command.
+// its subagents' included, when an admin picks it for the instance or a
+// project and the gateway is set up. The area keeps the settings row,
+// one gateway's leases at a time, and the ShellBackend bash asks for at
+// each command.
 
 import type { SandboxResponse } from "../../shared/api/sandbox.ts";
 import {
   SANDBOX_KEYS,
+  type SandboxBackend,
   type SandboxKeyRole,
 } from "../../shared/contracts/sandbox.ts";
 import { type SandboxNet, sandboxNet } from "../../shared/sandbox-net.ts";
@@ -78,18 +80,28 @@ export type SandboxDeps = {
   limits(): KnowledgeCaps & SandboxCaps;
   repos: { hold(tree: string): (() => void) | null };
   connect: Connect;
+  // a project's own backend over the instance's, an area above
+  projects: {
+    // null follows the instance's, as does a project not found
+    backend(projectId: string): SandboxBackend | null;
+    // how many projects pick each backend of their own
+    counts(): Record<SandboxBackend, number>;
+  };
 };
 
 export type Sandbox = {
   store: SandboxStore;
   routes: RouteDescriptor[];
-  // the shell of the next command: the sandbox's when it is on
-  shell(builtin: ShellBackend): ShellBackend;
-  // the settings and every key file in place
+  // the shell of a project's next command: the sandbox's when its
+  // backend is openshell and the gateway is set up; without a project,
+  // the instance's
+  shell(builtin: ShellBackend, projectId?: string | null): ShellBackend;
+  // the instance's backend is openshell, with an endpoint and every key
+  // file in place
   active(): boolean;
   // the network a command in a sandbox runs under
   net(): SandboxNet;
-  // the current gateway's leases, null while the shell is off
+  // the current gateway's leases, null while no backend asks for it
   leases(): Leases | null;
   // at start: the leases made and an earlier process's sandboxes swept
   start(): Promise<void>;
@@ -124,15 +136,25 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     cert: deps.secret(SANDBOX_KEYS.cert),
     key: deps.secret(SANDBOX_KEYS.key),
   });
-  // what the next command runs on, null while the shell is off
+  // the gateway the settings name, whatever backend the instance picks,
+  // since a project may pick openshell over a builtin instance; null
+  // without an endpoint or a key file
   const config = (): (GatewayConfig & { image: string }) | null => {
     const held = store.settings();
-    if (held.backend !== "openshell" || held.endpoint === null) return null;
+    if (held.endpoint === null) return null;
     const { ca, cert, key } = keys();
     if (ca === null || cert === null || key === null) return null;
     const image = held.image ?? defaultImage(deps.version);
     return { endpoint: held.endpoint, ca, cert, key, image };
   };
+  // a project's backend, its own over the instance's
+  const backendOf = (projectId?: string | null): SandboxBackend =>
+    (projectId ? deps.projects.backend(projectId) : null) ??
+    store.settings().backend;
+  // the instance or some project runs openshell
+  const wanted = (): boolean =>
+    store.settings().backend === "openshell" ||
+    deps.projects.counts().openshell > 0;
   const drop = () => {
     if (current === null) return;
     const { leases, gateway } = current;
@@ -144,14 +166,16 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       retired = retired.filter((old) => old.leases !== leases);
     });
   };
-  // the leases of the gateway the settings name: a new endpoint, key or
-  // image deletes every sandbox of the old one
-  const ensure = (): Leases | null => {
+  // the leases of the gateway the settings name, made only when create
+  // asks: a new endpoint, key or image deletes every sandbox of the old
+  // one. One manager serves every project, so a project's change never
+  // makes or drops one
+  const ensure = (create: boolean): Leases | null => {
     const next = config();
     const key = next === null ? "" : JSON.stringify(next);
     if (current !== null && current.key === key) return current.leases;
     drop();
-    if (next === null) return null;
+    if (next === null || !create) return null;
     const { image, ...reach } = next;
     const gateway = deps.connect(reach);
     const leases = new Leases({
@@ -199,7 +223,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     sharedWithSubagents: true,
     atOnce: true,
     acquire(call, deadline, signal) {
-      const leases = ensure();
+      const leases = ensure(true);
       if (leases === null) throw new Error("the sandbox shell is not set up");
       return leases.acquire(call, deadline, signal);
     },
@@ -219,9 +243,12 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
         cert: held.cert !== null,
         key: held.key !== null,
       },
-      active: config() !== null,
+      active: store.settings().backend === "openshell" && config() !== null,
+      overrides: deps.projects.counts(),
     };
   };
+  const on = (projectId?: string | null): boolean =>
+    backendOf(projectId) === "openshell" && config() !== null;
 
   return {
     store,
@@ -237,15 +264,22 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
         ],
         refused: current?.leases.refused() ?? null,
       }),
-      saved: () => void ensure(),
+      // the instance's switch off drains the sandboxes, unless a project
+      // still runs on openshell
+      saved: () => {
+        const want = wanted();
+        ensure(want);
+        if (!want) drop();
+      },
     }),
-    shell: (builtin) => (ensure() === null ? builtin : backend),
-    active: () => config() !== null,
+    shell: (builtin, projectId) =>
+      on(projectId) && ensure(true) !== null ? backend : builtin,
+    active: () => on(),
     net: () => sandboxNet(store.settings()),
-    leases: () => ensure(),
+    leases: () => ensure(wanted()),
     async start() {
       running = true;
-      ensure();
+      ensure(wanted());
       if (current === null) return;
       current.started ??= current.leases.start();
       await current.started;
