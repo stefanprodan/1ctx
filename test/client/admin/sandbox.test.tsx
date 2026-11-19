@@ -272,10 +272,10 @@ describe("the Sandbox words", () => {
   test("counts the projects that pick their own shell, and keeps the gateway for their openshell", () => {
     expect(overridesLine({ builtin: 0, openshell: 0 })).toBeNull();
     expect(overridesLine({ builtin: 0, openshell: 1 })).toBe(
-      "1 project picks its own shell: 1 openshell.",
+      "1 project picks its own shell: 1 on OpenShell.",
     );
     expect(overridesLine({ builtin: 2, openshell: 1 })).toBe(
-      "3 projects pick their own shell: 2 builtin, 1 openshell.",
+      "3 projects pick their own shell: 2 on Built-in, 1 on OpenShell.",
     );
     expect(gatewayShown("openshell", { builtin: 0, openshell: 0 })).toBe(true);
     expect(gatewayShown("builtin", { builtin: 3, openshell: 0 })).toBe(false);
@@ -399,7 +399,7 @@ describe("the Sandbox page", () => {
         expect(html).toContain(`name="${name}"`);
       }
       expect(html).toContain(
-        "Commands run in the built-in shell, inside the server. 1 project picks its own shell: 1 openshell.",
+        "Commands run in the built-in shell, inside the server. 1 project picks its own shell: 1 on OpenShell.",
       );
       expect(html).toContain("No sandboxes yet.");
     },

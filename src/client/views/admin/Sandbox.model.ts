@@ -115,9 +115,9 @@ export function overridesLine(
 ): string | null {
   const total = overrides.builtin + overrides.openshell;
   if (total === 0) return null;
-  const parts = (["builtin", "openshell"] as const)
-    .filter((backend) => overrides[backend] > 0)
-    .map((backend) => `${overrides[backend]} ${backend}`);
+  const parts = BACKEND_OPTIONS.filter(
+    (option) => overrides[option.value] > 0,
+  ).map((option) => `${overrides[option.value]} on ${option.label}`);
   return `${plural(total, "project")} ${
     total === 1 ? "picks its" : "pick their"
   } own shell: ${parts.join(", ")}.`;
