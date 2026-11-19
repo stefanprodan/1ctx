@@ -26,7 +26,9 @@ updates:
           - "*"
 
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /
+      - /deploy/sandbox
     schedule:
       interval: cron
       cronjob: "0 6 1,15 * *"

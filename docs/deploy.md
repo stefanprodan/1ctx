@@ -148,7 +148,8 @@ gateway add`.
   Python 3.15 trixie-slim image that brings Python and uv, by digest,
   and yq and bun by version and the sha256 their releases publish,**
   checked at build. Bun is the root Dockerfile's version,
-  so the two move together. It makes every root the sandbox policy
+  so the two move together. Dependabot bumps the base's digest; yq and
+  bun are bumped by hand. It makes every root the sandbox policy
   names and holds no helper: the server passes them with each exec.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
   would kill the shutdown after the drain. Docker Compose sets

@@ -1,15 +1,14 @@
 # syntax=docker/dockerfile:1
 # check=error=true
 
-# The image a sandbox shell runs. It holds the tools a command reaches
-# for and every root the sandbox policy names: Landlock skips a path
-# that does not exist. The fixed helpers are not here; the server passes
-# them with each exec, so the image never drifts from the binary.
-# The base brings Python and uv, both in /usr/local/bin.
+# The 1ctx shell image
+#
+# Runtimes:  Python, Bun
+# Packages:  uv, npm (via bun)
+# Data:      jq, yq, ripgrep
+# System:    bash, coreutils, findutils, procps, tar, curl, git
 FROM ghcr.io/astral-sh/uv:python3.15-trixie-slim@sha256:980d6aa868431fd4ef2b32481e934ef5ee3b662c5decade3aa2d7e7ffb8075e4
 
-# yq and bun are release binaries, pinned with the sha256 each release
-# publishes for it; bun is the root Dockerfile's version
 ARG YQ_VERSION=v4.54.3
 ARG YQ_SHA256_AMD64=129534601871538efe0ba4c5e62a34fb1d5f469bcb975c4fddeb467d82974973
 ARG YQ_SHA256_ARM64=89f69310b61b68d1245065a1241d1fc843f7a36cd6103ffd77ad987613bd1b67
@@ -44,14 +43,9 @@ RUN set -eu; \
     chmod 0755 /usr/local/bin/yq /usr/local/bin/bun; \
     rm -r /tmp/bun.zip /tmp/bun
 
-# uid 1000 is the workload's.
-# /knowledge, /uploads and /mcp hold rows the server pushes as the
-# workload, and /sandbox/.1ctx a command's records; /repos takes
-# read-only mounts. /tmp, /opt/home and /sandbox/tmp are the sandbox's
-# own files on the container's disk, never saved. OpenShell keeps the
-# image's home and working folder for its workspace and refuses a mount
-# there, so both are /sandbox, its workspace, and the server's HOME,
-# /opt/home, which it sets on each exec, is never either.
+# Landlock skips a path that does not exist, so every root the policy
+# names is made here. OpenShell refuses a mount on the image's home, so
+# the home is /sandbox and the server's HOME is /opt/home.
 RUN groupadd -g 1000 sandbox \
  && useradd -u 1000 -g 1000 -d /sandbox -s /bin/bash sandbox \
  && mkdir -p /knowledge /uploads /mcp /repos \
@@ -60,11 +54,7 @@ RUN groupadd -g 1000 sandbox \
       /sandbox /opt/home /sandbox/tmp /sandbox/.1ctx \
  && chmod 1777 /tmp
 
-# For docker run only: OpenShell's execs do not see these, so the
-# server passes its own. uv keeps its cache and tools in the home, not
-# the base's /usr/local/bin, and copies, since the cache and a project
-# may sit on different mounts. bun keeps its cache and global packages in
-# the home too, never /knowledge, and sends no crash reports
+# Only docker run sees these; the server sends its own with each exec.
 ENV HOME=/sandbox \
     TMPDIR=/sandbox/tmp \
     UV_CACHE_DIR=/opt/home/.cache/uv \
@@ -76,5 +66,4 @@ ENV HOME=/sandbox \
 
 USER sandbox
 WORKDIR /sandbox
-# the base runs uv; a plain run gets a shell, as before
 CMD ["/bin/bash"]
