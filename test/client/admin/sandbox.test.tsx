@@ -439,7 +439,7 @@ describe("the Sandbox page", () => {
     const html = render(<Sandbox />);
     expect(html).toContain("setting-alert");
     expect(html).toContain(
-      "Every command is refused: the sandbox image img fails its root check (missing /repos). An admin must fix the image or pick another.",
+      "Every OpenShell command is refused: the sandbox image img fails its root check (missing /repos). An admin must fix the image or pick another.",
     );
   });
 });

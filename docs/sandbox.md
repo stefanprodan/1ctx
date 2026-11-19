@@ -56,7 +56,10 @@ only to the gateway, over gRPC with mutual TLS.
   its next command takes the other shell, `$HOME` and `/tmp` of the old
   one stay behind, and an unused sandbox goes by the idle sweep. While
   nothing runs `openshell` the warm pool empties and makes none, and the
-  manager goes once it holds no sandbox.
+  manager goes once it holds no sandbox and a sweep of it has listed
+  every kind. A project's backend change or delete asks it at once
+  (`projectsChanged()`); whether any project runs `openshell` is one
+  indexed lookup, since it is asked often.
 - **The hosts are the sandbox's own, never Web access's list.**
   `shared/sandbox-net.ts` parses them for the page and the route: at
   most 200, each a host name (an IDN in its ASCII form) or an OpenShell

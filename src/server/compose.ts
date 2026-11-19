@@ -392,7 +392,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     },
     usage: { projectTotal },
     // a closure: the sandbox area is built later
-    shell: { instanceBackend: () => sandbox.store.settings().backend },
+    shell: {
+      instanceBackend: () => sandbox.store.settings().backend,
+      changed: () => sandbox.projectsChanged(),
+    },
   });
   const credentials = credentialsArea({
     db,
@@ -531,6 +534,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     connect: options.sandboxGateway ?? openshellGateway,
     projects: {
       backend: (projectId) => projects.store.backendOf(projectId),
+      openshell: () => projects.store.anyOpenshell(),
       counts: () => projects.store.backendCounts(),
     },
   });

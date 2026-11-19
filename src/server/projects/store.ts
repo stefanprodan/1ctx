@@ -194,6 +194,17 @@ export class ProjectStore {
     );
   }
 
+  // some project runs openshell, by the partial index
+  anyOpenshell(): boolean {
+    return (
+      this.db
+        .query<{ one: number }, []>(
+          "select 1 as one from projects where backend = 'openshell' limit 1",
+        )
+        .get() !== null
+    );
+  }
+
   // how many projects pick each backend over the instance's
   backendCounts(): Record<SandboxBackend, number> {
     const counts: Record<SandboxBackend, number> = { builtin: 0, openshell: 0 };

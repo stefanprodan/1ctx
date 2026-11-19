@@ -157,7 +157,7 @@ export function offLine(state: SandboxResponse): string | null {
 
 // the server's words for why no command runs
 export const refusedLine = (refused: string) =>
-  `Every command is refused: ${refused}.`;
+  `Every OpenShell command is refused: ${refused}.`;
 
 const STATE_WORDS: Record<LeaseState, string> = {
   creating: "Creating",

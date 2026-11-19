@@ -4,6 +4,7 @@
 import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   DeleteProjectResponse,
+  ProjectBackendResponse,
   ProjectResponse,
   ProjectsResponse,
 } from "../../shared/api/projects.ts";
@@ -36,6 +37,7 @@ import {
   summary,
   uniqueViolation,
 } from "./store.ts";
+import { visible } from "./visible.ts";
 
 export type AccessPort = {
   project(principal: Principal, id: string): ProjectRow;
@@ -80,6 +82,8 @@ export type UsagePort = {
 // its own follows: an area built later
 export type ShellPort = {
   instanceBackend(): SandboxBackend;
+  // a project's backend changed or a project went, after the commit
+  changed(): void;
 };
 
 export type RoutesDeps = {
@@ -251,9 +255,19 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             updated = deps.store.setBackend(current.id, change.backend);
           }
           if (updated === null) throw new NotFound("no such project");
-          return { result: detail(updated), events };
+          return { result: updated, events };
         });
-        const body: ProjectResponse = { project };
+        if (change.backend !== undefined) deps.shell.changed();
+        // another user's personal project: what changed alone, since its
+        // admin may not read the rest
+        if (!visible(project, ctx.principal!, false)) {
+          const own: ProjectBackendResponse = {
+            id: project.id,
+            backend: project.backend,
+          };
+          return json(own);
+        }
+        const body: ProjectResponse = { project: detail(project) };
         return json(body);
       },
     },
@@ -276,6 +290,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
             events: [accessChanged(null)],
           };
         });
+        deps.shell.changed();
         const body: DeleteProjectResponse = { deleted };
         return json(body);
       },

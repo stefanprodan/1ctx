@@ -12,6 +12,12 @@ export type ProjectsResponse = { projects: ProjectSummary[] };
 
 // GET /api/projects/:id and every project write
 export type ProjectResponse = { project: ProjectDetail };
+// PATCH /api/projects/:id on another user's personal project, which its
+// admin may not read: the backend it set alone
+export type ProjectBackendResponse = {
+  id: string;
+  backend: SandboxBackend | null;
+};
 
 // labels left out start the project with DEFAULT_LABELS
 export type CreateProjectRequest = {

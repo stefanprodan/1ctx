@@ -264,8 +264,10 @@ from `emailOn` in `GET /api/me`.
   (`docs/mcp.md`). A project's shell backend is an admin's alone, a
   personal project's included: `backend` on `PATCH /api/projects/:id`,
   the one field that route takes for a personal project, whose name and
-  description stay a 404 there. Anyone who sees the project reads it,
-  with the instance's, in the detail.
+  description stay a 404 there. On another user's personal project it
+  answers `{ id, backend }` alone, never the detail the admin may not
+  read. Anyone who sees the project reads it, with the instance's, in
+  the detail.
 - **Removing a member drops their waiting messages in the same
   transaction.** If they lose visibility, it also unclaims their
   external tasks there. An admin made a member unclaims external tasks

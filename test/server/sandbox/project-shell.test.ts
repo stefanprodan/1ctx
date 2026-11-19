@@ -9,6 +9,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ShellBackend } from "../../../src/server/bash/index.ts";
 import { silent } from "../../../src/server/lib/log.ts";
+import { HEALTH_MS } from "../../../src/server/sandbox/index.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
 import type {
   ProjectResponse,
@@ -306,9 +307,15 @@ describe("who sets a project's shell", () => {
         body: { backend: "openshell" },
       });
       expect(res.status).toBe(200);
-      const project = ((await res.json()) as ProjectResponse).project;
-      expect(project).toMatchObject({ id: own.id, backend: "openshell" });
+      // what changed alone: the admin may not read the rest of it
+      expect(await res.json()).toEqual({ id: own.id, backend: "openshell" });
       expect(app.projects.backendOf(own.id)).toBe("openshell");
+      // an admin's own personal project answers its whole detail
+      const mine = app.projects.personal(app.users.byUsername("admin")!.id)!;
+      res = await admin.call("PATCH", `/api/projects/${mine.id}`, {
+        body: { backend: "builtin" },
+      });
+      expect(Object.keys(await res.json())).toEqual(["project"]);
       // and nothing else of a personal project is
       for (const body of [
         { name: "renamed" },
@@ -393,7 +400,6 @@ describe("the one manager, as projects come and go", () => {
     await run(
       async (app, admin) => {
         const box = await createTeam(admin, "box");
-        const plain = await createTeam(admin, "plain");
         const res = await admin.call("PUT", "/api/limits", {
           body: { values: { sandboxWarm: 1 } },
         });
@@ -410,10 +416,9 @@ describe("the one manager, as projects come and go", () => {
         const { leases, sandbox } = await idleLease(app, box.id);
         await until(() => warm().length === 1);
         const spare = warm()[0]!.sandbox;
+        // the change itself lets the pool empty, never the idle sandbox a
+        // chat may come back to
         await setBackend(admin, box, null);
-        // a command of a builtin project lets the pool empty, never the
-        // idle sandbox a chat may come back to
-        expect(shellOf(app, plain.id)).toBe("builtin");
         await until(() => fake.deletes.includes(spare));
         await until(() => leases.rows().length === 1);
         expect(fake.deletes).not.toContain(sandbox);
@@ -459,5 +464,65 @@ describe("the one manager, as projects come and go", () => {
     } finally {
       app.db.close();
     }
+  });
+
+  test("a start sweep that could not list keeps the manager until a sweep does", async () => {
+    const fake = fakeGateway();
+    const app = await testApp({ secrets: KEYS, sandboxGateway: fake.connect });
+    try {
+      const admin = app.client();
+      await admin.login("admin", "hunter2-test");
+      const box = await createTeam(admin, "box");
+      await instance(admin, { endpoint: ENDPOINT });
+      await setBackend(admin, box, "openshell");
+      expect(shellOf(app, box.id)).toBe("openshell");
+      await app.sandbox.start();
+      const { sandbox } = await idleLease(app, box.id);
+      await setBackend(admin, box, null);
+      await app.shutdown();
+      fake.fail("list");
+      const again = await testApp({
+        secrets: KEYS,
+        sandboxGateway: fake.connect,
+        db: app.db,
+      });
+      try {
+        await again.sandbox.start();
+        // nothing runs openshell, but the leftovers are not known yet
+        const kept = again.sandbox.leases();
+        expect(kept).not.toBeNull();
+        again.sandbox.projectsChanged();
+        expect(again.sandbox.leases()).toBe(kept);
+        expect(fake.sandboxes.has(sandbox)).toBe(true);
+        // the gateway answers again: the next probe sweeps, then it goes
+        fake.unfail("list");
+        again.now.value += HEALTH_MS;
+        await until(() => fake.deletes.includes(sandbox), 20_000);
+        await until(() => again.sandbox.leases() === null, 20_000);
+      } finally {
+        await again.shutdown();
+      }
+    } finally {
+      app.db.close();
+    }
+  });
+
+  test("a deleted project on openshell lets the manager go", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        const box = await createTeam(admin, "box");
+        await instance(admin, { endpoint: ENDPOINT });
+        await setBackend(admin, box, "openshell");
+        expect(shellOf(app, box.id)).toBe("openshell");
+        await app.sandbox.start();
+        expect(app.sandbox.leases()).not.toBeNull();
+        const res = await admin.call("DELETE", `/api/projects/${box.id}`);
+        expect(res.status).toBe(200);
+        expect(app.sandbox.leases()).toBeNull();
+      },
+      KEYS,
+      fake,
+    );
   });
 });

@@ -1,12 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The sandboxes of one gateway, by root workspace: a chat's commands
-// and its subagents' share one. A sandbox is a cache of
-// the rows: any of them may be deleted between two commands and made
-// again, so every doubt (a mismatch, a clear, a lost gateway) deletes
-// rather than repairs. Deletes run in the background (deletes.ts) and
-// never block a command.
+// The sandboxes of one gateway, by root workspace: a chat's commands and
+// its subagents' share one. A sandbox is a cache of the rows, deleted and
+// made again at any doubt (a mismatch, a clear, a lost gateway) rather
+// than repaired. Deletes run in the background (deletes.ts), never
+// blocking a command.
 
 import type { LeaseRow } from "../../shared/contracts/sandbox.ts";
 import type { ShellCall, ShellRepo, StoredBytes } from "../bash/index.ts";
@@ -35,7 +34,6 @@ export {
   STUCK_CHECK_MS,
 } from "./deletes.ts";
 export type { RecycleReason, SandboxHold } from "./hold.ts";
-
 export { REFILL_BACKOFF_MS, WARM_CREATE_MS } from "./pool.ts";
 
 export type LeasesDeps = {
@@ -55,6 +53,8 @@ export type LeasesDeps = {
   // the provider locks every manager of the instance shares
   locks?: Map<string, Promise<unknown>>;
   net?: NetworkDeps["net"];
+  // a sweep listed every kind: what an earlier run left is known
+  listed?(): void;
 };
 
 export class Leases {
@@ -493,7 +493,7 @@ export class Leases {
       when,
     );
     // a sweep that could not list runs again at the next good probe
-    if (!listed) this.watch.sweepAgain();
+    listed ? this.deps.listed?.() : this.watch.sweepAgain();
     this.policy.seen(globalPolicy);
   }
 }

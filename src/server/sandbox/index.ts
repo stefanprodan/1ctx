@@ -84,7 +84,9 @@ export type SandboxDeps = {
   projects: {
     // null follows the instance's, as does a project not found
     backend(projectId: string): SandboxBackend | null;
-    // how many projects pick each backend of their own
+    // some project runs openshell, asked often, so cheap
+    openshell(): boolean;
+    // how many projects pick each backend of their own, for the page
     counts(): Record<SandboxBackend, number>;
   };
 };
@@ -106,6 +108,9 @@ export type Sandbox = {
   // the limits were saved: a command at the cap and the warm pool look
   // again
   poke(): void;
+  // a project's backend changed or a project went: an unwanted manager
+  // lets its warm pool empty, or goes once it holds nothing
+  projectsChanged(): void;
   // timers stopped and the bus left; sandboxes stay for the next sweep
   close(): void;
   // every command's put-back after its commit ended, for a test
@@ -122,6 +127,8 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     unsubscribe(): void;
     // its start sweep, once the area started
     started: Promise<void> | null;
+    // a sweep of it listed every kind, so no leftover is unknown
+    swept: boolean;
   } | null = null;
   // managers the settings moved off, each deleting its sandboxes as
   // their commands end; its client closes once every delete ended
@@ -151,8 +158,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     store.settings().backend;
   // the instance or some project runs openshell
   const wanted = (): boolean =>
-    store.settings().backend === "openshell" ||
-    deps.projects.counts().openshell > 0;
+    store.settings().backend === "openshell" || deps.projects.openshell();
   const drop = () => {
     if (current === null) return;
     const { leases, gateway } = current;
@@ -167,8 +173,10 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
   // nothing runs openshell: an empty manager goes, and its warm pool
   // empties, so the last idle sandbox's delete lets it go. Never a drain
   // of a held or idle sandbox, which only a settings save does
+  // A manager whose sweeps never listed everything stays, so its probe
+  // sweeps what an earlier run left once the gateway answers.
   const tidy = () => {
-    if (current === null || wanted()) return;
+    if (current === null || !current.swept || wanted()) return;
     if (current.leases.rows().length === 0) drop();
     else current.leases.poke();
   };
@@ -206,6 +214,11 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       },
       locks,
       net: () => sandboxNet(store.settings()),
+      listed: () => {
+        if (current?.leases !== leases || current.swept) return;
+        current.swept = true;
+        queueMicrotask(tidy);
+      },
     });
     const unsubscribe = subscribe((event) => {
       for (const { sessionId, reason } of recyclesOf(event)) {
@@ -218,6 +231,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       gateway,
       unsubscribe,
       started: running ? leases.start() : null,
+      swept: false,
     };
     return leases;
   };
@@ -307,6 +321,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       tidy();
     },
     poke: () => current?.leases.poke(),
+    projectsChanged: () => tidy(),
     idle: () => commands.idle(),
     close() {
       running = false;
