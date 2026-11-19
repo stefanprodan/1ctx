@@ -6,10 +6,10 @@
 // the gateway is set up. The settings are one row; the gateway's client
 // certificate is three secret files, never part of a body.
 
-export const SANDBOX_SHELLS = ["builtin", "sandbox"] as const;
-export type SandboxShell = (typeof SANDBOX_SHELLS)[number];
-export function isSandboxShell(value: unknown): value is SandboxShell {
-  return SANDBOX_SHELLS.some((shell) => shell === value);
+export const SANDBOX_BACKENDS = ["builtin", "openshell"] as const;
+export type SandboxBackend = (typeof SANDBOX_BACKENDS)[number];
+export function isSandboxBackend(value: unknown): value is SandboxBackend {
+  return SANDBOX_BACKENDS.some((backend) => backend === value);
 }
 
 // where a sandbox's commands may connect: nowhere, or the hosts listed.
@@ -58,7 +58,7 @@ export function isSandboxImage(value: unknown): value is string {
 }
 
 export type SandboxSettings = {
-  shell: SandboxShell;
+  backend: SandboxBackend;
   // null until an admin saves one
   endpoint: string | null;
   // null runs the default image, named after the server's version

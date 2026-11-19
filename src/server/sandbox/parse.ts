@@ -4,9 +4,9 @@
 import type { PutSandboxRequest } from "../../shared/api/sandbox.ts";
 import {
   isGatewayEndpoint,
+  isSandboxBackend,
   isSandboxImage,
   isSandboxNetwork,
-  isSandboxShell,
   MAX_GATEWAY_ENDPOINT,
   MAX_SANDBOX_IMAGE,
 } from "../../shared/contracts/sandbox.ts";
@@ -22,13 +22,13 @@ export const ENDPOINT_RULE = `an https origin (https://host:port) of at most ${M
 export const IMAGE_RULE = `an image reference of at most ${MAX_SANDBOX_IMAGE} characters`;
 
 export function parseSandbox(body: unknown): PutSandboxRequest {
-  const b = fields(body, ["shell", "endpoint", "image", "network", "hosts"]);
+  const b = fields(body, ["backend", "endpoint", "image", "network", "hosts"]);
   const out: PutSandboxRequest = {};
-  if ("shell" in b) {
-    if (!isSandboxShell(b.shell)) {
-      throw new BadRequest("shell must be builtin or sandbox");
+  if ("backend" in b) {
+    if (!isSandboxBackend(b.backend)) {
+      throw new BadRequest("backend must be builtin or openshell");
     }
-    out.shell = b.shell;
+    out.backend = b.backend;
   }
   if ("endpoint" in b) {
     if (b.endpoint !== null && !isGatewayEndpoint(b.endpoint)) {
@@ -51,7 +51,7 @@ export function parseSandbox(body: unknown): PutSandboxRequest {
   if ("hosts" in b) out.hosts = hostsOf(b.hosts);
   if (Object.keys(out).length === 0) {
     throw new BadRequest(
-      "body must name shell, endpoint, image, network or hosts",
+      "body must name backend, endpoint, image, network or hosts",
     );
   }
   return out;

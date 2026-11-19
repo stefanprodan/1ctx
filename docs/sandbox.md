@@ -15,8 +15,8 @@ only to the gateway, over gRPC with mutual TLS.
 
 ## Settings
 
-- **One row, `sandbox_settings`, made by its migration.** Shell
-  (`builtin` by default, or `sandbox`), the gateway endpoint, the
+- **One row, `sandbox_settings`, made by its migration.** The backend
+  (`builtin` by default, or `openshell`), the gateway endpoint, the
   image, the network (`hosts` by default, or `off`), the hosts (JSON,
   null for the defaults), and the instance id. The id is random, made at the row's
   first read and never changed; the migration leaves it null, so a
@@ -34,7 +34,7 @@ only to the gateway, over gRPC with mutual TLS.
 - **Image null runs the default**, `ghcr.io/stefanprodan/1ctx-shell`
   tagged with the binary's version for a release, `dev` for a source
   run or a dev build, so an upgrade moves it along.
-- **The shell is on when the row says `sandbox`, an endpoint is saved
+- **The shell is on when the backend is `openshell`, an endpoint is saved
   and every key file is there.** `compose.ts` passes bash a closure
   asked at each command: builtin until then. A save that changes the
   endpoint, a key or the image drains the old gateway's leases: every

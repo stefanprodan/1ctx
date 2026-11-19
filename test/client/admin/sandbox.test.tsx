@@ -23,6 +23,8 @@ import {
 } from "../../../src/client/data/sandbox.ts";
 import { Save } from "../../../src/client/lib/save.ts";
 import {
+  BACKEND_OPTIONS,
+  backendLine,
   draftOf,
   HOSTS_HINT,
   leaseCounts,
@@ -36,11 +38,9 @@ import {
   netFieldOf,
   offLine,
   type SandboxDraft,
-  SHELL_OPTIONS,
   sandboxBody,
   sandboxDirty,
   sandboxFieldOf,
-  shellLine,
   stuckLine,
 } from "../../../src/client/views/admin/Sandbox.model.ts";
 import {
@@ -60,7 +60,7 @@ import { mount } from "../../helpers/mount.ts";
 import { pollTab } from "../../helpers/poll.ts";
 
 const settings: SandboxSettings = {
-  shell: "sandbox",
+  backend: "openshell",
   endpoint: "https://127.0.0.1:17671",
   image: null,
   network: "hosts",
@@ -93,7 +93,7 @@ describe("the Sandbox words", () => {
   test("the body takes empty as none and checks what the server checks", () => {
     expect(sandboxBody(draftOf(settings))).toEqual({
       body: {
-        shell: "sandbox",
+        backend: "openshell",
         endpoint: "https://127.0.0.1:17671",
         image: null,
       },
@@ -102,8 +102,8 @@ describe("the Sandbox words", () => {
     expect(sandboxBody({ ...d, endpoint: " " })).toMatchObject({
       field: "endpoint",
     });
-    expect(sandboxBody({ ...d, shell: "builtin", endpoint: "" })).toEqual({
-      body: { shell: "builtin", endpoint: null, image: null },
+    expect(sandboxBody({ ...d, backend: "builtin", endpoint: "" })).toEqual({
+      body: { backend: "builtin", endpoint: null, image: null },
     });
     expect(
       sandboxBody({ ...d, endpoint: "http://127.0.0.1:17671" }),
@@ -119,7 +119,7 @@ describe("the Sandbox words", () => {
   test("dirty only when a field differs from the saved row", () => {
     expect(sandboxDirty(draftOf(settings), settings)).toBe(false);
     expect(
-      sandboxDirty({ ...draftOf(settings), shell: "builtin" }, settings),
+      sandboxDirty({ ...draftOf(settings), backend: "builtin" }, settings),
     ).toBe(true);
   });
 
@@ -131,7 +131,7 @@ describe("the Sandbox words", () => {
       sandboxFieldOf(
         "the sandbox shell needs openshell-gateway-ca.key, openshell-gateway-cert.key, openshell-gateway-key.key",
       ),
-    ).toBe("shell");
+    ).toBe("backend");
     expect(sandboxFieldOf("image must be null or an image reference")).toBe(
       "image",
     );
@@ -139,13 +139,13 @@ describe("the Sandbox words", () => {
   });
 
   test("says which shell is picked and why the sandbox one is off", () => {
-    expect(shellLine("sandbox")).toBe(
+    expect(backendLine("openshell")).toBe(
       "Commands run in an OpenShell sandbox, one per chat or run.",
     );
-    expect(shellLine("builtin")).toBe(
+    expect(backendLine("builtin")).toBe(
       "Commands run in the built-in shell, inside the server.",
     );
-    expect(SHELL_OPTIONS.map((o) => o.label)).toEqual([
+    expect(BACKEND_OPTIONS.map((o) => o.label)).toEqual([
       "Built-in",
       "OpenShell",
     ]);
@@ -168,7 +168,7 @@ describe("the Sandbox words", () => {
     expect(
       offLine(
         response({
-          settings: { ...settings, shell: "builtin" },
+          settings: { ...settings, backend: "builtin" },
           active: false,
           keys: { ca: false, cert: false, key: false },
         }),
@@ -220,7 +220,7 @@ describe("the Sandbox words", () => {
       "hosts",
     );
     expect(netFieldOf("the hosts network needs a host at least")).toBe("hosts");
-    expect(netFieldOf("shell must be builtin or sandbox")).toBeUndefined();
+    expect(netFieldOf("backend must be builtin or openshell")).toBeUndefined();
   });
 
   test("a lease names its chat and phase, a stuck one its next step", () => {
@@ -310,12 +310,12 @@ describe("the Sandbox page", () => {
     "the built-in shell hides the gateway, the image and the network",
     () => {
       sandbox.value = response({
-        settings: { ...settings, shell: "builtin" },
+        settings: { ...settings, backend: "builtin" },
         active: false,
       });
       sandboxLeases.value = [];
       const html = render(<Sandbox />);
-      expect(html).toContain('name="shell"');
+      expect(html).toContain('name="backend"');
       for (const name of ["endpoint", "image", "hosts", "network"]) {
         expect(html).not.toContain(`name="${name}"`);
       }
@@ -450,7 +450,7 @@ describe("the Sandbox page flows", () => {
     expect(calls[0]!.url).toBe("/api/admin/sandbox");
     expect(calls[0]!.init?.method).toBe("PUT");
     expect(sentBody(0)).toEqual({
-      shell: "sandbox",
+      backend: "openshell",
       endpoint: "https://127.0.0.1:17671",
       image: "1ctx-shell:dev",
     });
@@ -471,12 +471,12 @@ describe("the Sandbox page flows", () => {
 
   test.serial("a refused save lands at its field", async () => {
     sandbox.value = response({
-      settings: { ...settings, shell: "builtin" },
+      settings: { ...settings, backend: "builtin" },
       active: false,
     });
     const drafted = signal<SandboxDraft | null>({
       ...draftOf(settings),
-      shell: "sandbox",
+      backend: "openshell",
     });
     const edited = draw(drafted);
     edited.submit();
@@ -491,10 +491,10 @@ describe("the Sandbox page flows", () => {
       ),
     );
     await settle();
-    expect(edited.save.fieldError("shell")).toContain(
+    expect(edited.save.fieldError("backend")).toContain(
       "openshell-gateway-ca.key",
     );
-    expect(drafted.value?.shell).toBe("sandbox");
+    expect(drafted.value?.backend).toBe("openshell");
     edited.save.dispose();
   });
 });
@@ -522,7 +522,7 @@ describe("the Network card's flows", () => {
     () => {
       sandbox.value = response();
       const drafted = signal<SandboxDraft | null>(null);
-      draw(drafted).pick("shell", "builtin");
+      draw(drafted).pick("backend", "builtin");
       const html = draw(drafted).html;
       expect(html).not.toContain('name="hosts"');
       expect(html).toContain(

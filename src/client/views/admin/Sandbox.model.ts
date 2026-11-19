@@ -11,9 +11,9 @@ import {
   type LeaseRow,
   type LeaseState,
   SANDBOX_KEYS,
+  type SandboxBackend,
   type SandboxNetwork,
   type SandboxSettings,
-  type SandboxShell,
 } from "../../../shared/contracts/sandbox.ts";
 import {
   foldDefaults,
@@ -26,21 +26,21 @@ import { hostsCount, lineError } from "./Tools.model.ts";
 
 // what the form holds: text as typed, empty for none
 export type SandboxDraft = {
-  shell: SandboxShell;
+  backend: SandboxBackend;
   endpoint: string;
   image: string;
 };
 
 export type SandboxField = keyof SandboxDraft;
 
-export const SHELL_OPTIONS: { value: SandboxShell; label: string }[] = [
+export const BACKEND_OPTIONS: { value: SandboxBackend; label: string }[] = [
   { value: "builtin", label: "Built-in" },
-  { value: "sandbox", label: "OpenShell" },
+  { value: "openshell", label: "OpenShell" },
 ];
 
 export function draftOf(settings: SandboxSettings): SandboxDraft {
   return {
-    shell: settings.shell,
+    backend: settings.backend,
     endpoint: settings.endpoint ?? "",
     image: settings.image ?? "",
   };
@@ -51,7 +51,7 @@ export function sandboxBody(
 ): { body: PutSandboxRequest } | { field: SandboxField; error: string } {
   const endpoint = d.endpoint.trim();
   const image = d.image.trim();
-  if (endpoint === "" && d.shell === "sandbox") {
+  if (endpoint === "" && d.backend === "openshell") {
     return { field: "endpoint", error: "Enter the gateway's address" };
   }
   if (endpoint !== "" && !isGatewayEndpoint(endpoint)) {
@@ -65,7 +65,7 @@ export function sandboxBody(
   }
   return {
     body: {
-      shell: d.shell,
+      backend: d.backend,
       endpoint: endpoint === "" ? null : endpoint,
       image: image === "" ? null : image,
     },
@@ -81,11 +81,11 @@ export function sandboxDirty(d: SandboxDraft, settings: SandboxSettings) {
 
 // the server's whole phrases, so a changed message changes these
 const FIELDS: [RegExp, SandboxField][] = [
-  [/^shell must be /, "shell"],
+  [/^backend must be /, "backend"],
   [/^endpoint must be /, "endpoint"],
   [/^image must be /, "image"],
   [/^the sandbox shell needs a gateway endpoint$/, "endpoint"],
-  [/^the sandbox shell needs openshell-/, "shell"],
+  [/^the sandbox shell needs openshell-/, "backend"],
 ];
 
 export function sandboxFieldOf(message: string): SandboxField | undefined {
@@ -103,8 +103,8 @@ export function missingKeys(state: SandboxResponse): string[] {
 
 // the shell picked, saved or not; offLine says when a saved sandbox
 // shell does not run
-export function shellLine(shell: SandboxShell): string {
-  return shell === "sandbox"
+export function backendLine(backend: SandboxBackend): string {
+  return backend === "openshell"
     ? "Commands run in an OpenShell sandbox, one per chat or run."
     : "Commands run in the built-in shell, inside the server.";
 }
@@ -112,7 +112,7 @@ export function shellLine(shell: SandboxShell): string {
 // why the saved sandbox shell is not running, null while it runs or
 // the built-in one is picked
 export function offLine(state: SandboxResponse): string | null {
-  if (state.settings.shell !== "sandbox" || state.active) return null;
+  if (state.settings.backend !== "openshell" || state.active) return null;
   const missing = missingKeys(state);
   if (missing.length === 0) return null;
   return `The sandbox shell is off: ${missing.join(", ")} ${

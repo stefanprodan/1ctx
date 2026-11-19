@@ -2109,7 +2109,7 @@ describe("the schema", () => {
       expect(db.query("select * from sandbox_settings").all()).toEqual([
         {
           id: 1,
-          shell: "builtin",
+          backend: "builtin",
           endpoint: null,
           image: null,
           instance_id: null,
@@ -2119,7 +2119,7 @@ describe("the schema", () => {
         },
       ]);
       expect(() =>
-        db.query("update sandbox_settings set shell = 'docker'").run(),
+        db.query("update sandbox_settings set backend = 'docker'").run(),
       ).toThrow();
     } finally {
       db.close();
@@ -2147,13 +2147,13 @@ describe("the schema", () => {
     const db = seed(MIGRATIONS.slice(0, 86));
     try {
       db.query(
-        "update sandbox_settings set shell = 'sandbox', endpoint = 'https://gw:8080', instance_id = 'i1'",
+        "update sandbox_settings set backend = 'openshell', endpoint = 'https://gw:8080', instance_id = 'i1'",
       ).run();
       expect(migrate(db)).toEqual(expectedFrom("0087-sandbox-network"));
       expect(db.query("select * from sandbox_settings").all()).toEqual([
         {
           id: 1,
-          shell: "sandbox",
+          backend: "openshell",
           endpoint: "https://gw:8080",
           image: null,
           instance_id: "i1",

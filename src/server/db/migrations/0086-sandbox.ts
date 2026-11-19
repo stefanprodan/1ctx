@@ -16,8 +16,8 @@ export const m0086: Migration = {
     db.exec(`
       create table sandbox_settings (
         id integer primary key check (id = 1),
-        shell text not null default 'builtin'
-          check (shell in ('builtin', 'sandbox')),
+        backend text not null default 'builtin'
+          check (backend in ('builtin', 'openshell')),
         endpoint text,
         image text,
         instance_id text,

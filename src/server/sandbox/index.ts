@@ -127,7 +127,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
   // what the next command runs on, null while the shell is off
   const config = (): (GatewayConfig & { image: string }) | null => {
     const held = store.settings();
-    if (held.shell !== "sandbox" || held.endpoint === null) return null;
+    if (held.backend !== "openshell" || held.endpoint === null) return null;
     const { ca, cert, key } = keys();
     if (ca === null || cert === null || key === null) return null;
     const image = held.image ?? defaultImage(deps.version);

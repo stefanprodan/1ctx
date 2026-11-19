@@ -8,12 +8,12 @@
 import type { SandboxResponse } from "../../shared/api/sandbox.ts";
 import {
   isGatewayEndpoint,
+  isSandboxBackend,
   isSandboxImage,
   isSandboxNetwork,
-  isSandboxShell,
   SANDBOX_KEYS,
+  type SandboxBackend,
   type SandboxNetwork,
-  type SandboxShell,
 } from "../../shared/contracts/sandbox.ts";
 import {
   foldDefaults,
@@ -26,8 +26,8 @@ import type { Action, Client } from "./client.ts";
 import { guarded, optionalSpec } from "./fields.ts";
 
 export type SandboxSpec = {
-  shell?: SandboxShell;
-  // null takes it off; the builtin shell alone allows that
+  backend?: SandboxBackend;
+  // null takes it off; the builtin backend alone allows that
   endpoint?: string | null;
   // null runs the default image
   image?: string | null;
@@ -68,7 +68,7 @@ function orNull<T>(
 // written; a field left out is the row's, which only the route reads
 export function sandboxSpec(value: unknown): SandboxSpec {
   const spec = optionalSpec<SandboxSpec>(value, {
-    shell: guarded(isSandboxShell, "must be builtin or sandbox"),
+    backend: guarded(isSandboxBackend, "must be builtin or openshell"),
     endpoint: orNull(
       isGatewayEndpoint,
       "must be null or an https origin (https://host:port)",
@@ -79,7 +79,7 @@ export function sandboxSpec(value: unknown): SandboxSpec {
   });
   if (spec.network === "hosts" && spec.hosts?.length === 0)
     throw new BadRequest("spec.hosts: the hosts network needs a host at least");
-  if (spec.shell === "sandbox" && spec.endpoint === null)
+  if (spec.backend === "openshell" && spec.endpoint === null)
     throw new BadRequest(
       "spec.endpoint: the sandbox shell needs a gateway endpoint",
     );
@@ -91,9 +91,9 @@ export function checkSandbox(
   spec: SandboxSpec,
   readSecret: (field: string, kind: SecretKind, name: string) => string,
 ): void {
-  if (spec.shell !== "sandbox") return;
+  if (spec.backend !== "openshell") return;
   for (const name of Object.values(SANDBOX_KEYS)) {
-    readSecret("shell", "openshell-", name);
+    readSecret("backend", "openshell-", name);
   }
 }
 
@@ -104,7 +104,7 @@ export async function applySandbox(
   const held = await api.call<SandboxResponse>("GET", "/api/admin/sandbox");
   const changed: SandboxSpec = {};
   for (const field of [
-    "shell",
+    "backend",
     "endpoint",
     "image",
     "network",

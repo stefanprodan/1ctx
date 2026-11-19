@@ -153,7 +153,7 @@ switch (command) {
       fail("usage: configure <url> <secrets> <endpoint> <image>");
     }
     const answer = await call(url, await signIn(url, secrets), "PUT", {
-      shell: "sandbox",
+      backend: "openshell",
       endpoint,
       image,
     });

@@ -51,7 +51,7 @@ describe("sandbox settings", () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as SandboxResponse;
       expect(body.settings).toMatchObject({
-        shell: "builtin",
+        backend: "builtin",
         endpoint: null,
         image: null,
       });
@@ -82,7 +82,7 @@ describe("sandbox settings", () => {
         });
         expect(res.status).toBe(400);
       }
-      for (const body of [{}, { other: 1 }, { shell: "docker" }]) {
+      for (const body of [{}, { other: 1 }, { backend: "docker" }]) {
         const res = await admin.call("PUT", "/api/admin/sandbox", { body });
         expect(res.status).toBe(400);
       }
@@ -91,7 +91,7 @@ describe("sandbox settings", () => {
       });
       expect(res.status).toBe(200);
       expect(((await res.json()) as SandboxResponse).settings).toMatchObject({
-        shell: "builtin",
+        backend: "builtin",
         endpoint: ENDPOINT,
         image: "registry.test/sbx:1",
       });
@@ -133,7 +133,7 @@ describe("sandbox settings", () => {
       expect(saved.status).toBe(200);
       body = JSON.parse(saved.text) as SandboxResponse;
       expect(body.settings).toMatchObject({
-        shell: "builtin",
+        backend: "builtin",
         network: "hosts",
         hosts: ["*.githubusercontent.com", "pypi.org"],
       });
@@ -167,12 +167,12 @@ describe("sandbox settings", () => {
     await run(
       async (_app, admin) => {
         let res = await admin.call("PUT", "/api/admin/sandbox", {
-          body: { shell: "sandbox" },
+          body: { backend: "openshell" },
         });
         expect(res.status).toBe(400);
         expect(await res.text()).toContain("needs a gateway endpoint");
         res = await admin.call("PUT", "/api/admin/sandbox", {
-          body: { shell: "sandbox", endpoint: ENDPOINT },
+          body: { backend: "openshell", endpoint: ENDPOINT },
         });
         expect(res.status).toBe(400);
         expect(await res.text()).toContain("openshell-gateway-key.key");
@@ -188,7 +188,7 @@ describe("sandbox settings", () => {
         const builtin = { run: async () => ({}) as never };
         expect(app.sandbox.shell(builtin)).toBe(builtin);
         const res = await admin.call("PUT", "/api/admin/sandbox", {
-          body: { shell: "sandbox", endpoint: ENDPOINT },
+          body: { backend: "openshell", endpoint: ENDPOINT },
         });
         expect(((await res.json()) as SandboxResponse).active).toBe(true);
         expect(app.sandbox.shell(builtin)).not.toBe(builtin);
@@ -201,7 +201,7 @@ describe("sandbox settings", () => {
           },
         ]);
         await admin.call("PUT", "/api/admin/sandbox", {
-          body: { shell: "builtin" },
+          body: { backend: "builtin" },
         });
         expect(app.sandbox.shell(builtin)).toBe(builtin);
         expect(app.sandbox.leases()).toBeNull();
@@ -216,7 +216,7 @@ describe("sandbox settings", () => {
     await run(
       async (app, admin) => {
         await admin.call("PUT", "/api/admin/sandbox", {
-          body: { shell: "sandbox", endpoint: ENDPOINT },
+          body: { backend: "openshell", endpoint: ENDPOINT },
         });
         const leases = app.sandbox.leases()!;
         const hold = await leases.acquire(
@@ -256,7 +256,7 @@ describe("sandbox settings", () => {
     await run(
       async (app, admin) => {
         await admin.call("PUT", "/api/admin/sandbox", {
-          body: { shell: "sandbox", endpoint: ENDPOINT },
+          body: { backend: "openshell", endpoint: ENDPOINT },
         });
         const old = app.sandbox.leases()!;
         const hold = await old.acquire(
@@ -348,7 +348,7 @@ describe("sandbox settings", () => {
       await admin.login("admin", "hunter2-test");
       await admin.call("PUT", "/api/admin/sandbox", {
         body: {
-          shell: "sandbox",
+          backend: "openshell",
           endpoint: ENDPOINT,
           hosts: ["api.example.test"],
         },
@@ -378,7 +378,7 @@ describe("sandbox settings", () => {
     await run(
       async (app, admin) => {
         await admin.call("PUT", "/api/admin/sandbox", {
-          body: { shell: "sandbox", endpoint: ENDPOINT },
+          body: { backend: "openshell", endpoint: ENDPOINT },
         });
         let res = await admin.call("GET", "/api/admin/sandbox/leases");
         expect(((await res.json()) as SandboxLeasesResponse).refused).toBe(

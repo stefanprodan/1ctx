@@ -511,7 +511,7 @@ export const AUTH_CASES: AuthCase[] = [
     method: "PUT",
     path: "/api/admin/sandbox",
     // admin: the builtin shell, saved as it is
-    body: { shell: "builtin" },
+    body: { backend: "builtin" },
     expect: { anonymous: 401, member: 403, admin: 200 },
   },
   {

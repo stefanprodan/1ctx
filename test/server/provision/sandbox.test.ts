@@ -70,7 +70,7 @@ const check = (docs: Document[], keys: Record<string, string>) =>
 describe("provision Sandbox", () => {
   test("a second Sandbox document is refused", () => {
     expect(() =>
-      documents(sandbox({ shell: "builtin" }), sandbox({}, "other")),
+      documents(sandbox({ backend: "builtin" }), sandbox({}, "other")),
     ).toThrow(
       "Sandbox/other: one Sandbox object per instance (first Sandbox/sandbox)",
     );
@@ -99,17 +99,19 @@ describe("provision Sandbox", () => {
       "spec.hosts: the hosts network needs a host at least",
     );
     expect(() =>
-      documents(sandbox({ shell: "sandbox", endpoint: null })),
+      documents(sandbox({ backend: "openshell", endpoint: null })),
     ).toThrow("spec.endpoint: the sandbox shell needs a gateway endpoint");
     // a field left out is the row's, which the route checks at apply
     documents(sandbox({ hosts: [] }));
-    documents(sandbox({ shell: "builtin", endpoint: null }));
+    documents(sandbox({ backend: "builtin", endpoint: null }));
   });
 
   test("the sandbox shell needs the gateway's key files before apply", () => {
-    const docs = documents(sandbox({ shell: "sandbox", endpoint: ENDPOINT }));
+    const docs = documents(
+      sandbox({ backend: "openshell", endpoint: ENDPOINT }),
+    );
     expect(() => check(docs, {})).toThrow(
-      "spec.shell secret openshell-gateway-ca.key is missing or empty",
+      "spec.backend secret openshell-gateway-ca.key is missing or empty",
     );
     check(docs, KEYS);
   });
@@ -117,10 +119,10 @@ describe("provision Sandbox", () => {
   test("updates the row the database made, then is unchanged", async () => {
     await run(async (app, apply) => {
       const id = app.sandbox.store.settings().instanceId;
-      const doc = sandbox({ shell: "sandbox", endpoint: ENDPOINT });
+      const doc = sandbox({ backend: "openshell", endpoint: ENDPOINT });
       expect(await apply(doc)).toContain("updated sandbox/sandbox");
       expect(app.sandbox.store.settings()).toMatchObject({
-        shell: "sandbox",
+        backend: "openshell",
         endpoint: ENDPOINT,
         image: null,
         instanceId: id,
@@ -131,7 +133,7 @@ describe("provision Sandbox", () => {
       expect(app.sandbox.store.settings().image).toBe("registry.test/sbx:2");
       await apply(sandbox({ image: null }));
       expect(app.sandbox.store.settings()).toMatchObject({
-        shell: "sandbox",
+        backend: "openshell",
         image: null,
       });
       // hosts compare as the sorted list a save stores

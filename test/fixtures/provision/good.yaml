@@ -89,7 +89,7 @@ kind: Sandbox
 metadata:
   name: sandbox
 spec:
-  shell: builtin
+  backend: builtin
   endpoint: https://gateway.test:17670
   image: null
 ---

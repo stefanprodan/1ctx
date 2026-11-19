@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type {
+  SandboxBackend,
   SandboxNetwork,
   SandboxSettings,
-  SandboxShell,
 } from "../../shared/contracts/sandbox.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
 type Raw = {
-  shell: SandboxShell;
+  backend: SandboxBackend;
   endpoint: string | null;
   image: string | null;
   instance_id: string | null;
@@ -21,7 +21,7 @@ type Raw = {
 
 export type SavedFields = Pick<
   SandboxSettings,
-  "shell" | "endpoint" | "image" | "network" | "hosts"
+  "backend" | "endpoint" | "image" | "network" | "hosts"
 >;
 
 // the one settings row, made by its migration; the instance id at its
@@ -41,7 +41,7 @@ export class SandboxStore {
       raw = this.raw();
     }
     return {
-      shell: raw.shell,
+      backend: raw.backend,
       endpoint: raw.endpoint,
       image: raw.image,
       network: raw.network,
@@ -54,7 +54,7 @@ export class SandboxStore {
   private raw(): Raw {
     return this.db
       .query<Raw, []>(
-        "select shell, endpoint, image, instance_id, network, hosts, updated_at from sandbox_settings where id = 1",
+        "select backend, endpoint, image, instance_id, network, hosts, updated_at from sandbox_settings where id = 1",
       )
       .get()!;
   }
@@ -63,12 +63,12 @@ export class SandboxStore {
     this.db
       .query(
         `update sandbox_settings
-           set shell = ?, endpoint = ?, image = ?, network = ?, hosts = ?,
+           set backend = ?, endpoint = ?, image = ?, network = ?, hosts = ?,
                updated_at = ?
          where id = 1`,
       )
       .run(
-        fields.shell,
+        fields.backend,
         fields.endpoint,
         fields.image,
         fields.network,

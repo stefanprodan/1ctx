@@ -71,14 +71,14 @@ they name.
 - **`Sandbox` is the instance's one sandbox shell setting**
   (`docs/sandbox.md`). A second `Sandbox` document is refused, and any
   name updates the row the database made, so it is never created.
-  `shell`, `endpoint`, `image`, `network` (`off` or `hosts`) and
-  `hosts` are optional; `endpoint`, `image` and `hosts` take null, null
-  hosts being the defaults. Validation refuses an endpoint that is not
-  an https origin, a host the sandbox does not take
-  (`docs/sandbox.md`) and, for `shell: sandbox`, a missing
+  `backend` (`builtin` or `openshell`), `endpoint`, `image`, `network`
+  (`off` or `hosts`) and `hosts` are optional; `endpoint`, `image` and
+  `hosts` take null, null hosts being the defaults. Validation refuses
+  an endpoint that is not an https origin, a host the sandbox does not
+  take (`docs/sandbox.md`) and, for `backend: openshell`, a missing
   `openshell-gateway-ca`, `-cert` or `-key` file. Within one document it
   refuses what the save would, `network: hosts` with no host and
-  `shell: sandbox` with a null endpoint; the save refuses the same
+  `backend: openshell` with a null endpoint; the save refuses the same
   against the row's other fields. Hosts compare as the sorted list a
   save stores.
 

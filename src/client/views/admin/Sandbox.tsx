@@ -46,6 +46,8 @@ import { DraftFoot } from "./DraftFoot.tsx";
 import "./sandbox.css";
 import { useLatest } from "./drafts.ts";
 import {
+  BACKEND_OPTIONS,
+  backendLine,
   draftOf,
   HOSTS_HINT,
   keyFiles,
@@ -69,11 +71,9 @@ import {
   refusedLine,
   type SandboxDraft,
   type SandboxField,
-  SHELL_OPTIONS,
   sandboxBody,
   sandboxDirty,
   sandboxFieldOf,
-  shellLine,
   stuckLine,
 } from "./Sandbox.model.ts";
 
@@ -134,7 +134,7 @@ export function SandboxCards({
       <Shell state={state} drafted={drafted} />
       {/* the built-in shell has no network of its own, as it has no
           gateway or image */}
-      {(drafted.value ?? draftOf(state.settings)).shell === "sandbox" && (
+      {(drafted.value ?? draftOf(state.settings)).backend === "openshell" && (
         <Network state={state} />
       )}
       <Leases
@@ -220,7 +220,7 @@ function Shell({
     >
       <Setting
         title="Shell"
-        line={shellLine(d.shell)}
+        line={backendLine(d.backend)}
         foot={
           <DraftFoot
             save={save}
@@ -236,26 +236,26 @@ function Shell({
             <span class="label">Shell</span>
             <Seg
               label="Shell"
-              name="shell"
-              value={d.shell}
-              invalid={save.fieldError("shell") !== null}
-              options={SHELL_OPTIONS.map((o) => ({
+              name="backend"
+              value={d.backend}
+              invalid={save.fieldError("backend") !== null}
+              options={BACKEND_OPTIONS.map((o) => ({
                 ...o,
                 disabled: save.busy,
               }))}
               // the built-in shell hides the gateway and image, so they
               // go back to their saved values rather than fail unseen
-              onPick={(shell) =>
+              onPick={(backend) =>
                 set(
-                  shell === "sandbox"
-                    ? { shell }
-                    : { ...draftOf(state.settings), shell },
+                  backend === "openshell"
+                    ? { backend }
+                    : { ...draftOf(state.settings), backend },
                 )
               }
             />
-            <FieldError save={save} field="shell" />
+            <FieldError save={save} field="backend" />
           </div>
-          {d.shell === "sandbox" && (
+          {d.backend === "openshell" && (
             <>
               <Text
                 label="Gateway"

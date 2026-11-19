@@ -81,11 +81,11 @@ reporting.
   own composer follows at once. The aside reads `overviewTotals()`: clips, audio in minutes
   and cost, "not priced" while no clip named one.
 - **Sandbox is its own Config page, after Web access.** One Shell card
-  (the shell as a `Seg`, Built-in or OpenShell, the gateway's https
-  address, the image, empty for the default) saves the shell, endpoint
-  and image, as SMTP's Server card does. Its line follows the shell
-  picked, saved or not. Built-in hides the gateway and image and puts
-  their drafts back to the saved values, which the save keeps;
+  (the `backend` field as a `Seg`, Built-in or OpenShell, the gateway's
+  https address, the image, empty for the default) saves the backend,
+  endpoint and image, as SMTP's Server card does. Its line follows the
+  backend picked, saved or not. Built-in hides the gateway and image and
+  puts their drafts back to the saved values, which the save keeps;
   `sandboxFieldOf()` matches the server's whole phrases.
 - **The Sandbox page's Network card shows while the shell picked is
   OpenShell**, its own form saving only the network and hosts. Off or

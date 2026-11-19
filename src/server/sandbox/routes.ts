@@ -46,7 +46,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const body = parseSandbox(await jsonBody(req));
         const held = deps.store.settings();
         const next = {
-          shell: body.shell ?? held.shell,
+          backend: body.backend ?? held.backend,
           endpoint: body.endpoint === undefined ? held.endpoint : body.endpoint,
           image: body.image === undefined ? held.image : body.image,
           network: body.network ?? held.network,
@@ -55,7 +55,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         if (next.network === "hosts" && next.hosts?.length === 0) {
           throw new BadRequest("the hosts network needs a host at least");
         }
-        if (next.shell === "sandbox") {
+        if (next.backend === "openshell") {
           if (next.endpoint === null) {
             throw new BadRequest("the sandbox shell needs a gateway endpoint");
           }
@@ -65,7 +65,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         }
         deps.store.save(next, deps.clock());
         deps.log.info("sandbox settings saved", {
-          shell: next.shell,
+          backend: next.backend,
           network: next.network,
         });
         deps.saved();
