@@ -230,6 +230,7 @@ describe("atomic knowledge and scratch commits", () => {
     try {
       expect(await run(s, `${edits}; false`)).toEqual({
         error: true,
+        exited: true,
         content: "exit 1\nwrote existing (rev 2, 1 lines)",
         opened: [],
         saved: ["/knowledge/existing"],

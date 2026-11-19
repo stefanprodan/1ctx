@@ -55,6 +55,9 @@ export type CommandResult = {
   // where a command that saved nothing ended, for the log; finishTool
   // stores a row's fields by name, so it never reaches one
   ended?: CommandEnd;
+  // a command that ran and exited nonzero: the error is its own answer,
+  // not a tool failure, so the runner logs nothing. Never stored
+  exited?: boolean;
   // the caller's abort ended it, so this is no result: the runner writes
   // its cut text instead. Never stored
   interrupted?: boolean;
@@ -448,6 +451,7 @@ export async function run(
       ...printed,
       content: notice + printed.content,
       error: answer.exitCode !== 0,
+      ...(answer.exitCode !== 0 ? { exited: true } : {}),
       opened,
     };
   } catch (error) {

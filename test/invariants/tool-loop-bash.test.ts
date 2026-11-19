@@ -200,11 +200,17 @@ describe("a bash command that saves nothing", () => {
       // the loop runs to its cap first: wait as long as the test may
       const answer = await waitScript(chat.scripted, 2);
       const failed = logs.events.filter((event) => event.msg === "tool failed");
-      expect(failed).toHaveLength(2);
-      // a nonzero exit commits, so only the limit names a phase
-      expect(
-        failed.filter((event) => event.fields.phase !== undefined),
-      ).toMatchObject([{ fields: { phase: "run", cause: "limit" } }]);
+      // a nonzero exit is the command's own answer, so only the limit
+      // logs, and nothing was thrown to name a type
+      expect(failed.map((event) => event.fields)).toEqual([
+        {
+          chat: expect.any(String),
+          tool: "bash",
+          duration: expect.any(Number),
+          phase: "run",
+          cause: "limit",
+        },
+      ]);
       expect(JSON.stringify(logs.events)).not.toContain("secret-words");
       expect(chat.app.knowledge.counts(chat.projectId).files).toBe(0);
       answer.reply("done");
