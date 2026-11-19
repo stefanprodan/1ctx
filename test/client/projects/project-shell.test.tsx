@@ -86,12 +86,12 @@ describe("the model", () => {
 
 describe("the write", () => {
   test.serial(
-    "a team project's goes to its admin route, a personal one's to the owner's",
+    "any project's goes to the admin route, a personal one's too",
     async () => {
       project.value = team;
       answer = () =>
         Response.json({ project: { ...team, backend: "builtin" } });
-      await saveShell(team, "builtin");
+      await saveShell(team.id, "builtin");
       expect(calls.at(-1)!.url).toBe("/api/projects/t1");
       expect(calls.at(-1)!.init?.method).toBe("PATCH");
       expect(JSON.parse(String(calls.at(-1)!.init?.body))).toEqual({
@@ -100,8 +100,8 @@ describe("the write", () => {
       // the answer is the detail, kept for the tab on screen
       expect(project.value?.backend).toBe("builtin");
       answer = () => Response.json({ project: personal });
-      await saveShell(personal, null);
-      expect(calls.at(-1)!.url).toBe("/api/profile/project");
+      await saveShell(personal.id, null);
+      expect(calls.at(-1)!.url).toBe("/api/projects/p1");
       expect(JSON.parse(String(calls.at(-1)!.init?.body))).toEqual({
         backend: null,
       });
@@ -130,6 +130,14 @@ describe("the select", () => {
     expect(html).toContain("disabled");
     expect(html).toContain(SHELL_ADMIN_HINT);
     expect(html).toContain(">Built-in<");
+  });
+
+  test("a personal project's owner reads it disabled, as a team's member does", () => {
+    const html = render(
+      <ProjectShell project={personal} section edit={false} />,
+    );
+    expect(html).toContain("disabled");
+    expect(html).toContain(SHELL_ADMIN_HINT);
   });
 
   test("the admin page's card holds the select in its head", () => {
@@ -186,39 +194,42 @@ describe("a pick", () => {
     },
   );
 
-  test.serial("a personal project's goes to its owner's route", async () => {
-    answer = () => Response.json({ project: personal });
-    const { view, pick } = await mounted(
-      <ProjectShell project={personal} section edit />,
-    );
-    try {
-      await pick("openshell");
-      await act(() => settle());
-      expect(calls.at(-1)!.url).toBe("/api/profile/project");
-      expect(JSON.parse(String(calls.at(-1)!.init?.body))).toEqual({
-        backend: "openshell",
-      });
-    } finally {
-      await view.unmount();
-    }
-    // the default sends null
-    const set = await mounted(
-      <ProjectShell
-        project={{ ...personal, backend: "openshell" }}
-        section
-        edit
-      />,
-    );
-    try {
-      await set.pick(INSTANCE_DEFAULT);
-      await act(() => settle());
-      expect(JSON.parse(String(calls.at(-1)!.init?.body))).toEqual({
-        backend: null,
-      });
-    } finally {
-      await set.view.unmount();
-    }
-  });
+  test.serial(
+    "an admin's pick on a personal project goes to the admin route",
+    async () => {
+      answer = () => Response.json({ project: personal });
+      const { view, pick } = await mounted(
+        <ProjectShell project={personal} section edit />,
+      );
+      try {
+        await pick("openshell");
+        await act(() => settle());
+        expect(calls.at(-1)!.url).toBe("/api/projects/p1");
+        expect(JSON.parse(String(calls.at(-1)!.init?.body))).toEqual({
+          backend: "openshell",
+        });
+      } finally {
+        await view.unmount();
+      }
+      // the default sends null
+      const set = await mounted(
+        <ProjectShell
+          project={{ ...personal, backend: "openshell" }}
+          section
+          edit
+        />,
+      );
+      try {
+        await set.pick(INSTANCE_DEFAULT);
+        await act(() => settle());
+        expect(JSON.parse(String(calls.at(-1)!.init?.body))).toEqual({
+          backend: null,
+        });
+      } finally {
+        await set.view.unmount();
+      }
+    },
+  );
 
   test.serial(
     "a refused pick says why on the tab and on the card",

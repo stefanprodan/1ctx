@@ -19,14 +19,13 @@ export type CreateProjectRequest = {
   description: string;
   labels?: LabelInput[];
 };
-// at least one field. backend null follows the instance's sandbox setting
+// at least one field; a personal project takes backend alone. backend
+// null follows the instance's sandbox setting
 export type UpdateProjectRequest = {
   name?: string;
   description?: string;
   backend?: SandboxBackend | null;
 };
-// PATCH /api/profile/project: the caller's personal project
-export type UpdateOwnProjectRequest = { backend: SandboxBackend | null };
 // PATCH /api/projects/:id/about: any user who sees the project
 export type UpdateAboutRequest = { description: string };
 // POST /api/projects/:id/labels

@@ -69,11 +69,12 @@ its MCP servers (`views/projects/McpServers.tsx`,
   The options are `Instance default (<backend>)`, named from the
   detail's `instanceBackend`, then Built-in and OpenShell, the Sandbox
   page's words (`shellOptions()`); the default sends null.
-- **A pick is written at once** (`saveShell()`), as an MCP side is: the
-  owner's on a personal project through `PATCH /api/profile/project`,
-  an admin's on a team project through `PATCH /api/projects/:id`. The
-  answer is the detail, kept as a metadata write's. On the admin page
-  it holds the page's `saving`, since the answer replaces the row.
-- **A team's member reads the value** in the same select, disabled,
-  with "An admin sets it." under it. A refused write is the hint's
+- **A pick is an admin's, written at once** (`saveShell()`), as an MCP
+  side is, through `PATCH /api/projects/:id` on any project. The answer
+  is the detail, kept as a metadata write's. On the admin page it holds
+  the page's `saving`, since the answer replaces the row. No admin page
+  shows another user's personal project, so its shell is set through
+  the API alone.
+- **Anyone else reads the value,** a personal project's owner included,
+  in the same select, disabled, with "An admin sets it." under it. A refused write is the hint's
   error line on the tab, the card's line on the admin page.

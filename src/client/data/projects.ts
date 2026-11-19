@@ -17,7 +17,6 @@ import type {
   ProjectsResponse,
   UpdateAboutRequest,
   UpdateLabelRequest,
-  UpdateOwnProjectRequest,
   UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import type {
@@ -148,18 +147,14 @@ async function writeMetadata(
 export const saveAbout = (id: string, body: UpdateAboutRequest) =>
   writeMetadata(id, `${projectPath(id)}/about`, "PATCH", body);
 
-// a project's shell backend: its owner's on a personal project, an
-// admin's on a team one; the answer is the detail, kept as any write's
+// a project's shell backend, an admin's on any project; the answer is
+// the detail, kept as any write's
 export function saveShell(
-  project: Pick<ProjectDetail, "id" | "kind">,
+  id: string,
   backend: SandboxBackend | null,
 ): Promise<void> {
-  if (project.kind === "personal") {
-    const body: UpdateOwnProjectRequest = { backend };
-    return writeMetadata(project.id, "/api/profile/project", "PATCH", body);
-  }
   const body: UpdateProjectRequest = { backend };
-  return writeMetadata(project.id, projectPath(project.id), "PATCH", body);
+  return writeMetadata(id, projectPath(id), "PATCH", body);
 }
 
 export const addLabel = (id: string, body: CreateLabelRequest) =>

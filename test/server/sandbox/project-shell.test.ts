@@ -268,7 +268,7 @@ describe("who sets a project's shell", () => {
     });
   });
 
-  test("a member reads a team project's shell, and only its owner sets a personal one", async () => {
+  test("a member reads a team project's shell, and only an admin sets a personal one", async () => {
     await run(async (app, admin) => {
       const user = app.createUser({
         username: "casey",
@@ -292,27 +292,40 @@ describe("who sets a project's shell", () => {
         backend: "openshell",
         instanceBackend: "builtin",
       });
-      // a personal project is not the admin's to set through the team route
+      // a personal project's shell is an admin's, never its owner's
       const own = (
         (await (
           await member.call("GET", "/api/projects")
         ).json()) as ProjectsResponse
       ).projects.find((p) => p.kind === "personal")!;
-      res = await admin.call("PATCH", `/api/projects/${own.id}`, {
+      res = await member.call("PATCH", `/api/projects/${own.id}`, {
         body: { backend: "openshell" },
       });
-      expect(res.status).toBe(404);
-      res = await member.call("PATCH", "/api/profile/project", {
+      expect(res.status).toBe(403);
+      res = await admin.call("PATCH", `/api/projects/${own.id}`, {
         body: { backend: "openshell" },
       });
       expect(res.status).toBe(200);
       const project = ((await res.json()) as ProjectResponse).project;
       expect(project).toMatchObject({ id: own.id, backend: "openshell" });
       expect(app.projects.backendOf(own.id)).toBe("openshell");
-      for (const body of [{}, { backend: "docker" }, { other: 1 }]) {
-        res = await member.call("PATCH", "/api/profile/project", { body });
-        expect(res.status, JSON.stringify(body)).toBe(400);
+      // and nothing else of a personal project is
+      for (const body of [
+        { name: "renamed" },
+        { description: "Mine." },
+        { backend: null, description: "Mine." },
+      ]) {
+        res = await admin.call("PATCH", `/api/projects/${own.id}`, { body });
+        expect(res.status, JSON.stringify(body)).toBe(404);
       }
+      expect(app.projects.byId(own.id)).toMatchObject({
+        name: "personal",
+        backend: "openshell",
+      });
+      res = await member.call("PATCH", "/api/profile/project", {
+        body: { backend: null },
+      });
+      expect(res.status).toBe(404);
     });
   });
 });

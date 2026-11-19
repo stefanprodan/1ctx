@@ -13,7 +13,7 @@ import type { Option } from "../../ui/Select.model.ts";
 import { BACKEND_OPTIONS } from "../admin/Sandbox.model.ts";
 
 export const SHELL_TEXT = "Where the bash tool runs this project's commands.";
-// a team member reads the value; an admin sets it
+// anyone but an admin reads the value
 export const SHELL_ADMIN_HINT = "An admin sets it.";
 
 // the select's value for a project that follows the instance

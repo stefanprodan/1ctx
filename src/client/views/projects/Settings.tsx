@@ -4,9 +4,9 @@
 // A project's Settings tab, laid out as the profile: its description and
 // its labels, then its repositories, its MCP servers and its shell. Every
 // user who sees the project writes its description and labels. A
-// personal project's owner writes its repositories and shell, an admin a
-// team project's, through the admin page's routes and entities, and a
-// member reads them. An admin adds and removes a team project's listed
+// personal project's owner writes its repositories, an admin a team
+// project's, through the admin page's routes and entities, and a member
+// reads them. Only an admin sets a project's shell. An admin adds and removes a team project's listed
 // MCP servers. The name of a team project is changed on the admin page.
 
 import { useSignal } from "@preact/signals";
@@ -208,7 +208,7 @@ export function Settings({ params }: { params: Params }) {
               key={`shell-${shown.id}`}
               project={shown}
               section
-              edit={personal || admin}
+              edit={admin}
             />
           </div>
         );

@@ -7,7 +7,6 @@ import type {
   CreateProjectRequest,
   UpdateAboutRequest,
   UpdateLabelRequest,
-  UpdateOwnProjectRequest,
   UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import {
@@ -141,12 +140,6 @@ export function parseUpdateProject(body: unknown): UpdateProjectRequest {
       : { description: parseTeamDescription(b.description) }),
     ...(b.backend === undefined ? {} : { backend: parseBackend(b.backend) }),
   };
-}
-
-export function parseUpdateOwnProject(body: unknown): UpdateOwnProjectRequest {
-  const b = fields(body, ["backend"]);
-  if (b.backend === undefined) throw new BadRequest("backend is required");
-  return { backend: parseBackend(b.backend) };
 }
 
 // a team project's description is required, a personal one's not

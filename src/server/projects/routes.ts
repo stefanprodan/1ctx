@@ -15,7 +15,7 @@ import type { ProjectDetail } from "../../shared/contracts/project.ts";
 import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { LATEST_FILES } from "../../shared/knowledge.ts";
-import { RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
+import { isRecord, RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import { accessChanged, type BusEvent } from "../lib/bus.ts";
@@ -28,7 +28,6 @@ import { metadataRoutes } from "./metadata.ts";
 import {
   parseAddMember,
   parseCreateProject,
-  parseUpdateOwnProject,
   parseUpdateProject,
 } from "./parse.ts";
 import {
@@ -214,10 +213,24 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/projects/:id",
       policy: "admin",
       async handle(req, ctx) {
-        findTeam(ctx.params.id);
-        const change = parseUpdateProject(await jsonBody(req));
+        // a personal project's backend is an admin's too, and nothing else
+        // of it is: any other field, a bad one included, is a 404 there
+        const editable = (body: unknown): ProjectRow => {
+          const project = deps.store.byId(ctx.params.id);
+          const backendOnly =
+            isRecord(body) &&
+            Object.keys(body).every((field) => field === "backend");
+          if (project === null || (project.kind !== "team" && !backendOnly)) {
+            throw new NotFound("no such project");
+          }
+          return project;
+        };
+        editable({});
+        const sent = await jsonBody(req);
+        editable(sent);
+        const change = parseUpdateProject(sent);
         const project = transact(deps.db, () => {
-          const current = findTeam(ctx.params.id);
+          const current = editable(sent);
           let updated: ProjectRow | null = current;
           let events: BusEvent[] = [];
           if (change.name !== undefined || change.description !== undefined) {
@@ -241,21 +254,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           return { result: detail(updated), events };
         });
         const body: ProjectResponse = { project };
-        return json(body);
-      },
-    },
-    {
-      // the caller's own personal project, whoever they are
-      method: "PATCH",
-      path: "/api/profile/project",
-      policy: "authenticated",
-      async handle(req, ctx) {
-        const { backend } = parseUpdateOwnProject(await jsonBody(req));
-        const own = deps.store.personal(ctx.principal!.userId);
-        if (own === null) throw new NotFound("no personal project");
-        const updated = deps.store.setBackend(own.id, backend);
-        if (updated === null) throw new NotFound("no personal project");
-        const body: ProjectResponse = { project: detail(updated) };
         return json(body);
       },
     },
