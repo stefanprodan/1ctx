@@ -81,7 +81,7 @@ export const POLICY: SandboxPolicy = {
 // a source run or a dev build runs the dev tag
 export function defaultImage(version: string): string {
   const release =
-    /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/.test(version) &&
+    /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) &&
     !version.startsWith("v0.0.0");
   return `ghcr.io/stefanprodan/1ctx-shell:${release ? version : "dev"}`;
 }

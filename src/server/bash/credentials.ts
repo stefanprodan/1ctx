@@ -171,8 +171,8 @@ const ALNUM = /[A-Za-z0-9]/;
 const UNRESERVED = /[A-Za-z0-9._~-]/;
 
 // a key as JSON encoders write it: `/` as `\/`, and the characters
-// they escape as \uXXXX in either case, so an API echoing it escaped
-// is caught too
+// they escape as \uXXXX in either case, and as a URL encodes it, its
+// hex in either case, so an API echoing it escaped is caught too
 export function escapedForms(key: string): string[] {
   const forms = new Set([key]);
   const hex = (char: string, upper: boolean) => {
@@ -201,6 +201,12 @@ export function escapedForms(key: string): string[] {
       forms.add(encode(slash, UNRESERVED, upper, false));
       forms.add(encode(slash, ALNUM, upper, false));
     }
+  }
+  // a lone surrogate has no URL form, and no URL carries it
+  if (key.isWellFormed()) {
+    const percent = encodeURIComponent(key);
+    forms.add(percent);
+    forms.add(percent.replace(/%[0-9A-F]{2}/g, (hex) => hex.toLowerCase()));
   }
   return [...forms];
 }

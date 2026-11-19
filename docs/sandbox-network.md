@@ -51,8 +51,9 @@ what the bash tool's description shares with it.
   which OpenShell's supervisor puts in every new exec's environment.
   `Authorization` takes any template (bearer style); another header
   only a template that is the key alone. A `Cookie`, a template with
-  words around the key in another header, a prefix with a glob
-  character or `%`, a prefix whose host is a pattern (`*`) or an IPv6
+  words around the key in another header, a header or template holding
+  `$`, a backtick, `"` or `\` (the description double-quotes it, so the
+  variable expands), a prefix with a glob character or `%`, a prefix whose host is a pattern (`*`) or an IPv6
   literal, a variable two names share, and every refusal
   `commandCredentials()` makes are not attached; each send's first
   command names them in its notice.
@@ -66,11 +67,11 @@ what the bash tool's description shares with it.
   response. The mount scrubs the output before its cut; `scrub.ts`
   replaces every key the send read, with `escapedForms()`, in the
   pulled files before they commit and in open's copies. A doc or
-  scratch name holding one, in any of those forms, saves nothing and
-  recycles.
+  scratch name or an opened path holding one, in any of those forms,
+  saves nothing and recycles.
 - **Providers go with their last sandbox.** One no lease uses is
   deleted once its sandbox's delete is observed (it cannot go while
-  attached), then its profile once no provider of any manager uses it,
+  attached; a failed delete is asked again after 5 and 15 s), then its profile once no provider of any manager uses it,
   one still attaching included. The sweeps keep providers and profiles
   a lease of any manager uses and delete the rest of the instance's,
   each asked again right before its delete under the attach's lock:

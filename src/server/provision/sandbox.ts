@@ -64,8 +64,10 @@ function orNull<T>(
   };
 }
 
+// what the route refuses within one document, before anything is
+// written; a field left out is the row's, which only the route reads
 export function sandboxSpec(value: unknown): SandboxSpec {
-  return optionalSpec<SandboxSpec>(value, {
+  const spec = optionalSpec<SandboxSpec>(value, {
     shell: guarded(isSandboxShell, "must be builtin or sandbox"),
     endpoint: orNull(
       isGatewayEndpoint,
@@ -75,6 +77,13 @@ export function sandboxSpec(value: unknown): SandboxSpec {
     network: guarded(isSandboxNetwork, "must be off or hosts"),
     hosts,
   });
+  if (spec.network === "hosts" && spec.hosts?.length === 0)
+    throw new BadRequest("spec.hosts: the hosts network needs a host at least");
+  if (spec.shell === "sandbox" && spec.endpoint === null)
+    throw new BadRequest(
+      "spec.endpoint: the sandbox shell needs a gateway endpoint",
+    );
+  return spec;
 }
 
 // offline: the sandbox shell needs the gateway's three key files

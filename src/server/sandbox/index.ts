@@ -92,6 +92,9 @@ export type Sandbox = {
   leases(): Leases | null;
   // at start: the leases made and an earlier process's sandboxes swept
   start(): Promise<void>;
+  // the limits were saved: a command at the cap and the warm pool look
+  // again
+  poke(): void;
   // timers stopped and the bus left; sandboxes stay for the next sweep
   close(): void;
   // every command's put-back after its commit ended, for a test
@@ -239,6 +242,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       current.started ??= current.leases.start();
       await current.started;
     },
+    poke: () => current?.leases.poke(),
     idle: () => commands.idle(),
     close() {
       running = false;

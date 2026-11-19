@@ -163,14 +163,21 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   bind does not follow it.
 - **The warm pool refills in the background** to `sandboxWarm`, never
   past the cap or while a command waits for room, and again when an
-  acquire ends; a failed create waits 30 s.
+  acquire ends; a failed create waits 30 s (`pool.ts`). A save of the
+  limits wakes the commands waiting at the cap and deletes the warm
+  sandboxes past a lowered `sandboxWarm`.
 - **At start, every sandbox, then provider, under the instance label
-  that no lease holds is deleted.** A sweep that cannot list marks the
-  gateway lost, so the next probe that answers sweeps. A manager the
+  that no lease holds is deleted.** A command waits, at most to its
+  deadline, until the start sweep has listed and recorded them, so they
+  count against the cap. A sweep that cannot list the
+  sandboxes, providers or profiles marks the gateway lost, so the next
+  probe that answers sweeps. A manager the
   settings moved off (retired) leases nothing, refuses the commands
   waiting in it, keeps its held sandboxes, which no other manager's
   sweep takes, and deletes each as its command ends, retries included.
-  A stuck one it lets go, trees and all, to the next sweep. It closes
+  A stuck one it keeps, trees and phase checks included, until the
+  gateway forgets it, since the replacement's start sweep skipped it
+  while it was deleting; a later sweep asks its delete again. It closes
   its client once no record is left and its providers' deletes ended.
 - **A gateway restart drops every lease** (`watch.ts`). A probe lists
   the labelled sandboxes every 30 s: a failure, then a success, is a
@@ -220,7 +227,9 @@ sizes of when it was made. No limit of ours bounds its disk (below).
 - **The command runs through the wrapper** with a fresh 128-bit id and
   `SANDBOX_ENV`, as every exec of ours, since OpenShell passes none of
   the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH`, uv's
-  and bun's, nothing secret. Each of stdout and stderr keeps `ioBytes`; the
+  and bun's, nothing secret. Each of stdout and stderr keeps four
+  bytes a character of the result cut plus the longest form of a key
+  the send read, so a key the cut crosses is whole for the scrub; the
   rest is drained. At `job.endsAt` the exec is stopped and the answer
   is exit 124.
 - **An exec the gateway answers `sandbox is not ready` or unavailable**
@@ -229,7 +238,8 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   spares pid 1 and the keep-alive by pid and start time (read at
   create). A process whose leader is a zombie is alive while any of its
   threads is not. The walk's bounds are the caps or what the pushed trees held,
-  whichever is more, plus 8 MiB a tree. A file whose hash differs from
+  whichever is more, plus 8 MiB a tree; a doc counts as
+  `MAX_KNOWLEDGE_SEGMENTS` entries, its folders and itself. A file whose hash differs from
   the baseline is pulled and its hash checked; an unchanged one reads
   its bytes from the job. `/uploads` and `/mcp` are only compared. The
   pull goes in batches of paths, each exec's stdin under 1,000 KiB; the
@@ -238,7 +248,10 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   that is not UTF-8 saves nothing and recycles.
 - **The records are hostile.** The cwd record and open's copies are
   pulled with the changed files, the cwd and each opened path within a
-  path's bound (8 KiB, escaped three times over), never a file's: a
+  path's bound (8 KiB, escaped three times over) and each copy within
+  what open reads (the larger file cap of docs and repositories), never
+  a tree's file bound; an opened path naming a key, read unescaped,
+  saves nothing and recycles. A
   missing or non-UTF-8 cwd keeps the start, open's copies are made again with `openedRecord()` for
   `checkOpened()`, and a subagent's are never read. After each command
   the records folder is emptied, its contents only and no link

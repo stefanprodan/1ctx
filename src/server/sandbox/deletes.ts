@@ -22,7 +22,7 @@ export const STUCK_CHECK_MS = 5 * MINUTE_MS;
 // a delete that failed, not one past its timeout, is asked again after
 // this, then three and nine times this, then it is stuck
 export const DELETE_RETRY_MS = 5_000;
-const DELETE_TRIES = 3;
+export const DELETE_TRIES = 3;
 
 export type DeletesDeps = {
   clock: Clock;
@@ -32,9 +32,7 @@ export type DeletesDeps = {
   cuts: Cuts;
   // shut down: no retry and no phase check
   closed(): boolean;
-  // the settings moved off: no stuck record is kept
-  draining(): boolean;
-  // a record went, its delete observed or handed to a sweep
+  // a record went, its delete observed
   forgot(): void;
   // a delete ended, either way
   ended(): void;
@@ -99,10 +97,9 @@ export class Deletes {
         sandbox: lease.name,
         ...errorFields(error, false),
       });
-      // a drained manager keeps no stuck one: unheld, it is the next
-      // sweep's of whichever manager serves the gateway
-      if (this.deps.draining()) this.forget(lease);
-      else await this.stuck(lease);
+      // kept, a drained manager's too, until the gateway forgets it: a
+      // sweep that already ran would never see it again
+      await this.stuck(lease);
     } finally {
       cancel();
     }

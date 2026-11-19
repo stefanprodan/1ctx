@@ -21,7 +21,7 @@ import {
   SANDBOX_ENV,
   type SandboxHold,
 } from "../../../src/server/sandbox/index.ts";
-import { rejection } from "../../helpers/async.ts";
+import { rejection, settle } from "../../helpers/async.ts";
 import { fakeClock, fakeGateway, until } from "../../helpers/sandbox.ts";
 
 const INSTANCE = "a1b2c3d4e5f6";
@@ -252,6 +252,66 @@ describe("sandbox leases", () => {
     t.leases.close();
   });
 
+  test("a lowered sandboxWarm deletes the warm sandboxes past it", async () => {
+    const t = setup({ sandboxWarm: 2 });
+    await t.leases.start();
+    await until(
+      () => t.leases.rows().filter((row) => row.state === "warm").length === 2,
+    );
+    t.limits.sandboxWarm = 0;
+    t.leases.poke();
+    await until(() => t.leases.rows().length === 0);
+    expect(t.fake.deletes).toHaveLength(2);
+    t.leases.close();
+  });
+
+  test("a raised cap admits a command waiting at it", async () => {
+    const t = setup({ sandboxesMax: 1 });
+    await t.acquire("a");
+    const b = t.acquire("b");
+    await settle();
+    expect(t.fake.creates).toHaveLength(1);
+    t.limits.sandboxesMax = 2;
+    t.leases.poke();
+    await b;
+    expect(t.fake.creates).toHaveLength(2);
+  });
+
+  test("a command waits for the start sweep to count what an earlier run left", async () => {
+    const t = setup({ sandboxesMax: 1 });
+    t.fake.seed("1ctx-left-over", { [INSTANCE_LABEL]: INSTANCE });
+    const resume = t.fake.pause("list");
+    const started = t.leases.start();
+    await until(() => t.fake.paused === 1);
+    const got = t.acquire("chat");
+    await settle();
+    expect(t.fake.creates).toHaveLength(0);
+    resume();
+    // the leftover counts against the cap, so its delete comes first
+    const hold = await got;
+    expect(t.fake.deletes).toEqual(["1ctx-left-over"]);
+    expect(t.fake.creates.map((spec) => spec.name)).toEqual([hold.sandbox]);
+    await started;
+    t.leases.close();
+  });
+
+  test("a command's wait for the start sweep ends at its deadline", async () => {
+    const t = setup();
+    t.fake.pause("list");
+    void t.leases.start();
+    await until(() => t.fake.paused === 1);
+    const got = t.leases.acquire(
+      t.call("chat"),
+      t.time.now() + 5_000,
+      new AbortController().signal,
+    );
+    await until(() => t.time.sleeping().includes(t.time.now() + 5_000));
+    t.time.advance(5_000);
+    expect(await got).toBe("busy");
+    expect(t.fake.creates).toHaveLength(0);
+    t.leases.close();
+  });
+
   test("at the cap a warm sandbox goes before an idle one", async () => {
     const t = setup({ sandboxesMax: 2, sandboxWarm: 1 });
     await t.leases.start();
@@ -435,6 +495,19 @@ describe("sandbox leases", () => {
     t.fake.unfail("list");
     t.time.advance(HEALTH_MS);
     await until(() => t.fake.deletes.includes("1ctx-leftover0000"));
+    t.leases.close();
+  });
+
+  test("a start sweep that could not list providers runs at the next probe", async () => {
+    const t = setup();
+    t.fake.providers.set("1ctx-left-provider", { [INSTANCE_LABEL]: INSTANCE });
+    t.fake.fail("providerList");
+    await t.leases.start();
+    expect(t.fake.providerDeletes).toEqual([]);
+    t.fake.unfail("providerList");
+    // the first probe that lists finds the gateway lost, so it sweeps
+    t.time.advance(HEALTH_MS);
+    await until(() => t.fake.providerDeletes.includes("1ctx-left-provider"));
     t.leases.close();
   });
 

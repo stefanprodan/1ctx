@@ -177,6 +177,7 @@ function jobOf(
       knowledgeFileBytes: limits.knowledgeFileBytes,
       mountBytes: 64 << 20,
       ioBytes: 1 << 20,
+      resultCut: 50_000,
       iterations: 10_000,
       knowledge: docs.map(([name, doc]) => ({
         name,
@@ -564,17 +565,22 @@ async function cleanup() {
   const labels = { [INSTANCE_LABEL]: instanceId };
   const deadline = Date.now() + 120_000;
   for (;;) {
+    // a failed list is asked again, never read as nothing left
     const left = await real
       .list(labels, AbortSignal.timeout(10_000))
-      .catch(() => []);
-    if (left.length === 0) break;
+      .catch(() => null);
+    if (left?.length === 0) break;
     if (Date.now() > deadline) {
-      console.log(
-        `FAIL cleanup: ${left.map((s) => s.name).join(", ")} still listed`,
+      report(
+        "cleanup",
+        false,
+        left === null
+          ? "the sandboxes could not be listed"
+          : `${left.map((s) => s.name).join(", ")} still listed`,
       );
       return;
     }
-    for (const box of left)
+    for (const box of left ?? [])
       await real.delete(box.name, AbortSignal.timeout(10_000)).catch(() => {});
     await Bun.sleep(1000);
   }

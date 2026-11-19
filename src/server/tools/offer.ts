@@ -51,6 +51,7 @@ import type {
   MemoryScope,
   Offered,
   OfferedCredential,
+  OfferedShell,
   Tool,
   ToolResult,
 } from "./types.ts";
@@ -86,6 +87,8 @@ type OfferDeps = {
   externalTaskOn?(): boolean;
   // the sandbox shell runs the next command
   sandbox?(): boolean;
+  // how long a sandbox command may run
+  commandSeconds?(): number | undefined;
   toolsFor(
     search: SearchProvider | null,
     hosts: readonly string[],
@@ -97,6 +100,7 @@ type OfferDeps = {
     chatMain?: boolean,
     // the send's own deadline, which a command's time never passes
     deadlineMs?: number | null,
+    shell?: OfferedShell,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
@@ -383,6 +387,8 @@ export function offered(
   }
   const skills = { block: skillCatalog.text, skills: agentSkills };
   const sandbox = deps.sandbox?.() === true;
+  // read once, so the description and every dispatch agree
+  const commandSeconds = sandbox ? deps.commandSeconds?.() : undefined;
   const baseTools = fillYear(
     [
       ...deps
@@ -396,6 +402,10 @@ export function offered(
           subagent,
           chatSend && !subagent,
           scope?.deadlineMs ?? null,
+          {
+            sandbox,
+            ...(commandSeconds === undefined ? {} : { commandSeconds }),
+          },
         )
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
@@ -464,5 +474,6 @@ export function offered(
     credentials: credentials.offered,
     credentialsOff: credentials.off,
     ...(sandbox ? { sandbox: true as const } : {}),
+    ...(commandSeconds === undefined ? {} : { commandSeconds }),
   };
 }

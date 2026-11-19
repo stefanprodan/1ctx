@@ -21,6 +21,7 @@ import {
   type PrefixGlob,
   placement,
   prefixGlob,
+  quotable,
 } from "./rules.ts";
 
 // OpenShell's NetworkEnforcementMode.ENFORCE: unset is audit, which
@@ -234,6 +235,8 @@ function refusal(
     return `${REFUSALS[credential.refused]}, so it is not attached`;
   if (placement(credential.header, credential.template) === null)
     return `goes in a ${credential.header} header the sandbox cannot fill, so it is not attached`;
+  if (!quotable(credential.header, credential.template))
+    return 'has a header or template with $, `, " or \\, which the shell would read, so it is not attached';
   if (prefixGlob(credential.prefix) === null)
     return "has a prefix the sandbox cannot match, so it is not attached";
   const other = envs.get(envName(credential.name));

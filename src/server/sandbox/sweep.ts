@@ -32,10 +32,13 @@ export type SweepDeps = {
   // recorded as deleting, so it counts against the cap until its delete
   // is observed; settles when that delete ended
   adopt(name: string, phase: SandboxPhase): Promise<void>;
+  // the listed sandboxes are recorded, their deletes begun
+  counted?(): void;
 };
 
 // globalPolicy null when the gateway could not say; listed false when
-// its sandboxes could not be listed, so nothing was swept
+// its sandboxes, providers or profiles could not be listed, so what was
+// not listed is swept again
 export async function sweepLabelled(
   deps: SweepDeps,
   when: "start" | "restart",
@@ -52,20 +55,19 @@ export async function sweepLabelled(
   const deletes = found
     .filter((info) => !deps.held(info.name))
     .map((info) => deps.adopt(info.name, info.phase));
+  deps.counted?.();
   await Promise.all(deletes);
-  const providers =
-    (await ask(clock, log, STEP_MS, (signal) =>
-      gateway.providers.list(labels, signal),
-    )) ?? [];
+  const providers = await ask(clock, log, STEP_MS, (signal) =>
+    gateway.providers.list(labels, signal),
+  );
   let removed = 0;
-  for (const name of providers) {
+  for (const name of providers ?? []) {
     if (await deps.dropProvider(name)) removed++;
   }
-  const profiles =
-    (await ask(clock, log, STEP_MS, (signal) =>
-      gateway.providers.profiles(labels, signal),
-    )) ?? [];
-  for (const id of profiles) await deps.dropProfile(id);
+  const profiles = await ask(clock, log, STEP_MS, (signal) =>
+    gateway.providers.profiles(labels, signal),
+  );
+  for (const id of profiles ?? []) await deps.dropProfile(id);
   if (deletes.length > 0 || removed > 0) {
     log.info("sandboxes swept", {
       when,
@@ -73,7 +75,7 @@ export async function sweepLabelled(
       providers: removed,
     });
   }
-  return { globalPolicy, listed: true };
+  return { globalPolicy, listed: providers !== null && profiles !== null };
 }
 
 // probes a cut create is looked for: one lands within seconds

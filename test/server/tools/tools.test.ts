@@ -531,3 +531,59 @@ describe("skill tools from the required skills port", () => {
     }
   });
 });
+
+describe("bash at dispatch", () => {
+  test("keeps the shell and command time it was offered with", async () => {
+    let seconds = 900;
+    let shell: { mode: "hosts"; hosts: string[] } | null = {
+      mode: "hosts",
+      hosts: ["pypi.test"],
+    };
+    const seen: object[] = [];
+    const tools = toolsArea({
+      db: memoryDb(),
+      fetcher: (async () => {
+        throw new Error("no network in this test");
+      }) as unknown as typeof fetch,
+      secret: () => null,
+      clock: () => now,
+      log: silent,
+      render: (md) => md,
+      skills: skillsPort(),
+      bash: {
+        async run(_p, _w, _a, _c, caps) {
+          seen.push(caps);
+          return { content: "ok", error: false };
+        },
+        sandbox: () => shell,
+        sandboxCommandSeconds: () => seconds,
+      },
+    });
+    const offered = tools.offered(now, "");
+    const bash = offered.tools.find((tool) => tool.name === "bash");
+    expect(bash?.description).toContain("A command may run up to 15 minutes.");
+    // the limit and the shell move after the offer
+    seconds = 60;
+    shell = null;
+    const ctx = {
+      ...context(),
+      actor: {
+        projectId: "project",
+        userId: "user",
+        agentId: "agent",
+        agentName: "coder",
+        sessionId: "session",
+        workspace: { id: "session", sessionId: "session" },
+        origin: "chat" as const,
+      },
+    };
+    await tools.run(
+      offered,
+      { id: "call_1", name: "bash", arguments: '{"command":"ls"}' },
+      ctx,
+    );
+    expect(seen).toEqual([
+      expect.objectContaining({ sandboxCommandMs: 900_000 }),
+    ]);
+  });
+});

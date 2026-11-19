@@ -93,8 +93,8 @@ that shell that shows a file on the chat page.
   its own output; the worker is ended `BACKSTOP_MS` later, and the tool
   registry waits half a second past that (`graceMs`).
 - **A sandbox command has `sandboxCommandSeconds` instead.** The tool
-  built under the sandbox shell sets it as its registry timeout and
-  passes it as `sandboxCommandMs`; the mount picks the shell first and
+  offered under the sandbox shell sets it as its registry timeout and
+  passes it as `sandboxCommandMs`, at dispatch too; the mount picks the shell first and
   uses it for the deadline, the backstop and the queues only when the
   shell says `sandboxTimeout`. The built-in shell keeps the call
   timeout. The send's deadline still ends any command, by its signal.
@@ -166,7 +166,7 @@ that shell that shows a file on the chat page.
   whole key. A signed request's 206 answer is refused too. Unsigned
   requests send them all. Keys ride only in the command caps.
 - **A key never reaches the result.** Every key read, and its
-  JSON-escaped forms (`escapedForms()`), is replaced by `[credential
+  JSON-escaped and URL-encoded forms (`escapedForms()`), is replaced by `[credential
   <name>]` in body, header values, status text, final URL and errors.
   Header names containing a key, case-insensitively, are dropped.
   Redirect history is kept, with the same rules on every hop's status

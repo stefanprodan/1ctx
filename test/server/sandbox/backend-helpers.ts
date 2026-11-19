@@ -43,7 +43,7 @@ export type Rows = {
   uploadsRevision?: number;
   kept?: Record<string, string>;
   subagent?: boolean;
-  ioBytes?: number;
+  resultCut?: number;
   visuals?: boolean;
   // the sandbox network the command runs under, off when not given
   net?: SandboxNet;
@@ -105,7 +105,8 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
       cwd: rows.cwd ?? "/knowledge",
       knowledgeFileBytes: limits.knowledgeFileBytes,
       mountBytes: 1 << 26,
-      ioBytes: rows.ioBytes ?? 1 << 20,
+      ioBytes: 1 << 20,
+      resultCut: rows.resultCut ?? limits.resultCut,
       iterations: 1000,
       knowledge: knowledge.map(([name, text]) => ({
         name,

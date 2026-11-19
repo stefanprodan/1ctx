@@ -31,12 +31,7 @@ import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import {
-  type Mcp,
-  NO_OFFER,
-  type OfferedMcpTool,
-  type OfferedServer,
-} from "../mcp/index.ts";
+import type { OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { type AgentEmailDeps, agentEmails } from "./agent-email.ts";
@@ -46,7 +41,11 @@ import {
   type AutomationsPort,
   makeAutomationTool,
 } from "./builtin/automation.ts";
-import { type CredentialKeysPort, makeBashTool } from "./builtin/bash.ts";
+import {
+  type CredentialKeysPort,
+  makeBashTool,
+  offeredShell,
+} from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
 import {
   DELEGATE_TOOL,
@@ -62,8 +61,10 @@ import {
 import {
   asMcpCall,
   checkMcpArguments,
+  type McpPort,
   makeMcpCatalogTools,
   mcpCallName,
+  NO_MCP,
   resolveMcpCall,
 } from "./builtin/mcp.ts";
 import { runMemory } from "./builtin/memory.ts";
@@ -91,6 +92,7 @@ import { ToolStore } from "./store.ts";
 import type {
   MemoryScope,
   Offered,
+  OfferedShell,
   Tool,
   ToolContext,
   ToolResult,
@@ -144,10 +146,7 @@ export type ToolsDeps = {
   log: Log;
   render: (markdown: string) => string;
   skills: SkillsPort;
-  mcp?: Pick<
-    Mcp,
-    "offered" | "offeredSides" | "switchable" | "call" | "validateArguments"
-  >;
+  mcp?: McpPort;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
   bash?: BashToolPort;
   // the project's credentials for a send, and each row and key again at
@@ -210,15 +209,7 @@ const MCP_BACKSTOP_MS = 1000;
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
   const skillStore: SkillsPort = deps.skills;
-  const mcpService = deps.mcp ?? {
-    switchable: () => [],
-    offered: () => NO_OFFER,
-    offeredSides: () => NO_OFFER,
-    async call() {
-      throw new Error("MCP is not configured");
-    },
-    validateArguments: () => null,
-  };
+  const mcpService = deps.mcp ?? NO_MCP;
   const searchDeps: SearchDependencies = deps.searchDeps ?? {
     fetch: deps.fetcher,
     sleep: abortableSleep,
@@ -248,6 +239,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     subagent = false,
     chatMain = false,
     deadlineMs: number | null = null,
+    shell?: OfferedShell,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
@@ -273,6 +265,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       docs: knowledge,
       subagent,
       deadlineMs,
+      ...offeredShell(deps.bash, shell),
     }),
   ];
 
@@ -387,6 +380,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           automationOn,
           externalTaskOn,
           sandbox: () => (deps.bash?.sandbox?.() ?? null) !== null,
+          commandSeconds: () => deps.bash?.sandboxCommandSeconds?.(),
           toolsFor,
           log: deps.log,
         },
@@ -454,6 +448,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           },
           offered.subagent,
           offered.chatMain === true,
+          null,
+          offered,
         )
           .filter((tool) => allowed.has(tool.name))
           .map((tool) =>

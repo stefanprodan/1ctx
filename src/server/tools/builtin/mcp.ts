@@ -4,10 +4,32 @@
 import { toolArguments } from "../../../shared/contracts/tool.ts";
 import { isRecord } from "../../../shared/words.ts";
 import { ToolError } from "../../lib/errors.ts";
-import type { Mcp, OfferedMcpTool, OfferedServer } from "../../mcp/index.ts";
+import {
+  type Mcp,
+  NO_OFFER,
+  type OfferedMcpTool,
+  type OfferedServer,
+} from "../../mcp/index.ts";
 import type { ToolCall } from "../../providers/index.ts";
 import { parsedArgs } from "../registry.ts";
 import type { Tool } from "../types.ts";
+
+// what the tools ask of MCP; without a service nothing is offered and a
+// call is refused
+export type McpPort = Pick<
+  Mcp,
+  "offered" | "offeredSides" | "switchable" | "call" | "validateArguments"
+>;
+
+export const NO_MCP: McpPort = {
+  switchable: () => [],
+  offered: () => NO_OFFER,
+  offeredSides: () => NO_OFFER,
+  async call() {
+    throw new Error("MCP is not configured");
+  },
+  validateArguments: () => null,
+};
 
 function flat(servers: OfferedServer[]): OfferedMcpTool[] {
   return servers.flatMap((server) => server.tools);

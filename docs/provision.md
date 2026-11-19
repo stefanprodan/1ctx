@@ -76,8 +76,10 @@ they name.
   hosts being the defaults. Validation refuses an endpoint that is not
   an https origin, a host the sandbox does not take
   (`docs/sandbox.md`) and, for `shell: sandbox`, a missing
-  `openshell-gateway-ca`, `-cert` or `-key` file; the save refuses the
-  sandbox shell without an endpoint. Hosts compare as the sorted list a
+  `openshell-gateway-ca`, `-cert` or `-key` file. Within one document it
+  refuses what the save would, `network: hosts` with no host and
+  `shell: sandbox` with a null endpoint; the save refuses the same
+  against the row's other fields. Hosts compare as the sorted list a
   save stores.
 
 - **An `Agent` is matched by name among live agents.** One naming a

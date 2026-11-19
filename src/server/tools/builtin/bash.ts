@@ -19,8 +19,14 @@ import {
   placeholderValue,
   placement,
   prefixGlob,
+  quotable,
 } from "../../sandbox/rules.ts";
-import type { OfferedCredential, Tool, ToolResult } from "../types.ts";
+import type {
+  OfferedCredential,
+  OfferedShell,
+  Tool,
+  ToolResult,
+} from "../types.ts";
 import { domainWords } from "../web.ts";
 import { durationWords } from "./automation-text.ts";
 
@@ -95,6 +101,7 @@ function sandboxCredentialWords(
     .filter(
       (credential) =>
         placement(credential.header, credential.template) !== null &&
+        quotable(credential.header, credential.template) &&
         prefixGlob(credential.prefix) !== null,
     )
     .map(
@@ -211,6 +218,21 @@ export type BashToolOptions = {
   // the send's deadline: the words never promise a command more
   deadlineMs?: number | null;
 };
+
+// the shell a description was offered for, never one moved since;
+// bash's own word when none is given
+export function offeredShell(
+  bash: BashToolPort | undefined,
+  shell: OfferedShell | undefined,
+): Pick<BashToolOptions, "sandbox" | "commandSeconds"> {
+  if (shell === undefined) return {};
+  return {
+    sandbox: shell.sandbox === true ? (bash?.sandbox?.() ?? NO_NET) : null,
+    ...(shell.commandSeconds === undefined
+      ? {}
+      : { commandSeconds: shell.commandSeconds }),
+  };
+}
 
 // the limits' defaults, for a tool built without bash's word
 const COMMAND_SECONDS = 600;

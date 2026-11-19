@@ -263,6 +263,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     cores: options.cores ?? availableParallelism(),
     wake,
+    // a closure: the sandbox area is built later
+    saved: () => sandbox.poke(),
   });
   const usage = usageArea({
     db,

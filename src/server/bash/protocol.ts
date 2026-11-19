@@ -40,6 +40,8 @@ export type Job = {
   knowledgeFileBytes: number;
   mountBytes: number;
   ioBytes: number;
+  // the characters a result shows, which the sandbox sizes its output by
+  resultCut: number;
   // the cap on commands and on each loop, awk, sed and jq iteration
   iterations: number;
   knowledge: MountFile[];

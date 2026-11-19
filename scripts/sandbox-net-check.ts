@@ -225,6 +225,7 @@ async function command(
       knowledgeFileBytes: limits.knowledgeFileBytes,
       mountBytes: 64 << 20,
       ioBytes: 1 << 20,
+      resultCut: 50_000,
       iterations: 10_000,
       knowledge: [],
       scratch: [...scratch].map(([name, file]) => ({
@@ -687,37 +688,52 @@ async function cleanup() {
   leases.drain();
   const deadline = Date.now() + 120_000;
   for (;;) {
+    // a failed list is asked again, never read as nothing left
     const left = await real
       .list(labels, AbortSignal.timeout(10_000))
-      .catch(() => []);
-    if (left.length === 0) break;
+      .catch(() => null);
+    if (left?.length === 0) break;
     if (Date.now() > deadline) {
-      console.log(
-        `FAIL cleanup: ${left.map((s) => s.name).join(", ")} still listed`,
+      report(
+        "cleanup",
+        false,
+        left === null
+          ? "the sandboxes could not be listed"
+          : `${left.map((s) => s.name).join(", ")} still listed`,
       );
       return;
     }
-    for (const box of left)
+    for (const box of left ?? [])
       await real.delete(box.name, AbortSignal.timeout(10_000)).catch(() => {});
     await Bun.sleep(1000);
   }
   // a provider goes once no sandbox names it, then its profile
-  for (let tries = 0; tries < 10; tries++) {
+  for (let tries = 0; ; tries++) {
     const providers = await real.providers
       .list(labels, AbortSignal.timeout(10_000))
-      .catch(() => []);
-    for (const name of providers)
+      .catch(() => null);
+    for (const name of providers ?? [])
       await real.providers
         .delete(name, AbortSignal.timeout(10_000))
         .catch(() => {});
     const profiles = await real.providers
       .profiles(labels, AbortSignal.timeout(10_000))
-      .catch(() => []);
-    for (const id of profiles)
+      .catch(() => null);
+    for (const id of profiles ?? [])
       await real.providers
         .deleteProfile(id, AbortSignal.timeout(10_000))
         .catch(() => {});
-    if (providers.length === 0 && profiles.length === 0) break;
+    if (providers?.length === 0 && profiles?.length === 0) break;
+    if (tries === 9 || Date.now() > deadline) {
+      report(
+        "cleanup",
+        false,
+        providers === null || profiles === null
+          ? "the providers or profiles could not be listed"
+          : `${[...providers, ...profiles].join(", ")} still listed`,
+      );
+      return;
+    }
     await Bun.sleep(1000);
   }
   console.log(

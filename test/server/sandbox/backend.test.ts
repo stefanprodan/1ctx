@@ -12,6 +12,7 @@ import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { manifestOf, wantedOf } from "../../../src/server/sandbox/baseline.ts";
 import { walkBounds } from "../../../src/server/sandbox/bounds.ts";
 import { SandboxUnavailable } from "../../../src/server/sandbox/gateway.ts";
+import { MAX_KNOWLEDGE_SEGMENTS } from "../../../src/shared/words.ts";
 import { answerOf, bytes, pushes, setup } from "./backend-helpers.ts";
 
 // a command that runs until its exec is stopped
@@ -444,10 +445,10 @@ describe("the sandbox backend", () => {
     expect(await t.settled(ran.hold)).not.toBe("idle");
   });
 
-  test("output keeps ioBytes of each stream and drains the rest", async () => {
+  test("output keeps four bytes a result character of each stream and drains the rest", async () => {
     const t = setup();
     const ran = await t.run(
-      { ...ROWS, ioBytes: 4 },
+      { ...ROWS, resultCut: 1 },
       { stdout: "abcdefgh", stderr: "123456" },
     );
     expect(answerOf(ran.settled)).toMatchObject({
@@ -558,6 +559,16 @@ describe("the walk's bounds", () => {
     expect(big.limits.totalBytes - small.limits.totalBytes).toBe(5000 - 100);
     // scratch is not the walk's: its caps never move the bounds
     expect(walkBounds({ ...caps, scratchBytes: 1 << 26 }, null)).toEqual(small);
+    // a doc counts its folders too, at the most segments a name holds
+    const docs = {
+      ...caps,
+      knowledgeFiles: 10,
+      uploadFiles: 0,
+      mcpKeptFiles: 0,
+    };
+    expect(walkBounds(docs, null).limits.entries).toBe(
+      10 * MAX_KNOWLEDGE_SEGMENTS + 64,
+    );
   });
 
   test("a walk past them recycles, and a tree over a lowered cap still shrinks", async () => {

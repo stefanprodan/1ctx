@@ -196,4 +196,10 @@ export type Offered = {
   // the sandbox shell ran bash when the send began: each /tmp is its
   // sandbox's, so a subagent's never passes to or from its parent's
   sandbox?: true;
+  // a sandbox command's time as bash's description offered it, which a
+  // dispatch keeps though the limit moved since
+  commandSeconds?: number;
 };
+
+// the shell bash's description was made for, kept for its dispatch
+export type OfferedShell = { sandbox?: boolean; commandSeconds?: number };

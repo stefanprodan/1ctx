@@ -26,6 +26,12 @@ export function placement(header: string, template: string): Placement | null {
     : null;
 }
 
+// The description quotes the header in double quotes, so the variable
+// expands; a `$`, backtick, `"` or `\` of its own would expand or end
+// them, and such a credential is not attached.
+export const quotable = (header: string, template: string) =>
+  !/[$`"\\]/.test(header + template.replace(KEY_PLACEHOLDER, ""));
+
 // the header value the agent sends, the variable in the key's place
 export const placeholderValue = (template: string, name: string) =>
   template.replace(KEY_PLACEHOLDER, () => `$${envName(name)}`);

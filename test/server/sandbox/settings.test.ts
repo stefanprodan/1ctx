@@ -332,6 +332,10 @@ describe("sandbox settings", () => {
     expect(defaultImage("v1.2.3-rc.1")).toBe(
       "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-rc.1",
     );
+    // a hyphen inside the prerelease, as the release workflow allows
+    expect(defaultImage("v1.2.3-rc-hotfix")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-rc-hotfix",
+    );
     expect(defaultImage("v0.0.0-dev")).toBe(
       "ghcr.io/stefanprodan/1ctx-shell:dev",
     );

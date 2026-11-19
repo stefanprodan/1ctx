@@ -100,6 +100,43 @@ describe("the sandbox's read back refuses", () => {
     }
   });
 
+  test("an opened path holding a key its escaped record hid", async () => {
+    // the record escapes the space but keeps the colon, a URL's form the
+    // other way round, so only the path it names shows the key
+    const key = "made:up key-0123456789abcdef";
+    const t = setup();
+    const ran = await t.run(
+      {
+        ...ROWS,
+        net,
+        credentials: [{ ...credential, key, value: `Bearer ${key}` }],
+      },
+      { opened: [{ path: `/tmp/got-${key}`, text: "t" }] },
+    );
+    const answer = answerOf(ran.settled);
+    expect(answer.changes).toBeNull();
+    expect(answer.refused).toBe(
+      "a file name held a credential, so nothing was saved",
+    );
+    expect(JSON.stringify(answer)).not.toContain(key);
+    ran.settle({ landed: false, why: "skipped" });
+    expect(await t.settled(ran.hold)).not.toBe("idle");
+  });
+
+  test("an opened copy past what open reads, under a tree's larger bound", async () => {
+    const t = setup({ knowledgeFileBytes: 100 });
+    const ran = await t.run(ROWS, {
+      opened: [{ path: "/tmp/big", text: "x".repeat(1000) }],
+    });
+    const answer = answerOf(ran.settled);
+    expect(answer.changes).toBeNull();
+    expect(answer.refused).toBe(
+      "the files could not be read back, so nothing was saved",
+    );
+    ran.settle({ landed: false, why: "skipped" });
+    expect(await t.settled(ran.hold)).not.toBe("idle");
+  });
+
   test("a read back that ends past the deadline, as a deadline", async () => {
     const t = setup();
     const ran = await t.run(ROWS, ({ fs }) => {

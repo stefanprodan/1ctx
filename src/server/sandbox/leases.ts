@@ -19,10 +19,11 @@ import type { Gateway } from "./gateway.ts";
 import type { RecycleReason, SandboxHold } from "./hold.ts";
 import { GLOBAL_POLICY_REFUSAL, Network, type NetworkDeps } from "./network.ts";
 import { PolicyGate } from "./policy.ts";
+import { WarmPool } from "./pool.ts";
 import { ImageCheck, ImageRefused } from "./roots.ts";
 import { fitsCaps, mountsKey, sandboxName } from "./spec.ts";
 import { Cuts, sweepLabelled } from "./sweep.ts";
-import { bounded, Changes } from "./waits.ts";
+import { bounded, Changes, within } from "./waits.ts";
 import { Watch } from "./watch.ts";
 
 export {
@@ -32,10 +33,7 @@ export {
 } from "./deletes.ts";
 export type { RecycleReason, SandboxHold } from "./hold.ts";
 
-// a warm sandbox's create, which no command's deadline bounds
-export const WARM_CREATE_MS = 120_000;
-// a failed warm create waits this long before the pool tries again
-export const REFILL_BACKOFF_MS = 30_000;
+export { REFILL_BACKOFF_MS, WARM_CREATE_MS } from "./pool.ts";
 
 export type LeasesDeps = {
   clock: Clock;
@@ -69,7 +67,10 @@ export class Leases {
   private readonly watch: Watch;
   private readonly cuts = new Cuts();
   private readonly deletes: Deletes;
-  private backoff: (() => void) | null = null;
+  private readonly pool: WarmPool;
+  // the start sweep until it recorded what an earlier run left, so no
+  // create passes the cap before those count
+  private starting: Promise<void> | null = null;
 
   constructor(private readonly deps: LeasesDeps) {
     this.changes = new Changes(deps.clock);
@@ -84,7 +85,6 @@ export class Leases {
       book: this.book,
       cuts: this.cuts,
       closed: () => this.closed,
-      draining: () => this.draining,
       forgot: () => {
         this.deps.freed?.();
         this.settleDrain();
@@ -92,6 +92,20 @@ export class Leases {
       ended: () => this.poke(),
     });
     this.policy = new PolicyGate({ ...deps, cleared: () => this.poke() });
+    this.pool = new WarmPool({
+      ...deps,
+      book: this.book,
+      deletes: this.deletes,
+      stopped: () => this.closed || this.draining,
+      blocked: () => this.policy.blocked || this.image.refused !== null,
+      total: () => this.total(),
+      waiting: () => this.changes.waiting,
+      build: (signal) => {
+        const lease = this.add(null, mountsKey([]));
+        return { lease, built: this.build(lease, [], undefined, signal) };
+      },
+      changed: () => this.changes.changed(),
+    });
     this.watch = new Watch({
       ...deps,
       live: () => this.book.live(),
@@ -119,7 +133,7 @@ export class Leases {
       }
     } finally {
       // a pool held back while commands waited fills once none does
-      this.refill();
+      this.pool.refill();
     }
   }
 
@@ -132,6 +146,11 @@ export class Leases {
     const want = mountsKey(call.repos);
     // read once, and only when a sandbox is taken or made for the call
     let stored: StoredBytes | undefined;
+    if (this.starting !== null) {
+      const { clock } = this.deps;
+      if (!(await within(clock, this.starting, deadline, signal)))
+        return "busy";
+    }
     for (;;) {
       signal.throwIfAborted();
       if (this.closed) throw new Error("the sandbox shell is stopping");
@@ -162,7 +181,7 @@ export class Leases {
         if (warm !== null) {
           warm.workspace = key;
           this.book.byWorkspace.set(key, warm);
-          this.refill();
+          this.pool.refill();
           return this.take(warm);
         }
         if (this.total() < this.deps.limits().sandboxesMax) {
@@ -204,8 +223,17 @@ export class Leases {
 
   // at start: what an earlier run left, then the pool and the probe
   async start(): Promise<void> {
-    await this.sweep("start");
-    this.refill();
+    let counted = () => {};
+    this.starting = new Promise<void>((resolve) => {
+      counted = resolve;
+    });
+    try {
+      await this.sweep("start", counted);
+    } finally {
+      counted();
+      this.starting = null;
+    }
+    this.pool.refill();
     this.watch.arm();
   }
 
@@ -225,7 +253,7 @@ export class Leases {
     this.deps.log.warn("sandbox gateway restarted", { leases: leases.length });
     for (const lease of leases) this.remove(lease, "restart");
     await this.sweep("restart");
-    this.refill();
+    this.pool.refill();
   }
 
   // the leases against what the gateway lists (watch.ts)
@@ -263,14 +291,14 @@ export class Leases {
   // another manager's delete observed: a waiting command may fit now
   poke(): void {
     this.changes.changed();
-    this.refill();
+    this.pool.refill();
   }
 
   // timers stopped; the sandboxes stay for the next start's sweep
   close(): void {
     this.closed = true;
     this.watch.close();
-    this.backoff?.();
+    this.pool.stop();
     for (const lease of this.book.records.values()) lease.timer?.();
     this.changes.changed();
   }
@@ -282,8 +310,7 @@ export class Leases {
   drain(): Promise<void> {
     this.draining = true;
     this.watch.close();
-    this.backoff?.();
-    this.backoff = null;
+    this.pool.stop();
     const done = new Promise<void>((resolve) => {
       this.drained = resolve;
     });
@@ -430,53 +457,10 @@ export class Leases {
     this.deletes.destroy(lease, reason);
   }
 
-  // the pool topped up in the background, never past the cap and never
-  // while a command waits for room
-  private refill(): void {
-    if (this.closed || this.draining || this.backoff !== null) return;
-    if (this.policy.blocked || this.image.refused !== null) return;
-    const caps = this.deps.limits();
-    let warm = this.book.warm();
-    while (
-      warm < caps.sandboxWarm &&
-      this.total() < caps.sandboxesMax &&
-      this.changes.waiting === 0
-    ) {
-      warm++;
-      void this.warm();
-    }
-  }
-
-  private async warm(): Promise<void> {
-    const lease = this.add(null, mountsKey([]));
-    const ctl = new AbortController();
-    const cancel = after(this.deps.clock, WARM_CREATE_MS, () =>
-      ctl.abort(new Error("warm create timed out")),
-    );
-    try {
-      await this.build(lease, [], undefined, ctl.signal);
-      if (lease.doomed || this.closed || this.draining) {
-        this.deletes.destroy(lease, "settings");
-      } else lease.state = "warm";
-    } catch (error) {
-      this.deletes.destroy(lease, "failed");
-      this.deps.log.warn("sandbox create failed", {
-        sandbox: lease.name,
-        ...errorFields(error),
-      });
-      if (!this.closed && !this.draining && this.backoff === null) {
-        this.backoff = after(this.deps.clock, REFILL_BACKOFF_MS, () => {
-          this.backoff = null;
-          this.refill();
-        });
-      }
-    } finally {
-      cancel();
-    }
-    this.changes.changed();
-  }
-
-  private async sweep(when: "start" | "restart"): Promise<void> {
+  private async sweep(
+    when: "start" | "restart",
+    counted?: () => void,
+  ): Promise<void> {
     const { globalPolicy, listed } = await sweepLabelled(
       {
         ...this.deps,
@@ -489,6 +473,7 @@ export class Leases {
           ),
         dropProfile: (id) => this.net.sweepProfile(id),
         adopt: (name, phase) => this.deletes.adopt(name, phase),
+        counted,
       },
       when,
     );

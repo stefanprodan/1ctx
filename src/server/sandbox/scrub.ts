@@ -6,7 +6,11 @@
 // replaced in what the command leaves, as in its output: the pulled
 // files before they commit, and the records open copied.
 
-import { type CommandCredential, scrubBytes } from "../bash/index.ts";
+import {
+  type CommandCredential,
+  escapedForms,
+  scrubBytes,
+} from "../bash/index.ts";
 import type { PullFrame } from "./pull.ts";
 import type { Readout } from "./readout.ts";
 
@@ -27,4 +31,19 @@ export function scrubPulled(
       ? frame
       : { ...frame, data: scrubBytes(frame.data, credentials) },
   );
+}
+
+// What a command's stream keeps: past what a result shows at 4 bytes a
+// character, the longest form of a key, so a key the cut crosses is
+// still whole for the scrub. The rest is drained.
+export function outputBytes(
+  resultCut: number,
+  credentials: readonly CommandCredential[],
+): number {
+  let longest = 0;
+  for (const credential of credentials)
+    if ("key" in credential)
+      for (const form of escapedForms(credential.key))
+        longest = Math.max(longest, Buffer.byteLength(form));
+  return 4 * resultCut + longest;
 }

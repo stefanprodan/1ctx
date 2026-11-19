@@ -639,6 +639,23 @@ describe("bash's description under the sandbox shell", () => {
     expect(words).not.toContain("send no key");
   });
 
+  test("a header or template the shell would read is never offered", () => {
+    const words = makeBashTool({
+      web: listed,
+      credentials: {
+        offered: [
+          { ...github, name: "dollar", template: "token $(id) {key}" },
+          { ...github, name: "tick", header: "X-`id`", template: "{key}" },
+          { ...github, name: "quote", template: 'a" {key}' },
+          { ...github, name: "slash", template: "a\\ {key}" },
+        ],
+        off: [],
+      },
+      sandbox: hosts,
+    }).description;
+    expect(words).not.toContain("send -H");
+  });
+
   test("the sandbox's own hosts, never Web access's: ten named, then how many more", () => {
     const many = Array.from({ length: 13 }, (_, i) => `h${i + 10}.test`);
     const words = makeBashTool({

@@ -463,45 +463,51 @@ test.serial("an unsigned request may not name another host", async () => {
   );
 });
 
-test.serial("a key echoed JSON-escaped is redacted too", async () => {
-  const key = 'abc/def+ghi=jkl<01>&"23\\45';
-  const hex = (char: string) =>
-    `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`;
-  const escaped = [
-    JSON.stringify(key).slice(1, -1),
-    JSON.stringify(key).slice(1, -1).replaceAll("/", "\\/"),
-    [...key].map((c) => (/[A-Za-z0-9]/.test(c) ? c : hex(c))).join(""),
-    [...key]
-      .map((c) => (/[A-Za-z0-9]/.test(c) ? c : hex(c).toUpperCase()))
-      .join("")
-      .replaceAll("\\U", "\\u"),
-    [...key].map((c) => (/[A-Za-z0-9._~-]/.test(c) ? c : hex(c))).join(""),
-    // Go's encoder: <, > and & as \u, the rest as JSON, / kept
-    JSON.stringify(key)
-      .slice(1, -1)
-      .replace(/[<>&]/g, (c) => hex(c)),
-  ];
-  await withTransport(
-    () =>
-      new Response(escaped.map((form) => `{"k":"${form}"}`).join("\n"), {
-        headers: { "x-echo": escaped[1]! },
-      }),
-    async () => {
-      const fetch = commandFetch(
-        ALL,
-        [quotes({ key, value: `Token ${key}` })],
-        limits,
-      );
-      const result = await fetch(`${PREFIX}echo`);
-      const body = text(result.body);
-      for (const form of escaped) expect(body).not.toContain(form);
-      expect(body.split("\n")).toEqual(
-        escaped.map(() => '{"k":"[credential quotes]"}'),
-      );
-      expect(result.headers["x-echo"]).toBe("[credential quotes]");
-    },
-  );
-});
+test.serial(
+  "a key echoed JSON-escaped or URL-encoded is redacted too",
+  async () => {
+    const key = 'abc/def+ghi=jkl<01>&"23\\45';
+    const hex = (char: string) =>
+      `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`;
+    const escaped = [
+      JSON.stringify(key).slice(1, -1),
+      JSON.stringify(key).slice(1, -1).replaceAll("/", "\\/"),
+      [...key].map((c) => (/[A-Za-z0-9]/.test(c) ? c : hex(c))).join(""),
+      [...key]
+        .map((c) => (/[A-Za-z0-9]/.test(c) ? c : hex(c).toUpperCase()))
+        .join("")
+        .replaceAll("\\U", "\\u"),
+      [...key].map((c) => (/[A-Za-z0-9._~-]/.test(c) ? c : hex(c))).join(""),
+      // Go's encoder: <, > and & as \u, the rest as JSON, / kept
+      JSON.stringify(key)
+        .slice(1, -1)
+        .replace(/[<>&]/g, (c) => hex(c)),
+      // a URL's, its hex in either case
+      encodeURIComponent(key),
+      encodeURIComponent(key).replace(/%[0-9A-F]{2}/g, (h) => h.toLowerCase()),
+    ];
+    await withTransport(
+      () =>
+        new Response(escaped.map((form) => `{"k":"${form}"}`).join("\n"), {
+          headers: { "x-echo": escaped[1]! },
+        }),
+      async () => {
+        const fetch = commandFetch(
+          ALL,
+          [quotes({ key, value: `Token ${key}` })],
+          limits,
+        );
+        const result = await fetch(`${PREFIX}echo`);
+        const body = text(result.body);
+        for (const form of escaped) expect(body).not.toContain(form);
+        expect(body.split("\n")).toEqual(
+          escaped.map(() => '{"k":"[credential quotes]"}'),
+        );
+        expect(result.headers["x-echo"]).toBe("[credential quotes]");
+      },
+    );
+  },
+);
 
 const PRIVATE_URLS = [
   "http://127.0.0.1/",

@@ -24,6 +24,7 @@ import {
   INSTANCE_LABEL,
   Leases,
   type SandboxHold,
+  STUCK_CHECK_MS,
 } from "../../../src/server/sandbox/index.ts";
 import { planNetwork } from "../../../src/server/sandbox/netpolicy.ts";
 import { POLICY_RECHECK_MS } from "../../../src/server/sandbox/policy.ts";
@@ -125,7 +126,7 @@ function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
 }
 
 describe("managers of one gateway", () => {
-  test("a drained manager asks a failed delete again, then lets its trees and client go", async () => {
+  test("a drained manager asks a failed delete again, then settles with its trees let go", async () => {
     const t = setup();
     const old = t.manager();
     const hold = await t.acquire(old, "chat", { repos: [REPO] });
@@ -146,7 +147,7 @@ describe("managers of one gateway", () => {
     expect(t.held.get(REPO.tree)).toBe(0);
   });
 
-  test("a drained manager keeps no stuck delete: its trees go and a sweep takes the name", async () => {
+  test("a drained manager keeps a stuck delete until the gateway forgets it, and a later sweep takes the name", async () => {
     const t = setup();
     const old = t.manager();
     const hold = await t.acquire(old, "chat", { repos: [REPO] });
@@ -158,12 +159,44 @@ describe("managers of one gateway", () => {
     hold.release();
     await until(() => t.fake.deletes.length === 1);
     t.time.advance(DELETE_TIMEOUT_MS);
-    await until(() => drained);
-    expect(t.held.get(REPO.tree)).toBe(0);
+    await until(() => old.rows()[0]?.state === "stuck");
+    expect(drained).toBe(false);
+    expect(t.held.get(REPO.tree)).toBe(1);
     t.fake.deleteMode = "complete";
     const next = t.manager("img:2");
     await next.start();
     expect(t.fake.deletes).toEqual([hold.sandbox, hold.sandbox]);
+    t.time.advance(STUCK_CHECK_MS);
+    await until(() => drained);
+    expect(t.held.get(REPO.tree)).toBe(0);
+    next.close();
+  });
+
+  test("a stuck delete of a drained manager is not lost to a sweep that ran while it was deleting", async () => {
+    const t = setup();
+    const old = t.manager();
+    const hold = await t.acquire(old, "chat");
+    t.fake.deleteMode = "stuck";
+    let drained = false;
+    void old.drain().then(() => {
+      drained = true;
+    });
+    // the replacement starts at once, while the old delete is pending
+    const next = t.manager("img:2");
+    await next.start();
+    hold.release();
+    await until(() => t.fake.deletes.length === 1);
+    t.time.advance(DELETE_TIMEOUT_MS);
+    await until(() => old.rows()[0]?.state === "stuck");
+    // still held and counted, so the next sweep, a restart's, takes it
+    expect(drained).toBe(false);
+    expect(old.counted()).toBe(1);
+    t.fake.deleteMode = "complete";
+    await next.restarted();
+    expect(t.fake.deletes).toEqual([hold.sandbox, hold.sandbox]);
+    t.time.advance(STUCK_CHECK_MS);
+    await until(() => drained);
+    expect(old.rows()).toEqual([]);
     next.close();
   });
 

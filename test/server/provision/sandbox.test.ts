@@ -94,6 +94,18 @@ describe("provision Sandbox", () => {
     );
   });
 
+  test("a document refuses what the route would: no host, or no endpoint", () => {
+    expect(() => documents(sandbox({ network: "hosts", hosts: [] }))).toThrow(
+      "spec.hosts: the hosts network needs a host at least",
+    );
+    expect(() =>
+      documents(sandbox({ shell: "sandbox", endpoint: null })),
+    ).toThrow("spec.endpoint: the sandbox shell needs a gateway endpoint");
+    // a field left out is the row's, which the route checks at apply
+    documents(sandbox({ hosts: [] }));
+    documents(sandbox({ shell: "builtin", endpoint: null }));
+  });
+
   test("the sandbox shell needs the gateway's key files before apply", () => {
     const docs = documents(sandbox({ shell: "sandbox", endpoint: ENDPOINT }));
     expect(() => check(docs, {})).toThrow(

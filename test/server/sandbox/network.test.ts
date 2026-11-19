@@ -14,6 +14,7 @@ import type {
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
+  DELETE_RETRY_MS,
   GLOBAL_POLICY_REFUSAL,
   INSTANCE_LABEL,
   Leases,
@@ -283,6 +284,7 @@ describe("the network policy", () => {
       signed({ name: "quo-tes", prefix: "https://g.test/" }),
       signed({ name: "quo_tes", prefix: "https://h.test/" }),
       signed({ name: "x-key", header: "X-Api-Key", template: "{key}" }),
+      signed({ name: "y-shell", template: "Bearer $(id) {key}" }),
     ]);
     expect(made.attach.map((one) => one.name)).toEqual([
       "quo-tes",
@@ -298,6 +300,7 @@ describe("the network policy", () => {
         "credential e-wrapped goes in a X-Api-Key header the sandbox cannot fill, so it is not attached",
         "credential f-glob has a prefix the sandbox cannot match, so it is not attached",
         "credential quo_tes shares the variable ONECTX_CRED_QUO_TES with credential quo-tes, so it is not attached",
+        'credential y-shell has a header or template with $, `, " or \\, which the shell would read, so it is not attached',
         "",
       ].join("\n"),
     );
@@ -629,6 +632,23 @@ describe("a sandbox's network", () => {
     const hold = await second;
     expect(hold.sandbox).not.toBe(first.sandbox);
     expect(t.fake.profiles.has(old!.profile.id)).toBe(true);
+  });
+
+  test("a provider's failed drop is asked again", async () => {
+    const t = setup();
+    const a = await t.acquire(LISTED, [signed()]);
+    const [one] = plan(LISTED, [signed()]).attach;
+    a.release();
+    t.fake.fail("providerDelete");
+    t.leases.recycle("chat", "clear");
+    await until(() =>
+      t.time.sleeping().includes(t.time.now() + DELETE_RETRY_MS),
+    );
+    expect(t.fake.providers.has(one!.provider)).toBe(true);
+    t.fake.unfail("providerDelete");
+    t.time.advance(DELETE_RETRY_MS);
+    await until(() => t.fake.profileDeletes.length === 1);
+    expect(t.fake.providerDeletes).toEqual([one!.provider]);
   });
 
   test("the start sweep deletes this instance's profiles, never another's", async () => {

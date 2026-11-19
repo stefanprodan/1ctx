@@ -141,6 +141,7 @@ export function mountJob(
     knowledgeFileBytes: storage.knowledgeFileBytes,
     mountBytes,
     ioBytes,
+    resultCut: caps.resultCut,
     iterations: COMMAND_ITERATIONS,
     knowledge: rows.map((row) => ({
       name: row.name,

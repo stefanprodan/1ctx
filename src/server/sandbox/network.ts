@@ -10,8 +10,9 @@
 
 import type { SandboxNet } from "../../shared/sandbox-net.ts";
 import type { ShellCall } from "../bash/index.ts";
-import { after, type Clock, sleepUnless } from "../lib/clock.ts";
+import { after, type Clock, sleep, sleepUnless } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import { DELETE_RETRY_MS, DELETE_TRIES } from "./deletes.ts";
 import type { Gateway } from "./gateway.ts";
 import type { SandboxHold } from "./hold.ts";
 import {
@@ -278,7 +279,7 @@ export class Network {
     for (const [provider, users] of [...this.users]) {
       if (!users.delete(sandbox) || users.size > 0) continue;
       this.users.delete(provider);
-      const dropped = this.locked(provider, null, () => this.drop(provider))
+      const dropped = this.dropRetried(provider)
         .catch(() => {})
         .finally(() => this.dropping.delete(dropped));
       this.dropping.add(dropped);
@@ -290,18 +291,35 @@ export class Network {
     while (this.dropping.size > 0) await Promise.all([...this.dropping]);
   }
 
-  private async drop(provider: string): Promise<void> {
-    // attached again while this waited for the lock
-    if ((this.users.get(provider)?.size ?? 0) > 0) return;
-    const { clock, log, gateway } = this.deps;
+  // a failed delete, a blip, is asked again as a sandbox's is, each
+  // try under the lock and the waits outside it
+  private async dropRetried(provider: string): Promise<void> {
     const profile = this.profileOf.get(provider);
+    for (let tries = 0; ; tries++) {
+      const done = await this.locked(provider, null, () =>
+        this.drop(provider, profile),
+      );
+      if (done || tries >= DELETE_TRIES - 1) return;
+      await sleep(this.deps.clock, DELETE_RETRY_MS * 3 ** tries).promise;
+    }
+  }
+
+  // false when the provider's delete failed
+  private async drop(
+    provider: string,
+    profile: string | undefined,
+  ): Promise<boolean> {
+    // attached again while this waited for the lock
+    if ((this.users.get(provider)?.size ?? 0) > 0) return true;
+    const { clock, log, gateway } = this.deps;
     this.profileOf.delete(provider);
     this.providers.delete(provider);
     const done = await ask(clock, log, STEP_MS, async (signal) => {
       await gateway.providers.delete(provider, signal);
       return true;
     });
-    if (done === null || profile === undefined) return;
+    if (done === null) return false;
+    if (profile === undefined) return true;
     await this.locked(profileLock(profile), null, async () => {
       // another provider of it, attached or attaching, here or elsewhere
       if (this.holdsProfile(profile)) return;
@@ -312,6 +330,7 @@ export class Network {
         return true;
       });
     });
+    return true;
   }
 
   // a sweep's delete of a provider no lease used when it listed: asked

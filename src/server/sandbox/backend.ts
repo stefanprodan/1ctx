@@ -67,7 +67,7 @@ import {
   recordedCwd,
   recordRequests,
 } from "./readout.ts";
-import { scrubPulled } from "./scrub.ts";
+import { outputBytes, scrubPulled } from "./scrub.ts";
 import { SANDBOX_ENV } from "./spec.ts";
 import { bounded } from "./waits.ts";
 
@@ -252,8 +252,9 @@ class Command {
     const { job } = this;
     const id = commandId();
     const open = !job.subagent;
-    const stdout = new Capped(job.ioBytes);
-    const stderr = new Capped(job.ioBytes);
+    const kept = outputBytes(job.resultCut, this.context.credentials);
+    const stdout = new Capped(kept);
+    const stderr = new Capped(kept);
     let code: number;
     // the command runs in the sandbox, so its wait holds no process
     // slot; the read back takes one again
@@ -337,18 +338,19 @@ class Command {
       return { ok: true, answer: { ...shown, changes: null, refused: null } };
     const open = !job.subagent;
     const records = recordRequests(id, open);
-    // a record holding a path is read with a path's bound, never a file's
-    const paths = recordBounds(id, open);
+    // a record is read with its own bound, never a tree's file bound
+    const openBytes = Math.max(
+      job.knowledgeFileBytes,
+      job.repos.length > 0 ? job.repoFileBytes : 0,
+    );
+    const paths = recordBounds(id, open, openBytes);
     const named = [...paths.values()].reduce((sum, at) => sum + at, 0);
     const frames = await pull(
       this.on,
       [...read.pulls.keys(), ...records],
       {
-        fileBytes: Math.max(limits.fileBytes, job.knowledgeFileBytes),
-        totalBytes:
-          limits.totalBytes +
-          MAX_OPENS_PER_COMMAND * job.knowledgeFileBytes +
-          named,
+        fileBytes: Math.max(limits.fileBytes, openBytes),
+        totalBytes: limits.totalBytes + named,
         paths,
       },
       [...SANDBOX_ROOTS, ...RECORD_ROOTS],
@@ -357,7 +359,9 @@ class Command {
     // a key the command was handed is never saved or shown
     const scrubbed = scrubPulled(read, frames, this.context.credentials);
     const pwd = recordedCwd(id, scrubbed) ?? start;
-    const opened = open ? openedOf(id, scrubbed, job.visuals) : [];
+    const opened = open
+      ? openedOf(id, scrubbed, job.visuals, this.context.credentials)
+      : [];
     // every record goes, not only this command's: one command runs in
     // a sandbox at a time, and what a command left there would fill it
     await removeRecords(this.on);

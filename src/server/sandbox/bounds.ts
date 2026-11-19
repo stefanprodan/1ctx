@@ -4,6 +4,7 @@
 // How far a walk after a command may go: pure, from the caps and what
 // the trees held before it.
 
+import { MAX_KNOWLEDGE_SEGMENTS } from "../../shared/words.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { heldSizes, type Tree } from "./baseline.ts";
 import { PATH_BYTES } from "./readout.ts";
@@ -16,7 +17,10 @@ export function walkBounds(caps: KnowledgeCaps, before: Tree | null) {
   const tree = (root: string, cap: number) =>
     Math.max(cap, held.bytes.get(root) ?? 0) + TREE_SLACK_BYTES;
   const entries = Math.max(
-    4 * (caps.knowledgeFiles + caps.uploadFiles + caps.mcpKeptFiles) + 64,
+    // a doc's folders and itself, at the most segments a name holds
+    MAX_KNOWLEDGE_SEGMENTS * caps.knowledgeFiles +
+      4 * (caps.uploadFiles + caps.mcpKeptFiles) +
+      64,
     held.entries + 64,
   );
   const fileBytes = Math.max(

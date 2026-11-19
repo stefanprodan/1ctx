@@ -44,6 +44,8 @@ export type LimitsDeps = {
   cores: number;
   // a write moved a send cap, so a run waiting for a place may start
   wake?: () => void;
+  // any write: the sandboxes' cap waiters and warm pool read it again
+  saved?: () => void;
 };
 
 export type LimitsArea = {
@@ -125,6 +127,7 @@ export function limitsArea(deps: LimitsDeps): LimitsArea {
     const before = sendCaps();
     write();
     if (sendCaps() !== before) deps.wake?.();
+    deps.saved?.();
   };
   // a value saved equal to its default drops the override
   const set = (values: Partial<Limits>, now: number): void =>

@@ -7,7 +7,7 @@
 // only rule is checked on its source, and it runs against a real
 // gateway in the hand-run sandbox script.
 
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import {
   chmodSync,
   existsSync,
@@ -17,6 +17,7 @@ import {
   mkdtempSync,
   readFileSync,
   realpathSync,
+  rmSync,
   statSync,
   symlinkSync,
   truncateSync,
@@ -48,8 +49,16 @@ const WIDE = { entries: 1000, nameBytes: 100_000, fileBytes: 10_000_000 };
 const idOf = (name: string) => `${name}-`.padEnd(22, "0");
 const LIMITS = { entries: 1000, fileBytes: 10_000_000, totalBytes: 10_000_000 };
 
+// every base a test made, removed once the file ends; rmSync unlinks a
+// link and never follows it
+const bases: string[] = [];
+afterAll(() => {
+  for (const base of bases) rmSync(base, { recursive: true, force: true });
+});
+
 function scratch() {
   const base = realpathSync(mkdtempSync(join(tmpdir(), "1ctx-shell-")));
+  bases.push(base);
   const roots = [join(base, "knowledge"), join(base, "tmp")];
   for (const root of roots) mkdirSync(root);
   return { base, roots };

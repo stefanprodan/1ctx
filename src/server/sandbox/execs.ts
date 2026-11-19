@@ -53,7 +53,10 @@ export function refusal(error: StepFailure): string {
     return "the command's processes could not all be stopped, so nothing was saved";
   if (error.step === "walk" && error.reason === "unicode")
     return "a file name is not UTF-8, so nothing was saved";
-  if (error.step === "walk" && error.reason === "credential")
+  if (
+    (error.step === "walk" || error.step === "records") &&
+    error.reason === "credential"
+  )
     return "a file name held a credential, so nothing was saved";
   if (error.step === "walk" && error.reason === "linked")
     return "a file has more than one name (a hard link), so nothing was saved";

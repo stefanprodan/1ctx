@@ -44,6 +44,29 @@ export async function ask<T>(
   }
 }
 
+// false at the deadline, before the promise settled; a throw when the
+// command was stopped
+export async function within(
+  clock: Clock,
+  promise: Promise<void>,
+  deadline: number,
+  signal: AbortSignal,
+): Promise<boolean> {
+  const left = deadline - clock();
+  if (left <= 0) return false;
+  const stop = new AbortController();
+  try {
+    await Promise.race([
+      promise,
+      sleepUnless(clock, left, AbortSignal.any([signal, stop.signal])),
+    ]);
+  } finally {
+    stop.abort();
+  }
+  signal.throwIfAborted();
+  return clock() < deadline;
+}
+
 // what a command at the cap waits on: any release, delete or create
 export class Changes {
   private readonly waiters = new Set<() => void>();

@@ -37,7 +37,10 @@ type Method =
   | "importProfile"
   | "put"
   | "attach"
-  | "state";
+  | "state"
+  // a provider's or profile's list and delete, apart from a sandbox's
+  | "providerList"
+  | "providerDelete";
 
 type Box = { phase: SandboxPhase; labels: Record<string, string> };
 
@@ -296,13 +299,13 @@ export function fakeGateway(): FakeGateway {
     },
     providers: {
       async list(labels, signal) {
-        await enter("list", signal);
+        await enter("providerList", signal);
         return [...fake.providers]
           .filter(([, have]) => matches(have, labels))
           .map(([name]) => name);
       },
       async delete(name, signal) {
-        await enter("delete", signal);
+        await enter("providerDelete", signal);
         for (const set of fake.attached.values()) {
           if (set.has(name)) throw new Error(`provider ${name} is attached`);
         }
@@ -316,13 +319,13 @@ export function fakeGateway(): FakeGateway {
         }
       },
       async profiles(annotations, signal) {
-        await enter("list", signal);
+        await enter("providerList", signal);
         return [...fake.profiles.values()]
           .filter((profile) => matches(profile.annotations, annotations))
           .map((profile) => profile.id);
       },
       async deleteProfile(id, signal) {
-        await enter("delete", signal);
+        await enter("providerDelete", signal);
         fake.profileDeletes.push(id);
         fake.profiles.delete(id);
       },

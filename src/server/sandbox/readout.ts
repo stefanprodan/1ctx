@@ -163,15 +163,22 @@ export const PATH_BYTES = 4096;
 // name), far under a file's bound
 const RECORD_PATH_BYTES = 2 * PATH_BYTES;
 
-// The records that hold a path, each bounded to one: the cwd raw, an
-// opened copy's name escaped with its newline. Read with a file's
-// bound, a hostile record would reach the split and unescape at any size.
-export function recordBounds(id: string, open: boolean): Map<string, number> {
+// Each record's bound: the cwd raw, an opened copy's name escaped with
+// its newline, and the copy at what open reads (`openBytes`). Read with
+// a tree's file bound, a hostile record would reach the split and
+// unescape at any size.
+export function recordBounds(
+  id: string,
+  open: boolean,
+  openBytes: number,
+): Map<string, number> {
   const { cwd, opened } = recordPaths(id);
   const out = new Map([[escapePath(cwd), RECORD_PATH_BYTES]]);
   if (open)
-    for (let n = 1; n <= MAX_OPENS_PER_COMMAND; n++)
+    for (let n = 1; n <= MAX_OPENS_PER_COMMAND; n++) {
+      out.set(escapePath(`${opened}/${n}`), openBytes);
       out.set(escapePath(`${opened}/${n}.path`), 3 * RECORD_PATH_BYTES + 1);
+    }
   return out;
 }
 
@@ -198,7 +205,11 @@ export function openedOf(
   id: string,
   frames: readonly PullFrame[],
   visuals: boolean,
+  credentials: readonly CommandCredential[] = [],
 ): OpenedRecord[] {
+  const forms = credentials.flatMap((credential) =>
+    "key" in credential ? escapedForms(credential.key) : [],
+  );
   const { opened } = recordPaths(id);
   const byPath = new Map(frames.map((frame) => [frame.escaped, frame]));
   const out: OpenedRecord[] = [];
@@ -217,6 +228,10 @@ export function openedOf(
     const path = raw === null ? null : pathOf(raw);
     if (path === null || !path.unicode)
       throw new StepFailure("records", "name");
+    // the scrub saw the escaped record, so a key escaping hid is checked
+    // in the path it names
+    if (forms.some((form) => path.path.includes(form)))
+      throw new StepFailure("records", "credential");
     let text: string;
     try {
       text = textFromBytes(copy.data);

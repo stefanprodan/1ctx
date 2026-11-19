@@ -517,6 +517,25 @@ describe("limits area", () => {
     }
   });
 
+  test("every write calls the saved port, so the sandboxes read the limits again", () => {
+    const db = memoryDb();
+    try {
+      let saves = 0;
+      const area = limitsArea({
+        db,
+        clock: () => 100,
+        cores: 1,
+        saved: () => saves++,
+      });
+      area.set({ ...DEFAULT_LIMITS, sandboxWarm: 1 }, 100);
+      area.set({ ...DEFAULT_LIMITS, rounds: 20 }, 110);
+      area.reset();
+      expect(saves).toBe(3);
+    } finally {
+      db.close();
+    }
+  });
+
   test("saves the send, tool-work and bash limits through the full-set PUT", async () => {
     const app = await testApp();
     try {

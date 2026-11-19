@@ -40,6 +40,7 @@ const job = (command: string, fields: Partial<Job> = {}): Job => ({
   knowledgeFileBytes: MiB,
   mountBytes: 64 * MiB,
   ioBytes: MiB,
+  resultCut: 50_000,
   iterations: 1e12,
   knowledge: [],
   scratch: [],
