@@ -9,15 +9,17 @@ import type {
   PatchMcpRequest,
   PatchMcpSettings,
 } from "../../shared/api/mcp.ts";
-import type { McpSide } from "../../shared/contracts/mcp.ts";
+import {
+  MAX_MCP_URL,
+  MCP_TIMEOUT_MS,
+  type McpSide,
+} from "../../shared/contracts/mcp.ts";
 import {
   isPattern,
   isSecretName,
   isServerName,
-  MAX_MCP_URL,
   MAX_PATTERNS,
   MCP_KEY_PREFIX,
-  MCP_TIMEOUT_MS,
   secretNameRule,
 } from "../../shared/words.ts";
 import { fields } from "../lib/body.ts";

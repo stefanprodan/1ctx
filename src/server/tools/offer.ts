@@ -51,6 +51,7 @@ import type {
   MemoryScope,
   Offered,
   OfferedCredential,
+  OfferedShell,
   Tool,
   ToolResult,
 } from "./types.ts";
@@ -84,6 +85,10 @@ type OfferDeps = {
   // the admin's external_task row is on and the external tasks are wired
   // to act on
   externalTaskOn?(): boolean;
+  // the sandbox shell runs the next command
+  sandbox?(): boolean;
+  // how long a sandbox command may run
+  commandSeconds?(): number | undefined;
   toolsFor(
     search: SearchProvider | null,
     hosts: readonly string[],
@@ -93,12 +98,16 @@ type OfferDeps = {
     credentials: SendCredentials,
     subagent?: boolean,
     chatMain?: boolean,
+    // the send's own deadline, which a command's time never passes
+    deadlineMs?: number | null,
+    shell?: OfferedShell,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
 
 // credentials ride on the network: none without it, and none outside a
-// project. A subagent's are read-only, so curl never writes through one.
+// project. A subagent's are read-only outside the sandbox shell, so
+// curl never writes through one.
 function credentialsFor(
   port: CredentialsPort | undefined,
   projectId: string | null | undefined,
@@ -280,8 +289,8 @@ export function offered(
   requestedMode: McpMode = "auto",
   scope?: MemoryScope,
   disabledCapabilities: readonly string[] = [],
-  // building a subagent's offer: its bash says nothing of open and its
-  // credentials are read-only
+  // building a subagent's offer: its bash says nothing of open and,
+  // outside the sandbox shell, its credentials are read-only
   subagent = false,
 ): Offered {
   if (scope?.phase === "child") {
@@ -325,12 +334,15 @@ export function offered(
           domains: [...access.hosts],
         };
   const search = web === null ? null : deps.store.row("websearch").provider;
+  const sandbox = deps.sandbox?.() === true;
+  // a subagent in its parent's sandbox has its parent's credentials,
+  // since the sandbox's network is the parent's
   const credentials = credentialsFor(
     deps.credentials,
     scope?.projectId,
     web,
     disabledCapabilities,
-    subagent,
+    subagent && !sandbox,
   );
   // a chat's main rounds, a summoned agent's and a chat's subagents: a
   // run's subagent offer has no automation of its own, so its origin
@@ -378,6 +390,8 @@ export function offered(
     });
   }
   const skills = { block: skillCatalog.text, skills: agentSkills };
+  // read once, so the description and every dispatch agree
+  const commandSeconds = sandbox ? deps.commandSeconds?.() : undefined;
   const baseTools = fillYear(
     [
       ...deps
@@ -390,13 +404,18 @@ export function offered(
           credentials,
           subagent,
           chatSend && !subagent,
+          scope?.deadlineMs ?? null,
+          {
+            sandbox,
+            ...(commandSeconds === undefined ? {} : { commandSeconds }),
+          },
         )
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
       ...(memory === null ? [] : makeMemoryTools(memory)),
       // a main offer of an agent whose Subagents switch is on
       ...(scope?.phase === "main" && scope.delegate
-        ? [makeDelegateTool()]
+        ? [makeDelegateTool(sandbox)]
         : []),
     ].map(schema),
     now,
@@ -457,5 +476,7 @@ export function offered(
     memory,
     credentials: credentials.offered,
     credentialsOff: credentials.off,
+    ...(sandbox ? { sandbox: true as const } : {}),
+    ...(commandSeconds === undefined ? {} : { commandSeconds }),
   };
 }

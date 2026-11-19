@@ -2,9 +2,9 @@
 
 How the binary runs outside the preview: as an OS service, on the
 staging instance, in a container, and how releases are built. Governs
-`src/server/service/`, `scripts/staging.sh` and the `make staging-*`
-targets, the `Dockerfile`, `.dockerignore`, `deploy/` and
-`.github/workflows/`.
+`src/server/service/`, `scripts/staging.sh`, `scripts/openshell.sh`
+and the `make staging-*` targets, the `Dockerfile`, `.dockerignore`,
+`deploy/` and `.github/workflows/`.
 
 ## The OS service (`1ctx service`)
 
@@ -62,6 +62,63 @@ never written in a tracked file.
   beside the YAML is copied, so a `knowledge` path elsewhere is
   refused.
 
+## The sandbox gateway
+
+The sandbox shell (`docs/sandbox.md`) needs OpenShell's gateway beside
+the server. `scripts/openshell.sh` installs it from the pinned
+release (0.1.9, its sha256 checked), makes its certificates once,
+writes its config and runs it; never Homebrew, never `openshell
+gateway add`.
+
+- **macOS needs Apple silicon and Docker Desktop running.** OpenShell
+  0.1.9 publishes no Intel macOS gateway. The script fails at once when
+  `docker info` does not answer.
+- **The config is fixed:** the Docker driver with bridge supervisor
+  networking calling back on `https://host.openshell.internal:<port>`
+  (under Docker Desktop `127.0.0.1` is the container's own), push
+  policy delivery, bind mounts on and resource admission off for the
+  repositories' binds, `sandbox_label = "1ctx-<instance id>"`, and
+  telemetry off. It listens on `127.0.0.1:<port>`, its unauthenticated
+  `/healthz` on the port plus 10000, metrics off. A start refuses
+  either port held by another process, and health counts only once the
+  listener is the gateway's own pid. Its log moves to `gateway.log.1`
+  at each start.
+- **Its client bundle is the `openshell-` keys.** The CA, client
+  certificate and key are copied into the secrets folder as
+  `openshell-gateway-{ca,cert,key}.key`; the endpoint is
+  `https://127.0.0.1:<port>`.
+- **The preview: `PREVIEW_SHELL=sandbox make preview`** runs one from
+  `.preview/openshell/` on 17671 (`PREVIEW_GATEWAY_PORT` for a second
+  checkout), after the server so its instance id is made, builds
+  `1ctx-shell:dev` when missing, and turns the sandbox shell on. A
+  restart keeps an unchanged gateway. The server counts as up only when
+  the preview port's one listener is the pid it started, so a stranger
+  on the port is refused before the admin password is sent.
+  `preview-stop` stops the gateway; `preview-clean` and `preview-reset`,
+  with or without the variable, stop the server, delete every sandbox
+  and provider under the instance label through the gateway (started for
+  it when down), stop it and remove `.preview/openshell/`. A sandbox the
+  gateway cannot delete stops the clean with the `docker rm -f` and
+  `docker volume rm` commands for the containers and volumes labelled
+  `openshell.ai/sandbox-namespace=1ctx-<instance id>`; once none is
+  left, the clean goes on. A gateway that outlives its stop fails the
+  command and keeps its pid file and directory. A new database under a
+  kept gateway sweeps the old instance's sandboxes before the label
+  changes.
+- **Staging: `STAGING_SANDBOX=1` in `scripts/staging.env`** makes
+  `make staging-deploy` install it under `~/.1ctx/openshell` as the
+  LaunchAgent `dev.1ctx.openshell` (`STAGING_GATEWAY_PORT`, 17671),
+  before the server's restart and checked healthy; on a box whose
+  server has not made its instance id yet, right after, waiting up to
+  30 s for the id. An unchanged gateway is never restarted, since a
+  restart drops every lease; a changed config, binary or script is. The
+  deploy copies the bundle into `~/.1ctx/secrets`; the shell is turned
+  on in the admin page or a `Sandbox` document.
+- **Docker Compose:** a gateway service beside the server, not built
+  yet.
+- **Kubernetes:** OpenShell's own Helm chart as a prerequisite, not
+  built yet.
+
 ## The container image
 
 - **The build cross-compiles on `$BUILDPLATFORM`.** `bun build
@@ -87,6 +144,13 @@ never written in a tracked file.
   needs, which hangs or corrupts the database. A named volume takes
   the image's `/data` with its owner 65532. On a Linux host a bind
   mount works once it is `chown 65532:65532`.
+- **The sandbox image (`deploy/sandbox/Dockerfile`) pins its base, uv's
+  Python 3.15 trixie-slim image that brings Python and uv, by digest,
+  and yq and bun by version and the sha256 their releases publish,**
+  checked at build. Bun is the root Dockerfile's version,
+  so the two move together. Dependabot bumps the base's digest; yq and
+  bun are bumped by hand. It makes every root the sandbox policy
+  names and holds no helper: the server passes them with each exec.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
   would kill the shutdown after the drain. Docker Compose sets
   `stop_grace_period: 25s`; a plain run passes `--stop-timeout 25`.
@@ -186,6 +250,11 @@ deletes the cluster with every release in it.
 - **The release pushes `ghcr.io/stefanprodan/1ctx:<tag>`, never
   `latest`.** The image is amd64 and arm64, with provenance attested
   for it and for the archives' checksums.
+- **The release pushes `ghcr.io/stefanprodan/1ctx-shell:<tag>`
+  beside it,** built from `deploy/sandbox/Dockerfile` for the same
+  platforms, with provenance attested. `make sandbox-image` builds it
+  locally as `1ctx-shell:dev`. The first push creates the GHCR
+  package `1ctx-shell` private; make it public once by hand.
 - **The release pushes the Helm chart beside the image.** Its version is
   the tag without the `v` and its `appVersion` the tag, at
   `oci://ghcr.io/stefanprodan/charts/onectx`, with provenance attested.

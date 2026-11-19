@@ -16,7 +16,9 @@
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "paths": {
-      "just-bash": ["./vendor/just-bash/src/index.ts"]
+      "just-bash": ["./vendor/just-bash/src/index.ts"],
+      "openshell-sdk": ["./vendor/openshell-sdk/src/index.ts"],
+      "openshell-sdk/raw": ["./vendor/openshell-sdk/src/raw.ts"]
     }
   },
   "include": [

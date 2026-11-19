@@ -5,8 +5,9 @@ Governs `src/server/provision/`: `1ctx provision` and the server's
 
 Provisioning applies YAML documents, one object each (a `kind` from
 `KINDS`: users, the SMTP server, projects, credentials, repositories,
-providers, deciders, Dictation, skills, MCP servers, agents, tools), to an
-instance's database, creating or updating what they name.
+providers, deciders, Dictation, the sandbox shell, skills, MCP servers,
+agents, tools), to an instance's database, creating or updating what
+they name.
 
 ## Running it
 
@@ -66,6 +67,20 @@ instance's database, creating or updating what they name.
   an update stays; a new one without it is off. A model change and a
   switch flip are two writes: a failure between them leaves the model
   saved with the old switch, and applying again finishes it.
+
+- **`Sandbox` is the instance's one sandbox shell setting**
+  (`docs/sandbox.md`). A second `Sandbox` document is refused, and any
+  name updates the row the database made, so it is never created.
+  `backend` (`builtin` or `openshell`), `endpoint`, `image`, `network`
+  (`off` or `hosts`) and `hosts` are optional; `endpoint`, `image` and
+  `hosts` take null, null hosts being the defaults. Validation refuses
+  an endpoint that is not an https origin, a host the sandbox does not
+  take (`docs/sandbox.md`) and, for `backend: openshell`, a missing
+  `openshell-gateway-ca`, `-cert` or `-key` file. Within one document it
+  refuses what the save would, `network: hosts` with no host and
+  `backend: openshell` with a null endpoint; the save refuses the same
+  against the row's other fields. Hosts compare as the sorted list a
+  save stores.
 
 - **An `Agent` is matched by name among live agents.** One naming a
   deleted agent creates a new agent. The automations the delete paused

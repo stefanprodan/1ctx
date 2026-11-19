@@ -6,7 +6,7 @@
 // change and an opened record refused all the same.
 
 import { describe, expect, test } from "bun:test";
-import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/tree.ts";
+import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/readback.ts";
 import { callCaps, run, scratchState, setup } from "./helpers.ts";
 
 const FORGED = new URL("../../fixtures/bash/forged.worker.ts", import.meta.url);

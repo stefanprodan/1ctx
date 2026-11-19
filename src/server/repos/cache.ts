@@ -13,7 +13,7 @@ import {
   utimesSync,
 } from "node:fs";
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { Clock } from "../lib/clock.ts";
 import { newId } from "../lib/ids.ts";
 import {
@@ -144,6 +144,14 @@ export class RepoCache {
       if (left > 0) this.holds.set(entry.folder, left);
       else this.holds.delete(entry.folder);
     };
+  }
+
+  // a tree by its files/ folder, as a mount names it: the sandbox shell
+  // holds what its sandbox binds for as long as the bind lives
+  holdFiles(files: string): (() => void) | null {
+    if (basename(files) !== "files") return null;
+    const entry = this.index.get(dirname(files));
+    return entry === undefined ? null : this.hold(entry);
   }
 
   held(folder: string): boolean {

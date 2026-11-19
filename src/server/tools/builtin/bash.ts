@@ -5,17 +5,30 @@
 // execution takes its identity only from the runner's call context.
 
 import type { HttpMethod } from "../../../shared/contracts/credential.ts";
+import type { SandboxNet } from "../../../shared/sandbox-net.ts";
 import type { WebSnapshot } from "../../../shared/web.ts";
 import {
   BACKSTOP_MS,
-  type BashCapability,
+  type BashToolPort,
   type CommandCredential,
   type Refusal,
   scrubKeys,
 } from "../../bash/index.ts";
 import { headerValue, type KeyRead } from "../../credentials/index.ts";
-import type { OfferedCredential, Tool, ToolResult } from "../types.ts";
+import {
+  placeholderValue,
+  placement,
+  prefixGlob,
+  quotable,
+} from "../../sandbox/rules.ts";
+import type {
+  OfferedCredential,
+  OfferedShell,
+  Tool,
+  ToolResult,
+} from "../types.ts";
 import { domainWords } from "../web.ts";
+import { durationWords } from "./automation-text.ts";
 
 // what a command asks of the credentials area: the row as it is now and
 // the key its file holds now
@@ -63,6 +76,48 @@ function networkWords(
   ].join(" ");
 }
 
+const NETWORK_EXAMPLES = ["pypi.org", "registry.npmjs.org", "github.com"];
+
+// the sandbox shell's network: its own hosts, never Web access's, and a
+// placeholder the agent places where the built-in shell's curl signs on
+// its own
+function sandboxNetworkWords(
+  net: SandboxNet,
+  credentials: readonly OfferedCredential[],
+): string {
+  if (net.mode === "off") return "No network.";
+  const signed = sandboxCredentialWords(credentials);
+  // only the examples the admin's list still holds
+  const named = NETWORK_EXAMPLES.filter((host) => net.hosts.includes(host));
+  const examples = named.length === 0 ? "" : ` (${named.join(", ")}…)`;
+  return [
+    `Network: HTTP and HTTPS to the admin's list only: package and container registries, code hosts, docs, news and public APIs${examples}; anything else is refused.`,
+    ...(signed === "" ? [] : [signed]),
+  ].join(" ");
+}
+
+// one sentence per credential the sandbox can place, so a subagent's
+// replace those alone
+function sandboxCredentialWords(
+  credentials: readonly OfferedCredential[],
+): string {
+  return credentials
+    .filter(
+      (credential) =>
+        placement(credential.header, credential.template) !== null &&
+        quotable(credential.header, credential.template) &&
+        prefixGlob(credential.prefix) !== null,
+    )
+    .map(
+      (credential) =>
+        `For ${prefixWords(credential.prefix)} (${credential.name}${credential.readOnly ? ", GET and HEAD only" : ""}) send -H "${credential.header}: ${placeholderValue(credential.template, credential.name)}", a placeholder the key replaces there alone.`,
+    )
+    .join(" ");
+}
+
+// a send without web access: no network in the sandbox either
+const NO_NET: SandboxNet = { mode: "off", hosts: [] };
+
 export const isReadMethod = (method: HttpMethod) =>
   method === "GET" || method === "HEAD";
 
@@ -108,6 +163,7 @@ export function commandCredentials(
         prefix: credential.prefix,
         key: read.key,
         header: credential.header,
+        template: credential.template,
         value: headerValue(credential.template, read.key),
         methods: credential.readOnly
           ? credential.methods.filter(isReadMethod)
@@ -120,7 +176,9 @@ export function commandCredentials(
   ];
 }
 
-// the tail keeps its length, the receipts the registry keeps apart
+// the printed output was scrubbed whole before its cut (mount.ts); this
+// pass takes the notices and receipts around it. The tail keeps its
+// length, the receipts the registry keeps apart
 function scrubbed(
   result: ToolResult,
   credentials: readonly CommandCredential[],
@@ -143,7 +201,7 @@ function scrubbed(
 }
 
 export type BashToolOptions = {
-  bash?: Pick<BashCapability, "run">;
+  bash?: BashToolPort;
   web?: WebSnapshot | null;
   visuals?: boolean;
   credentials?: BashCredentials;
@@ -152,22 +210,79 @@ export type BashToolOptions = {
   docs?: boolean;
   // a subagent's: no open, so the description leaves it out
   subagent?: boolean;
+  // the sandbox shell runs the commands, under this network: a real
+  // shell and OpenShell's rules, so the description says what differs.
+  // null is the built-in shell; bash's own word when not given
+  sandbox?: SandboxNet | null;
+  // how long a command may run under the sandbox shell; bash's own
+  // word when not given
+  commandSeconds?: number;
+  // how long an unused sandbox is kept; bash's own word when not given
+  idleMinutes?: number;
+  // the send's deadline: the words never promise a command more
+  deadlineMs?: number | null;
 };
+
+// the shell a description was offered for, never one moved since;
+// bash's own word when none is given
+export function offeredShell(
+  bash: BashToolPort | undefined,
+  shell: OfferedShell | undefined,
+): Pick<BashToolOptions, "sandbox" | "commandSeconds"> {
+  if (shell === undefined) return {};
+  return {
+    sandbox: shell.sandbox === true ? (bash?.sandbox?.() ?? NO_NET) : null,
+    ...(shell.commandSeconds === undefined
+      ? {}
+      : { commandSeconds: shell.commandSeconds }),
+  };
+}
+
+// the limits' defaults, for a tool built without bash's word
+const COMMAND_SECONDS = 600;
+const IDLE_MINUTES = 30;
+
+const BUILTIN_TOOLS =
+  "jq, yq, awk and diff are there, git, python and node are not.";
+const BUILTIN_TMP =
+  "/tmp is this chat's scratch for any bytes, kept between commands.";
 
 const OPEN_WORDS =
   "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. To point to one, write its /knowledge/ path. ";
 
+// the sandbox shell's words, short: a real Linux shell needs few rules
+const SANDBOX_OPEN =
+  "open <file> shows a file to the user: HTML and SVG as visuals, Markdown rendered. ";
+
+function sandboxWords(
+  idleMinutes: number,
+  promisedMs: number,
+  open: boolean,
+  network: string,
+): string {
+  const idle = `${idleMinutes} idle minute${idleMinutes === 1 ? "" : "s"}`;
+  return `Run a bash command in this chat's Linux sandbox: Python 3.15 with uv, Bun, git, jq, yq and rg; no node. /knowledge is the project's shared docs, saved as a new version when the command ends; if someone else changed a file meanwhile, nothing is saved: read it again and retry. /uploads holds the user's attachments, read-only. /tmp and $HOME are yours until the sandbox is recycled (after ${idle}, a restart, a timeout or a failed save), so keep what must last in /knowledge. Search before reading: rg -il 'word' /knowledge, grep -n, sed -n '40,120p'. Never print whole files or trees; long output is cut. Each call is a new shell in the last directory: chain one task's steps in one call, and make independent calls in parallel. A call may run ${durationWords(promisedMs)}; send a background job's output to a file. Install with uv run --with pkg, a venv under $HOME, or bun add in a project under $HOME. ${open ? SANDBOX_OPEN : ""}${network} Never write secrets.`;
+}
+
 // a send's bash description as a subagent's, whatever was added after:
 // no open, and the subagent's own credential words
-export const asSubagent = (
+export function asSubagent(
   description: string,
   web: WebSnapshot | null,
   parent: readonly OfferedCredential[],
   own: readonly OfferedCredential[],
-): string =>
-  description
+): string {
+  const out = description
     .replace(OPEN_WORDS, "")
+    .replace(SANDBOX_OPEN, "")
     .replace(networkWords(web, parent), () => networkWords(web, own));
+  // the network sentence is the parent's, from the setting of when the
+  // send began, so only its credential sentences are swapped
+  const signed = sandboxCredentialWords(parent);
+  if (signed === "") return out;
+  const mine = sandboxCredentialWords(own);
+  return out.replace(`${signed} `, () => (mine === "" ? "" : `${mine} `));
+}
 
 export function makeBashTool({
   bash,
@@ -177,15 +292,38 @@ export function makeBashTool({
   keys,
   docs = true,
   subagent = false,
+  sandbox = bash?.sandbox?.() ?? null,
+  commandSeconds = bash?.sandboxCommandSeconds?.() ?? COMMAND_SECONDS,
+  idleMinutes = bash?.sandboxIdleMinutes?.() ?? IDLE_MINUTES,
+  deadlineMs = null,
 }: BashToolOptions = {}): Tool<ToolResult> {
+  // a real shell's work takes minutes: under the sandbox a command has
+  // its own time, the built-in shell keeps the call timeout
+  const commandMs = sandbox !== null ? commandSeconds * 1000 : null;
+  // a run's deadline may be shorter than a command's own time
+  const promisedMs =
+    deadlineMs === null
+      ? commandSeconds * 1000
+      : Math.min(commandSeconds * 1000, deadlineMs);
   return {
     name: "bash",
+    ...(commandMs === null ? {} : { timeoutMs: commandMs }),
     // past the mount's own backstop, so its words end a stuck command
     graceMs: BACKSTOP_MS + 500,
     description:
-      "Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. jq, yq, awk and diff are there, git, python and node are not. Never write secrets, since others can read this chat and the project. " +
-      (subagent ? "" : OPEN_WORDS) +
-      networkWords(web, credentials.offered),
+      sandbox !== null
+        ? sandboxWords(
+            idleMinutes,
+            promisedMs,
+            !subagent,
+            sandboxNetworkWords(
+              web === null ? NO_NET : sandbox,
+              credentials.offered,
+            ),
+          )
+        : `Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. ${BUILTIN_TMP} /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. ${BUILTIN_TOOLS} Never write secrets, since others can read this chat and the project. ` +
+          (subagent ? "" : OPEN_WORDS) +
+          networkWords(web, credentials.offered),
     parameters: {
       type: "object",
       properties: {
@@ -219,6 +357,7 @@ export function makeBashTool({
       const repos = ctx.repos ?? null;
       const caps = {
         callTimeoutMs: ctx.caps.callTimeoutMs,
+        ...(commandMs === null ? {} : { sandboxCommandMs: commandMs }),
         resultCut: ctx.caps.resultCut,
         visuals,
         knowledge: docs,
@@ -259,6 +398,7 @@ export function makeBashTool({
               ...(signing.length === 0 ? {} : { credentials: signing }),
             },
         ctx.signal,
+        ctx.sendId,
       );
       return scrubbed(result, signing);
     },

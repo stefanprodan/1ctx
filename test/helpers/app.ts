@@ -22,6 +22,7 @@ import {
   silent,
 } from "../../src/server/lib/log.ts";
 import type { JobRunner } from "../../src/server/repos/index.ts";
+import type { Connect } from "../../src/server/sandbox/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import {
   ADMIN_SECRET,
@@ -440,6 +441,9 @@ export async function testApp(
     // the host's floor on every machine
     cores?: number;
     emailSender?: FakeEmailSender;
+    // the sandbox shell's gateway; the real one by default, which no
+    // test reaches since the shell is builtin until a test sets it up
+    sandboxGateway?: Connect;
   } = {},
 ): Promise<TestApp> {
   const db = options.db ?? memoryDb();
@@ -529,6 +533,7 @@ export async function testApp(
     repoJobs: options.repoJobs,
     cores: options.cores ?? 1,
     emailSender: emailSender.emailSender,
+    sandboxGateway: options.sandboxGateway,
   });
   return {
     ...app,

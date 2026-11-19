@@ -84,6 +84,9 @@ export type Repos = {
   // at a turn's start: the trees of the project's repositories on, each
   // held until release(), and a notice for each one not mounted
   prepare(projectId: string, options?: PrepareOptions): Promise<Prepared>;
+  // a mounted tree by its files/ folder, held until the release; null
+  // when the cache does not hold it
+  hold(files: string): (() => void) | null;
   // at startup: fetching rows back to pending, the cache indexed and
   // its tmp/ cleared; null without a cache directory
   start(): { dir: string; trees: number; bytes: number } | null;
@@ -127,6 +130,7 @@ export function reposArea(deps: ReposDeps): Repos {
     usingKeys: () => store.usingKeys(),
     auth,
     prepare: (projectId, options) => mounts.prepare(projectId, options),
+    hold: (files) => cache?.holdFiles(files) ?? null,
     start() {
       const started = mounts.start();
       return started === null || cache === null

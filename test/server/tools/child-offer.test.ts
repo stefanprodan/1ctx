@@ -7,6 +7,10 @@
 import { describe, expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
 import type { OfferOptions } from "../../../src/server/mcp/index.ts";
+import {
+  DELEGATE_DESCRIPTION,
+  SANDBOX_DELEGATE_DESCRIPTION,
+} from "../../../src/server/tools/builtin/delegate.ts";
 import { offered } from "../../../src/server/tools/offer.ts";
 import type { Tool } from "../../../src/server/tools/types.ts";
 
@@ -135,6 +139,44 @@ describe("a subagent's offer", () => {
     expect(links).toEqual([]);
   });
 
+  test("under the sandbox shell says it works in this chat's sandbox, the built-in words unchanged", () => {
+    const hash = (text: string) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    expect(hash(DELEGATE_DESCRIPTION)).toBe(
+      "e5f53ee6309ae06bd61ff5079b7a77c1570d0447ececb1fa045553662646b297",
+    );
+    const scope = {
+      projectId: "p",
+      automation: null,
+      phase: "main",
+      chat: { sessionId: "s", userId: "u" },
+      delegate: true,
+    } as const;
+    const description = (o: ReturnType<typeof offered>) =>
+      o.tools.find((t) => t.name === "delegate")?.description;
+    for (const sandbox of [false, true]) {
+      const { deps } = parts();
+      const on = { ...deps, sandbox: () => sandbox };
+      const main = offered(on, 0, "a", false, "auto", scope);
+      expect(main.sandbox).toBe(sandbox ? true : undefined);
+      expect(description(main)).toBe(
+        sandbox ? SANDBOX_DELEGATE_DESCRIPTION : DELEGATE_DESCRIPTION,
+      );
+      const child = offered(on, 0, "a", false, "auto", {
+        projectId: "p",
+        automation: null,
+        phase: "child",
+      });
+      expect(child.sandbox).toBe(sandbox ? true : undefined);
+    }
+    expect(SANDBOX_DELEGATE_DESCRIPTION).toBe(
+      "Hand a task to a subagent: a fresh copy of you with its own context, working in this chat's sandbox. It cannot see this chat, so put the goal, where to look and what to return in task; it answers in its reply. Calls in one reply run in parallel, so split independent work that way. Delegate work that would flood your context (exploring a repository, many files, web research); keep small questions and work that needs this conversation.",
+    );
+    expect(hash(SANDBOX_DELEGATE_DESCRIPTION)).toBe(
+      "a11c624d730452207646c2d3250de69545bdf366e73b172a4d631be70f351131",
+    );
+  });
+
   test("marks credentials read-only, one with no read method off", () => {
     const { deps } = parts();
     const scope = { projectId: "p", automation: null } as const;
@@ -159,6 +201,17 @@ describe("a subagent's offer", () => {
     ]);
     expect(main.credentialsOff).toEqual([]);
     expect(child.credentialsOff.map((c) => c.name)).toEqual(["c-w"]);
+    // in its parent's sandbox a subagent has its parent's network
+    const shared = offered(
+      { ...deps, sandbox: () => true },
+      0,
+      "a",
+      false,
+      "auto",
+      { ...scope, phase: "child" },
+    );
+    expect(methods(shared)).toEqual(methods(main));
+    expect(shared.credentialsOff).toEqual([]);
   });
 
   test("a main offer without the switch carries no delegate", () => {

@@ -74,6 +74,7 @@ import {
   optionalSpec,
 } from "./fields.ts";
 import type { RepositorySpec } from "./repository.ts";
+import type { SandboxSpec } from "./sandbox.ts";
 import type { SmtpServerSpec } from "./smtp.ts";
 
 export type UserSpec = {
@@ -242,6 +243,7 @@ export type Specs = {
   Provider: ProviderSpec;
   Decider: DeciderSpec;
   Dictation: DictationSpec;
+  Sandbox: SandboxSpec;
   Skill: SkillSpec;
   McpServer: McpServerSpec;
   Agent: AgentSpec;

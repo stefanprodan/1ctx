@@ -38,6 +38,7 @@ import { keptStated } from "./fields.ts";
 import { applyMcpServer } from "./mcp.ts";
 import { type Document, KINDS, type LabelSpec, type Of } from "./parse.ts";
 import { applyRepository } from "./repository.ts";
+import { applySandbox } from "./sandbox.ts";
 import { applySmtpServer } from "./smtp.ts";
 
 export type Secret = (kind: SecretKind, name: string) => string | null;
@@ -422,6 +423,9 @@ export async function apply(
             break;
           case "Dictation":
             action = await applyDictation(api, doc);
+            break;
+          case "Sandbox":
+            action = await applySandbox(api, doc);
             break;
           case "Skill":
             action = await skill(api, doc);

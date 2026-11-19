@@ -26,6 +26,52 @@ that shell that shows a file on the chat page.
   and copies them; `tools/kept.ts` only decides what a result keeps
   (`docs/mcp.md`).
 
+## The shell
+
+- **A command runs behind `ShellBackend` (`bash/shell.ts`).**
+  `mount.ts` keeps the workspace's queue, the process slot, the mount
+  and the commit; the backend runs the `Job` and answers a `Settled`.
+  `shell` in `BashDeps` picks one per command; without it every command
+  runs on `builtinShell`, the worker below, whose settle does nothing.
+  `compose.ts` passes the sandbox area's, builtin until the sandbox
+  shell is on (`docs/sandbox.md`).
+- **A backend gets a trusted context the command never sees.** Project,
+  workspace, send id, each repository's tree folder, the web snapshot,
+  the credentials, and `mounted`: each doc's id and revision, the
+  scratch revision and `used_at` (the pair, since a dropped row
+  restarts the revision at 0), the uploads' session revision (the
+  parent's for a subagent; a file's time can repeat), each kept
+  file's row, and `docs()`, the doc rows as they stand. A run may
+  answer `rows`, those it read again, which the commit checks against.
+- **`settle()` is called exactly once after the command ran.** Landed
+  carries what the transaction wrote: each doc's id, revision,
+  `updated_at` and stored text (null when deleted), the scratch
+  revision and `used_at`. Thrown: a check or the commit threw
+  (`moved`: a conflict's doc); its returned string replaces the error.
+  Skipped: nothing committed. Its throw is logged only.
+- **`acquire()` runs under the workspace's queue, before the process
+  slot,** so a command waiting for its shell holds no slot. `busy` at
+  the deadline ends it in phase `queue`, cause `busy`. Its hold goes to
+  the run, or is released when the command never runs.
+- **The read back is pure (`bash/readback.ts`).** A backend lists its
+  trees as entries (path, kind, mode, bytes) and calls
+  `discardNotices()` and `readBack()`, which judge names, text docs,
+  links and special files, deletes, modes, discards, a subagent's
+  shared write and the cwd. `test/fixtures/bash/tree-cases.ts` is the
+  one fixture set every listing runs against.
+- **The sandbox backend keeps its tree between commands**
+  (`docs/sandbox-commands.md`): it settles a landed commit by putting the
+  sandbox back to the stored rows, and alone recycles on anything else.
+  Its exits are the command's own (`ownExits`): only the answer's
+  `stopped` says it stopped one, where another shell's 124 or 126 does.
+- **A backend with `ownTmp` keeps `/tmp` itself.** The mount reads no
+  scratch file and drops none, and an answer with a scratch file
+  change is out of protocol; the commit saves the cwd alone
+  (`writeCwd()`, `used_at` kept, the last commit's winning, no revision
+  checked), with no scratch cap or name check. Only the sandbox says it,
+  and `atOnce`: its workspace's commands run at once, held but never
+  queued (`bash/queue.ts`).
+
 ## The command
 
 - **Each command runs in its own worker.** `bash/worker.ts` starts one
@@ -51,11 +97,18 @@ that shell that shows a file on the chat page.
   queues. The interpreter stops at the call timeout with exit 124 and
   its own output; the worker is ended `BACKSTOP_MS` later, and the tool
   registry waits half a second past that (`graceMs`).
+- **A sandbox command has `sandboxCommandSeconds` instead.** The tool
+  offered under the sandbox shell sets it as its registry timeout and
+  passes it as `sandboxCommandMs`, at dispatch too; the mount picks the shell first and
+  uses it for the deadline, the backstop and the queues only when the
+  shell says `sandboxTimeout`. The built-in shell keeps the call
+  timeout. The send's deadline still ends any command, by its signal.
 - **A deadline in a queue is `busy`.** A command whose deadline, or the
   registry's timer, passes before it holds its slots, or that holds them
   with under `MIN_RUN_MS` of the call timeout left, never runs: cause
   `busy`, phase `queue`. The longer of its two waits picks the words:
-  the process slot, or the chat's own commands (combine steps).
+  the process slot or the shell, or the chat's own commands (combine
+  steps).
   Neither invites a retry at once, which rejoins the queue at its back.
   An abort or shutdown while queued stays `abort`.
 - **A late start is named.** A command that waited over a second for
@@ -118,12 +171,20 @@ that shell that shows a file on the chat page.
   whole key. A signed request's 206 answer is refused too. Unsigned
   requests send them all. Keys ride only in the command caps.
 - **A key never reaches the result.** Every key read, and its
-  JSON-escaped forms (`escapedForms()`), is replaced by `[credential
+  JSON-escaped and URL-encoded forms (`escapedForms()`), is replaced by `[credential
   <name>]` in body, header values, status text, final URL and errors.
   Header names containing a key, case-insensitively, are dropped.
   Redirect history is kept, with the same rules on every hop's status
   text and headers, even for an unsigned request with an unrelated key
-  loaded. The tool scrubs the result again, the tail kept apart.
+  loaded. The mount scrubs stdout and stderr whole before the result's
+  cut, so no key is cut into a fragment; the tool scrubs the result
+  again, the tail kept apart.
+- **The sandbox shell has OpenShell's network, not this one.** It
+  follows the sandbox's own network setting, and is off while the
+  send has no web access. Its
+  policy, placeholders, scrub of pulled files and the accepted
+  differences from `commandFetch()` are in `docs/sandbox-network.md`,
+  with its description's words; the built-in shell's is unchanged.
 
 ## The writable trees
 
@@ -144,7 +205,10 @@ that shell that shows a file on the chat page.
   logged at `startup`. The per-workspace queue (`bash/queue.ts`) is
   taken before a process slot (`acquireProcess()`, shared with uploads)
   and released after it. Channel agents therefore never wait behind one
-  another's commands.
+  another's commands. A sandbox command frees its slot (`hooks.slot`)
+  before its sandbox's turn and takes one in its save's turn;
+  `sandboxesMax` times `SANDBOX_COMMANDS` bounds their mounts. Waits
+  are read on `deps.clock`, the deadline on the wall.
 - **Written doc paths go on the tool row.** `finishTool` stores them as
   `savedDocs` for another agent's trace (`docs/sessions.md`). A command
   that completed keeps them even when a cut writes its row; one the
@@ -160,7 +224,8 @@ that shell that shows a file on the chat page.
   id as its workspace; a channel uses its session and agent, so each
   agent keeps separate files, cwd and revision across its turns. Regular
   files of any bytes and their modes cascade with the session. A symlink
-  or other type fails the command.
+  or other type fails the command. Under the sandbox shell `/tmp` is
+  the sandbox's own and the rows are never read or written.
 - **Sweeps skip a workspace holding or waiting for a command.** The idle
   sweep (`scratchIdleDays`) expires each workspace by its own last use.
   Archiving drops every workspace of the session; neither path takes one
@@ -229,7 +294,7 @@ that shell that shows a file on the chat page.
   `maxFileReadSize` at `repoFileBytes`, so a larger file is listed and
   reads as File too large. With no repository the worker mounts the
   base alone.
-- **`/repos` never reaches a commit.** `tree.ts` reads the base only.
+- **`/repos` never reaches a commit.** `tree.ts` lists the base only.
   A write under `/repos` fails at the command with Read-only file
   system; one beside the mounts lands in the base and is discarded
   with a notice, a folder alone silently, since the shell makes its
@@ -256,14 +321,8 @@ that shell that shows a file on the chat page.
 
 ## Subagents
 
-- **A subagent's command carries `subagent` in its caps.** It mounts
-  `/uploads` of `uploadsFrom`, its parent's session, and its job's
-  `subagent` flag leaves `open` out of the worker. A change under
-  `/knowledge` (the docs on or off) or `/uploads` is refused at commit
-  with `READ_ONLY_TO_SUBAGENT`, nothing saved, by the worker and, for
-  docs, by the server; `checkOpened()` refuses any opened record. Its
-  `/tmp` comes and goes by copy (`bash/handoff.ts`,
-  `docs/subagents.md`).
+A subagent's command, its caps and its shell are in
+`docs/subagents.md`.
 
 ## The open command
 

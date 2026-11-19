@@ -18,6 +18,7 @@ const credential: CommandCredential = {
   prefix: "https://signed.example.test/api/",
   key: KEY,
   header: "Authorization",
+  template: "Bearer {key}",
   value: `Bearer ${KEY}`,
   methods: ["GET", "POST"],
 };

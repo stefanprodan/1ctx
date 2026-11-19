@@ -26,6 +26,9 @@ import {
 export type CommandHooks = {
   kept(index: number): Uint8Array | null;
   fetch: SecureFetch | null;
+  // the command's process slot: a shell whose command runs elsewhere
+  // frees it for the remote wait and takes it again for its read back
+  slot?: { free(): void; take(signal: AbortSignal): Promise<void> };
 };
 
 export type CommandStops = {

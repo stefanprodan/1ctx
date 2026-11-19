@@ -3,74 +3,48 @@
 //
 // A disposable mount: no transaction is held while the shell runs.
 
-import type {
-  KnowledgeAuthor,
-  KnowledgeFile,
-} from "../../shared/contracts/knowledge.ts";
-import type { WebSnapshot } from "../../shared/web.ts";
+import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
 import type { Db } from "../db/index.ts";
 import {
   acquireProcess,
   type Change,
-  type MountedDoc,
-  type MountedUploads,
+  DocConflict,
 } from "../knowledge/index.ts";
 import type { Clock } from "../lib/clock.ts";
+import { errorFields, type Log } from "../lib/log.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
-import { BACKSTOP_MS, COMMAND_ITERATIONS } from "./commands.ts";
-import { type CommitDocs, commit } from "./commit.ts";
-import { type CommandCredential, commandFetch } from "./credentials.ts";
-import { type KeptEntry, listKept, readKept } from "./kept.ts";
-import { mountableScratch } from "./names.ts";
+import { BACKSTOP_MS } from "./commands.ts";
+import { checked, commit } from "./commit.ts";
+import { commandFetch, scrubKeys } from "./credentials.ts";
 import {
-  checkOpened,
-  mountPath,
-  type OpenedRecord,
-  openedReceipt,
-} from "./open.ts";
+  type CommandCaps,
+  type DocsPort,
+  mountJob,
+  storedBytes,
+} from "./job.ts";
+import { readKept } from "./kept.ts";
+import { checkOpened, type OpenedRecord, openedReceipt } from "./open.ts";
 import { failed, refused } from "./output.ts";
 import type {
   Answer,
-  Changes,
   CommandCause,
   CommandEnd,
   CommandPhase,
-  Job,
-  JobRepo,
 } from "./protocol.ts";
 import { acquireSession } from "./queue.ts";
-import type { Scratch, ScratchStore } from "./scratch.ts";
-import { READ_ONLY_TO_SUBAGENT } from "./tree.ts";
-import type { CommandWorkers } from "./worker.ts";
+import { READ_ONLY_TO_SUBAGENT } from "./readback.ts";
+import type { ScratchStore } from "./scratch.ts";
+import type {
+  SettleOutcome,
+  ShellBackend,
+  ShellCall,
+  ShellHold,
+  ShellRun,
+} from "./shell.ts";
 import { type Workspace, workspaceSession } from "./workspace.ts";
 
-// the repositories a send mounted, read-only under /repos
-export type CommandRepos = {
-  mounts: readonly JobRepo[];
-  fileBytes: number;
-  // what the command's result opens with: a repository left out and why
-  notice: string;
-};
-export type CommandCaps = {
-  callTimeoutMs: number;
-  resultCut: number;
-  visuals: boolean;
-  // false while the send has the project docs off: no /knowledge
-  knowledge: boolean;
-  repos?: CommandRepos;
-  // a subagent's command: /uploads is its parent's, and nothing under
-  // /knowledge or /uploads may change and nothing be opened
-  subagent?: { uploadsFrom: string };
-} & (
-  | { web?: null }
-  | {
-      web: WebSnapshot;
-      fetchDeadlineMs: number;
-      fetchBodyBytes: number;
-      // the send's credentials, their keys read for this command
-      credentials?: CommandCredential[];
-    }
-);
+export type { CommandCaps, CommandRepos, DocsPort } from "./job.ts";
+
 export type CommandResult = {
   content: string;
   error: boolean;
@@ -88,24 +62,21 @@ export type CommandResult = {
   // written
   discarded?: boolean;
 };
-// what a command reads and writes of the docs and uploads, bound to
-// knowledge's stores
-export type DocsPort = {
-  mountedDocs(projectId: string): MountedDoc[];
-  mountedUploads(sessionId: string): MountedUploads;
-  commitDocs: CommitDocs;
-};
 type MountDeps = {
   db: Db;
   knowledge: DocsPort;
   scratch: ScratchStore;
   clock: Clock;
-  workers: CommandWorkers;
+  log: Log;
+  // the shell of this command, asked once per command
+  shell(): ShellBackend;
   current(): KnowledgeCaps;
   // each phase a command's worker reports, by chat
   onPhase?(sessionId: string, phase: "run" | "diff"): void;
   // BACKSTOP_MS unless a test needs the deadline alone to decide
   backstopMs?: number;
+  // a process slot, acquireProcess unless a test watches the waits
+  acquire?(signal: AbortSignal): Promise<() => void>;
 };
 
 const seconds = (ms: number) => Math.round(ms / 1000);
@@ -114,156 +85,51 @@ const seconds = (ms: number) => Math.round(ms / 1000);
 const MIN_RUN_MS = 100;
 // the call's deadline passed in a queue; neither words invite a retry at
 // once, which would rejoin the queue at its back
-function busy(waitedMs: number, timeoutMs: number, ownChat: boolean) {
-  return ownChat
+function busy(waitedMs: number, timeoutMs: number, longest: Wait) {
+  return longest === "own"
     ? `command not run: this chat's earlier commands used the ${seconds(timeoutMs)} s call timeout, combine steps into fewer commands`
-    : `command not run: waited ${seconds(waitedMs)} s for a free slot, the server is busy`;
+    : `command not run: waited ${seconds(waitedMs)} s for a free ${longest}, the server is busy`;
 }
 
-// what the worker answered, held to the mounted trees: no doc changes
-// with the docs off, a delete names a mounted doc, no name twice, and
-// scratch removes only what it mounted and writes no more files than
-// it may hold, since a command inside could post an answer of its own
-function checked(
-  changes: Changes | null,
-  docs: ReadonlyMap<string, KnowledgeFile>,
-  scratch: Scratch,
-  knowledge: boolean,
-  scratchFiles: number,
-): Changes {
-  if (changes === null || (!knowledge && changes.knowledge.length > 0))
-    throw new Error("the command worker answered out of protocol");
-  // bounded before a row is written or a name walked; a lowered cap
-  // still lets an oversized scratch rewrite what it holds
-  if (changes.written.length > Math.max(scratchFiles, scratch.files))
-    throw new Error(
-      `the scratch would have ${changes.written.length} files, the limit is ${scratchFiles}`,
-    );
-  const names = new Set(changes.knowledge.map((change) => change.name));
-  const written = new Set(changes.written.map((file) => file.path));
-  const mounted = new Set(scratch.entries.map((file) => file.path));
-  if (
-    names.size !== changes.knowledge.length ||
-    changes.knowledge.some(
-      (change) => change.text === null && !docs.has(change.name),
-    ) ||
-    written.size !== changes.written.length ||
-    new Set(changes.removed).size !== changes.removed.length ||
-    changes.removed.some((path) => !mounted.has(path) || written.has(path)) ||
-    !mountPath(changes.cwd)
-  )
-    throw new Error("the command worker answered out of protocol");
-  return changes;
-}
+// what a command waited for longest: the chat's own earlier commands,
+// a shell, or a process slot
+type Wait = "own" | "shell" | "slot";
 
-type Mount = {
-  job: Job;
-  rows: MountedDoc[];
-  scratch: Scratch;
-  // scratch rows whose name the rule no longer allows, dropped on commit
-  skipped: string[];
-  kept: KeptEntry[];
-  storage: KnowledgeCaps;
-  // the repository notice and the scratch left out
-  left: string;
-};
-
-function mountJob(
-  deps: MountDeps,
-  caps: CommandCaps,
-  command: string,
-  started: number,
-  projectId: string,
-  workspace: Workspace,
-): Mount {
-  const sessionId = workspaceSession(workspace);
-  const repos = caps.repos;
-  const storage = deps.current();
-  const docs = caps.knowledge;
-  const rows = docs ? deps.knowledge.mountedDocs(projectId) : [];
-  const stored = deps.scratch.read(workspace);
-  // the worker writes each row at /tmp/<path>, so a row outside the
-  // rule never mounts; the commit drops it
-  const mountable = mountableScratch(stored.entries);
-  const scratch = { ...stored, entries: mountable.kept };
-  const skipped = mountable.skipped;
-  const left =
-    (repos?.notice ?? "") +
-    (skipped.length === 0
-      ? ""
-      : `left out ${skipped.length} file${skipped.length === 1 ? "" : "s"} in /tmp whose name is no longer allowed, dropped when the command saves\n`);
-  const scratchTime = deps.scratch.usedAt(workspace) ?? 0;
-  const uploads = deps.knowledge.mountedUploads(
-    caps.subagent?.uploadsFrom ?? sessionId,
-  );
-  const kept = listKept(deps.db, workspace);
-  const keptBytes = kept.reduce((bytes, entry) => bytes + entry.bytes, 0);
-  // A lowered cap still permits deleting or shrinking the mounted base.
-  const projectBytes = Math.max(
-    storage.knowledgeProjectBytes,
-    rows.reduce((bytes, row) => bytes + row.bytes, 0),
-  );
-  const mountBytes =
-    projectBytes +
-    Math.max(storage.scratchBytes, scratch.bytes) +
-    Math.max(storage.uploadBytes, uploads.bytes) +
-    // lazy files count when a command reads them
-    keptBytes +
-    2 * 1024 * 1024;
-  const ioBytes = Math.max(
-    4 * caps.resultCut,
-    storage.scratchBytes,
-    storage.knowledgeFileBytes,
-    ...uploads.entries.map((file) => file.bytes),
-    // the reads the path line teaches (yq, then rg, then sed) add up
-    ...kept.map((entry) => 4 * entry.bytes),
-  );
-  const job: Job = {
-    command,
-    endsAt: started + caps.callTimeoutMs,
-    docs,
-    visuals: caps.visuals,
-    network: Boolean(caps.web),
-    cwd: scratch.cwd,
-    knowledgeFileBytes: storage.knowledgeFileBytes,
-    mountBytes,
-    ioBytes,
-    iterations: COMMAND_ITERATIONS,
-    knowledge: rows.map((row) => ({
-      name: row.name,
-      data: row.data,
-      mtime: row.updatedAt,
-    })),
-    // the scratch commit reads only the revision and totals, so its
-    // bytes can go
-    scratch: scratch.entries.map((file) => ({
-      name: file.path,
-      data: file.data,
-      mode: file.mode,
-      mtime: scratchTime,
-    })),
-    uploads: uploads.entries.map((file) => ({
-      name: file.name,
-      data: file.data,
-      mtime: file.createdAt,
-    })),
-    kept: kept.map((entry) => entry.path),
-    repos: (repos?.mounts ?? []).map((repo) => ({ ...repo })),
-    repoFileBytes: repos?.fileBytes ?? 0,
-    ...(caps.subagent ? { subagent: true } : {}),
+function scrubbedAnswer(
+  answer: Answer,
+  credentials: ShellCall["credentials"],
+): Answer {
+  if (!credentials.some((credential) => "key" in credential)) return answer;
+  return {
+    ...answer,
+    stdout: scrubKeys(answer.stdout, credentials),
+    stderr: scrubKeys(answer.stderr, credentials),
   };
-  return { job, rows, scratch, skipped, kept, storage, left };
 }
 
-// 124 is the interpreter's own deadline, 126 another of its limits: the
-// exit decides, whatever changes came with it
+export const SHELL_SWITCHED =
+  "the shell changed during this turn, so the command did not run: finish with what you have";
+
+// 124 is the interpreter's own deadline, 126 another of its limits,
+// unless the shell's exits are the command's own: the stop decides,
+// whatever changes came with it
+function stopOf(
+  shell: ShellBackend,
+  answer: Answer,
+): "deadline" | "limit" | undefined {
+  if (shell.ownExits) return answer.stopped;
+  if (answer.exitCode === 124) return "deadline";
+  return answer.exitCode === 126 ? "limit" : undefined;
+}
+
 function stopped(
   answer: Answer,
+  stop: "deadline" | "limit",
   late: string,
   notice: string,
   resultCut: number,
 ): CommandResult {
-  const head = answer.exitCode === 124 ? late + notice : notice;
+  const head = stop === "deadline" ? late + notice : notice;
   const printed = refused(
     answer.stdout,
     answer.stderr,
@@ -277,7 +143,7 @@ function stopped(
     error: true,
     ended: {
       phase: "run",
-      cause: answer.exitCode === 124 ? "deadline" : "limit",
+      cause: stop,
     },
   };
 }
@@ -288,11 +154,34 @@ export async function run(
   workspace: Workspace,
   author: KnowledgeAuthor,
   command: string,
-  caps: CommandCaps,
+  given: CommandCaps,
   signal: AbortSignal,
+  sendId: string,
 ): Promise<CommandResult> {
   const sessionId = workspaceSession(workspace);
+  // the deadline is wall time, which a worker's thread and the timer
+  // keep; the waits a result names are the clock's, so a test moves them
   const started = Date.now();
+  const began = deps.clock();
+  const slotOf = deps.acquire ?? acquireProcess;
+  // the shell is picked once, before the timers its deadline sets
+  const shell = deps.shell();
+  // a subagent's credentials were offered for the shell of its send's
+  // start (tools/offer.ts): another one runs none of its commands
+  if (
+    given.subagent &&
+    (given.sandboxCommandMs !== undefined) !==
+      (shell.sharedWithSubagents === true)
+  )
+    return {
+      ...failed(new Error(SHELL_SWITCHED), given.resultCut),
+      ended: { phase: "queue", cause: "error" },
+    };
+  const ownTmp = shell.ownTmp === true;
+  const caps: CommandCaps =
+    shell.sandboxTimeout && given.sandboxCommandMs !== undefined
+      ? { ...given, callTimeoutMs: given.sandboxCommandMs }
+      : given;
   const deadline = new AbortController();
   const timer = setTimeout(
     () => deadline.abort(new Error("command timed out")),
@@ -301,23 +190,57 @@ export async function run(
   const combined = AbortSignal.any([signal, deadline.signal]);
   let release: (() => void) | undefined;
   let releaseSession: (() => void) | undefined;
+  // what the shell's acquire took, until the run takes it over
+  let hold: ShellHold | null = null;
+  // the run whose settle is owed, given once
+  let ran: ShellRun | null = null;
+  const settle = (outcome: SettleOutcome): string | undefined => {
+    const owed = ran;
+    ran = null;
+    if (owed === null) return;
+    try {
+      return owed.settle(outcome);
+    } catch (error) {
+      deps.log.warn("shell settle failed", {
+        chat: sessionId,
+        ...errorFields(error),
+      });
+    }
+  };
+  // set once the answer is checked for its commit: a throw from there
+  // is the commit's
+  let committing = false;
   // a repository's notice stands even when the command never mounts
   let notice = caps.repos?.notice ?? "";
   // set once the command ran, so a refused save still shows its output
   let answer: Answer | undefined;
   let phase: CommandPhase = "queue";
+  // true while the shell's acquire is pending
+  let inShell = false;
   // the worker's word when neither signal fired: a shutdown is an abort
   let ended: CommandCause = "error";
   // a late start leads the result, so the command never reads as too slow
   let late = "";
-  // when the chat's turn came, to name the longer wait
+  // when the chat's turn came and when its shell was held, to name the
+  // longest wait
   let turnAt: number | undefined;
-  const ownChat = (now: number) =>
-    (turnAt ?? now) - started >= now - (turnAt ?? now);
+  let heldAt: number | undefined;
+  const longest = (now: number): Wait => {
+    const turn = turnAt ?? now;
+    const held = heldAt ?? now;
+    const queued = turn - began;
+    const shellWait = held - turn;
+    // a shell that was not free names itself unless the chat's own
+    // commands took longer
+    if (inShell) return queued > shellWait ? "own" : "shell";
+    const slotWait = now - held;
+    if (queued >= shellWait && queued >= slotWait) return "own";
+    return shellWait > slotWait ? "shell" : "slot";
+  };
   const busyResult = (): CommandResult => {
-    const now = Date.now();
+    const now = deps.clock();
     return {
-      content: notice + busy(now - started, caps.callTimeoutMs, ownChat(now)),
+      content: notice + busy(now - began, caps.callTimeoutMs, longest(now)),
       error: true,
       ended: { phase: "queue", cause: "busy" },
     };
@@ -333,35 +256,76 @@ export async function run(
     if (timedOut) return phase === "queue" ? "busy" : "deadline";
     return signal.aborted ? "abort" : ended;
   };
+  const call: ShellCall = {
+    projectId,
+    workspace,
+    root:
+      shell.sharedWithSubagents && caps.subagent?.workspace !== undefined
+        ? caps.subagent.workspace
+        : workspace.id,
+    sendId,
+    subagent: Boolean(caps.subagent),
+    repos: (caps.repos?.mounts ?? []).map((repo) => ({
+      name: repo.name,
+      tree: repo.folder,
+    })),
+    repoFileBytes: caps.repos?.fileBytes ?? 0,
+    network: Boolean(caps.web),
+    credentials: caps.web ? (caps.credentials ?? []) : [],
+    stored: () => storedBytes(deps, caps, projectId, workspace),
+  };
   try {
-    releaseSession = await acquireSession(workspace, combined);
-    turnAt = Date.now();
-    release = await acquireProcess(combined);
+    releaseSession = await acquireSession(
+      workspace,
+      combined,
+      shell.atOnce === true,
+    );
+    turnAt = deps.clock();
+    if (shell.acquire) {
+      inShell = true;
+      const got = await shell.acquire(
+        call,
+        started + caps.callTimeoutMs,
+        combined,
+      );
+      if (got === "busy") return busyResult();
+      hold = got;
+      inShell = false;
+    }
+    // without an acquire no time goes to the shell
+    heldAt = shell.acquire ? deps.clock() : turnAt;
+    release = await slotOf(combined);
     combined.throwIfAborted();
-    const now = Date.now();
-    const waitedMs = now - started;
+    const now = deps.clock();
+    const waitedMs = now - began;
     // the slots came with the call's time spent: running would only end
-    // at once at the deadline
-    if (caps.callTimeoutMs - waitedMs < MIN_RUN_MS) return busyResult();
+    // at once at the deadline, which is the wall's
+    if (started + caps.callTimeoutMs - Date.now() < MIN_RUN_MS)
+      return busyResult();
     if (waitedMs > 1000) {
-      const behind = ownChat(now)
-        ? "behind this chat's earlier commands"
-        : "for a free slot";
+      const wait = longest(now);
+      const behind =
+        wait === "own"
+          ? "behind this chat's earlier commands"
+          : `for a free ${wait}`;
       late = `waited ${seconds(waitedMs)} s ${behind}, so the command had ${Math.max(0, seconds(caps.callTimeoutMs) - seconds(waitedMs))} s to run\n`;
     }
     phase = "mount";
-    const { job, rows, scratch, skipped, kept, storage, left } = mountJob(
-      deps,
-      caps,
-      command,
-      started,
-      projectId,
-      workspace,
-    );
+    const { job, rows, scratch, skipped, kept, storage, left, mounted } =
+      mountJob(deps, caps, command, started, projectId, workspace, ownTmp);
     const docs = caps.knowledge;
     notice = left;
-    const settled = await deps.workers.run(
+    // the hold is the backend's from here, whatever run does
+    const handed = hold;
+    hold = null;
+    ran = await shell.run(
       job,
+      {
+        ...call,
+        mounted,
+        hold: handed,
+        docs: () => (docs ? deps.knowledge.mountedDocs(projectId) : []),
+      },
       {
         // MCP results past the cut, read from the database on first read
         kept: (index) =>
@@ -372,6 +336,16 @@ export async function run(
               maxResponseSize: caps.fetchBodyBytes,
             })
           : null,
+        slot: {
+          free() {
+            const held = release;
+            release = undefined;
+            held?.();
+          },
+          async take(waiting) {
+            if (release === undefined) release = await slotOf(waiting);
+          },
+        },
       },
       {
         signal,
@@ -380,30 +354,50 @@ export async function run(
         phase: (reached) => deps.onPhase?.(sessionId, reached),
       },
     );
+    const settled = ran.settled;
     if (!settled.ok) {
       phase = settled.phase;
       notice = left + settled.notice;
       ended = settled.cause;
       throw combined.aborted ? combined.reason : settled.error;
     }
-    answer = settled.answer;
+    // a key crossing the cut would leave a fragment no scrub matches,
+    // so the output is scrubbed whole before any cut
+    answer = scrubbedAnswer(settled.answer, call.credentials);
     phase = "diff";
     notice = left + answer.notice;
     combined.throwIfAborted();
-    if (answer.exitCode === 124 || answer.exitCode === 126) {
-      return stopped(answer, late, notice, caps.resultCut);
+    const stop = stopOf(shell, answer);
+    if (stop !== undefined) {
+      return stopped(answer, stop, late, notice, caps.resultCut);
     }
     if (answer.refused !== null) throw new Error(answer.refused);
-    const mounted = new Map(rows.map(({ data: _, ...row }) => [row.name, row]));
+    committing = true;
+    // a shell that read the rows again at its save diffs against those
+    const against = ran.rows ?? rows;
+    const before = new Map(
+      against.map(({ data: _, ...row }) => [row.name, row]),
+    );
     const answered = checked(
       answer.changes,
-      mounted,
+      before,
       scratch,
       docs,
       storage.scratchFiles,
     );
+    // a shell that keeps /tmp itself answers no scratch file
+    if (
+      ownTmp &&
+      (answered.written.length > 0 || answered.removed.length > 0)
+    ) {
+      throw new Error("the command worker answered out of protocol");
+    }
     // the worker's own refusal is only words; the server's is this
-    if (caps.subagent && answered.knowledge.length > 0) {
+    if (
+      caps.subagent &&
+      !shell.sharedWithSubagents &&
+      answered.knowledge.length > 0
+    ) {
       throw new Error(READ_ONLY_TO_SUBAGENT);
     }
     const opened = checkOpened(answer.opened, {
@@ -414,12 +408,12 @@ export async function run(
     });
     const changes: Change[] = answered.knowledge.map((change) => ({
       name: change.name,
-      before: mounted.get(change.name) ?? null,
+      before: before.get(change.name) ?? null,
       text: change.text,
     }));
     phase = "commit";
     combined.throwIfAborted();
-    const printed = commit(
+    const { printed, landed } = commit(
       {
         db: deps.db,
         scratch: deps.scratch,
@@ -432,6 +426,7 @@ export async function run(
       {
         workspace,
         before: scratch,
+        owned: ownTmp,
         changes: {
           written: answered.written,
           removed: [...answered.removed, ...skipped],
@@ -448,6 +443,7 @@ export async function run(
       combined,
       deps.clock(),
     );
+    settle({ landed: true, ...landed });
     return {
       ...printed,
       content: notice + printed.content,
@@ -455,13 +451,21 @@ export async function run(
       opened,
     };
   } catch (error) {
+    const words = settle(
+      !committing
+        ? { landed: false, why: "skipped" }
+        : error instanceof DocConflict
+          ? { landed: false, why: "thrown", moved: error.doc }
+          : { landed: false, why: "thrown" },
+    );
     const why = cause();
     if (why === "busy") return busyResult();
     if (why === "deadline") notice = late + notice;
     const cut = caps.resultCut - notice.length;
+    const shown = words === undefined ? error : new Error(words);
     const result = answer
-      ? refused(answer.stdout, answer.stderr, answer.exitCode, error, cut)
-      : failed(error, cut);
+      ? refused(answer.stdout, answer.stderr, answer.exitCode, shown, cut)
+      : failed(shown, cut);
     return {
       ...result,
       content: notice + result.content,
@@ -471,6 +475,9 @@ export async function run(
     };
   } finally {
     clearTimeout(timer);
+    // a run that saved nothing and returned, an exit at a limit
+    settle({ landed: false, why: "skipped" });
+    hold?.release();
     release?.();
     releaseSession?.();
   }

@@ -25,18 +25,13 @@ import {
   type McpMode,
   type SearchProvider,
 } from "../../shared/words.ts";
-import type { BashCapability } from "../bash/index.ts";
+import type { BashToolPort } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
-import {
-  type Mcp,
-  NO_OFFER,
-  type OfferedMcpTool,
-  type OfferedServer,
-} from "../mcp/index.ts";
+import type { OfferedMcpTool, OfferedServer } from "../mcp/index.ts";
 import type { MemoryCapability } from "../memory/index.ts";
 import type { ToolCall } from "../providers/index.ts";
 import { type AgentEmailDeps, agentEmails } from "./agent-email.ts";
@@ -46,7 +41,11 @@ import {
   type AutomationsPort,
   makeAutomationTool,
 } from "./builtin/automation.ts";
-import { type CredentialKeysPort, makeBashTool } from "./builtin/bash.ts";
+import {
+  type CredentialKeysPort,
+  makeBashTool,
+  offeredShell,
+} from "./builtin/bash.ts";
 import { datetimeTool } from "./builtin/datetime.ts";
 import {
   DELEGATE_TOOL,
@@ -62,8 +61,10 @@ import {
 import {
   asMcpCall,
   checkMcpArguments,
+  type McpPort,
   makeMcpCatalogTools,
   mcpCallName,
+  NO_MCP,
   resolveMcpCall,
 } from "./builtin/mcp.ts";
 import { runMemory } from "./builtin/memory.ts";
@@ -91,6 +92,7 @@ import { ToolStore } from "./store.ts";
 import type {
   MemoryScope,
   Offered,
+  OfferedShell,
   Tool,
   ToolContext,
   ToolResult,
@@ -144,18 +146,14 @@ export type ToolsDeps = {
   log: Log;
   render: (markdown: string) => string;
   skills: SkillsPort;
-  mcp?: Pick<
-    Mcp,
-    "offered" | "offeredSides" | "switchable" | "call" | "validateArguments"
-  >;
+  mcp?: McpPort;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
-  bash?: Pick<BashCapability, "run">;
+  bash?: BashToolPort;
   // the project's credentials for a send, and each row and key again at
   // each command
   credentials?: CredentialsPort & CredentialKeysPort;
   searchDeps?: SearchDependencies;
-  // email_user's: whether email is set up, and what the tool reads and
-  // queues; without it the tool is never offered
+  // email_user's setup and outbox; without it the tool is never offered
   email?: Omit<AgentEmailDeps, "db" | "clock"> & { enabled(): boolean };
   usage?: {
     visuals(since: number, until: number): VisualCounts;
@@ -171,8 +169,7 @@ export type ToolsDeps = {
 
 export type Tools = {
   capabilities(): string[];
-  // the names of the servers offered in the project that a disabled set
-  // turns off
+  // the servers in the project that a disabled set turns off
   serverNames(
     projectId: string,
     disabledCapabilities: readonly string[],
@@ -212,15 +209,7 @@ const MCP_BACKSTOP_MS = 1000;
 export function toolsArea(deps: ToolsDeps): ToolsArea {
   const store = new ToolStore(deps.db);
   const skillStore: SkillsPort = deps.skills;
-  const mcpService = deps.mcp ?? {
-    switchable: () => [],
-    offered: () => NO_OFFER,
-    offeredSides: () => NO_OFFER,
-    async call() {
-      throw new Error("MCP is not configured");
-    },
-    validateArguments: () => null,
-  };
+  const mcpService = deps.mcp ?? NO_MCP;
   const searchDeps: SearchDependencies = deps.searchDeps ?? {
     fetch: deps.fetcher,
     sleep: abortableSleep,
@@ -230,8 +219,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     email === undefined
       ? null
       : agentEmails({ db: deps.db, clock: deps.clock, ...email });
-  // the admin's row and a server set up: a send is offered the tool only
-  // with both
+  // the admin's row and a server set up: the tool is offered only with both
   const emailOn = () =>
     email !== undefined && store.row(EMAIL_TOOL).enabled && email.enabled();
   const automations = deps.automations ?? null;
@@ -250,6 +238,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     credentials: SendCredentials,
     subagent = false,
     chatMain = false,
+    deadlineMs: number | null = null,
+    shell?: OfferedShell,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
@@ -274,6 +264,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       keys: deps.credentials,
       docs: knowledge,
       subagent,
+      deadlineMs,
+      ...offeredShell(deps.bash, shell),
     }),
   ];
 
@@ -387,6 +379,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           emailOn,
           automationOn,
           externalTaskOn,
+          sandbox: () => (deps.bash?.sandbox?.() ?? null) !== null,
+          commandSeconds: () => deps.bash?.sandboxCommandSeconds?.(),
           toolsFor,
           log: deps.log,
         },
@@ -454,6 +448,8 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           },
           offered.subagent,
           offered.chatMain === true,
+          null,
+          offered,
         )
           .filter((tool) => allowed.has(tool.name))
           .map((tool) =>

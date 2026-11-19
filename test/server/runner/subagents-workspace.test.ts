@@ -8,10 +8,11 @@
 import { describe, expect, test } from "bun:test";
 import { copyBack, copyIn } from "../../../src/server/bash/handoff.ts";
 import { checkOpened } from "../../../src/server/bash/open.ts";
+import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/readback.ts";
 import { ScratchStore } from "../../../src/server/bash/scratch.ts";
-import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/tree.ts";
 import { transact } from "../../../src/server/db/index.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
+import { SANDBOX_SUBAGENT_LINE } from "../../../src/server/runner/prompt.ts";
 import { type ChatApp, startChat, waitScript } from "../../helpers/chat.ts";
 import {
   bashCall,
@@ -22,6 +23,7 @@ import {
   scratchLeft,
   settled,
   subagentApp,
+  system,
 } from "../../helpers/subagents.ts";
 import { stage, start } from "./uploads-helpers.ts";
 
@@ -74,6 +76,40 @@ describe("a subagent's /tmp", () => {
         "sub-1/report.md": "report",
         "sub-1/seed.txt": "changed",
       });
+      const [childId] = childrenOf(chat, sessionId);
+      expect(scratchLeft(chat, childId!)).toBe(0);
+    } finally {
+      await chat.app.shutdown();
+    }
+  });
+
+  test("under the sandbox shell nothing is copied in or back, and the subagent is told it shares the sandbox", async () => {
+    const chat = await subagentApp();
+    // the offer reads bash's word on the shell; the commands still run
+    // in the built-in one, whose rows show what the handoff did
+    chat.app.bash.sandbox = () => ({ mode: "off", hosts: [] });
+    try {
+      const { script, sessionId } = await startChat(chat, "write a report");
+      script.toolRound([bashCall("b1", "printf seed > /tmp/seed.txt")]);
+      script.end();
+      const second = await waitScript(chat.scripted, 2);
+      second.toolRound([delegateCall("d1", "Write the report.")]);
+      second.end();
+      const child = await waitScript(chat.scripted, 3);
+      expect(isChild(child)).toBe(false);
+      expect(system(child)).toContain(SANDBOX_SUBAGENT_LINE);
+      child.toolRound([
+        bashCall("c1", "ls /tmp; printf report > /tmp/report.md"),
+      ]);
+      child.end();
+      const answer = await waitScript(chat.scripted, 4);
+      expect(lastResult(answer)).not.toContain("seed.txt");
+      answer.reply("The report says hi.");
+      const back = await waitScript(chat.scripted, 5);
+      expect(lastResult(back)).toBe("The report says hi.");
+      back.reply("done");
+      await settled(chat, sessionId);
+      expect(scratchOf(chat, sessionId)).toEqual({ "seed.txt": "seed" });
       const [childId] = childrenOf(chat, sessionId);
       expect(scratchLeft(chat, childId!)).toBe(0);
     } finally {

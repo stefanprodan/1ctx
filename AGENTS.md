@@ -11,8 +11,10 @@ them on schedules (automations), with shared knowledge and memory.
   the user's explicit go-ahead. In `src/`, only
   `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
   only `server/email/smtp.ts` imports `nodemailer`, only
-  `server/mcp-server/` imports `@modelcontextprotocol/server`, and only
-  `client/ui/Plot.tsx` imports `uplot`. `patches/` holds modern-tar's
+  `server/mcp-server/` imports `@modelcontextprotocol/server`, only
+  `client/ui/Plot.tsx` imports `uplot`, and only `server/sandbox/`
+  imports `openshell-sdk` and its packages (`PACKAGE_OWNERS` in
+  `test/structure.ts`). `patches/` holds modern-tar's
   patch: it keeps the raw header `typeflag`, so GNU sparse and unknown
   types are not read as regular files, and cancelling an entry's body
   never drops the next entry's, which hung the stream.
@@ -43,6 +45,7 @@ make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 make image          # the container image, native and loaded; PLATFORMS=a,b only builds
 make image-smoke    # run the image as production does, sign in, stop it (CI runs it)
+make sandbox-image  # the sandbox image, native, loaded as 1ctx-shell:dev
 make kind-up        # the local kind cluster 1ctx-test; kind-image, kind-down
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
 make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
@@ -54,8 +57,11 @@ make models         # refresh src/server/providers/models.json from models.dev
 
 The preview is a local, throwaway instance for trying a change. It runs
 the source with `ONECTX_DEV=1` against `.preview/1ctx.sqlite` and the
-secrets in `.preview/secrets/`. A CSS edit hot-reloads, a client edit
-reloads the page, a server edit restarts the process. The first start
+secrets in `.preview/secrets/`. `PREVIEW_SHELL=sandbox` adds an
+OpenShell gateway and the sandbox shell (`docs/deploy.md`); a second
+checkout sets `PREVIEW_PORT` and `PREVIEW_GATEWAY_PORT`. A CSS edit
+hot-reloads, a client edit reloads the page, a server edit restarts
+the process. The first start
 writes `user-admin.key` with the password `admin-preview`. Check a UI
 change in Chrome through the DevTools MCP at 1440 and 390 wide; the
 console must stay empty. Report what was verified and how. Do not commit
@@ -91,10 +97,12 @@ skills/       installable agent skills, added by URL, never seeded;
 site/         1ctx.dev and the brand files, its own project.
               site/README.md is the brand book.
 vendor/       just-bash/ (a git subtree, outside Biome and the structure
-              rules) and its three docs.
+              rules) and its three docs; openshell-sdk/, OpenShell's
+              TypeScript SDK with its generated stubs, kept the same way.
 docs/         the rules of each area (see Docs).
 deploy/       docker/ (the Docker Compose files), charts/onectx/ (the Helm
-              chart) and flux/ (its Flux example); docs/deploy.md.
+              chart), flux/ (its Flux example) and sandbox/ (the
+              sandbox image); docs/deploy.md.
 ```
 
 **Server areas.** `src/server/<area>/` has `index.ts` (what others may
@@ -144,7 +152,8 @@ change it in the same commit as the code that changes a rule.
 | `docs/composer.md` | `composer/`: the draft, its files and switches, the slash commands |
 | `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
-| `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
+| `docs/access.md` | requests and the router, logins, users, names, project visibility, the socket, links by email |
+| `docs/secrets.md` | `secrets/`: the secret files, their kinds, reads and the log scrub |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, stream bounds |
@@ -168,11 +177,14 @@ change it in the same commit as the code that changes a rule.
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
 | `docs/dictation.md` | `dictation/`: the Dictation setting, `POST /api/transcribe`, its WAV check, cap, call and usage row |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
+| `docs/sandbox.md` | `sandbox/`: the sandbox shell's settings, the gateway port, leases, the pool, the sweeps |
+| `docs/sandbox-commands.md` | a command in the sandbox: its base, push, fence, walk, read back and settle; the sandbox a chat shares with its subagents |
+| `docs/sandbox-network.md` | the sandbox's network: its hosts, OpenShell's policy, credentials as providers, the scrub, differences from the built-in curl |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |
 | `docs/load-testing.md` | `scripts/load/`: the load harness, its fakes, databases, fence, targets and results |
-| `vendor/README.md` | changing or syncing `vendor/just-bash/` |
+| `vendor/README.md` | changing or syncing `vendor/just-bash/` and `vendor/openshell-sdk/` |
 | `vendor/changes.md` | a hunk of `vendor/just-bash/`: its `(1ctx <id>)` entry, same commit |
 | `vendor/differences.md` | where a vendored command still differs from its tool |
 
@@ -244,7 +256,7 @@ fixture under `test/fixtures/structure/`.
 - **Secrets are files**, one bare value per `<kind>-<name>.key`, read
   through the secrets port bound to the caller's kind. A value is never
   logged, returned by a route or stored in the database
-  (`docs/access.md`).
+  (`docs/secrets.md`).
 - **Session is the domain noun** and never means a cookie; the cookie
   is a login.
 - **A log line is one slog text event** on stderr, from `logger(area)`

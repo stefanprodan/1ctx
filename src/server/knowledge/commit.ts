@@ -12,6 +12,19 @@ import { checkFile, checkNames, checkTotals } from "./check.ts";
 import type { KnowledgeStore } from "./store.ts";
 import { lineCount } from "./text.ts";
 
+// a doc another write moved since the change read it, named for a shell
+// that puts it back
+export class DocConflict extends Conflict {
+  // logged as the Conflict it is
+  override name = "Conflict";
+  constructor(
+    message: string,
+    readonly doc: string,
+  ) {
+    super(message);
+  }
+}
+
 export type Change = {
   name: string;
   before: KnowledgeFile | null;
@@ -43,10 +56,11 @@ export function commitKnowledge(
         : found?.id !== change.before.id ||
           found.revision !== change.before.revision
     ) {
-      throw new Conflict(
+      throw new DocConflict(
         source === "upload"
           ? `${change.name} changed while uploading, try again`
           : `${change.name} changed while the command ran, read it again`,
+        change.name,
       );
     }
     bytes -= found?.bytes ?? 0;

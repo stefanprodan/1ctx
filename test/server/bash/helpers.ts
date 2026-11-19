@@ -1,10 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bashArea, type Workspace } from "../../../src/server/bash/index.ts";
+import {
+  type BashDeps,
+  bashArea,
+  type Workspace,
+} from "../../../src/server/bash/index.ts";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import type { ScratchChanges } from "../../../src/server/bash/scratch.ts";
 import { transact } from "../../../src/server/db/index.ts";
+import { acquireProcess } from "../../../src/server/knowledge/index.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import type { KnowledgeCaps } from "../../../src/server/limits/index.ts";
 import { setup as knowledgeSetup } from "../knowledge/helpers.ts";
@@ -20,10 +25,13 @@ export function setup(
   overrides: Partial<KnowledgeCaps> = {},
   worker = COMMAND_WORKER,
   backstopMs?: number,
+  shell?: BashDeps["shell"],
 ) {
   const { area: knowledge, ...base } = knowledgeSetup(overrides);
   const phases: { sessionId: string; phase: string }[] = [];
   const waking = new Set<() => void>();
+  // the process slots asked for, each before its wait
+  const slots = { asked: 0 };
   const bash = bashArea({
     db: base.db,
     clock: () => base.now.value,
@@ -31,13 +39,20 @@ export function setup(
     log: silent,
     worker,
     ...(backstopMs ? { backstopMs } : {}),
+    ...(shell ? { shell } : {}),
     onCommandPhase: (sessionId, phase) => {
       phases.push({ sessionId, phase });
       for (const wake of [...waking]) wake();
     },
+    acquireProcess: (signal) => {
+      const slot = acquireProcess(signal);
+      slots.asked++;
+      for (const wake of [...waking]) wake();
+      return slot;
+    },
     knowledge,
   });
-  return { ...base, knowledge, bash, phases, waking };
+  return { ...base, knowledge, bash, phases, waking, slots };
 }
 
 export type Setup = ReturnType<typeof setup>;
@@ -49,6 +64,7 @@ export const callCaps = {
   knowledge: true,
 };
 export const freshSignal = () => new AbortController().signal;
+export const SEND_ID = "send00000001";
 
 export const run = (
   s: Setup,
@@ -65,6 +81,7 @@ export const run = (
     command,
     caps,
     signal,
+    SEND_ID,
   );
 
 export function seedScratch(s: Setup, changes: Partial<ScratchChanges>) {
@@ -119,6 +136,20 @@ export function untilPhase(
       );
       if (at < 0) return;
       s.phases.splice(at, 1);
+      s.waking.delete(check);
+      resolve();
+    };
+    s.waking.add(check);
+    check();
+  });
+}
+
+// Resolves once the setup's commands asked for this many process slots,
+// so a test moves the clock only while a command waits in that queue.
+export function untilSlotsAsked(s: Setup, count: number): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (s.slots.asked < count) return;
       s.waking.delete(check);
       resolve();
     };

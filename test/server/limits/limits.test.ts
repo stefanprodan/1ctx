@@ -278,12 +278,37 @@ describe("limits area", () => {
     }
   });
 
+  test("defines the sandbox limits, the warm pool held under the cap", () => {
+    const of = (name: keyof typeof LIMIT_DEFINITIONS) => {
+      const { default: value, min, max, unit } = LIMIT_DEFINITIONS[name];
+      expect(LIMIT_DEFINITIONS[name].scope).toBe("sandbox");
+      return [value, min, max, unit];
+    };
+    expect(of("sandboxesMax")).toEqual([20, 1, 256, "count"]);
+    expect(of("sandboxWarm")).toEqual([0, 0, 32, "count"]);
+    expect(of("sandboxIdleMinutes")).toEqual([30, 1, 240, "minutes"]);
+    expect(of("sandboxCpus")).toEqual([4, 1, 64, "count"]);
+    expect(of("sandboxMemoryMiB")).toEqual([4096, 256, 65_536, "mebibytes"]);
+    expect(of("sandboxCommandSeconds")).toEqual([600, 20, 3600, "seconds"]);
+    const db = memoryDb();
+    try {
+      const area = limitsArea({ db, clock: () => 100, cores: 1 });
+      expect(() => area.set({ sandboxesMax: 2, sandboxWarm: 3 }, 100)).toThrow(
+        "sandboxWarm must not be above sandboxesMax",
+      );
+      area.set({ sandboxesMax: 2, sandboxWarm: 2 }, 100);
+      expect(area.current()).toMatchObject({ sandboxesMax: 2, sandboxWarm: 2 });
+    } finally {
+      db.close();
+    }
+  });
+
   test("lists every limit once in its scope with the runtime defaults", () => {
     const db = memoryDb();
     try {
       const rows = limitsArea({ db, clock: () => 100, cores: 1 }).rows();
-      expect(rows).toHaveLength(67);
-      expect(new Set(rows.map((row) => row.name)).size).toBe(67);
+      expect(rows).toHaveLength(73);
+      expect(new Set(rows.map((row) => row.name)).size).toBe(73);
       expect(rows.filter((row) => row.scope === "send")).toHaveLength(19);
       expect(rows.filter((row) => row.scope === "call")).toHaveLength(9);
       expect(rows.filter((row) => row.scope === "knowledge")).toHaveLength(13);
@@ -294,6 +319,7 @@ describe("limits area", () => {
       expect(rows.filter((row) => row.scope === "repos")).toHaveLength(4);
       expect(rows.filter((row) => row.scope === "dictation")).toHaveLength(1);
       expect(rows.filter((row) => row.scope === "images")).toHaveLength(7);
+      expect(rows.filter((row) => row.scope === "sandbox")).toHaveLength(6);
       expect(LIMIT_DEFINITIONS.dictationClipsPerUser).toEqual({
         default: 30,
         min: 1,
@@ -491,6 +517,25 @@ describe("limits area", () => {
     }
   });
 
+  test("every write calls the saved port, so the sandboxes read the limits again", () => {
+    const db = memoryDb();
+    try {
+      let saves = 0;
+      const area = limitsArea({
+        db,
+        clock: () => 100,
+        cores: 1,
+        saved: () => saves++,
+      });
+      area.set({ ...DEFAULT_LIMITS, sandboxWarm: 1 }, 100);
+      area.set({ ...DEFAULT_LIMITS, rounds: 20 }, 110);
+      area.reset();
+      expect(saves).toBe(3);
+    } finally {
+      db.close();
+    }
+  });
+
   test("saves the send, tool-work and bash limits through the full-set PUT", async () => {
     const app = await testApp();
     try {
@@ -511,7 +556,7 @@ describe("limits area", () => {
       });
       expect(saved.status).toBe(200);
       const body: LimitsResponse = await saved.json();
-      expect(body.limits).toHaveLength(67);
+      expect(body.limits).toHaveLength(73);
       expect(body.limits).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: "rounds", value: 250 }),

@@ -42,9 +42,10 @@ data kept on your server.
 - **MCP and skills.** Connect [MCP](https://modelcontextprotocol.io/)
   servers and install [Agent Skills](https://agentskills.io/). Choose
   which capabilities a chat or automation can use.
-- **Sandboxed commands.** Agents use a sandboxed shell with built-in
-  commands and a virtual filesystem to work with project files. They can
-  call HTTP APIs with managed credentials.
+- **Sandboxed commands.** Agents use a built-in shell with a virtual
+  filesystem, or a Linux sandbox per chat on
+  [OpenShell](https://github.com/NVIDIA/OpenShell). They can call HTTP
+  APIs with managed credentials.
 - **Repository context.** Mount GitHub and GitLab repositories read-only
   so agents can inspect code alongside the project's knowledge.
 - **Web and visuals.** Agents can search the web, fetch pages and create

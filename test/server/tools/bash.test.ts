@@ -6,6 +6,7 @@
 // registry alongside the receipts.
 
 import { describe, expect, test } from "bun:test";
+import { BACKSTOP_MS } from "../../../src/server/bash/index.ts";
 import {
   acquireSession,
   heldWorkspaces,
@@ -22,6 +23,7 @@ import {
 import { builtinCatalog } from "../../../src/server/tools/catalog.ts";
 import { Registry } from "../../../src/server/tools/registry.ts";
 import type { ToolContext } from "../../../src/server/tools/types.ts";
+import { SANDBOX_DEFAULT_HOSTS } from "../../../src/shared/sandbox-net.ts";
 import { settleRun } from "../../helpers/automations.ts";
 import { chatApp, startChat, waitScript } from "../../helpers/chat.ts";
 import { freshSignal, type Setup, setup } from "../bash/helpers.ts";
@@ -466,6 +468,7 @@ describe("bash with credentials", () => {
         prefix: quotes.prefix,
         key: KEY,
         header: "X-Api-Key",
+        template: "Token {key}",
         value: `Token ${KEY}`,
         methods: ["GET"],
       },
@@ -578,5 +581,286 @@ describe("bash with credentials", () => {
     });
     await tool.run({ command: "ls" }, context());
     expect(caps).not.toHaveProperty("credentials");
+  });
+});
+
+describe("bash's description under the sandbox shell", () => {
+  const github = {
+    id: "gh1",
+    name: "gh-api",
+    keyName: "http-gh",
+    prefix: "https://api.github.test/",
+    header: "Authorization",
+    template: "token {key}",
+    methods: ["GET" as const, "POST" as const],
+  };
+  const cookie = {
+    ...github,
+    id: "c1",
+    name: "session",
+    header: "Cookie",
+    template: "s={key}",
+  };
+  const listed = {
+    mode: "listed" as const,
+    domains: ["api.github.test", "pypi.test"],
+  };
+
+  const hosts = { mode: "hosts" as const, hosts: SANDBOX_DEFAULT_HOSTS };
+
+  // the words as the user wrote them: a call's time and the idle time
+  // from the limits, then the network and each credential
+  const WORDS =
+    "Run a bash command in this chat's Linux sandbox: Python 3.15 with uv, Bun, git, jq, yq and rg; no node. /knowledge is the project's shared docs, saved as a new version when the command ends; if someone else changed a file meanwhile, nothing is saved: read it again and retry. /uploads holds the user's attachments, read-only. /tmp and $HOME are yours until the sandbox is recycled (after 30 idle minutes, a restart, a timeout or a failed save), so keep what must last in /knowledge. Search before reading: rg -il 'word' /knowledge, grep -n, sed -n '40,120p'. Never print whole files or trees; long output is cut. Each call is a new shell in the last directory: chain one task's steps in one call, and make independent calls in parallel. A call may run 10 minutes; send a background job's output to a file. Install with uv run --with pkg, a venv under $HOME, or bun add in a project under $HOME. open <file> shows a file to the user: HTML and SVG as visuals, Markdown rendered. Network: HTTP and HTTPS to the admin's list only: package and container registries, code hosts, docs, news and public APIs (pypi.org, registry.npmjs.org, github.com…); anything else is refused. Never write secrets.";
+
+  test("its words are the short ones, byte for byte", () => {
+    const hash = (text: string) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    const words = makeBashTool({ web: listed, sandbox: hosts }).description;
+    expect(words).toBe(WORDS);
+    expect(hash(words)).toBe(
+      "89f76173d949afc6e9a79e568dd3557036a435bef4795f7ad4a39aefa88c2a02",
+    );
+    expect(hash(makeBashTool({ web: null, sandbox: hosts }).description)).toBe(
+      "a74885d876fdd6a2a0eb3991b9694d12e00c870b2f2be20dd293a0033226d3cf",
+    );
+    expect(
+      hash(
+        makeBashTool({ web: listed, sandbox: hosts, subagent: true })
+          .description,
+      ),
+    ).toBe("0f9671be33052b1e11364b50024afef77664e36e156649b7cd5f3fb018a37300");
+  });
+
+  test("each credential it can place follows the network, its header named", () => {
+    const words = makeBashTool({
+      web: listed,
+      credentials: { offered: [github, cookie], off: [] },
+      sandbox: hosts,
+    }).description;
+    expect(words).toContain(
+      'anything else is refused. For https://api.github.test/ (gh-api) send -H "Authorization: token $ONECTX_CRED_GH_API", a placeholder the key replaces there alone. Never write secrets.',
+    );
+    expect(words).not.toContain("session");
+    expect(words).not.toContain("send no key");
+  });
+
+  test("a header or template the shell would read is never offered", () => {
+    const words = makeBashTool({
+      web: listed,
+      credentials: {
+        offered: [
+          { ...github, name: "dollar", template: "token $(id) {key}" },
+          { ...github, name: "tick", header: "X-`id`", template: "{key}" },
+          { ...github, name: "quote", template: 'a" {key}' },
+          { ...github, name: "slash", template: "a\\ {key}" },
+        ],
+        off: [],
+      },
+      sandbox: hosts,
+    }).description;
+    expect(words).not.toContain("send -H");
+  });
+
+  test("the admin's list is named by kind, never by its hosts", () => {
+    const many = Array.from({ length: 13 }, (_, i) => `h${i + 10}.test`);
+    const words = makeBashTool({
+      web: { mode: "all", domains: [] },
+      sandbox: { mode: "hosts", hosts: many },
+    }).description;
+    expect(words).toBe(
+      WORDS.replace(" (pypi.org, registry.npmjs.org, github.com…)", ""),
+    );
+    expect(words).not.toContain("h10.test");
+    expect(words).not.toContain("any host");
+  });
+
+  test("its examples are only those the admin's list holds, in their order", () => {
+    const words = makeBashTool({
+      web: { mode: "all", domains: [] },
+      sandbox: { mode: "hosts", hosts: ["github.com", "x.test", "pypi.org"] },
+    }).description;
+    expect(words).toBe(
+      WORDS.replace(
+        "(pypi.org, registry.npmjs.org, github.com…)",
+        "(pypi.org, github.com…)",
+      ),
+    );
+  });
+
+  test("a send without web access says no network, whatever the sandbox's hosts", () => {
+    const words = makeBashTool({
+      web: null,
+      credentials: { offered: [github], off: [] },
+      sandbox: hosts,
+    }).description;
+    expect(words.endsWith(" No network. Never write secrets.")).toBe(true);
+    expect(words).not.toContain("Network:");
+    expect(words).not.toContain("ONECTX_CRED");
+    expect(words).toContain("uv run");
+  });
+
+  test("off says no network, whatever Web access says", () => {
+    const words = makeBashTool({
+      web: listed,
+      credentials: { offered: [github], off: [] },
+      sandbox: { mode: "off", hosts: ["pypi.test"] },
+    }).description;
+    expect(words.endsWith(" No network. Never write secrets.")).toBe(true);
+    expect(words).not.toContain("ONECTX_CRED");
+    expect(words).toContain("uv run");
+  });
+
+  test("the built-in shell's words are untouched, and a subagent's are its parent's less open", () => {
+    const options = {
+      web: listed,
+      credentials: { offered: [github], off: [] },
+    };
+    expect(makeBashTool({ ...options, sandbox: null }).description).toBe(
+      makeBashTool(options).description,
+    );
+    expect(makeBashTool(options).description).toContain(
+      "jq, yq, awk and diff are there, git, python and node are not.",
+    );
+    const parent = makeBashTool({ ...options, sandbox: hosts }).description;
+    // a subagent in its parent's sandbox has its parent's credentials
+    const child = asSubagent(`${parent}\n\nrepos`, listed, [github], [github]);
+    expect(child).toBe(
+      `${parent.replace("open <file> shows a file to the user: HTML and SVG as visuals, Markdown rendered. ", "")}\n\nrepos`,
+    );
+    expect(child).toContain("(gh-api) send -H");
+    expect(
+      makeBashTool({ ...options, sandbox: hosts, subagent: true }).description,
+    ).toBe(asSubagent(parent, listed, [github], [github]));
+  });
+
+  test("a sandbox command has its own time, said in the words and passed on", async () => {
+    const seen: { caps: object; aborted: boolean }[] = [];
+    const timeouts: number[] = [];
+    const timer = {
+      now: () => 0,
+      timeout: (ms: number) => {
+        timeouts.push(ms);
+        return new AbortController().signal;
+      },
+    };
+    const bash = (sandboxed: boolean) => ({
+      async run(
+        _p: string,
+        _w: unknown,
+        _a: unknown,
+        _c: string,
+        caps: object,
+        signal: AbortSignal,
+      ) {
+        seen.push({ caps, aborted: signal.aborted });
+        return { content: "ok", error: false };
+      },
+      sandbox: () => (sandboxed ? hosts : null),
+      sandboxCommandSeconds: () => 900,
+      sandboxIdleMinutes: () => 45,
+    });
+    const sandboxed = makeBashTool({ bash: bash(true) });
+    expect(sandboxed.timeoutMs).toBe(900_000);
+    expect(sandboxed.description).toContain("A call may run 15 minutes;");
+    expect(sandboxed.description).toContain(
+      "recycled (after 45 idle minutes, a restart,",
+    );
+    expect(
+      makeBashTool({ sandbox: hosts, idleMinutes: 1 }).description,
+    ).toContain("(after 1 idle minute, a restart");
+    // a run's deadline under the command's own time caps the words
+    expect(
+      makeBashTool({ sandbox: hosts, deadlineMs: 300_000 }).description,
+    ).toContain("A call may run 5 minutes;");
+    expect(
+      makeBashTool({ sandbox: hosts, deadlineMs: 1_800_000 }).description,
+    ).toContain("A call may run 10 minutes;");
+    await new Registry([sandboxed], undefined, timer).run(
+      call({ command: "make test" }),
+      context(),
+    );
+    const builtin = makeBashTool({ bash: bash(false) });
+    expect(builtin.timeoutMs).toBeUndefined();
+    expect(builtin.description).not.toContain("A call may run");
+    await new Registry([builtin], undefined, timer).run(
+      call({ command: "ls" }),
+      context(),
+    );
+    const grace = BACKSTOP_MS + 500;
+    expect(timeouts).toEqual([
+      900_000 + grace,
+      DEFAULT_LIMITS.callTimeoutMs + grace,
+    ]);
+    expect(seen.map((one) => one.caps)).toEqual([
+      expect.objectContaining({
+        callTimeoutMs: DEFAULT_LIMITS.callTimeoutMs,
+        sandboxCommandMs: 900_000,
+      }),
+      expect.not.objectContaining({ sandboxCommandMs: expect.anything() }),
+    ]);
+    expect(makeBashTool({ sandbox: hosts }).description).toContain(
+      "A call may run 10 minutes;",
+    );
+  });
+
+  test("the built-in shell's words stay byte for byte", () => {
+    const hash = (text: string) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    expect(hash(makeBashTool().description)).toBe(
+      "27825f49251f64e13747dcbde4c2bd6667d9e50a1a42fb22198b17f96b33036f",
+    );
+    expect(
+      hash(makeBashTool({ web: { mode: "all", domains: [] } }).description),
+    ).toBe("4d18abed7e696ad9463068295b1bf452f2e0f17d2f9eac7a7eb4bd7d3ff5bf12");
+    expect(hash(makeBashTool({ subagent: true }).description)).toBe(
+      "61c60fd5537e8b6553d29e1e5acd38cd099c819367d29fb83db0a7e0bda64338",
+    );
+    expect(makeBashTool().description).toContain(
+      "/tmp is this chat's scratch for any bytes, kept between commands.",
+    );
+  });
+
+  test("the send's end stops a sandbox command long before its own time", async () => {
+    const send = new AbortController();
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const tool = makeBashTool({
+      bash: {
+        run: (_p, _w, _a, _c, _caps, signal) =>
+          new Promise((_, reject) => {
+            started();
+            signal.addEventListener("abort", () => reject(signal.reason));
+          }),
+        sandbox: () => hosts,
+        sandboxCommandSeconds: () => 3600,
+      },
+    });
+    const timer = {
+      now: () => 0,
+      timeout: () => new AbortController().signal,
+    };
+    const pending = new Registry([tool], undefined, timer).run(
+      call({ command: "sleep 3000" }),
+      { ...context(), signal: send.signal },
+    );
+    await running;
+    send.abort(new Error("the send's deadline"));
+    const result = await pending;
+    expect(result).toMatchObject({ error: true, interrupted: true });
+  });
+
+  test("bash's own word picks the variant", () => {
+    const run = async () => ({ content: "", error: false });
+    expect(
+      makeBashTool({ bash: { run, sandbox: () => hosts }, web: listed })
+        .description,
+    ).toContain("uv run");
+    expect(
+      makeBashTool({ bash: { run, sandbox: () => null }, web: listed })
+        .description,
+    ).not.toContain("uv run");
   });
 });

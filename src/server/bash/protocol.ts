@@ -40,6 +40,8 @@ export type Job = {
   knowledgeFileBytes: number;
   mountBytes: number;
   ioBytes: number;
+  // the characters a result shows, which the sandbox sizes its output by
+  resultCut: number;
   // the cap on commands and on each loop, awk, sed and jq iteration
   iterations: number;
   knowledge: MountFile[];
@@ -73,6 +75,9 @@ export type Answer = {
   changes: Changes | null;
   // why the changes could not be read back, as the diff threw
   refused: string | null;
+  // what stopped the command, from a shell whose exits are the
+  // command's own (ownExits); every other shell's exit 124 or 126 says
+  stopped?: "deadline" | "limit";
 };
 
 // what curl asked for, headers as pairs since Headers do not clone

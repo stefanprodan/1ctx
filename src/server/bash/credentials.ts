@@ -40,13 +40,21 @@ export type Refusal =
 // one credential of the send as a command sees it: the key read for this
 // command, or why it signs nothing. The key rides here and nowhere else
 export type CommandCredential = { name: string; prefix: string } & (
-  | { key: string; header: string; value: string; methods: HttpMethod[] }
+  | {
+      key: string;
+      header: string;
+      // the header value with {key} in the key's place, for a shell
+      // that places the key itself
+      template: string;
+      value: string;
+      methods: HttpMethod[];
+    }
   | { refused: Refusal }
 );
 
 export type FetchLimits = { timeoutMs: number; maxResponseSize: number };
 
-const REFUSALS: Record<Refusal, string> = {
+export const REFUSALS: Record<Refusal, string> = {
   off: "is off in this chat",
   writes: "signs only writes, which a subagent cannot send",
   missing: "has no key",
@@ -163,8 +171,8 @@ const ALNUM = /[A-Za-z0-9]/;
 const UNRESERVED = /[A-Za-z0-9._~-]/;
 
 // a key as JSON encoders write it: `/` as `\/`, and the characters
-// they escape as \uXXXX in either case, so an API echoing it escaped
-// is caught too
+// they escape as \uXXXX in either case, and as a URL encodes it, its
+// hex in either case, so an API echoing it escaped is caught too
 export function escapedForms(key: string): string[] {
   const forms = new Set([key]);
   const hex = (char: string, upper: boolean) => {
@@ -193,6 +201,12 @@ export function escapedForms(key: string): string[] {
       forms.add(encode(slash, UNRESERVED, upper, false));
       forms.add(encode(slash, ALNUM, upper, false));
     }
+  }
+  // a lone surrogate has no URL form, and no URL carries it
+  if (key.isWellFormed()) {
+    const percent = encodeURIComponent(key);
+    forms.add(percent);
+    forms.add(percent.replace(/%[0-9A-F]{2}/g, (hex) => hex.toLowerCase()));
   }
   return [...forms];
 }
@@ -399,4 +413,21 @@ export function commandFetch(
       throw rebuildError(error, secrets);
     }
   };
+}
+
+// a file's bytes with every key the command read replaced, as its text
+// would be
+export function scrubBytes(
+  bytes: Uint8Array,
+  credentials: readonly CommandCredential[],
+): Uint8Array {
+  let out = bytes;
+  for (const secret of secretsOf(credentials)) {
+    out = replaceBytes(
+      out,
+      encoder.encode(secret.key),
+      encoder.encode(secret.label),
+    );
+  }
+  return out;
 }

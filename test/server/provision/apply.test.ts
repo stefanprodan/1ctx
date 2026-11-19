@@ -127,6 +127,7 @@ describe("provision through the composed app", () => {
         "provider",
         "decider",
         "dictation",
+        "sandbox",
         "skill",
         "mcpserver",
         "agent",

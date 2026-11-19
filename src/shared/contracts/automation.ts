@@ -9,13 +9,13 @@
 // above the one it holds. The edit revision counts only the saves that
 // changed a field; an edit names the one it started from.
 
-import {
-  type AttentionMode,
-  type EventOutcome,
-  type EventSource,
-  MAX_MCP_URL,
-  type SessionStatus,
+import type {
+  AttentionMode,
+  EventOutcome,
+  EventSource,
+  SessionStatus,
 } from "../words.ts";
+import { MAX_MCP_URL } from "./mcp.ts";
 
 export type AutomationSummary = {
   id: string;

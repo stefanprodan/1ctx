@@ -37,14 +37,8 @@ export class ScratchStore {
 
   read(workspace: Workspace): Scratch {
     const id = workspaceId(workspace);
-    const row = this.db
-      .query<Omit<Scratch, "entries">, [string]>(
-        `select cwd, revision, bytes, files from session_scratch
-         where workspace_id = ?`,
-      )
-      .get(id);
     return {
-      ...(row ?? { cwd: "/knowledge", revision: 0, bytes: 0, files: 0 }),
+      ...this.head(workspace),
       entries: this.db
         .query<ScratchFile, [string]>(
           `select path, data, mode from session_scratch_files
@@ -52,6 +46,17 @@ export class ScratchStore {
         )
         .all(id),
     };
+  }
+
+  // the row without its files: the cwd, the revision and the totals
+  head(workspace: Workspace): Omit<Scratch, "entries"> {
+    const row = this.db
+      .query<Omit<Scratch, "entries">, [string]>(
+        `select cwd, revision, bytes, files from session_scratch
+         where workspace_id = ?`,
+      )
+      .get(workspaceId(workspace));
+    return row ?? { cwd: "/knowledge", revision: 0, bytes: 0, files: 0 };
   }
 
   // the last command's time, the mtime its files mount with, since a
@@ -66,13 +71,14 @@ export class ScratchStore {
     );
   }
 
-  // The caller owns the transaction so knowledge and scratch roll back together.
+  // The caller owns the transaction so knowledge and scratch roll back
+  // together. Answers the revision written.
   write(
     workspace: Workspace,
     expectedRevision: number,
     changes: ScratchChanges,
     now: number,
-  ): void {
+  ): number {
     const id = workspaceId(workspace);
     const current = this.db
       .query<{ revision: number }, [string]>(
@@ -123,6 +129,32 @@ export class ScratchStore {
          ) where workspace_id = ?`,
       )
       .run(id, id);
+    return expectedRevision + 1;
+  }
+
+  // The cwd alone, for a shell that keeps /tmp itself: the files and
+  // the last use stay, so the rows age out as if no command ran. A new
+  // row takes now as its last use. Its commands may run at once, so the
+  // last to commit sets the cwd and no revision is checked. Answers the
+  // revision written.
+  writeCwd(workspace: Workspace, cwd: string, now: number): number {
+    const id = workspaceId(workspace);
+    const current = this.db
+      .query<{ revision: number }, [string]>(
+        "select revision from session_scratch where workspace_id = ?",
+      )
+      .get(id);
+    const revision = (current?.revision ?? 0) + 1;
+    this.db
+      .query(
+        `insert into session_scratch
+         (workspace_id, session_id, cwd, revision, bytes, files, used_at)
+         values (?, ?, ?, ?, 0, 0, ?)
+         on conflict (workspace_id) do update set
+           cwd = excluded.cwd, revision = excluded.revision`,
+      )
+      .run(id, workspaceSession(workspace), cwd, revision, now);
+    return revision;
   }
 
   // the stored names and sizes, which a commit checks inside its

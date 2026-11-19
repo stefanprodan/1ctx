@@ -77,9 +77,10 @@ export type ToolContext = {
   keep?: KeepPort | null;
   repos?: SendRepos | null;
   // set in a subagent's own calls: the session whose /uploads its
-  // commands read, and that nothing may be written to /knowledge or
-  // /uploads or opened onto a page
-  subagent?: { uploadsFrom: string } | null;
+  // commands read and its parent's workspace, and that nothing may be
+  // opened onto a page, nor written to /knowledge or /uploads in a
+  // shell of its own
+  subagent?: { uploadsFrom: string; workspace?: string } | null;
 };
 
 export type ToolResult = CommandResult & {
@@ -121,6 +122,8 @@ export type MemoryScope = {
   // the send's origin; a subagent's offer has no automation of its own,
   // so it carries its parent's, and a run's children read no automations
   origin?: SessionOrigin;
+  // the send's deadline, so the bash words never promise a command more
+  deadlineMs?: number | null;
 };
 
 // a chat's saves, bound to its project, session and author
@@ -191,4 +194,13 @@ export type Offered = {
   }[];
   // a subagent's offer: bash leaves out open
   subagent?: boolean;
+  // the sandbox shell ran bash when the send began: each /tmp is its
+  // sandbox's, so a subagent's never passes to or from its parent's
+  sandbox?: true;
+  // a sandbox command's time as bash's description offered it, which a
+  // dispatch keeps though the limit moved since
+  commandSeconds?: number;
 };
+
+// the shell bash's description was made for, kept for its dispatch
+export type OfferedShell = { sandbox?: boolean; commandSeconds?: number };

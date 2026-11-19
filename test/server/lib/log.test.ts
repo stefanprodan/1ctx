@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { DocConflict } from "../../../src/server/knowledge/index.ts";
 import {
   errorFields,
   format,
@@ -72,6 +73,12 @@ describe("error fields", () => {
       status: 503,
       retry: true,
     });
+  });
+
+  test("a doc's conflict logs as a Conflict", () => {
+    expect(
+      errorFields(new DocConflict("a.md changed", "a.md"), false).error_type,
+    ).toBe("Conflict");
   });
 
   test("cuts the error at 200 characters when it is written", () => {

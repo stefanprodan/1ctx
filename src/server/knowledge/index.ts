@@ -79,6 +79,9 @@ export type KnowledgeCapability = KnowledgePort & {
   // their text as bytes
   mountedDocs(projectId: string): MountedDoc[];
   mountedUploads(sessionId: string): MountedUploads;
+  // their totals alone
+  docBytes(projectId: string): number;
+  uploadBytes(sessionId: string): number;
   // a command's docs changes, inside the caller's transaction
   commitDocs(
     projectId: string,
@@ -355,6 +358,8 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
     },
     mountedDocs: (projectId) => store.mounted(projectId),
     mountedUploads: (sessionId) => uploads.mounted(sessionId),
+    docBytes: (projectId) => store.totals(projectId).bytes,
+    uploadBytes: (sessionId) => uploads.bytes(sessionId),
     commitDocs: (projectId, author, changes, caps, now) =>
       commitKnowledge(store, projectId, author, changes, caps, now),
   };
@@ -367,7 +372,7 @@ export function knowledgeArea(deps: KnowledgeDeps): KnowledgeArea {
 }
 
 export { checkFile, checkNames, checkTotals } from "./check.ts";
-export type { Change } from "./commit.ts";
+export { type Change, DocConflict } from "./commit.ts";
 export { type KnowledgeEdit, MAX_EDITS } from "./edit.ts";
 export {
   MAX_KNOWLEDGE_BODY,

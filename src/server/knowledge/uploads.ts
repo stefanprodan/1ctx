@@ -40,8 +40,10 @@ export type UploadTree = {
   entries: UploadFile[];
 };
 
-// a chat's uploads as a command mounts them
+// a chat's uploads as a command mounts them; the revision moves on
+// every change to the tree, which a file's time alone may not show
 export type MountedUploads = {
+  revision: number;
   bytes: number;
   entries: {
     name: string;
@@ -243,10 +245,20 @@ export class UploadStore {
 
   // the session's files with their text as bytes, which a command's
   // mount transfers to its worker as they come from SQLite
+  bytes(sessionId: string): number {
+    return (
+      this.db
+        .query<{ bytes: number }, [string]>(
+          "select bytes from session_uploads where session_id = ?",
+        )
+        .get(sessionId)?.bytes ?? 0
+    );
+  }
+
   mounted(sessionId: string): MountedUploads {
     const row = this.db
-      .query<{ bytes: number }, [string]>(
-        "select bytes from session_uploads where session_id = ?",
+      .query<{ revision: number; bytes: number }, [string]>(
+        "select revision, bytes from session_uploads where session_id = ?",
       )
       .get(sessionId);
     const entries = this.db
@@ -259,7 +271,7 @@ export class UploadStore {
          from session_upload_files where session_id = ? order by name`,
       )
       .all(sessionId);
-    return { bytes: row?.bytes ?? 0, entries };
+    return { revision: row?.revision ?? 0, bytes: row?.bytes ?? 0, entries };
   }
 
   private readStored(sessionId: string): StoredUploadTree {

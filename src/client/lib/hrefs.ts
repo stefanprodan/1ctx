@@ -13,6 +13,7 @@ export const DICTATION_HREF = "/admin/config/dictation";
 export const DECISIONS_HREF = "/admin/config/decisions";
 export const LIMITS_HREF = "/admin/config/limits";
 export const SMTP_HREF = "/admin/config/smtp";
+export const SANDBOX_HREF = "/admin/config/sandbox";
 export const MCP_HREF = "/admin/config/mcp";
 export const PROVIDERS_HREF = "/admin/config/providers";
 export const SKILLS_HREF = "/admin/config/skills";

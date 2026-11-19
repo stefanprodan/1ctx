@@ -7,10 +7,11 @@
 // to both land in one transaction.
 
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
+import type { SandboxNet } from "../../shared/sandbox-net.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
-import type { KnowledgeCaps } from "../limits/index.ts";
+import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
 import {
   copyBack,
   copyIn,
@@ -25,23 +26,42 @@ import {
   run,
 } from "./mount.ts";
 import { ScratchStore } from "./scratch.ts";
+import { builtinShell, type ShellBackend } from "./shell.ts";
 import { commandWorkers } from "./worker.ts";
 import type { Workspace } from "./workspace.ts";
 
 export type BashDeps = {
   db: Db;
   clock: Clock;
-  limits: { current(): KnowledgeCaps };
+  limits: {
+    current(): KnowledgeCaps &
+      Pick<SandboxCaps, "sandboxCommandSeconds" | "sandboxIdleMinutes">;
+  };
   log: Log;
   // the command worker entry, built where the binary resolves it
   worker: URL;
+  // the shell of the next command, asked once per command so a setting
+  // can switch it between commands; without it every command runs in
+  // the builtin one, just-bash in that worker
+  shell?(builtin: ShellBackend): ShellBackend;
+  // the sandbox shell's network setting; off without it
+  sandboxNet?(): SandboxNet;
   // each phase a command's worker reports, by chat; a test waits on it
   onCommandPhase?(sessionId: string, phase: "run" | "diff"): void;
+  // a process slot, acquireProcess unless a test watches the waits
+  acquireProcess?(signal: AbortSignal): Promise<() => void>;
   // BACKSTOP_MS unless a test needs the deadline alone to decide
   backstopMs?: number;
   knowledge: DocsPort;
 };
 export type BashCapability = {
+  // the network of the sandbox shell the next command runs in, so the
+  // tool's description says what differs; null under just-bash
+  sandbox?(): SandboxNet | null;
+  // how long a command may run under the sandbox shell, and an unused
+  // sandbox is kept
+  sandboxCommandSeconds?(): number;
+  sandboxIdleMinutes?(): number;
   run(
     projectId: string,
     workspace: Workspace,
@@ -49,6 +69,8 @@ export type BashCapability = {
     command: string,
     caps: CommandCaps,
     signal: AbortSignal,
+    // the send the command is a call of, which a shell may key on
+    sendId: string,
   ): Promise<CommandResult>;
   // a send's start: the session's kept MCP files trimmed to the budget,
   // and the number the next kept folder takes; files of rows past
@@ -76,6 +98,12 @@ export type BashCapability = {
   // a child's scratch, when its files could not come back
   dropScratch(workspace: Workspace): void;
 };
+// what the bash tool reads of the area: a command, and the sandbox
+// shell's words
+export type BashToolPort = Pick<
+  BashCapability,
+  "run" | "sandbox" | "sandboxCommandSeconds" | "sandboxIdleMinutes"
+>;
 export type BashArea = BashCapability & {
   scratch: ScratchStore;
   // idle scratch no command holds
@@ -87,19 +115,29 @@ export type BashArea = BashCapability & {
 export function bashArea(deps: BashDeps): BashArea {
   const scratch = new ScratchStore(deps.db);
   const workers = commandWorkers(deps.worker, deps.log);
+  const builtin = builtinShell(workers);
+  const pick = deps.shell;
   return {
     scratch,
-    run: (projectId, workspace, author, command, caps, signal) =>
+    sandbox: () =>
+      pick !== undefined && pick(builtin) !== builtin
+        ? (deps.sandboxNet?.() ?? { mode: "off", hosts: [] })
+        : null,
+    sandboxCommandSeconds: () => deps.limits.current().sandboxCommandSeconds,
+    sandboxIdleMinutes: () => deps.limits.current().sandboxIdleMinutes,
+    run: (projectId, workspace, author, command, caps, signal, sendId) =>
       run(
         {
           db: deps.db,
           knowledge: deps.knowledge,
           scratch,
           clock: deps.clock,
-          workers,
+          log: deps.log,
+          shell: pick ? () => pick(builtin) : () => builtin,
           current: () => deps.limits.current(),
           ...(deps.onCommandPhase ? { onPhase: deps.onCommandPhase } : {}),
           ...(deps.backstopMs ? { backstopMs: deps.backstopMs } : {}),
+          ...(deps.acquireProcess ? { acquire: deps.acquireProcess } : {}),
         },
         projectId,
         workspace,
@@ -107,6 +145,7 @@ export function bashArea(deps: BashDeps): BashArea {
         command,
         caps,
         signal,
+        sendId,
       ),
     startKept: (workspace, afterSeq) =>
       transact(deps.db, () => {
@@ -136,11 +175,13 @@ export function bashArea(deps: BashDeps): BashArea {
   };
 }
 
-export { BACKSTOP_MS } from "./commands.ts";
+export { BACKSTOP_MS, MAX_OPENS_PER_COMMAND } from "./commands.ts";
 export {
   type CommandCredential,
   escapedForms,
+  REFUSALS,
   type Refusal,
+  scrubBytes,
   scrubKeys,
 } from "./credentials.ts";
 export type { Returned, ScratchBaseline } from "./handoff.ts";
@@ -160,8 +201,51 @@ export {
   writeKeptFrame,
 } from "./kept.ts";
 export type { CommandResult } from "./mount.ts";
-export type { OpenedRecord } from "./open.ts";
-export type { CommandEnd, JobRepo } from "./protocol.ts";
+export { type OpenedRecord, openedRecord } from "./open.ts";
+export {
+  mountPath,
+  normalizePath,
+  prefixes,
+  underKnowledge,
+  underRoot,
+} from "./paths.ts";
+export type {
+  Answer,
+  Changes,
+  CommandEnd,
+  Job,
+  JobRepo,
+} from "./protocol.ts";
+export {
+  discardNotices,
+  type EntryKind,
+  exitAt,
+  READ_ONLY_TO_SUBAGENT,
+  type ReadBack,
+  readBack,
+  savedCwd,
+  sharedChange,
+  startNotice,
+  type TreeEntry,
+  type TreeMount,
+  treeChanges,
+} from "./readback.ts";
+export type {
+  Mounted,
+  SettleOutcome,
+  ShellBackend,
+  ShellCall,
+  ShellContext,
+  ShellHold,
+  ShellRepo,
+  ShellRun,
+  StoredBytes,
+} from "./shell.ts";
+export type {
+  CommandHooks,
+  CommandStops,
+  Settled,
+} from "./worker.ts";
 export {
   sessionWorkspace,
   type Workspace,

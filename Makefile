@@ -9,7 +9,7 @@ export PLATFORMS
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke models
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke sandbox-image sandbox-check sandbox-net-check kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke models
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -41,6 +41,15 @@ image: ## Build the container image and load it (PLATFORMS=linux/amd64,linux/arm
 
 image-smoke: ## Build the image, run it as production does, sign in and stop it
 	@bun run image-smoke
+
+sandbox-image: ## Build the sandbox image and load it as 1ctx-shell:dev (PLATFORMS=a,b only builds)
+	@bun run sandbox-image
+
+sandbox-check: ## Drive a real sandbox gateway through the sandbox backend by hand (ARGS="--ca .. --cert .. --key ..")
+	@bun run sandbox-check $(ARGS)
+
+sandbox-net-check: ## Drive a real sandbox gateway's network and credentials by hand (ARGS="--ca .. --cert .. --key ..")
+	@bun run sandbox-net-check $(ARGS)
 
 kind-up: ## Create the local kind cluster 1ctx-test with metrics-server
 	@bun run kind-up

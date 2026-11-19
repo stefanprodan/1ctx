@@ -142,6 +142,20 @@ export type ImageCaps = {
   imagesPerHour: number;
 };
 
+// the sandbox shell's sandboxes, read at each lease and create: how
+// many the instance keeps, the warm ones among them, the minutes an
+// unused one is kept, and what each may use
+export type SandboxCaps = {
+  sandboxesMax: number;
+  sandboxWarm: number;
+  sandboxIdleMinutes: number;
+  sandboxCpus: number;
+  sandboxMemoryMiB: number;
+  // how long one command may run in a sandbox, in place of the call
+  // timeout, which is sized for the built-in shell
+  sandboxCommandSeconds: number;
+};
+
 export type Limits = LoopLimits &
   ChannelCaps &
   ToolCaps &
@@ -152,7 +166,8 @@ export type Limits = LoopLimits &
   RepoCaps &
   ExternalCaps &
   DictationCaps &
-  ImageCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  ImageCaps &
+  SandboxCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -179,7 +194,9 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   rounds: limit(100, 1, 500, "count", "send"),
   callsPerRound: limit(10, 1, 50, "count", "send"),
   callsPerSend: limit(100, 1, 1000, "count", "send"),
-  toolMs: limit(600_000, 10_000, 3_600_000, "ms", "send"),
+  // one full sandbox command fits it, and it ends under a chat's
+  // deadline, so its answer round can still come
+  toolMs: limit(1_200_000, 10_000, 3_600_000, "ms", "send"),
   resultBytes: limit(2 * MiB, 64 * KiB, 32 * MiB, "bytes", "send"),
   toolWorkTokens: limit(1_000_000, 10_000, 10_000_000, "tokens", "send"),
   contextReserve: limit(20_000, 1000, 200_000, "tokens", "send"),
@@ -252,6 +269,14 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   imagesPerRequest: limit(20, 1, 100, "count", "images"),
   imageProjectBytes: limit(GiB, 256 * MiB, 50 * GiB, "bytes", "images"),
   imagesPerHour: limit(60, 10, 1000, "count", "images"),
+  sandboxesMax: limit(20, 1, 256, "count", "sandbox"),
+  // a warm one is a sandbox too, so the pool stays under the cap
+  sandboxWarm: limit(0, 0, 32, "count", "sandbox"),
+  sandboxIdleMinutes: limit(30, 1, 240, "minutes", "sandbox"),
+  sandboxCpus: limit(4, 1, 64, "count", "sandbox"),
+  // the trees' tmpfs bytes count against it too
+  sandboxMemoryMiB: limit(4096, 256, 65_536, "mebibytes", "sandbox"),
+  sandboxCommandSeconds: limit(600, 20, 3600, "seconds", "sandbox"),
 };
 
 // the table on the given cores; only the process cap's default moves

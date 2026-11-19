@@ -249,7 +249,10 @@ function startChild(
 }
 
 // its kept-file budget and its copy of the parent's /tmp, after its rows
-// committed, so a throw here ends the child as failed
+// committed, so a throw here ends the child as failed. Under the sandbox
+// shell it runs in its parent's sandbox: no copy in, none comes back,
+// and its kept folders take the parent's numbers, so they never meet
+// the parent's under the one /mcp
 function setUp(
   deps: ChildDeps,
   send: ActiveSend,
@@ -259,13 +262,15 @@ function setUp(
   try {
     const kept = deps.bash.startKept(send.workspace, null);
     let next = kept.next;
+    const shared = send.policy.offered.sandbox ? parent.keep : null;
     send.keep = {
-      take: () => next++,
+      take: shared ? () => shared.take() : () => next++,
       maxBytes: kept.maxBytes,
       used: kept.used,
       maxFiles: kept.maxFiles,
       files: kept.files,
     };
+    if (send.policy.offered.sandbox) return null;
     return deps.bash.copyScratch(parent.workspace, send.workspace);
   } catch (error) {
     deps.log.warn("child setup failed", {

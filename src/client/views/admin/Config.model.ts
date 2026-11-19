@@ -99,6 +99,18 @@ export const LIMITS_CARDS: readonly LimitsGroup[] = [
     line: "How often a user may dictate.",
     names: ["dictationClipsPerUser"],
   },
+  {
+    title: "Sandboxes",
+    line: "Sandboxes bash runs in, when the OpenShell shell is on.",
+    names: [
+      "sandboxesMax",
+      "sandboxWarm",
+      "sandboxIdleMinutes",
+      "sandboxCpus",
+      "sandboxMemoryMiB",
+      "sandboxCommandSeconds",
+    ],
+  },
 ];
 
 export const STORAGE_CARDS: readonly LimitsGroup[] = [

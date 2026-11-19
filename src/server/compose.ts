@@ -13,6 +13,7 @@ import { ATTENTION_AT } from "../shared/contracts/decision.ts";
 import {
   EMAIL_KEY_PREFIX,
   MCP_KEY_PREFIX,
+  OPENSHELL_KEY_PREFIX,
   type SecretKind,
 } from "../shared/words.ts";
 import { type Access, accessArea } from "./access/index.ts";
@@ -82,6 +83,12 @@ import {
   type ShutdownResult,
 } from "./runner/index.ts";
 import {
+  type Connect,
+  openshellGateway,
+  type Sandbox,
+  sandboxArea,
+} from "./sandbox/index.ts";
+import {
   type KeptPass,
   type SessionStore,
   type Sessions,
@@ -134,6 +141,8 @@ export type ComposeOptions = {
   cores?: number;
   // what reaches the SMTP server; a test passes a fake that records
   emailSender?: EmailSender;
+  // how the sandbox shell reaches its gateway; a test passes a fake
+  sandboxGateway?: Connect;
 };
 
 export type App = {
@@ -153,6 +162,7 @@ export type App = {
   // the cache directory as startup found it
   repoCache: { dir: string; trees: number; bytes: number } | null;
   bash: BashArea;
+  sandbox: Sandbox;
   sessions: SessionStore;
   automations: Automations["store"];
   automationDrafts: Automations["drafts"];
@@ -195,6 +205,7 @@ const SCRUB_KINDS: SecretKind[] = [
   "mcp-",
   "http-",
   "email-",
+  OPENSHELL_KEY_PREFIX,
 ];
 
 export function scrubbedLogs(
@@ -252,6 +263,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     cores: options.cores ?? availableParallelism(),
     wake,
+    // a closure: the sandbox area is built later
+    saved: () => sandbox.poke(),
   });
   const usage = usageArea({
     db,
@@ -488,12 +501,27 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...(options.onCommandPhase
       ? { onCommandPhase: options.onCommandPhase }
       : {}),
+    // a closure: the sandbox area is built after bash
+    shell: (builtin) => sandbox.shell(builtin),
+    sandboxNet: () => sandbox.net(),
     knowledge: {
       mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
       mountedUploads: (sessionId) => knowledge.mountedUploads(sessionId),
+      docBytes: (projectId) => knowledge.docBytes(projectId),
+      uploadBytes: (sessionId) => knowledge.uploadBytes(sessionId),
       commitDocs: (projectId, author, changes, caps, now) =>
         knowledge.commitDocs(projectId, author, changes, caps, now),
     },
+  });
+  const sandbox: Sandbox = sandboxArea({
+    db,
+    clock,
+    log: log("sandbox"),
+    version: options.version,
+    secret: (name) => secret(OPENSHELL_KEY_PREFIX, name),
+    limits: () => limits.current(),
+    repos: { hold: (files) => repos.hold(files) },
+    connect: options.sandboxGateway ?? openshellGateway,
   });
   sessions = sessionsArea({
     db,
@@ -825,6 +853,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     repaired = sessions.repair();
     // before the queue, so a resumed send never sees a tree the cache drops
     repoCache = repos.start();
+    // in the background: a gateway that is down never delays the start
+    void sandbox.start();
     runner.queue.start();
     reconciled = automations.start();
     overview.start();
@@ -847,6 +877,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     ...knowledge.routes,
     ...images.routes,
     ...repos.routes,
+    ...sandbox.routes,
     ...sessions.routes,
     ...externalTasks.routes,
     ...(tools.routes ?? []),
@@ -910,6 +941,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     repos,
     repoCache,
     bash,
+    sandbox,
     sessions: sessions.store,
     automations: automations.store,
     automationDrafts: automations.drafts,
@@ -1013,6 +1045,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       skills.close();
       const result = await runner.shutdown(async () => {
         bash.close();
+        sandbox.close();
         await Promise.all([mcp.close(), inboundMcp.close()]);
       });
       automations.stop();

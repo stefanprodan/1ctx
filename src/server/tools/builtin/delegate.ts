@@ -28,13 +28,19 @@ export type DelegatePort = (
   ctx: ToolContext,
 ) => Promise<ToolResult>;
 
-export const DELEGATE_DESCRIPTION =
-  "Hand a task to a subagent, a fresh copy of you that works in its own context and answers briefly. Several delegate calls in one reply run together, a few at a time: when the work splits into independent parts, such as two repositories or two topics, send one call per part together in a single reply. Delegate work that would fill your context with material you need once: exploring a repository, reading many files or long MCP results, web research. Answer small questions yourself, and keep work that needs this conversation. A subagent has your tools less delegate, memory, email, visuals and MCP writes, and writes only to its own /tmp. It sees nothing but task and a copy of your /tmp, so put everything it needs in task: the goal, where to look, what to return. Files it writes come back under /tmp/<name>/, listed in the result.";
+const DELEGATE_HEAD =
+  "Hand a task to a subagent, a fresh copy of you that works in its own context and answers briefly. Several delegate calls in one reply run together, a few at a time: when the work splits into independent parts, such as two repositories or two topics, send one call per part together in a single reply. Delegate work that would fill your context with material you need once: exploring a repository, reading many files or long MCP results, web research. Answer small questions yourself, and keep work that needs this conversation. A subagent has your tools less delegate, memory, email, visuals and MCP writes, and writes only to its own /tmp.";
 
-export function makeDelegateTool(): Tool {
+export const DELEGATE_DESCRIPTION = `${DELEGATE_HEAD} It sees nothing but task and a copy of your /tmp, so put everything it needs in task: the goal, where to look, what to return. Files it writes come back under /tmp/<name>/, listed in the result.`;
+
+// under the sandbox shell the subagent works in this chat's sandbox
+export const SANDBOX_DELEGATE_DESCRIPTION =
+  "Hand a task to a subagent: a fresh copy of you with its own context, working in this chat's sandbox. It cannot see this chat, so put the goal, where to look and what to return in task; it answers in its reply. Calls in one reply run in parallel, so split independent work that way. Delegate work that would flood your context (exploring a repository, many files, web research); keep small questions and work that needs this conversation.";
+
+export function makeDelegateTool(sandbox = false): Tool {
   return {
     name: DELEGATE_TOOL,
-    description: DELEGATE_DESCRIPTION,
+    description: sandbox ? SANDBOX_DELEGATE_DESCRIPTION : DELEGATE_DESCRIPTION,
     parameters: {
       type: "object",
       properties: {

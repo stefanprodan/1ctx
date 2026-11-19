@@ -1,0 +1,432 @@
+// Copyright 2026 Stefan Prodan.
+// SPDX-License-Identifier: Apache-2.0
+//
+// The sandbox shell's settings: one row with its instance id, an https
+// endpoint, the key files by presence alone, and the shell bash gets.
+
+import { describe, expect, test } from "bun:test";
+import type { ShellCall } from "../../../src/server/bash/index.ts";
+import { publish } from "../../../src/server/lib/bus.ts";
+import {
+  defaultImage,
+  INSTANCE_LABEL,
+  type Leases,
+} from "../../../src/server/sandbox/index.ts";
+import type {
+  SandboxLeasesResponse,
+  SandboxResponse,
+} from "../../../src/shared/api/sandbox.ts";
+import { SANDBOX_DEFAULT_HOSTS } from "../../../src/shared/sandbox-net.ts";
+import { type TestApp, testApp } from "../../helpers/app.ts";
+import { rejection } from "../../helpers/async.ts";
+import { fakeGateway, until } from "../../helpers/sandbox.ts";
+
+const KEYS = {
+  "openshell-gateway-ca": "ca-pem-value",
+  "openshell-gateway-cert": "cert-pem-value",
+  "openshell-gateway-key": "key-pem-value",
+};
+const ENDPOINT = "https://gateway.test:17670";
+
+async function run(
+  body: (app: TestApp, admin: ReturnType<TestApp["client"]>) => Promise<void>,
+  secrets: Record<string, string> = KEYS,
+  fake = fakeGateway(),
+) {
+  const app = await testApp({ secrets, sandboxGateway: fake.connect });
+  try {
+    const admin = app.client();
+    await admin.login("admin", "hunter2-test");
+    await body(app, admin);
+  } finally {
+    await app.shutdown();
+    app.db.close();
+  }
+}
+
+describe("sandbox settings", () => {
+  test("start builtin, with an instance id made once", async () => {
+    await run(async (app, admin) => {
+      const res = await admin.call("GET", "/api/admin/sandbox");
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as SandboxResponse;
+      expect(body.settings).toMatchObject({
+        backend: "builtin",
+        endpoint: null,
+        image: null,
+      });
+      expect(body.settings.instanceId).toMatch(/^[0-9a-z]{12}$/);
+      expect(body.gatewayLabel).toBe(`1ctx-${body.settings.instanceId}`);
+      expect(body.defaultImage).toBe("ghcr.io/stefanprodan/1ctx-shell:dev");
+      expect(body.keys).toEqual({ ca: true, cert: true, key: true });
+      expect(body.active).toBe(false);
+      expect(app.sandbox.store.settings().instanceId).toBe(
+        body.settings.instanceId,
+      );
+      // names presence alone, never a value
+      expect(JSON.stringify(body)).not.toContain("pem-value");
+    });
+  });
+
+  test("an endpoint is an https origin and nothing else", async () => {
+    await run(async (_app, admin) => {
+      for (const endpoint of [
+        "http://gateway.test:17670",
+        "https://gateway.test:17670/v1",
+        "https://user:pass@gateway.test",
+        "https://gateway.test?x=1",
+        "gateway.test:17670",
+      ]) {
+        const res = await admin.call("PUT", "/api/admin/sandbox", {
+          body: { endpoint },
+        });
+        expect(res.status).toBe(400);
+      }
+      for (const body of [{}, { other: 1 }, { backend: "docker" }]) {
+        const res = await admin.call("PUT", "/api/admin/sandbox", { body });
+        expect(res.status).toBe(400);
+      }
+      const res = await admin.call("PUT", "/api/admin/sandbox", {
+        body: { endpoint: ENDPOINT, image: "registry.test/sbx:1" },
+      });
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as SandboxResponse).settings).toMatchObject({
+        backend: "builtin",
+        endpoint: ENDPOINT,
+        image: "registry.test/sbx:1",
+      });
+    });
+  });
+
+  test("the network is off or hosts, the defaults until a list is saved", async () => {
+    await run(async (app, admin) => {
+      const put = async (body: Record<string, unknown>) => {
+        const res = await admin.call("PUT", "/api/admin/sandbox", { body });
+        return { status: res.status, text: await res.text() };
+      };
+      let body = (await (
+        await admin.call("GET", "/api/admin/sandbox")
+      ).json()) as SandboxResponse;
+      expect(body.settings).toMatchObject({ network: "hosts", hosts: null });
+      expect(app.sandbox.net()).toEqual({
+        mode: "hosts",
+        hosts: SANDBOX_DEFAULT_HOSTS,
+      });
+      for (const bad of [
+        { network: "all" },
+        { hosts: "pypi.org" },
+        { hosts: [1] },
+        { hosts: ["*.com"] },
+        { hosts: ["pypi.org:443"] },
+        { hosts: Array.from({ length: 201 }, (_, i) => `h${i}.test`) },
+        { network: "hosts", hosts: [] },
+      ]) {
+        expect((await put(bad)).status, JSON.stringify(bad)).toBe(400);
+      }
+      expect(
+        JSON.parse((await put({ hosts: ["ok.test", "*.com"] })).text),
+      ).toEqual({ error: 'hosts: "*.com" needs three labels as a wildcard' });
+      const saved = await put({
+        network: "hosts",
+        hosts: ["PyPI.org", "*.githubusercontent.com", "pypi.org"],
+      });
+      expect(saved.status).toBe(200);
+      body = JSON.parse(saved.text) as SandboxResponse;
+      expect(body.settings).toMatchObject({
+        backend: "builtin",
+        network: "hosts",
+        hosts: ["*.githubusercontent.com", "pypi.org"],
+      });
+      // a save without the network keeps it
+      await put({ image: "registry.test/sbx:2" });
+      expect(app.sandbox.store.settings().hosts).toEqual([
+        "*.githubusercontent.com",
+        "pypi.org",
+      ]);
+      expect((await put({ network: "off" })).status).toBe(200);
+      expect(app.sandbox.net()).toEqual({
+        mode: "off",
+        hosts: ["*.githubusercontent.com", "pypi.org"],
+      });
+      // the defaults saved as a list are stored as null, so later
+      // defaults reach the instance
+      expect(
+        (await put({ hosts: [...SANDBOX_DEFAULT_HOSTS].reverse() })).status,
+      ).toBe(200);
+      expect(app.sandbox.store.settings().hosts).toBeNull();
+      await put({ hosts: ["a.test"] });
+      expect((await put({ hosts: null })).status).toBe(200);
+      expect(app.sandbox.store.settings()).toMatchObject({
+        network: "off",
+        hosts: null,
+      });
+    });
+  });
+
+  test("the sandbox shell needs an endpoint and every key file", async () => {
+    await run(
+      async (_app, admin) => {
+        let res = await admin.call("PUT", "/api/admin/sandbox", {
+          body: { backend: "openshell" },
+        });
+        expect(res.status).toBe(400);
+        expect(await res.text()).toContain("needs a gateway endpoint");
+        res = await admin.call("PUT", "/api/admin/sandbox", {
+          body: { backend: "openshell", endpoint: ENDPOINT },
+        });
+        expect(res.status).toBe(400);
+        expect(await res.text()).toContain("openshell-gateway-key.key");
+      },
+      { "openshell-gateway-ca": "ca", "openshell-gateway-cert": "cert" },
+    );
+  });
+
+  test("bash runs builtin until the sandbox shell is on, then on the gateway the settings name", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        const builtin = { run: async () => ({}) as never };
+        expect(app.sandbox.shell(builtin)).toBe(builtin);
+        const res = await admin.call("PUT", "/api/admin/sandbox", {
+          body: { backend: "openshell", endpoint: ENDPOINT },
+        });
+        expect(((await res.json()) as SandboxResponse).active).toBe(true);
+        expect(app.sandbox.shell(builtin)).not.toBe(builtin);
+        expect(fake.configs).toEqual([
+          {
+            endpoint: ENDPOINT,
+            ca: "ca-pem-value",
+            cert: "cert-pem-value",
+            key: "key-pem-value",
+          },
+        ]);
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { backend: "builtin" },
+        });
+        expect(app.sandbox.shell(builtin)).toBe(builtin);
+        expect(app.sandbox.leases()).toBeNull();
+      },
+      KEYS,
+      fake,
+    );
+  });
+
+  test("the area recycles a session's sandboxes on its bus events", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { backend: "openshell", endpoint: ENDPOINT },
+        });
+        const leases = app.sandbox.leases()!;
+        const hold = await leases.acquire(
+          {
+            projectId: "project",
+            workspace: { id: "chat-gone", sessionId: "chat-gone" },
+            root: "chat-gone",
+            sendId: "send",
+            subagent: false,
+            repos: [],
+            repoFileBytes: 0,
+            network: false,
+            credentials: [],
+          },
+          app.now.value + 20_000,
+          new AbortController().signal,
+        );
+        if (hold === "busy") throw new Error("busy");
+        expect(fake.sandboxes.get(hold.sandbox)?.labels).toEqual({
+          [INSTANCE_LABEL]: app.sandbox.store.settings().instanceId,
+        });
+        hold.release();
+        publish({
+          type: "session.deleted",
+          data: { projectId: "project", sessionId: "chat-gone" },
+        });
+        await until(() => leases.rows().length === 0);
+        expect(fake.deletes).toEqual([hold.sandbox]);
+      },
+      KEYS,
+      fake,
+    );
+  });
+
+  test("a new image leaves the old manager's held sandbox to its command", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { backend: "openshell", endpoint: ENDPOINT },
+        });
+        const old = app.sandbox.leases()!;
+        const hold = await old.acquire(
+          {
+            projectId: "project",
+            workspace: { id: "chat", sessionId: "chat" },
+            root: "chat",
+            sendId: "send",
+            subagent: false,
+            repos: [],
+            repoFileBytes: 0,
+            network: false,
+            credentials: [],
+          },
+          app.now.value + 20_000,
+          new AbortController().signal,
+        );
+        if (hold === "busy") throw new Error("busy");
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { image: "registry.test/sbx:2" },
+        });
+        const next = app.sandbox.leases()!;
+        expect(next).not.toBe(old);
+        await app.sandbox.start();
+        // the new manager's start sweep spared it
+        expect(fake.deletes).toEqual([]);
+        hold.release();
+        await until(() => fake.deletes.includes(hold.sandbox));
+      },
+      KEYS,
+      fake,
+    );
+  });
+
+  test("a new image's old manager never deletes a provider the new one attached", async () => {
+    const fake = fakeGateway();
+    // every provider delete asked, before the fake refuses an attached
+    // one, and each client closed, which a drained manager's ends with
+    const asks: string[] = [];
+    let closed = 0;
+    const connect: typeof fake.connect = (config) => {
+      const gateway = fake.connect(config);
+      const remove = gateway.providers.delete;
+      gateway.providers.delete = (name, signal) => {
+        asks.push(name);
+        return remove(name, signal);
+      };
+      const close = gateway.close;
+      gateway.close = () => {
+        closed++;
+        close();
+      };
+      return gateway;
+    };
+    const key = "made-up-key-0123456789abcdef";
+    const call = (id: string): ShellCall => ({
+      projectId: "project",
+      workspace: { id, sessionId: id },
+      root: id,
+      sendId: "send",
+      subagent: false,
+      repos: [],
+      repoFileBytes: 0,
+      network: true,
+      credentials: [
+        {
+          name: "quotes",
+          prefix: "https://api.example.test/v1/",
+          key,
+          header: "Authorization",
+          template: "Bearer {key}",
+          value: `Bearer ${key}`,
+          methods: ["GET", "HEAD"],
+        },
+      ],
+    });
+    const acquire = async (leases: Leases, id: string, now: number) => {
+      const hold = await leases.acquire(
+        call(id),
+        now + 20_000,
+        new AbortController().signal,
+      );
+      if (hold === "busy") throw new Error("busy");
+      return hold;
+    };
+    const app = await testApp({ secrets: KEYS, sandboxGateway: connect });
+    try {
+      const admin = app.client();
+      await admin.login("admin", "hunter2-test");
+      await admin.call("PUT", "/api/admin/sandbox", {
+        body: {
+          backend: "openshell",
+          endpoint: ENDPOINT,
+          hosts: ["api.example.test"],
+        },
+      });
+      const old = app.sandbox.leases()!;
+      const hold = await acquire(old, "a", app.now.value);
+      await admin.call("PUT", "/api/admin/sandbox", {
+        body: { image: "registry.test/sbx:2" },
+      });
+      const next = app.sandbox.leases()!;
+      await app.sandbox.start();
+      const other = await acquire(next, "b", app.now.value);
+      hold.release();
+      await until(() => closed > 0);
+      expect(fake.deletes).toEqual([hold.sandbox]);
+      expect(asks).toEqual([]);
+      other.release();
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
+
+  test("an image that fails its root check is named on the leases route", async () => {
+    const fake = fakeGateway();
+    fake.rootProblems = ["missing /repos"];
+    await run(
+      async (app, admin) => {
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { backend: "openshell", endpoint: ENDPOINT },
+        });
+        let res = await admin.call("GET", "/api/admin/sandbox/leases");
+        expect(((await res.json()) as SandboxLeasesResponse).refused).toBe(
+          null,
+        );
+        const error = await rejection(
+          app.sandbox.leases()!.acquire(
+            {
+              projectId: "project",
+              workspace: { id: "chat", sessionId: "chat" },
+              root: "chat",
+              sendId: "send",
+              subagent: false,
+              repos: [],
+              repoFileBytes: 0,
+              network: false,
+              credentials: [],
+            },
+            app.now.value + 20_000,
+            new AbortController().signal,
+          ),
+        );
+        expect(error.message).toContain("fails its root check");
+        res = await admin.call("GET", "/api/admin/sandbox/leases");
+        const body = (await res.json()) as SandboxLeasesResponse;
+        expect(body.refused).toBe(error.message);
+      },
+      KEYS,
+      fake,
+    );
+  });
+
+  test("the default image follows a release's version, a dev build the dev tag", () => {
+    expect(defaultImage("v1.2.3")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3",
+    );
+    expect(defaultImage("v1.2.3-rc.1")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-rc.1",
+    );
+    // a hyphen inside the prerelease, as the release workflow allows
+    expect(defaultImage("v1.2.3-rc-hotfix")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-rc-hotfix",
+    );
+    expect(defaultImage("v0.0.0-dev")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:dev",
+    );
+    expect(defaultImage("main-abc123")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:dev",
+    );
+  });
+});

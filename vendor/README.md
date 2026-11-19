@@ -263,3 +263,80 @@ runs the suite twice and writes the list only when both runs agree
    without its entry or an entry left without its markers.
    A new command upstream added is off until `KNOWLEDGE_COMMANDS` in
    `src/server/bash/commands.ts` names it.
+
+# openshell-sdk, vendored
+
+The sandbox shell talks to an OpenShell gateway through OpenShell's
+TypeScript SDK (Apache-2.0), Connect-ES gRPC over `node:http2`. We run
+it from source in `vendor/openshell-sdk/`, because it is published only
+to GitHub Packages, which needs a token to install, and its tag ships
+no generated stubs. We have not changed its code.
+
+## Where it comes from
+
+| | |
+|---|---|
+| Upstream | `NVIDIA/OpenShell`, directory `sdk/typescript`, and four files of `proto/` |
+| Tag | `v0.1.9` |
+| Kept as | a plain copy: `src/`, `package.json`, `README.md`, `tsconfig.json` and its `.license`, the protos in `proto/`, the stubs in `src/gen/`, our `buf.gen.yaml` |
+| Resolved by | the `openshell-sdk` and `openshell-sdk/raw` entries of `paths` in `tsconfig.json`, pointing at `src/index.ts` and `src/raw.ts` |
+| Its packages | `@bufbuild/protobuf` 2.12.1, `@connectrpc/connect` 2.1.2 and `@connectrpc/connect-node` 2.1.2, pinned devDependencies in our `package.json`; `@bufbuild/buf` 1.71.0 and `@bufbuild/protoc-gen-es` 2.12.1 only regenerate the stubs |
+
+Only `src/server/sandbox/` imports `openshell-sdk` or its three
+packages: `PACKAGE_OWNERS` in `test/structure.ts` holds it, with the
+fixture `package-outside-owner`. The tree is outside Biome and the
+structure test, as just-bash is; `bun check` checks the files our code
+imports, with our settings, and they pass them unchanged.
+`LICENSE` is the Apache-2.0 text, and `THIRD_PARTY_LICENSES.md` names
+the copy.
+
+## What we removed
+
+- `src/*.test.ts` (client, errors, oidc, providers, raw, routing,
+  transport), `vitest.config.ts` and `e2e/`: upstream's vitest suite and
+  its end-to-end script, which need vitest and a gateway.
+- `biome.json`, `tsconfig.build.json` (each with its `.license`) and
+  `package-lock.json`: its own lint, build and npm lock.
+- `.gitignore`: it ignores `src/gen/`, which we keep.
+- From `proto/`, every file but `openshell.proto`, `sandbox.proto`,
+  `datamodel.proto` and `options.proto`, the closure the SDK generates
+  from.
+
+`src/oidc.ts` stays: it needs only `node:net`.
+
+## The stubs
+
+`src/gen/` is generated, never edited. `buf.gen.yaml` is upstream's
+with its paths moved to this layout (the `1ctx:` comment in it). It
+reads the four protos and googleapis' `google/rpc/error_details.proto`
+from buf.build at a pinned commit, so a regeneration needs the network;
+nothing in the build or the tests runs it. `@bufbuild/buf` runs without
+its install script: Bun installs its platform binary as an optional
+dependency. To regenerate:
+
+```sh
+cd vendor/openshell-sdk && ../../node_modules/.bin/buf generate
+```
+
+It must leave `git status` clean on an unchanged tag.
+
+## Taking a new release
+
+1. Read the release's notes and the commits under `sdk/typescript` and
+   `proto/` between the two tags.
+2. Clone the tag, copy `sdk/typescript/src/` over `src/` without its
+   tests, and the four protos over `proto/`. A new proto the SDK's
+   `buf.gen.yaml` lists comes too, with a line in its `paths`; compare
+   upstream's template with ours for anything else.
+3. Regenerate the stubs, as above.
+4. Match the packages: move each pin to the version upstream's
+   `package.json` range resolves to, and `@bufbuild/buf` and
+   `@bufbuild/protoc-gen-es` to theirs. A package new to upstream needs
+   the user's go-ahead.
+5. Update the tag here and in `THIRD_PARTY_LICENSES.md`, then check it:
+
+   ```sh
+   bun install --ignore-scripts
+   make lint && make test
+   make build && make smoke
+   ```

@@ -24,10 +24,52 @@ FLAGS=${STAGING_FLAGS:-}
 # the server's own default unless a deploy asks for another
 DRAIN_FLAG=${DRAIN:+--drain $DRAIN}
 KEEP_BACKUPS=3
+# STAGING_SANDBOX=1 runs OpenShell's gateway beside the server as the
+# LaunchAgent dev.1ctx.openshell (scripts/openshell.sh)
+SANDBOX=${STAGING_SANDBOX:-}
+GATEWAY_PORT=${STAGING_GATEWAY_PORT:-17671}
 
 # BatchMode fails fast instead of prompting
 ssh_() { ssh -o BatchMode=yes -o ConnectTimeout=10 "$HOST" "$@"; }
 fail() { echo "staging: $1" >&2; exit 1; }
+
+# The gateway's binary, certificates, config and LaunchAgent under
+# ~/.1ctx/openshell, its client bundle in the secrets. Its label names
+# the instance id, made by the server at its first start, so a box
+# without one answers 3 and the deploy installs the gateway after the
+# server instead of before it, waiting (WAIT=1) for the server to make
+# it. An unchanged gateway is never restarted.
+gateway() {
+  local wait=${1:-}
+  # called in a list, where set -e is off: each step returns itself
+  ssh_ 'mkdir -p ~/.1ctx/openshell && chmod 700 ~/.1ctx/openshell' || return 1
+  scp -q scripts/openshell.sh "$HOST:~/.1ctx/openshell/openshell.sh.new" ||
+    return 1
+  ssh_ PORT="$GATEWAY_PORT" WAIT="$wait" bash -s <<'REMOTE'
+set -euo pipefail
+dir=$HOME/.1ctx/openshell
+mv -f "$dir/openshell.sh.new" "$dir/openshell.sh"
+db=~/.1ctx/1ctx.sqlite
+id=
+# the server makes the id at its first read of the row, just after its
+# health answers; a healthy start does it within a second
+for _ in $(seq 1 30); do
+  if [ -f "$db" ]; then
+    id=$(sqlite3 -readonly "$db" \
+      'select instance_id from sandbox_settings where id = 1' 2>/dev/null || true)
+  fi
+  if [ -n "$id" ] || [ "$WAIT" != 1 ]; then break; fi
+  sleep 1
+done
+[ -n "$id" ] || exit 3
+sh() { bash "$dir/openshell.sh" "$@"; }
+sh docker
+changed=$(sh install "$dir" "$PORT" "1ctx-$id")
+sh launchd "$dir" "$changed"
+sh bundle "$dir" ~/.1ctx/secrets
+echo "gateway: healthy at https://127.0.0.1:$PORT, label 1ctx-$id"
+REMOTE
+}
 
 deploy() {
   # Staging holds real data and takes main only. A branch's migration is
@@ -73,11 +115,21 @@ ls -1t ~/.1ctx/backups/1ctx-*.sqlite | tail -n +$((KEEP + 1)) | while read -r f;
 done
 REMOTE
 
+  # the gateway before the server, so its sandboxes have one to reach
+  local later=
+  if [ "$SANDBOX" = 1 ]; then
+    gateway || { [ $? = 3 ] && later=1; } || exit 1
+  fi
+
   # Upload beside the live binary and rename: an interrupted copy must not
   # leave the service manager restarting a truncated executable.
   scp -q bin/1ctx "$HOST:~/.1ctx/bin/1ctx.new"
   ssh_ "mv -f ~/.1ctx/bin/1ctx.new ~/.1ctx/bin/1ctx &&
     ~/.1ctx/bin/1ctx service install --restart --listen $LISTEN $FLAGS $DRAIN_FLAG"
+
+  if [ -n "$later" ]; then
+    gateway 1 || fail "the gateway did not install after the server's first start"
+  fi
 }
 
 provision() {

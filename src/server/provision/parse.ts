@@ -29,6 +29,7 @@ import { object } from "./fields.ts";
 import { checkMcpServer, teamNames } from "./mcp.ts";
 import { checkHeldWire } from "./provider.ts";
 import { repoKey, repoName, repositories, repository } from "./repository.ts";
+import { checkSandbox, sandboxSpec } from "./sandbox.ts";
 import {
   SMTP_REQUIRED,
   type SmtpLogin,
@@ -36,6 +37,7 @@ import {
   smtpServerSpec,
 } from "./smtp.ts";
 import * as spec from "./spec.ts";
+import { duplicate } from "./unique.ts";
 
 export const KINDS = [
   "User",
@@ -46,6 +48,7 @@ export const KINDS = [
   "Provider",
   "Decider",
   "Dictation",
+  "Sandbox",
   "Skill",
   "McpServer",
   "Agent",
@@ -84,6 +87,7 @@ export type Of<K extends Kind> = Extract<Document, { kind: K }>;
 
 export type { DictationSpec } from "./dictation.ts";
 export type { RepositorySpec } from "./repository.ts";
+export type { SandboxSpec } from "./sandbox.ts";
 export type { SmtpLogin, SmtpServerSpec } from "./smtp.ts";
 export type {
   AgentSpec,
@@ -123,6 +127,7 @@ function document(value: unknown, source: string): Document {
       Provider: isName,
       Decider: isName,
       Dictation: isName,
+      Sandbox: isName,
       Skill: isSkillName,
       McpServer: isServerName,
       Agent: isName,
@@ -153,6 +158,8 @@ function document(value: unknown, source: string): Document {
         return { ...base, kind, spec: spec.decider(b.spec) };
       case "Dictation":
         return { ...base, kind, spec: dictationSpec(b.spec) };
+      case "Sandbox":
+        return { ...base, kind, spec: sandboxSpec(b.spec) };
       case "Skill":
         return { ...base, kind, spec: spec.skill(b.spec) };
       case "McpServer":
@@ -164,42 +171,6 @@ function document(value: unknown, source: string): Document {
     }
   } catch (error) {
     throw new Error(`${source}: ${label}: ${(error as Error).message}`);
-  }
-}
-
-function duplicate(documents: Document[]): void {
-  const seen = new Map<string, string>();
-  for (const doc of documents) {
-    const key = `${doc.kind}/${doc.name}`;
-    const previous = seen.get(key);
-    if (previous !== undefined) {
-      throw new Error(
-        `${doc.source}: ${key}: metadata.name is duplicated (first in ${previous})`,
-      );
-    }
-    seen.set(key, doc.source);
-  }
-  for (const kind of ["SmtpServer", "Dictation"] as const) {
-    const [first, second] = documents.filter((doc) => doc.kind === kind);
-    if (second !== undefined) {
-      throw new Error(
-        `${second.source}: ${kind}/${second.name}: one ${kind} object per instance (first ${kind}/${first!.name})`,
-      );
-    }
-  }
-  // one default of a kind, since a second would take the mark from the
-  // first
-  for (const kind of ["Agent", "Decider"] as const) {
-    let marked: Document | null = null;
-    for (const doc of documents) {
-      if (doc.kind !== kind || doc.spec.default !== true) continue;
-      if (marked !== null) {
-        throw new Error(
-          `${doc.source}: ${kind}/${doc.name}: spec.default is also set on ${kind}/${marked.name}`,
-        );
-      }
-      marked = doc;
-    }
   }
 }
 
@@ -409,6 +380,9 @@ export function preflight(
         break;
       case "Dictation":
         checkDictation(doc, documents, inventory, providerWire);
+        break;
+      case "Sandbox":
+        checkSandbox(doc.spec, readSecret);
         break;
       case "Skill":
         if (!exists) required(["url"]);

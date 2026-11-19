@@ -1,7 +1,7 @@
-# Access, users, projects, secrets and the socket
+# Access, users, projects and the socket
 
-Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
-`web/` (the router and the socket).
+Governs `src/server/access/`, `users/`, `projects/` and `web/` (the
+router and the socket). Secret files are `docs/secrets.md`.
 
 ## Requests
 
@@ -73,7 +73,8 @@ Governs `src/server/access/`, `users/`, `projects/`, `secrets/` and
 - **An access key is a row, not a secret file.** `access_keys` keeps
   only the sha256 of `1ctx_` plus 32 random bytes as base64url. The
   create response shows the token once; lists and logs never do.
-  The secrets rules below govern files, not these login-like credentials.
+  The secrets rules (`docs/secrets.md`) govern files, not these
+  login-like credentials.
 - **Only the owner mints a key.** `GET/POST /api/profile/keys` list and
   create; `DELETE /api/profile/keys/:id` revokes. A name follows the
   agent name rule (`isName`, 2 to 80 lowercase letters, digits, dashes
@@ -271,21 +272,6 @@ from `emailOn` in `GET /api/me`.
   rule.** Missing drafts and drafts in hidden chats answer the same "no
   such chat" 404 as opening that chat, an admin in another personal
   project included.
-
-## Secrets
-
-- **A secrets reader is bound to one kind.** One bare value per
-  `<kind>-<name>.key`, the kind from `SECRET_KINDS`, the name by
-  `isSecretName`; `read()` and `list()` refuse a name of
-  another kind. `compose.ts` binds each area's reader; only provision,
-  the Monitor's key checks (`overview/`) and the log scrubber read by
-  kind.
-- **`read()` sizes a file before reading it.** Null for an absent or
-  empty file, a non-regular file after links (a FIFO could block) and
-  one past `maxBytes`; `main.ts` caps `http-` files.
-- **A value is never logged, returned by a route or stored.** Routes
-  list names alone. Provider, search, MCP, `http-` and `email-` values
-  are scrubbed from logs, the kinds in `SCRUB_KINDS` in `compose.ts`.
 
 ## The socket
 

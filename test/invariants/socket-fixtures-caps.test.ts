@@ -83,18 +83,24 @@ describe("socket fixtures for caps", () => {
   });
 
   test("the time cap", async () => {
+    // a minute of tool time, so the clock stays far from any deadline
+    const toolMs = 60_000;
     const holder: { chat: ChatApp | null } = { chat: null };
     const fake = fakeTools({
       c1: {
         result: { content: "slow", error: false },
         onRun: () => {
-          if (holder.chat)
-            holder.chat.app.now.value += DEFAULT_LIMITS.toolMs + 1000;
+          if (holder.chat) holder.chat.app.now.value += toolMs + 1000;
         },
       },
     });
     const chat = await chatApp(fake);
     holder.chat = chat;
+    chat.app.db
+      .query(
+        "insert into limits (name, value, updated_at) values ('toolMs', ?, 0)",
+      )
+      .run(toolMs);
     const conn = await watcher(chat);
     const { detail, script, sessionId } = await startChat(chat, "long tools");
     watch(chat, conn, sessionId);

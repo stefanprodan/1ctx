@@ -77,6 +77,12 @@ export const LIMIT_NAMES = [
   "imagesPerRequest",
   "imageProjectBytes",
   "imagesPerHour",
+  "sandboxesMax",
+  "sandboxWarm",
+  "sandboxIdleMinutes",
+  "sandboxCpus",
+  "sandboxMemoryMiB",
+  "sandboxCommandSeconds",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 
@@ -90,6 +96,8 @@ export const LIMIT_UNITS = [
   "minutes",
   "hours",
   "pixels",
+  "mebibytes",
+  "seconds",
 ] as const;
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 
@@ -105,6 +113,7 @@ export const LIMIT_SCOPES = [
   "external",
   "dictation",
   "images",
+  "sandbox",
 ] as const;
 export type LimitScope = (typeof LIMIT_SCOPES)[number];
 

@@ -75,6 +75,10 @@ export function summonedLine(chatAgent: string): string {
 export const SUBAGENT_LINE =
   "You are a subagent: another agent handed you the task below and reads your answer, not a user. Nobody can answer questions, so do the task and stop. Answer briefly with what the task asks for. Put long output in a file under /tmp and name the file in your answer: files you add or change in /tmp reach the other agent. /knowledge and /uploads are read-only to you. Copy anything from /mcp the other agent needs into /tmp.";
 
+// under the sandbox shell the child shares its parent's sandbox
+export const SANDBOX_SUBAGENT_LINE =
+  "You are a subagent: another agent gave you this task and reads only your answer, and nobody can answer questions. You share its sandbox: /tmp, $HOME and /knowledge are the same files. Do the task, then reply briefly with what it asked for; put a long result in a file and say where.";
+
 export function userLine(
   policy: Pick<SendPolicy, "fullName" | "username" | "about" | "tz">,
 ): string {
@@ -130,7 +134,7 @@ export type PromptPolicy = Pick<
 export function subagentPrompt(policy: PromptPolicy): string {
   const parts = [projectLine(policy)];
   if (policy.prompt.trim() !== "") parts.push(policy.prompt.trim());
-  parts.push(SUBAGENT_LINE);
+  parts.push(policy.offered.sandbox ? SANDBOX_SUBAGENT_LINE : SUBAGENT_LINE);
   if (policy.offered.skills.block !== "") {
     parts.push(policy.offered.skills.block);
   }
