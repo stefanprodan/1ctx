@@ -47,6 +47,7 @@ import {
 import { AsideBones, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { McpServers } from "../projects/McpServers.tsx";
 import { DescriptionField, NameField } from "../projects/ProjectFields.tsx";
+import { ProjectShell } from "../projects/ProjectShell.tsx";
 import { Repos } from "../projects/Repos.tsx";
 import { SpendLines, UsageSection } from "./AdminAside.tsx";
 import {
@@ -158,6 +159,7 @@ function Body({ project }: { project: ProjectDetail }) {
         section={false}
         admin
       />
+      <ProjectShell project={project} section={false} edit saving={saving} />
       <SettingDelete
         title={`Delete ${project.name}`}
         line={deleteLine(project)}

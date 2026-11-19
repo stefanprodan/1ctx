@@ -21,11 +21,12 @@ import {
   sandboxRefused,
   watchSandboxLeases,
 } from "../../../src/client/data/sandbox.ts";
+import { BACKEND_OPTIONS } from "../../../src/client/lib/backends.ts";
 import { Save } from "../../../src/client/lib/save.ts";
 import {
-  BACKEND_OPTIONS,
   backendLine,
   draftOf,
+  gatewayShown,
   HOSTS_HINT,
   leaseCounts,
   leaseSub,
@@ -37,10 +38,12 @@ import {
   netDraftOf,
   netFieldOf,
   offLine,
+  overridesLine,
   type SandboxDraft,
   sandboxBody,
   sandboxDirty,
   sandboxFieldOf,
+  sandboxOn,
   stuckLine,
 } from "../../../src/client/views/admin/Sandbox.model.ts";
 import {
@@ -76,6 +79,7 @@ const response = (over: Partial<SandboxResponse> = {}): SandboxResponse => ({
   gatewayLabel: "1ctx-abc123",
   keys: { ca: true, cert: true, key: true },
   active: true,
+  overrides: { builtin: 0, openshell: 0 },
   ...over,
 });
 
@@ -223,6 +227,61 @@ describe("the Sandbox words", () => {
     expect(netFieldOf("backend must be builtin or openshell")).toBeUndefined();
   });
 
+  test("a project on openshell without a working gateway is named, and no sandbox is claimed", () => {
+    const builtinWith = (over: Partial<SandboxResponse>) =>
+      response({
+        settings: { ...settings, backend: "builtin" },
+        active: false,
+        ...over,
+      });
+    const one = { builtin: 0, openshell: 1 };
+    expect(
+      offLine(
+        builtinWith({
+          settings: { ...settings, backend: "builtin", endpoint: null },
+          overrides: one,
+        }),
+      ),
+    ).toBe(
+      "1 project on OpenShell runs the built-in shell until a gateway is saved.",
+    );
+    expect(
+      offLine(
+        builtinWith({
+          settings: { ...settings, backend: "builtin", endpoint: null },
+          overrides: { builtin: 0, openshell: 2 },
+        }),
+      ),
+    ).toBe(
+      "2 projects on OpenShell run the built-in shell until a gateway is saved.",
+    );
+    const keyless = builtinWith({
+      overrides: one,
+      keys: { ca: true, cert: true, key: false },
+    });
+    expect(offLine(keyless)).toBe(
+      "The sandbox shell is off: openshell-gateway-key.key is missing.",
+    );
+    expect(sandboxOn(keyless)).toBe(false);
+    expect(offLine(builtinWith({ overrides: one }))).toBeNull();
+    expect(sandboxOn(builtinWith({ overrides: one }))).toBe(true);
+    expect(sandboxOn(builtinWith({}))).toBe(false);
+    expect(sandboxOn(response())).toBe(true);
+  });
+
+  test("counts the projects that pick their own shell, and keeps the gateway for their openshell", () => {
+    expect(overridesLine({ builtin: 0, openshell: 0 })).toBeNull();
+    expect(overridesLine({ builtin: 0, openshell: 1 })).toBe(
+      "1 project picks its own shell: 1 on OpenShell.",
+    );
+    expect(overridesLine({ builtin: 2, openshell: 1 })).toBe(
+      "3 projects pick their own shell: 2 on Built-in, 1 on OpenShell.",
+    );
+    expect(gatewayShown("openshell", { builtin: 0, openshell: 0 })).toBe(true);
+    expect(gatewayShown("builtin", { builtin: 3, openshell: 0 })).toBe(false);
+    expect(gatewayShown("builtin", { builtin: 0, openshell: 1 })).toBe(true);
+  });
+
   test("a lease names its chat and phase, a stuck one its next step", () => {
     expect(leaseSub(lease())).toBe("s1 · ready");
     expect(leaseSub(lease({ workspace: null, phase: null }))).toBe(
@@ -326,6 +385,26 @@ describe("the Sandbox page", () => {
     },
   );
 
+  test.serial(
+    "a project on openshell keeps the gateway, the image and the network under the built-in shell",
+    () => {
+      sandbox.value = response({
+        settings: { ...settings, backend: "builtin" },
+        active: false,
+        overrides: { builtin: 0, openshell: 1 },
+      });
+      sandboxLeases.value = [];
+      const html = render(<Sandbox />);
+      for (const name of ["endpoint", "image", "hosts"]) {
+        expect(html).toContain(`name="${name}"`);
+      }
+      expect(html).toContain(
+        "Commands run in the built-in shell, inside the server. 1 project picks its own shell: 1 on OpenShell.",
+      );
+      expect(html).toContain("No sandboxes yet.");
+    },
+  );
+
   test.serial("off hides the hosts and their count", () => {
     sandbox.value = response({
       settings: { ...settings, network: "off", hosts: ["a.test"] },
@@ -360,7 +439,7 @@ describe("the Sandbox page", () => {
     const html = render(<Sandbox />);
     expect(html).toContain("setting-alert");
     expect(html).toContain(
-      "Every command is refused: the sandbox image img fails its root check (missing /repos). An admin must fix the image or pick another.",
+      "Every OpenShell command is refused: the sandbox image img fails its root check (missing /repos). An admin must fix the image or pick another.",
     );
   });
 });

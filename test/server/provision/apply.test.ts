@@ -584,6 +584,45 @@ describe("provision through the composed app", () => {
     },
   );
 
+  test("a project's backend is set at create and update, and a re-apply writes nothing", async () => {
+    const { app } = await instance();
+    try {
+      const made = documents(
+        object("Project", "finops", {
+          description: "A team project.",
+          backend: "builtin",
+        }),
+      );
+      expect((await app.provision.apply(made, ignore)).created).toBe(1);
+      const id = app.projects.teamProjectIds()[0]!;
+      expect(app.projects.backendOf(id)).toBe("builtin");
+      const writes = mutations(app.db);
+      expect((await app.provision.apply(made, ignore)).unchanged).toBe(1);
+      expect(writes()).toEqual([]);
+      const moved = documents(
+        object("Project", "finops", { backend: "openshell" }),
+      );
+      expect((await app.provision.apply(moved, ignore)).updated).toBe(1);
+      expect(app.projects.backendOf(id)).toBe("openshell");
+      // left out stays, null follows the instance again
+      await app.provision.apply(
+        documents(object("Project", "finops", { description: "Changed." })),
+        ignore,
+      );
+      expect(app.projects.backendOf(id)).toBe("openshell");
+      await app.provision.apply(
+        documents(object("Project", "finops", { backend: null })),
+        ignore,
+      );
+      expect(app.projects.backendOf(id)).toBeNull();
+      expect(() =>
+        documents(object("Project", "finops", { backend: "docker" })),
+      ).toThrow("backend must be builtin, openshell or null");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
   test("diffs project membership, preserves omissions and never prunes unnamed rows", async () => {
     const { app } = await instance();
     try {

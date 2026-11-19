@@ -84,18 +84,23 @@ reporting.
   (the `backend` field as a `Seg`, Built-in or OpenShell, the gateway's
   https address, the image, empty for the default) saves the backend,
   endpoint and image, as SMTP's Server card does. Its line follows the
-  backend picked, saved or not. Built-in hides the gateway and image and
-  puts their drafts back to the saved values, which the save keeps;
-  `sandboxFieldOf()` matches the server's whole phrases.
-- **The Sandbox page's Network card shows while the shell picked is
-  OpenShell**, its own form saving only the network and hosts. Off or
+  backend picked, saved or not, and then `overridesLine()`, how many
+  projects pick their own shell, when any do. Built-in hides the
+  gateway and image and puts their drafts back to the saved values,
+  which the save keeps, unless a project picks `openshell`
+  (`gatewayShown()`); `sandboxFieldOf()` matches the server's whole
+  phrases.
+- **The Sandbox page's Network card shows while `gatewayShown()`**, its
+  own form saving only the network and hosts. Off or
   Hosts as a `Seg`; Hosts draws the box, one host per line, counted
   "N of 200", a line's refusal named by `lineError()`. The box holds
   the saved hosts, or the defaults while none are saved. Use defaults,
   as on a `LimitsSetting` card, fills the draft with Hosts and the
   defaults without saving, disabled while the draft is already that. A saved
-  sandbox shell missing a key file says so in a `SettingAlert`, and so
-  does the leases route's `refused` while every command is refused. The
+  sandbox shell, or a project's, missing a key file or a gateway says
+  so in a `SettingAlert` (`offLine()`), and the Sandboxes card claims
+  none runs (`sandboxOn()`). So does the leases route's `refused`
+  while every command is refused. The
   Sandboxes card lists the leases as `RowsLine`s, read again every 15
   seconds while seen, a stuck one in bad words with its next step
   (`stuckLine()`). The aside counts them, names the gateway label and

@@ -48,6 +48,7 @@ export const project = {
   ownerId: "user00000001",
   createdAt: 1,
   description: "",
+  backend: null,
 };
 
 const key = (scope: "read" | "write" = "read"): Principal => ({

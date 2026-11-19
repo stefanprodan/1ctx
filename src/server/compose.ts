@@ -391,6 +391,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
       latest: (projectId, limit) => knowledge.latest(projectId, limit),
     },
     usage: { projectTotal },
+    // a closure: the sandbox area is built later
+    shell: {
+      instanceBackend: () => sandbox.store.settings().backend,
+      changed: () => sandbox.projectsChanged(),
+    },
   });
   const credentials = credentialsArea({
     db,
@@ -507,7 +512,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       ? { onCommandPhase: options.onCommandPhase }
       : {}),
     // a closure: the sandbox area is built after bash
-    shell: (builtin) => sandbox.shell(builtin),
+    shell: (builtin, projectId) => sandbox.shell(builtin, projectId),
     sandboxNet: () => sandbox.net(),
     knowledge: {
       mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
@@ -527,6 +532,11 @@ export async function compose(options: ComposeOptions): Promise<App> {
     limits: () => limits.current(),
     repos: { hold: (files) => repos.hold(files) },
     connect: options.sandboxGateway ?? openshellGateway,
+    projects: {
+      backend: (projectId) => projects.store.backendOf(projectId),
+      openshell: () => projects.store.anyOpenshell(),
+      counts: () => projects.store.backendCounts(),
+    },
   });
   sessions = sessionsArea({
     db,

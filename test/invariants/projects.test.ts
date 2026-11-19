@@ -185,6 +185,8 @@ describe("GET /api/projects/:id", () => {
         chats: 0,
         knowledge: { files: 0, tokens: 0 },
         latestFiles: [],
+        backend: null,
+        instanceBackend: "builtin",
         members: [
           {
             id: admin.id,

@@ -361,10 +361,15 @@ describe("sandbox settings", () => {
       const next = app.sandbox.leases()!;
       await app.sandbox.start();
       const other = await acquire(next, "b", app.now.value);
+      const [mine] = fake.attached.get(hold.sandbox)!;
+      const [theirs] = fake.attached.get(other.sandbox)!;
       hold.release();
       await until(() => closed > 0);
       expect(fake.deletes).toEqual([hold.sandbox]);
-      expect(asks).toEqual([]);
+      // each manager's provider is its own: the old one's goes alone,
+      // its drop and the new one's sweep may both ask
+      expect(new Set(asks)).toEqual(new Set([mine!]));
+      expect(fake.providers.has(theirs!)).toBe(true);
       other.release();
     } finally {
       await app.shutdown();

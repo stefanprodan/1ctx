@@ -21,7 +21,8 @@ import {
   parseSandboxHosts,
   SANDBOX_DEFAULT_HOSTS,
 } from "../../../shared/sandbox-net.ts";
-import { ago } from "../../lib/format.ts";
+import { BACKEND_OPTIONS } from "../../lib/backends.ts";
+import { ago, plural } from "../../lib/format.ts";
 import { hostsCount, lineError } from "./Tools.model.ts";
 
 // what the form holds: text as typed, empty for none
@@ -32,11 +33,6 @@ export type SandboxDraft = {
 };
 
 export type SandboxField = keyof SandboxDraft;
-
-export const BACKEND_OPTIONS: { value: SandboxBackend; label: string }[] = [
-  { value: "builtin", label: "Built-in" },
-  { value: "openshell", label: "OpenShell" },
-];
 
 export function draftOf(settings: SandboxSettings): SandboxDraft {
   return {
@@ -109,20 +105,55 @@ export function backendLine(backend: SandboxBackend): string {
     : "Commands run in the built-in shell, inside the server.";
 }
 
-// why the saved sandbox shell is not running, null while it runs or
-// the built-in one is picked
+// the projects that pick their own shell over this one, null for none
+export function overridesLine(
+  overrides: SandboxResponse["overrides"],
+): string | null {
+  const total = overrides.builtin + overrides.openshell;
+  if (total === 0) return null;
+  const parts = BACKEND_OPTIONS.filter(
+    (option) => overrides[option.value] > 0,
+  ).map((option) => `${overrides[option.value]} on ${option.label}`);
+  return `${plural(total, "project")} ${
+    total === 1 ? "picks its" : "pick their"
+  } own shell: ${parts.join(", ")}.`;
+}
+
+// the gateway, image and network are the sandbox's: shown while the
+// shell picked is OpenShell or a project runs openshell over Built-in
+export const gatewayShown = (
+  backend: SandboxBackend,
+  overrides: SandboxResponse["overrides"],
+): boolean => backend === "openshell" || overrides.openshell > 0;
+
+// the gateway is saved and every key file found, whatever the backend
+const gatewayReady = (state: SandboxResponse): boolean =>
+  state.settings.endpoint !== null && missingKeys(state).length === 0;
+
+// a sandbox may run: the instance's shell, or a project's openshell
+export const sandboxOn = (state: SandboxResponse): boolean =>
+  state.active || (state.overrides.openshell > 0 && gatewayReady(state));
+
+// why the sandbox shell the instance or a project picked is not
+// running, null while it runs or nothing picks it
 export function offLine(state: SandboxResponse): string | null {
-  if (state.settings.backend !== "openshell" || state.active) return null;
+  const projects = state.overrides.openshell;
+  if (state.settings.backend !== "openshell" && projects === 0) return null;
+  if (state.active || gatewayReady(state)) return null;
   const missing = missingKeys(state);
-  if (missing.length === 0) return null;
-  return `The sandbox shell is off: ${missing.join(", ")} ${
-    missing.length === 1 ? "is" : "are"
-  } missing.`;
+  if (missing.length > 0) {
+    return `The sandbox shell is off: ${missing.join(", ")} ${
+      missing.length === 1 ? "is" : "are"
+    } missing.`;
+  }
+  return `${plural(projects, "project")} on OpenShell ${
+    projects === 1 ? "runs" : "run"
+  } the built-in shell until a gateway is saved.`;
 }
 
 // the server's words for why no command runs
 export const refusedLine = (refused: string) =>
-  `Every command is refused: ${refused}.`;
+  `Every OpenShell command is refused: ${refused}.`;
 
 const STATE_WORDS: Record<LeaseState, string> = {
   creating: "Creating",

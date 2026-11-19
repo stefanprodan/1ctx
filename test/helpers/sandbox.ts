@@ -6,6 +6,7 @@
 // signal ends it, hold deletes pending or stuck, or crash and come back
 // with every sandbox in error, as a gateway killed mid-flight does.
 
+import { BINDS_COMMAND } from "../../src/server/sandbox/binds.ts";
 import type {
   Connect,
   CreateSpec,
@@ -99,6 +100,10 @@ export type FakeGateway = {
   rootProblems: string[];
   // the root checks run, by sandbox
   rootChecks: string[];
+  // the repositories whose bind every read refuses
+  unsharedRepos: string[];
+  // the repository checks run, by sandbox
+  bindChecks: string[];
   // each sandbox's filesystem, which answers the helpers' execs
   files: Map<string, FakeFs>;
   // every new sandbox's filesystem is set up by this, as a test asks
@@ -138,6 +143,8 @@ export function fakeGateway(): FakeGateway {
     started: "4242",
     rootProblems: [],
     rootChecks: [],
+    unsharedRepos: [],
+    bindChecks: [],
     files: new Map(),
     deleteMode: "complete",
     fail: (method, error = new Error(`fake ${method} failed`)) =>
@@ -246,6 +253,23 @@ export function fakeGateway(): FakeGateway {
         fake.rootChecks.push(request.sandbox);
         const lines = [...fake.rootProblems, "ok"].join("\n");
         yield { stream: "stdout", data: text(`${lines}\n`) };
+        yield { exit: 0 };
+        return;
+      }
+      const binds = BINDS_COMMAND.length;
+      if (
+        request.command.slice(0, binds).join("\0") === BINDS_COMMAND.join("\0")
+      ) {
+        fake.bindChecks.push(request.sandbox);
+        const lines = request.command
+          .slice(binds)
+          .flatMap((name, place) =>
+            fake.unsharedRepos.includes(name) ? [`unreadable ${place}`] : [],
+          );
+        yield {
+          stream: "stdout",
+          data: text(`${[...lines, "ok"].join("\n")}\n`),
+        };
         yield { exit: 0 };
         return;
       }

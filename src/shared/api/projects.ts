@@ -5,12 +5,19 @@
 
 import type { LabelInput } from "../contracts/label.ts";
 import type { ProjectDetail, ProjectSummary } from "../contracts/project.ts";
+import type { SandboxBackend } from "../contracts/sandbox.ts";
 
 // GET /api/projects: the caller's projects, the personal one first
 export type ProjectsResponse = { projects: ProjectSummary[] };
 
 // GET /api/projects/:id and every project write
 export type ProjectResponse = { project: ProjectDetail };
+// PATCH /api/projects/:id on another user's personal project, which its
+// admin may not read: the backend it set alone
+export type ProjectBackendResponse = {
+  id: string;
+  backend: SandboxBackend | null;
+};
 
 // labels left out start the project with DEFAULT_LABELS
 export type CreateProjectRequest = {
@@ -18,8 +25,13 @@ export type CreateProjectRequest = {
   description: string;
   labels?: LabelInput[];
 };
-// at least one of the two
-export type UpdateProjectRequest = { name?: string; description?: string };
+// at least one field; a personal project takes backend alone. backend
+// null follows the instance's sandbox setting
+export type UpdateProjectRequest = {
+  name?: string;
+  description?: string;
+  backend?: SandboxBackend | null;
+};
 // PATCH /api/projects/:id/about: any user who sees the project
 export type UpdateAboutRequest = { description: string };
 // POST /api/projects/:id/labels

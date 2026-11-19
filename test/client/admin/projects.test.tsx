@@ -86,6 +86,8 @@ const detail: ProjectDetail = {
   chats: 3,
   knowledge: { files: 0, tokens: 0 },
   latestFiles: [],
+  backend: null,
+  instanceBackend: "builtin" as const,
 };
 
 let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;

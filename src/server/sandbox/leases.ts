@@ -13,6 +13,7 @@ import type { ShellCall, ShellRepo, StoredBytes } from "../bash/index.ts";
 import { after, type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
+import { RepoUnshared } from "./binds.ts";
 import { Book, type Lease } from "./book.ts";
 import { buildSandbox } from "./create.ts";
 import { Deletes } from "./deletes.ts";
@@ -24,7 +25,8 @@ import { PolicyGate } from "./policy.ts";
 import { WarmPool } from "./pool.ts";
 import { ImageCheck, ImageRefused } from "./roots.ts";
 import { fitsCaps, mountsKey, sandboxName } from "./spec.ts";
-import { Cuts, sweepLabelled } from "./sweep.ts";
+import { Cuts } from "./sweep.ts";
+import { Sweeper } from "./sweeper.ts";
 import { bounded, Changes, Gate } from "./waits.ts";
 import { Watch } from "./watch.ts";
 
@@ -48,13 +50,18 @@ export type LeasesDeps = {
   // the repository cache's hold on a mounted tree
   repos: { hold(tree: string): (() => void) | null };
   // the managers the settings moved off, still deleting: their sandboxes
-  // count against the cap, and no sweep of this one takes what they hold
+  // count against the cap
   others?(): readonly Leases[];
+  // a salt in this manager's provider and profile names, so a delete of
+  // its own never takes another manager's, on whatever gateway
+  owner?: string;
   // a delete of this manager was observed, so another may admit one
   freed?(): void;
   // the provider locks every manager of the instance shares
   locks?: Map<string, Promise<unknown>>;
   net?: NetworkDeps["net"];
+  // a sweep listed every kind: what an earlier run left is known
+  listed?(): void;
 };
 
 export class Leases {
@@ -76,6 +83,7 @@ export class Leases {
   // shut from start until a sweep recorded what an earlier run left, so
   // no create passes the cap before those count
   private readonly starting = new Gate();
+  private readonly sweeper: Sweeper;
 
   constructor(private readonly deps: LeasesDeps) {
     this.changes = new Changes(deps.clock);
@@ -125,11 +133,23 @@ export class Leases {
       mark: () => this.book.tick(),
       gone: (lease) => this.remove(lease, "failed"),
       restarted: () => this.restarted(),
-      sweep: () => this.sweep("again").then(() => this.pool.refill()),
+      sweep: () => this.sweeper.sweep("again").then(() => this.pool.refill()),
       reap: (found) => {
         const due = this.cuts.due(found, (name) => this.book.holds(name));
         for (const info of due) void this.deletes.adopt(info.name, info.phase);
       },
+    });
+    this.sweeper = new Sweeper({
+      ...deps,
+      book: this.book,
+      net: this.net,
+      deletes: this.deletes,
+      policy: this.policy,
+      pool: this.pool,
+      watch: this.watch,
+      starting: this.starting,
+      others: () => this.others(),
+      remove: (lease, reason) => this.remove(lease, reason),
     });
   }
 
@@ -244,19 +264,10 @@ export class Leases {
     }
   }
 
-  // at start: what an earlier run left, then the pool and the probe. A
-  // sweep that could not list keeps the gate shut and the pool empty
-  // until one that can, which the next probe that answers runs
-  async start(): Promise<void> {
-    this.starting.close();
-    try {
-      await this.sweep("start");
-    } catch (error) {
-      this.starting.open();
-      throw error;
-    }
-    this.pool.refill();
-    this.watch.arm();
+  // at start: what an earlier run left, then the pool and the probe
+  // (sweeper.ts)
+  start(): Promise<void> {
+    return this.sweeper.start();
   }
 
   // an exec answered that the sandbox is not ready or the gateway is
@@ -268,14 +279,9 @@ export class Leases {
     void this.check();
   }
 
-  // every lease dropped and its sandbox deleted, then what the gateway
-  // still lists under our label, stuck ones asked to delete again
-  async restarted(): Promise<void> {
-    const leases = this.book.live();
-    this.deps.log.warn("sandbox gateway restarted", { leases: leases.length });
-    for (const lease of leases) this.remove(lease, "restart");
-    await this.sweep("restart");
-    this.pool.refill();
+  // every lease dropped, then a sweep (sweeper.ts)
+  restarted(): Promise<void> {
+    return this.sweeper.restarted();
   }
 
   // the leases against what the gateway lists (watch.ts)
@@ -381,12 +387,16 @@ export class Leases {
     this.seats.changed();
     lease.usedAt = this.deps.clock();
     if (lease.holders > 0) return;
-    if (lease.recycled !== null) {
-      this.deletes.destroy(lease, lease.recycled);
-      return;
-    }
-    if (lease.doomed || this.closed || this.draining) {
-      this.deletes.destroy(lease, "discard");
+    if (
+      lease.recycled !== null ||
+      lease.doomed ||
+      this.closed ||
+      this.draining
+    ) {
+      this.deletes.destroy(lease, lease.recycled ?? "discard");
+      // a command waiting for its workspace's doomed sandbox makes
+      // another now, never after the delete; the cap counts this one
+      this.changes.changed();
       return;
     }
     lease.state = "idle";
@@ -427,10 +437,17 @@ export class Leases {
     try {
       await this.build(lease, repos, stored, step.signal);
     } catch (error) {
-      this.deletes.destroy(lease, "failed");
+      this.deletes.failed(lease, error);
       signal.throwIfAborted();
       if (step.signal.aborted) return "busy";
-      if (error instanceof ImageRefused) throw error;
+      // a host that cannot share a repository, seen outside the chat too
+      if (error instanceof RepoUnshared)
+        this.deps.log.warn("sandbox repository unreadable", {
+          sandbox: lease.name,
+          repos: error.unreadable,
+        });
+      if (error instanceof ImageRefused || error instanceof RepoUnshared)
+        throw error;
       this.deps.log.warn("sandbox create failed", {
         sandbox: lease.name,
         ...errorFields(error),
@@ -473,27 +490,5 @@ export class Leases {
       return;
     }
     this.deletes.destroy(lease, reason);
-  }
-
-  private async sweep(when: "start" | "restart" | "again"): Promise<void> {
-    const { globalPolicy, listed } = await sweepLabelled(
-      {
-        ...this.deps,
-        held: (name) =>
-          this.book.holds(name) ||
-          this.others().some((other) => other.holds(name)),
-        dropProvider: (name) =>
-          this.net.sweep(name, (provider) =>
-            this.others().some((other) => other.holdsProvider(provider)),
-          ),
-        dropProfile: (id) => this.net.sweepProfile(id),
-        adopt: (name, phase) => this.deletes.adopt(name, phase),
-        counted: () => this.starting.open(),
-      },
-      when,
-    );
-    // a sweep that could not list runs again at the next good probe
-    if (!listed) this.watch.sweepAgain();
-    this.policy.seen(globalPolicy);
   }
 }

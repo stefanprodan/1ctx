@@ -15,6 +15,7 @@ const personal: ProjectRow = {
   ownerId: "u1",
   createdAt: 0,
   description: "",
+  backend: null,
 };
 const team: ProjectRow = { ...personal, id: "p2", kind: "team", name: "ops" };
 const owner = { userId: "u1", role: "member" as const };

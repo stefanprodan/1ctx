@@ -21,6 +21,9 @@ export type Lease = {
   state: LeaseState;
   // the commands holding it: a chat's and its subagents' at once
   holders: number;
+  // those of them whose network was set up: a command with another plan
+  // never changes it under them
+  admitted: number;
   // a command holds it, or its create runs: deleted when that ends
   doomed: boolean;
   // why a holder recycled it, the delete's reason at the last release
@@ -76,6 +79,7 @@ export class Book {
       holds: [],
       state: "creating",
       holders: 0,
+      admitted: 0,
       doomed: false,
       recycled: null,
       lost: new AbortController(),

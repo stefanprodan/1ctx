@@ -34,11 +34,34 @@ only to the gateway, over gRPC with mutual TLS.
 - **Image null runs the default**, `ghcr.io/stefanprodan/1ctx-shell`
   tagged with the binary's version for a release, `dev` for a source
   run or a dev build, so an upgrade moves it along.
-- **The shell is on when the backend is `openshell`, an endpoint is saved
-  and every key file is there.** `compose.ts` passes bash a closure
-  asked at each command: builtin until then. A save that changes the
-  endpoint, a key or the image drains the old gateway's leases: every
-  sandbox deleted.
+- **A project may pick its own backend** (`projects.backend`,
+  `builtin` or `openshell`); null follows the instance's. The sandbox
+  area reads it through a port from `compose.ts`, since projects sit
+  above it.
+- **A project's shell is on when its backend is `openshell`, an
+  endpoint is saved and every key file is there.** `compose.ts` passes
+  bash a closure asked at each command with the project: builtin until
+  then. The tool offer's `sandbox()` asks the same with the send's
+  project, so a turn's offer and its commands agree. `active` in the
+  GET answer is the instance's alone; `overrides` counts the projects
+  that pick each backend.
+- **One gateway manager serves every project,** keyed by the endpoint,
+  the keys and the image. It is made when a command needs it, at a
+  save while the instance or a project runs `openshell`, and at start
+  whenever a gateway is saved, so its sweep takes what an earlier run
+  left. A save that changes the endpoint, a key or the image drains the
+  old gateway's leases: every sandbox deleted, and so does a key file
+  gone, at the next command, and any save while nothing runs
+  `openshell`, once a sweep of the manager listed every kind; a new
+  gateway then gets a manager whose start sweep takes what was left. A
+  project's change drains nothing:
+  its next command takes the other shell, `$HOME` and `/tmp` of the old
+  one stay behind, and an unused sandbox goes by the idle sweep. While
+  nothing runs `openshell` the warm pool empties and makes none, and the
+  manager goes once it holds no sandbox and a sweep of it has listed
+  every kind. A project's backend change or delete asks it at once
+  (`projectsChanged()`); whether any project runs `openshell` is one
+  indexed lookup, since it is asked often.
 - **The hosts are the sandbox's own, never Web access's list.**
   `shared/sandbox-net.ts` parses them for the page and the route: at
   most 200, each a host name (an IDN in its ASCII form) or an OpenShell
@@ -80,6 +103,9 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   never retrying is what keeps a launch at most once.
 - **A sandbox's name is `1ctx-` and 14 random characters:** the
   gateway refuses one over 19, so the instance is in the label alone.
+  A create the gateway answers with the name held (`NameTaken`) deletes
+  nothing, since that sandbox is another's; any other failed create is
+  deleted, since it may have landed.
 - **A sandbox is made with its whole layout.** The image, the keep-alive
   (`/usr/bin/sleep infinity`), CPU and memory, the filesystem policy
   with Landlock `hard_requirement`, and Docker mounts: a tmpfs per
@@ -108,6 +134,14 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   takes a file, `/repos` a folder. Each manager checks until one
   passes; a failed check refuses every command and the pool for good
   with the image named, shown as the leases route's `refused`.
+- **A sandbox made with repositories lists each once** (`binds.ts`),
+  after the root check, since some Docker hosts bind one so every read
+  under it is refused (Docker Desktop on the Apple Virtualization
+  framework) while the image passes. One that cannot be listed fails
+  that create with words naming it and Docker VMM, and logs a warning
+  with the sandbox and how many, never the names; the sandbox goes,
+  the image is never refused, and a sandbox without repositories is
+  never asked.
 - **Every exec runs with `SANDBOX_ENV`** (`spec.ts`): HOME, `TMPDIR`,
   `PATH`, uv's settings and bun's (its cache and global packages under
   HOME, never `/knowledge`, and `DO_NOT_TRACK`). An
@@ -144,8 +178,9 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   is `busy`.
 - **A lease counts its holders.** It goes idle at the last release,
   and the idle clock starts there. The network is set up in the
-  sandbox's turn (below), since its holders run at once; a recycle
-  while a command waits for that turn sends it on to a fresh sandbox.
+  sandbox's turn (below), since its holders run at once; a recycle or
+  a retire (a failed setup, a plan that differs) while a command waits
+  for that turn sends it on to a fresh sandbox.
 - **The keep-alive's pid is read once at create,** by bash builtins
   over `/proc`, and a sandbox without exactly one is never leased.
 - **The cap counts creating, warm, leased, idle and deleting
@@ -170,7 +205,7 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   in memory, its phase asked every 5 minutes. A delete that fails
   before its timeout is asked again after 5 and 15 s, then is stuck.
   A stuck delete is asked again only by a sweep (a restart of the
-  gateway or of 1ctx). A stuck sandbox in `error` has an exited
+  gateway or of 1ctx, or the hourly one). A stuck sandbox in `error` has an exited
   container: remove its containers and volumes (labelled with its
   sandbox id) on the Docker host.
 - **The cache trees a sandbox binds stay held until its delete is
@@ -199,8 +234,8 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   passed, since the replacement's start sweep skipped it while it was
   deleting; a later sweep asks its delete again, and the name it then
   holds counts once against the cap. A stuck sandbox it gave up on is
-  looked at again only by a start sweep, a restart or an "again"
-  sweep. It closes its client once no
+  looked at again only by a start sweep, a restart, an "again" or the
+  hourly sweep. It closes its client once no
   record is left and its providers' deletes ended; after a close a
   failed provider delete is not asked again.
 - **A gateway restart drops every lease** (`watch.ts`). A probe lists
@@ -210,7 +245,9 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   leaves them all there. Any other
   sandbox in `error` or not listed goes alone, a held one at its
   release. On a restart every lease is recycled and the labelled
-  sandboxes swept again, stuck ones included. The backend calls
+  sandboxes swept again, stuck ones included. A probe that answers
+  sweeps as well once `SWEEP_MS` (an hour) passed since the last sweep,
+  dropping no lease, so what a lost answer left goes in time. The backend calls
   `sandboxFailed(workspace)` when an exec says the sandbox is not ready
   or the gateway is unavailable: that lease goes and a probe starts.
   It returns at once and is never awaited on a command's path, since a
@@ -220,8 +257,11 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   held by no lease, deletes it.
 - **The client's HTTP/2 session is 1ctx's own,** closed with the
   gateway port.
-- **A create or list the RPC cannot cancel** is waited for only until
-  the step's signal; what the gateway still does is the next sweep's.
+- **Create, list and a policy's save go through the raw RPCs** with
+  the step's signal, as every other call, so a wait that ends cancels
+  its RPC: a gateway that never answers holds no more than one call per
+  wait. A create cut that still lands is the probe's or the next
+  sweep's.
 
 ## Where the gateway runs
 

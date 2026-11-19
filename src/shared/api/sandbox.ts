@@ -22,6 +22,8 @@ export type SandboxResponse = {
   gatewayLabel: string;
   keys: Record<SandboxKeyRole, boolean>;
   active: boolean;
+  // how many projects pick each backend of their own over the instance's
+  overrides: Record<SandboxBackend, number>;
 };
 
 // PUT /api/admin/sandbox: fields left out stay. endpoint must be an

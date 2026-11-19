@@ -161,12 +161,17 @@ export function wantedOf(
           row === undefined
             ? null
             : `k:${row.messageId}:${row.position}:${row.bytes}`,
+        // a row gone since the mount is unreadable: the push is eager,
+        // so an empty file would stand in for bytes nobody asked for
         read: () => {
+          let data: Uint8Array | null;
           try {
-            return kept(index) ?? new Uint8Array();
+            data = kept(index);
           } catch {
             throw new KeptUnreadable();
           }
+          if (data === null) throw new KeptUnreadable();
+          return data;
         },
       };
     }),

@@ -71,8 +71,8 @@ type MountDeps = {
   scratch: ScratchStore;
   clock: Clock;
   log: Log;
-  // the shell of this command, asked once per command
-  shell(): ShellBackend;
+  // the shell of this command in its project, asked once per command
+  shell(projectId: string): ShellBackend;
   current(): KnowledgeCaps;
   // each phase a command's worker reports, by chat
   onPhase?(sessionId: string, phase: "run" | "diff"): void;
@@ -168,13 +168,13 @@ export async function run(
   const began = deps.clock();
   const slotOf = deps.acquire ?? acquireProcess;
   // the shell is picked once, before the timers its deadline sets
-  const shell = deps.shell();
-  // a subagent's credentials were offered for the shell of its send's
-  // start (tools/offer.ts): another one runs none of its commands
+  const shell = deps.shell(projectId);
+  // a send's tool, network and credentials were offered for the shell
+  // of its start (tools/offer.ts): another one runs none of its
+  // commands, and the next send's offer names the new one
   if (
-    given.subagent &&
     (given.sandboxCommandMs !== undefined) !==
-      (shell.sharedWithSubagents === true)
+    (shell.sharedWithSubagents === true)
   )
     return {
       ...failed(new Error(SHELL_SWITCHED), given.resultCut),

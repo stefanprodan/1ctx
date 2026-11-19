@@ -7,9 +7,9 @@
 // a crashed gateway comes back with every sandbox in error; every ready
 // sandbox in error says the same even when no probe saw it down. A
 // sweep that could not list is run again by the next probe that
-// answers, which drops no lease.
+// answers, which drops no lease, and so is one every SWEEP_MS.
 
-import { after, type Clock } from "../lib/clock.ts";
+import { after, type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { Lease } from "./book.ts";
 import type { Gateway, SandboxInfo } from "./gateway.ts";
@@ -19,6 +19,9 @@ import { ask } from "./waits.ts";
 
 // how often the gateway's sandboxes are listed while the shell is on
 export const HEALTH_MS = 30_000;
+// how often a probe sweeps as well: what a lost answer left (a create
+// that landed after its probes, a delete no one saw) goes in time
+export const SWEEP_MS = 60 * MINUTE_MS;
 
 export type WatchDeps = {
   clock: Clock;
@@ -68,8 +71,11 @@ export class Watch {
   private timer: (() => void) | null = null;
   private running: Promise<void> | null = null;
   private closed = false;
+  private sweepAt: number;
 
-  constructor(private readonly deps: WatchDeps) {}
+  constructor(private readonly deps: WatchDeps) {
+    this.sweepAt = deps.clock() + SWEEP_MS;
+  }
 
   // a sweep that could not list: the next probe that answers runs it
   // again, a blip of one list never read as a restart
@@ -122,10 +128,12 @@ export class Watch {
       // the restart sweeps, and marks it again if it cannot list
       this.lost = false;
       this.again = false;
+      this.sweepAt = this.deps.clock() + SWEEP_MS;
       return this.deps.restarted();
     }
-    if (this.again) {
+    if (this.again || this.deps.clock() >= this.sweepAt) {
       this.again = false;
+      this.sweepAt = this.deps.clock() + SWEEP_MS;
       await this.deps.sweep();
     }
     this.deps.reap(found);

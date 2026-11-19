@@ -9,7 +9,7 @@
 import { after, type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { Book, Lease } from "./book.ts";
-import type { Gateway, SandboxPhase } from "./gateway.ts";
+import { type Gateway, NameTaken, type SandboxPhase } from "./gateway.ts";
 import type { RecycleReason } from "./hold.ts";
 import { mountsKey } from "./spec.ts";
 import { type Cuts, STEP_MS } from "./sweep.ts";
@@ -56,6 +56,18 @@ export class Deletes {
     lease.state = "deleting";
     this.deps.log.info("sandbox recycled", { sandbox: lease.name, reason });
     void this.delete(lease);
+  }
+
+  // a create that threw: deleted, since it may have landed, unless the
+  // gateway answered the name was held, which makes it another's
+  failed(lease: Lease, error: unknown): void {
+    if (!(error instanceof NameTaken)) {
+      this.destroy(lease, "failed");
+      return;
+    }
+    lease.state = "deleting";
+    this.forget(lease);
+    this.deps.ended();
   }
 
   // a sandbox no lease uses, or a stuck one, deleted again

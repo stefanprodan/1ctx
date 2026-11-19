@@ -110,6 +110,12 @@ async function project(
   if (before && doc.spec.labels !== undefined) {
     if (await labels(api, project, doc.spec.labels)) action = "updated";
   }
+  if (doc.spec.backend !== undefined && doc.spec.backend !== project.backend) {
+    await api.call("PATCH", `/api/projects/${project.id}`, {
+      backend: doc.spec.backend,
+    });
+    if (before) action = "updated";
+  }
   if (doc.spec.members !== undefined) {
     const { users } = await api.call<UsersResponse>("GET", "/api/users");
     const wanted = new Set(

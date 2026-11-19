@@ -5,7 +5,8 @@
 // sandbox at once. Each hold lets go once, by a release, a recycle or a
 // retire. A recycle dooms the lease and stops the other holders at
 // once, since what the sandbox holds is unknown from then on; a retire
-// dooms it and lets them finish.
+// dooms it and lets them finish. A hold counts as admitted once its
+// network is set up, until it lets go.
 
 import type { ShellCall } from "../bash/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -20,13 +21,23 @@ import { bounded } from "./waits.ts";
 // this bounds that memory; a command past it waits in acquire()
 export const SANDBOX_COMMANDS = 6;
 
+// each hold's lease, and its admission once its network is set up
+const holds = new WeakMap<SandboxHold, { lease: Lease; admit(): void }>();
+
 export function holdOf(
   lease: Lease,
   gateway: Gateway,
   ends: { failed(): void; release(): void },
 ): SandboxHold {
   let done = false;
-  return {
+  let admitted = false;
+  const end = () => {
+    done = true;
+    if (admitted) lease.admitted--;
+    admitted = false;
+    ends.release();
+  };
+  const hold: SandboxHold = {
     sandbox: lease.name,
     keepAlivePid: lease.pid!,
     keepAliveStart: lease.started!,
@@ -40,31 +51,39 @@ export function holdOf(
     turn: (signal) => lease.turns.take(signal),
     release: () => {
       if (done) return;
-      done = true;
-      ends.release();
+      end();
     },
     recycle: (reason) => {
       if (done) return;
-      done = true;
       lease.doomed = true;
       lease.recycled ??= reason;
       if (!lease.lost.signal.aborted)
         lease.lost.abort(new Error("the sandbox was recycled"));
-      ends.release();
+      end();
     },
     retire: (reason) => {
       if (done) return;
-      done = true;
       lease.doomed = true;
       lease.recycled ??= reason;
-      ends.release();
+      end();
     },
   };
+  holds.set(hold, {
+    lease,
+    admit: () => {
+      if (done || admitted) return;
+      admitted = true;
+      lease.admitted++;
+    },
+  });
+  return hold;
 }
 
 // the network set up in the sandbox's turn, since its holders run at
 // once; a turn not had by the deadline is busy, and lets the hold go.
-// A sibling's recycle while it waits sends the caller to a fresh one
+// A sibling's recycle or retire while it waits (a failed setup among
+// them) sends the caller to a fresh one, since a doomed lease is joined
+// by no one
 export async function configureInTurn(
   net: Network,
   clock: Clock,
@@ -91,11 +110,21 @@ export async function configureInTurn(
   } finally {
     step.dispose();
   }
+  const own = holds.get(hold)!;
   try {
-    if (!hold.lost.aborted)
-      return await net.configure(hold, call, deadline, signal);
-    hold.release();
-    return "recycled";
+    if (hold.lost.aborted || own.lease.doomed) {
+      hold.release();
+      return "recycled";
+    }
+    const ready = await net.configure(
+      hold,
+      call,
+      deadline,
+      signal,
+      own.lease.admitted,
+    );
+    if (ready === "ready") own.admit();
+    return ready;
   } finally {
     pass();
   }

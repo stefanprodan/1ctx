@@ -83,7 +83,7 @@ export class WarmPool {
         this.deps.deletes.destroy(lease, "settings");
       } else lease.state = "warm";
     } catch (error) {
-      this.deps.deletes.destroy(lease, "failed");
+      this.deps.deletes.failed(lease, error);
       this.deps.log.warn("sandbox create failed", {
         sandbox: lease.name,
         ...errorFields(error),

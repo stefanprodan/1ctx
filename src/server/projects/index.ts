@@ -12,6 +12,7 @@ import {
   type KnowledgePort,
   routes,
   type SessionsPort,
+  type ShellPort,
   type TaskClaimsPort,
   type TaskLabelsPort,
   type UsagePort,
@@ -19,7 +20,11 @@ import {
 } from "./routes.ts";
 import { type ProjectRow, ProjectStore } from "./store.ts";
 
-export { parseLabelDescription, parseLabelName } from "./parse.ts";
+export {
+  parseBackend,
+  parseLabelDescription,
+  parseLabelName,
+} from "./parse.ts";
 export { type ProjectRow, ProjectStore } from "./store.ts";
 export { visible } from "./visible.ts";
 
@@ -33,6 +38,7 @@ export type ProjectsDeps = {
   taskLabels: TaskLabelsPort;
   knowledge: KnowledgePort;
   usage: UsagePort;
+  shell: ShellPort;
 };
 
 export type Projects = {
@@ -70,6 +76,7 @@ export function projectsArea(deps: ProjectsDeps): Projects {
       taskLabels: deps.taskLabels,
       knowledge: deps.knowledge,
       usage: deps.usage,
+      shell: deps.shell,
       clock: deps.clock,
     }),
   };

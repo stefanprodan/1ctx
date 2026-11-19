@@ -7,6 +7,7 @@ import {
   type ProjectLabel,
 } from "../../shared/contracts/label.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
+import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
 import { PERSONAL_PROJECT_NAME, type ProjectKind } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -18,6 +19,8 @@ export type ProjectRow = {
   ownerId: string;
   createdAt: number;
   description: string;
+  // the project's own shell backend, null following the instance's
+  backend: SandboxBackend | null;
 };
 
 type Raw = {
@@ -27,6 +30,7 @@ type Raw = {
   owner_id: string;
   created_at: number;
   description: string;
+  backend: SandboxBackend | null;
 };
 
 const row = (raw: Raw): ProjectRow => ({
@@ -36,6 +40,7 @@ const row = (raw: Raw): ProjectRow => ({
   ownerId: raw.owner_id,
   createdAt: raw.created_at,
   description: raw.description,
+  backend: raw.backend,
 });
 
 export const summary = (
@@ -170,6 +175,47 @@ export class ProjectStore {
       )
       .run(fields.name, fields.description, id);
     return this.byId(id);
+  }
+
+  setBackend(id: string, backend: SandboxBackend | null): ProjectRow | null {
+    this.db
+      .query("update projects set backend = ? where id = ?")
+      .run(backend, id);
+    return this.byId(id);
+  }
+
+  backendOf(id: string): SandboxBackend | null {
+    return (
+      this.db
+        .query<{ backend: SandboxBackend | null }, [string]>(
+          "select backend from projects where id = ?",
+        )
+        .get(id)?.backend ?? null
+    );
+  }
+
+  // some project runs openshell, by the partial index
+  anyOpenshell(): boolean {
+    return (
+      this.db
+        .query<{ one: number }, []>(
+          "select 1 as one from projects where backend = 'openshell' limit 1",
+        )
+        .get() !== null
+    );
+  }
+
+  // how many projects pick each backend over the instance's
+  backendCounts(): Record<SandboxBackend, number> {
+    const counts: Record<SandboxBackend, number> = { builtin: 0, openshell: 0 };
+    for (const r of this.db
+      .query<{ backend: SandboxBackend; n: number }, []>(
+        "select backend, count(*) as n from projects where backend is not null group by backend",
+      )
+      .all()) {
+      counts[r.backend] = r.n;
+    }
+    return counts;
   }
 
   remove(id: string): boolean {

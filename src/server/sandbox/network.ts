@@ -5,8 +5,12 @@
 // the command: the providers its credentials need, attached, then bound
 // by the policy, then waited for until OpenShell reports both applied.
 // What can only be undone by a new sandbox (a credential gone, a key
-// rotated, the network turned off) recycles instead. A provider's key is
-// compared by its hash in memory, never stored or logged.
+// rotated, the network turned off) recycles instead. Commands sharing a
+// sandbox run under one plan: one whose plan differs beside others
+// retires the sandbox and gets another once they end, never changing
+// theirs, so each save's scrub knows every key the sandbox was given. A
+// provider's key is compared by its hash in memory, never stored or
+// logged.
 
 import type { SandboxNet } from "../../shared/sandbox-net.ts";
 import type { ShellCall } from "../bash/index.ts";
@@ -52,6 +56,8 @@ export type NetworkDeps = {
   log: Log;
   gateway: Gateway;
   instanceId: string;
+  // salts the provider and profile names of one manager
+  owner?: string;
   // the sandbox's network setting, read at each command; off without it
   net?(): SandboxNet;
   // by provider name and by profile, shared by every manager of the
@@ -87,19 +93,27 @@ export class Network {
   }
 
   // ready: the sandbox's network is the send's. recycled: the hold went,
-  // so the caller leases again. busy: the deadline passed first
+  // so the caller leases again. busy: the deadline passed first.
+  // admitted: the other holders whose network is set up
   async configure(
     hold: SandboxHold,
     call: ShellCall,
     deadline: number,
     signal: AbortSignal,
+    admitted = 0,
   ): Promise<"ready" | "recycled" | "busy"> {
     const state = (hold.network.value as NetState | null) ?? freshState();
     hold.network.value = state;
     // a send without web access has no network here either
     const net = (call.network ? this.deps.net?.() : undefined) ?? NO_NET;
-    const plan = planNetwork(call, net, this.deps.instanceId);
+    const plan = planNetwork(call, net, this.deps.instanceId, this.deps.owner);
     const why = stale(state, plan);
+    const fresh = plan.attach.filter((one) => !state.attached.has(one.name));
+    const differs = why !== null || fresh.length > 0 || plan.key !== state.key;
+    if (differs && admitted > 0) {
+      hold.retire(why ?? (fresh.length > 0 ? "credentials" : "network"));
+      return "recycled";
+    }
     if (why !== null) {
       hold.recycle(why);
       return "recycled";
@@ -110,7 +124,6 @@ export class Network {
       signal,
       "the command's time ran out",
     );
-    const fresh = plan.attach.filter((one) => !state.attached.has(one.name));
     try {
       // a global policy set since start replaces the sandbox's own
       const global = await this.deps.gateway.globalPolicy(step.signal);

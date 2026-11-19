@@ -17,11 +17,13 @@ import type {
   ProjectsResponse,
   UpdateAboutRequest,
   UpdateLabelRequest,
+  UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import type {
   ProjectDetail,
   ProjectSummary,
 } from "../../shared/contracts/project.ts";
+import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { ApiError, api } from "./api.ts";
@@ -144,6 +146,16 @@ async function writeMetadata(
 
 export const saveAbout = (id: string, body: UpdateAboutRequest) =>
   writeMetadata(id, `${projectPath(id)}/about`, "PATCH", body);
+
+// a project's shell backend, an admin's on any project; the answer is
+// the detail, kept as any write's
+export function saveShell(
+  id: string,
+  backend: SandboxBackend | null,
+): Promise<void> {
+  const body: UpdateProjectRequest = { backend };
+  return writeMetadata(id, projectPath(id), "PATCH", body);
+}
 
 export const addLabel = (id: string, body: CreateLabelRequest) =>
   writeMetadata(id, `${projectPath(id)}/labels`, "POST", body);

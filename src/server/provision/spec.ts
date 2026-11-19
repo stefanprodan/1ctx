@@ -4,6 +4,7 @@
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import { MAX_LABELS_PER_PROJECT } from "../../shared/contracts/label.ts";
 import type { McpSide } from "../../shared/contracts/mcp.ts";
+import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
 import { sourceKind } from "../../shared/skills.ts";
 import { isWebAccessMode, type WebAccessMode } from "../../shared/web.ts";
 import {
@@ -50,7 +51,11 @@ import {
   parseTimeout,
   parseUrl,
 } from "../mcp/index.ts";
-import { parseLabelDescription, parseLabelName } from "../projects/index.ts";
+import {
+  parseBackend,
+  parseLabelDescription,
+  parseLabelName,
+} from "../projects/index.ts";
 import {
   azureBaseUrlProblem,
   parseBaseUrl,
@@ -95,6 +100,8 @@ export type ProjectSpec = {
   labels?: LabelSpec[];
   // a folder relative to the file that holds the document
   knowledge?: string;
+  // the project's own shell backend; null follows the instance's
+  backend?: SandboxBackend | null;
 };
 
 export type LabelSpec = { name: string; description?: string };
@@ -292,6 +299,7 @@ export function project(value: unknown): ProjectSpec {
     members: (v) => names(v, isUsername),
     labels,
     knowledge: folderPath,
+    backend: parseBackend,
   });
 }
 

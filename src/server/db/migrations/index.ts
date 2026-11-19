@@ -94,6 +94,7 @@ import { m0085 } from "./0085-turn-note.ts";
 import { m0086 } from "./0086-sandbox.ts";
 import { m0087 } from "./0087-sandbox-network.ts";
 import { m0088 } from "./0088-sandbox-home.ts";
+import { m0089 } from "./0089-project-backend.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -184,4 +185,5 @@ export const MIGRATIONS: Migration[] = [
   m0086,
   m0087,
   m0088,
+  m0089,
 ];

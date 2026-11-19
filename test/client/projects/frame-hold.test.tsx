@@ -42,6 +42,8 @@ const detail: ProjectDetail = {
   chats: 0,
   knowledge: { files: 0, tokens: 0 },
   latestFiles: [],
+  backend: null,
+  instanceBackend: "builtin" as const,
 };
 
 let clock: ReturnType<typeof fakeClock>;

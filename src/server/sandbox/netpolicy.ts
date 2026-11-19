@@ -158,7 +158,10 @@ export function planNetwork(
   call: Pick<ShellCall, "credentials">,
   net: SandboxNet,
   instanceId: string,
+  // one manager's salt: its names are its own
+  owner = "",
 ): NetPlan {
+  const scope = owner === "" ? instanceId : `${instanceId}\0${owner}`;
   const rules: Record<string, unknown> = {};
   const attach: Attach[] = [];
   const notes: string[] = [];
@@ -181,13 +184,13 @@ export function planNetwork(
       const profile: Profile = {
         ...where,
         env,
-        id: hashedName(instanceId, "profile", env, where.style, where.header),
+        id: hashedName(scope, "profile", env, where.style, where.header),
       };
       const hash = keyHash(keyed.key);
       const one: Attach = {
         name: keyed.name,
         provider: hashedName(
-          instanceId,
+          scope,
           "provider",
           keyed.name,
           keyed.prefix,

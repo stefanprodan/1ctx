@@ -101,6 +101,7 @@ const EXPECTED_IDS = [
   "0086-sandbox",
   "0087-sandbox-network",
   "0088-sandbox-home",
+  "0089-project-backend",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -132,6 +133,7 @@ const LATER_COLUMNS = [
   "images",
   "mcp_on",
   "cleared_at",
+  "backend",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -2143,6 +2145,45 @@ describe("the schema", () => {
     }
   });
 
+  test("0089 gives every project a null backend, checked against the two words", () => {
+    const db = seed(MIGRATIONS.slice(0, 88));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0089-project-backend"));
+      expect(db.query("select id, backend from projects").all()).toEqual([
+        { id: "p", backend: null },
+      ]);
+      // the partial index the sandbox's frequent question reads
+      expect(
+        db
+          .query(
+            "select name, sql from sqlite_master where type = 'index' and tbl_name = 'projects' and name = 'projects_openshell'",
+          )
+          .all(),
+      ).toEqual([
+        {
+          name: "projects_openshell",
+          sql: expect.stringContaining("where backend = 'openshell'"),
+        },
+      ]);
+      expect(
+        db
+          .query(
+            "explain query plan select 1 from projects where backend = 'openshell' limit 1",
+          )
+          .all()
+          .map((row) => (row as { detail: string }).detail)
+          .join(" "),
+      ).toContain("projects_openshell");
+      db.query("update projects set backend = 'openshell'").run();
+      db.query("update projects set backend = 'builtin'").run();
+      expect(() =>
+        db.query("update projects set backend = 'docker'").run(),
+      ).toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
   test("0087 gives the sandbox row its network, hosts with the defaults", () => {
     const db = seed(MIGRATIONS.slice(0, 86));
     try {
@@ -3192,10 +3233,14 @@ describe("the schema", () => {
           values ('t', 'team', 'ops', 'Pages', 'u', 500);
       `);
       const projects = () =>
-        db.query("select * from projects order by id").all();
+        db
+          .query<Record<string, unknown>, []>(
+            "select * from projects order by id",
+          )
+          .all();
       const before = projects();
       expect(migrate(db)).toEqual(expectedFrom("0067-project-labels"));
-      expect(projects()).toEqual(before);
+      expect(earlier(projects())).toEqual(before);
       const rows = db
         .query<
           {
@@ -4699,6 +4744,7 @@ describe("project channel migrations", () => {
       "0086-sandbox",
       "0087-sandbox-network",
       "0088-sandbox-home",
+      "0089-project-backend",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4924,6 +4970,7 @@ describe("project channel migrations", () => {
           "0086-sandbox",
           "0087-sandbox-network",
           "0088-sandbox-home",
+          "0089-project-backend",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5098,6 +5145,7 @@ describe("project channel migrations", () => {
         "0086-sandbox",
         "0087-sandbox-network",
         "0088-sandbox-home",
+        "0089-project-backend",
       ]);
       expect(
         db
