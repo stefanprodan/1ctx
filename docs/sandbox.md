@@ -52,9 +52,12 @@ the CPU, memory and tmpfs sizes of when it was made.
   `openshell.ts` imports the SDK; the leases and a test's fake
   (`test/helpers/sandbox.ts`) see the port alone. Every call takes a
   signal, and the caller aborts it at its deadline.
-- **Exec is single-attempt over the raw RPC** with a fresh request id
-  and `noLoginShell`, never the SDK's curated stream, which retries
-  before response headers.
+- **Exec is single-attempt over the raw RPC** with `noLoginShell` and
+  no request id, never the SDK's curated stream, which retries before
+  response headers. A request id is a durable admission the gateway
+  keeps for its replay window (a cut one forever), at most 1,000 per
+  caller, so a busy instance would lock itself out of every create;
+  never retrying is what keeps a launch at most once.
 - **A sandbox's name is `1ctx-` and 14 random characters:** the
   gateway refuses one over 19, so the instance is in the label alone.
 - **A sandbox is made with its whole layout.** The image, the keep-alive
@@ -138,6 +141,69 @@ the CPU, memory and tmpfs sizes of when it was made.
   gateway port.
 - **A create or list the RPC cannot cancel** is waited for only until
   the step's signal; what the gateway still does is the next sweep's.
+
+## A command
+
+- **`backend.ts` runs the command; the rules stay bash's.** It lists
+  the trees as `TreeEntry` rows and calls `discardNotices()`,
+  `savedCwd()` and `readBack()` exactly as `command.worker.ts` does,
+  and answers the same `Settled`, so `mount.ts` checks and commits as
+  for just-bash. `test/server/sandbox/tree-cases.test.ts` runs the
+  shared fixtures through it.
+- **The baseline is what was pushed plus what committed** (`baseline.ts`),
+  kept with the lease and never read from the sandbox. Each file is
+  keyed by the identity its bytes came from (a doc's id and revision,
+  the scratch revision and `used_at`, the uploads' session revision, a
+  kept file's row), so only a file whose key changed is hashed. The
+  next command pushes the difference: removes, folders, files, and a
+  mode and time for every folder holding a change. A fresh sandbox
+  pushes everything; kept MCP files are pushed, never read lazily. A
+  kept file the store cannot read runs no command and saves nothing,
+  with the builtin shell's words.
+- **Modes and times are the builtin shell's:** docs and uploads `0644`,
+  scratch its stored mode, folders `0755`; a doc its `updated_at`, an
+  upload its `created_at`, scratch the workspace's `used_at`, a folder
+  its newest file's time, a kept file 0.
+- **Every exec is one attempt** on a signal bounded by `job.endsAt` and
+  the command's stops; a failed push, fence, walk, pull or records
+  removal saves nothing and recycles. The command's exec is never
+  retried.
+- **The command runs through the wrapper** with a fresh 128-bit id and
+  `SANDBOX_ENV`, as every exec of ours, since OpenShell passes none of
+  the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH` and
+  uv's, nothing secret. Each of stdout and stderr keeps `ioBytes`; the
+  rest is drained. At `job.endsAt` the exec is stopped and the answer
+  is exit 124.
+- **An exec the gateway answers `sandbox is not ready` or unavailable**
+  calls the leases' `sandboxFailed()` (never awaited), then recycles.
+- **After the command, the fence, then a complete walk.** The fence
+  spares pid 1 and the keep-alive by pid and start time (read at
+  create). The walk's bounds are the caps or what the pushed trees held,
+  whichever is more, plus 8 MiB a tree. A file whose hash differs from
+  the baseline is pulled and its hash checked; an unchanged one reads
+  its bytes from the job. `/uploads` and `/mcp` are only compared.
+- **The records are hostile.** The cwd record and open's copies are
+  pulled with the changed files: a missing or non-UTF-8 cwd keeps the
+  start, open's copies are made again with `openedRecord()` for
+  `checkOpened()`, and a subagent's are never read. After each command
+  the records folder is emptied, its contents only and no link
+  followed, since one command runs in a sandbox at a time and anything
+  left there would fill it. A cwd under `/repos` is checked by an exec.
+- **Settle.** Landed: the sandbox is put back to the stored rows (a
+  doc's stored text, scratch at the new `used_at`, empty folders
+  removed, every mode rebuilt, a frame only for a time the rows moved),
+  then released; a failed
+  put-back recycles and leaves the commit. Anything else recycles: exit
+  124 or 126, an abort, a refused tree, a thrown commit, and a change
+  under `/uploads`, `/mcp` or a docs-off `/knowledge` (mode included),
+  after the rest committed.
+- **Accepted differences:** a hard link, or a file the walk cannot
+  read (`chmod 000`), saves nothing and recycles; a real shell's exit
+  124 or 126 reads as a deadline or a limit; a background job that
+  holds stdout or stderr keeps the command to its deadline (124,
+  nothing saved, recycled), since the gateway waits for the stream; a
+  time a command set on a file it left unchanged stays until the rows
+  move it, since the walk reads no times.
 
 ## Where the gateway runs
 

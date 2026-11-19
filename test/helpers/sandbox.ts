@@ -16,6 +16,8 @@ import type {
   SandboxPhase,
 } from "../../src/server/sandbox/index.ts";
 import { KEEP_ALIVE_COMMAND } from "../../src/server/sandbox/index.ts";
+import { START_TIME_COMMAND } from "../../src/server/sandbox/keepalive.ts";
+import { FakeFs } from "./sandbox-fs.ts";
 
 type Method =
   | "health"
@@ -63,7 +65,13 @@ export type FakeGateway = {
     labels: Record<string, string>,
     phase?: SandboxPhase,
   ): void;
-  // what a command's exec answers, other than the keep-alive's
+  // the keep-alive's start time each sandbox reports
+  started: string;
+  // each sandbox's filesystem, which answers the helpers' execs
+  files: Map<string, FakeFs>;
+  // every new sandbox's filesystem is set up by this, as a test asks
+  onFiles?: (name: string, fs: FakeFs) => void;
+  // what an exec answers in place of the filesystem's
   onExec?: (request: ExecRequest) => ExecEvent[];
 };
 
@@ -89,6 +97,8 @@ export function fakeGateway(): FakeGateway {
     policies: [],
     globalPolicy: false,
     pid: 7,
+    started: "4242",
+    files: new Map(),
     deleteMode: "complete",
     fail: (method, error = new Error(`fake ${method} failed`)) =>
       failing.set(method, error),
@@ -142,6 +152,9 @@ export function fakeGateway(): FakeGateway {
       fake.creates.push(spec);
       await enter("create", signal);
       fake.sandboxes.set(spec.name, { phase: "ready", labels: spec.labels });
+      const files = new FakeFs();
+      fake.files.set(spec.name, files);
+      fake.onFiles?.(spec.name, files);
     },
     async waitReady(name, signal) {
       await enter("waitReady", signal);
@@ -159,9 +172,22 @@ export function fakeGateway(): FakeGateway {
         yield { exit: 0 };
         return;
       }
-      for (const event of fake.onExec?.(request) ?? [{ exit: 0 }]) {
-        yield event;
+      const started =
+        request.command.slice(0, -1).join("\0") ===
+        START_TIME_COMMAND.join("\0");
+      if (started) {
+        const stat = `${fake.pid} (sleep) S ${"0 ".repeat(18)}${fake.started} 0 0\n`;
+        yield { stream: "stdout", data: text(stat) };
+        yield { exit: 0 };
+        return;
       }
+      if (fake.onExec) {
+        for (const event of fake.onExec(request)) yield event;
+        return;
+      }
+      const files = fake.files.get(request.sandbox);
+      if (files === undefined) throw new Error("no such sandbox");
+      yield* files.exec(request);
     },
     async delete(name, signal) {
       fake.deletes.push(name);

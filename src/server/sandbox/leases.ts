@@ -15,7 +15,7 @@ import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
 import { Book, type Lease } from "./book.ts";
 import type { Gateway, SandboxPhase } from "./gateway.ts";
 import type { RecycleReason, SandboxHold } from "./hold.ts";
-import { readKeepAlive } from "./keepalive.ts";
+import { readKeepAlive, readStartTime } from "./keepalive.ts";
 import { createSpec, mountsKey, sandboxName } from "./spec.ts";
 import { Cuts, STEP_MS, sweepLabelled } from "./sweep.ts";
 import { ask, bounded, Changes } from "./waits.ts";
@@ -228,7 +228,11 @@ export class Leases {
     return {
       sandbox: lease.name,
       keepAlivePid: lease.pid!,
+      keepAliveStart: lease.started!,
       workspace: lease.workspace!,
+      gateway: this.deps.gateway,
+      synced: lease.synced,
+      failed: () => void this.sandboxFailed(lease.workspace!),
       release: () => {
         if (done) return;
         done = true;
@@ -319,6 +323,7 @@ export class Leases {
     await gateway.waitReady(lease.name, signal);
     lease.phase = "ready";
     lease.pid = await readKeepAlive(gateway, lease.name, signal);
+    lease.started = await readStartTime(gateway, lease.name, lease.pid, signal);
     lease.ready = this.book.tick();
     this.deps.log.info("sandbox created", {
       sandbox: lease.name,

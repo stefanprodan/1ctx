@@ -58,6 +58,9 @@ that shell that shows a file on the chat page.
   links and special files, deletes, modes, discards, a subagent's
   shared write and the cwd. `test/fixtures/bash/tree-cases.ts` is the
   one fixture set every listing runs against.
+- **The sandbox backend keeps its tree between commands**
+  (`docs/sandbox.md`): it settles a landed commit by putting the
+  sandbox back to the stored rows, and recycles on anything else.
 
 ## The command
 

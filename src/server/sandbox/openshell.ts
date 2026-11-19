@@ -6,6 +6,7 @@
 // curated stream retries on a transport error before response headers
 // and a command must launch once or not at all.
 
+import { Code } from "@connectrpc/connect";
 import {
   createGrpcTransport,
   Http2SessionManager,
@@ -26,6 +27,7 @@ import type {
   SandboxPhase,
   SandboxPolicy,
 } from "./gateway.ts";
+import { SandboxUnavailable } from "./gateway.ts";
 
 // 1ctx keeps every sandbox and provider in the gateway's default
 // workspace; the instance label tells its own apart
@@ -326,7 +328,10 @@ async function* execOnce(
         environment: request.environment ?? {},
         stdin: request.stdin ?? new Uint8Array(),
         noLoginShell: true,
-        requestId: crypto.randomUUID(),
+        // No request id: each one is a durable admission the gateway
+        // keeps a day (a cut one forever), capped per caller, so a busy
+        // instance would lock itself out. One attempt with no retry is
+        // already at most once.
       },
       { signal: request.signal },
     );
@@ -340,7 +345,14 @@ async function* execOnce(
       }
     }
   } catch (error) {
-    throw error instanceof SdkError ? error : fromConnect(error);
+    const sdk = error instanceof SdkError ? error : fromConnect(error);
+    // the sandbox or its supervisor is gone, not the command
+    if (
+      sdk.connectCode === Code.Unavailable ||
+      /sandbox is not ready/i.test(sdk.message)
+    )
+      throw new SandboxUnavailable(sdk.message, { cause: sdk });
+    throw sdk;
   }
   if (!exited) throw new SdkError("rpc", "exec ended without an exit");
 }

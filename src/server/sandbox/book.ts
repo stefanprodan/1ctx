@@ -26,6 +26,11 @@ export type Lease = {
   // when it was ready, in the book's own order; 0 before
   ready: number;
   pid: number | null;
+  // the keep-alive's start time, which the fence checks with its pid
+  started: string | null;
+  // what the shell backend last left in the sandbox; the leases never
+  // read it, and it goes with the record
+  synced: { value: unknown };
   phase: SandboxPhase | null;
   createdAt: number;
   usedAt: number;
@@ -60,6 +65,8 @@ export class Book {
       tries: 0,
       ready: 0,
       pid: null,
+      started: null,
+      synced: { value: null },
       phase: null,
       createdAt: now,
       usedAt: now,

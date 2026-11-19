@@ -6,6 +6,7 @@
 // it and pid 1, and stops every other process of the workload's user.
 
 import type { Gateway } from "./gateway.ts";
+import { startTimeOf } from "./helpers.ts";
 import { KEEP_ALIVE, SANDBOX_ENV } from "./spec.ts";
 
 // the most of the script's output read
@@ -64,4 +65,40 @@ export async function readKeepAlive(
   const pid = code === 0 ? keepAlivePid(stdout) : null;
   if (pid === null) throw new Error("no single keep-alive process");
   return pid;
+}
+
+// the keep-alive's start time, field 22 of its stat: the fence checks
+// it, so a pid the kernel gave to another process is never spared
+export const START_TIME_COMMAND = [
+  "/usr/bin/bash",
+  "--noprofile",
+  "--norc",
+  "-c",
+  'builtin read -r -d "" s <"/proc/$1/stat"; builtin printf %s "$s"',
+  "stat",
+];
+
+export async function readStartTime(
+  gateway: Gateway,
+  sandbox: string,
+  pid: number,
+  signal: AbortSignal,
+): Promise<string> {
+  let code: number | null = null;
+  let stdout = "";
+  const decoder = new TextDecoder();
+  for await (const event of gateway.exec({
+    sandbox,
+    command: [...START_TIME_COMMAND, String(pid)],
+    environment: { ...SANDBOX_ENV },
+    signal,
+  })) {
+    if ("exit" in event) code = event.exit;
+    else if (event.stream === "stdout" && stdout.length < OUTPUT_BYTES) {
+      stdout += decoder.decode(event.data, { stream: true });
+    }
+  }
+  const started = code === 0 ? startTimeOf(stdout) : null;
+  if (started === null) throw new Error("no start time for the keep-alive");
+  return started;
 }

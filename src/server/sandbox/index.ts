@@ -18,6 +18,7 @@ import type { Clock } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
+import { sandboxBackend } from "./backend.ts";
 import { recyclesOf, seenForks } from "./events.ts";
 import type { Connect, Gateway, GatewayConfig } from "./gateway.ts";
 import { Leases } from "./leases.ts";
@@ -61,9 +62,6 @@ export {
 } from "./spec.ts";
 export { HEALTH_MS } from "./watch.ts";
 
-// what a command gets until the backend is built: the hold given back
-export const NOT_BUILT = "sandbox shell not built";
-
 export type SandboxDeps = {
   db: Db;
   clock: Clock;
@@ -90,6 +88,8 @@ export type Sandbox = {
   start(): Promise<void>;
   // timers stopped and the bus left; sandboxes stay for the next sweep
   close(): void;
+  // every command's put-back after its commit ended, for a test
+  idle(): Promise<void>;
 };
 
 export function sandboxArea(deps: SandboxDeps): Sandbox {
@@ -173,24 +173,19 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     return leases;
   };
 
+  const commands = sandboxBackend({
+    clock: deps.clock,
+    log: deps.log,
+    limits: deps.limits,
+  });
   const backend: ShellBackend = {
     acquire(call, deadline, signal) {
       const leases = ensure();
       if (leases === null) throw new Error("the sandbox shell is not set up");
       return leases.acquire(call, deadline, signal);
     },
-    // replaced by the sandbox backend's run; until then a command fails
-    // and gives its hold back
-    run: async (_job, context) => ({
-      settled: {
-        ok: false,
-        phase: "run",
-        cause: "error",
-        notice: "",
-        error: new Error(NOT_BUILT),
-      },
-      settle: () => context.hold?.release(),
-    }),
+    run: (job, context, hooks, stops) =>
+      commands.run(job, context, hooks, stops),
   };
 
   const answer = (): SandboxResponse => {
@@ -229,6 +224,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       current.started ??= current.leases.start();
       await current.started;
     },
+    idle: () => commands.idle(),
     close() {
       running = false;
       for (const old of retired) {

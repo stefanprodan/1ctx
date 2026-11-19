@@ -119,3 +119,9 @@ export type GatewayConfig = {
 };
 
 export type Connect = (config: GatewayConfig) => Gateway;
+
+// an exec the gateway refused because the sandbox is not ready or the
+// gateway is unavailable: the lease goes, not only the command
+export class SandboxUnavailable extends Error {
+  override name = "SandboxUnavailable";
+}
