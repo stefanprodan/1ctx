@@ -193,6 +193,8 @@ log.info("startup", {
   cache: app.repoCache === null ? "none" : displayPath(app.repoCache.dir),
   cache_trees: app.repoCache?.trees,
   cache_bytes: app.repoCache?.bytes,
+  // trees others could not read, dropped to be fetched again
+  cache_dropped: app.repoCache?.dropped || undefined,
   migrations: migrations.length > 0 ? migrations.join(",") : "current",
   provision:
     provision.length > 0 ? provision.map(displayPath).join(",") : undefined,

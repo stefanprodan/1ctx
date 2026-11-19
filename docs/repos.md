@@ -165,13 +165,15 @@ may call them are in `docs/access.md`.
   folder with every member under it, never merged.
 - **The commit is the first member's pax `comment=`,** 40 or 64 hex.
   When the job knows the commit, a different one fails it `not found`.
-- **Files keep their mode with the owner's read bit,** and every file
-  and folder gets the commit's time. A symlink whose target stays
-  inside the tree is kept, its target written normalized from its
-  folder, so only leading `..` climb, through real folders, and no
-  target leaves the tree. One out of it, a hard link to nothing kept
-  and any other member is dropped and counted (`dropped`). A hard link
-  to a kept file is a copy.
+- **Everything in a tree is readable by others,** since the sandbox
+  shell binds `files/` for an unprivileged user: folders are 0755 (set
+  with chmod, as mkdir's mode is masked) and files keep their mode with
+  every read bit. Every file and folder gets the commit's time.
+- **A symlink whose target stays inside the tree is kept,** its target
+  written normalized from its folder, so only leading `..` climb,
+  through real folders, and no target leaves the tree. One out of it, a
+  hard link to nothing kept and any other member is dropped and counted
+  (`dropped`). A hard link to a kept file is a copy with its mode.
 - **The ignore rules apply while unpacking,** per path and its parents
   (`ignored()`), so an ignored file is never written; it counts toward
   the members' bound.
@@ -189,7 +191,10 @@ may call them are in `docs/access.md`.
 - **A tree is published whole:** a job unpacks into `tmp/<job id>/`
   and renames it into `trees/`; when that exists, a concurrent job won
   and the loser removes its own. Startup removes `tmp/` and indexes the
-  trees; a folder without `tree.json` is removed.
+  trees; a folder without `tree.json` is removed, and one whose `files/`
+  others cannot list (written before trees were readable) is renamed
+  out and removed in the background (`cache_dropped` on the startup
+  line), so it is fetched again. The tree folder itself stays 0700.
 - **A tree counts its size on disk** (`disk` in `tree.json`): each
   kept file rounded up to 4 KiB blocks, an empty one a block, and a
   block per folder and link, so a tree of empty files still counts.

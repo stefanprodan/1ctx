@@ -94,7 +94,12 @@ words.
   fixed text with closed values.
 - **`tool failed` names the tool by `toolLogName()`.** A built-in's
   name, `mcp:<server>` for an offered MCP tool, else `unknown`; never
-  the name the model wrote.
+  the name the model wrote. A throw logs its `errorFields()`, a timeout
+  `cause=timeout`, an error result with nothing thrown `cause=result`
+  (a bash command that saved nothing: its `phase` and `cause`). A bash
+  command that ran and exited nonzero (`exited`, never stored) is a
+  failed row but logs nothing: the exit is the command's own answer,
+  from either shell.
 - **A call the send's abort ended is `interrupted`, not failed.** The
   flag lives on `ToolResult` in memory and is never stored. The
   registry sets it on a throw once `ctx.signal` aborted (`failedCall`

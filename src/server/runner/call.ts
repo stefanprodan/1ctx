@@ -62,7 +62,8 @@ export function toolContext(
 }
 
 // a tool that throws is a failed result whose content is the error; a
-// call the send's abort ended logs nothing, the send's end has the cause
+// call the send's abort ended logs nothing, the send's end has the cause,
+// nor does a command's nonzero exit, which is the command's own answer
 export async function runOne(
   deps: CallDeps,
   send: ActiveSend,
@@ -82,16 +83,19 @@ export async function runOne(
       ...(ctx.signal.aborted ? { interrupted: true } : {}),
     };
   }
-  if (result.error && !result.interrupted) {
+  if (result.error && !result.interrupted && !result.exited) {
     // a closed name: the model may call any name at all
     const tool = deps.tools.logName?.(offered, call) ?? "unknown";
     deps.log.warn("tool failed", {
       chat: send.sessionId,
       tool,
       duration: deps.clock() - started,
+      // an error result with nothing thrown is the tool's own answer
       ...(result.timedOut
         ? { cause: "timeout" }
-        : errorFields(result.failure, false)),
+        : "failure" in result
+          ? errorFields(result.failure, false)
+          : { cause: "result" }),
       // a bash command that saved nothing: where it ended and why
       ...(result.ended === undefined
         ? {}
