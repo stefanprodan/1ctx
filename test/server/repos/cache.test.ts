@@ -3,6 +3,7 @@
 
 import { afterAll, expect, test } from "bun:test";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -43,6 +44,7 @@ function setup(free = Number.MAX_SAFE_INTEGER) {
   const publish = (source: string, commit: string, disk: number) => {
     const folder = cache.folder(source, commit, "k");
     mkdirSync(join(folder, "files"), { recursive: true });
+    chmodSync(join(folder, "files"), 0o755);
     writeFileSync(
       join(folder, "tree.json"),
       JSON.stringify(meta(commit, disk)),
@@ -72,6 +74,17 @@ test("startup clears tmp/, indexes every tree and drops a folder with no tree.js
   expect(readdirSync(join(dir, "tmp"))).toEqual([]);
   expect(existsSync(join(dir, "trees", "s3", `${COMMIT}-k`))).toBe(false);
   expect(again.get("s1", COMMIT, "k")?.meta.disk).toBe(100);
+});
+
+test("startup drops a tree whose files/ others cannot read", () => {
+  const { dir, publish } = setup();
+  publish("s1", COMMIT, 100);
+  const locked = publish("s2", COMMIT, 50);
+  chmodSync(join(locked.folder, "files"), 0o700);
+  const again = new RepoCache(dir, () => Date.now());
+  expect(again.start()).toEqual({ trees: 1, bytes: 100 });
+  expect(existsSync(locked.folder)).toBe(false);
+  expect(again.get("s2", COMMIT, "k")).toBeNull();
 });
 
 test("startup drops a tree whose tree.json has no size on disk", () => {

@@ -4,6 +4,7 @@
 // Runs in the fetch worker: writes a tarball's members under files/.
 
 import {
+  chmodSync,
   closeSync,
   copyFileSync,
   fchmodSync,
@@ -71,7 +72,8 @@ export class TreeWriter {
   // what each path is, so no member lands under a link or a file
   private readonly kinds = new Map<string, "dir" | "file" | "link">();
   private readonly named = new Set<string>();
-  private readonly written = new Set<string>();
+  // each written file's mode, which a hard link's copy takes
+  private readonly written = new Map<string, number>();
   readonly dirs: string[] = [];
   // past a cap the rest is counted, never written, for the numbers
   over = false;
@@ -85,7 +87,10 @@ export class TreeWriter {
     private readonly top: string,
     readonly time: number,
   ) {
-    mkdirSync(files, { recursive: true, mode: 0o700 });
+    // the sandbox shell binds files/ for an unprivileged user, so the
+    // tree is readable by others; chmod, since mkdir's mode is masked
+    mkdirSync(files, { recursive: true, mode: 0o755 });
+    chmodSync(files, 0o755);
   }
 
   async write(
@@ -138,14 +143,15 @@ export class TreeWriter {
         return;
       }
       this.kinds.set(path, "file");
+      const mode = (member.mode & 0o777) | 0o444;
       try {
         for await (const chunk of body) writeAll(fd, chunk);
-        fchmodSync(fd, (member.mode & 0o777) | 0o400);
+        fchmodSync(fd, mode);
         futimesSync(fd, time, time);
       } finally {
         closeSync(fd);
       }
-      this.wrote(path, member.size);
+      this.wrote(path, member.size, mode);
       return;
     }
     const link =
@@ -169,7 +175,8 @@ export class TreeWriter {
       const from = target.startsWith(`${top}/`)
         ? normalizePath(target.slice(top.length + 1))
         : "";
-      if (this.written.has(from)) {
+      const mode = this.written.get(from);
+      if (mode !== undefined) {
         const size = Bun.file(join(files, from)).size;
         if (this.count(size)) return;
         try {
@@ -181,8 +188,9 @@ export class TreeWriter {
           return;
         }
         this.kinds.set(path, "file");
+        chmodSync(join(files, path), mode);
         utimesSync(join(files, path), time, time);
-        this.wrote(path, size);
+        this.wrote(path, size, mode);
         return;
       }
     }
@@ -208,8 +216,8 @@ export class TreeWriter {
     meta.dropped++;
   }
 
-  private wrote(path: string, size: number): void {
-    this.written.add(path);
+  private wrote(path: string, size: number, mode: number): void {
+    this.written.set(path, mode);
     this.meta.disk += onDisk(size);
   }
 
@@ -222,6 +230,7 @@ export class TreeWriter {
       if (kind !== undefined) throw new Refused("host unreachable");
       try {
         mkdirSync(join(this.files, prefix), { mode: 0o755 });
+        chmodSync(join(this.files, prefix), 0o755);
       } catch (error) {
         // every name this job made is in kinds, so one there already is
         // another spelling the volume folds into it: never merged

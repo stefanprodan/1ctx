@@ -44,6 +44,17 @@ const freeSpace: FreeSpace = (dir) => {
   return Number(stats.bavail) * Number(stats.bsize);
 };
 
+// whether others may list and enter a tree's files/, as the sandbox
+// shell's user must; one stat, as the writer that opened the root
+// opened everything inside
+const othersRead = (folder: string) => {
+  try {
+    return (statSync(join(folder, "files")).mode & 0o005) === 0o005;
+  } catch {
+    return false;
+  }
+};
+
 export type Swept = { trees: number; bytes: number; tmp: number };
 
 export class RepoCache {
@@ -78,6 +89,12 @@ export class RepoCache {
         if (meta === null) {
           // a folder without its tree.json is not a tree: fetch it again
           rmSync(folder, { recursive: true, force: true });
+          continue;
+        }
+        if (!othersRead(folder)) {
+          // written before trees were readable by others: the sandbox
+          // shell cannot read it, so it goes and is fetched again
+          this.drop(folder);
           continue;
         }
         const lastRead = statSync(folder).mtimeMs;
@@ -182,20 +199,26 @@ export class RepoCache {
     for (const entry of order) {
       if (total <= capBytes) break;
       if (this.held(entry.folder)) continue;
-      const away = join(tmpDir(this.dir), `evict-${newId()}`);
-      try {
-        renameSync(entry.folder, away);
-      } catch {
-        continue;
-      }
+      if (!this.drop(entry.folder)) continue;
       this.index.delete(entry.folder);
       this.touched.delete(entry.folder);
-      void rm(away, { recursive: true, force: true }).catch(() => {});
       total -= entry.meta.disk;
       trees++;
       bytes += entry.meta.disk;
     }
     return { trees, bytes };
+  }
+
+  // renamed out of trees/ at once and removed in the background
+  private drop(folder: string): boolean {
+    const away = join(tmpDir(this.dir), `evict-${newId()}`);
+    try {
+      renameSync(folder, away);
+    } catch {
+      return false;
+    }
+    void rm(away, { recursive: true, force: true }).catch(() => {});
+    return true;
   }
 
   // hourly: evict past the cap, and clear what a job left in tmp/ past

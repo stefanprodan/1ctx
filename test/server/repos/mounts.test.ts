@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
   adapter,
@@ -545,6 +545,28 @@ test("startup sets a fetching row pending, clears tmp/ and fetches what waits", 
   expect(readdirSync(join(dir, "tmp"))).toEqual([]);
   expect(await settledState(repos.store, writes, row.id)).toBe("ready");
   expect(await settledState(repos.store, writes, waiting.id)).toBe("ready");
+});
+
+test("a tree others cannot read is dropped at startup and fetched again", async () => {
+  const { repos, add, jobs } = setup({
+    answers: {
+      [ARCHIVE]: tarResponse(tree()),
+      [`${PAGE}/archive/${COMMIT}.tar.gz`]: tarResponse(tree()),
+    },
+  });
+  add("p1");
+  const first = await repos.prepare("p1");
+  const folder = first.mounts[0]!.folder;
+  first.release();
+  // as a tree written before trees were readable by others
+  chmodSync(folder, 0o700);
+  repos.start();
+  expect(existsSync(folder)).toBe(false);
+  const again = await repos.prepare("p1");
+  expect(again.mounts[0]?.folder).toBe(folder);
+  expect(statSync(folder).mode & 0o777).toBe(0o755);
+  expect(jobs()).toBe(2);
+  again.release();
 });
 
 test("the drain ends every fetch and writes no row after", async () => {

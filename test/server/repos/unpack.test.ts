@@ -131,7 +131,7 @@ test("a tarball is unpacked under its commit with modes and the commit's time", 
   );
   expect(statSync(join(files, "src/main.go")).mode & 0o777).toBe(0o644);
   expect(statSync(join(files, "src/run.sh")).mode & 0o777).toBe(0o755);
-  expect(statSync(join(files, "locked")).mode & 0o777).toBe(0o400);
+  expect(statSync(join(files, "locked")).mode & 0o777).toBe(0o444);
   for (const path of [
     "src/main.go",
     "docs/deep/nested/README.md",
@@ -146,6 +146,36 @@ test("a tarball is unpacked under its commit with modes and the commit's time", 
   expect(meta.commit).toBe(COMMIT);
   expect(leftovers(fixture)).toEqual([]);
 });
+
+test.serial(
+  "a tree is readable by others under any umask, for the sandbox's user",
+  async () => {
+    // mkdir's mode is masked by the umask, so the writer sets each one
+    const umask = process.umask(0o077);
+    try {
+      const { result, files } = await run([
+        { name: "src", type: "dir" },
+        { name: "src/secret.env", body: "x", mode: 0o600 },
+        { name: "deep/a/b.sh", body: "echo\n", mode: 0o700 },
+        {
+          name: "deep/copy.env",
+          type: "link",
+          linkname: "src/secret.env",
+        },
+      ]);
+      expect(result.ok).toBe(true);
+      const mode = (path: string) => statSync(join(files, path)).mode & 0o777;
+      expect(mode("")).toBe(0o755);
+      expect(mode("src")).toBe(0o755);
+      expect(mode("deep/a")).toBe(0o755);
+      expect(mode("src/secret.env")).toBe(0o644);
+      expect(mode("deep/a/b.sh")).toBe(0o744);
+      expect(mode("deep/copy.env")).toBe(0o644);
+    } finally {
+      process.umask(umask);
+    }
+  },
+);
 
 test("a link inside the tree is kept, one out of it and odd members are dropped", async () => {
   const { result, files } = await run([
