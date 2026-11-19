@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Config / Sandbox: which shell runs the bash tool's commands, the
-// OpenShell gateway and image of the sandbox one, and the sandboxes the
-// instance holds, stuck deletes named. The gateway's key files are
+// OpenShell gateway and image of the sandbox one, where its commands may
+// connect, and the sandboxes the instance holds, stuck deletes named. The gateway's key files are
 // shown by name only, never their values.
 
 import { type Signal, useSignal } from "@preact/signals";
@@ -43,15 +43,28 @@ import {
 import { AsideItem, AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { CardsWaiting } from "./AdminWaiting.tsx";
 import { DraftFoot } from "./DraftFoot.tsx";
+import "./sandbox.css";
 import { useLatest } from "./drafts.ts";
 import {
   draftOf,
+  HOSTS_HINT,
   keyFiles,
   leaseAge,
   leaseCounts,
   leaseSub,
   leaseWord,
   missingKeys,
+  NET_DEFAULTS,
+  NETWORK_LINE,
+  NETWORK_OPTIONS,
+  type NetDraft,
+  netAtDefaults,
+  netBody,
+  netCount,
+  netDirty,
+  netDraftOf,
+  netFieldOf,
+  netRows,
   offLine,
   refusedLine,
   type SandboxDraft,
@@ -119,6 +132,11 @@ export function SandboxCards({
       {off !== null && <SettingAlert>{off}</SettingAlert>}
       {refused !== null && <SettingAlert>{refusedLine(refused)}</SettingAlert>}
       <Shell state={state} drafted={drafted} />
+      {/* the built-in shell has no network of its own, as it has no
+          gateway or image */}
+      {(drafted.value ?? draftOf(state.settings)).shell === "sandbox" && (
+        <Network state={state} />
+      )}
       <Leases
         rows={sandboxLeases.value}
         failed={sandboxLeasesError.value !== null}
@@ -202,7 +220,7 @@ function Shell({
     >
       <Setting
         title="Shell"
-        line={shellLine(state)}
+        line={shellLine(d.shell)}
         foot={
           <DraftFoot
             save={save}
@@ -258,6 +276,100 @@ function Shell({
                 onInput={(image) => set({ image })}
               />
             </>
+          )}
+        </div>
+      </Setting>
+    </SettingForm>
+  );
+}
+
+// null until an edit, so a load that lands late shows through
+function Network({ state }: { state: SandboxResponse }) {
+  const drafted = useSignal<NetDraft | null>(null);
+  const latest = useLatest(state);
+  const save = useSave(async () => {
+    const got = netBody(drafted.value ?? netDraftOf(latest.current.settings));
+    if (!("body" in got)) return;
+    await saveSandbox(got.body);
+    drafted.value = null;
+  }, netFieldOf);
+  const d = drafted.value ?? netDraftOf(state.settings);
+  const set = (next: NetDraft) => {
+    drafted.value = next;
+    save.touch();
+  };
+  const invalid = save.fieldError("hosts") !== null;
+  return (
+    <SettingForm
+      save={save}
+      check={() => {
+        const got = netBody(d);
+        return "body" in got ? null : at("hosts", got.error);
+      }}
+    >
+      <Setting
+        title="Network"
+        count={d.mode === "hosts" ? netCount(d.text) : undefined}
+        line={NETWORK_LINE}
+        action={
+          <button
+            type="button"
+            class="btn btn-small"
+            disabled={save.busy || netAtDefaults(d)}
+            onClick={() => set(NET_DEFAULTS)}
+          >
+            Use defaults
+          </button>
+        }
+        foot={
+          <DraftFoot
+            save={save}
+            dirty={netDirty(d, state.settings)}
+            onDiscard={() => {
+              drafted.value = null;
+            }}
+          />
+        }
+      >
+        <div class="pair">
+          <div class="field pair-wide">
+            <span class="label">Network</span>
+            <Seg
+              label="Network"
+              name="network"
+              value={d.mode}
+              options={NETWORK_OPTIONS.map((o) => ({
+                ...o,
+                disabled: save.busy,
+              }))}
+              onPick={(mode) => set({ ...d, mode })}
+            />
+          </div>
+          {d.mode === "hosts" && (
+            <label class="field pair-wide">
+              <span class="label">Hosts</span>
+              <textarea
+                name="hosts"
+                class="sandbox-hosts"
+                rows={netRows(d.text)}
+                spellcheck={false}
+                autocomplete="off"
+                value={d.text}
+                disabled={save.busy}
+                aria-invalid={invalid || undefined}
+                onInput={(event) =>
+                  set({
+                    ...d,
+                    text: (event.currentTarget as HTMLTextAreaElement).value,
+                  })
+                }
+              />
+              {invalid ? (
+                <FieldError save={save} field="hosts" />
+              ) : (
+                <span class="hint">{HOSTS_HINT}</span>
+              )}
+            </label>
           )}
         </div>
       </Setting>

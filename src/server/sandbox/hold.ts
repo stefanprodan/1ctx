@@ -21,7 +21,8 @@ export type RecycleReason =
   | "settings"
   | "failed"
   | "discard"
-  | "credentials";
+  | "credentials"
+  | "network";
 
 // a workspace's sandbox, held by one command from acquire to settle
 export type SandboxHold = ShellHold & {

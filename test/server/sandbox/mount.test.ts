@@ -35,6 +35,7 @@ function sandboxed(plays: Record<string, (fs: FakeFs) => CommandEffect>) {
     image: "img",
     limits: () => limits,
     repos: { hold: () => () => {} },
+    net: () => ({ mode: "hosts", hosts: ["pypi.org", "*.example.com"] }),
   });
   const backend = sandboxBackend({
     clock: wallClock,
@@ -50,6 +51,44 @@ function sandboxed(plays: Record<string, (fs: FakeFs) => CommandEffect>) {
 }
 
 describe("the sandbox behind the mount", () => {
+  test("a send's web access, all or listed, takes the sandbox's hosts, and off takes the network away", async () => {
+    const t = sandboxed({});
+    const hosts = () =>
+      (
+        (t.fake.policies.at(-1)?.network.web as {
+          endpoints: { host: string }[];
+        }) ?? { endpoints: [] }
+      ).endpoints.map((endpoint) => endpoint.host);
+    const web = (mode: "all" | "listed") => ({
+      ...callCaps,
+      web: { mode, domains: ["listed.test"] },
+      fetchDeadlineMs: 1000,
+      fetchBodyBytes: 1000,
+    });
+    try {
+      await run(t.s, "noop", web("all"));
+      await t.backend.idle();
+      expect(hosts()).toEqual([
+        "pypi.org",
+        "pypi.org",
+        "*.example.com",
+        "*.example.com",
+      ]);
+      await run(t.s, "noop", web("listed"));
+      await t.backend.idle();
+      expect(t.fake.policies).toHaveLength(1);
+      // web off, by the admin or the send's own switch: no endpoint, and
+      // the sandbox that had hosts goes
+      await run(t.s, "noop", callCaps);
+      await t.backend.idle();
+      expect(t.fake.deletes).toHaveLength(1);
+      expect(t.fake.policies).toHaveLength(1);
+    } finally {
+      t.leases.close();
+      t.s.db.close();
+    }
+  });
+
   test("a command's changes commit, and the sandbox holds what the rows store", async () => {
     const t = sandboxed({
       edit: (fs) => {

@@ -163,11 +163,14 @@ that shell that shows a file on the chat page.
   loaded. The mount scrubs stdout and stderr whole before the result's
   cut, so no key is cut into a fragment; the tool scrubs the result
   again, the tail kept apart.
-- **The sandbox shell has OpenShell's network, not this one.** Its
+- **The sandbox shell has OpenShell's network, not this one.** It
+  follows the sandbox's own network setting, and is off while the
+  send has no web access. Its
   policy, placeholders, scrub of pulled files and the accepted
-  differences from `commandFetch()` are in `docs/sandbox.md`; the tool
-  description says them when the sandbox shell is on, and the
-  built-in shell's description is unchanged.
+  differences from `commandFetch()` are in `docs/sandbox-network.md`;
+  the tool description says them, and the setting's hosts, when the
+  sandbox shell is on, and the built-in shell's description is
+  unchanged.
 
 ## The writable trees
 

@@ -18,7 +18,7 @@ import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { sandboxBackend } from "../../../src/server/sandbox/backend.ts";
 import { Leases, type SandboxHold } from "../../../src/server/sandbox/index.ts";
-import type { WebSnapshot } from "../../../src/shared/web.ts";
+import type { SandboxNet } from "../../../src/shared/sandbox-net.ts";
 import { fakeClock, fakeGateway, until } from "../../helpers/sandbox.ts";
 import type {
   CommandCall,
@@ -45,7 +45,8 @@ export type Rows = {
   subagent?: boolean;
   ioBytes?: number;
   visuals?: boolean;
-  web?: WebSnapshot | null;
+  // the sandbox network the command runs under, off when not given
+  net?: SandboxNet;
   credentials?: CommandCredential[];
 };
 
@@ -59,6 +60,7 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
     cert: "",
     key: "",
   });
+  let net: SandboxNet = { mode: "off", hosts: [] };
   const leases = new Leases({
     clock: time.clock,
     log: silent,
@@ -67,22 +69,26 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
     image: "img",
     limits: () => limits,
     repos: { hold: () => () => {} },
+    net: () => net,
   });
   const backend = sandboxBackend({
     clock: time.clock,
     log: silent,
     limits: () => limits,
   });
-  const call = (rows: Rows = {}): ShellCall => ({
-    projectId: "project",
-    workspace: { id: "chat", sessionId: "chat" },
-    sendId: "send",
-    subagent: rows.subagent ?? false,
-    repos: [],
-    repoFileBytes: 0,
-    web: rows.web ?? null,
-    credentials: rows.credentials ?? [],
-  });
+  const call = (rows: Rows = {}): ShellCall => {
+    net = rows.net ?? { mode: "off", hosts: [] };
+    return {
+      projectId: "project",
+      workspace: { id: "chat", sessionId: "chat" },
+      sendId: "send",
+      subagent: rows.subagent ?? false,
+      repos: [],
+      repoFileBytes: 0,
+      network: true,
+      credentials: rows.credentials ?? [],
+    };
+  };
 
   function jobOf(rows: Rows, command: string): { job: Job; mounted: Mounted } {
     const docs = rows.docs ?? true;

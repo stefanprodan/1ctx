@@ -7,6 +7,7 @@
 // to both land in one transaction.
 
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
+import type { SandboxNet } from "../../shared/sandbox-net.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
@@ -40,6 +41,8 @@ export type BashDeps = {
   // can switch it between commands; without it every command runs in
   // the builtin one, just-bash in that worker
   shell?(builtin: ShellBackend): ShellBackend;
+  // the sandbox shell's network setting; off without it
+  sandboxNet?(): SandboxNet;
   // each phase a command's worker reports, by chat; a test waits on it
   onCommandPhase?(sessionId: string, phase: "run" | "diff"): void;
   // BACKSTOP_MS unless a test needs the deadline alone to decide
@@ -47,9 +50,9 @@ export type BashDeps = {
   knowledge: DocsPort;
 };
 export type BashCapability = {
-  // the next command runs in the sandbox shell, not just-bash, so the
-  // tool's description says what differs
-  sandboxed?(): boolean;
+  // the network of the sandbox shell the next command runs in, so the
+  // tool's description says what differs; null under just-bash
+  sandbox?(): SandboxNet | null;
   run(
     projectId: string,
     workspace: Workspace,
@@ -101,7 +104,10 @@ export function bashArea(deps: BashDeps): BashArea {
   const pick = deps.shell;
   return {
     scratch,
-    sandboxed: () => pick !== undefined && pick(builtin) !== builtin,
+    sandbox: () =>
+      pick !== undefined && pick(builtin) !== builtin
+        ? (deps.sandboxNet?.() ?? { mode: "off", hosts: [] })
+        : null,
     run: (projectId, workspace, author, command, caps, signal, sendId) =>
       run(
         {

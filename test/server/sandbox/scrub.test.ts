@@ -20,7 +20,7 @@ const credential: CommandCredential = {
   value: `Bearer ${KEY}`,
   methods: ["GET"],
 };
-const web = { mode: "listed" as const, domains: ["api.example.test"] };
+const net = { mode: "hosts" as const, hosts: ["api.example.test"] };
 
 describe("the sandbox's scrub", () => {
   test("a key in a pulled file or an opened copy is replaced", async () => {
@@ -28,7 +28,7 @@ describe("the sandbox's scrub", () => {
     const ran = await t.run(
       {
         knowledge: { "a.md": "a\n" },
-        web,
+        net,
         credentials: [credential],
       },
       ({ fs, open }) => {
@@ -63,7 +63,7 @@ describe("the sandbox's scrub", () => {
     const t = setup();
     const ran = await t.run(
       {
-        web,
+        net,
         credentials: [
           { name: "quotes", prefix: credential.prefix, refused: "missing" },
         ],

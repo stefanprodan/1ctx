@@ -157,7 +157,7 @@ const callOf = (r: Rows): ShellCall => ({
   subagent: false,
   repos: r.repos,
   repoFileBytes: 1 << 20,
-  web: null,
+  network: false,
   credentials: [],
 });
 

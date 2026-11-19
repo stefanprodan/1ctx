@@ -11,10 +11,18 @@ import {
   type LeaseRow,
   type LeaseState,
   SANDBOX_KEYS,
+  type SandboxNetwork,
   type SandboxSettings,
   type SandboxShell,
 } from "../../../shared/contracts/sandbox.ts";
+import {
+  foldDefaults,
+  MAX_SANDBOX_HOSTS,
+  parseSandboxHosts,
+  SANDBOX_DEFAULT_HOSTS,
+} from "../../../shared/sandbox-net.ts";
 import { ago } from "../../lib/format.ts";
+import { hostsCount, lineError } from "./Tools.model.ts";
 
 // what the form holds: text as typed, empty for none
 export type SandboxDraft = {
@@ -27,7 +35,7 @@ export type SandboxField = keyof SandboxDraft;
 
 export const SHELL_OPTIONS: { value: SandboxShell; label: string }[] = [
   { value: "builtin", label: "Built-in" },
-  { value: "sandbox", label: "Sandbox" },
+  { value: "sandbox", label: "OpenShell" },
 ];
 
 export function draftOf(settings: SandboxSettings): SandboxDraft {
@@ -93,8 +101,10 @@ export function missingKeys(state: SandboxResponse): string[] {
     .map((role) => `${SANDBOX_KEYS[role]}.key`);
 }
 
-export function shellLine(state: SandboxResponse): string {
-  return state.active
+// the shell picked, saved or not; offLine says when a saved sandbox
+// shell does not run
+export function shellLine(shell: SandboxShell): string {
+  return shell === "sandbox"
     ? "Commands run in an OpenShell sandbox, one per chat or run."
     : "Commands run in the built-in shell, inside the server.";
 }
@@ -150,4 +160,77 @@ export function leaseCounts(rows: readonly LeaseRow[]) {
     warm: of("creating", "warm"),
     stuck: of("stuck"),
   };
+}
+
+// the Network card's form: the mode and the hosts box as typed
+export type NetDraft = { mode: SandboxNetwork; text: string };
+
+export const NETWORK_OPTIONS: { value: SandboxNetwork; label: string }[] = [
+  { value: "off", label: "Off" },
+  { value: "hosts", label: "Hosts" },
+];
+
+export const NETWORK_LINE =
+  "Where commands in the sandbox may connect, while Web access is on.";
+
+export const HOSTS_HINT =
+  "One host per line. A wildcard needs three labels, like *.example.com.";
+
+const hostsText = (hosts: readonly string[]) => hosts.join("\n");
+const DEFAULTS_TEXT = hostsText(SANDBOX_DEFAULT_HOSTS);
+
+// the saved hosts, or the defaults while none are saved
+export function netDraftOf(settings: SandboxSettings): NetDraft {
+  return {
+    mode: settings.network,
+    text: hostsText(settings.hosts ?? SANDBOX_DEFAULT_HOSTS),
+  };
+}
+
+export const NET_DEFAULTS: NetDraft = { mode: "hosts", text: DEFAULTS_TEXT };
+
+// the hosts the box parses to, sorted, or null when it does not parse
+function hostsOf(text: string): string[] | null {
+  const parsed = parseSandboxHosts(text.split("\n"));
+  return parsed.ok ? parsed.hosts : null;
+}
+
+// Use defaults has nothing to do: hosts, and the box holds the defaults
+// in any order
+export function netAtDefaults(d: NetDraft): boolean {
+  return d.mode === "hosts" && hostsOf(d.text)?.join("\n") === DEFAULTS_TEXT;
+}
+
+// off keeps the list without reading it
+export function netDirty(d: NetDraft, settings: SandboxSettings): boolean {
+  const saved = netDraftOf(settings);
+  if (d.mode !== saved.mode) return true;
+  return d.mode === "hosts" && d.text.trim() !== saved.text;
+}
+
+// the defaults go as null, so a later release's defaults reach this one
+export function netBody(
+  d: NetDraft,
+): { body: PutSandboxRequest } | { error: string } {
+  if (d.mode === "off") return { body: { network: "off" } };
+  const parsed = parseSandboxHosts(d.text.split("\n"));
+  if (!parsed.ok) return { error: lineError(parsed) };
+  if (parsed.hosts.length === 0) return { error: "List at least one host." };
+  return { body: { network: "hosts", hosts: foldDefaults(parsed.hosts) } };
+}
+
+// the lines typed while the box does not parse
+export function netCount(text: string): string {
+  const parsed = hostsOf(text);
+  return `${parsed === null ? hostsCount(text) : parsed.length} of ${MAX_SANDBOX_HOSTS}`;
+}
+
+// as tall as what is typed, within reason; past that it scrolls
+export const netRows = (text: string) =>
+  Math.min(Math.max(text.split("\n").length, 4) + 1, 16);
+
+export function netFieldOf(message: string): "hosts" | undefined {
+  return /^hosts|^network must be |^the hosts network /.test(message)
+    ? "hosts"
+    : undefined;
 }

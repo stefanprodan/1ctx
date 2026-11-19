@@ -9,10 +9,17 @@ import type { SandboxResponse } from "../../shared/api/sandbox.ts";
 import {
   isGatewayEndpoint,
   isSandboxImage,
+  isSandboxNetwork,
   isSandboxShell,
   SANDBOX_KEYS,
+  type SandboxNetwork,
   type SandboxShell,
 } from "../../shared/contracts/sandbox.ts";
+import {
+  foldDefaults,
+  MAX_SANDBOX_HOSTS,
+  parseSandboxHosts,
+} from "../../shared/sandbox-net.ts";
 import type { SecretKind } from "../../shared/words.ts";
 import { BadRequest } from "../lib/errors.ts";
 import type { Action, Client } from "./client.ts";
@@ -24,7 +31,28 @@ export type SandboxSpec = {
   endpoint?: string | null;
   // null runs the default image
   image?: string | null;
+  network?: SandboxNetwork;
+  // null takes the defaults; stored sorted
+  hosts?: string[] | null;
 };
+
+function hosts(value: unknown): string[] | null {
+  if (value === null) return null;
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_SANDBOX_HOSTS ||
+    !value.every((host) => typeof host === "string")
+  ) {
+    throw new BadRequest(
+      `must be null or a list of at most ${MAX_SANDBOX_HOSTS} hosts`,
+    );
+  }
+  const parsed = parseSandboxHosts(value);
+  if (!parsed.ok)
+    throw new BadRequest(`${JSON.stringify(parsed.value)} ${parsed.error}`);
+  // the defaults as null, as the route stores them
+  return foldDefaults(parsed.hosts);
+}
 
 function orNull<T>(
   guard: (value: unknown) => value is T,
@@ -44,6 +72,8 @@ export function sandboxSpec(value: unknown): SandboxSpec {
       "must be null or an https origin (https://host:port)",
     ),
     image: orNull(isSandboxImage, "must be null or an image reference"),
+    network: guarded(isSandboxNetwork, "must be off or hosts"),
+    hosts,
   });
 }
 
@@ -64,9 +94,19 @@ export async function applySandbox(
 ): Promise<Action> {
   const held = await api.call<SandboxResponse>("GET", "/api/admin/sandbox");
   const changed: SandboxSpec = {};
-  for (const field of ["shell", "endpoint", "image"] as const) {
+  for (const field of [
+    "shell",
+    "endpoint",
+    "image",
+    "network",
+    "hosts",
+  ] as const) {
     const value = doc.spec[field];
-    if (value !== undefined && value !== held.settings[field]) {
+    // a list by its sorted hosts, as parsed and as stored
+    if (
+      value !== undefined &&
+      JSON.stringify(value) !== JSON.stringify(held.settings[field])
+    ) {
       Object.assign(changed, { [field]: value });
     }
   }

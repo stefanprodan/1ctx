@@ -1,9 +1,10 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A command's network as OpenShell's policy, pure: the send's web
-// snapshot and credentials become the sandbox's network rules, the
-// providers to attach and the notice naming what was left out. The
+// A command's network as OpenShell's policy, pure: the sandbox's own
+// network setting and the send's credentials become the sandbox's
+// network rules, the providers to attach and the notice naming what was
+// left out. Web access never applies here. The
 // rules are the proto's init shape, so the gateway port passes them on.
 
 import { createHash, randomBytes } from "node:crypto";
@@ -11,6 +12,7 @@ import {
   HTTP_METHODS,
   type HttpMethod,
 } from "../../shared/contracts/credential.ts";
+import type { SandboxNet } from "../../shared/sandbox-net.ts";
 import type { CommandCredential, ShellCall } from "../bash/index.ts";
 import { REFUSALS } from "../bash/index.ts";
 import {
@@ -26,9 +28,6 @@ import {
 const ENFORCE = 1;
 // the wrapper's shell, which covers every process it starts
 export const BINARIES = [{ path: "/usr/bin/bash" }];
-// every name of three labels or more; OpenShell refuses `*.*` and
-// `*.com` as wildcards of a whole top-level domain
-export const ALL_HOSTS = "**.*.*";
 const PORTS = [443, 80];
 
 // the endpointless profile one credential's provider is made from:
@@ -52,6 +51,8 @@ export type Attach = {
 };
 
 export type NetPlan = {
+  // the sandbox network it was made from
+  mode: SandboxNet["mode"];
   network: Record<string, unknown>;
   // the network as one comparable key
   key: string;
@@ -62,6 +63,8 @@ export type NetPlan = {
 
 // what a lease's sandbox was last given
 export type NetState = {
+  // a fresh sandbox's empty policy is off
+  mode: SandboxNet["mode"];
   key: string;
   attached: Map<string, { provider: string; hash: string; prefix: string }>;
   // the send whose first command named the notice, and the notice
@@ -69,6 +72,7 @@ export type NetState = {
 };
 
 export const freshState = (): NetState => ({
+  mode: "off",
   key: JSON.stringify({}),
   attached: new Map(),
   noticed: "",
@@ -142,32 +146,24 @@ function credentialRule(attach: Attach) {
 type Keyed = Extract<CommandCredential, { key: string }>;
 
 export function planNetwork(
-  call: Pick<ShellCall, "web" | "credentials">,
+  call: Pick<ShellCall, "credentials">,
+  net: SandboxNet,
   instanceId: string,
 ): NetPlan {
-  const { web } = call;
   const network: Record<string, unknown> = {};
   const attach: Attach[] = [];
   const notes: string[] = [];
-  if (web !== null) {
-    const hosts = [...(web.mode === "all" ? [ALL_HOSTS] : []), ...web.domains];
-    if (hosts.length > 0)
-      network.web = {
-        name: "web",
-        endpoints: hosts.flatMap(hostEndpoints),
-        binaries: BINARIES,
-      };
-  }
+  if (net.mode === "hosts" && net.hosts.length > 0)
+    network.web = {
+      name: "web",
+      endpoints: net.hosts.flatMap(hostEndpoints),
+      binaries: BINARIES,
+    };
   // by code point, so the order never hangs on a locale
   const credentials = [...call.credentials].sort((a, b) =>
     a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
   );
-  if (web?.mode === "all") {
-    if (credentials.length > 0)
-      notes.push(
-        `credentials are not used while every host is open, so requests go unsigned: ${credentials.map((c) => c.name).join(", ")}\n`,
-      );
-  } else if (web !== null) {
+  if (net.mode === "hosts") {
     const envs = new Map<string, string>();
     for (const credential of credentials) {
       const why = refusal(credential, envs);
@@ -208,6 +204,7 @@ export function planNetwork(
     }
   }
   return {
+    mode: net.mode,
     network,
     key: JSON.stringify(network),
     attach,
@@ -233,10 +230,15 @@ function refusal(
   return null;
 }
 
-// a sandbox given a credential that went, changed its key or prefix,
-// or a send that left listed mode: an echoed key or an old placeholder
-// may outlive its send there, so the sandbox goes
-export function stale(state: NetState, plan: NetPlan): boolean {
+// why the sandbox goes, or null. A credential that went, changed its
+// key or prefix: an echoed key or an old placeholder may outlive its
+// send there. A network turned off: a new sandbox starts with none,
+// where a policy load that failed or lagged would leave the old hosts
+// open
+export function stale(
+  state: NetState,
+  plan: NetPlan,
+): "credentials" | "network" | null {
   const wanted = new Map(plan.attach.map((one) => [one.name, one]));
   for (const [name, had] of state.attached) {
     const want = wanted.get(name);
@@ -246,7 +248,7 @@ export function stale(state: NetState, plan: NetPlan): boolean {
       want.hash !== had.hash ||
       want.prefix !== had.prefix
     )
-      return true;
+      return "credentials";
   }
-  return false;
+  return state.mode === "hosts" && plan.mode === "off" ? "network" : null;
 }

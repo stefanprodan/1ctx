@@ -14,6 +14,7 @@ import type {
   SandboxLeasesResponse,
   SandboxResponse,
 } from "../../../src/shared/api/sandbox.ts";
+import { SANDBOX_DEFAULT_HOSTS } from "../../../src/shared/sandbox-net.ts";
 import { type TestApp, testApp } from "../../helpers/app.ts";
 import { rejection } from "../../helpers/async.ts";
 import { fakeGateway, until } from "../../helpers/sandbox.ts";
@@ -95,6 +96,71 @@ describe("sandbox settings", () => {
     });
   });
 
+  test("the network is off or hosts, the defaults until a list is saved", async () => {
+    await run(async (app, admin) => {
+      const put = async (body: Record<string, unknown>) => {
+        const res = await admin.call("PUT", "/api/admin/sandbox", { body });
+        return { status: res.status, text: await res.text() };
+      };
+      let body = (await (
+        await admin.call("GET", "/api/admin/sandbox")
+      ).json()) as SandboxResponse;
+      expect(body.settings).toMatchObject({ network: "hosts", hosts: null });
+      expect(app.sandbox.net()).toEqual({
+        mode: "hosts",
+        hosts: SANDBOX_DEFAULT_HOSTS,
+      });
+      for (const bad of [
+        { network: "all" },
+        { hosts: "pypi.org" },
+        { hosts: [1] },
+        { hosts: ["*.com"] },
+        { hosts: ["pypi.org:443"] },
+        { hosts: Array.from({ length: 201 }, (_, i) => `h${i}.test`) },
+        { network: "hosts", hosts: [] },
+      ]) {
+        expect((await put(bad)).status, JSON.stringify(bad)).toBe(400);
+      }
+      expect(
+        JSON.parse((await put({ hosts: ["ok.test", "*.com"] })).text),
+      ).toEqual({ error: 'hosts: "*.com" needs three labels as a wildcard' });
+      const saved = await put({
+        network: "hosts",
+        hosts: ["PyPI.org", "*.githubusercontent.com", "pypi.org"],
+      });
+      expect(saved.status).toBe(200);
+      body = JSON.parse(saved.text) as SandboxResponse;
+      expect(body.settings).toMatchObject({
+        shell: "builtin",
+        network: "hosts",
+        hosts: ["*.githubusercontent.com", "pypi.org"],
+      });
+      // a save without the network keeps it
+      await put({ image: "registry.test/sbx:2" });
+      expect(app.sandbox.store.settings().hosts).toEqual([
+        "*.githubusercontent.com",
+        "pypi.org",
+      ]);
+      expect((await put({ network: "off" })).status).toBe(200);
+      expect(app.sandbox.net()).toEqual({
+        mode: "off",
+        hosts: ["*.githubusercontent.com", "pypi.org"],
+      });
+      // the defaults saved as a list are stored as null, so later
+      // defaults reach the instance
+      expect(
+        (await put({ hosts: [...SANDBOX_DEFAULT_HOSTS].reverse() })).status,
+      ).toBe(200);
+      expect(app.sandbox.store.settings().hosts).toBeNull();
+      await put({ hosts: ["a.test"] });
+      expect((await put({ hosts: null })).status).toBe(200);
+      expect(app.sandbox.store.settings()).toMatchObject({
+        network: "off",
+        hosts: null,
+      });
+    });
+  });
+
   test("the sandbox shell needs an endpoint and every key file", async () => {
     await run(
       async (_app, admin) => {
@@ -159,7 +225,7 @@ describe("sandbox settings", () => {
             subagent: false,
             repos: [],
             repoFileBytes: 0,
-            web: null,
+            network: false,
             credentials: [],
           },
           app.now.value + 20_000,
@@ -198,7 +264,7 @@ describe("sandbox settings", () => {
             subagent: false,
             repos: [],
             repoFileBytes: 0,
-            web: null,
+            network: false,
             credentials: [],
           },
           app.now.value + 20_000,
@@ -242,7 +308,7 @@ describe("sandbox settings", () => {
               subagent: false,
               repos: [],
               repoFileBytes: 0,
-              web: null,
+              network: false,
               credentials: [],
             },
             app.now.value + 20_000,

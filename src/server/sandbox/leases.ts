@@ -17,7 +17,7 @@ import { buildSandbox } from "./create.ts";
 import { Deletes } from "./deletes.ts";
 import type { Gateway } from "./gateway.ts";
 import type { RecycleReason, SandboxHold } from "./hold.ts";
-import { GLOBAL_POLICY_REFUSAL, Network } from "./network.ts";
+import { GLOBAL_POLICY_REFUSAL, Network, type NetworkDeps } from "./network.ts";
 import { PolicyGate } from "./policy.ts";
 import { ImageCheck, ImageRefused } from "./roots.ts";
 import { fitsCaps, mountsKey, sandboxName } from "./spec.ts";
@@ -53,6 +53,7 @@ export type LeasesDeps = {
   freed?(): void;
   // the provider locks every manager of the instance shares
   locks?: Map<string, Promise<unknown>>;
+  net?: NetworkDeps["net"];
 };
 
 export class Leases {

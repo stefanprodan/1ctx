@@ -99,6 +99,7 @@ const EXPECTED_IDS = [
   "0084-channel-clear",
   "0085-turn-note",
   "0086-sandbox",
+  "0087-sandbox-network",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2112,10 +2113,39 @@ describe("the schema", () => {
           image: null,
           instance_id: null,
           updated_at: 0,
+          network: "hosts",
+          hosts: null,
         },
       ]);
       expect(() =>
         db.query("update sandbox_settings set shell = 'docker'").run(),
+      ).toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0087 gives the sandbox row its network, hosts with the defaults", () => {
+    const db = seed(MIGRATIONS.slice(0, 86));
+    try {
+      db.query(
+        "update sandbox_settings set shell = 'sandbox', endpoint = 'https://gw:8080', instance_id = 'i1'",
+      ).run();
+      expect(migrate(db)).toEqual(expectedFrom("0087-sandbox-network"));
+      expect(db.query("select * from sandbox_settings").all()).toEqual([
+        {
+          id: 1,
+          shell: "sandbox",
+          endpoint: "https://gw:8080",
+          image: null,
+          instance_id: "i1",
+          updated_at: 0,
+          network: "hosts",
+          hosts: null,
+        },
+      ]);
+      expect(() =>
+        db.query("update sandbox_settings set network = 'all'").run(),
       ).toThrow();
     } finally {
       db.close();
@@ -4649,6 +4679,7 @@ describe("project channel migrations", () => {
       "0084-channel-clear",
       "0085-turn-note",
       "0086-sandbox",
+      "0087-sandbox-network",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4872,6 +4903,7 @@ describe("project channel migrations", () => {
           "0084-channel-clear",
           "0085-turn-note",
           "0086-sandbox",
+          "0087-sandbox-network",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5044,6 +5076,7 @@ describe("project channel migrations", () => {
         "0084-channel-clear",
         "0085-turn-note",
         "0086-sandbox",
+        "0087-sandbox-network",
       ]);
       expect(
         db

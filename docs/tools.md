@@ -118,7 +118,9 @@ words.
   subagent's.
 - **The admin's `web` row is one mode: `off`, `all` or `listed`.** Off
   and all keep the saved hosts. Web off (admin or chat) removes
-  webfetch, websearch, bash's network and every credential. Websearch
+  webfetch, websearch, bash's network and every credential, the
+  sandbox shell's network included; its all or listed never reaches
+  the sandbox, which has its own hosts (`docs/sandbox-network.md`). Websearch
   also needs a provider, null on a fresh instance. Webfetch checks every
   redirect against the listed origins and refuses a private host the
   list does not name, as bash's curl does (`docs/bash.md`). The send

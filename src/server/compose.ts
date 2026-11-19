@@ -501,6 +501,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       : {}),
     // a closure: the sandbox area is built after bash
     shell: (builtin) => sandbox.shell(builtin),
+    sandboxNet: () => sandbox.net(),
     knowledge: {
       mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
       mountedUploads: (sessionId) => knowledge.mountedUploads(sessionId),

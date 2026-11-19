@@ -5,6 +5,7 @@
 // execution takes its identity only from the runner's call context.
 
 import type { HttpMethod } from "../../../shared/contracts/credential.ts";
+import { hostWords, type SandboxNet } from "../../../shared/sandbox-net.ts";
 import type { WebSnapshot } from "../../../shared/web.ts";
 import {
   BACKSTOP_MS,
@@ -68,36 +69,42 @@ function networkWords(
   ].join(" ");
 }
 
-// the sandbox shell's network: OpenShell's rules, and a placeholder the
-// agent places where the built-in shell's curl signs on its own
+// the sandbox shell's network: its own hosts, never Web access's, and a
+// placeholder the agent places where the built-in shell's curl signs on
+// its own
 function sandboxNetworkWords(
-  web: WebSnapshot | null,
+  net: SandboxNet,
   credentials: readonly OfferedCredential[],
 ): string {
-  if (web === null) return "No network.";
-  const listed = web.domains.length > 0 ? `: ${domainWords(web)}` : ", none is";
-  const where =
-    web.mode === "all"
-      ? `any host of three labels or more (api.github.com), and one of two labels (pypi.org) only when listed${listed}`
-      : `these hosts only: ${domainWords(web)}`;
-  const placed = credentials.filter(
-    (credential) =>
-      placement(credential.header, credential.template) !== null &&
-      prefixGlob(credential.prefix) !== null,
-  );
+  if (net.mode === "off") return "No network.";
+  const signed = sandboxCredentialWords(credentials);
   return [
-    `curl, python and uv reach HTTP and HTTPS on ports 80 and 443 of ${where}. Save downloads in /tmp.`,
-    ...(web.mode === "all"
-      ? credentials.length > 0
-        ? ["Requests go unsigned here."]
-        : []
-      : placed.map(
-          (credential) =>
-            `For ${prefixWords(credential.prefix)} (${credential.name}${credential.readOnly ? ", GET and HEAD only" : ""}) send -H "${credential.header}: ${placeholderValue(credential.template, credential.name)}", a placeholder the key replaces there alone.`,
-        )),
+    `curl, python and uv reach HTTP and HTTPS on ports 80 and 443 of these hosts only: ${hostWords(net.hosts)}. Save downloads in /tmp.`,
+    ...(signed === "" ? [] : [signed]),
     "Each redirect is checked as a new request, responses are never redacted, and a refusal is a 403 from the proxy or a refused connection.",
   ].join(" ");
 }
+
+// one sentence per credential the sandbox can place, so a subagent's
+// replace those alone
+function sandboxCredentialWords(
+  credentials: readonly OfferedCredential[],
+): string {
+  return credentials
+    .filter(
+      (credential) =>
+        placement(credential.header, credential.template) !== null &&
+        prefixGlob(credential.prefix) !== null,
+    )
+    .map(
+      (credential) =>
+        `For ${prefixWords(credential.prefix)} (${credential.name}${credential.readOnly ? ", GET and HEAD only" : ""}) send -H "${credential.header}: ${placeholderValue(credential.template, credential.name)}", a placeholder the key replaces there alone.`,
+    )
+    .join(" ");
+}
+
+// a send without web access: no network in the sandbox either
+const NO_NET: SandboxNet = { mode: "off", hosts: [] };
 
 export const isReadMethod = (method: HttpMethod) =>
   method === "GET" || method === "HEAD";
@@ -182,7 +189,7 @@ function scrubbed(
 }
 
 export type BashToolOptions = {
-  bash?: Pick<BashCapability, "run" | "sandboxed">;
+  bash?: Pick<BashCapability, "run" | "sandbox">;
   web?: WebSnapshot | null;
   visuals?: boolean;
   credentials?: BashCredentials;
@@ -191,10 +198,10 @@ export type BashToolOptions = {
   docs?: boolean;
   // a subagent's: no open, so the description leaves it out
   subagent?: boolean;
-  // the sandbox shell runs the commands: a real shell and OpenShell's
-  // network, so the description says what differs; bash's own word
-  // when not given
-  sandbox?: boolean;
+  // the sandbox shell runs the commands, under this network: a real
+  // shell and OpenShell's rules, so the description says what differs.
+  // null is the built-in shell; bash's own word when not given
+  sandbox?: SandboxNet | null;
 };
 
 const BUILTIN_TOOLS =
@@ -208,18 +215,22 @@ const OPEN_WORDS =
 
 // a send's bash description as a subagent's, whatever was added after:
 // no open, and the subagent's own credential words
-export const asSubagent = (
+export function asSubagent(
   description: string,
   web: WebSnapshot | null,
   parent: readonly OfferedCredential[],
   own: readonly OfferedCredential[],
-): string =>
-  description
+): string {
+  const out = description
     .replace(OPEN_WORDS, "")
-    .replace(networkWords(web, parent), () => networkWords(web, own))
-    .replace(sandboxNetworkWords(web, parent), () =>
-      sandboxNetworkWords(web, own),
-    );
+    .replace(networkWords(web, parent), () => networkWords(web, own));
+  // the sandbox's hosts are the setting's of when the send began, so
+  // only its credential sentences are swapped
+  const signed = sandboxCredentialWords(parent);
+  if (signed === "") return out;
+  const mine = sandboxCredentialWords(own);
+  return out.replace(`${signed} `, () => (mine === "" ? "" : `${mine} `));
+}
 
 export function makeBashTool({
   bash,
@@ -229,16 +240,21 @@ export function makeBashTool({
   keys,
   docs = true,
   subagent = false,
-  sandbox = bash?.sandboxed?.() ?? false,
+  sandbox = bash?.sandbox?.() ?? null,
 }: BashToolOptions = {}): Tool<ToolResult> {
   return {
     name: "bash",
     // past the mount's own backstop, so its words end a stuck command
     graceMs: BACKSTOP_MS + 500,
     description:
-      `Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. ${sandbox ? SANDBOX_TOOLS : BUILTIN_TOOLS} Never write secrets, since others can read this chat and the project. ` +
+      `Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. ${sandbox !== null ? SANDBOX_TOOLS : BUILTIN_TOOLS} Never write secrets, since others can read this chat and the project. ` +
       (subagent ? "" : OPEN_WORDS) +
-      (sandbox ? sandboxNetworkWords : networkWords)(web, credentials.offered),
+      (sandbox !== null
+        ? sandboxNetworkWords(
+            web === null ? NO_NET : sandbox,
+            credentials.offered,
+          )
+        : networkWords(web, credentials.offered)),
     parameters: {
       type: "object",
       properties: {

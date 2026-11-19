@@ -12,6 +12,14 @@ export function isSandboxShell(value: unknown): value is SandboxShell {
   return SANDBOX_SHELLS.some((shell) => shell === value);
 }
 
+// where a sandbox's commands may connect: nowhere, or the hosts listed.
+// Web access never applies to it
+export const SANDBOX_NETWORKS = ["off", "hosts"] as const;
+export type SandboxNetwork = (typeof SANDBOX_NETWORKS)[number];
+export function isSandboxNetwork(value: unknown): value is SandboxNetwork {
+  return SANDBOX_NETWORKS.some((network) => network === value);
+}
+
 // the secret files of the gateway's mutual TLS, PEM values, by role
 export const SANDBOX_KEYS = {
   ca: "openshell-gateway-ca",
@@ -55,6 +63,9 @@ export type SandboxSettings = {
   endpoint: string | null;
   // null runs the default image, named after the server's version
   image: string | null;
+  network: SandboxNetwork;
+  // null until an admin saves a list: the defaults
+  hosts: string[] | null;
   // made once with the database; names the gateway's label and every
   // sandbox and provider label
   instanceId: string;

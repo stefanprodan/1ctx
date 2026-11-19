@@ -49,7 +49,12 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           shell: body.shell ?? held.shell,
           endpoint: body.endpoint === undefined ? held.endpoint : body.endpoint,
           image: body.image === undefined ? held.image : body.image,
+          network: body.network ?? held.network,
+          hosts: body.hosts === undefined ? held.hosts : body.hosts,
         };
+        if (next.network === "hosts" && next.hosts?.length === 0) {
+          throw new BadRequest("the hosts network needs a host at least");
+        }
         if (next.shell === "sandbox") {
           if (next.endpoint === null) {
             throw new BadRequest("the sandbox shell needs a gateway endpoint");
@@ -59,7 +64,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           }
         }
         deps.store.save(next, deps.clock());
-        deps.log.info("sandbox settings saved", { shell: next.shell });
+        deps.log.info("sandbox settings saved", {
+          shell: next.shell,
+          network: next.network,
+        });
         deps.saved();
         return json(deps.answer());
       },

@@ -57,7 +57,7 @@ function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
     subagent: false,
     repos,
     repoFileBytes: 0,
-    web: null,
+    network: false,
     credentials: [],
   });
   const deadline = () => time.now() + 20_000;

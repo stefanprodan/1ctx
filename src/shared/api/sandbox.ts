@@ -6,6 +6,7 @@
 import type {
   LeaseRow,
   SandboxKeyRole,
+  SandboxNetwork,
   SandboxSettings,
   SandboxShell,
 } from "../contracts/sandbox.ts";
@@ -26,11 +27,15 @@ export type SandboxResponse = {
 // PUT /api/admin/sandbox: fields left out stay. endpoint must be an
 // https origin; null takes it off, which the builtin shell allows alone.
 // image null runs the default. Shell sandbox needs an endpoint and every
-// key file, else a 400
+// key file, else a 400. hosts: at most MAX_SANDBOX_HOSTS, each a host or
+// a wildcard (shared/sandbox-net.ts); null takes the defaults, and the
+// hosts network needs one at least
 export type PutSandboxRequest = {
   shell?: SandboxShell;
   endpoint?: string | null;
   image?: string | null;
+  network?: SandboxNetwork;
+  hosts?: string[] | null;
 };
 
 // GET /api/admin/sandbox/leases: every sandbox the instance holds,

@@ -81,11 +81,19 @@ reporting.
   own composer follows at once. The aside reads `overviewTotals()`: clips, audio in minutes
   and cost, "not priced" while no clip named one.
 - **Sandbox is its own Config page, after Web access.** One Shell card
-  (the shell as a `Seg`, the gateway's https address, the image, empty
-  for the default) saves the whole row, as SMTP's Server card does.
-  Built-in hides the gateway and image and puts their drafts back to
-  the saved values, which the save keeps;
-  `sandboxFieldOf()` matches the server's whole phrases. A saved
+  (the shell as a `Seg`, Built-in or OpenShell, the gateway's https
+  address, the image, empty for the default) saves the shell, endpoint
+  and image, as SMTP's Server card does. Its line follows the shell
+  picked, saved or not. Built-in hides the gateway and image and puts
+  their drafts back to the saved values, which the save keeps;
+  `sandboxFieldOf()` matches the server's whole phrases.
+- **The Sandbox page's Network card shows while the shell picked is
+  OpenShell**, its own form saving only the network and hosts. Off or
+  Hosts as a `Seg`; Hosts draws the box, one host per line, counted
+  "N of 200", a line's refusal named by `lineError()`. The box holds
+  the saved hosts, or the defaults while none are saved. Use defaults,
+  as on a `LimitsSetting` card, fills the draft with Hosts and the
+  defaults without saving, disabled while the draft is already that. A saved
   sandbox shell missing a key file says so in a `SettingAlert`, and so
   does the leases route's `refused` while every command is refused. The
   Sandboxes card lists the leases as `RowsLine`s, read again every 15

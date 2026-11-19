@@ -82,7 +82,7 @@ describe("the shell port", () => {
         subagent: false,
         repos: [],
         repoFileBytes: 0,
-        web: null,
+        network: false,
         credentials: [],
         hold: null,
         mounted: {

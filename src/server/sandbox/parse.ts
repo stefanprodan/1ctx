@@ -5,10 +5,16 @@ import type { PutSandboxRequest } from "../../shared/api/sandbox.ts";
 import {
   isGatewayEndpoint,
   isSandboxImage,
+  isSandboxNetwork,
   isSandboxShell,
   MAX_GATEWAY_ENDPOINT,
   MAX_SANDBOX_IMAGE,
 } from "../../shared/contracts/sandbox.ts";
+import {
+  foldDefaults,
+  MAX_SANDBOX_HOSTS,
+  parseSandboxHosts,
+} from "../../shared/sandbox-net.ts";
 import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
@@ -16,7 +22,7 @@ export const ENDPOINT_RULE = `an https origin (https://host:port) of at most ${M
 export const IMAGE_RULE = `an image reference of at most ${MAX_SANDBOX_IMAGE} characters`;
 
 export function parseSandbox(body: unknown): PutSandboxRequest {
-  const b = fields(body, ["shell", "endpoint", "image"]);
+  const b = fields(body, ["shell", "endpoint", "image", "network", "hosts"]);
   const out: PutSandboxRequest = {};
   if ("shell" in b) {
     if (!isSandboxShell(b.shell)) {
@@ -36,8 +42,37 @@ export function parseSandbox(body: unknown): PutSandboxRequest {
     }
     out.image = b.image;
   }
+  if ("network" in b) {
+    if (!isSandboxNetwork(b.network)) {
+      throw new BadRequest("network must be off or hosts");
+    }
+    out.network = b.network;
+  }
+  if ("hosts" in b) out.hosts = hostsOf(b.hosts);
   if (Object.keys(out).length === 0) {
-    throw new BadRequest("body must name shell, endpoint or image");
+    throw new BadRequest(
+      "body must name shell, endpoint, image, network or hosts",
+    );
   }
   return out;
+}
+
+function hostsOf(value: unknown): string[] | null {
+  if (value === null) return null;
+  if (
+    !Array.isArray(value) ||
+    value.length > MAX_SANDBOX_HOSTS ||
+    !value.every((host) => typeof host === "string")
+  ) {
+    throw new BadRequest(
+      `hosts must be null or a list of at most ${MAX_SANDBOX_HOSTS} hosts`,
+    );
+  }
+  const parsed = parseSandboxHosts(value);
+  if (!parsed.ok) {
+    throw new BadRequest(
+      `hosts: ${JSON.stringify(parsed.value)} ${parsed.error}`,
+    );
+  }
+  return foldDefaults(parsed.hosts);
 }

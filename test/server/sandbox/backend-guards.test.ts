@@ -31,7 +31,7 @@ const credential: CommandCredential = {
   value: `Bearer ${KEY}`,
   methods: ["GET"],
 };
-const web = { mode: "listed" as const, domains: ["api.example.test"] };
+const net = { mode: "hosts" as const, hosts: ["api.example.test"] };
 const ROWS = { knowledge: { "a.md": "a\n" }, scratch: { "s.txt": "s" } };
 
 describe("the sandbox's read back refuses", () => {
@@ -43,7 +43,7 @@ describe("the sandbox's read back refuses", () => {
     ]) {
       const t = setup();
       const ran = await t.run(
-        { ...ROWS, web, credentials: [credential] },
+        { ...ROWS, net, credentials: [credential] },
         ({ fs }) => {
           fs.write(path, "x");
           fs.write("/tmp/kept.txt", "y");

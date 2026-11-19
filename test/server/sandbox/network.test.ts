@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A send's web snapshot and credentials as the sandbox's network: the
-// policy each mode makes, the providers attached and bound in order,
+// The sandbox's network setting and a send's credentials as the
+// sandbox's network: the policy each mode makes, the providers attached and bound in order,
 // what recycles a sandbox, and the provider lifecycle, over the fake
 // gateway.
 
@@ -21,7 +21,6 @@ import {
   type SandboxHold,
 } from "../../../src/server/sandbox/index.ts";
 import {
-  ALL_HOSTS,
   hashedName,
   planNetwork,
 } from "../../../src/server/sandbox/netpolicy.ts";
@@ -31,7 +30,7 @@ import {
   placement,
   prefixGlob,
 } from "../../../src/server/sandbox/rules.ts";
-import type { WebSnapshot } from "../../../src/shared/web.ts";
+import type { SandboxNet } from "../../../src/shared/sandbox-net.ts";
 import { rejection, settle } from "../../helpers/async.ts";
 import {
   bindings,
@@ -59,13 +58,13 @@ const signed = (
     ...fields,
   };
 };
-const LISTED: WebSnapshot = {
-  mode: "listed",
-  domains: ["api.example.test", "docs.example.test"],
+const LISTED: SandboxNet = {
+  mode: "hosts",
+  hosts: ["api.example.test", "docs.example.test"],
 };
-const ALL: WebSnapshot = { mode: "all", domains: ["example.test"] };
-const plan = (web: WebSnapshot | null, credentials: CommandCredential[] = []) =>
-  planNetwork({ web, credentials }, INSTANCE);
+const OFF: SandboxNet = { mode: "off", hosts: ["api.example.test"] };
+const plan = (net: SandboxNet, credentials: CommandCredential[] = []) =>
+  planNetwork({ credentials }, net, INSTANCE);
 
 type Rule = {
   endpoints: Record<string, unknown>[];
@@ -73,8 +72,9 @@ type Rule = {
 };
 
 describe("the network policy", () => {
-  test("off makes no endpoint and attaches nothing", () => {
-    expect(plan(null)).toEqual({
+  test("off makes no endpoint and attaches no credential", () => {
+    expect(plan(OFF, [signed()])).toEqual({
+      mode: "off",
       network: {},
       key: "{}",
       attach: [],
@@ -82,7 +82,7 @@ describe("the network policy", () => {
     });
   });
 
-  test("listed opens each host on 443 and 80, inspected and enforced, for the wrapper's bash", () => {
+  test("hosts opens each host on 443 and 80, inspected and enforced, for the wrapper's bash", () => {
     const web = plan(LISTED).network.web as Rule;
     expect(web.binaries).toEqual([{ path: "/usr/bin/bash" }]);
     expect(web.endpoints).toEqual(
@@ -98,25 +98,24 @@ describe("the network policy", () => {
     );
   });
 
-  test("all opens every name of three labels and each listed host, and attaches no credential", () => {
-    const made = plan(ALL, [
-      signed(),
-      { name: "off-one", prefix: "https://x.test/", refused: "off" },
-    ]);
-    const web = made.network.web as Rule;
+  test("a wildcard host goes to OpenShell as it is", () => {
+    const made = plan({
+      mode: "hosts",
+      hosts: ["**.example.test", "*.githubusercontent.com", "pypi.org"],
+    });
     expect(
-      web.endpoints.map((endpoint) => [endpoint.host, endpoint.port]),
+      (made.network.web as Rule).endpoints.map((endpoint) => [
+        endpoint.host,
+        endpoint.port,
+      ]),
     ).toEqual([
-      [ALL_HOSTS, 443],
-      [ALL_HOSTS, 80],
-      ["example.test", 443],
-      ["example.test", 80],
+      ["**.example.test", 443],
+      ["**.example.test", 80],
+      ["*.githubusercontent.com", 443],
+      ["*.githubusercontent.com", 80],
+      ["pypi.org", 443],
+      ["pypi.org", 80],
     ]);
-    expect(made.attach).toEqual([]);
-    expect(Object.keys(made.network)).toEqual(["web"]);
-    expect(made.notice).toBe(
-      "credentials are not used while every host is open, so requests go unsigned: off-one, quotes\n",
-    );
   });
 
   test("a credential binds its prefix and denies every method it lacks", () => {
@@ -159,7 +158,7 @@ describe("the network policy", () => {
   });
 
   test("a credential's host joins the policy though the snapshot does not list it", () => {
-    const made = plan({ mode: "listed", domains: ["other.test"] }, [
+    const made = plan({ mode: "hosts", hosts: ["other.test"] }, [
       signed({ prefix: "https://unlisted.test:8443/api" }),
     ]);
     const [endpoint] = (made.network.cred_quotes as Rule).endpoints;
@@ -189,7 +188,7 @@ describe("the network policy", () => {
 
   test("names are hashes of the instance and the credential", () => {
     const a = plan(LISTED, [signed()]).attach[0]!;
-    const b = planNetwork({ web: LISTED, credentials: [signed()] }, "other")
+    const b = planNetwork({ credentials: [signed()] }, LISTED, "other")
       .attach[0]!;
     expect(a.provider).toMatch(/^1ctx-[0-9a-z]{14}$/);
     expect(a.profile.id).toMatch(/^1ctx-[0-9a-z]{14}$/);
@@ -335,30 +334,35 @@ function setup() {
     image: "img",
     limits: () => DEFAULT_LIMITS,
     repos: { hold: () => () => {} },
+    net: () => net,
   });
+  let net: SandboxNet = OFF;
   const call = (
-    web: WebSnapshot | null,
+    given: SandboxNet,
     credentials: CommandCredential[] = [],
     workspace = "chat",
     sendId = "send",
-  ): ShellCall => ({
-    projectId: "project",
-    workspace: { id: workspace, sessionId: workspace },
-    sendId,
-    subagent: false,
-    repos: [],
-    repoFileBytes: 0,
-    web,
-    credentials,
-  });
+  ): ShellCall => {
+    net = given;
+    return {
+      projectId: "project",
+      workspace: { id: workspace, sessionId: workspace },
+      sendId,
+      subagent: false,
+      repos: [],
+      repoFileBytes: 0,
+      network: true,
+      credentials,
+    };
+  };
   const acquire = (
-    web: WebSnapshot | null,
+    given: SandboxNet,
     credentials: CommandCredential[] = [],
     workspace = "chat",
     sendId = "send",
   ) =>
     leases.acquire(
-      call(web, credentials, workspace, sendId),
+      call(given, credentials, workspace, sendId),
       time.now() + 20_000,
       new AbortController().signal,
     ) as Promise<SandboxHold>;
@@ -399,7 +403,7 @@ describe("a sandbox's network", () => {
 
   test("off on a fresh sandbox loads nothing, and an unchanged policy is never loaded again", async () => {
     const t = setup();
-    const off = await t.acquire(null);
+    const off = await t.acquire(OFF);
     off.release();
     expect(t.fake.policies).toEqual([]);
     const first = await t.acquire(LISTED, [signed()]);
@@ -426,33 +430,61 @@ describe("a sandbox's network", () => {
     ]);
   });
 
-  test("a rotated key, a removed credential or leaving listed mode recycles the sandbox", async () => {
+  test("a rotated key, a removed credential or the network turned off recycles the sandbox", async () => {
     for (const next of [
-      { web: LISTED, credentials: [signed({ key: `${KEY}-rotated` })] },
-      { web: LISTED, credentials: [] },
-      { web: ALL, credentials: [signed()] },
-      { web: null, credentials: [] },
+      { net: LISTED, credentials: [signed({ key: `${KEY}-rotated` })] },
+      { net: LISTED, credentials: [] },
+      { net: OFF, credentials: [signed()] },
+      { net: OFF, credentials: [] },
       {
-        web: LISTED,
+        net: LISTED,
         credentials: [signed({ prefix: "https://api.example.test/v2/" })],
       },
     ]) {
       const t = setup();
       const first = await t.acquire(LISTED, [signed()]);
       first.release();
-      const second = await t.acquire(next.web, next.credentials);
+      const second = await t.acquire(next.net, next.credentials);
       expect(second.sandbox).not.toBe(first.sandbox);
       await until(() => t.state(first.sandbox) === undefined);
       expect(t.fake.deletes).toEqual([first.sandbox]);
     }
   });
 
-  test("all mode attaches none and says requests go unsigned", async () => {
+  test("the network turned off recycles a sandbox with no credential, and turned on keeps it", async () => {
     const t = setup();
-    const hold = await t.acquire(ALL, [signed()]);
+    const first = await t.acquire(LISTED);
+    first.release();
+    const off = await t.acquire(OFF);
+    expect(off.sandbox).not.toBe(first.sandbox);
+    off.release();
+    const on = await t.acquire(LISTED);
+    expect(on.sandbox).toBe(off.sandbox);
+    on.release();
+    expect(t.fake.policies).toHaveLength(2);
+  });
+
+  test("a send without web access runs with the network off, whatever the setting", async () => {
+    const t = setup();
+    const first = await t.acquire(LISTED, [signed()]);
+    first.release();
+    const off = await t.leases.acquire(
+      { ...t.call(LISTED, [signed()]), network: false },
+      t.time.now() + 20_000,
+      new AbortController().signal,
+    );
+    if (off === "busy") throw new Error("busy");
+    expect(off.sandbox).not.toBe(first.sandbox);
+    expect(t.fake.policies).toHaveLength(1);
+    expect(t.fake.attached.get(off.sandbox)).toBeUndefined();
+  });
+
+  test("off attaches no credential", async () => {
+    const t = setup();
+    const hold = await t.acquire(OFF, [signed()]);
     expect(t.fake.puts).toEqual([]);
     expect(t.fake.attached.get(hold.sandbox)).toBeUndefined();
-    expect(hold.notice).toContain("requests go unsigned: quotes");
+    expect(t.fake.policies).toEqual([]);
   });
 
   test("the notice is named by each send's first command alone", async () => {

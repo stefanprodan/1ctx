@@ -38,7 +38,7 @@ const LABEL = "[a-z0-9]([a-z0-9-]*[a-z0-9])?";
 const NAME = new RegExp(`^${LABEL}(\\.${LABEL})*$`);
 
 // one line to the host it names, null when it is not a plain host
-function hostOf(line: string): string | null {
+export function hostOf(line: string): string | null {
   if (line.length > MAX_WEB_DOMAIN || /[\s/*?#@\\]/.test(line)) return null;
   let url: URL;
   try {

@@ -5,9 +5,10 @@
 // the command: the providers its credentials need, attached, then bound
 // by the policy, then waited for until OpenShell reports both applied.
 // What can only be undone by a new sandbox (a credential gone, a key
-// rotated, listed mode left) recycles instead. A provider's key is
+// rotated, the network turned off) recycles instead. A provider's key is
 // compared by its hash in memory, never stored or logged.
 
+import type { SandboxNet } from "../../shared/sandbox-net.ts";
 import type { ShellCall } from "../bash/index.ts";
 import { after, type Clock, sleepUnless } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
@@ -39,6 +40,8 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 export const GLOBAL_POLICY_REFUSAL =
   "the sandbox gateway has a global policy set, which replaces each sandbox's own. An admin must remove it";
 
+const NO_NET: SandboxNet = { mode: "off", hosts: [] };
+
 // a provider past this after its bind is not coming
 export const READY_MS = 10_000;
 const READY_POLL_MS = 50;
@@ -48,6 +51,8 @@ export type NetworkDeps = {
   log: Log;
   gateway: Gateway;
   instanceId: string;
+  // the sandbox's network setting, read at each command; off without it
+  net?(): SandboxNet;
   // by provider name and by profile, shared by every manager of the
   // instance, so an attach and a delete of one never overlap
   locks?: Map<string, Promise<unknown>>;
@@ -87,9 +92,12 @@ export class Network {
   ): Promise<"ready" | "recycled" | "busy"> {
     const state = (hold.network.value as NetState | null) ?? freshState();
     hold.network.value = state;
-    const plan = planNetwork(call, this.deps.instanceId);
-    if (stale(state, plan)) {
-      hold.recycle("credentials");
+    // a send without web access has no network here either
+    const net = (call.network ? this.deps.net?.() : undefined) ?? NO_NET;
+    const plan = planNetwork(call, net, this.deps.instanceId);
+    const why = stale(state, plan);
+    if (why !== null) {
+      hold.recycle(why);
       return "recycled";
     }
     const step = bounded(
@@ -126,6 +134,7 @@ export class Network {
         );
         state.key = plan.key;
       }
+      state.mode = plan.mode;
       for (const one of fresh)
         await this.ready(hold.sandbox, one.provider, step.signal);
     } catch (error) {

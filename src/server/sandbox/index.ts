@@ -11,6 +11,7 @@ import {
   SANDBOX_KEYS,
   type SandboxKeyRole,
 } from "../../shared/contracts/sandbox.ts";
+import { type SandboxNet, sandboxNet } from "../../shared/sandbox-net.ts";
 import type { ShellBackend } from "../bash/index.ts";
 import type { Db } from "../db/index.ts";
 import { subscribe } from "../lib/bus.ts";
@@ -85,6 +86,8 @@ export type Sandbox = {
   shell(builtin: ShellBackend): ShellBackend;
   // the settings and every key file in place
   active(): boolean;
+  // the network a command in a sandbox runs under
+  net(): SandboxNet;
   // the current gateway's leases, null while the shell is off
   leases(): Leases | null;
   // at start: the leases made and an earlier process's sandboxes swept
@@ -160,6 +163,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       // a retired manager's delete frees room under the instance's cap
       freed: () => current?.leases.poke(),
       locks,
+      net: () => sandboxNet(store.settings()),
     });
     const unsubscribe = subscribe((event) => {
       for (const { sessionId, reason } of recyclesOf(event, forks)) {
@@ -225,6 +229,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     }),
     shell: (builtin) => (ensure() === null ? builtin : backend),
     active: () => config() !== null,
+    net: () => sandboxNet(store.settings()),
     leases: () => ensure(),
     async start() {
       running = true;

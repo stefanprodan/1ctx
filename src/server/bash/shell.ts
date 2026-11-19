@@ -6,7 +6,6 @@
 // answers as the command worker does. The context is the server's and
 // never reaches the command.
 
-import type { WebSnapshot } from "../../shared/web.ts";
 import type { Landed } from "./commit.ts";
 import type { CommandCredential } from "./credentials.ts";
 import type { Job } from "./protocol.ts";
@@ -31,7 +30,8 @@ export type ShellCall = {
   subagent: boolean;
   repos: readonly ShellRepo[];
   repoFileBytes: number;
-  web: WebSnapshot | null;
+  // the send has web access; without it the sandbox has no network
+  network: boolean;
   // the send's credentials, their keys read for this command
   credentials: readonly CommandCredential[];
   // what each tree's rows hold now, read only by a shell that sizes its

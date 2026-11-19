@@ -224,7 +224,7 @@ export async function run(
       tree: repo.folder,
     })),
     repoFileBytes: caps.repos?.fileBytes ?? 0,
-    web: caps.web ?? null,
+    network: Boolean(caps.web),
     credentials: caps.web ? (caps.credentials ?? []) : [],
     stored: () => storedBytes(deps, caps, projectId, workspace),
   };

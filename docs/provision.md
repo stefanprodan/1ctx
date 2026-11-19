@@ -71,10 +71,14 @@ they name.
 - **`Sandbox` is the instance's one sandbox shell setting**
   (`docs/sandbox.md`). A second `Sandbox` document is refused, and any
   name updates the row the database made, so it is never created.
-  `shell`, `endpoint` and `image` are optional; `endpoint` and `image`
-  take null. Validation refuses an endpoint that is not an https origin
-  and, for `shell: sandbox`, a missing `openshell-gateway-ca`, `-cert` or
-  `-key` file; the save refuses the sandbox shell without an endpoint.
+  `shell`, `endpoint`, `image`, `network` (`off` or `hosts`) and
+  `hosts` are optional; `endpoint`, `image` and `hosts` take null, null
+  hosts being the defaults. Validation refuses an endpoint that is not
+  an https origin, a host the sandbox does not take
+  (`docs/sandbox.md`) and, for `shell: sandbox`, a missing
+  `openshell-gateway-ca`, `-cert` or `-key` file; the save refuses the
+  sandbox shell without an endpoint. Hosts compare as the sorted list a
+  save stores.
 
 - **An `Agent` is matched by name among live agents.** One naming a
   deleted agent creates a new agent. The automations the delete paused

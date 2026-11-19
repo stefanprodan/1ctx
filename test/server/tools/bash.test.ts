@@ -604,17 +604,24 @@ describe("bash's description under the sandbox shell", () => {
     domains: ["api.github.test", "pypi.test"],
   };
 
+  const hosts = {
+    mode: "hosts" as const,
+    hosts: ["api.github.test", "pypi.test"],
+  };
+
   test("it names the placeholder, the header it goes in and the differences", () => {
     const words = makeBashTool({
       web: listed,
       credentials: { offered: [github, cookie], off: [] },
-      sandbox: true,
+      sandbox: hosts,
     }).description;
     expect(words).toContain(
       'For https://api.github.test/ (gh-api) send -H "Authorization: token $ONECTX_CRED_GH_API", a placeholder the key replaces there alone.',
     );
     expect(words).not.toContain("session");
-    expect(words).toContain("these hosts only: api.github.test, pypi.test.");
+    expect(words).toContain(
+      "curl, python and uv reach HTTP and HTTPS on ports 80 and 443 of these hosts only: api.github.test, pypi.test. Save downloads in /tmp.",
+    );
     expect(words).toContain("run Python with uv run or uvx, never pip");
     expect(words).toContain("into a venv under $HOME, never in /tmp");
     expect(words).toContain("Redirect a background job's output");
@@ -624,17 +631,39 @@ describe("bash's description under the sandbox shell", () => {
     expect(words).not.toContain("send no key");
   });
 
-  test("all mode says two-label hosts need listing and requests go unsigned", () => {
+  test("the sandbox's own hosts, never Web access's: ten named, then how many more", () => {
+    const many = Array.from({ length: 13 }, (_, i) => `h${i + 10}.test`);
     const words = makeBashTool({
-      web: { mode: "all", domains: ["pypi.test"] },
-      credentials: { offered: [github], off: [] },
-      sandbox: true,
+      web: { mode: "all", domains: [] },
+      sandbox: { mode: "hosts", hosts: many },
     }).description;
     expect(words).toContain(
-      "any host of three labels or more (api.github.com), and one of two labels (pypi.org) only when listed: pypi.test.",
+      `these hosts only: ${many.slice(0, 10).join(", ")} and 3 more.`,
     );
-    expect(words).toContain("Requests go unsigned here.");
+    expect(words).not.toContain("any host");
+    expect(words).not.toContain("unsigned");
+  });
+
+  test("a send without web access says no network, whatever the sandbox's hosts", () => {
+    const words = makeBashTool({
+      web: null,
+      credentials: { offered: [github], off: [] },
+      sandbox: hosts,
+    }).description;
+    expect(words.endsWith(" No network.")).toBe(true);
+    expect(words).not.toContain("pypi.test");
+    expect(words).toContain("uv run");
+  });
+
+  test("off says no network, whatever Web access says", () => {
+    const words = makeBashTool({
+      web: listed,
+      credentials: { offered: [github], off: [] },
+      sandbox: { mode: "off", hosts: ["pypi.test"] },
+    }).description;
+    expect(words.endsWith(" No network.")).toBe(true);
     expect(words).not.toContain("ONECTX_CRED");
+    expect(words).toContain("uv run");
   });
 
   test("the built-in shell's words are untouched, and a subagent's follow the sandbox's", () => {
@@ -642,30 +671,38 @@ describe("bash's description under the sandbox shell", () => {
       web: listed,
       credentials: { offered: [github], off: [] },
     };
-    expect(makeBashTool({ ...options, sandbox: false }).description).toBe(
+    expect(makeBashTool({ ...options, sandbox: null }).description).toBe(
       makeBashTool(options).description,
     );
     expect(makeBashTool(options).description).toContain(
       "jq, yq, awk and diff are there, git, python and node are not.",
     );
-    const parent = makeBashTool({ ...options, sandbox: true }).description;
+    const parent = makeBashTool({ ...options, sandbox: hosts }).description;
     const child = asSubagent(
-      parent,
+      `${parent}\n\nrepos`,
       listed,
       [github],
       [{ ...github, readOnly: true }],
     );
     expect(child).toContain("(gh-api, GET and HEAD only) send -H");
+    expect(child).toContain("these hosts only: api.github.test, pypi.test.");
+    expect(child).toContain("refused connection.\n\nrepos");
+    // a subagent with none of its parent's credentials keeps the rest
+    const bare = asSubagent(parent, listed, [github], []);
+    expect(bare).not.toContain("ONECTX_CRED");
+    expect(bare).toContain(
+      "Save downloads in /tmp. Each redirect is checked as a new request",
+    );
   });
 
   test("bash's own word picks the variant", () => {
     const run = async () => ({ content: "", error: false });
     expect(
-      makeBashTool({ bash: { run, sandboxed: () => true }, web: listed })
+      makeBashTool({ bash: { run, sandbox: () => hosts }, web: listed })
         .description,
     ).toContain("uv run");
     expect(
-      makeBashTool({ bash: { run, sandboxed: () => false }, web: listed })
+      makeBashTool({ bash: { run, sandbox: () => null }, web: listed })
         .description,
     ).not.toContain("uv run");
   });

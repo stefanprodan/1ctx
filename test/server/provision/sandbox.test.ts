@@ -10,6 +10,7 @@ import {
   type Document,
   preflight,
 } from "../../../src/server/provision/parse.ts";
+import { SANDBOX_DEFAULT_HOSTS } from "../../../src/shared/sandbox-net.ts";
 import type { SecretKind } from "../../../src/shared/words.ts";
 import { type TestApp, testApp } from "../../helpers/app.ts";
 import { documents, object } from "./helpers.ts";
@@ -81,6 +82,18 @@ describe("provision Sandbox", () => {
     ).toThrow("spec.endpoint: must be null or an https origin");
   });
 
+  test("the network is off or hosts, each host one OpenShell takes", () => {
+    expect(() => documents(sandbox({ network: "all" }))).toThrow(
+      "spec.network: must be off or hosts",
+    );
+    expect(() => documents(sandbox({ hosts: ["pypi.org", "*.com"] }))).toThrow(
+      'spec.hosts: "*.com" needs three labels as a wildcard',
+    );
+    expect(() => documents(sandbox({ hosts: "pypi.org" }))).toThrow(
+      "spec.hosts: must be null or a list",
+    );
+  });
+
   test("the sandbox shell needs the gateway's key files before apply", () => {
     const docs = documents(sandbox({ shell: "sandbox", endpoint: ENDPOINT }));
     expect(() => check(docs, {})).toThrow(
@@ -109,6 +122,29 @@ describe("provision Sandbox", () => {
         shell: "sandbox",
         image: null,
       });
+      // hosts compare as the sorted list a save stores
+      const net = sandbox({
+        network: "off",
+        hosts: ["pypi.org", "*.githubusercontent.com"],
+      });
+      expect(await apply(net)).toContain("updated sandbox/sandbox");
+      expect(app.sandbox.store.settings()).toMatchObject({
+        network: "off",
+        hosts: ["*.githubusercontent.com", "pypi.org"],
+      });
+      expect(await apply(net)).toContain("unchanged sandbox/sandbox");
+      await apply(sandbox({ network: "hosts", hosts: null }));
+      expect(app.sandbox.store.settings()).toMatchObject({
+        network: "hosts",
+        hosts: null,
+      });
+      // the defaults written out are the defaults: stored as null, and
+      // unchanged on the next apply
+      const listed = sandbox({ hosts: [...SANDBOX_DEFAULT_HOSTS] });
+      expect(await apply(listed)).toContain("unchanged sandbox/sandbox");
+      await apply(sandbox({ hosts: ["a.test"] }));
+      expect(await apply(listed)).toContain("updated sandbox/sandbox");
+      expect(app.sandbox.store.settings().hosts).toBeNull();
     });
   });
 });

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The sandbox shell's network against a real OpenShell gateway, by
-// hand (make sandbox-net-check ARGS="..."): the policy each web mode
-// makes, credentials as providers and placeholders, and what OpenShell
+// hand (make sandbox-net-check ARGS="..."): the policy each sandbox
+// network makes, credentials as providers and placeholders, and what OpenShell
 // refuses. Requests go to public echo services (httpbin.org,
 // example.com). The keys are made up here and written to a temporary
 // secrets folder; no real key is read. Every sandbox, provider and
@@ -42,7 +42,7 @@ import {
 import { envName } from "../src/server/sandbox/rules.ts";
 import { secrets } from "../src/server/secrets/index.ts";
 import type { HttpMethod } from "../src/shared/contracts/credential.ts";
-import type { WebSnapshot } from "../src/shared/web.ts";
+import type { SandboxNet } from "../src/shared/sandbox-net.ts";
 
 const { values: flags } = parseArgs({
   options: {
@@ -158,14 +158,21 @@ const leases = new Leases({
   image: flags.image!,
   limits: () => limits,
   repos: { hold: () => () => {} },
+  net: () => net,
 });
 const backend = sandboxBackend({ clock: wallClock, log, limits: () => limits });
 
-const LISTED: WebSnapshot = {
-  mode: "listed",
-  domains: ["example.com", "httpbin.org"],
+const LISTED: SandboxNet = {
+  mode: "hosts",
+  hosts: ["example.com", "httpbin.org"],
 };
-const ALL: WebSnapshot = { mode: "all", domains: ["httpbin.org"] };
+const WILD: SandboxNet = {
+  mode: "hosts",
+  hosts: ["**.hf.co", "*.githubusercontent.com", "httpbin.org"],
+};
+const OFF: SandboxNet = { mode: "off", hosts: LISTED.hosts };
+// what the leases read at each command, as the settings row would say
+let net: SandboxNet = LISTED;
 
 // the workspace's scratch as the database would hold it, so a command
 // that lands keeps its sandbox
@@ -175,12 +182,13 @@ let usedAt: number | null = null;
 
 let sendSerial = 0;
 async function command(
-  web: WebSnapshot | null,
+  given: SandboxNet,
   rows: Row[],
   text: string,
   send = `send-${++sendSerial}`,
 ) {
-  const credentials = web === null ? [] : credentialsOf(rows);
+  net = given;
+  const credentials = credentialsOf(rows);
   const call: ShellCall = {
     projectId: "net-check",
     workspace: { id: "net-check", sessionId: "net-check" },
@@ -188,7 +196,7 @@ async function command(
     subagent: false,
     repos: [],
     repoFileBytes: 0,
-    web,
+    network: true,
     credentials,
   };
   const loads = policyLoads;
@@ -205,7 +213,7 @@ async function command(
       endsAt: now + 60_000,
       docs: true,
       visuals: true,
-      network: web !== null,
+      network: given.mode === "hosts",
       cwd: "/tmp",
       knowledgeFileBytes: limits.knowledgeFileBytes,
       mountBytes: 64 << 20,
@@ -542,53 +550,59 @@ async function main() {
     `${rotated.sandbox} -> ${removed.sandbox}; ${brief(removed.raw)}`,
   );
 
-  const all = await command(
-    ALL,
+  const wild = await command(
+    WILD,
     [HEADER],
     [
       `env | grep -c '^ONECTX_CRED_'`,
-      probe("three-label", "https://www.example.com/"),
+      probe(
+        "wildcard",
+        "https://raw.githubusercontent.com/github/gitignore/main/README.md",
+      ),
+      // any answer at all, which a refused name never gets
+      probe("deep-wildcard", "https://us.aws.cdn.hf.co/"),
+      probe("listed", "https://httpbin.org/get"),
       probe("two-label", "https://example.org/"),
-      probe("two-label-listed", "https://httpbin.org/get"),
+      probe("unlisted", "https://www.example.com/"),
       probe("literal", "https://1.1.1.1/"),
-      probe("private-name", "http://10.0.0.1.nip.io/"),
-      probe("private-name-2", "http://192.168.1.1.nip.io/"),
-      probe("port-8443", "https://www.example.com:8443/"),
+      probe("port-8443", "https://httpbin.org:8443/get"),
       probe("metadata", "http://169.254.169.254/latest/meta-data/"),
     ].join("\n"),
   );
-  const three = all.raw;
+  const w = wild.raw;
   report(
-    "leaving listed mode recycles and attaches nothing",
-    all.sandbox !== removed.sandbox &&
-      three.startsWith("0\n") &&
-      all.notice.includes("requests go unsigned"),
-    `${removed.sandbox} -> ${all.sandbox}; ${brief(all.notice)}`,
+    "a wildcard host reaches a name under it, ** any depth, beside the listed hosts",
+    wild.sandbox === removed.sandbox &&
+      w.startsWith("1\n") &&
+      status(w, "wildcard") === "200" &&
+      !["", "000"].includes(status(w, "deep-wildcard")) &&
+      status(w, "listed") === "200",
+    `${wild.loaded} load; ${["wildcard", "deep-wildcard", "listed"].map((label) => `${label} ${status(w, label)}`).join(", ")}`,
   );
   report(
-    "all mode: three labels pass, two only when listed",
-    status(three, "three-label") === "200" &&
-      status(three, "two-label") === "000" &&
-      status(three, "two-label-listed") === "200",
-    ["three-label", "two-label", "two-label-listed"]
-      .map((label) => `${label} ${status(three, label)}`)
-      .join(", "),
-  );
-  report(
-    "all mode: private names, metadata and other ports are refused",
-    ["private-name", "private-name-2", "port-8443", "metadata"].every(
-      (label) => status(three, label) !== "200",
+    "unlisted names, raw addresses, metadata and other ports are refused",
+    ["two-label", "unlisted", "literal", "port-8443", "metadata"].every(
+      (label) => status(w, label) === "000",
     ),
-    ["literal", "private-name", "private-name-2", "port-8443", "metadata"]
-      .map((label) => `${label} ${status(three, label)}`)
+    ["two-label", "unlisted", "literal", "port-8443", "metadata"]
+      .map((label) => `${label} ${status(w, label)}`)
       .join(", "),
   );
 
-  const off = await command(null, [], probe("off", "https://httpbin.org/get"));
+  const off = await command(
+    OFF,
+    [HEADER],
+    [
+      `env | grep -c '^ONECTX_CRED_'`,
+      probe("off", "https://httpbin.org/get"),
+    ].join("\n"),
+  );
   report(
-    "off: no endpoint, nothing reaches out",
-    status(off.raw, "off") === "000",
-    `${off.sandbox} (${off.loaded} load); ${lineOf(off.raw, "off")}`,
+    "off recycles, attaches nothing and nothing reaches out",
+    off.sandbox !== wild.sandbox &&
+      off.raw.startsWith("0\n") &&
+      status(off.raw, "off") === "000",
+    `${wild.sandbox} -> ${off.sandbox} (${off.loaded} load); ${lineOf(off.raw, "off")}`,
   );
 }
 

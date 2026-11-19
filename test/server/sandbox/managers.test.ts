@@ -49,11 +49,9 @@ const CREDENTIAL: CommandCredential = {
   value: "Bearer made-up-key-0123456789abcdef",
   methods: ["GET", "HEAD"],
 };
-const LISTED = { mode: "listed" as const, domains: ["api.example.test"] };
-const PROVIDER = planNetwork(
-  { web: LISTED, credentials: [CREDENTIAL] },
-  INSTANCE,
-).attach[0]!.provider;
+const NET = { mode: "hosts" as const, hosts: ["api.example.test"] };
+const PROVIDER = planNetwork({ credentials: [CREDENTIAL] }, NET, INSTANCE)
+  .attach[0]!.provider;
 
 function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
   const time = fakeClock();
@@ -94,6 +92,7 @@ function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
         for (const other of managers) other.poke();
       },
       locks,
+      net: () => NET,
     });
     managers.push(leases);
     return leases;
@@ -105,7 +104,7 @@ function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
     subagent: false,
     repos: [],
     repoFileBytes: 0,
-    web: null,
+    network: true,
     credentials: [],
     ...fields,
   });
@@ -204,7 +203,6 @@ describe("managers of one gateway", () => {
     const t = setup();
     const old = t.manager();
     const hold = await t.acquire(old, "chat", {
-      web: LISTED,
       credentials: [CREDENTIAL],
     });
     void old.drain();
@@ -221,7 +219,6 @@ describe("managers of one gateway", () => {
     const t = setup();
     const old = t.manager();
     const hold = await t.acquire(old, "chat", {
-      web: LISTED,
       credentials: [CREDENTIAL],
     });
     const gateway = t.fake.connect(t.fake.configs[0]!);
@@ -254,14 +251,12 @@ describe("managers of one gateway", () => {
     const t = setup();
     const old = t.manager();
     const hold = await t.acquire(old, "a", {
-      web: LISTED,
       credentials: [CREDENTIAL],
     });
     const drained = old.drain();
     const next = t.manager("img:2");
     const key = "made-up-key-rotated-0123456789";
     const other = await t.acquire(next, "b", {
-      web: LISTED,
       credentials: [{ ...CREDENTIAL, key, value: `Bearer ${key}` }],
     });
     hold.release();
@@ -284,7 +279,6 @@ describe("managers of one gateway", () => {
     gateway.providers.delete = async (name, signal) => {
       if (name === "1ctx-left-over" && taking === null) {
         taking = t.acquire(leases, "chat", {
-          web: LISTED,
           credentials: [CREDENTIAL],
         });
         await until(() => t.fake.calls.includes(`attach:${PROVIDER}`));
