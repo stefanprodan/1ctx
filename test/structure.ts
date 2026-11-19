@@ -38,6 +38,7 @@ export const LAYERS = [
   "images",
   "repos",
   "bash",
+  "sandbox",
   "sessions",
   "external-tasks",
   "tools",
@@ -90,6 +91,23 @@ export const UNLAYERED: Record<string, string> = {
   "client/ui/chart.css":
     "uPlot's own sheet is unlayered, so its overrides have to be too",
 };
+
+// packages only one directory may import, by specifier or its subpaths,
+// with the directory
+export const PACKAGE_OWNERS: Record<string, string> = {
+  "openshell-sdk": "server/sandbox/",
+  "@bufbuild/protobuf": "server/sandbox/",
+  "@connectrpc/connect": "server/sandbox/",
+  "@connectrpc/connect-node": "server/sandbox/",
+};
+
+// the directory that owns a package specifier, or null
+function ownerOf(specifier: string): string | null {
+  for (const [name, dir] of Object.entries(PACKAGE_OWNERS)) {
+    if (specifier === name || specifier.startsWith(`${name}/`)) return dir;
+  }
+  return null;
+}
 
 // hosts no test may name: the suite never reaches a network
 export const FORBIDDEN_HOSTS = [
@@ -297,6 +315,15 @@ export function check(root: string): Violation[] {
       if (isExternal(s)) {
         const builtin = s.startsWith("bun") || s.startsWith("node:");
         if (imp.kind !== "scan") outside.add(s);
+        const owner = ownerOf(s);
+        if (owner !== null && !rel.startsWith(owner.replaceAll("/", sep))) {
+          out.push({
+            file: rel,
+            rule: "package",
+            detail: `imports ${s}; only ${owner} may`,
+          });
+          continue;
+        }
         if (area === "shared") {
           out.push({ file: rel, rule: "shared", detail: `imports ${s}` });
         } else if (area === "client" && builtin) {

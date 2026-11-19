@@ -95,3 +95,14 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## OpenShell TypeScript SDK
+
+`vendor/openshell-sdk/` holds `sdk/typescript` and four files of
+`proto/` from https://github.com/NVIDIA/OpenShell at the tag `v0.1.9`,
+and the stubs generated from them. Copyright (c) 2025-2026 NVIDIA
+CORPORATION & AFFILIATES. Licensed under the Apache License, Version
+2.0; a copy is in `vendor/openshell-sdk/LICENSE`. The stub
+`src/gen/google/rpc/error_details_pb.ts` is generated from
+`google/rpc/error_details.proto` in https://github.com/googleapis/googleapis,
+Copyright Google LLC, under the same license.

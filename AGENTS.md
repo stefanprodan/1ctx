@@ -11,8 +11,10 @@ them on schedules (automations), with shared knowledge and memory.
   the user's explicit go-ahead. In `src/`, only
   `server/lib/archive.ts` imports `@zip.js/zip.js` and `modern-tar`,
   only `server/email/smtp.ts` imports `nodemailer`, only
-  `server/mcp-server/` imports `@modelcontextprotocol/server`, and only
-  `client/ui/Plot.tsx` imports `uplot`. `patches/` holds modern-tar's
+  `server/mcp-server/` imports `@modelcontextprotocol/server`, only
+  `client/ui/Plot.tsx` imports `uplot`, and only `server/sandbox/`
+  imports `openshell-sdk` and its packages (`PACKAGE_OWNERS` in
+  `test/structure.ts`). `patches/` holds modern-tar's
   patch: it keeps the raw header `typeflag`, so GNU sparse and unknown
   types are not read as regular files, and cancelling an entry's body
   never drops the next entry's, which hung the stream.
@@ -91,7 +93,8 @@ skills/       installable agent skills, added by URL, never seeded;
 site/         1ctx.dev and the brand files, its own project.
               site/README.md is the brand book.
 vendor/       just-bash/ (a git subtree, outside Biome and the structure
-              rules) and its three docs.
+              rules) and its three docs; openshell-sdk/, OpenShell's
+              TypeScript SDK with its generated stubs, kept the same way.
 docs/         the rules of each area (see Docs).
 deploy/       docker/ (the Docker Compose files), charts/onectx/ (the Helm
               chart) and flux/ (its Flux example); docs/deploy.md.
@@ -172,7 +175,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |
 | `docs/load-testing.md` | `scripts/load/`: the load harness, its fakes, databases, fence, targets and results |
-| `vendor/README.md` | changing or syncing `vendor/just-bash/` |
+| `vendor/README.md` | changing or syncing `vendor/just-bash/` and `vendor/openshell-sdk/` |
 | `vendor/changes.md` | a hunk of `vendor/just-bash/`: its `(1ctx <id>)` entry, same commit |
 | `vendor/differences.md` | where a vendored command still differs from its tool |
 
