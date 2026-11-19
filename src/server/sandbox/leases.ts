@@ -1,11 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The sandboxes of one gateway, by root workspace: a chat's commands and
-// its subagents' share one. A sandbox is a cache of the rows, deleted and
-// made again at any doubt (a mismatch, a clear, a lost gateway) rather
-// than repaired. Deletes run in the background (deletes.ts), never
-// blocking a command.
+// The sandboxes of one gateway, by root workspace: a chat's commands
+// and its subagents' share one. A sandbox is a cache of
+// the rows: any of them may be deleted between two commands and made
+// again, so every doubt (a mismatch, a clear, a lost gateway) deletes
+// rather than repairs. Deletes run in the background (deletes.ts) and
+// never block a command.
 
 import type { LeaseRow } from "../../shared/contracts/sandbox.ts";
 import type { ShellCall, ShellRepo, StoredBytes } from "../bash/index.ts";
@@ -23,7 +24,8 @@ import { PolicyGate } from "./policy.ts";
 import { WarmPool } from "./pool.ts";
 import { ImageCheck, ImageRefused } from "./roots.ts";
 import { fitsCaps, mountsKey, sandboxName } from "./spec.ts";
-import { Cuts, sweepLabelled } from "./sweep.ts";
+import { Cuts } from "./sweep.ts";
+import { Sweeper } from "./sweeper.ts";
 import { bounded, Changes, Gate } from "./waits.ts";
 import { Watch } from "./watch.ts";
 
@@ -34,6 +36,7 @@ export {
   STUCK_CHECK_MS,
 } from "./deletes.ts";
 export type { RecycleReason, SandboxHold } from "./hold.ts";
+
 export { REFILL_BACKOFF_MS, WARM_CREATE_MS } from "./pool.ts";
 
 export type LeasesDeps = {
@@ -76,6 +79,7 @@ export class Leases {
   // shut from start until a sweep recorded what an earlier run left, so
   // no create passes the cap before those count
   private readonly starting = new Gate();
+  private readonly sweeper: Sweeper;
 
   constructor(private readonly deps: LeasesDeps) {
     this.changes = new Changes(deps.clock);
@@ -125,11 +129,23 @@ export class Leases {
       mark: () => this.book.tick(),
       gone: (lease) => this.remove(lease, "failed"),
       restarted: () => this.restarted(),
-      sweep: () => this.sweep("again").then(() => this.pool.refill()),
+      sweep: () => this.sweeper.sweep("again").then(() => this.pool.refill()),
       reap: (found) => {
         const due = this.cuts.due(found, (name) => this.book.holds(name));
         for (const info of due) void this.deletes.adopt(info.name, info.phase);
       },
+    });
+    this.sweeper = new Sweeper({
+      ...deps,
+      book: this.book,
+      net: this.net,
+      deletes: this.deletes,
+      policy: this.policy,
+      pool: this.pool,
+      watch: this.watch,
+      starting: this.starting,
+      others: () => this.others(),
+      remove: (lease, reason) => this.remove(lease, reason),
     });
   }
 
@@ -244,19 +260,10 @@ export class Leases {
     }
   }
 
-  // at start: what an earlier run left, then the pool and the probe. A
-  // sweep that could not list keeps the gate shut and the pool empty
-  // until one that can, which the next probe that answers runs
-  async start(): Promise<void> {
-    this.starting.close();
-    try {
-      await this.sweep("start");
-    } catch (error) {
-      this.starting.open();
-      throw error;
-    }
-    this.pool.refill();
-    this.watch.arm();
+  // at start: what an earlier run left, then the pool and the probe
+  // (sweeper.ts)
+  start(): Promise<void> {
+    return this.sweeper.start();
   }
 
   // an exec answered that the sandbox is not ready or the gateway is
@@ -268,14 +275,9 @@ export class Leases {
     void this.check();
   }
 
-  // every lease dropped and its sandbox deleted, then what the gateway
-  // still lists under our label, stuck ones asked to delete again
-  async restarted(): Promise<void> {
-    const leases = this.book.live();
-    this.deps.log.warn("sandbox gateway restarted", { leases: leases.length });
-    for (const lease of leases) this.remove(lease, "restart");
-    await this.sweep("restart");
-    this.pool.refill();
+  // every lease dropped, then a sweep (sweeper.ts)
+  restarted(): Promise<void> {
+    return this.sweeper.restarted();
   }
 
   // the leases against what the gateway lists (watch.ts)
@@ -473,27 +475,5 @@ export class Leases {
       return;
     }
     this.deletes.destroy(lease, reason);
-  }
-
-  private async sweep(when: "start" | "restart" | "again"): Promise<void> {
-    const { globalPolicy, listed } = await sweepLabelled(
-      {
-        ...this.deps,
-        held: (name) =>
-          this.book.holds(name) ||
-          this.others().some((other) => other.holds(name)),
-        dropProvider: (name) =>
-          this.net.sweep(name, (provider) =>
-            this.others().some((other) => other.holdsProvider(provider)),
-          ),
-        dropProfile: (id) => this.net.sweepProfile(id),
-        adopt: (name, phase) => this.deletes.adopt(name, phase),
-        counted: () => this.starting.open(),
-      },
-      when,
-    );
-    // a sweep that could not list runs again at the next good probe
-    listed ? this.deps.listed?.() : this.watch.sweepAgain();
-    this.policy.seen(globalPolicy);
   }
 }
