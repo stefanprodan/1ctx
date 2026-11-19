@@ -134,12 +134,19 @@ export async function run(
   workspace: Workspace,
   author: KnowledgeAuthor,
   command: string,
-  caps: CommandCaps,
+  given: CommandCaps,
   signal: AbortSignal,
   sendId: string,
 ): Promise<CommandResult> {
   const sessionId = workspaceSession(workspace);
   const started = Date.now();
+  // the shell is picked once, before the timers its deadline sets
+  const shell = deps.shell();
+  const ownTmp = shell.ownTmp === true;
+  const caps: CommandCaps =
+    shell.sandboxTimeout && given.sandboxCommandMs !== undefined
+      ? { ...given, callTimeoutMs: given.sandboxCommandMs }
+      : given;
   const deadline = new AbortController();
   const timer = setTimeout(
     () => deadline.abort(new Error("command timed out")),
@@ -231,7 +238,6 @@ export async function run(
   try {
     releaseSession = await acquireSession(workspace, combined);
     turnAt = Date.now();
-    const shell = deps.shell();
     if (shell.acquire) {
       inShell = true;
       const got = await shell.acquire(
@@ -262,7 +268,7 @@ export async function run(
     }
     phase = "mount";
     const { job, rows, scratch, skipped, kept, storage, left, mounted } =
-      mountJob(deps, caps, command, started, projectId, workspace);
+      mountJob(deps, caps, command, started, projectId, workspace, ownTmp);
     const docs = caps.knowledge;
     notice = left;
     // the hold is the backend's from here, whatever run does
@@ -281,6 +287,16 @@ export async function run(
               maxResponseSize: caps.fetchBodyBytes,
             })
           : null,
+        slot: {
+          free() {
+            const held = release;
+            release = undefined;
+            held?.();
+          },
+          async take(waiting) {
+            if (release === undefined) release = await acquireProcess(waiting);
+          },
+        },
       },
       {
         signal,
@@ -315,6 +331,13 @@ export async function run(
       docs,
       storage.scratchFiles,
     );
+    // a shell that keeps /tmp itself answers no scratch file
+    if (
+      ownTmp &&
+      (answered.written.length > 0 || answered.removed.length > 0)
+    ) {
+      throw new Error("the command worker answered out of protocol");
+    }
     // the worker's own refusal is only words; the server's is this
     if (caps.subagent && answered.knowledge.length > 0) {
       throw new Error(READ_ONLY_TO_SUBAGENT);
@@ -345,6 +368,7 @@ export async function run(
       {
         workspace,
         before: scratch,
+        owned: ownTmp,
         changes: {
           written: answered.written,
           removed: [...answered.removed, ...skipped],

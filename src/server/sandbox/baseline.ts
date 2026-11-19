@@ -129,7 +129,6 @@ export function wantedOf(
   before: Tree | null,
 ): Wanted {
   const wanted: Wanted = { tree: new Map(), bytes: new Map() };
-  const scratchKey = `s:${mounted.scratch.revision}:${mounted.scratch.usedAt}`;
   const uploadsKey = `u:${mounted.uploads.sessionId}:${mounted.uploads.revision}`;
   const files: Source[] = [
     ...job.knowledge.map((file, index) => {
@@ -142,13 +141,6 @@ export function wantedOf(
         data: file.data,
       };
     }),
-    ...job.scratch.map((file) => ({
-      path: `/tmp/${file.name}`,
-      mode: file.mode,
-      mtime: file.mtime,
-      key: scratchKey,
-      data: file.data,
-    })),
     ...job.uploads.map((file) => ({
       path: `/uploads/${file.name}`,
       mode: FILE_MODE,
@@ -184,23 +176,16 @@ export function wantedOf(
 type Landed = Extract<SettleOutcome, { landed: true }>;
 
 // The tree after a landed commit: each doc the commit wrote as it
-// stored it (its text, which may drop a BOM, and its time), every
-// scratch file at the new used_at, folders rebuilt from the files, so
-// an empty folder goes. /uploads and /mcp stay as they were.
-export function committedTree(
-  wanted: Wanted,
-  changes: {
-    written: { path: string; data: Uint8Array; mode: number }[];
-    removed: string[];
-  },
-  landed: Landed,
-): Wanted {
+// stored it (its text, which may drop a BOM, and its time), folders
+// rebuilt from the files, so an empty folder goes. /uploads and /mcp
+// stay as they were.
+export function committedTree(wanted: Wanted, landed: Landed): Wanted {
   const out: Wanted = { tree: new Map(), bytes: new Map() };
   const encoder = new TextEncoder();
   const files: Source[] = [];
   for (const [path, node] of wanted.tree) {
     if (node.kind !== "file") continue;
-    if (path.startsWith("/knowledge/") || path.startsWith("/tmp/")) continue;
+    if (path.startsWith("/knowledge/")) continue;
     out.tree.set(path, node);
     const data = wanted.bytes.get(path);
     if (data !== undefined) out.bytes.set(path, data);
@@ -230,31 +215,6 @@ export function committedTree(
       });
   }
   files.push(...docs.values());
-  const { revision, usedAt } = landed.scratch;
-  const key = `s:${revision}:${usedAt}`;
-  const removed = new Set(changes.removed.map((name) => `/tmp/${name}`));
-  const scratch = new Map<string, Source>();
-  for (const [path, node] of wanted.tree) {
-    if (node.kind !== "file" || !path.startsWith("/tmp/")) continue;
-    if (removed.has(path)) continue;
-    scratch.set(path, {
-      path,
-      mode: node.mode,
-      mtime: usedAt,
-      key,
-      data: wanted.bytes.get(path),
-      known: node,
-    });
-  }
-  for (const file of changes.written)
-    scratch.set(`/tmp/${file.path}`, {
-      path: `/tmp/${file.path}`,
-      mode: file.mode,
-      mtime: usedAt,
-      key,
-      data: file.data,
-    });
-  files.push(...scratch.values());
   place(out, files, null);
   withFolders(out.tree);
   return out;

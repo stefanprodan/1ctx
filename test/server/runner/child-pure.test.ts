@@ -18,6 +18,7 @@ import {
 import type { Offered } from "../../../src/server/runner/policy.ts";
 import {
   type PromptPolicy,
+  SANDBOX_SUBAGENT_LINE,
   SUBAGENT_LINE,
   subagentPrompt,
   systemPrompt,
@@ -89,6 +90,22 @@ describe("a subagent's prompt", () => {
         "<mcp_instructions>be kind</mcp_instructions>",
       ].join("\n\n"),
     );
+  });
+
+  test("the built-in line stays byte for byte, and the sandbox's says /tmp is its own", () => {
+    expect(
+      new Bun.CryptoHasher("sha256").update(SUBAGENT_LINE).digest("hex"),
+    ).toBe("e2c7f567ba11b5ac85c1fcda3c42ec66052b41100c61e3f4785a171b0606d3c3");
+    const sandboxed = subagentPrompt({
+      ...policy,
+      offered: { ...policy.offered, sandbox: true },
+    });
+    expect(sandboxed).toContain(SANDBOX_SUBAGENT_LINE);
+    expect(sandboxed).not.toContain(SUBAGENT_LINE);
+    expect(SANDBOX_SUBAGENT_LINE).toContain(
+      "Your /tmp is your own and never reaches the other agent",
+    );
+    expect(SANDBOX_SUBAGENT_LINE).not.toContain("reach the other agent");
   });
 
   test("is what systemPrompt answers for a subagent, notes and lines left out", () => {

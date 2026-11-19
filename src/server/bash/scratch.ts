@@ -37,14 +37,8 @@ export class ScratchStore {
 
   read(workspace: Workspace): Scratch {
     const id = workspaceId(workspace);
-    const row = this.db
-      .query<Omit<Scratch, "entries">, [string]>(
-        `select cwd, revision, bytes, files from session_scratch
-         where workspace_id = ?`,
-      )
-      .get(id);
     return {
-      ...(row ?? { cwd: "/knowledge", revision: 0, bytes: 0, files: 0 }),
+      ...this.head(workspace),
       entries: this.db
         .query<ScratchFile, [string]>(
           `select path, data, mode from session_scratch_files
@@ -54,15 +48,15 @@ export class ScratchStore {
     };
   }
 
-  // the stored total alone, without the files
-  bytes(workspace: Workspace): number {
-    return (
-      this.db
-        .query<{ bytes: number }, [string]>(
-          "select bytes from session_scratch where workspace_id = ?",
-        )
-        .get(workspaceId(workspace))?.bytes ?? 0
-    );
+  // the row without its files: the cwd, the revision and the totals
+  head(workspace: Workspace): Omit<Scratch, "entries"> {
+    const row = this.db
+      .query<Omit<Scratch, "entries">, [string]>(
+        `select cwd, revision, bytes, files from session_scratch
+         where workspace_id = ?`,
+      )
+      .get(workspaceId(workspace));
+    return row ?? { cwd: "/knowledge", revision: 0, bytes: 0, files: 0 };
   }
 
   // the last command's time, the mtime its files mount with, since a
@@ -135,6 +129,36 @@ export class ScratchStore {
          ) where workspace_id = ?`,
       )
       .run(id, id);
+    return expectedRevision + 1;
+  }
+
+  // The cwd alone, for a shell that keeps /tmp itself: the files and
+  // the last use stay, so the rows age out as if no command ran. A new
+  // row takes now as its last use. Answers the revision written.
+  writeCwd(
+    workspace: Workspace,
+    expectedRevision: number,
+    cwd: string,
+    now: number,
+  ): number {
+    const id = workspaceId(workspace);
+    const current = this.db
+      .query<{ revision: number }, [string]>(
+        "select revision from session_scratch where workspace_id = ?",
+      )
+      .get(id);
+    if ((current?.revision ?? 0) !== expectedRevision) {
+      throw new Conflict("the scratch changed while the command ran");
+    }
+    this.db
+      .query(
+        `insert into session_scratch
+         (workspace_id, session_id, cwd, revision, bytes, files, used_at)
+         values (?, ?, ?, ?, 0, 0, ?)
+         on conflict (workspace_id) do update set
+           cwd = excluded.cwd, revision = excluded.revision`,
+      )
+      .run(id, workspaceSession(workspace), cwd, expectedRevision + 1, now);
     return expectedRevision + 1;
   }
 

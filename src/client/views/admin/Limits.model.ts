@@ -37,6 +37,8 @@ export function displayOf(row: LimitRow): Display {
       return { word: "px", factor: 1 };
     case "mebibytes":
       return { word: "MB", factor: 1 };
+    case "seconds":
+      return { word: "s", factor: 1 };
     default:
       return { word: "", factor: 1 };
   }

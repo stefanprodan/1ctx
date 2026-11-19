@@ -56,6 +56,9 @@ export type ScratchCommit = {
   workspace: Workspace;
   before: Scratch;
   changes: ScratchChanges;
+  // the shell keeps /tmp itself: no file changes, so no cap or name is
+  // held to rows the command never saw
+  owned?: boolean;
 };
 
 export function checkScratchTotals(
@@ -158,25 +161,34 @@ export function commit(
       caps,
       now,
     );
-    const revision = deps.scratch.write(
-      scratch.workspace,
-      scratch.before.revision,
-      scratch.changes,
-      now,
-    );
+    const revision = scratch.owned
+      ? deps.scratch.writeCwd(
+          scratch.workspace,
+          scratch.before.revision,
+          scratch.changes.cwd,
+          now,
+        )
+      : deps.scratch.write(
+          scratch.workspace,
+          scratch.before.revision,
+          scratch.changes,
+          now,
+        );
     // counted from the rows just written, so the caps hold whatever the
     // command worker answered, and bound the rows before their names are
     // walked
-    const stored = deps.scratch.sizes(scratch.workspace);
-    checkScratchTotals(
-      scratch.before,
-      {
-        files: stored.length,
-        bytes: stored.reduce((sum, file) => sum + file.bytes, 0),
-      },
-      caps,
-    );
-    checkScratchNames(stored.map((file) => file.path));
+    if (!scratch.owned) {
+      const stored = deps.scratch.sizes(scratch.workspace);
+      checkScratchTotals(
+        scratch.before,
+        {
+          files: stored.length,
+          bytes: stored.reduce((sum, file) => sum + file.bytes, 0),
+        },
+        caps,
+      );
+      checkScratchNames(stored.map((file) => file.path));
+    }
     const content = output(
       result.stdout,
       result.stderr,

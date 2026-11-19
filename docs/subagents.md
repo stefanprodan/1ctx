@@ -151,6 +151,11 @@ is its root.
   agent's. The child starts in `/tmp` (`bash/handoff.ts`). It mounts
   `/knowledge`, `/repos` (the parent's trees) and the parent's
   `/uploads` (`subagent.uploadsFrom` on the call's context).
+- **Under the sandbox shell nothing passes through `/tmp`.** An offer
+  made with the sandbox shell says `sandbox`: the child's setup copies
+  nothing in, so nothing comes back, and the delegate description and
+  the subagent's line say so (share through `/knowledge`, answer in
+  the reply). The built-in words are unchanged.
 - **`/knowledge` and `/uploads` are read-only to a child.** Its worker
   refuses a command that changed either, with the docs on or off, and
   the server refuses any doc change itself; nothing is saved, `/tmp`

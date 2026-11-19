@@ -4,8 +4,8 @@
 // A command's network as OpenShell's policy, pure: the sandbox's own
 // network setting and the send's credentials become the sandbox's
 // network rules, the providers to attach and the notice naming what was
-// left out. Web access never applies here. The
-// rules are the proto's init shape, so the gateway port passes them on.
+// left out. Web access never picks its hosts: a send without it
+// runs with no network, decided in network.ts. The rules are the proto's init shape, so the gateway port passes them on.
 
 import { createHash, randomBytes } from "node:crypto";
 import {
@@ -101,13 +101,21 @@ const allow = (methods: readonly HttpMethod[], path: string) =>
 // takes the old ones.
 const SALT = randomBytes(32).toString("hex");
 
-const hostEndpoints = (host: string) =>
+// bun and npm ask for a scoped package as @scope%2fname, and OpenShell
+// drops an encoded slash otherwise. Never on a host a credential of the
+// send binds, whose prefix check must keep refusing %2F
+export const ENCODED_SLASH_HOSTS: readonly string[] = ["registry.npmjs.org"];
+
+const hostEndpoints = (host: string, bound: ReadonlySet<string>) =>
   PORTS.map((port) => ({
     host,
     port,
     protocol: "rest",
     enforcement: ENFORCE,
     rules: allow(HTTP_METHODS, "**"),
+    ...(ENCODED_SLASH_HOSTS.includes(host) && !bound.has(host)
+      ? { allowEncodedSlash: true }
+      : {}),
   }));
 
 // the method rules name the bare base too: the endpoint's glob selects
@@ -150,15 +158,9 @@ export function planNetwork(
   net: SandboxNet,
   instanceId: string,
 ): NetPlan {
-  const network: Record<string, unknown> = {};
+  const rules: Record<string, unknown> = {};
   const attach: Attach[] = [];
   const notes: string[] = [];
-  if (net.mode === "hosts" && net.hosts.length > 0)
-    network.web = {
-      name: "web",
-      endpoints: net.hosts.flatMap(hostEndpoints),
-      binaries: BINARIES,
-    };
   // by code point, so the order never hangs on a locale
   const credentials = [...call.credentials].sort((a, b) =>
     a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
@@ -200,9 +202,19 @@ export function planNetwork(
         methods: [...keyed.methods],
       };
       attach.push(one);
-      network[`cred_${keyed.name.replace(/-/g, "_")}`] = credentialRule(one);
+      rules[`cred_${keyed.name.replace(/-/g, "_")}`] = credentialRule(one);
     }
   }
+  const network: Record<string, unknown> = {};
+  if (net.mode === "hosts" && net.hosts.length > 0) {
+    const bound = new Set(attach.map((one) => one.glob.host));
+    network.web = {
+      name: "web",
+      endpoints: net.hosts.flatMap((host) => hostEndpoints(host, bound)),
+      binaries: BINARIES,
+    };
+  }
+  Object.assign(network, rules);
   return {
     mode: net.mode,
     network,

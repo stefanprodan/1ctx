@@ -6,6 +6,7 @@
 // registry alongside the receipts.
 
 import { describe, expect, test } from "bun:test";
+import { BACKSTOP_MS } from "../../../src/server/bash/index.ts";
 import {
   acquireSession,
   heldWorkspaces,
@@ -620,10 +621,17 @@ describe("bash's description under the sandbox shell", () => {
     );
     expect(words).not.toContain("session");
     expect(words).toContain(
-      "curl, python and uv reach HTTP and HTTPS on ports 80 and 443 of these hosts only: api.github.test, pypi.test. Save downloads in /tmp.",
+      "curl, python, uv and bun reach HTTP and HTTPS on ports 80 and 443 of these hosts only: api.github.test, pypi.test. Save downloads in /tmp.",
     );
     expect(words).toContain("run Python with uv run or uvx, never pip");
-    expect(words).toContain("into a venv under $HOME, never in /tmp");
+    expect(words).toContain("into a venv under $HOME, or with bun add");
+    expect(words).toContain("in a project under $HOME, never in /knowledge");
+    expect(words).toContain(
+      "/tmp and $HOME hold any bytes but last only while this chat's sandbox does: it is recycled after 30 idle minutes, on a restart, and when a command times out or its files cannot be saved, so put what must last in /knowledge.",
+    );
+    expect(words).not.toContain("kept between commands");
+    expect(words).not.toContain("in /tmp or /knowledge");
+    expect(words).toContain("TypeScript with bun file.ts");
     expect(words).toContain("Redirect a background job's output");
     expect(words).toContain("A hard link or an unreadable file");
     expect(words).toContain("responses are never redacted");
@@ -693,6 +701,138 @@ describe("bash's description under the sandbox shell", () => {
     expect(bare).toContain(
       "Save downloads in /tmp. Each redirect is checked as a new request",
     );
+  });
+
+  test("the built-in shell's words stay byte for byte", () => {
+    const hash = (text: string) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    expect(hash(makeBashTool().description)).toBe(
+      "27825f49251f64e13747dcbde4c2bd6667d9e50a1a42fb22198b17f96b33036f",
+    );
+    expect(
+      hash(makeBashTool({ web: { mode: "all", domains: [] } }).description),
+    ).toBe("4d18abed7e696ad9463068295b1bf452f2e0f17d2f9eac7a7eb4bd7d3ff5bf12");
+    expect(hash(makeBashTool({ subagent: true }).description)).toBe(
+      "61c60fd5537e8b6553d29e1e5acd38cd099c819367d29fb83db0a7e0bda64338",
+    );
+    expect(makeBashTool().description).toContain(
+      "/tmp is this chat's scratch for any bytes, kept between commands.",
+    );
+  });
+
+  test("a sandbox command has its own time, said in the words and passed on", async () => {
+    const seen: { caps: object; aborted: boolean }[] = [];
+    const timeouts: number[] = [];
+    const timer = {
+      now: () => 0,
+      timeout: (ms: number) => {
+        timeouts.push(ms);
+        return new AbortController().signal;
+      },
+    };
+    const bash = (sandboxed: boolean) => ({
+      async run(
+        _p: string,
+        _w: unknown,
+        _a: unknown,
+        _c: string,
+        caps: object,
+        signal: AbortSignal,
+      ) {
+        seen.push({ caps, aborted: signal.aborted });
+        return { content: "ok", error: false };
+      },
+      sandbox: () => (sandboxed ? hosts : null),
+      sandboxCommandSeconds: () => 900,
+      sandboxIdleMinutes: () => 45,
+    });
+    const sandboxed = makeBashTool({ bash: bash(true) });
+    expect(sandboxed.timeoutMs).toBe(900_000);
+    expect(sandboxed.description).toContain(
+      "A command may run up to 15 minutes.",
+    );
+    expect(sandboxed.description).toContain(
+      "it is recycled after 45 idle minutes, on a restart, and when",
+    );
+    expect(
+      makeBashTool({ sandbox: hosts, idleMinutes: 1 }).description,
+    ).toContain("recycled after 1 idle minute, on");
+    // a run's deadline under the command's own time caps the words
+    expect(
+      makeBashTool({ sandbox: hosts, deadlineMs: 300_000 }).description,
+    ).toContain("A command may run up to 5 minutes.");
+    expect(
+      makeBashTool({ sandbox: hosts, deadlineMs: 1_800_000 }).description,
+    ).toContain("A command may run up to 10 minutes.");
+    await new Registry([sandboxed], undefined, timer).run(
+      call({ command: "make test" }),
+      context(),
+    );
+    const builtin = makeBashTool({ bash: bash(false) });
+    expect(builtin.timeoutMs).toBeUndefined();
+    expect(builtin.description).not.toContain("A command may run");
+    await new Registry([builtin], undefined, timer).run(
+      call({ command: "ls" }),
+      context(),
+    );
+    const grace = BACKSTOP_MS + 500;
+    expect(timeouts).toEqual([
+      900_000 + grace,
+      DEFAULT_LIMITS.callTimeoutMs + grace,
+    ]);
+    expect(seen.map((one) => one.caps)).toEqual([
+      expect.objectContaining({
+        callTimeoutMs: DEFAULT_LIMITS.callTimeoutMs,
+        sandboxCommandMs: 900_000,
+      }),
+      expect.not.objectContaining({ sandboxCommandMs: expect.anything() }),
+    ]);
+    expect(makeBashTool({ sandbox: hosts }).description).toContain(
+      "A command may run up to 10 minutes.",
+    );
+  });
+
+  test("the send's end stops a sandbox command long before its own time", async () => {
+    const send = new AbortController();
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const tool = makeBashTool({
+      bash: {
+        run: (_p, _w, _a, _c, _caps, signal) =>
+          new Promise((_, reject) => {
+            started();
+            signal.addEventListener("abort", () => reject(signal.reason));
+          }),
+        sandbox: () => hosts,
+        sandboxCommandSeconds: () => 3600,
+      },
+    });
+    const timer = {
+      now: () => 0,
+      timeout: () => new AbortController().signal,
+    };
+    const pending = new Registry([tool], undefined, timer).run(
+      call({ command: "sleep 3000" }),
+      { ...context(), signal: send.signal },
+    );
+    await running;
+    send.abort(new Error("the send's deadline"));
+    const result = await pending;
+    expect(result).toMatchObject({ error: true, interrupted: true });
+  });
+
+  test("a subagent's sandbox words send what lasts to its answer", () => {
+    const own = makeBashTool({ sandbox: hosts, subagent: true }).description;
+    const parent = makeBashTool({ sandbox: hosts }).description;
+    const child = asSubagent(parent, null, [], []);
+    for (const words of [own, child]) {
+      expect(words).toContain(
+        "/tmp and $HOME hold any bytes but last only while your sandbox does, which ends with your task, so put what the other agent needs in your answer.",
+      );
+      expect(words).not.toContain("what must last in /knowledge");
+    }
   });
 
   test("bash's own word picks the variant", () => {

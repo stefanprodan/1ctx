@@ -178,8 +178,8 @@ def apply(h):
     root, parts = split(path)
     op = h["op"]
     if not parts:
-        # a root is the image's or a mount's, /tmp root's own: never
-        # removed, written or given a mode
+        # a root is the image's or a mount's: never removed, written
+        # or given a mode
         raise Refused("root", path)
     fd = parent(path, root, parts)
     name = parts[-1]

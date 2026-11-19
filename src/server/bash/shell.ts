@@ -41,7 +41,6 @@ export type ShellCall = {
 
 export type StoredBytes = {
   docs: number;
-  scratch: number;
   uploads: number;
   kept: number;
 };
@@ -95,6 +94,12 @@ export type ShellRun = {
 };
 
 export type ShellBackend = {
+  // /tmp is the shell's own: no scratch row is mounted, and a command
+  // writes or deletes none, only the cwd and the time of its last use
+  ownTmp?: true;
+  // a command may run to its caps' sandboxCommandMs, when the call
+  // gives one, instead of the call timeout
+  sandboxTimeout?: true;
   // Under the workspace's queue and before the process slot, so a
   // command waiting for its shell holds no slot. busy: none was free by
   // the deadline (ms since the epoch). Without it, nothing is held.

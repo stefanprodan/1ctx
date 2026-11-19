@@ -33,9 +33,9 @@ describe("the sandbox's scrub", () => {
       },
       ({ fs, open }) => {
         fs.write("/knowledge/a.md", `got ${KEY}\n`);
-        fs.write("/tmp/echo.json", `{"auth":"Bearer ${KEY}"}`);
+        fs.write("/knowledge/echo.json", `{"auth":"Bearer ${KEY}"}`);
         fs.write(
-          "/tmp/escaped.json",
+          "/knowledge/escaped.json",
           `{"auth":"${KEY.replaceAll("-", "\\u002d")}"}`,
         );
         return {
@@ -47,15 +47,11 @@ describe("the sandbox's scrub", () => {
       },
     );
     const answer = answerOf(ran.settled);
-    const text = (path: string) =>
-      new TextDecoder().decode(
-        answer.changes!.written.find((file) => file.path === path)!.data,
-      );
     expect(answer.changes!.knowledge).toEqual([
       { name: "a.md", text: `got ${LABEL}\n` },
+      { name: "echo.json", text: `{"auth":"Bearer ${LABEL}"}` },
+      { name: "escaped.json", text: `{"auth":"${LABEL}"}` },
     ]);
-    expect(text("echo.json")).toBe(`{"auth":"Bearer ${LABEL}"}`);
-    expect(text("escaped.json")).toBe(`{"auth":"${LABEL}"}`);
     expect(answer.opened.map((one) => one.text)).toEqual([`got ${LABEL}\n`]);
   });
 
@@ -69,14 +65,14 @@ describe("the sandbox's scrub", () => {
         ],
       },
       ({ fs }) => {
-        fs.write("/tmp/plain.txt", KEY);
+        fs.write("/knowledge/plain.md", KEY);
         return {};
       },
     );
     const answer = answerOf(ran.settled);
-    expect(new TextDecoder().decode(answer.changes!.written[0]!.data)).toBe(
-      KEY,
-    );
+    expect(answer.changes!.knowledge).toEqual([
+      { name: "plain.md", text: KEY },
+    ]);
     expect(answer.notice).toBe(
       "credential quotes has no key, so it is not attached\n",
     );

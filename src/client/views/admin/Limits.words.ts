@@ -292,10 +292,10 @@ export const LIMIT_WORDS: Record<LimitName, { label: string; text: string }> = {
   },
   sandboxMemoryMiB: {
     label: "Memory",
-    text: "Memory one sandbox may use, its files included.",
+    text: "Memory one sandbox may use.",
   },
-  sandboxHomeMiB: {
-    label: "Program files",
-    text: "Room for programs' own files and caches in a sandbox.",
+  sandboxCommandSeconds: {
+    label: "Command time",
+    text: "How long one bash command may run in a sandbox.",
   },
 };

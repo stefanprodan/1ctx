@@ -61,6 +61,11 @@ that shell that shows a file on the chat page.
 - **The sandbox backend keeps its tree between commands**
   (`docs/sandbox.md`): it settles a landed commit by putting the
   sandbox back to the stored rows, and recycles on anything else.
+- **A backend with `ownTmp` keeps `/tmp` itself.** The mount reads no
+  scratch file and drops none, and an answer with a scratch file
+  change is out of protocol; the commit saves the cwd alone
+  (`writeCwd()`, `used_at` kept), with no scratch cap or name check.
+  Only the sandbox says it.
 
 ## The command
 
@@ -87,6 +92,12 @@ that shell that shows a file on the chat page.
   queues. The interpreter stops at the call timeout with exit 124 and
   its own output; the worker is ended `BACKSTOP_MS` later, and the tool
   registry waits half a second past that (`graceMs`).
+- **A sandbox command has `sandboxCommandSeconds` instead.** The tool
+  built under the sandbox shell sets it as its registry timeout and
+  passes it as `sandboxCommandMs`; the mount picks the shell first and
+  uses it for the deadline, the backstop and the queues only when the
+  shell says `sandboxTimeout`. The built-in shell keeps the call
+  timeout. The send's deadline still ends any command, by its signal.
 - **A deadline in a queue is `busy`.** A command whose deadline, or the
   registry's timer, passes before it holds its slots, or that holds them
   with under `MIN_RUN_MS` of the call timeout left, never runs: cause
@@ -191,7 +202,9 @@ that shell that shows a file on the chat page.
   logged at `startup`. The per-workspace queue (`bash/queue.ts`) is
   taken before a process slot (`acquireProcess()`, shared with uploads)
   and released after it. Channel agents therefore never wait behind one
-  another's commands.
+  another's commands. A sandbox command frees its slot for the remote
+  exec (`hooks.slot`) and takes one again for its read back and
+  commit; `sandboxesMax` bounds those commands.
 - **Written doc paths go on the tool row.** `finishTool` stores them as
   `savedDocs` for another agent's trace (`docs/sessions.md`). A command
   that completed keeps them even when a cut writes its row; one the
@@ -207,7 +220,8 @@ that shell that shows a file on the chat page.
   id as its workspace; a channel uses its session and agent, so each
   agent keeps separate files, cwd and revision across its turns. Regular
   files of any bytes and their modes cascade with the session. A symlink
-  or other type fails the command.
+  or other type fails the command. Under the sandbox shell `/tmp` is
+  the sandbox's own and the rows are never read or written.
 - **Sweeps skip a workspace holding or waiting for a command.** The idle
   sweep (`scratchIdleDays`) expires each workspace by its own last use.
   Archiving drops every workspace of the session; neither path takes one

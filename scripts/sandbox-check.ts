@@ -67,7 +67,6 @@ const limits = {
   scratchBytes: 4 << 20,
   uploadBytes: 4 << 20,
   mcpKeptBytes: 4 << 20,
-  sandboxHomeMiB: 64,
 };
 
 // every exec timed by which helper it ran
@@ -256,8 +255,12 @@ function commit(r: Rows, answer: Answer): SettleOutcome {
   return { landed: true, docs, scratch: { revision: r.revision, usedAt: now } };
 }
 
+// what each command did with its process slot, as mount.ts lends it
+const slots: string[] = [];
+
 async function command(r: Rows, text: string, timeoutMs = 30_000) {
   timings.length = 0;
+  slots.length = 0;
   const started = performance.now();
   const hold = (await leases.acquire(
     callOf(r),
@@ -272,6 +275,12 @@ async function command(r: Rows, text: string, timeoutMs = 30_000) {
     {
       kept: (index) => encoder.encode(Object.values(r.kept)[index]!),
       fetch: null,
+      slot: {
+        free: () => slots.push(`free ${timings.length}`),
+        take: async () => {
+          slots.push(`take ${timings.length}`);
+        },
+      },
     },
     {
       signal: new AbortController().signal,
@@ -291,7 +300,16 @@ async function command(r: Rows, text: string, timeoutMs = 30_000) {
   const total = Math.round(performance.now() - started);
   const state =
     leases.rows().find((row) => row.sandbox === hold.sandbox)?.state ?? "gone";
-  return { settled, answer, hold, acquired, total, state, steps: [...timings] };
+  return {
+    settled,
+    answer,
+    hold,
+    acquired,
+    total,
+    state,
+    steps: [...timings],
+    slots: [...slots],
+  };
 }
 
 const results: { step: string; ok: boolean; detail: string }[] = [];
@@ -319,26 +337,29 @@ async function main() {
 
   const write = await command(
     chat,
-    "echo hi > /knowledge/new.md; mkdir -p /tmp/d; printf x > /tmp/d/x.txt; chmod 600 /tmp/d/x.txt; cd /tmp/d",
+    "echo hi > /knowledge/new.md; mkdir -p /tmp/d; printf x > /tmp/d/x.txt; chmod 600 /tmp/d/x.txt; ln -s / /tmp/d/link; cd /tmp/d",
   );
   report(
-    "a command writes /knowledge and /tmp, and moves its cwd",
+    "a command writes /knowledge and /tmp, saves the doc and the cwd, no scratch",
     JSON.stringify(write.answer?.changes?.knowledge) ===
       '[{"name":"new.md","text":"hi\\n"}]' &&
-      write.answer?.changes?.written[0]?.path === "d/x.txt" &&
+      write.answer?.changes?.written.length === 0 &&
+      write.answer?.changes?.removed.length === 0 &&
       write.answer?.changes?.cwd === "/tmp/d" &&
       write.state === "idle",
-    `changes ${JSON.stringify({ ...write.answer?.changes, written: write.answer?.changes?.written.map((f) => [f.path, f.mode.toString(8)]) })}; ${stepsOf(write.steps)}`,
+    `changes ${JSON.stringify({ ...write.answer?.changes, written: write.answer?.changes?.written.length })}; ${stepsOf(write.steps)}`,
   );
 
   const after = await command(
     chat,
-    "pwd; stat -c '%n %a %Y' /tmp/d /tmp/d/x.txt /tmp/notes.txt /knowledge/new.md",
+    "pwd; stat -c '%n %a' /tmp/d/x.txt /knowledge/new.md; ls /tmp/notes.txt 2>&1; df -h /tmp $HOME | tail -n +2",
   );
   report(
-    "the next command starts in the cwd and sees the stored times",
-    after.answer?.stdout.startsWith("/tmp/d\n") === true,
-    `${brief(after.answer?.stdout ?? "")}; usedAt ${chat.usedAt}`,
+    "the next command starts in the cwd, /tmp kept as left and never pushed",
+    after.answer?.stdout.startsWith("/tmp/d\n") === true &&
+      after.answer.stdout.includes("/tmp/d/x.txt 600") &&
+      after.answer.stdout.includes("No such file"),
+    brief(after.answer?.stdout ?? ""),
   );
 
   const opened = await command(
@@ -431,7 +452,8 @@ except Exception as e: print('mem', type(e).__name__)"`,
   const warm = await command(chat, "true");
   report(
     "a warm command with nothing changed pushes nothing",
-    warm.steps[0]?.step === "command" && warm.state === "idle",
+    // a cwd under /tmp is checked by one exec before the command
+    !warm.steps.some((s) => s.step === "push") && warm.state === "idle",
     `total ${warm.total}ms: ${stepsOf(warm.steps)}`,
   );
 
@@ -452,9 +474,9 @@ except Exception as e: print('mem', type(e).__name__)"`,
   );
 
   const linked = rows("check-link");
-  const hard = await command(linked, "ln /tmp/notes.txt /tmp/hard");
+  const hard = await command(linked, "ln /knowledge/a.md /knowledge/hard.md");
   report(
-    "a hard link in /tmp saves nothing and recycles",
+    "a hard link in /knowledge saves nothing and recycles",
     hard.answer?.changes === null && hard.state !== "idle",
     `refused ${hard.answer?.refused}; state ${hard.state}`,
   );
@@ -468,17 +490,72 @@ except Exception as e: print('mem', type(e).__name__)"`,
   );
 
   const big = rows("check-big");
-  for (let i = 0; i < 500; i++)
-    big.scratch.set(`many/f${i}.txt`, {
-      data: encoder.encode(`${i}\n`.repeat(100)),
-      mode: 0o644,
+  for (let i = 0; i < 400; i++)
+    big.docs.set(`many/f${i}.md`, {
+      id: `doc-many-${i}`,
+      revision: 1,
+      updatedAt: Date.now(),
+      text: `${i}\n`.repeat(100),
     });
   const bigFirst = await command(big, "true");
   const bigWarm = await command(big, "true");
   report(
-    "500 files: a first push, then a warm walk",
+    "400 docs: a first push, then a warm walk",
     bigWarm.state === "idle",
     `first ${bigFirst.total}ms (${stepsOf(bigFirst.steps)}); warm ${bigWarm.total}ms (${stepsOf(bigWarm.steps)})`,
+  );
+
+  // a command past the 20 s call timeout, on the sandbox's own time
+  const long = rows("check-long");
+  const slept = await command(
+    long,
+    "sleep 30; echo slept",
+    limits.sandboxCommandSeconds * 1000,
+  );
+  report(
+    "a 30 s command runs to its end on the sandbox's command time",
+    slept.answer?.exitCode === 0 &&
+      (slept.answer?.stdout ?? "") === "slept\n" &&
+      slept.state === "idle",
+    `exit ${slept.answer?.exitCode}, ${slept.total}ms, ${slept.state}`,
+  );
+  // the slot is freed before the command's exec and taken after it: the
+  // count is the execs ended by then
+  const exec = slept.steps.findIndex((s) => s.step === "command");
+  report(
+    "the process slot is free while the command runs in the sandbox",
+    slept.slots.join(",") === `free ${exec},take ${exec + 1}`,
+    `${slept.slots.join(", ")}; ${stepsOf(slept.steps)}`,
+  );
+
+  // past the old 512 MiB home tmpfs: the container's disk takes it
+  const disk = rows("check-disk");
+  const twoGiB = await command(
+    disk,
+    "dd if=/dev/zero of=$HOME/big bs=1M count=2048 status=none && ls -l $HOME/big && rm $HOME/big && echo removed",
+    120_000,
+  );
+  report(
+    "a 2 GiB file in $HOME is written and removed",
+    twoGiB.answer?.exitCode === 0 &&
+      (twoGiB.answer?.stdout ?? "").includes("2147483648") &&
+      (twoGiB.answer?.stdout ?? "").includes("removed") &&
+      twoGiB.state === "idle",
+    `exit ${twoGiB.answer?.exitCode}, ${twoGiB.total}ms, ${twoGiB.state}; ${brief((twoGiB.answer?.stdout ?? "") + (twoGiB.answer?.stderr ?? ""))}`,
+  );
+
+  // /tmp lasts with the sandbox and goes when it is recycled
+  const keep = rows("check-keep");
+  await command(keep, "echo kept > /tmp/keep.txt");
+  const kept = await command(keep, "cat /tmp/keep.txt");
+  await command(keep, "exit 126");
+  const gone = await command(keep, "cat /tmp/keep.txt 2>&1; true");
+  report(
+    "/tmp lasts between commands and goes with a recycle",
+    (kept.answer?.stdout ?? "") === "kept\n" &&
+      kept.hold.sandbox !== gone.hold.sandbox &&
+      (gone.answer?.stdout ?? "").includes("No such file"),
+    `kept ${brief(kept.answer?.stdout ?? "")}; after recycle ${brief(gone.answer?.stdout ?? "")}`,
   );
 }
 

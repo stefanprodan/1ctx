@@ -55,9 +55,13 @@ only to the gateway, over gRPC with mutual TLS.
 ## Limits
 
 `sandboxesMax` (20), `sandboxWarm` (0, never above the cap),
-`sandboxIdleMinutes` (5), `sandboxCpus` (2), `sandboxMemoryMiB`
-(2048) and `sandboxHomeMiB` (512), scope `sandbox`. A sandbox takes
-the CPU, memory and tmpfs sizes of when it was made.
+`sandboxIdleMinutes` (30), `sandboxCpus` (2), `sandboxMemoryMiB`
+(2048) and `sandboxCommandSeconds` (600, a command's time in place of
+the call timeout, `docs/bash.md`), scope `sandbox`. `toolMs` (20
+minutes) holds a full command and ends under a chat's deadline; an automation run is still bounded by
+`runDeadlineMs` (10 minutes by default), and a chat turn by
+`sendDeadlineMs`. A sandbox takes the CPU, memory and tmpfs
+sizes of when it was made. No limit of ours bounds its disk (below).
 
 ## The gateway port
 
@@ -76,27 +80,37 @@ the CPU, memory and tmpfs sizes of when it was made.
 - **A sandbox is made with its whole layout.** The image, the keep-alive
   (`/usr/bin/sleep infinity`), CPU and memory, the filesystem policy
   with Landlock `hard_requirement`, and Docker mounts: a tmpfs per
-  writable root sized from the larger of its cap and what the call's
+  synced root sized from the larger of its cap and what the call's
   rows hold (`ShellCall.stored()`, the totals alone), plus 8 MiB, so a
-  tree over a lowered cap still mounts to be shrunk (`/tmp` scratch,
-  `/knowledge` the project's docs, `/uploads`, `/mcp` kept files),
-  `/opt/home` (HOME) and `/sandbox/tmp` from `sandboxHomeMiB`,
-  `/sandbox/.1ctx` for 11 opened docs and 4 MiB; and a read-only bind
-  per repository at `/repos/<name>`. OpenShell keeps the image's home
-  and working folder (`/sandbox` in ours) for its
-  workspace and fails a create that mounts there, so the image never
-  names HOME as either. Docker mounts a tmpfs `noexec`, so `/tmp`, HOME
-  and `/sandbox/tmp` pass the driver's `options: ["exec"]`. A warm
+  tree over a lowered cap still mounts to be shrunk (`/knowledge` the
+  project's docs, `/uploads`, `/mcp` kept files), `/sandbox/.1ctx` for
+  11 opened docs and 4 MiB; and a read-only bind per repository at
+  `/repos/<name>`. `/tmp`, `/opt/home` (HOME) and `/sandbox/tmp` are
+  the container's own disk, made by the image: a tmpfs counts against
+  the memory limit. OpenShell keeps the image's home and working folder
+  (`/sandbox` in ours) for its workspace and fails a create that
+  mounts there, so the image never names HOME as either. A warm
   sandbox is sized from the caps alone, so a call over one never takes
   it.
+- **`/tmp` is the sandbox's own, never the chat's scratch rows.** The
+  backend says `ownTmp`, so `mount.ts` reads no scratch file, drops
+  none whose name the rule no longer allows, and commits no file
+  change: only the cwd, never `used_at`, so hidden rows age out, and
+  without the scratch caps. `/tmp`
+  is never pushed, walked or pulled (`SANDBOX_ROOTS`), the read back
+  sees it as an empty scratch the command left alone, and a cwd under
+  it is checked by an exec. Its files go when the sandbox is recycled.
+  A subagent's sandbox is its own too, and no `/tmp` file passes
+  between it and its parent (`docs/subagents.md`).
 - **The image's first sandbox is checked for every root** (`roots.ts`),
   since Landlock skips a missing path: each writable root a folder that
   takes a file, `/repos` a folder. Each manager checks until one
   passes; a failed check refuses every command and the pool for good
   with the image named, shown as the leases route's `refused`.
 - **Every exec runs with `SANDBOX_ENV`** (`spec.ts`): HOME, `TMPDIR`,
-  `PATH` and uv's settings. An OpenShell exec sees none of the image's
-  `ENV`.
+  `PATH`, uv's settings and bun's (its cache and global packages under
+  HOME, never `/knowledge`, and `DO_NOT_TRACK`). An
+  OpenShell exec sees none of the image's `ENV`.
 - **The policy opens the devices shells and the fence use:**
   `/dev/null`, `/dev/zero`, `/dev/random`, `/dev/tty`, `/dev/ptmx` and
   `/dev/pts` read-write, `/dev/urandom` and `/sys/fs/cgroup` read-only.
@@ -128,9 +142,9 @@ the CPU, memory and tmpfs sizes of when it was made.
   wait.
 - **A recycle deletes; it never repairs.** A held lease is doomed and
   goes at its release; one doomed while it was made is deleted, never
-  handed out. Clears, archives, deletes, a fork's source, a
-  run's and a subagent's end recycle by the bus events
-  (`events.ts`). An idle lease goes after `sandboxIdleMinutes`.
+  handed out. Clears, archives, deletes, a run's and a subagent's end
+  recycle by the bus events (`events.ts`); a fork leaves its source's
+  sandbox alone. An idle lease goes after `sandboxIdleMinutes`.
 - **Deletes never block a command.** A delete waits for the gateway to
   forget the name, at most 60 s; past that the record is `stuck`, kept
   in memory, its phase asked every 5 minutes. A delete that fails
@@ -183,8 +197,7 @@ the CPU, memory and tmpfs sizes of when it was made.
 - **The baseline is what was pushed plus what committed** (`baseline.ts`),
   kept with the lease and never read from the sandbox. Each file is
   keyed by the identity its bytes came from (a doc's id and revision,
-  the scratch revision and `used_at`, the uploads' session revision, a
-  kept file's row), so only a file whose key changed is hashed. The
+  the uploads' session revision, a kept file's row), so only a file whose key changed is hashed. The
   next command pushes the difference: removes, folders, files, and a
   mode and time for every folder holding a change. A fresh sandbox
   pushes everything; kept MCP files are pushed, never read lazily. A
@@ -193,17 +206,16 @@ the CPU, memory and tmpfs sizes of when it was made.
   kept file the store cannot read runs no command and saves nothing,
   with the builtin shell's words.
 - **Modes and times are the builtin shell's:** docs and uploads `0644`,
-  scratch its stored mode, folders `0755`; a doc its `updated_at`, an
-  upload its `created_at`, scratch the workspace's `used_at`, a folder
-  its newest file's time, a kept file 0.
+  folders `0755`; a doc its `updated_at`, an upload its `created_at`, a
+  folder its newest file's time, a kept file 0.
 - **Every exec is one attempt** on a signal bounded by `job.endsAt` and
   the command's stops; a failed push, fence, walk, pull or records
   removal saves nothing and recycles. The command's exec is never
   retried.
 - **The command runs through the wrapper** with a fresh 128-bit id and
   `SANDBOX_ENV`, as every exec of ours, since OpenShell passes none of
-  the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH` and
-  uv's, nothing secret. Each of stdout and stderr keeps `ioBytes`; the
+  the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH`, uv's
+  and bun's, nothing secret. Each of stdout and stderr keeps `ioBytes`; the
   rest is drained. At `job.endsAt` the exec is stopped and the answer
   is exit 124.
 - **An exec the gateway answers `sandbox is not ready` or unavailable**
@@ -217,8 +229,8 @@ the CPU, memory and tmpfs sizes of when it was made.
   its bytes from the job. `/uploads` and `/mcp` are only compared. The
   pull goes in batches of paths, each exec's stdin under 1,000 KiB; the
   helper is given the file bound and refuses a file past it before its
-  bytes, and an exec ends at the decoder's first refusal. A doc or
-  scratch name that is not UTF-8 saves nothing and recycles.
+  bytes, and an exec ends at the decoder's first refusal. A doc name
+  that is not UTF-8 saves nothing and recycles.
 - **The records are hostile.** The cwd record and open's copies are
   pulled with the changed files, the cwd and each opened path within a
   path's bound (8 KiB, escaped three times over), never a file's: a
@@ -230,8 +242,8 @@ the CPU, memory and tmpfs sizes of when it was made.
 - **The deadline holds to the end.** A read back that ends past
   `job.endsAt`, after its last exec, answers 124 and saves nothing.
 - **Settle.** Landed: the sandbox is put back to the stored rows (a
-  doc's stored text, scratch at the new `used_at`, empty folders
-  removed, every mode rebuilt, a frame only for a time the rows moved),
+  doc's stored text, empty folders removed, every mode rebuilt, a
+  frame only for a time the rows moved),
   then released; a failed
   put-back recycles and leaves the commit. Anything else recycles: exit
   124 or 126, an abort, a refused tree, a thrown commit, and a change
@@ -244,6 +256,12 @@ the CPU, memory and tmpfs sizes of when it was made.
   nothing saved, recycled), since the gateway waits for the stream; a
   time a command set on a file it left unchanged stays until the rows
   move it, since the walk reads no times.
+- **No disk cap of ours.** `/tmp`, HOME and `/sandbox/tmp` share the
+  Docker VM's disk with every sandbox: tmpfs is charged to the memory
+  limit, Docker Desktop accepts `--storage-opt size` without enforcing
+  it, and OpenShell's Docker driver has no disk size. One runaway
+  command can fill that disk until its sandbox is recycled; the Docker
+  Desktop disk size bounds the host.
 
 ## Where the gateway runs
 

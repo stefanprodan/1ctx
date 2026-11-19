@@ -88,12 +88,9 @@ describe("sandbox leases", () => {
     expect(spec.cpus).toBe(2);
     expect(spec.memoryMiB).toBe(2048);
     expect(spec.mounts.map((mount) => mount.target)).toEqual([
-      "/tmp",
       "/knowledge",
       "/uploads",
       "/mcp",
-      "/opt/home",
-      "/sandbox/tmp",
       "/sandbox/.1ctx",
     ]);
     expect(spec.policy.readWrite).not.toContain("/sandbox");

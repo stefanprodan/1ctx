@@ -101,14 +101,14 @@ export const LIMITS_CARDS: readonly LimitsGroup[] = [
   },
   {
     title: "Sandboxes",
-    line: "Sandboxes bash runs in, when the sandbox shell is on.",
+    line: "Sandboxes bash runs in, when the OpenShell shell is on.",
     names: [
       "sandboxesMax",
       "sandboxWarm",
       "sandboxIdleMinutes",
       "sandboxCpus",
       "sandboxMemoryMiB",
-      "sandboxHomeMiB",
+      "sandboxCommandSeconds",
     ],
   },
 ];

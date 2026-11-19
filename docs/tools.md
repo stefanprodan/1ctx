@@ -69,8 +69,10 @@ words.
 - **The per-call cut keeps the tail too.** The registry cuts a body
   to `resultCut` before its `tail`, ending it with `resultCutLine()`
   when the line fits.
-- **A round's calls run in parallel.** Each runs under the call
-  timeout plus its tool's `graceMs` and the send's signal. Each call's
+- **A round's calls run in parallel.** Each runs under its tool's
+  `timeoutMs` (the call timeout when unset; bash's under the sandbox
+  shell is `sandboxCommandSeconds`) plus its `graceMs`, and the send's
+  signal. Each call's
   end is one transaction, one revision, one envelope.
 - **The server places every row.** Every message carries `send_id` and
   `round`, and a reply its `slot` (`work` or `answer`), written by the

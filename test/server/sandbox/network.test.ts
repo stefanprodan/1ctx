@@ -21,6 +21,7 @@ import {
   type SandboxHold,
 } from "../../../src/server/sandbox/index.ts";
 import {
+  ENCODED_SLASH_HOSTS,
   hashedName,
   planNetwork,
 } from "../../../src/server/sandbox/netpolicy.ts";
@@ -116,6 +117,44 @@ describe("the network policy", () => {
       ["pypi.org", 443],
       ["pypi.org", 80],
     ]);
+  });
+
+  test("an encoded slash passes on the npm registry alone, unless a credential binds it", () => {
+    expect(ENCODED_SLASH_HOSTS).toEqual(["registry.npmjs.org"]);
+    const net: SandboxNet = {
+      mode: "hosts",
+      hosts: ["registry.npmjs.org", "pypi.org"],
+    };
+    const slash = (made: ReturnType<typeof plan>) =>
+      (made.network.web as Rule).endpoints.map((endpoint) => [
+        endpoint.host,
+        endpoint.port,
+        endpoint.allowEncodedSlash ?? false,
+      ]);
+    expect(slash(plan(net))).toEqual([
+      ["registry.npmjs.org", 443, true],
+      ["registry.npmjs.org", 80, true],
+      ["pypi.org", 443, false],
+      ["pypi.org", 80, false],
+    ]);
+    const bound = plan(net, [
+      signed({ prefix: "https://registry.npmjs.org/-/npm/" }),
+    ]);
+    expect(bound.attach).toHaveLength(1);
+    expect(slash(bound).every(([, , open]) => open === false)).toBe(true);
+    expect(
+      (bound.network.cred_quotes as Rule).endpoints[0]!.allowEncodedSlash,
+    ).toBeUndefined();
+    // a refused credential binds nothing, so the registry stays open
+    const refused = plan(net, [
+      {
+        ...signed({ prefix: "https://registry.npmjs.org/-/npm/" }),
+        header: "Cookie",
+        template: "s={key}",
+      },
+    ]);
+    expect(refused.attach).toHaveLength(0);
+    expect(slash(refused)[0]).toEqual(["registry.npmjs.org", 443, true]);
   });
 
   test("a credential binds its prefix and denies every method it lacks", () => {

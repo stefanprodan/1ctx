@@ -249,7 +249,8 @@ function startChild(
 }
 
 // its kept-file budget and its copy of the parent's /tmp, after its rows
-// committed, so a throw here ends the child as failed
+// committed, so a throw here ends the child as failed. Under the sandbox
+// shell each /tmp is its sandbox's: no copy in, so none comes back
 function setUp(
   deps: ChildDeps,
   send: ActiveSend,
@@ -266,6 +267,7 @@ function setUp(
       maxFiles: kept.maxFiles,
       files: kept.files,
     };
+    if (send.policy.offered.sandbox) return null;
     return deps.bash.copyScratch(parent.workspace, send.workspace);
   } catch (error) {
     deps.log.warn("child setup failed", {

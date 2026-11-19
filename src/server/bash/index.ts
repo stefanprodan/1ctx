@@ -11,7 +11,7 @@ import type { SandboxNet } from "../../shared/sandbox-net.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
-import type { KnowledgeCaps } from "../limits/index.ts";
+import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
 import {
   copyBack,
   copyIn,
@@ -33,7 +33,10 @@ import type { Workspace } from "./workspace.ts";
 export type BashDeps = {
   db: Db;
   clock: Clock;
-  limits: { current(): KnowledgeCaps };
+  limits: {
+    current(): KnowledgeCaps &
+      Pick<SandboxCaps, "sandboxCommandSeconds" | "sandboxIdleMinutes">;
+  };
   log: Log;
   // the command worker entry, built where the binary resolves it
   worker: URL;
@@ -53,6 +56,10 @@ export type BashCapability = {
   // the network of the sandbox shell the next command runs in, so the
   // tool's description says what differs; null under just-bash
   sandbox?(): SandboxNet | null;
+  // how long a command may run under the sandbox shell, and an unused
+  // sandbox is kept
+  sandboxCommandSeconds?(): number;
+  sandboxIdleMinutes?(): number;
   run(
     projectId: string,
     workspace: Workspace,
@@ -89,6 +96,12 @@ export type BashCapability = {
   // a child's scratch, when its files could not come back
   dropScratch(workspace: Workspace): void;
 };
+// what the bash tool reads of the area: a command, and the sandbox
+// shell's words
+export type BashToolPort = Pick<
+  BashCapability,
+  "run" | "sandbox" | "sandboxCommandSeconds" | "sandboxIdleMinutes"
+>;
 export type BashArea = BashCapability & {
   scratch: ScratchStore;
   // idle scratch no command holds
@@ -108,6 +121,8 @@ export function bashArea(deps: BashDeps): BashArea {
       pick !== undefined && pick(builtin) !== builtin
         ? (deps.sandboxNet?.() ?? { mode: "off", hosts: [] })
         : null,
+    sandboxCommandSeconds: () => deps.limits.current().sandboxCommandSeconds,
+    sandboxIdleMinutes: () => deps.limits.current().sandboxIdleMinutes,
     run: (projectId, workspace, author, command, caps, signal, sendId) =>
       run(
         {

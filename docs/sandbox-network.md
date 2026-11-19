@@ -84,7 +84,11 @@ what the bash tool's description shares with it.
   unsigned; under a refused one too, when another rule admits it.
 - A prefix `/v1/` signs `/v1` too, and a matrix parameter (`/v1;x`)
   reads as `/v1`, each with its methods alone; TLS is OpenShell's
-  choice; encoded paths (`%2F`) and `Upgrade` are refused.
+  choice; encoded paths (`%2F`) and `Upgrade` are refused, except
+  `%2F` on the hosts of `ENCODED_SLASH_HOSTS` (`netpolicy.ts`), where
+  bun and npm ask for a scoped package as `@scope%2fname`. A host a
+  credential of the send binds never takes the exception, so its
+  prefix check keeps refusing `%2F`.
 - A read-only credential holds only on servers that ignore
   method-override headers (`X-HTTP-Method-Override`), which the
   builtin refuses on a signed request.

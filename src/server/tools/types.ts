@@ -121,6 +121,8 @@ export type MemoryScope = {
   // the send's origin; a subagent's offer has no automation of its own,
   // so it carries its parent's, and a run's children read no automations
   origin?: SessionOrigin;
+  // the send's deadline, so the bash words never promise a command more
+  deadlineMs?: number | null;
 };
 
 // a chat's saves, bound to its project, session and author
@@ -191,4 +193,7 @@ export type Offered = {
   }[];
   // a subagent's offer: bash leaves out open
   subagent?: boolean;
+  // the sandbox shell ran bash when the send began: each /tmp is its
+  // sandbox's, so a subagent's never passes to or from its parent's
+  sandbox?: true;
 };

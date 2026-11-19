@@ -32,7 +32,6 @@ import type { KnowledgeCaps } from "../limits/index.ts";
 import {
   committedTree,
   emptyManifest,
-  heldSizes,
   KEPT_FAILED,
   KeptUnreadable,
   manifestOf,
@@ -40,6 +39,7 @@ import {
   type Wanted,
   wantedOf,
 } from "./baseline.ts";
+import { walkBounds } from "./bounds.ts";
 import {
   Capped,
   drain,
@@ -60,7 +60,6 @@ import type { RecycleReason, SandboxHold } from "./leases.ts";
 import {
   fill,
   openedOf,
-  PATH_BYTES,
   RECORD_ROOTS,
   type Readout,
   readout,
@@ -69,7 +68,7 @@ import {
   recordRequests,
 } from "./readout.ts";
 import { scrubPulled } from "./scrub.ts";
-import { SANDBOX_ENV, TREE_SLACK_BYTES } from "./spec.ts";
+import { SANDBOX_ENV } from "./spec.ts";
 import { bounded } from "./waits.ts";
 
 export type BackendDeps = {
@@ -87,49 +86,11 @@ export function commandId(): string {
   );
 }
 
-// The walk's bounds: what the caps allow, or what the trees held when
-// that was more, so a tree over a lowered cap can still shrink.
-export function walkBounds(caps: KnowledgeCaps, before: Tree | null) {
-  const held = heldSizes(before);
-  const tree = (root: string, cap: number) =>
-    Math.max(cap, held.bytes.get(root) ?? 0) + TREE_SLACK_BYTES;
-  const entries = Math.max(
-    4 *
-      (caps.knowledgeFiles +
-        caps.scratchFiles +
-        caps.uploadFiles +
-        caps.mcpKeptFiles) +
-      64,
-    held.entries + 64,
-  );
-  const fileBytes = Math.max(
-    caps.knowledgeFileBytes,
-    caps.scratchBytes,
-    caps.uploadBytes,
-    caps.mcpKeptBytes,
-    held.largest,
-  );
-  const totalBytes =
-    tree("/knowledge", caps.knowledgeProjectBytes) +
-    tree("/tmp", caps.scratchBytes) +
-    tree("/uploads", caps.uploadBytes) +
-    tree("/mcp", caps.mcpKeptBytes);
-  return {
-    limits: { entries, fileBytes, totalBytes },
-    bounds: {
-      entries: entries + 4,
-      nameBytes: entries * PATH_BYTES,
-      fileBytes: totalBytes,
-    },
-  };
-}
-
 type Ended = Extract<Settled, { ok: false }>;
 
 class Command {
   private wanted: Wanted | null = null;
   private read: Readout | null = null;
-  private changes: Answer["changes"] = null;
   // recycle at settle, whatever lands
   private dirty = true;
   private settled = false;
@@ -231,19 +192,26 @@ class Command {
       });
   }
 
-  // a folder before the command: the pushed tree's, or a repository's
+  // a folder before the command: the pushed tree's, or one the sandbox
+  // holds alone, asked by an exec
   private async before(path: string): Promise<boolean> {
     const { job } = this;
-    if (path === "/tmp" || path === "/uploads") return true;
+    if (path === "/uploads") return true;
     if (path === "/knowledge") return job.docs;
     if (path === "/mcp") return job.kept.length > 0;
-    if (path === "/repos" || path.startsWith("/repos/")) return this.repo(path);
+    const own = this.own(path);
+    if (own !== null) return own;
     return this.wanted?.tree.get(path)?.kind === "dir";
   }
 
-  private async repo(path: string): Promise<boolean> {
-    if (this.job.repos.length === 0) return false;
-    return path === "/repos" || isFolder(this.on, path);
+  // /tmp and the mounted repositories are never walked, so a folder
+  // there is asked of the sandbox; null for a path elsewhere
+  private own(path: string): Promise<boolean> | null {
+    if (path === "/tmp") return Promise.resolve(true);
+    if (path.startsWith("/tmp/")) return isFolder(this.on, path);
+    if (path !== "/repos" && !path.startsWith("/repos/")) return null;
+    if (this.job.repos.length === 0) return Promise.resolve(false);
+    return path === "/repos" ? Promise.resolve(true) : isFolder(this.on, path);
   }
 
   async run(): Promise<Settled> {
@@ -287,6 +255,9 @@ class Command {
     const stdout = new Capped(job.ioBytes);
     const stderr = new Capped(job.ioBytes);
     let code: number;
+    // the command runs in the sandbox, so its wait holds no process
+    // slot; the read back takes one again
+    this.hooks.slot?.free();
     try {
       code = await drain(
         this.on.gateway.exec({
@@ -332,6 +303,7 @@ class Command {
     if (exitCode === 124)
       return { ok: true, answer: { ...printed, changes: null, refused: null } };
     try {
+      await this.hooks.slot?.take(this.on.signal);
       return await this.readBack(id, start, printed, caps);
     } catch (error) {
       if (exitCode === 126 && !this.stops.signal.aborted && !this.late()) {
@@ -389,15 +361,17 @@ class Command {
     // every record goes, not only this command's: one command runs in
     // a sandbox at a time, and what a command left there would fill it
     await removeRecords(this.on);
-    const back = await readBack(read.entries, job, {
-      exitCode: printed.exitCode,
-      start,
-      pwd,
-      isDirectory: (path) =>
-        path === "/repos" || path.startsWith("/repos/")
-          ? this.repo(path)
-          : read.folders.has(path),
-    });
+    // no scratch file is mounted or read back: /tmp is the sandbox's
+    const back = await readBack(
+      read.entries,
+      { ...job, scratch: [] },
+      {
+        exitCode: printed.exitCode,
+        start,
+        pwd,
+        isDirectory: (path) => this.own(path) ?? read.folders.has(path),
+      },
+    );
     // the read back is the server's own work and may pass the deadline
     // after the last exec: what ends late saves nothing, as a late exec
     if (this.late())
@@ -405,7 +379,6 @@ class Command {
         ok: true,
         answer: { ...printed, exitCode: 124, changes: null, refused: null },
       };
-    this.changes = back.changes;
     // a change that cannot commit leaves a tree the rows do not hold
     this.dirty = back.changes === null || read.discarded;
     return { ok: true, answer: { ...shown, opened, ...back } };
@@ -433,14 +406,13 @@ class Command {
     this.hold.recycle(reason);
   }
 
-  // the stored rows again: a doc as stored, scratch at its new time,
-  // empty folders gone, every mode and time rebuilt
+  // the stored rows again: a doc as stored, empty folders gone, every
+  // mode and time rebuilt
   private async normalize(
     landed: Extract<SettleOutcome, { landed: true }>,
   ): Promise<void> {
-    const changes = this.changes!;
-    const after = committedTree(this.wanted!, changes, landed);
-    const manifest = manifestOf(this.read!.held, after, ["/knowledge", "/tmp"]);
+    const after = committedTree(this.wanted!, landed);
+    const manifest = manifestOf(this.read!.held, after, ["/knowledge"]);
     this.hold.synced.value = null;
     const step = bounded(
       this.deps.clock,

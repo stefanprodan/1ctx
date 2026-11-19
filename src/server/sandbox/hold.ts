@@ -14,7 +14,6 @@ export type RecycleReason =
   | "clear"
   | "archive"
   | "delete"
-  | "fork"
   | "run"
   | "child"
   | "restart"

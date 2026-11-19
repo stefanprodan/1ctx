@@ -247,6 +247,7 @@ export function buildPolicy(input: {
                 ? { sessionId: input.sessionId, userId: user.id }
                 : null,
             delegate: agent.subagents,
+            deadlineMs: input.deadlineMs ?? null,
           },
           disabledCapabilities,
         )

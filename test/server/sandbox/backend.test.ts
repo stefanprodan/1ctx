@@ -9,8 +9,8 @@
 import { describe, expect, test } from "bun:test";
 import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/index.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import { walkBounds } from "../../../src/server/sandbox/backend.ts";
 import { manifestOf, wantedOf } from "../../../src/server/sandbox/baseline.ts";
+import { walkBounds } from "../../../src/server/sandbox/bounds.ts";
 import { SandboxUnavailable } from "../../../src/server/sandbox/gateway.ts";
 import { answerOf, bytes, pushes, setup } from "./backend-helpers.ts";
 
@@ -21,6 +21,7 @@ const hang = (signal: AbortSignal) =>
     signal.addEventListener("abort", () => reject(signal.reason));
   });
 
+// scratch rows a sandbox never holds: its /tmp is its own
 const ROWS = {
   knowledge: { "a.md": "hello\n", "notes/b.md": "b\n" },
   scratch: { "notes.txt": "x", "run.sh": { text: "echo", mode: 0o755 } },
@@ -31,7 +32,7 @@ const ROWS = {
 };
 
 describe("the sandbox backend", () => {
-  test("a first command pushes every row with its mode and time", async () => {
+  test("a first command pushes every row but scratch, with its mode and time", async () => {
     const t = setup();
     const ran = await t.run(ROWS);
     expect(ran.fs.tree()).toEqual({
@@ -40,8 +41,6 @@ describe("the sandbox backend", () => {
       "/knowledge/notes/b.md": "644 101 b\n",
       "/mcp/0001-read": "dir 755 0",
       "/mcp/0001-read/result.txt": "644 0 kept",
-      "/tmp/notes.txt": "644 500 x",
-      "/tmp/run.sh": "755 500 echo",
       "/uploads/in": "dir 755 50",
       "/uploads/in/data.csv": "644 50 1,2\n",
     });
@@ -55,13 +54,12 @@ describe("the sandbox backend", () => {
     ran.settle({ landed: false, why: "skipped" });
   });
 
-  test("a warm command with nothing changed pushes nothing, and a commit puts scratch at its new time", async () => {
+  test("a warm command with nothing changed pushes nothing", async () => {
     const t = setup();
     const first = await t.run(ROWS);
     first.settle(t.landed(ROWS, answerOf(first.settled), 900));
     expect(await t.settled(first.hold)).toBe("idle");
-    // the normalization pushed the new used_at
-    expect(first.fs.tree()["/tmp/notes.txt"]).toBe("644 900 x");
+    expect(first.fs.tree()["/tmp/notes.txt"]).toBeUndefined();
     const after = { ...ROWS, scratchRevision: 4, usedAt: 900 };
     const reads: number[] = [];
     const calls = first.fs.calls.length;
@@ -89,10 +87,11 @@ describe("the sandbox backend", () => {
       return { pwd: "/tmp/new" };
     });
     const answer = answerOf(ran.settled);
+    // /tmp is the sandbox's: no scratch change, the cwd there kept
     expect(answer.changes).toEqual({
       knowledge: [{ name: "a.md", text: "world\n" }],
-      written: [{ path: "new/c.txt", data: bytes("c"), mode: 0o600 }],
-      removed: ["notes.txt"],
+      written: [],
+      removed: [],
       cwd: "/tmp/new",
     });
     // the commit stored the text without its BOM
@@ -100,11 +99,10 @@ describe("the sandbox backend", () => {
     expect(await t.settled(ran.hold)).toBe("idle");
     expect(ran.fs.tree()).toMatchObject({
       "/knowledge/a.md": "644 900 world\n",
-      "/tmp/new": "dir 755 900",
-      "/tmp/new/c.txt": "600 900 c",
-      "/tmp/run.sh": "755 900 echo",
+      // the put-back leaves /tmp as the command left it
+      "/tmp/new": "dir 755 0",
+      "/tmp/new/c.txt": "600 0 c",
     });
-    expect(ran.fs.tree()["/tmp/notes.txt"]).toBeUndefined();
     // the next command's rows: a.md as committed, b.md edited on a page
     const next = {
       ...ROWS,
@@ -124,10 +122,11 @@ describe("the sandbox backend", () => {
     expect(t2.fs.tree()["/knowledge/notes/b.md"]).toBe("644 102 b2\n");
     expect(t2.fs.tree()["/knowledge/a.md"]).toBe("644 900 world\n");
     expect(answerOf(t2.settled).changes?.cwd).toBe("/tmp/new");
+    expect(answerOf(t2.settled).notice).toBe("");
     t2.settle({ landed: false, why: "skipped" });
   });
 
-  test("a subagent's copy-back advanced the scratch and is pushed next", async () => {
+  test("scratch rows that moved are never pushed", async () => {
     const t = setup();
     const first = await t.run(ROWS);
     first.settle(t.landed(ROWS, answerOf(first.settled), 900));
@@ -140,52 +139,61 @@ describe("the sandbox backend", () => {
       usedAt: 950,
     };
     const ran = await t.run(back);
-    expect(pushes(ran.fs)).toBe(pushed + 1);
-    expect(ran.fs.tree()["/tmp/from-child.txt"]).toBe("644 950 y");
+    expect(pushes(ran.fs)).toBe(pushed);
+    expect(ran.fs.tree()["/tmp/from-child.txt"]).toBeUndefined();
     ran.settle({ landed: false, why: "skipped" });
   });
 
-  test("a push frames a delete, a file turned folder, a mode and a time", () => {
+  test("/tmp is never walked or pulled, and a command there saves no scratch", async () => {
+    const t = setup();
+    const ran = await t.run(ROWS, ({ fs }) => {
+      fs.write("/tmp/big.bin", "x".repeat(100_000));
+      fs.nodes.set("/tmp/link", { kind: "link", target: "/" });
+      fs.nodes.set("/tmp/fifo", { kind: "other", mode: 0o644 });
+      fs.nodes.set("/tmp/new", { kind: "dir", mode: 0o700, mtime: 0 });
+      return { pwd: "/tmp/new" };
+    });
+    const answer = answerOf(ran.settled);
+    expect(answer.refused).toBeNull();
+    expect(answer.changes).toEqual({
+      knowledge: [],
+      written: [],
+      removed: [],
+      cwd: "/tmp/new",
+    });
+    const asked = ran.fs.pulled.map((stdin) => new TextDecoder().decode(stdin));
+    expect(asked.some((text) => text.includes("/tmp/"))).toBe(false);
+    ran.settle(t.landed(ROWS, answer, 900));
+    expect(await t.settled(ran.hold)).toBe("idle");
+    expect(ran.fs.frames.some((frame) => frame.includes(" /tmp"))).toBe(false);
+    expect(ran.fs.tree()["/tmp/big.bin"]).toBeDefined();
+  });
+
+  test("a push frames a delete, a file turned folder and a time", () => {
     const job = setup().jobOf;
+    const old = { knowledge: { a: "1", b: "2", "d/e": "3" } };
     const before = wantedOf(
-      job(
-        {
-          scratch: { a: "1", b: "2", "d/e": "3" },
-          scratchRevision: 1,
-          usedAt: 10,
-        },
-        "",
-      ).job,
-      job(
-        {
-          scratch: { a: "1", b: "2", "d/e": "3" },
-          scratchRevision: 1,
-          usedAt: 10,
-        },
-        "",
-      ).mounted,
+      job(old, "").job,
+      job(old, "").mounted,
       () => null,
       null,
     );
     const rows = {
-      scratch: { "a/x": "1", b: { text: "2", mode: 0o700 }, "d/e": "3" },
-      scratchRevision: 2,
-      usedAt: 20,
+      knowledge: { "a/x": "1", b: "2", "d/e": "3" },
+      revisions: { b: 2 },
     };
     const { job: next, mounted } = job(rows, "");
     const wanted = wantedOf(next, mounted, () => null, before.tree);
     const manifest = manifestOf(before.tree, wanted);
-    expect(manifest.remove).toEqual(["/tmp/a"]);
+    expect(manifest.remove).toEqual(["/knowledge/a"]);
     expect(manifest.folders).toEqual([
-      { path: "/tmp/a", mode: 0o755, mtime: 20 },
+      { path: "/knowledge/a", mode: 0o755, mtime: 101 },
     ]);
-    expect(manifest.files?.map((file) => file.path)).toEqual(["/tmp/a/x"]);
-    expect(
-      [...(manifest.meta ?? [])].sort((a, b) => (a.path < b.path ? -1 : 1)),
-    ).toEqual([
-      { path: "/tmp/b", mode: 0o700, mtime: 20 },
-      { path: "/tmp/d", mode: 0o755, mtime: 20 },
-      { path: "/tmp/d/e", mode: 0o644, mtime: 20 },
+    expect(manifest.files?.map((file) => file.path)).toEqual([
+      "/knowledge/a/x",
+    ]);
+    expect(manifest.meta).toEqual([
+      { path: "/knowledge/b", mode: 0o644, mtime: 102 },
     ]);
   });
 
@@ -195,15 +203,15 @@ describe("the sandbox backend", () => {
       t.fake.onFiles = (_, fs) => {
         fs.walkLines = (lines) =>
           lie === "drop"
-            ? lines.filter((line) => !line.endsWith("/tmp/notes.txt"))
+            ? lines.filter((line) => !line.endsWith("/knowledge/a.md"))
             : lines.map((line) =>
-                line.endsWith("/tmp/notes.txt")
+                line.endsWith("/knowledge/a.md")
                   ? line.replace(/ [0-9a-f]{64} /, ` ${"0".repeat(64)} `)
                   : line,
               );
       };
       const ran = await t.run(ROWS, ({ fs }) => {
-        fs.write("/tmp/notes.txt", "changed");
+        fs.write("/knowledge/a.md", "changed");
         return {};
       });
       const answer = answerOf(ran.settled);
@@ -241,16 +249,17 @@ describe("the sandbox backend", () => {
     for (const [root, change, extra] of cases) {
       const t = setup();
       const rows = { ...ROWS, ...extra };
+      const docs = !("docs" in rows) || rows.docs !== false;
       const ran = await t.run(rows, ({ fs }) => {
         change(fs);
-        fs.write("/tmp/kept.txt", "y");
+        if (docs) fs.write("/knowledge/kept.md", "y\n");
         return {};
       });
       const answer = answerOf(ran.settled);
       if (!answer.notice.includes(root)) expect(root).toBe("/uploads");
-      expect(answer.changes?.written.map((file) => file.path)).toEqual([
-        "kept.txt",
-      ]);
+      expect(answer.changes?.knowledge).toEqual(
+        docs ? [{ name: "kept.md", text: "y\n" }] : [],
+      );
       ran.settle(t.landed(rows, answer));
       expect(await t.settled(ran.hold)).not.toBe("idle");
     }
@@ -268,11 +277,11 @@ describe("the sandbox backend", () => {
     expect(await t.settled(limit.hold)).not.toBe("idle");
 
     const link = await t.run(ROWS, ({ fs }) => {
-      fs.nodes.set("/tmp/link", { kind: "link", target: "/" });
+      fs.nodes.set("/knowledge/link", { kind: "link", target: "/" });
       return {};
     });
     expect(answerOf(link.settled).refused).toBe(
-      "/tmp/link is not a regular file",
+      "/knowledge/link is not a regular file",
     );
     link.settle({ landed: false, why: "skipped" });
     expect(await t.settled(link.hold)).not.toBe("idle");
@@ -492,14 +501,15 @@ describe("records, kept reads, put-back frames and a lost sandbox", () => {
     await t.settled(first.hold);
     const after = { ...ROWS, scratchRevision: 4, usedAt: 900 };
     const frames = first.fs.frames.length;
-    const second = await t.run(after);
+    const second = await t.run(after, ({ fs }) => {
+      fs.write("/knowledge/a.md", "\uFEFFnew\n");
+      return {};
+    });
     second.settle(t.landed(after, answerOf(second.settled), 950));
     expect(await t.settled(second.hold)).toBe("idle");
-    // the docs kept their stored times: no frame names one
-    expect(second.fs.frames.slice(frames).sort()).toEqual([
-      "meta /tmp/notes.txt",
-      "meta /tmp/run.sh",
-    ]);
+    // the doc as stored, without its BOM, at its new time; nothing else
+    expect(second.fs.frames.slice(frames)).toEqual(["file /knowledge/a.md"]);
+    expect(second.fs.tree()["/knowledge/a.md"]).toBe("644 950 new\n");
   });
 
   test("an unavailable sandbox is reported on the deadline's path and after an exit 126", async () => {
@@ -529,25 +539,35 @@ describe("records, kept reads, put-back frames and a lost sandbox", () => {
 
 describe("the walk's bounds", () => {
   test("the caps, or what the trees held when more", () => {
-    const caps = { ...DEFAULT_LIMITS, scratchBytes: 100, scratchFiles: 2 };
+    const caps = {
+      ...DEFAULT_LIMITS,
+      knowledgeProjectBytes: 100,
+      knowledgeFileBytes: 100,
+      uploadBytes: 100,
+      mcpKeptBytes: 100,
+    };
     const small = walkBounds(caps, null);
     const t = setup();
-    const { job, mounted } = t.jobOf({ scratch: { a: "x".repeat(5000) } }, "");
+    const { job, mounted } = t.jobOf(
+      { knowledge: { a: "x".repeat(5000) } },
+      "",
+    );
     const held = wantedOf(job, mounted, () => null, null).tree;
     const big = walkBounds(caps, held);
     expect(big.limits.fileBytes).toBeGreaterThanOrEqual(5000);
     expect(big.limits.totalBytes - small.limits.totalBytes).toBe(5000 - 100);
+    // scratch is not the walk's: its caps never move the bounds
+    expect(walkBounds({ ...caps, scratchBytes: 1 << 26 }, null)).toEqual(small);
   });
 
   test("a walk past them recycles, and a tree over a lowered cap still shrinks", async () => {
     const t = setup({
       knowledgeFiles: 1,
-      scratchFiles: 1,
       uploadFiles: 1,
       mcpKeptFiles: 1,
     });
     const over = await t.run({}, ({ fs }) => {
-      for (let i = 0; i < 100; i++) fs.write(`/tmp/f${i}`, "x");
+      for (let i = 0; i < 100; i++) fs.write(`/knowledge/f${i}`, "x");
       return {};
     });
     expect(answerOf(over.settled).refused).toBe(
@@ -557,21 +577,20 @@ describe("the walk's bounds", () => {
     expect(await t.settled(over.hold)).not.toBe("idle");
 
     const rows = {
-      scratch: Object.fromEntries(
+      knowledge: Object.fromEntries(
         Array.from({ length: 80 }, (_, i) => [`f${i}`, "x"]),
       ),
-      scratchRevision: 1,
-      usedAt: 1,
     };
     const shrink = await t.run(rows);
     shrink.settle(t.landed(rows, answerOf(shrink.settled)));
     expect(await t.settled(shrink.hold)).toBe("idle");
-    const more = { ...rows, scratchRevision: 2, usedAt: t.time.now() };
-    const ran = await t.run(more, ({ fs }) => {
-      fs.remove("/tmp/f0");
+    const ran = await t.run(rows, ({ fs }) => {
+      fs.remove("/knowledge/f0");
       return {};
     });
-    expect(answerOf(ran.settled).changes?.removed).toEqual(["f0"]);
+    expect(answerOf(ran.settled).changes?.knowledge).toEqual([
+      { name: "f0", text: null },
+    ]);
     ran.settle({ landed: false, why: "skipped" });
   });
 });

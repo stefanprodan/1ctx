@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import type { BusEvent } from "../../../src/server/lib/bus.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
-import { recyclesOf, seenForks } from "../../../src/server/sandbox/events.ts";
+import { recyclesOf } from "../../../src/server/sandbox/events.ts";
 import {
   createSpec,
   KEEP_ALIVE_COMMAND,
@@ -18,32 +18,30 @@ import type { SessionSummary } from "../../../src/shared/contracts/session.ts";
 const MiB = 1024 * 1024;
 
 describe("the create spec", () => {
-  test("sizes each writable root from its cap and binds repositories read-only", () => {
+  test("sizes each synced root from its cap and binds repositories read-only", () => {
     const spec = createSpec({
       name: "1ctx-i-x",
       instanceId: "i",
       image: "img",
-      caps: { ...DEFAULT_LIMITS, sandboxHomeMiB: 256, scratchBytes: 32 * MiB },
+      caps: { ...DEFAULT_LIMITS, mcpKeptBytes: 32 * MiB },
       repos: [{ name: "app", tree: "/cache/t/files" }],
     });
     const size = (target: string) =>
       spec.mounts.find((mount) => mount.target === target);
-    expect(size("/tmp")).toEqual({
+    expect(size("/mcp")).toEqual({
       type: "tmpfs",
-      target: "/tmp",
+      target: "/mcp",
       sizeBytes: 40 * MiB,
-      exec: true,
+      exec: false,
     });
-    expect(size("/mcp")).toMatchObject({ sizeBytes: 40 * MiB, exec: false });
     expect(size("/knowledge")).toMatchObject({ exec: false });
-    expect(size("/opt/home")).toMatchObject({
-      sizeBytes: 256 * MiB,
-      exec: true,
-    });
-    expect(size("/sandbox/tmp")).toMatchObject({
-      sizeBytes: 256 * MiB,
-      exec: true,
-    });
+    expect(size("/uploads")).toMatchObject({ exec: false });
+    // the container's own disk, never a tmpfs the memory limit counts
+    for (const target of ["/tmp", "/opt/home", "/sandbox/tmp"])
+      expect(size(target)).toBeUndefined();
+    expect(spec.policy.readWrite).toEqual(
+      expect.arrayContaining(["/tmp", "/sandbox/tmp"]),
+    );
     expect(spec.policy.readWrite).toEqual(
       expect.arrayContaining(["/opt/home", "/dev/ptmx", "/dev/pts"]),
     );
@@ -110,35 +108,30 @@ const changed = (
 
 describe("the bus events that recycle", () => {
   test("a clear, an archive, a delete, a run's and a child's end", () => {
-    const forks = seenForks();
-    expect(recyclesOf(changed({}, { cleared: true }), forks)).toEqual([
+    expect(recyclesOf(changed({}, { cleared: true }))).toEqual([
       { sessionId: "s1", reason: "clear" },
     ]);
     expect(
-      recyclesOf(changed({ archived: { at: 1, reason: "idle" } }), forks),
+      recyclesOf(changed({ archived: { at: 1, reason: "idle" } })),
     ).toEqual([{ sessionId: "s1", reason: "archive" }]);
     expect(
-      recyclesOf(
-        { type: "session.deleted", data: { projectId: "p", sessionId: "s1" } },
-        forks,
-      ),
+      recyclesOf({
+        type: "session.deleted",
+        data: { projectId: "p", sessionId: "s1" },
+      }),
     ).toEqual([{ sessionId: "s1", reason: "delete" }]);
     expect(
       recyclesOf(
         changed({ origin: "automation" }, { send: { status: "done" } }),
-        forks,
       ),
     ).toEqual([{ sessionId: "s1", reason: "run" }]);
     expect(
       recyclesOf(
         changed({ origin: "automation" }, { send: { status: "running" } }),
-        forks,
       ),
     ).toEqual([]);
     // a chat's turn ending keeps its sandbox
-    expect(
-      recyclesOf(changed({}, { send: { status: "done" } }), forks),
-    ).toEqual([]);
+    expect(recyclesOf(changed({}, { send: { status: "done" } }))).toEqual([]);
     const child = (status: string) =>
       ({
         type: "child.changed",
@@ -149,18 +142,13 @@ describe("the bus events that recycle", () => {
           child: { sessionId: "c1", status, tokens: 0, rows: [] },
         },
       }) as BusEvent;
-    expect(recyclesOf(child("running"), forks)).toEqual([]);
-    expect(recyclesOf(child("failed"), forks)).toEqual([
+    expect(recyclesOf(child("running"))).toEqual([]);
+    expect(recyclesOf(child("failed"))).toEqual([
       { sessionId: "c1", reason: "child" },
     ]);
   });
 
-  test("a fork recycles its source once", () => {
-    const forks = seenForks();
-    const fork = changed({ id: "f1", forkedFromId: "s1" });
-    expect(recyclesOf(fork, forks)).toEqual([
-      { sessionId: "s1", reason: "fork" },
-    ]);
-    expect(recyclesOf(fork, forks)).toEqual([]);
+  test("a fork leaves its source's sandbox alone", () => {
+    expect(recyclesOf(changed({ id: "f1", forkedFromId: "s1" }))).toEqual([]);
   });
 });

@@ -7,8 +7,9 @@
 // byte outside 0x21 to 0x7e, and %, as %XX in capitals, so a name never
 // breaks a line or a field and every name has one spelling.
 
-// the trees a sandbox holds as rows; /repos is mounted, never synced
-export const SANDBOX_ROOTS = ["/knowledge", "/tmp", "/uploads", "/mcp"];
+// the trees a sandbox holds as rows; /repos is mounted, never synced,
+// and /tmp is the sandbox's own, never pushed, walked or pulled
+export const SANDBOX_ROOTS = ["/knowledge", "/uploads", "/mcp"];
 
 // the gateway refuses an exec request past its 1 MiB message, and the
 // helper's own source rides in the same request
@@ -117,7 +118,7 @@ function checkFields(entry: PushFolder) {
 const parentOf = (path: string) => path.slice(0, path.lastIndexOf("/"));
 
 // Every path under a root and never a root itself: a root is the
-// image's or a mount's (/tmp is root's, 1777), so the helper refuses it.
+// image's or a mount's, so the helper refuses it.
 // Every folder a frame changes, holding a removed or new entry, must
 // have its mode in folders or meta: the helper opens it to its owner to
 // make the change, and the trailing meta puts the stored mode back.

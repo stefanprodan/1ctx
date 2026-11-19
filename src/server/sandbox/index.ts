@@ -20,7 +20,7 @@ import type { RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
 import { sandboxBackend } from "./backend.ts";
-import { recyclesOf, seenForks } from "./events.ts";
+import { recyclesOf } from "./events.ts";
 import type { Connect, Gateway, GatewayConfig } from "./gateway.ts";
 import { Leases } from "./leases.ts";
 import { routes } from "./routes.ts";
@@ -100,7 +100,6 @@ export type Sandbox = {
 
 export function sandboxArea(deps: SandboxDeps): Sandbox {
   const store = new SandboxStore(deps.db);
-  const forks = seenForks();
   let running = false;
   let current: {
     key: string;
@@ -166,7 +165,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       net: () => sandboxNet(store.settings()),
     });
     const unsubscribe = subscribe((event) => {
-      for (const { sessionId, reason } of recyclesOf(event, forks)) {
+      for (const { sessionId, reason } of recyclesOf(event)) {
         leases.recycleSession(sessionId, reason);
       }
     }, deps.log);
@@ -186,6 +185,8 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     limits: deps.limits,
   });
   const backend: ShellBackend = {
+    ownTmp: true,
+    sandboxTimeout: true,
     acquire(call, deadline, signal) {
       const leases = ensure();
       if (leases === null) throw new Error("the sandbox shell is not set up");

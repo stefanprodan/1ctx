@@ -27,6 +27,9 @@ export type CommandRepos = {
 };
 export type CommandCaps = {
   callTimeoutMs: number;
+  // what a command under the sandbox shell may run instead, given by a
+  // tool that offered the sandbox's words
+  sandboxCommandMs?: number;
   resultCut: number;
   visuals: boolean;
   // false while the send has the project docs off: no /knowledge
@@ -81,13 +84,17 @@ export function mountJob(
   started: number,
   projectId: string,
   workspace: Workspace,
+  // the shell keeps /tmp itself: no scratch file is read
+  ownTmp = false,
 ): Mount {
   const sessionId = workspaceSession(workspace);
   const repos = caps.repos;
   const storage = deps.current();
   const docs = caps.knowledge;
   const rows = docs ? deps.knowledge.mountedDocs(projectId) : [];
-  const stored = deps.scratch.read(workspace);
+  const stored = ownTmp
+    ? { ...deps.scratch.head(workspace), entries: [] }
+    : deps.scratch.read(workspace);
   // the worker writes each row at /tmp/<path>, so a row outside the
   // rule never mounts; the commit drops it
   const mountable = mountableScratch(stored.entries);
@@ -187,7 +194,6 @@ export function storedBytes(
   const uploadsFrom = caps.subagent?.uploadsFrom ?? workspaceSession(workspace);
   return {
     docs: caps.knowledge ? deps.knowledge.docBytes(projectId) : 0,
-    scratch: deps.scratch.bytes(workspace),
     uploads: deps.knowledge.uploadBytes(uploadsFrom),
     kept: listKept(deps.db, workspace).reduce((n, entry) => n + entry.bytes, 0),
   };

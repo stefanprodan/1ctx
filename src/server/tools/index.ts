@@ -25,7 +25,7 @@ import {
   type McpMode,
   type SearchProvider,
 } from "../../shared/words.ts";
-import type { BashCapability } from "../bash/index.ts";
+import type { BashToolPort } from "../bash/index.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import { BadRequest } from "../lib/errors.ts";
@@ -149,13 +149,12 @@ export type ToolsDeps = {
     "offered" | "offeredSides" | "switchable" | "call" | "validateArguments"
   >;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
-  bash?: Pick<BashCapability, "run" | "sandbox">;
+  bash?: BashToolPort;
   // the project's credentials for a send, and each row and key again at
   // each command
   credentials?: CredentialsPort & CredentialKeysPort;
   searchDeps?: SearchDependencies;
-  // email_user's: whether email is set up, and what the tool reads and
-  // queues; without it the tool is never offered
+  // email_user's setup and outbox; without it the tool is never offered
   email?: Omit<AgentEmailDeps, "db" | "clock"> & { enabled(): boolean };
   usage?: {
     visuals(since: number, until: number): VisualCounts;
@@ -171,8 +170,7 @@ export type ToolsDeps = {
 
 export type Tools = {
   capabilities(): string[];
-  // the names of the servers offered in the project that a disabled set
-  // turns off
+  // the servers in the project that a disabled set turns off
   serverNames(
     projectId: string,
     disabledCapabilities: readonly string[],
@@ -230,8 +228,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     email === undefined
       ? null
       : agentEmails({ db: deps.db, clock: deps.clock, ...email });
-  // the admin's row and a server set up: a send is offered the tool only
-  // with both
+  // the admin's row and a server set up: the tool is offered only with both
   const emailOn = () =>
     email !== undefined && store.row(EMAIL_TOOL).enabled && email.enabled();
   const automations = deps.automations ?? null;
@@ -250,6 +247,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     credentials: SendCredentials,
     subagent = false,
     chatMain = false,
+    deadlineMs: number | null = null,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
     ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
@@ -274,6 +272,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
       keys: deps.credentials,
       docs: knowledge,
       subagent,
+      deadlineMs,
     }),
   ];
 
@@ -387,6 +386,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
           emailOn,
           automationOn,
           externalTaskOn,
+          sandbox: () => (deps.bash?.sandbox?.() ?? null) !== null,
           toolsFor,
           log: deps.log,
         },

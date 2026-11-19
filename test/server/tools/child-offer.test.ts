@@ -7,6 +7,10 @@
 import { describe, expect, test } from "bun:test";
 import { silent } from "../../../src/server/lib/log.ts";
 import type { OfferOptions } from "../../../src/server/mcp/index.ts";
+import {
+  DELEGATE_DESCRIPTION,
+  SANDBOX_DELEGATE_DESCRIPTION,
+} from "../../../src/server/tools/builtin/delegate.ts";
 import { offered } from "../../../src/server/tools/offer.ts";
 import type { Tool } from "../../../src/server/tools/types.ts";
 
@@ -133,6 +137,43 @@ describe("a subagent's offer", () => {
       });
     }
     expect(links).toEqual([]);
+  });
+
+  test("under the sandbox shell says /tmp passes neither way, the built-in words unchanged", () => {
+    const hash = (text: string) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    expect(hash(DELEGATE_DESCRIPTION)).toBe(
+      "e5f53ee6309ae06bd61ff5079b7a77c1570d0447ececb1fa045553662646b297",
+    );
+    const scope = {
+      projectId: "p",
+      automation: null,
+      phase: "main",
+      chat: { sessionId: "s", userId: "u" },
+      delegate: true,
+    } as const;
+    const description = (o: ReturnType<typeof offered>) =>
+      o.tools.find((t) => t.name === "delegate")?.description;
+    for (const sandbox of [false, true]) {
+      const { deps } = parts();
+      const on = { ...deps, sandbox: () => sandbox };
+      const main = offered(on, 0, "a", false, "auto", scope);
+      expect(main.sandbox).toBe(sandbox ? true : undefined);
+      expect(description(main)).toBe(
+        sandbox ? SANDBOX_DELEGATE_DESCRIPTION : DELEGATE_DESCRIPTION,
+      );
+      const child = offered(on, 0, "a", false, "auto", {
+        projectId: "p",
+        automation: null,
+        phase: "child",
+      });
+      expect(child.sandbox).toBe(sandbox ? true : undefined);
+    }
+    expect(SANDBOX_DELEGATE_DESCRIPTION).toContain(
+      "nothing in yours reaches it and nothing in its comes back",
+    );
+    expect(SANDBOX_DELEGATE_DESCRIPTION).toContain("under /knowledge");
+    expect(SANDBOX_DELEGATE_DESCRIPTION).not.toContain("copy of your /tmp");
   });
 
   test("marks credentials read-only, one with no read method off", () => {

@@ -408,7 +408,6 @@ describe("the image's roots", () => {
 describe("tree sizes", () => {
   const stored: StoredBytes = {
     docs: 300 * MiB,
-    scratch: 1,
     uploads: 0,
     kept: 0,
   };
@@ -428,8 +427,8 @@ describe("tree sizes", () => {
     expect(size("/knowledge")).toMatchObject({
       sizeBytes: 300 * MiB + TREE_SLACK_BYTES,
     });
-    expect(size("/tmp")).toMatchObject({
-      sizeBytes: caps.scratchBytes + TREE_SLACK_BYTES,
+    expect(size("/uploads")).toMatchObject({
+      sizeBytes: caps.uploadBytes + TREE_SLACK_BYTES,
     });
   });
 

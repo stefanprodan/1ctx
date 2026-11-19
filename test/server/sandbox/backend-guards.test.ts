@@ -37,16 +37,16 @@ const ROWS = { knowledge: { "a.md": "a\n" }, scratch: { "s.txt": "s" } };
 describe("the sandbox's read back refuses", () => {
   test("a saved name holding a key, in any spelling the scrub knows", async () => {
     for (const path of [
-      `/tmp/${KEY}.json`,
+      `/knowledge/${KEY}.json`,
       `/knowledge/got-${KEY}.md`,
-      `/tmp/${KEY.replaceAll("-", "\\u002d")}`,
+      `/knowledge/${KEY.replaceAll("-", "\\u002d")}`,
     ]) {
       const t = setup();
       const ran = await t.run(
         { ...ROWS, net, credentials: [credential] },
         ({ fs }) => {
           fs.write(path, "x");
-          fs.write("/tmp/kept.txt", "y");
+          fs.write("/knowledge/kept.md", "y\n");
           return {};
         },
       );
@@ -64,13 +64,13 @@ describe("the sandbox's read back refuses", () => {
   test("a saved name that is not UTF-8", async () => {
     // the fake names its node by the lossy spelling, the walk lists the
     // raw bytes, as a real walk lists a name the command made
-    const lossy = "/tmp/bad�";
+    const lossy = "/knowledge/bad�";
     const t = setup();
     const ran = await t.run(ROWS, ({ fs }) => {
       fs.write(lossy, "x");
       fs.walkLines = (lines) =>
         lines.map((line) =>
-          line.replace(escapePath(lossy), `${escapePath("/tmp/bad")}%FF`),
+          line.replace(escapePath(lossy), `${escapePath("/knowledge/bad")}%FF`),
         );
       return {};
     });
@@ -103,7 +103,7 @@ describe("the sandbox's read back refuses", () => {
   test("a read back that ends past the deadline, as a deadline", async () => {
     const t = setup();
     const ran = await t.run(ROWS, ({ fs }) => {
-      fs.write("/tmp/s.txt", "changed");
+      fs.write("/knowledge/a.md", "changed\n");
       // the time passes once the last exec, the records' removal, ended
       const exec = fs.exec.bind(fs);
       fs.exec = async function* (request) {
@@ -125,17 +125,18 @@ describe("the sandbox's read back refuses", () => {
 
 describe("the sandbox's pull", () => {
   test("many long names go in batches, each under the request limit", async () => {
-    // 15 folders of 240 bytes and a file name: 100 paths of about 11 KiB
+    // doc names at their 200 characters: 5200 paths of about 210 bytes
     // escaped, past one request together
-    const deep = Array.from({ length: 15 }, () => "é".repeat(120)).join("/");
-    const t = setup();
+    const deep = ["a".repeat(80), "b".repeat(80), "c".repeat(30)].join("/");
+    const t = setup({ knowledgeFiles: 10_000 });
     const ran = await t.run(ROWS, ({ fs }) => {
-      for (let n = 0; n < 100; n++) fs.write(`/tmp/${deep}/${n}`, String(n));
+      for (let n = 0; n < 5200; n++)
+        fs.write(`/knowledge/${deep}/${n}`, String(n));
       return {};
     });
     const answer = answerOf(ran.settled);
     expect(answer.refused).toBeNull();
-    expect(answer.changes?.written).toHaveLength(100);
+    expect(answer.changes?.knowledge).toHaveLength(5200);
     expect(ran.fs.pulled.length).toBeGreaterThan(1);
     for (const stdin of ran.fs.pulled)
       expect(stdin.byteLength).toBeLessThan(PUSH_CHUNK_BYTES);

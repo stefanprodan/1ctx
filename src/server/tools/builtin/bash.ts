@@ -9,7 +9,7 @@ import { hostWords, type SandboxNet } from "../../../shared/sandbox-net.ts";
 import type { WebSnapshot } from "../../../shared/web.ts";
 import {
   BACKSTOP_MS,
-  type BashCapability,
+  type BashToolPort,
   type CommandCredential,
   type Refusal,
   scrubKeys,
@@ -22,6 +22,7 @@ import {
 } from "../../sandbox/rules.ts";
 import type { OfferedCredential, Tool, ToolResult } from "../types.ts";
 import { domainWords } from "../web.ts";
+import { durationWords } from "./automation-text.ts";
 
 // what a command asks of the credentials area: the row as it is now and
 // the key its file holds now
@@ -79,7 +80,7 @@ function sandboxNetworkWords(
   if (net.mode === "off") return "No network.";
   const signed = sandboxCredentialWords(credentials);
   return [
-    `curl, python and uv reach HTTP and HTTPS on ports 80 and 443 of these hosts only: ${hostWords(net.hosts)}. Save downloads in /tmp.`,
+    `curl, python, uv and bun reach HTTP and HTTPS on ports 80 and 443 of these hosts only: ${hostWords(net.hosts)}. Save downloads in /tmp.`,
     ...(signed === "" ? [] : [signed]),
     "Each redirect is checked as a new request, responses are never redacted, and a refusal is a 403 from the proxy or a refused connection.",
   ].join(" ");
@@ -189,7 +190,7 @@ function scrubbed(
 }
 
 export type BashToolOptions = {
-  bash?: Pick<BashCapability, "run" | "sandbox">;
+  bash?: BashToolPort;
   web?: WebSnapshot | null;
   visuals?: boolean;
   credentials?: BashCredentials;
@@ -202,13 +203,35 @@ export type BashToolOptions = {
   // shell and OpenShell's rules, so the description says what differs.
   // null is the built-in shell; bash's own word when not given
   sandbox?: SandboxNet | null;
+  // how long a command may run under the sandbox shell; bash's own
+  // word when not given
+  commandSeconds?: number;
+  // how long an unused sandbox is kept; bash's own word when not given
+  idleMinutes?: number;
+  // the send's deadline: the words never promise a command more
+  deadlineMs?: number | null;
 };
+
+// the limits' defaults, for a tool built without bash's word
+const COMMAND_SECONDS = 600;
+const IDLE_MINUTES = 30;
 
 const BUILTIN_TOOLS =
   "jq, yq, awk and diff are there, git, python and node are not.";
+const BUILTIN_TMP =
+  "/tmp is this chat's scratch for any bytes, kept between commands.";
+// the sandbox's /tmp is its own disk, never saved, so it says how long
+// it lasts and where lasting files go
+const sandboxTmp = (idleMinutes: number) =>
+  `/tmp and $HOME hold any bytes but last only while this chat's sandbox does: it is recycled after ${idleMinutes} idle minute${idleMinutes === 1 ? "" : "s"}, on a restart, and when a command times out or its files cannot be saved, so put what must last in /knowledge.`;
+// a subagent's sandbox ends with it and /knowledge is read-only to it
+const SUBAGENT_TMP =
+  "/tmp and $HOME hold any bytes but last only while your sandbox does, which ends with your task, so put what the other agent needs in your answer.";
+const PARENT_TMP =
+  /\/tmp and \$HOME hold any bytes but last only while this chat's sandbox does: [^.]*\./;
 // what the agent does differently in a real shell
 const SANDBOX_TOOLS =
-  "jq, yq, git, python3 and uv are there, node is not: run Python with uv run or uvx, never pip. Only /knowledge and /tmp are kept, other files may go between commands. /tmp is small and saved after each command, so install packages with uv run --with pkg, or into a venv under $HOME, never in /tmp or /knowledge. $HOME lasts until the sandbox is recycled, so check a venv exists before using it. Redirect a background job's output (job >/tmp/log 2>&1 &), or the command waits to its deadline. A hard link or an unreadable file in /tmp or /knowledge saves nothing.";
+  "jq, yq, git, python3, uv and bun are there, node is not: run Python with uv run or uvx, never pip, and TypeScript with bun file.ts. Install packages with uv run --with pkg, into a venv under $HOME, or with bun add in a project under $HOME, never in /knowledge, and check a venv or node_modules exists before using it. Redirect a background job's output (job >/tmp/log 2>&1 &), or the command waits to its deadline. A hard link or an unreadable file in /knowledge saves nothing.";
 
 const OPEN_WORDS =
   "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. To point to one, write its /knowledge/ path. ";
@@ -223,6 +246,7 @@ export function asSubagent(
 ): string {
   const out = description
     .replace(OPEN_WORDS, "")
+    .replace(PARENT_TMP, SUBAGENT_TMP)
     .replace(networkWords(web, parent), () => networkWords(web, own));
   // the sandbox's hosts are the setting's of when the send began, so
   // only its credential sentences are swapped
@@ -241,13 +265,25 @@ export function makeBashTool({
   docs = true,
   subagent = false,
   sandbox = bash?.sandbox?.() ?? null,
+  commandSeconds = bash?.sandboxCommandSeconds?.() ?? COMMAND_SECONDS,
+  idleMinutes = bash?.sandboxIdleMinutes?.() ?? IDLE_MINUTES,
+  deadlineMs = null,
 }: BashToolOptions = {}): Tool<ToolResult> {
+  // a real shell's work takes minutes: under the sandbox a command has
+  // its own time, the built-in shell keeps the call timeout
+  const commandMs = sandbox !== null ? commandSeconds * 1000 : null;
+  // a run's deadline may be shorter than a command's own time
+  const promisedMs =
+    deadlineMs === null
+      ? commandSeconds * 1000
+      : Math.min(commandSeconds * 1000, deadlineMs);
   return {
     name: "bash",
+    ...(commandMs === null ? {} : { timeoutMs: commandMs }),
     // past the mount's own backstop, so its words end a stuck command
     graceMs: BACKSTOP_MS + 500,
     description:
-      `Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. ${sandbox !== null ? SANDBOX_TOOLS : BUILTIN_TOOLS} Never write secrets, since others can read this chat and the project. ` +
+      `Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. ${sandbox === null ? BUILTIN_TMP : subagent ? SUBAGENT_TMP : sandboxTmp(idleMinutes)} /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. ${sandbox !== null ? `${SANDBOX_TOOLS} A command may run up to ${durationWords(promisedMs)}.` : BUILTIN_TOOLS} Never write secrets, since others can read this chat and the project. ` +
       (subagent ? "" : OPEN_WORDS) +
       (sandbox !== null
         ? sandboxNetworkWords(
@@ -288,6 +324,7 @@ export function makeBashTool({
       const repos = ctx.repos ?? null;
       const caps = {
         callTimeoutMs: ctx.caps.callTimeoutMs,
+        ...(commandMs === null ? {} : { sandboxCommandMs: commandMs }),
         resultCut: ctx.caps.resultCut,
         visuals,
         knowledge: docs,

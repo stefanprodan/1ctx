@@ -39,6 +39,11 @@ export const SANDBOX_ENV: Readonly<Record<string, string>> = {
   UV_PYTHON_DOWNLOADS: "never",
   UV_CACHE_DIR: `${HOME}/.cache/uv`,
   UV_LINK_MODE: "copy",
+  // bun's cache and global packages stay in HOME, never /knowledge,
+  // which is saved after a command
+  BUN_INSTALL: `${HOME}/.bun`,
+  BUN_INSTALL_CACHE_DIR: `${HOME}/.bun/install/cache`,
+  DO_NOT_TRACK: "1",
   PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 };
 
@@ -109,7 +114,6 @@ export function mountsKey(repos: readonly ShellRepo[]): string {
 export function fitsCaps(caps: KnowledgeCaps, stored: StoredBytes): boolean {
   return (
     stored.docs <= caps.knowledgeProjectBytes &&
-    stored.scratch <= caps.scratchBytes &&
     stored.uploads <= caps.uploadBytes &&
     stored.kept <= caps.mcpKeptBytes
   );
@@ -125,17 +129,16 @@ export function createSpec(input: {
   stored?: StoredBytes;
 }): CreateSpec {
   const { caps } = input;
-  // Docker mounts a tmpfs noexec unless told: a script in /tmp or a
-  // tool uv installs in HOME must run. A tree over a lowered cap is
-  // sized to what it holds, so the command that shrinks it can mount it
-  const tree = (target: string, cap: number, held = 0, exec = false) => ({
+  // A tree over a lowered cap is sized to what it holds, so the command
+  // that shrinks it can mount it. /tmp, HOME and /sandbox/tmp are the
+  // container's own disk, which the memory limit does not count
+  const tree = (target: string, cap: number, held = 0) => ({
     type: "tmpfs" as const,
     target,
     sizeBytes: Math.max(cap, held) + TREE_SLACK_BYTES,
-    exec,
+    exec: false,
   });
   const stored = input.stored;
-  const home = caps.sandboxHomeMiB * MiB;
   return {
     name: input.name,
     labels: { [INSTANCE_LABEL]: input.instanceId },
@@ -145,12 +148,9 @@ export function createSpec(input: {
     memoryMiB: caps.sandboxMemoryMiB,
     policy: POLICY,
     mounts: [
-      tree("/tmp", caps.scratchBytes, stored?.scratch, true),
       tree("/knowledge", caps.knowledgeProjectBytes, stored?.docs),
       tree("/uploads", caps.uploadBytes, stored?.uploads),
       tree("/mcp", caps.mcpKeptBytes, stored?.kept),
-      { type: "tmpfs", target: HOME, sizeBytes: home, exec: true },
-      { type: "tmpfs", target: "/sandbox/tmp", sizeBytes: home, exec: true },
       {
         type: "tmpfs",
         target: "/sandbox/.1ctx",

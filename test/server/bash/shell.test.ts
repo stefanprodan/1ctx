@@ -16,6 +16,7 @@ import type {
 } from "../../../src/server/bash/index.ts";
 import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { acquireProcess } from "../../../src/server/knowledge/queue.ts";
+import { freeSlots } from "../../helpers/slots.ts";
 import {
   afterMountRead,
   callCaps,
@@ -65,6 +66,53 @@ const create = (s: Setup, name: string, text: string) =>
   s.knowledge.create(s.projectId, s.author, name, text);
 
 describe("the shell port", () => {
+  test.serial(
+    "the built-in shell's command holds its process slot",
+    async () => {
+      const during: number[] = [];
+      const s = setup({}, undefined, undefined, (builtin) => ({
+        async run(job, context, hooks, stops) {
+          during.push(await freeSlots());
+          return builtin.run(job, context, hooks, stops);
+        },
+      }));
+      try {
+        expect((await run(s, "true")).error).toBe(false);
+        expect(during).toEqual([PROCESS_SLOTS - 1]);
+        expect(await freeSlots()).toBe(PROCESS_SLOTS);
+      } finally {
+        s.db.close();
+      }
+    },
+  );
+
+  test("a sandbox command runs to sandboxCommandMs, any other shell to the call timeout", async () => {
+    for (const sandboxTimeout of [true, false]) {
+      const ends: number[] = [];
+      const s = setup({}, undefined, undefined, (builtin) => ({
+        ...(sandboxTimeout ? { sandboxTimeout: true as const } : {}),
+        async run(job, context, hooks, stops) {
+          ends.push(job.endsAt);
+          return builtin.run(job, context, hooks, stops);
+        },
+      }));
+      try {
+        const before = Date.now();
+        const result = await run(s, "true", {
+          ...callCaps,
+          sandboxCommandMs: 600_000,
+        });
+        const after = Date.now();
+        expect(result.error).toBe(false);
+        const limit = sandboxTimeout ? 600_000 : callCaps.callTimeoutMs;
+        expect(ends[0]!).toBeGreaterThanOrEqual(before + limit);
+        expect(ends[0]!).toBeLessThanOrEqual(after + limit);
+      } finally {
+        s.db.close();
+      }
+    }
+  });
+
   test("a backend gets the send and what was mounted, apart from the job", async () => {
     const { seen, shell } = watched();
     const s = setup({}, undefined, undefined, shell);
@@ -74,7 +122,7 @@ describe("the shell port", () => {
       expect(seen.contexts).toHaveLength(1);
       const { stored, ...context } = seen.contexts[0]!;
       // the totals a shell sizes its trees by, before the mount
-      expect(stored?.()).toEqual({ docs: 4, scratch: 0, uploads: 0, kept: 0 });
+      expect(stored?.()).toEqual({ docs: 4, uploads: 0, kept: 0 });
       expect(context).toEqual({
         projectId: s.projectId,
         workspace: { id: s.session.id, sessionId: s.session.id },

@@ -100,6 +100,7 @@ const EXPECTED_IDS = [
   "0085-turn-note",
   "0086-sandbox",
   "0087-sandbox-network",
+  "0088-sandbox-home",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2120,6 +2121,23 @@ describe("the schema", () => {
       expect(() =>
         db.query("update sandbox_settings set shell = 'docker'").run(),
       ).toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0088 drops a saved sandbox home limit and keeps the others", () => {
+    const db = seed(MIGRATIONS.slice(0, 87));
+    try {
+      const insert = db.query(
+        "insert into limits (name, value, updated_at) values (?, ?, 1)",
+      );
+      insert.run("sandboxHomeMiB", 1024);
+      insert.run("sandboxCpus", 4);
+      expect(migrate(db)).toEqual(expectedFrom("0088-sandbox-home"));
+      expect(db.query("select name, value from limits").all()).toEqual([
+        { name: "sandboxCpus", value: 4 },
+      ]);
     } finally {
       db.close();
     }
@@ -4680,6 +4698,7 @@ describe("project channel migrations", () => {
       "0085-turn-note",
       "0086-sandbox",
       "0087-sandbox-network",
+      "0088-sandbox-home",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4904,6 +4923,7 @@ describe("project channel migrations", () => {
           "0085-turn-note",
           "0086-sandbox",
           "0087-sandbox-network",
+          "0088-sandbox-home",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5077,6 +5097,7 @@ describe("project channel migrations", () => {
         "0085-turn-note",
         "0086-sandbox",
         "0087-sandbox-network",
+        "0088-sandbox-home",
       ]);
       expect(
         db

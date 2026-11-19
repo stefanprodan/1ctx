@@ -82,7 +82,7 @@ export const LIMIT_NAMES = [
   "sandboxIdleMinutes",
   "sandboxCpus",
   "sandboxMemoryMiB",
-  "sandboxHomeMiB",
+  "sandboxCommandSeconds",
 ] as const;
 export type LimitName = (typeof LIMIT_NAMES)[number];
 
@@ -97,6 +97,7 @@ export const LIMIT_UNITS = [
   "hours",
   "pixels",
   "mebibytes",
+  "seconds",
 ] as const;
 export type LimitUnit = (typeof LIMIT_UNITS)[number];
 

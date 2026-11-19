@@ -3,20 +3,32 @@
 //
 // The sandbox backend behind mount.ts with the real commit: what it
 // read back lands in the rows, the sandbox is put back to what the rows
-// store, and the next command pushes only what changed since.
+// store, the next command pushes only what changed since, and /tmp is
+// the sandbox's own, so no scratch row is read, written or deleted.
 
 import { describe, expect, test } from "bun:test";
+import { PROCESS_SLOTS } from "../../../src/server/knowledge/limits.ts";
 import { wallClock } from "../../../src/server/lib/clock.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { sandboxBackend } from "../../../src/server/sandbox/backend.ts";
+import { HELPER_SOURCES } from "../../../src/server/sandbox/helpers.ts";
 import { Leases } from "../../../src/server/sandbox/index.ts";
 import { TREE_SLACK_BYTES } from "../../../src/server/sandbox/spec.ts";
 import { fakeGateway } from "../../helpers/sandbox.ts";
 import type { CommandEffect, FakeFs } from "../../helpers/sandbox-fs.ts";
-import { callCaps, run, scratchState, setup } from "../bash/helpers.ts";
+import { freeSlots } from "../../helpers/slots.ts";
+import {
+  callCaps,
+  run,
+  scratchState,
+  seedScratch,
+  setup,
+} from "../bash/helpers.ts";
 
-function sandboxed(plays: Record<string, (fs: FakeFs) => CommandEffect>) {
+function sandboxed(
+  plays: Record<string, (fs: FakeFs) => CommandEffect | Promise<CommandEffect>>,
+) {
   const fake = fakeGateway();
   fake.onFiles = (_, fs) => {
     fs.onCommand = ({ command, fs: tree }) => plays[command]?.(tree) ?? {};
@@ -43,6 +55,7 @@ function sandboxed(plays: Record<string, (fs: FakeFs) => CommandEffect>) {
     limits: () => limits,
   });
   const s = setup({}, undefined, undefined, () => ({
+    ownTmp: true,
     acquire: (call, deadline, signal) => leases.acquire(call, deadline, signal),
     run: backend.run,
   }));
@@ -105,13 +118,13 @@ describe("the sandbox behind the mount", () => {
       await t.backend.idle();
       const scratch = scratchState(t.s);
       expect(scratch.cwd).toBe("/tmp");
-      expect(scratch.entries.map((file) => file.path)).toEqual(["s.txt"]);
+      expect(scratch.entries).toEqual([]);
       const doc = t.s.knowledge.store.mounted(t.s.projectId)[0]!;
       expect(new TextDecoder().decode(doc.data)).toBe("new\n");
       const tree = t.files().tree();
-      // the stored text, BOM dropped, at the doc's time; scratch at used_at
+      // the stored text, BOM dropped, at the doc's time; /tmp as left
       expect(tree["/knowledge/a.md"]).toBe(`644 ${doc.updatedAt} new\n`);
-      expect(tree["/tmp/s.txt"]).toBe(`644 ${scratch.usedAt} s`);
+      expect(tree["/tmp/s.txt"]).toBe("644 0 s");
       const calls = t.files().calls.length;
       const again = await run(t.s, "noop", callCaps);
       expect(again.error).toBe(false);
@@ -125,14 +138,13 @@ describe("the sandbox behind the mount", () => {
         "pull",
         "records",
       ]);
+      // a later used_at moves nothing in the sandbox either
       t.s.now.value += 1000;
+      const later = t.files().calls.length;
       await run(t.s, "noop", callCaps);
       await t.backend.idle();
-      // scratch's new used_at, one frame a file and folder
-      expect(t.files().calls.at(-1)).toBe("push");
-      expect(t.files().tree()["/tmp/s.txt"]).toBe(
-        `644 ${scratchState(t.s).usedAt} s`,
-      );
+      expect(t.files().calls.slice(later)).not.toContain("push");
+      expect(t.files().tree()["/tmp/s.txt"]).toBe("644 0 s");
     } finally {
       t.leases.close();
       t.s.db.close();
@@ -150,11 +162,94 @@ describe("the sandbox behind the mount", () => {
     try {
       const result = await run(t.s, "touch", callCaps);
       expect(result.content).toContain("changes under /uploads were discarded");
-      expect(scratchState(t.s).entries.map((file) => file.path)).toEqual([
-        "kept.txt",
-      ]);
+      expect(scratchState(t.s).entries).toEqual([]);
       await t.backend.idle();
       expect(t.fake.deletes).toHaveLength(1);
+    } finally {
+      t.leases.close();
+      t.s.db.close();
+    }
+  });
+
+  test.serial(
+    "the remote command holds no process slot, its read back does",
+    async () => {
+      const during: number[] = [];
+      const t = sandboxed({
+        wait: async () => {
+          during.push(await freeSlots());
+          return { stdout: "done\n" };
+        },
+      });
+      // the walk, the first exec after the command, runs holding one
+      const walking: number[] = [];
+      const play = t.fake.onFiles!;
+      t.fake.onFiles = (name, fs) => {
+        play(name, fs);
+        const exec = fs.exec.bind(fs);
+        fs.exec = async function* (request) {
+          if (request.command[4] === HELPER_SOURCES.walk)
+            walking.push(await freeSlots());
+          yield* exec(request);
+        };
+      };
+      try {
+        const result = await run(t.s, "wait", callCaps);
+        expect(result.error).toBe(false);
+        expect(during).toEqual([PROCESS_SLOTS]);
+        expect(walking).toEqual([PROCESS_SLOTS - 1]);
+        expect(await freeSlots()).toBe(PROCESS_SLOTS);
+        await t.backend.idle();
+      } finally {
+        t.leases.close();
+        t.s.db.close();
+      }
+    },
+  );
+
+  test("a command never writes or deletes a scratch row, whatever the cap", async () => {
+    const t = sandboxed({
+      churn: (fs) => {
+        fs.write("/tmp/old.txt", "changed");
+        fs.write("/tmp/new.txt", "new");
+        fs.nodes.set("/tmp/link", { kind: "link", target: "/" });
+        fs.write("/knowledge/a.md", "saved\n");
+        return { pwd: "/tmp" };
+      },
+    });
+    try {
+      const data = new TextEncoder().encode("x".repeat(3000));
+      seedScratch(t.s, {
+        written: [
+          { path: "old.txt", data, mode: 0o644 },
+          { path: "gone.txt", data, mode: 0o600 },
+          { path: "bad name", data, mode: 0o644 },
+        ],
+      });
+      const before = scratchState(t.s);
+      t.s.now.value += 60_000;
+      // stored scratch over a lowered cap holds no sandbox command back
+      t.limits.scratchBytes = 1000;
+      t.limits.scratchFiles = 10;
+      const result = await run(t.s, "churn", {
+        ...callCaps,
+        knowledge: true,
+      });
+      expect(result.error).toBe(false);
+      expect(result.content).not.toContain("left out");
+      await t.backend.idle();
+      const after = scratchState(t.s);
+      expect(after.entries).toEqual(before.entries);
+      expect(after.cwd).toBe("/tmp");
+      // the hidden rows age from their own last use
+      expect(after.usedAt).toBe(before.usedAt!);
+      // the rows were never pushed: the sandbox holds only its own
+      expect(t.files().tree()["/tmp/gone.txt"]).toBeUndefined();
+      expect(
+        new TextDecoder().decode(
+          t.s.knowledge.store.mounted(t.s.projectId)[0]!.data,
+        ),
+      ).toBe("saved\n");
     } finally {
       t.leases.close();
       t.s.db.close();

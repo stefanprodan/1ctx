@@ -84,6 +84,8 @@ type OfferDeps = {
   // the admin's external_task row is on and the external tasks are wired
   // to act on
   externalTaskOn?(): boolean;
+  // the sandbox shell runs the next command
+  sandbox?(): boolean;
   toolsFor(
     search: SearchProvider | null,
     hosts: readonly string[],
@@ -93,6 +95,8 @@ type OfferDeps = {
     credentials: SendCredentials,
     subagent?: boolean,
     chatMain?: boolean,
+    // the send's own deadline, which a command's time never passes
+    deadlineMs?: number | null,
   ): Tool<string | ToolResult>[];
   log: Log;
 };
@@ -378,6 +382,7 @@ export function offered(
     });
   }
   const skills = { block: skillCatalog.text, skills: agentSkills };
+  const sandbox = deps.sandbox?.() === true;
   const baseTools = fillYear(
     [
       ...deps
@@ -390,13 +395,14 @@ export function offered(
           credentials,
           subagent,
           chatSend && !subagent,
+          scope?.deadlineMs ?? null,
         )
         .filter((tool) => allowed.has(tool.name)),
       ...makeSkillTools(skills.skills, deps.skills),
       ...(memory === null ? [] : makeMemoryTools(memory)),
       // a main offer of an agent whose Subagents switch is on
       ...(scope?.phase === "main" && scope.delegate
-        ? [makeDelegateTool()]
+        ? [makeDelegateTool(sandbox)]
         : []),
     ].map(schema),
     now,
@@ -457,5 +463,6 @@ export function offered(
     memory,
     credentials: credentials.offered,
     credentialsOff: credentials.off,
+    ...(sandbox ? { sandbox: true as const } : {}),
   };
 }

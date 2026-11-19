@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // A walk read as the read-back rules list a tree: every entry with its
-// kind and mode, the bytes of a file under /knowledge or /tmp from the
-// rows when its hash is unchanged and pulled when it is not, an upload's
-// only when unchanged. What a command changed where nothing commits is
+// kind and mode, the bytes of a file under /knowledge from the rows when
+// its hash is unchanged and pulled when it is not, an upload's only when
+// unchanged. /tmp is the sandbox's own and never walked. What a command changed where nothing commits is
 // marked, so its sandbox is recycled. A name that would be saved must
 // be UTF-8, as every name the built-in shell makes is, and must not
 // hold a key the command was handed. The records a command leaves (its
@@ -51,9 +51,12 @@ const keptOnly = (path: string, job: Job) =>
   path.startsWith("/mcp/") ||
   (!job.docs && underKnowledge(path));
 
-// what a commit would save: a doc while docs are on, any scratch file
-const saved = (path: string, job: Job) =>
-  (job.docs && underKnowledge(path)) || path.startsWith("/tmp/");
+// what a commit would save: a doc while docs are on
+const saved = (path: string, job: Job) => job.docs && underKnowledge(path);
+
+// /tmp as the rules read it: an empty scratch the command left alone,
+// since the sandbox keeps its own and no row is saved from it
+const TMP: TreeEntry = { path: "/tmp", kind: "dir", mode: 0o1777 };
 
 export function readout(
   walked: readonly WalkEntry[],
@@ -65,7 +68,7 @@ export function readout(
   const forms = credentials.flatMap((credential) =>
     "key" in credential ? escapedForms(credential.key) : [],
   );
-  const entries: TreeEntry[] = [];
+  const entries: TreeEntry[] = [TMP];
   const folders = new Set<string>();
   const held: Held = new Map();
   const pulls: Readout["pulls"] = new Map();

@@ -3,7 +3,9 @@
 //
 // The shared tree fixtures through the sandbox backend: the case's rows
 // pushed, its tree left by the command, the walk and pull read back by
-// the same rules, the answer as the builtin shell's.
+// the same rules, the answer as the builtin shell's but for /tmp, which
+// is the sandbox's own: never read back, so no scratch change and no
+// refusal from it.
 
 import { describe, expect, test } from "bun:test";
 import { TREE_CASES } from "../../fixtures/bash/tree-cases.ts";
@@ -22,6 +24,24 @@ const SKIPPED = new Set([
 ]);
 const REPOS =
   "changes under /repos were discarded: copy a file to /tmp to change it\n";
+
+type Expected = (typeof TREE_CASES)[number]["expected"];
+
+// the builtin's answer with /tmp left alone
+function sandboxed(expected: Expected, cwd: string): Expected {
+  if ("refusedContains" in expected) {
+    if (!expected.refusedContains.startsWith("/tmp/")) return expected;
+    return {
+      changes: { knowledge: [], written: [], removed: [], cwd },
+      refused: null,
+    };
+  }
+  if (expected.changes === null) return expected;
+  return {
+    ...expected,
+    changes: { ...expected.changes, written: [], removed: [] },
+  };
+}
 
 describe("the tree fixtures through the sandbox", () => {
   for (const item of TREE_CASES.filter((each) => !SKIPPED.has(each.name))) {
@@ -78,12 +98,13 @@ describe("the tree fixtures through the sandbox", () => {
       });
       const answer = answerOf(ran.settled);
       expect(answer.notice).toBe(item.notice.replace(REPOS, ""));
-      if ("refusedContains" in item.expected) {
+      const expected = sandboxed(item.expected, item.pwd ?? mount.cwd);
+      if ("refusedContains" in expected) {
         expect(answer.changes).toBeNull();
-        expect(answer.refused).toContain(item.expected.refusedContains);
+        expect(answer.refused).toContain(expected.refusedContains);
       } else {
         expect({ changes: answer.changes, refused: answer.refused }).toEqual(
-          item.expected,
+          expected,
         );
       }
       ran.settle({ landed: false, why: "skipped" });

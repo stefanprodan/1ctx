@@ -42,7 +42,10 @@ import {
 import { envName } from "../src/server/sandbox/rules.ts";
 import { secrets } from "../src/server/secrets/index.ts";
 import type { HttpMethod } from "../src/shared/contracts/credential.ts";
-import type { SandboxNet } from "../src/shared/sandbox-net.ts";
+import {
+  SANDBOX_DEFAULT_HOSTS,
+  type SandboxNet,
+} from "../src/shared/sandbox-net.ts";
 
 const { values: flags } = parseArgs({
   options: {
@@ -148,7 +151,7 @@ const gateway: Gateway = {
     return real.setPolicy(...args);
   },
 };
-const limits = { ...DEFAULT_LIMITS, sandboxHomeMiB: 64 };
+const limits = { ...DEFAULT_LIMITS };
 const log = logger("sandbox-net-check");
 const leases = new Leases({
   clock: wallClock,
@@ -171,6 +174,10 @@ const WILD: SandboxNet = {
   hosts: ["**.hf.co", "*.githubusercontent.com", "httpbin.org"],
 };
 const OFF: SandboxNet = { mode: "off", hosts: LISTED.hosts };
+const DEFAULTS: SandboxNet = {
+  mode: "hosts",
+  hosts: [...SANDBOX_DEFAULT_HOSTS],
+};
 // what the leases read at each command, as the settings row would say
 let net: SandboxNet = LISTED;
 
@@ -320,7 +327,7 @@ async function main() {
         "wrong-header",
         `-H "X-Other: ${H}" https://httpbin.org/anything/hdr/x`,
       ),
-      `curl -s -m 15 -H "Authorization: Bearer ${A}" https://httpbin.org/anything/signed/echo > /tmp/echo.json`,
+      `curl -s -m 15 -H "Authorization: Bearer ${A}" https://httpbin.org/anything/signed/echo > /knowledge/echo.json`,
     ].join("\n"),
   );
   const out = first.raw;
@@ -355,12 +362,12 @@ async function main() {
     "an echoed key is scrubbed from the output and the pulled file",
     !first.shown.includes(signedKey) &&
       first.shown.includes(`[credential ${SIGNED.name}]`) &&
-      first.changes?.written.some((file) => file.path === "echo.json") ===
+      first.changes?.knowledge.some((doc) => doc.name === "echo.json") ===
         true &&
-      first.changes.written.every(
-        (file) => !new TextDecoder().decode(file.data).includes(signedKey),
+      first.changes.knowledge.every(
+        (doc) => doc.text === null || !doc.text.includes(signedKey),
       ),
-    `written ${first.changes?.written.map((file) => file.path).join(", ")}`,
+    `saved ${first.changes?.knowledge.map((doc) => doc.name).join(", ")}`,
   );
   report(
     "a credential OpenShell cannot place is left out and named",
@@ -589,6 +596,38 @@ async function main() {
       .join(", "),
   );
 
+  // a scoped package too: its registry path holds an encoded slash
+  const bun = await command(
+    DEFAULTS,
+    [],
+    [
+      `mkdir -p "$HOME/bun-check" && cd "$HOME/bun-check"`,
+      `printf '{"name":"bun-check","private":true}' > package.json`,
+      `printf 'import { z } from "zod";\\nconsole.log(z.string().parse("zod-ok"));\\n' > x.ts`,
+      `bun add zod @types/node > "$HOME/bun-add.log" 2>&1; echo "add $?"`,
+      `grep -iE 'error|403|denied|refused' "$HOME/bun-add.log" | head -5`,
+      `printf 'types '; cat node_modules/@types/node/package.json | jq -r .name`,
+      `printf 'run '; bun run x.ts 2>&1 | tail -1`,
+      `printf 'cache '; ls "$HOME/.bun/install/cache" | grep -c .`,
+      `printf 'npm-encoded '; curl -s -m 15 -o /dev/null -w '%{http_code}' 'https://registry.npmjs.org/@types%2fnode'; echo`,
+    ].join("\n"),
+  );
+  const n = bun.raw;
+  report(
+    "an encoded slash passes on the npm registry",
+    lineOf(n, "npm-encoded") === "npm-encoded 200",
+    lineOf(n, "npm-encoded"),
+  );
+  report(
+    "bun adds a package and a scoped one from the defaults, and runs TypeScript",
+    lineOf(n, "add") === "add 0" &&
+      lineOf(n, "types") === "types @types/node" &&
+      lineOf(n, "run") === "run zod-ok" &&
+      Number(lineOf(n, "cache").split(" ")[1]) > 0 &&
+      (bun.changes?.written.length ?? 0) === 0,
+    `${bun.ms}ms; ${brief(n)}; /tmp written ${bun.changes?.written.length ?? 0}`,
+  );
+
   const off = await command(
     OFF,
     [HEADER],
@@ -599,10 +638,10 @@ async function main() {
   );
   report(
     "off recycles, attaches nothing and nothing reaches out",
-    off.sandbox !== wild.sandbox &&
+    off.sandbox !== bun.sandbox &&
       off.raw.startsWith("0\n") &&
       status(off.raw, "off") === "000",
-    `${wild.sandbox} -> ${off.sandbox} (${off.loaded} load); ${lineOf(off.raw, "off")}`,
+    `${bun.sandbox} -> ${off.sandbox} (${off.loaded} load); ${lineOf(off.raw, "off")}`,
   );
 }
 
