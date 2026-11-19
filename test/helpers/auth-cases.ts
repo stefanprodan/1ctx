@@ -504,6 +504,23 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "GET",
+    path: "/api/admin/sandbox",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "PUT",
+    path: "/api/admin/sandbox",
+    // admin: the builtin shell, saved as it is
+    body: { shell: "builtin" },
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
+    path: "/api/admin/sandbox/leases",
+    expect: { anonymous: 401, member: 403, admin: 200 },
+  },
+  {
+    method: "GET",
     path: "/api/admin/dictation",
     expect: { anonymous: 401, member: 403, admin: 200 },
   },

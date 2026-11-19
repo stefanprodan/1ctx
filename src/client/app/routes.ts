@@ -80,6 +80,7 @@ import {
   providers,
 } from "../data/providers.ts";
 import { loadRepos } from "../data/repos.ts";
+import { loadSandbox } from "../data/sandbox.ts";
 import {
   homeProjectId,
   loadList,
@@ -838,6 +839,15 @@ export const ROUTES: Route[] = [
     load: async () => {
       await Promise.all([loadDictation(), loadProviders(), loadOverview()]);
     },
+  },
+  {
+    path: "/admin/config/sandbox",
+    view: lazy(() =>
+      import("../views/admin/Sandbox.tsx").then((m) => m.Sandbox),
+    ),
+    title: () => "Sandbox",
+    role: "admin",
+    load: loadSandbox,
   },
   {
     path: "/admin/config/decisions",

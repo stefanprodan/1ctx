@@ -147,7 +147,7 @@ export function bashArea(deps: BashDeps): BashArea {
   };
 }
 
-export { BACKSTOP_MS } from "./commands.ts";
+export { BACKSTOP_MS, MAX_OPENS_PER_COMMAND } from "./commands.ts";
 export {
   type CommandCredential,
   escapedForms,

@@ -142,6 +142,19 @@ export type ImageCaps = {
   imagesPerHour: number;
 };
 
+// the sandbox shell's sandboxes, read at each lease and create: how
+// many the instance keeps, the warm ones among them, the minutes an
+// unused one is kept, and what each may use
+export type SandboxCaps = {
+  sandboxesMax: number;
+  sandboxWarm: number;
+  sandboxIdleMinutes: number;
+  sandboxCpus: number;
+  sandboxMemoryMiB: number;
+  // /opt/home and /sandbox/tmp, each; programs' own files
+  sandboxHomeMiB: number;
+};
+
 export type Limits = LoopLimits &
   ChannelCaps &
   ToolCaps &
@@ -152,7 +165,8 @@ export type Limits = LoopLimits &
   RepoCaps &
   ExternalCaps &
   DictationCaps &
-  ImageCaps & { runDeadlineMs: number; sendDeadlineMs: number };
+  ImageCaps &
+  SandboxCaps & { runDeadlineMs: number; sendDeadlineMs: number };
 
 export type LimitDefinition = {
   default: number;
@@ -252,6 +266,14 @@ export const LIMIT_DEFINITIONS: Record<LimitName, LimitDefinition> = {
   imagesPerRequest: limit(20, 1, 100, "count", "images"),
   imageProjectBytes: limit(GiB, 256 * MiB, 50 * GiB, "bytes", "images"),
   imagesPerHour: limit(60, 10, 1000, "count", "images"),
+  sandboxesMax: limit(20, 1, 256, "count", "sandbox"),
+  // a warm one is a sandbox too, so the pool stays under the cap
+  sandboxWarm: limit(0, 0, 32, "count", "sandbox"),
+  sandboxIdleMinutes: limit(5, 1, 240, "minutes", "sandbox"),
+  sandboxCpus: limit(2, 1, 64, "count", "sandbox"),
+  // the trees' tmpfs bytes count against it too
+  sandboxMemoryMiB: limit(2048, 256, 65_536, "mebibytes", "sandbox"),
+  sandboxHomeMiB: limit(512, 64, 8192, "mebibytes", "sandbox"),
 };
 
 // the table on the given cores; only the process cap's default moves

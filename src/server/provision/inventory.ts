@@ -50,6 +50,8 @@ export function inventoryOf(sources: InventorySources): Inventory {
     Provider: sources.providers.list().map((row) => row.name),
     Decider: sources.deciders.list().map((row) => row.name),
     Dictation: sources.dictation.settings() === null ? [] : ["dictation"],
+    // made with the database, so always held
+    Sandbox: ["sandbox"],
     Skill: sources.skills.names(),
     McpServer: sources.mcp.list().map((row) => row.name),
     Agent: sources.agents.list().map((row) => row.name),

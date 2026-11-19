@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { McpProjects } from "../../../shared/api/mcp.ts";
-import type {
-  McpChange,
-  McpOn,
-  McpServerSummary,
-  McpSide,
+import {
+  MCP_TIMEOUT_MS,
+  type McpChange,
+  type McpOn,
+  type McpServerSummary,
+  type McpSide,
 } from "../../../shared/contracts/mcp.ts";
 import { classify, serverBlock } from "../../../shared/mcp.ts";
-import { MCP_TIMEOUT_MS } from "../../../shared/words.ts";
 import { ago, pluralCommas } from "../../lib/format.ts";
 import { cutLines } from "../../lib/lines.ts";
 import { onCount, onWords } from "../directory/Directory.model.ts";

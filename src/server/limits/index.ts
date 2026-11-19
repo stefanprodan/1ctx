@@ -13,6 +13,7 @@ import {
   type LimitDefinition,
   type Limits,
   limitDefinitions,
+  type SandboxCaps,
   type SendCaps,
 } from "./defaults.ts";
 import { routes } from "./routes.ts";
@@ -29,6 +30,7 @@ export {
   LIMIT_DEFINITIONS,
   type Limits,
   type LoopLimits,
+  type SandboxCaps,
   type SendCaps,
   scheduledShare,
   sendsRunningDefault,
@@ -54,8 +56,12 @@ export type LimitsArea = {
 };
 
 // a user's cap never reads larger than the project's, nor the
-// project's than the process's; a message's images always fit a request
-function ordered(caps: SendCaps & ImageCaps): void {
+// project's than the process's; a message's images always fit a
+// request; the warm sandboxes fit the cap
+function ordered(caps: SendCaps & ImageCaps & SandboxCaps): void {
+  if (caps.sandboxWarm > caps.sandboxesMax) {
+    throw new BadRequest("sandboxWarm must not be above sandboxesMax");
+  }
   if (caps.imagesPerMessage > caps.imagesPerRequest) {
     throw new BadRequest("imagesPerMessage must not be above imagesPerRequest");
   }

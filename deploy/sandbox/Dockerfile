@@ -43,24 +43,30 @@ RUN set -eu; \
 
 # The base image's ubuntu user holds uid 1000, the workload's.
 # /knowledge, /uploads and /mcp hold rows the server pushes as the
-# workload, /sandbox/home and /sandbox/tmp the programs' own files, and
+# workload, /opt/home and /sandbox/tmp the programs' own files, and
 # /sandbox/.1ctx a command's records; /repos takes read-only mounts.
+# OpenShell keeps the image's home and working folder for its
+# workspace and refuses a mount there, so both are /sandbox, its
+# workspace, and the server's HOME, /opt/home, a tmpfs it mounts and
+# sets on each exec, is never either.
 RUN userdel -r ubuntu \
  && groupadd -g 1000 sandbox \
- && useradd -u 1000 -g 1000 -d /sandbox/home -s /bin/bash sandbox \
+ && useradd -u 1000 -g 1000 -d /sandbox -s /bin/bash sandbox \
  && mkdir -p /knowledge /uploads /mcp /repos \
-      /sandbox/home /sandbox/tmp /sandbox/.1ctx \
+      /opt/home /sandbox/tmp /sandbox/.1ctx \
  && chown sandbox:sandbox /knowledge /uploads /mcp \
-      /sandbox /sandbox/home /sandbox/tmp /sandbox/.1ctx \
+      /sandbox /opt/home /sandbox/tmp /sandbox/.1ctx \
  && chmod 1777 /tmp
 
-# uv runs the image's python3 and keeps its cache where the home's size
-# caps it; a copy, since the cache and a project sit on different mounts
-ENV HOME=/sandbox/home \
+# For docker run only: OpenShell's execs do not see these, so the
+# server passes its own. uv runs the image's python3, keeps
+# its cache where the home's size caps it, and copies, since the cache
+# and a project sit on different mounts
+ENV HOME=/sandbox \
     TMPDIR=/sandbox/tmp \
     UV_PYTHON_DOWNLOADS=never \
-    UV_CACHE_DIR=/sandbox/home/.cache/uv \
+    UV_CACHE_DIR=/opt/home/.cache/uv \
     UV_LINK_MODE=copy
 
 USER sandbox
-WORKDIR /sandbox/home
+WORKDIR /sandbox

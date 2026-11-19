@@ -57,8 +57,11 @@ make models         # refresh src/server/providers/models.json from models.dev
 
 The preview is a local, throwaway instance for trying a change. It runs
 the source with `ONECTX_DEV=1` against `.preview/1ctx.sqlite` and the
-secrets in `.preview/secrets/`. A CSS edit hot-reloads, a client edit
-reloads the page, a server edit restarts the process. The first start
+secrets in `.preview/secrets/`. `PREVIEW_SHELL=sandbox` adds an
+OpenShell gateway and the sandbox shell (`docs/deploy.md`); a second
+checkout sets `PREVIEW_PORT` and `PREVIEW_GATEWAY_PORT`. A CSS edit
+hot-reloads, a client edit reloads the page, a server edit restarts
+the process. The first start
 writes `user-admin.key` with the password `admin-preview`. Check a UI
 change in Chrome through the DevTools MCP at 1440 and 390 wide; the
 console must stay empty. Report what was verified and how. Do not commit
@@ -149,7 +152,8 @@ change it in the same commit as the code that changes a rule.
 | `docs/composer.md` | `composer/`: the draft, its files and switches, the slash commands |
 | `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
-| `docs/access.md` | requests and the router, logins, users, names, project visibility, secrets, the socket, links by email |
+| `docs/access.md` | requests and the router, logins, users, names, project visibility, the socket, links by email |
+| `docs/secrets.md` | `secrets/`: the secret files, their kinds, reads and the log scrub |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, stream bounds |
@@ -173,6 +177,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
 | `docs/dictation.md` | `dictation/`: the Dictation setting, `POST /api/transcribe`, its WAV check, cap, call and usage row |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
+| `docs/sandbox.md` | `sandbox/`: the sandbox shell's settings, the gateway port, leases, the pool, the sweeps |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |
@@ -249,7 +254,7 @@ fixture under `test/fixtures/structure/`.
 - **Secrets are files**, one bare value per `<kind>-<name>.key`, read
   through the secrets port bound to the caller's kind. A value is never
   logged, returned by a route or stored in the database
-  (`docs/access.md`).
+  (`docs/secrets.md`).
 - **Session is the domain noun** and never means a cookie; the cookie
   is a login.
 - **A log line is one slog text event** on stderr, from `logger(area)`

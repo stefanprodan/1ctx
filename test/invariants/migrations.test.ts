@@ -98,6 +98,7 @@ const EXPECTED_IDS = [
   "0083-mcp-access",
   "0084-channel-clear",
   "0085-turn-note",
+  "0086-sandbox",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2094,6 +2095,28 @@ describe("the schema", () => {
           turn_note: null,
         })),
       );
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0086 adds the sandbox settings row, builtin with no instance id yet", () => {
+    const db = seed(MIGRATIONS.slice(0, 85));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0086-sandbox"));
+      expect(db.query("select * from sandbox_settings").all()).toEqual([
+        {
+          id: 1,
+          shell: "builtin",
+          endpoint: null,
+          image: null,
+          instance_id: null,
+          updated_at: 0,
+        },
+      ]);
+      expect(() =>
+        db.query("update sandbox_settings set shell = 'docker'").run(),
+      ).toThrow();
     } finally {
       db.close();
     }
@@ -4625,6 +4648,7 @@ describe("project channel migrations", () => {
       "0083-mcp-access",
       "0084-channel-clear",
       "0085-turn-note",
+      "0086-sandbox",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -4847,6 +4871,7 @@ describe("project channel migrations", () => {
           "0083-mcp-access",
           "0084-channel-clear",
           "0085-turn-note",
+          "0086-sandbox",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5018,6 +5043,7 @@ describe("project channel migrations", () => {
         "0083-mcp-access",
         "0084-channel-clear",
         "0085-turn-note",
+        "0086-sandbox",
       ]);
       expect(
         db

@@ -80,6 +80,15 @@ reporting.
   so and links Providers. Both saves move `dictationOn`, so the admin's
   own composer follows at once. The aside reads `overviewTotals()`: clips, audio in minutes
   and cost, "not priced" while no clip named one.
+- **Sandbox is its own Config page, after Web access.** One Shell card
+  (the shell as a `Seg`, the gateway's https address, the image, empty
+  for the default) saves the whole row, as SMTP's Server card does;
+  `sandboxFieldOf()` matches the server's whole phrases. A saved
+  sandbox shell missing a key file says so in a `SettingAlert`. The
+  Sandboxes card lists the leases as `RowsLine`s, read again every 15
+  seconds while seen, a stuck one in bad words with its next step
+  (`stuckLine()`). The aside counts them, names the gateway label and
+  says whether each `openshell-` key file is found, never its value.
 - **The admin's own user page has no Reset password nor Disable.**
   `roleLock()` fixes their role and the last admin's.
 - **A user page lists the user's access keys from `userKeys`,** read

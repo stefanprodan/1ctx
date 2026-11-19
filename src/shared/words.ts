@@ -189,11 +189,13 @@ export const SECRET_KINDS = [
   "mcp-",
   "http-",
   "email-",
+  "openshell-",
 ] as const;
 export type SecretKind = (typeof SECRET_KINDS)[number];
 export const MCP_KEY_PREFIX = "mcp-" satisfies SecretKind;
 export const HTTP_KEY_PREFIX = "http-" satisfies SecretKind;
 export const EMAIL_KEY_PREFIX = "email-" satisfies SecretKind;
+export const OPENSHELL_KEY_PREFIX = "openshell-" satisfies SecretKind;
 
 export function isSecretName(kind: string, value: unknown): value is string {
   return (
@@ -208,10 +210,6 @@ export function isSecretName(kind: string, value: unknown): value is string {
 export const secretNameRule = (kind: SecretKind) =>
   `${kind} followed by 1 to 48 lowercase letters, digits and dashes, ` +
   "starting with a letter or digit";
-
-// an MCP server's own call timeout, null for the limits' callTimeoutMs
-export const MCP_TIMEOUT_MS = { min: 1_000, max: 3_600_000 } as const;
-export const MAX_MCP_URL = 2048;
 
 // every personal project is named this, so a team project may not be
 export const PERSONAL_PROJECT_NAME = "personal";

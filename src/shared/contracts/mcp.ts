@@ -6,6 +6,10 @@
 // is never stored: the page and the policy compute it from the
 // patterns through shared/mcp.ts.
 
+// an MCP server's own call timeout, null for the limits' callTimeoutMs
+export const MCP_TIMEOUT_MS = { min: 1_000, max: 3_600_000 } as const;
+export const MAX_MCP_URL = 2048;
+
 // what a refresh found different, with tool names
 export type McpChange = {
   at: number;
