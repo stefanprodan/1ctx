@@ -1,8 +1,10 @@
-# The sandbox's pull helper, run as python3 -I -S -c <this> <root>...
+# The sandbox's pull helper, run as
+#   python3 -I -S -c <this> <file bytes> <root>...
 # stdin: one percent-escaped path per line. For each, a frame on stdout:
 # a JSON header line {"path","size","mode"} then exactly `size` bytes, or
 # {"path","missing":true} when the path is no longer a regular file
-# reached without a link. Ends with PULL done <n>.
+# reached without a link. Ends with PULL done <n>. A file past <file
+# bytes> ends it with PULL refused size before a byte of it is sent.
 import errno, json, os, re, stat, sys
 
 PIECE = 1 << 16
@@ -41,7 +43,10 @@ def unescape(raw):
     return bytes(data)
 
 
-ROOTS = [os.fsencode(a) for a in sys.argv[1:]]
+if len(sys.argv) < 2 or not re.fullmatch(r"(0|[1-9][0-9]{0,15})", sys.argv[1]):
+    refuse("usage")
+CAP = int(sys.argv[1])
+ROOTS = [os.fsencode(a) for a in sys.argv[2:]]
 
 
 def split(path):
@@ -83,6 +88,8 @@ def frame(esc, fd):
         out.write(json.dumps(head, separators=(",", ":")).encode("ascii") + b"\n")
         return
     size = st.st_size
+    if size > CAP:
+        refuse("size")
     head = {"path": esc, "size": size, "mode": stat.S_IMODE(st.st_mode)}
     out.write(json.dumps(head, separators=(",", ":")).encode("ascii") + b"\n")
     left = size

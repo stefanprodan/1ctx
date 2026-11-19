@@ -91,16 +91,20 @@ gateway add`.
   `.preview/openshell/` on 17671 (`PREVIEW_GATEWAY_PORT` for a second
   checkout), after the server so its instance id is made, builds
   `1ctx-shell:dev` when missing, and turns the sandbox shell on. A
-  restart keeps an unchanged gateway. `preview-stop` stops it;
-  `preview-clean` and `preview-reset`, with or without the variable,
-  stop the server, delete every sandbox and provider under the
-  instance label through the gateway (started for it when down), stop
-  it and remove `.preview/openshell/`. A sandbox the gateway cannot
-  delete stops the clean with the `docker rm -f` and `docker volume rm`
-  commands for the containers and volumes labelled
+  restart keeps an unchanged gateway. The server counts as up only when
+  the preview port's one listener is the pid it started, so a stranger
+  on the port is refused before the admin password is sent.
+  `preview-stop` stops the gateway; `preview-clean` and `preview-reset`,
+  with or without the variable, stop the server, delete every sandbox
+  and provider under the instance label through the gateway (started for
+  it when down), stop it and remove `.preview/openshell/`. A sandbox the
+  gateway cannot delete stops the clean with the `docker rm -f` and
+  `docker volume rm` commands for the containers and volumes labelled
   `openshell.ai/sandbox-namespace=1ctx-<instance id>`; once none is
-  left, the clean goes on. A new database under a kept gateway sweeps
-  the old instance's sandboxes before the label changes.
+  left, the clean goes on. A gateway that outlives its stop fails the
+  command and keeps its pid file and directory. A new database under a
+  kept gateway sweeps the old instance's sandboxes before the label
+  changes.
 - **Staging: `STAGING_SANDBOX=1` in `scripts/staging.env`** makes
   `make staging-deploy` install it under `~/.1ctx/openshell` as the
   LaunchAgent `dev.1ctx.openshell` (`STAGING_GATEWAY_PORT`, 17671),

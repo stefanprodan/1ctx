@@ -5,12 +5,20 @@
 // kind and mode, the bytes of a file under /knowledge or /tmp from the
 // rows when its hash is unchanged and pulled when it is not, an upload's
 // only when unchanged. What a command changed where nothing commits is
-// marked, so its sandbox is recycled. The records a command leaves
-// (its cwd, open's copies) are hostile, and every one is checked.
+// marked, so its sandbox is recycled. A name that would be saved must
+// be UTF-8, as every name the built-in shell makes is, and must not
+// hold a key the command was handed. The records a command leaves (its
+// cwd, open's copies) are hostile, and every one is checked.
 
 import { textFromBytes } from "../../shared/knowledge.ts";
-import type { Job, OpenedRecord, TreeEntry } from "../bash/index.ts";
+import type {
+  CommandCredential,
+  Job,
+  OpenedRecord,
+  TreeEntry,
+} from "../bash/index.ts";
 import {
+  escapedForms,
   MAX_OPENS_PER_COMMAND,
   openedRecord,
   underKnowledge,
@@ -43,11 +51,20 @@ const keptOnly = (path: string, job: Job) =>
   path.startsWith("/mcp/") ||
   (!job.docs && underKnowledge(path));
 
+// what a commit would save: a doc while docs are on, any scratch file
+const saved = (path: string, job: Job) =>
+  (job.docs && underKnowledge(path)) || path.startsWith("/tmp/");
+
 export function readout(
   walked: readonly WalkEntry[],
   job: Job,
   wanted: Wanted,
+  credentials: readonly CommandCredential[] = [],
 ): Readout {
+  // every spelling the scrub replaces, so a name is held to the same
+  const forms = credentials.flatMap((credential) =>
+    "key" in credential ? escapedForms(credential.key) : [],
+  );
   const entries: TreeEntry[] = [];
   const folders = new Set<string>();
   const held: Held = new Map();
@@ -56,6 +73,12 @@ export function readout(
   const seen = new Set<string>();
   for (const at of walked) {
     const { path } = at;
+    // read lossily, the name would commit under another spelling
+    if (!at.unicode && saved(path, job))
+      throw new StepFailure("walk", "unicode");
+    // an echoed key a command wrote into a name is never stored
+    if (saved(path, job) && forms.some((form) => path.includes(form)))
+      throw new StepFailure("walk", "credential");
     const kind = KINDS[at.type];
     const top = path.split("/").length === 2;
     const want = wanted.tree.get(path);
@@ -91,8 +114,7 @@ export function readout(
     }
     // a changed upload reads as changed without its bytes, and /mcp is
     // judged by names alone
-    if ((job.docs && underKnowledge(path)) || path.startsWith("/tmp/"))
-      pulls.set(at.escaped, { entry, walked: at });
+    if (saved(path, job)) pulls.set(at.escaped, { entry, walked: at });
   }
   for (const path of wanted.tree.keys())
     if (keptOnly(path, job) && !seen.has(path)) discarded = true;
@@ -130,6 +152,25 @@ export function recordRequests(id: string, open: boolean): string[] {
 }
 
 export const RECORD_ROOTS = [RECORDS];
+
+// a path's bytes at Linux's PATH_MAX
+export const PATH_BYTES = 4096;
+
+// past any cwd or opened path the rules keep (/tmp/ and a 4095-byte
+// name), far under a file's bound
+const RECORD_PATH_BYTES = 2 * PATH_BYTES;
+
+// The records that hold a path, each bounded to one: the cwd raw, an
+// opened copy's name escaped with its newline. Read with a file's
+// bound, a hostile record would reach the split and unescape at any size.
+export function recordBounds(id: string, open: boolean): Map<string, number> {
+  const { cwd, opened } = recordPaths(id);
+  const out = new Map([[escapePath(cwd), RECORD_PATH_BYTES]]);
+  if (open)
+    for (let n = 1; n <= MAX_OPENS_PER_COMMAND; n++)
+      out.set(escapePath(`${opened}/${n}.path`), 3 * RECORD_PATH_BYTES + 1);
+  return out;
+}
 
 // The final cwd the wrapper wrote, or undefined: a record missing, not
 // UTF-8 or empty keeps the cwd the command started in.

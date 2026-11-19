@@ -47,6 +47,9 @@ export type BashDeps = {
   knowledge: DocsPort;
 };
 export type BashCapability = {
+  // the next command runs in the sandbox shell, not just-bash, so the
+  // tool's description says what differs
+  sandboxed?(): boolean;
   run(
     projectId: string,
     workspace: Workspace,
@@ -98,6 +101,7 @@ export function bashArea(deps: BashDeps): BashArea {
   const pick = deps.shell;
   return {
     scratch,
+    sandboxed: () => pick !== undefined && pick(builtin) !== builtin,
     run: (projectId, workspace, author, command, caps, signal, sendId) =>
       run(
         {
@@ -151,7 +155,9 @@ export { BACKSTOP_MS, MAX_OPENS_PER_COMMAND } from "./commands.ts";
 export {
   type CommandCredential,
   escapedForms,
+  REFUSALS,
   type Refusal,
+  scrubBytes,
   scrubKeys,
 } from "./credentials.ts";
 export type { Returned, ScratchBaseline } from "./handoff.ts";
@@ -209,6 +215,7 @@ export type {
   ShellHold,
   ShellRepo,
   ShellRun,
+  StoredBytes,
 } from "./shell.ts";
 export type {
   CommandHooks,

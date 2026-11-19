@@ -6,6 +6,7 @@ import {
   encodePush,
   escapePath,
   parsePushResult,
+  pushChunks,
   unescapePath,
 } from "../../../src/server/sandbox/frames.ts";
 import { decodePull, PullDecoder } from "../../../src/server/sandbox/pull.ts";
@@ -149,6 +150,41 @@ describe("push frames", () => {
     expect(Buffer.concat(parts.map(({ data }) => data))).toEqual(
       Buffer.from(data),
     );
+  });
+
+  test("make each chunk only when the one before it was taken", () => {
+    // a file's bytes are read through a getter, so the test sees how far
+    // the encoder has gone
+    const read: string[] = [];
+    const files = Array.from({ length: 5 }, (_, n) => {
+      const data = new Uint8Array(600).fill(n);
+      return {
+        path: `/tmp/f${n}`,
+        mode: 0o644,
+        mtime: 1,
+        get data() {
+          read.push(`/tmp/f${n}`);
+          return data;
+        },
+      };
+    });
+    const chunks = pushChunks({ files }, { limit: 1000 });
+    expect(read).toEqual([]);
+    const first = chunks.next();
+    // the second file is sized to see the first chunk is full, never framed
+    expect(new Set(read)).toEqual(new Set(["/tmp/f0", "/tmp/f1"]));
+    expect(
+      frames(first.value as Uint8Array).map(({ head }) => head.path),
+    ).toEqual(["/tmp/f0"]);
+    const rest = [...chunks];
+    expect(rest).toHaveLength(4);
+    expect(
+      encodePush({ files }, { limit: 1000 }).map((chunk) => [...chunk]),
+    ).toEqual([first.value as Uint8Array, ...rest].map((chunk) => [...chunk]));
+  });
+
+  test("refuse a bad manifest before the first chunk", () => {
+    expect(() => pushChunks({ remove: ["/tmp"] })).toThrow(TypeError);
   });
 
   test("an empty manifest is no exec, an empty file one frame", () => {

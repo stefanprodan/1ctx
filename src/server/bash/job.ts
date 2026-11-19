@@ -15,7 +15,7 @@ import { type KeptEntry, listKept } from "./kept.ts";
 import { mountableScratch } from "./names.ts";
 import type { Job, JobRepo } from "./protocol.ts";
 import type { Scratch, ScratchStore } from "./scratch.ts";
-import type { Mounted } from "./shell.ts";
+import type { Mounted, StoredBytes } from "./shell.ts";
 import { type Workspace, workspaceSession } from "./workspace.ts";
 
 // the repositories a send mounted, read-only under /repos
@@ -50,6 +50,9 @@ export type CommandCaps = {
 export type DocsPort = {
   mountedDocs(projectId: string): MountedDoc[];
   mountedUploads(sessionId: string): MountedUploads;
+  // the totals alone, read before a mount
+  docBytes(projectId: string): number;
+  uploadBytes(sessionId: string): number;
   commitDocs: CommitDocs;
 };
 
@@ -172,4 +175,20 @@ export function mountJob(
     })),
   };
   return { job, rows, scratch, skipped, kept, storage, left, mounted };
+}
+
+// the totals of what mountJob would read, from the summary rows alone
+export function storedBytes(
+  deps: { db: Db; knowledge: DocsPort; scratch: ScratchStore },
+  caps: CommandCaps,
+  projectId: string,
+  workspace: Workspace,
+): StoredBytes {
+  const uploadsFrom = caps.subagent?.uploadsFrom ?? workspaceSession(workspace);
+  return {
+    docs: caps.knowledge ? deps.knowledge.docBytes(projectId) : 0,
+    scratch: deps.scratch.bytes(workspace),
+    uploads: deps.knowledge.uploadBytes(uploadsFrom),
+    kept: listKept(deps.db, workspace).reduce((n, entry) => n + entry.bytes, 0),
+  };
 }

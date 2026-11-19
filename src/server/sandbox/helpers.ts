@@ -73,12 +73,16 @@ export function walkArgv(
   return [...python(walk, using), ...counts.map(String), ...roots];
 }
 
-// stdin: pullRequest's lines
+// stdin: pullRequest's lines. The helper refuses a file past fileBytes
+// before sending a byte of it
 export function pullArgv(
+  fileBytes: number,
   roots: readonly string[] = SANDBOX_ROOTS,
   using?: Interpreters,
 ): string[] {
-  return [...python(pull, using), ...roots];
+  if (!Number.isSafeInteger(fileBytes) || fileBytes < 0)
+    throw new TypeError("a pull bound is a count");
+  return [...python(pull, using), String(fileBytes), ...roots];
 }
 
 // a process's start time from its /proc/<pid>/stat: field 22, counted

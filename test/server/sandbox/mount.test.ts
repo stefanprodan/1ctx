@@ -11,6 +11,7 @@ import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { sandboxBackend } from "../../../src/server/sandbox/backend.ts";
 import { Leases } from "../../../src/server/sandbox/index.ts";
+import { TREE_SLACK_BYTES } from "../../../src/server/sandbox/spec.ts";
 import { fakeGateway } from "../../helpers/sandbox.ts";
 import type { CommandEffect, FakeFs } from "../../helpers/sandbox-fs.ts";
 import { callCaps, run, scratchState, setup } from "../bash/helpers.ts";
@@ -45,7 +46,7 @@ function sandboxed(plays: Record<string, (fs: FakeFs) => CommandEffect>) {
     run: backend.run,
   }));
   const files = () => [...fake.files.values()][0]!;
-  return { s, fake, leases, backend, files };
+  return { s, fake, leases, backend, files, limits };
 }
 
 describe("the sandbox behind the mount", () => {
@@ -115,6 +116,61 @@ describe("the sandbox behind the mount", () => {
       ]);
       await t.backend.idle();
       expect(t.fake.deletes).toHaveLength(1);
+    } finally {
+      t.leases.close();
+      t.s.db.close();
+    }
+  });
+
+  test("a key echoed across the result's cut leaves no part of it", async () => {
+    const key = "made-up-key-0123456789abcdef";
+    const credential = {
+      name: "quotes",
+      prefix: "https://api.example.test/v1/",
+      key,
+      header: "Authorization",
+      template: "Bearer {key}",
+      value: `Bearer ${key}`,
+      methods: ["GET" as const],
+    };
+    // a 1000 cut keeps 931 characters of output beside its mark and exit,
+    // so a cut first would keep the key's first 10 and the scrub after it
+    // would match nothing
+    const filler = "x".repeat(callCaps.resultCut - 79);
+    const t = sandboxed({
+      echo: () => ({ stdout: `${filler}${key}${"y".repeat(500)}\n` }),
+    });
+    try {
+      const result = await run(t.s, "echo", {
+        ...callCaps,
+        web: { mode: "listed", domains: ["api.example.test"] },
+        fetchDeadlineMs: 1000,
+        fetchBodyBytes: 1000,
+        credentials: [credential],
+      });
+      expect(result.content).toContain("output cut at");
+      for (let n = 6; n <= key.length; n++)
+        expect(result.content).not.toContain(key.slice(0, n));
+      await t.backend.idle();
+    } finally {
+      t.leases.close();
+      t.s.db.close();
+    }
+  });
+
+  test("a tree over a lowered cap is made as large as the rows hold", async () => {
+    const t = sandboxed({});
+    try {
+      const text = "x".repeat(4000);
+      t.s.knowledge.create(t.s.projectId, t.s.author, "a.md", text);
+      t.limits.knowledgeProjectBytes = 1000;
+      const result = await run(t.s, "noop", callCaps);
+      expect(result.error).toBe(false);
+      await t.backend.idle();
+      const knowledge = t.fake.creates[0]!.mounts.find(
+        (mount) => mount.target === "/knowledge",
+      );
+      expect(knowledge).toMatchObject({ sizeBytes: 4000 + TREE_SLACK_BYTES });
     } finally {
       t.leases.close();
       t.s.db.close();

@@ -60,17 +60,17 @@ import type { RecycleReason, SandboxHold } from "./leases.ts";
 import {
   fill,
   openedOf,
+  PATH_BYTES,
   RECORD_ROOTS,
   type Readout,
   readout,
+  recordBounds,
   recordedCwd,
   recordRequests,
 } from "./readout.ts";
+import { scrubPulled } from "./scrub.ts";
 import { SANDBOX_ENV, TREE_SLACK_BYTES } from "./spec.ts";
 import { bounded } from "./waits.ts";
-
-// a path's bytes at Linux's PATH_MAX, for the walk's name bound
-const PATH_BYTES = 4096;
 
 export type BackendDeps = {
   clock: Clock;
@@ -267,7 +267,7 @@ class Command {
       const start = await savedCwd(job.cwd, job.docs, (path) =>
         this.before(path),
       );
-      notice = startNotice(job.cwd, start, job.docs);
+      notice = hold.notice + startNotice(job.cwd, start, job.docs);
       started = true;
       this.stops.phase?.("run");
       return await this.command(start, notice, caps);
@@ -356,7 +356,7 @@ class Command {
     await fence(this.on, hold.keepAlivePid, hold.keepAliveStart);
     const { limits, bounds } = walkBounds(caps, wanted.tree);
     const walked = await walk(this.on, limits, bounds, SANDBOX_ROOTS);
-    const read = readout(walked, job, wanted);
+    const read = readout(walked, job, wanted, this.context.credentials);
     this.read = read;
     const notice = discardNotices(read.entries, job) + printed.notice;
     this.stops.phase?.("diff");
@@ -365,24 +365,27 @@ class Command {
       return { ok: true, answer: { ...shown, changes: null, refused: null } };
     const open = !job.subagent;
     const records = recordRequests(id, open);
+    // a record holding a path is read with a path's bound, never a file's
+    const paths = recordBounds(id, open);
+    const named = [...paths.values()].reduce((sum, at) => sum + at, 0);
     const frames = await pull(
       this.on,
       [...read.pulls.keys(), ...records],
       {
-        fileBytes: Math.max(
-          limits.fileBytes,
-          job.knowledgeFileBytes,
-          PATH_BYTES,
-        ),
+        fileBytes: Math.max(limits.fileBytes, job.knowledgeFileBytes),
         totalBytes:
           limits.totalBytes +
-          (MAX_OPENS_PER_COMMAND + 1) * (job.knowledgeFileBytes + PATH_BYTES),
+          MAX_OPENS_PER_COMMAND * job.knowledgeFileBytes +
+          named,
+        paths,
       },
       [...SANDBOX_ROOTS, ...RECORD_ROOTS],
     );
     fill(read, frames);
-    const pwd = recordedCwd(id, frames) ?? start;
-    const opened = open ? openedOf(id, frames, job.visuals) : [];
+    // a key the command was handed is never saved or shown
+    const scrubbed = scrubPulled(read, frames, this.context.credentials);
+    const pwd = recordedCwd(id, scrubbed) ?? start;
+    const opened = open ? openedOf(id, scrubbed, job.visuals) : [];
     // every record goes, not only this command's: one command runs in
     // a sandbox at a time, and what a command left there would fill it
     await removeRecords(this.on);
@@ -395,6 +398,13 @@ class Command {
           ? this.repo(path)
           : read.folders.has(path),
     });
+    // the read back is the server's own work and may pass the deadline
+    // after the last exec: what ends late saves nothing, as a late exec
+    if (this.late())
+      return {
+        ok: true,
+        answer: { ...printed, exitCode: 124, changes: null, refused: null },
+      };
     this.changes = back.changes;
     // a change that cannot commit leaves a tree the rows do not hold
     this.dirty = back.changes === null || read.discarded;

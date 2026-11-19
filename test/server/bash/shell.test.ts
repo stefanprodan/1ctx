@@ -72,7 +72,9 @@ describe("the shell port", () => {
       const doc = create(s, "a.md", "old\n");
       await run(s, "true");
       expect(seen.contexts).toHaveLength(1);
-      const context = seen.contexts[0]!;
+      const { stored, ...context } = seen.contexts[0]!;
+      // the totals a shell sizes its trees by, before the mount
+      expect(stored?.()).toEqual({ docs: 4, scratch: 0, uploads: 0, kept: 0 });
       expect(context).toEqual({
         projectId: s.projectId,
         workspace: { id: s.session.id, sessionId: s.session.id },

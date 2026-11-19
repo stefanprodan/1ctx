@@ -7,7 +7,7 @@
 // a StepFailure, after which the sandbox is recycled; what a sandbox
 // printed is read only within its bounds.
 
-import { encodePush, type PushManifest, parsePushResult } from "./frames.ts";
+import { type PushManifest, parsePushResult, pushChunks } from "./frames.ts";
 import { type ExecEvent, type Gateway, SandboxUnavailable } from "./gateway.ts";
 import {
   BASH,
@@ -22,6 +22,7 @@ import {
   type PullBounds,
   PullDecoder,
   type PullFrame,
+  pullBatches,
   pullRequest,
 } from "./pull.ts";
 import { SANDBOX_ENV } from "./spec.ts";
@@ -50,6 +51,10 @@ export class StepFailure extends Error {
 export function refusal(error: StepFailure): string {
   if (error.step === "fence")
     return "the command's processes could not all be stopped, so nothing was saved";
+  if (error.step === "walk" && error.reason === "unicode")
+    return "a file name is not UTF-8, so nothing was saved";
+  if (error.step === "walk" && error.reason === "credential")
+    return "a file name held a credential, so nothing was saved";
   if (error.step === "walk" && error.reason === "linked")
     return "a file has more than one name (a hard link), so nothing was saved";
   if (
@@ -135,15 +140,16 @@ async function small(
   }
 }
 
-// one exec per chunk, each awaited before the next
+// one exec per chunk, each made when the one before it was applied
 export async function push(on: Execs, manifest: PushManifest): Promise<number> {
-  const chunks = encodePush(manifest);
-  for (const chunk of chunks) {
+  let sent = 0;
+  for (const chunk of pushChunks(manifest)) {
     const { code, stdout } = await small(on, "push", pushArgv(), chunk);
     const result = parsePushResult(stdout);
     if (code !== 0 || !result.ok) throw new StepFailure("push", "refused");
+    sent++;
   }
-  return chunks.length;
+  return sent;
 }
 
 export async function fence(
@@ -192,29 +198,59 @@ export async function walk(
   return result.entries;
 }
 
+// The paths in batches, one exec each under the gateway's request
+// limit, the total bound counted across them all.
 export async function pull(
   on: Execs,
   escaped: readonly string[],
   bounds: PullBounds,
   roots: readonly string[],
 ): Promise<PullFrame[]> {
-  if (escaped.length === 0) return [];
+  const frames: PullFrame[] = [];
+  let spent = 0;
+  for (const batch of pullBatches(escaped)) {
+    const got = await pullOnce(
+      on,
+      batch,
+      { ...bounds, totalBytes: bounds.totalBytes - spent },
+      roots,
+    );
+    for (const frame of got) if (!frame.missing) spent += frame.data.byteLength;
+    frames.push(...got);
+  }
+  return frames;
+}
+
+async function pullOnce(
+  on: Execs,
+  escaped: readonly string[],
+  bounds: PullBounds,
+  roots: readonly string[],
+): Promise<PullFrame[]> {
   const decoder = new PullDecoder(roots, bounds, escaped);
+  // the exec ends at the decoder's first refusal: what follows can only
+  // be dropped, so it is never read
+  const stop = new AbortController();
   let code: number;
   try {
     code = await drain(
       on.gateway.exec({
         sandbox: on.sandbox,
-        command: pullArgv(roots),
+        command: pullArgv(bounds.fileBytes, roots),
         stdin: pullRequest(escaped),
         environment: { ...SANDBOX_ENV },
-        signal: on.signal,
+        signal: AbortSignal.any([on.signal, stop.signal]),
       }),
       (stream, data) => {
-        if (stream === "stdout") decoder.push(data);
+        if (stream !== "stdout") return;
+        const failed = decoder.push(data);
+        if (failed === null) return;
+        stop.abort();
+        throw new StepFailure("pull", failed.reason);
       },
     );
   } catch (error) {
+    if (error instanceof StepFailure) throw error;
     if (on.signal.aborted || error instanceof SandboxUnavailable) throw error;
     throw new StepFailure("pull", "transport");
   }

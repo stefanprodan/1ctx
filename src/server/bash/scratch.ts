@@ -54,6 +54,17 @@ export class ScratchStore {
     };
   }
 
+  // the stored total alone, without the files
+  bytes(workspace: Workspace): number {
+    return (
+      this.db
+        .query<{ bytes: number }, [string]>(
+          "select bytes from session_scratch where workspace_id = ?",
+        )
+        .get(workspaceId(workspace))?.bytes ?? 0
+    );
+  }
+
   // the last command's time, the mtime its files mount with, since a
   // file keeps no time of its own
   usedAt(workspace: Workspace): number | null {

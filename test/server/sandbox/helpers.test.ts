@@ -357,7 +357,10 @@ describe("pull helper", () => {
     const asked = ["f", "was-file", "pipe", "door/g", "none"].map((name) =>
       escapePath(join(tmp, name)),
     );
-    const result = await run(pullArgv(roots, using), pullRequest(asked));
+    const result = await run(
+      pullArgv(LIMITS.fileBytes, roots, using),
+      pullRequest(asked),
+    );
     expect(result.code).toBe(0);
     const pull = decodePull(
       result.stdout,
@@ -376,6 +379,28 @@ describe("pull helper", () => {
     const first = pull.frames[0]!;
     if (first.missing) throw new Error("missing");
     expect(new TextDecoder().decode(first.data)).toBe("body\n");
+  });
+
+  test("refuse a file past its cap before sending a byte of it", async () => {
+    const { roots } = scratch();
+    const tmp = roots[1]!;
+    writeFileSync(join(tmp, "small"), "ok");
+    writeFileSync(join(tmp, "sparse"), "");
+    truncateSync(join(tmp, "sparse"), 1 << 30);
+    const asked = ["small", "sparse"].map((name) =>
+      escapePath(join(tmp, name)),
+    );
+    const result = await run(pullArgv(100, roots, using), pullRequest(asked));
+    expect(result.code).not.toBe(0);
+    expect(result.stdout.byteLength).toBeLessThan(200);
+    expect(result.text).toEndWith("PULL refused size\n");
+    const pull = decodePull(
+      result.stdout,
+      roots,
+      { fileBytes: 100, totalBytes: 100 },
+      asked,
+    );
+    expect(pull.ok ? null : pull.reason).toBe("refused");
   });
 });
 

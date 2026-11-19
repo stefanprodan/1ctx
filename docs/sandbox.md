@@ -36,8 +36,9 @@ only to the gateway, over gRPC with mutual TLS.
   sandbox deleted.
 - **Routes:** `GET` and `PUT /api/admin/sandbox` (a `PUT` to the
   sandbox shell without an endpoint or a key file is a 400), and
-  `GET /api/admin/sandbox/leases`, every sandbox the instance holds.
-  All admin.
+  `GET /api/admin/sandbox/leases`, every sandbox the instance holds
+  and `refused`, why every command is refused (the image's root check,
+  a gateway-global policy), else null. All admin.
 
 ## Limits
 
@@ -49,9 +50,9 @@ the CPU, memory and tmpfs sizes of when it was made.
 ## The gateway port
 
 - **`gateway.ts` is the area's one view of OpenShell.** Only
-  `openshell.ts` imports the SDK; the leases and a test's fake
-  (`test/helpers/sandbox.ts`) see the port alone. Every call takes a
-  signal, and the caller aborts it at its deadline.
+  `openshell.ts` and `providers.ts` import the SDK; the leases and a
+  test's fake (`test/helpers/sandbox.ts`) see the port alone. Every
+  call takes a signal, and the caller aborts it at its deadline.
 - **Exec is single-attempt over the raw RPC** with `noLoginShell` and
   no request id, never the SDK's curated stream, which retries before
   response headers. A request id is a durable admission the gateway
@@ -63,7 +64,9 @@ the CPU, memory and tmpfs sizes of when it was made.
 - **A sandbox is made with its whole layout.** The image, the keep-alive
   (`/usr/bin/sleep infinity`), CPU and memory, the filesystem policy
   with Landlock `hard_requirement`, and Docker mounts: a tmpfs per
-  writable root sized from its cap plus 8 MiB (`/tmp` scratch,
+  writable root sized from the larger of its cap and what the call's
+  rows hold (`ShellCall.stored()`, the totals alone), plus 8 MiB, so a
+  tree over a lowered cap still mounts to be shrunk (`/tmp` scratch,
   `/knowledge` the project's docs, `/uploads`, `/mcp` kept files),
   `/opt/home` (HOME) and `/sandbox/tmp` from `sandboxHomeMiB`,
   `/sandbox/.1ctx` for 11 opened docs and 4 MiB; and a read-only bind
@@ -71,7 +74,14 @@ the CPU, memory and tmpfs sizes of when it was made.
   and working folder (`/sandbox` in ours) for its
   workspace and fails a create that mounts there, so the image never
   names HOME as either. Docker mounts a tmpfs `noexec`, so `/tmp`, HOME
-  and `/sandbox/tmp` pass the driver's `options: ["exec"]`.
+  and `/sandbox/tmp` pass the driver's `options: ["exec"]`. A warm
+  sandbox is sized from the caps alone, so a call over one never takes
+  it.
+- **The image's first sandbox is checked for every root** (`roots.ts`),
+  since Landlock skips a missing path: each writable root a folder that
+  takes a file, `/repos` a folder. Each manager checks until one
+  passes; a failed check refuses every command and the pool for good
+  with the image named, shown as the leases route's `refused`.
 - **Every exec runs with `SANDBOX_ENV`** (`spec.ts`): HOME, `TMPDIR`,
   `PATH` and uv's settings. An OpenShell exec sees none of the image's
   `ENV`.
@@ -81,7 +91,11 @@ the CPU, memory and tmpfs sizes of when it was made.
 - **A policy is loaded when the sandbox reports its version active,**
   not when saved; a load error throws with its words.
 - **A gateway-global policy refuses every command,** since it replaces
-  each sandbox's own. It is checked at start and after a restart.
+  each sandbox's own. It is checked at start, after a restart and
+  before each command's network (below); the lease stays. Once either
+  saw one, the pool stops, the leases route's `refused` names it, and a
+  refused command asks again at most every 10 s, so removing it
+  unblocks commands.
 
 ## Leases
 
@@ -94,13 +108,15 @@ the CPU, memory and tmpfs sizes of when it was made.
 - **The keep-alive's pid is read once at create,** by bash builtins
   over `/proc`, and a sandbox without exactly one is never leased.
 - **The cap counts creating, warm, leased, idle and deleting
-  sandboxes,** and stuck ones the gateway does not report in `error`.
+  sandboxes,** and stuck ones the gateway does not report in `error`,
+  a retired manager's (below) included.
   At the cap a warm one goes first, then the least recently used idle
   one, never one in use; the command waits for the delete to be
   observed. No more deletes are pending for the cap than commands
   wait.
 - **A recycle deletes; it never repairs.** A held lease is doomed and
-  goes at its release. Clears, archives, deletes, a fork's source, a
+  goes at its release; one doomed while it was made is deleted, never
+  handed out. Clears, archives, deletes, a fork's source, a
   run's and a subagent's end recycle by the bus events
   (`events.ts`). An idle lease goes after `sandboxIdleMinutes`.
 - **Deletes never block a command.** A delete waits for the gateway to
@@ -120,9 +136,11 @@ the CPU, memory and tmpfs sizes of when it was made.
 - **At start, every sandbox, then provider, under the instance label
   that no lease holds is deleted.** A sweep that cannot list marks the
   gateway lost, so the next probe that answers sweeps. A manager the
-  settings moved off keeps its held sandboxes, which no other
-  manager's sweep takes, deletes each as its command ends, and closes
-  its client once none is left.
+  settings moved off (retired) leases nothing, refuses the commands
+  waiting in it, keeps its held sandboxes, which no other manager's
+  sweep takes, and deletes each as its command ends, retries included.
+  A stuck one it lets go, trees and all, to the next sweep. It closes
+  its client once no record is left and its providers' deletes ended.
 - **A gateway restart drops every lease** (`watch.ts`). A probe lists
   the labelled sandboxes every 30 s: a failure, then a success, is a
   restart, and so is every ready sandbox (two at least) listed in
@@ -158,6 +176,8 @@ the CPU, memory and tmpfs sizes of when it was made.
   next command pushes the difference: removes, folders, files, and a
   mode and time for every folder holding a change. A fresh sandbox
   pushes everything; kept MCP files are pushed, never read lazily. A
+  push is one exec per chunk under 1,000 KiB, each chunk made once the
+  one before it applied, so a push holds one chunk beside its rows. A
   kept file the store cannot read runs no command and saves nothing,
   with the builtin shell's words.
 - **Modes and times are the builtin shell's:** docs and uploads `0644`,
@@ -178,17 +198,25 @@ the CPU, memory and tmpfs sizes of when it was made.
   calls the leases' `sandboxFailed()` (never awaited), then recycles.
 - **After the command, the fence, then a complete walk.** The fence
   spares pid 1 and the keep-alive by pid and start time (read at
-  create). The walk's bounds are the caps or what the pushed trees held,
+  create). A process whose leader is a zombie is alive while any of its
+  threads is not. The walk's bounds are the caps or what the pushed trees held,
   whichever is more, plus 8 MiB a tree. A file whose hash differs from
   the baseline is pulled and its hash checked; an unchanged one reads
-  its bytes from the job. `/uploads` and `/mcp` are only compared.
+  its bytes from the job. `/uploads` and `/mcp` are only compared. The
+  pull goes in batches of paths, each exec's stdin under 1,000 KiB; the
+  helper is given the file bound and refuses a file past it before its
+  bytes, and an exec ends at the decoder's first refusal. A doc or
+  scratch name that is not UTF-8 saves nothing and recycles.
 - **The records are hostile.** The cwd record and open's copies are
-  pulled with the changed files: a missing or non-UTF-8 cwd keeps the
-  start, open's copies are made again with `openedRecord()` for
+  pulled with the changed files, the cwd and each opened path within a
+  path's bound (8 KiB, escaped three times over), never a file's: a
+  missing or non-UTF-8 cwd keeps the start, open's copies are made again with `openedRecord()` for
   `checkOpened()`, and a subagent's are never read. After each command
   the records folder is emptied, its contents only and no link
   followed, since one command runs in a sandbox at a time and anything
   left there would fill it. A cwd under `/repos` is checked by an exec.
+- **The deadline holds to the end.** A read back that ends past
+  `job.endsAt`, after its last exec, answers 124 and saves nothing.
 - **Settle.** Landed: the sandbox is put back to the stored rows (a
   doc's stored text, scratch at the new `used_at`, empty folders
   removed, every mode rebuilt, a frame only for a time the rows moved),
@@ -204,6 +232,94 @@ the CPU, memory and tmpfs sizes of when it was made.
   nothing saved, recycled), since the gateway waits for the stream; a
   time a command set on a file it left unchanged stays until the rows
   move it, since the walk reads no times.
+
+## Network and credentials
+
+OpenShell's own policy and credential injection, no proxy of ours.
+`netpolicy.ts` makes the policy, pure; `network.ts` applies it in
+`acquire()`, after the lease and before the command; `rules.ts` holds
+what the bash tool's description shares with it.
+
+- **The policy is the send's.** Off: no endpoint. Listed: each listed
+  host on 443 and 80. All: `**.*.*` on 443 and 80 plus each listed
+  host. Every endpoint is `protocol: rest`, `enforcement: enforce`
+  (1 in the proto; unset is audit) with the seven methods allowed, for
+  `/usr/bin/bash`, which covers what the wrapper starts.
+- **It loads only when it changed,** waited for until the sandbox
+  reports its version active. A fresh sandbox's empty policy is the
+  create's, so off loads nothing.
+- **A credential is a provider, in listed mode only.** One endpointless
+  profile per credential shape (`1ctx-` and a hash of the instance, the
+  variable and the placement, annotated with the instance id) and one
+  provider per credential, prefix and key (`1ctx-` and a hash, the
+  key's hash salted per process, labelled). A provider's key is put
+  once and never changed: a rotation is a new provider, so a sandbox
+  bound to the old one keeps the key its send read and scrubs.
+- **Its rule binds the prefix's host, port and glob** (`/v1/` as
+  `/v1/**`) with `credentialBinding.provider`. OpenShell's endpoint
+  glob selects `/v1` too, a rule's `/v1/**` never does, so the rules
+  name both `/v1` and `/v1/**`: its methods allowed, every other
+  denied, a subagent's read-only one included. Its host joins even
+  when not listed.
+- **The order is attach, bind, ready.** Providers are attached first
+  (withheld until bound, never an error), the policy binds them, then
+  each provider's current state is polled until `ready`, at most
+  `READY_MS` (10 s). An attach waits for another attach or delete of
+  its provider only until the command's deadline. A failure recycles
+  the lease and fails the command; the profile and key are asked again
+  next time.
+- **Placeholders are the provider's variable**, `ONECTX_CRED_<NAME>`,
+  which OpenShell's supervisor puts in every new exec's environment.
+  `Authorization` takes any template (bearer style); another header
+  only a template that is the key alone. A `Cookie`, a template with
+  words around the key in another header, a prefix with a glob
+  character or `%`, a prefix whose host is a pattern (`*`) or an IPv6
+  literal, a variable two names share, and every refusal
+  `commandCredentials()` makes are not attached; each send's first
+  command names them in its notice.
+- **What cannot be undone recycles.** A credential removed, its key
+  rotated or its prefix changed, or a send leaving listed mode, deletes
+  the sandbox before the command (`credentials`), since an echoed key
+  or an old placeholder may outlive the send there.
+- **Keys are scrubbed from what leaves.** OpenShell never redacts a
+  response. The mount scrubs the output before its cut; `scrub.ts`
+  replaces every key the send read, with `escapedForms()`, in the
+  pulled files before they commit and in open's copies. A doc or
+  scratch name holding one, in any of those forms, saves nothing and
+  recycles.
+- **Providers go with their last sandbox.** One no lease uses is
+  deleted once its sandbox's delete is observed (it cannot go while
+  attached), then its profile once no provider of any manager uses it,
+  one still attaching included. The sweeps keep providers and profiles
+  a lease of any manager uses and delete the rest of the instance's,
+  each asked again right before its delete under the attach's lock:
+  one per provider name and one per profile, across managers.
+- **`scripts/sandbox-net-check.ts`** (`make sandbox-net-check`) runs
+  the request matrix against a real gateway with made-up keys.
+
+## Accepted differences from `commandFetch()`
+
+- Under an attached prefix a request without the placeholder goes out
+  unsigned; under a refused one too, when another rule admits it.
+- A prefix `/v1/` signs `/v1` too, and a matrix parameter (`/v1;x`)
+  reads as `/v1`, each with its methods alone; TLS is OpenShell's
+  choice; encoded paths (`%2F`) and `Upgrade` are refused.
+- A read-only credential holds only on servers that ignore
+  method-override headers (`X-HTTP-Method-Override`), which the
+  builtin refuses on a signed request.
+- All mode: unsigned, ports 80 and 443 only; a two-label name
+  (`pypi.org`) only when listed, a deeper one always; every address a
+  name resolves to must be public.
+- No routing, shaping, `Range` or 206 refusals, no redaction of
+  responses, no `fetchBodyBytes` or fetch deadline.
+- A redirect is a new request the client makes, checked on its own; a
+  placeholder off its binding is a 403 `credential_endpoint_mismatch`,
+  in another header `credential_placement_mismatch`.
+- An exact listed host may reach the private addresses it resolves to;
+  loopback, link-local and metadata never. The sandbox's own loopback
+  is reachable.
+- A key rotated or a global policy set mid-command applies until the
+  command ends; refusals are OpenShell's status and words.
 
 ## Where the gateway runs
 

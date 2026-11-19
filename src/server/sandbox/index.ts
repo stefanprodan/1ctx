@@ -34,6 +34,9 @@ export type {
   ExecRequest,
   Gateway,
   GatewayConfig,
+  ProfileSpec,
+  ProviderSpec,
+  ProviderState,
   SandboxInfo,
   SandboxPhase,
   SandboxPolicy,
@@ -43,7 +46,6 @@ export { KEEP_ALIVE_COMMAND, keepAlivePid } from "./keepalive.ts";
 export {
   DELETE_RETRY_MS,
   DELETE_TIMEOUT_MS,
-  GLOBAL_POLICY_REFUSAL,
   Leases,
   REFILL_BACKOFF_MS,
   type RecycleReason,
@@ -51,6 +53,7 @@ export {
   STUCK_CHECK_MS,
   WARM_CREATE_MS,
 } from "./leases.ts";
+export { GLOBAL_POLICY_REFUSAL, READY_MS } from "./network.ts";
 export { openshellGateway } from "./openshell.ts";
 export {
   createSpec,
@@ -105,15 +108,10 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     started: Promise<void> | null;
   } | null = null;
   // managers the settings moved off, each deleting its sandboxes as
-  // their commands end; its client closes once none is left
+  // their commands end; its client closes once every delete ended
   let retired: { leases: Leases; gateway: Gateway }[] = [];
-  const prune = () => {
-    retired = retired.filter((old) => {
-      if (old.leases.holding()) return true;
-      old.gateway.close();
-      return false;
-    });
-  };
+  // one attach or sweep at a time per provider, across managers
+  const locks = new Map<string, Promise<unknown>>();
 
   const keys = (): Record<SandboxKeyRole, string | null> => ({
     ca: deps.secret(SANDBOX_KEYS.ca),
@@ -131,15 +129,18 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
   };
   const drop = () => {
     if (current === null) return;
+    const { leases, gateway } = current;
     current.unsubscribe();
-    current.leases.drain();
-    retired.push({ leases: current.leases, gateway: current.gateway });
     current = null;
+    retired.push({ leases, gateway });
+    void leases.drain().then(() => {
+      gateway.close();
+      retired = retired.filter((old) => old.leases !== leases);
+    });
   };
   // the leases of the gateway the settings name: a new endpoint, key or
   // image deletes every sandbox of the old one
   const ensure = (): Leases | null => {
-    prune();
     const next = config();
     const key = next === null ? "" : JSON.stringify(next);
     if (current !== null && current.key === key) return current.leases;
@@ -155,8 +156,10 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       image,
       limits: deps.limits,
       repos: deps.repos,
-      // a retired manager on the same gateway may still hold one
-      foreign: (name) => retired.some((old) => old.leases.holds(name)),
+      others: () => retired.map((old) => old.leases),
+      // a retired manager's delete frees room under the instance's cap
+      freed: () => current?.leases.poke(),
+      locks,
     });
     const unsubscribe = subscribe((event) => {
       for (const { sessionId, reason } of recyclesOf(event, forks)) {
@@ -211,7 +214,13 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       clock: deps.clock,
       log: deps.log,
       answer,
-      leases: () => ({ leases: current?.leases.rows() ?? [] }),
+      leases: () => ({
+        leases: [
+          ...retired.flatMap((old) => old.leases.rows()),
+          ...(current?.leases.rows() ?? []),
+        ],
+        refused: current?.leases.refused() ?? null,
+      }),
       saved: () => void ensure(),
     }),
     shell: (builtin) => (ensure() === null ? builtin : backend),

@@ -40,13 +40,21 @@ export type Refusal =
 // one credential of the send as a command sees it: the key read for this
 // command, or why it signs nothing. The key rides here and nowhere else
 export type CommandCredential = { name: string; prefix: string } & (
-  | { key: string; header: string; value: string; methods: HttpMethod[] }
+  | {
+      key: string;
+      header: string;
+      // the header value with {key} in the key's place, for a shell
+      // that places the key itself
+      template: string;
+      value: string;
+      methods: HttpMethod[];
+    }
   | { refused: Refusal }
 );
 
 export type FetchLimits = { timeoutMs: number; maxResponseSize: number };
 
-const REFUSALS: Record<Refusal, string> = {
+export const REFUSALS: Record<Refusal, string> = {
   off: "is off in this chat",
   writes: "signs only writes, which a subagent cannot send",
   missing: "has no key",
@@ -399,4 +407,21 @@ export function commandFetch(
       throw rebuildError(error, secrets);
     }
   };
+}
+
+// a file's bytes with every key the command read replaced, as its text
+// would be
+export function scrubBytes(
+  bytes: Uint8Array,
+  credentials: readonly CommandCredential[],
+): Uint8Array {
+  let out = bytes;
+  for (const secret of secretsOf(credentials)) {
+    out = replaceBytes(
+      out,
+      encoder.encode(secret.key),
+      encoder.encode(secret.label),
+    );
+  }
+  return out;
 }

@@ -28,6 +28,7 @@ import type {
   SandboxPolicy,
 } from "./gateway.ts";
 import { SandboxUnavailable } from "./gateway.ts";
+import { providerCalls } from "./providers.ts";
 
 // 1ctx keeps every sandbox and provider in the gateway's default
 // workspace; the instance label tells its own apart
@@ -305,6 +306,7 @@ export const openshellGateway: Connect = (config) => {
           throw fromConnect(error);
         }
       },
+      ...providerCalls(client.raw, SCOPE, WORKSPACE),
     },
     close() {
       session.abort();

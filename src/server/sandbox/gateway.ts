@@ -69,6 +69,35 @@ export type SandboxInfo = {
   labels: Record<string, string>;
 };
 
+// one credential's profile: the variable its placeholder is in, and
+// the header OpenShell resolves it in (bearer: Authorization with any
+// words around it; header: that header holding the placeholder alone)
+export type ProfileSpec = {
+  id: string;
+  env: string;
+  style: "bearer" | "header";
+  header: string;
+  annotations: Record<string, string>;
+};
+
+// a provider holds one key, under its profile's variable
+export type ProviderSpec = {
+  name: string;
+  profile: string;
+  env: string;
+  key: string;
+  labels: Record<string, string>;
+};
+
+// pending covers a change saved and not yet applied, and one a later
+// change replaced; withheld is an endpointless provider not yet bound
+export type ProviderState =
+  | "ready"
+  | "pending"
+  | "withheld"
+  | "failed"
+  | "revoked";
+
 export type Gateway = {
   // healthy, or a throw when it cannot be reached
   health(signal: AbortSignal): Promise<{ healthy: boolean; version: string }>;
@@ -106,6 +135,29 @@ export type Gateway = {
       signal: AbortSignal,
     ): Promise<string[]>;
     delete(name: string, signal: AbortSignal): Promise<void>;
+    // an endpointless profile; one already there under its id is kept,
+    // since the id is a hash of what it holds
+    importProfile(profile: ProfileSpec, signal: AbortSignal): Promise<void>;
+    // the profiles carrying every annotation given
+    profiles(
+      annotations: Record<string, string>,
+      signal: AbortSignal,
+    ): Promise<string[]>;
+    deleteProfile(id: string, signal: AbortSignal): Promise<void>;
+    // created, or its key replaced when the name exists
+    put(spec: ProviderSpec, signal: AbortSignal): Promise<void>;
+    attach(
+      sandbox: string,
+      provider: string,
+      signal: AbortSignal,
+    ): Promise<void>;
+    // the provider's readiness in the sandbox as it is now, never an
+    // earlier receipt's
+    state(
+      sandbox: string,
+      provider: string,
+      signal: AbortSignal,
+    ): Promise<ProviderState>;
   };
   close(): void;
 };

@@ -39,8 +39,23 @@ list() {
       [[ $k == Uid: ]] && { uid=$v; break; }
     done 2>/dev/null <"$d/status"
     [[ -n $uid && $uid == "$UID" ]] || continue
-    [[ $state == Z ]] && continue
+    # a leader that exited alone reads Z while its other threads run:
+    # the group is alive while any thread is not Z, and takes its state
+    [[ $state == Z ]] && { live "$d"; [[ -z $T ]] && continue; state=$T; }
     L+=("$p:${state:-?}")
+  done
+}
+
+# T: the state of the first thread of $1 that is not a zombie, or empty
+live() {
+  T=
+  local t k v rest s
+  for t in "$1"/task/[1-9]*; do
+    s=
+    while builtin read -r k v rest; do
+      [[ $k == State: ]] && { s=$v; break; }
+    done 2>/dev/null <"$t/status"
+    [[ -n $s && $s != Z ]] && { T=$s; return; }
   done
 }
 

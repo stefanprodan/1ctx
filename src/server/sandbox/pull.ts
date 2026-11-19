@@ -5,7 +5,13 @@
 // file's size is checked against the bounds before a byte of it is
 // held, so a sandbox can never make the server allocate past them.
 
-import { MAX_LINE_BYTES, pathOf, rootOf, unescapePath } from "./frames.ts";
+import {
+  MAX_LINE_BYTES,
+  PUSH_CHUNK_BYTES,
+  pathOf,
+  rootOf,
+  unescapePath,
+} from "./frames.ts";
 
 export type PullFrame =
   | {
@@ -19,8 +25,13 @@ export type PullFrame =
     }
   | { missing: true; path: string; escaped: string; unicode: boolean };
 
-// a file's bytes and the bytes of every file together
-export type PullBounds = { fileBytes: number; totalBytes: number };
+// a file's bytes and the bytes of every file together; a path in
+// `paths` holds at most its own bound, smaller than a file's
+export type PullBounds = {
+  fileBytes: number;
+  totalBytes: number;
+  paths?: ReadonlyMap<string, number>;
+};
 
 export type PullFailure = {
   ok: false;
@@ -31,7 +42,8 @@ export type PullFailure = {
     | "file"
     | "total"
     | "unfinished"
-    | "count";
+    | "count"
+    | "refused";
   // the 0-based frame it stopped at
   frame: number;
 };
@@ -45,7 +57,33 @@ export function pullRequest(escaped: readonly string[]): Uint8Array {
   return new TextEncoder().encode(escaped.map((path) => `${path}\n`).join(""));
 }
 
+// The paths in batches whose request is strictly under `limit` bytes,
+// one exec each: the gateway refuses an exec request past its 1 MiB
+// message, so a long list of long names never rides in one.
+export function pullBatches(
+  escaped: readonly string[],
+  limit = PUSH_CHUNK_BYTES,
+): string[][] {
+  const out: string[][] = [];
+  let batch: string[] = [];
+  let used = 0;
+  for (const path of escaped) {
+    const size = path.length + 1;
+    if (size >= limit) throw new RangeError("a pull path past the request");
+    if (used + size >= limit) {
+      out.push(batch);
+      batch = [];
+      used = 0;
+    }
+    batch.push(path);
+    used += size;
+  }
+  if (batch.length > 0) out.push(batch);
+  return out;
+}
+
 const TRAILER = /^PULL done (0|[1-9][0-9]{0,9})$/;
+const REFUSED = /^PULL refused [a-z]{1,16}$/;
 const ascii = new TextDecoder("ascii");
 
 type Body = {
@@ -134,6 +172,10 @@ export class PullDecoder {
         this.fail("count");
       return;
     }
+    if (REFUSED.test(line)) {
+      this.fail("refused");
+      return;
+    }
     let head: unknown;
     try {
       head = JSON.parse(line);
@@ -187,8 +229,8 @@ export class PullDecoder {
       return;
     }
     const bytes = size as number;
-    // both bounds before the allocation
-    if (bytes > this.bounds.fileBytes) {
+    // every bound before the allocation
+    if (bytes > (this.bounds.paths?.get(escaped) ?? this.bounds.fileBytes)) {
       this.fail("file");
       return;
     }

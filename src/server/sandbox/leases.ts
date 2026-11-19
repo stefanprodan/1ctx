@@ -4,40 +4,38 @@
 // The sandboxes of one gateway, by workspace. A sandbox is a cache of
 // the rows: any of them may be deleted between two commands and made
 // again, so every doubt (a mismatch, a clear, a lost gateway) deletes
-// rather than repairs. Deletes run in the background and never block a
-// command; one that does not finish is kept as stuck, never retried.
+// rather than repairs. Deletes run in the background (deletes.ts) and
+// never block a command.
 
 import type { LeaseRow } from "../../shared/contracts/sandbox.ts";
-import type { ShellCall, ShellRepo } from "../bash/index.ts";
+import type { ShellCall, ShellRepo, StoredBytes } from "../bash/index.ts";
 import { after, type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
 import { Book, type Lease } from "./book.ts";
-import type { Gateway, SandboxPhase } from "./gateway.ts";
+import { buildSandbox } from "./create.ts";
+import { Deletes } from "./deletes.ts";
+import type { Gateway } from "./gateway.ts";
 import type { RecycleReason, SandboxHold } from "./hold.ts";
-import { readKeepAlive, readStartTime } from "./keepalive.ts";
-import { createSpec, mountsKey, sandboxName } from "./spec.ts";
-import { Cuts, STEP_MS, sweepLabelled } from "./sweep.ts";
-import { ask, bounded, Changes } from "./waits.ts";
+import { GLOBAL_POLICY_REFUSAL, Network } from "./network.ts";
+import { PolicyGate } from "./policy.ts";
+import { ImageCheck, ImageRefused } from "./roots.ts";
+import { fitsCaps, mountsKey, sandboxName } from "./spec.ts";
+import { Cuts, sweepLabelled } from "./sweep.ts";
+import { bounded, Changes } from "./waits.ts";
 import { Watch } from "./watch.ts";
 
+export {
+  DELETE_RETRY_MS,
+  DELETE_TIMEOUT_MS,
+  STUCK_CHECK_MS,
+} from "./deletes.ts";
 export type { RecycleReason, SandboxHold } from "./hold.ts";
 
-// a delete the gateway has not finished by then is stuck
-export const DELETE_TIMEOUT_MS = 60_000;
 // a warm sandbox's create, which no command's deadline bounds
 export const WARM_CREATE_MS = 120_000;
 // a failed warm create waits this long before the pool tries again
 export const REFILL_BACKOFF_MS = 30_000;
-// a stuck sandbox's phase is asked again this often, never its delete
-export const STUCK_CHECK_MS = 5 * MINUTE_MS;
-// a delete that failed, not one past its timeout, is asked again after
-// this, then three and nine times this, then it is stuck
-export const DELETE_RETRY_MS = 5_000;
-const DELETE_TRIES = 3;
-
-export const GLOBAL_POLICY_REFUSAL =
-  "the sandbox gateway has a global policy set, which would replace each sandbox's own; an admin must remove it";
 
 export type LeasesDeps = {
   clock: Clock;
@@ -48,23 +46,51 @@ export type LeasesDeps = {
   limits(): KnowledgeCaps & SandboxCaps;
   // the repository cache's hold on a mounted tree
   repos: { hold(tree: string): (() => void) | null };
-  // a sandbox another manager of this instance still holds, so no sweep
-  // of this one deletes it
-  foreign?(name: string): boolean;
+  // the managers the settings moved off, still deleting: their sandboxes
+  // count against the cap, and no sweep of this one takes what they hold
+  others?(): readonly Leases[];
+  // a delete of this manager was observed, so another may admit one
+  freed?(): void;
+  // the provider locks every manager of the instance shares
+  locks?: Map<string, Promise<unknown>>;
 };
 
 export class Leases {
-  private readonly book = new Book();
+  private readonly book = new Book((lease) => this.net.forgot(lease.name));
+  private readonly net: Network;
   private readonly changes: Changes;
   private closed = false;
-  // a gateway-global policy is set: nothing runs
-  private blocked = false;
+  // the settings moved off: no lease, every delete run to its end
+  private draining = false;
+  private drained: (() => void) | null = null;
+  private readonly policy: PolicyGate;
+  private readonly image: ImageCheck;
   private readonly watch: Watch;
   private readonly cuts = new Cuts();
+  private readonly deletes: Deletes;
   private backoff: (() => void) | null = null;
 
   constructor(private readonly deps: LeasesDeps) {
     this.changes = new Changes(deps.clock);
+    this.net = new Network({
+      ...deps,
+      profileElsewhere: (id) => this.others().some((o) => o.holdsProfile(id)),
+      globalPolicy: (set) => this.policy.seen(set),
+    });
+    this.image = new ImageCheck(deps.image, deps.log);
+    this.deletes = new Deletes({
+      ...deps,
+      book: this.book,
+      cuts: this.cuts,
+      closed: () => this.closed,
+      draining: () => this.draining,
+      forgot: () => {
+        this.deps.freed?.();
+        this.settleDrain();
+      },
+      ended: () => this.poke(),
+    });
+    this.policy = new PolicyGate({ ...deps, cleared: () => this.poke() });
     this.watch = new Watch({
       ...deps,
       live: () => this.book.live(),
@@ -73,7 +99,7 @@ export class Leases {
       restarted: () => this.restarted(),
       reap: (found) => {
         const due = this.cuts.due(found, (name) => this.book.holds(name));
-        for (const info of due) void this.adopt(info.name, info.phase);
+        for (const info of due) void this.deletes.adopt(info.name, info.phase);
       },
     });
   }
@@ -84,7 +110,12 @@ export class Leases {
     signal: AbortSignal,
   ): Promise<SandboxHold | "busy"> {
     try {
-      return await this.lease(call, deadline, signal);
+      for (;;) {
+        const hold = await this.lease(call, deadline, signal);
+        if (hold === "busy") return hold;
+        const net = await this.net.configure(hold, call, deadline, signal);
+        if (net !== "recycled") return net === "busy" ? net : hold;
+      }
     } finally {
       // a pool held back while commands waited fills once none does
       this.refill();
@@ -98,10 +129,18 @@ export class Leases {
   ): Promise<SandboxHold | "busy"> {
     const key = call.workspace.id;
     const want = mountsKey(call.repos);
+    // read once, and only when a sandbox is taken or made for the call
+    let stored: StoredBytes | undefined;
     for (;;) {
       signal.throwIfAborted();
       if (this.closed) throw new Error("the sandbox shell is stopping");
-      if (this.blocked) throw new Error(GLOBAL_POLICY_REFUSAL);
+      if (this.draining) {
+        throw new Error("the sandbox settings changed: run the command again");
+      }
+      if (this.image.refused !== null) throw this.image.refused;
+      if (!(await this.policy.open(deadline, signal))) {
+        throw new Error(GLOBAL_POLICY_REFUSAL);
+      }
       if (this.deps.clock() >= deadline) return "busy";
       const own = this.book.byWorkspace.get(key);
       if (own?.state === "idle" && own.mounts === want && !own.doomed) {
@@ -112,15 +151,24 @@ export class Leases {
         continue;
       }
       if (own === undefined) {
-        const warm = call.repos.length === 0 ? this.book.takeWarm() : null;
+        stored ??= call.stored?.();
+        const held = stored;
+        // a warm sandbox is sized from the caps: a tree over a lowered
+        // cap needs one of its own
+        const fits = held === undefined || fitsCaps(this.deps.limits(), held);
+        const warm =
+          call.repos.length === 0 && fits ? this.book.takeWarm() : null;
         if (warm !== null) {
           warm.workspace = key;
           this.book.byWorkspace.set(key, warm);
           this.refill();
           return this.take(warm);
         }
-        if (this.book.counted() < this.deps.limits().sandboxesMax) {
-          return this.make(key, call.repos, want, deadline, signal);
+        if (this.total() < this.deps.limits().sandboxesMax) {
+          const made = await this.make(key, call, want, held, deadline, signal);
+          // doomed while it was made: deleted, and the loop goes again
+          if (made !== null) return made;
+          continue;
         }
         // one delete per waiting command: the first one's delete is
         // still pending when the next wake comes
@@ -188,6 +236,7 @@ export class Leases {
     return this.book.rows();
   }
 
+  // this manager's own sandboxes against the cap
   counted(): number {
     return this.book.counted();
   }
@@ -196,12 +245,24 @@ export class Leases {
     return this.book.holds(name);
   }
 
-  holding(): boolean {
-    return this.book.holding();
+  holdsProvider(name: string): boolean {
+    return this.net.holds(name);
   }
 
-  blockedByPolicy(): boolean {
-    return this.blocked;
+  holdsProfile(id: string): boolean {
+    return this.net.holdsProfile(id);
+  }
+
+  // why every command is refused, for the admin; null while none is
+  refused(): string | null {
+    if (this.image.refused !== null) return this.image.refused.message;
+    return this.policy.blocked ? GLOBAL_POLICY_REFUSAL : null;
+  }
+
+  // another manager's delete observed: a waiting command may fit now
+  poke(): void {
+    this.changes.changed();
+    this.refill();
   }
 
   // timers stopped; the sandboxes stay for the next start's sweep
@@ -213,10 +274,38 @@ export class Leases {
     this.changes.changed();
   }
 
-  // the settings moved off this gateway or image: every sandbox goes
-  drain(): void {
+  // the settings moved off this gateway or image: every sandbox goes,
+  // held ones at their release, and each delete runs to its end, so the
+  // repository holds go with it. Settles once no record is left and
+  // their providers' deletes ended, when the caller closes the client
+  drain(): Promise<void> {
+    this.draining = true;
+    this.watch.close();
+    this.backoff?.();
+    this.backoff = null;
+    const done = new Promise<void>((resolve) => {
+      this.drained = resolve;
+    });
     for (const lease of this.book.live()) this.remove(lease, "settings");
-    this.close();
+    this.changes.changed();
+    this.settleDrain();
+    return done.then(() => this.net.dropped());
+  }
+
+  private settleDrain(): void {
+    if (this.drained === null || this.book.records.size > 0) return;
+    this.drained();
+    this.drained = null;
+  }
+
+  // every manager's sandboxes, since the cap is the instance's
+  private total(): number {
+    const own = this.book.counted();
+    return this.others().reduce((n, other) => n + other.counted(), own);
+  }
+
+  private others(): Leases[] {
+    return (this.deps.others?.() ?? []).filter((other) => other !== this);
   }
 
   private take(lease: Lease): SandboxHold {
@@ -232,6 +321,8 @@ export class Leases {
       workspace: lease.workspace!,
       gateway: this.deps.gateway,
       synced: lease.synced,
+      network: lease.network,
+      notice: "",
       failed: () => void this.sandboxFailed(lease.workspace!),
       release: () => {
         if (done) return;
@@ -241,15 +332,15 @@ export class Leases {
       recycle: (reason) => {
         if (done) return;
         done = true;
-        this.destroy(lease, reason);
+        this.deletes.destroy(lease, reason);
       },
     };
   }
 
   private release(lease: Lease): void {
     if (lease.state !== "leased") return;
-    if (lease.doomed || this.closed) {
-      this.destroy(lease, "discard");
+    if (lease.doomed || this.closed || this.draining) {
+      this.deletes.destroy(lease, "discard");
       return;
     }
     lease.state = "idle";
@@ -257,23 +348,26 @@ export class Leases {
     const ms = this.deps.limits().sandboxIdleMinutes * MINUTE_MS;
     lease.timer = after(this.deps.clock, ms, () => {
       lease.timer = null;
-      if (lease.state === "idle") this.destroy(lease, "idle");
+      if (lease.state === "idle") this.deletes.destroy(lease, "idle");
     });
     this.changes.changed();
   }
 
+  // null when a recycle or the settings doomed it while it was made
   private async make(
     key: string,
-    repos: readonly ShellRepo[],
+    call: ShellCall,
     mounts: string,
+    stored: StoredBytes | undefined,
     deadline: number,
     signal: AbortSignal,
-  ): Promise<SandboxHold | "busy"> {
+  ): Promise<SandboxHold | "busy" | null> {
+    const { repos } = call;
     const lease = this.add(key, mounts);
     for (const repo of repos) {
       const release = this.deps.repos.hold(repo.tree);
       if (release === null) {
-        this.destroy(lease, "failed");
+        this.deletes.destroy(lease, "failed");
         throw new Error(`the files of repository ${repo.name} are gone`);
       }
       lease.holds.push(release);
@@ -285,11 +379,12 @@ export class Leases {
       "the command's time ran out",
     );
     try {
-      await this.build(lease, repos, step.signal);
+      await this.build(lease, repos, stored, step.signal);
     } catch (error) {
-      this.destroy(lease, "failed");
+      this.deletes.destroy(lease, "failed");
       signal.throwIfAborted();
       if (step.signal.aborted) return "busy";
+      if (error instanceof ImageRefused) throw error;
       this.deps.log.warn("sandbox create failed", {
         sandbox: lease.name,
         ...errorFields(error),
@@ -298,6 +393,10 @@ export class Leases {
     } finally {
       step.dispose();
     }
+    if (lease.doomed || this.closed || this.draining) {
+      this.deletes.destroy(lease, "discard");
+      return null;
+    }
     return this.take(lease);
   }
 
@@ -305,25 +404,14 @@ export class Leases {
     return this.book.add(sandboxName(), workspace, mounts, this.deps.clock());
   }
 
-  // create, ready, and the keep-alive's pid: every step on the signal
+  // made (create.ts), then in the book's order for the probe
   private async build(
     lease: Lease,
     repos: readonly ShellRepo[],
+    stored: StoredBytes | undefined,
     signal: AbortSignal,
   ): Promise<void> {
-    const { gateway } = this.deps;
-    const spec = createSpec({
-      name: lease.name,
-      instanceId: this.deps.instanceId,
-      image: this.deps.image,
-      caps: this.deps.limits(),
-      repos,
-    });
-    await gateway.create(spec, signal);
-    await gateway.waitReady(lease.name, signal);
-    lease.phase = "ready";
-    lease.pid = await readKeepAlive(gateway, lease.name, signal);
-    lease.started = await readStartTime(gateway, lease.name, lease.pid, signal);
+    await buildSandbox(this.deps, this.image, lease, repos, stored, signal);
     lease.ready = this.book.tick();
     this.deps.log.info("sandbox created", {
       sandbox: lease.name,
@@ -338,90 +426,19 @@ export class Leases {
       lease.doomed = true;
       return;
     }
-    this.destroy(lease, reason);
-  }
-
-  private destroy(lease: Lease, reason: RecycleReason): void {
-    if (lease.state === "deleting" || lease.state === "stuck") return;
-    // a create cut short may still land after this delete
-    if (lease.state === "creating") this.cuts.mark(lease.name);
-    lease.timer?.();
-    lease.timer = null;
-    this.book.unlink(lease);
-    lease.state = "deleting";
-    this.deps.log.info("sandbox recycled", { sandbox: lease.name, reason });
-    void this.delete(lease);
-  }
-
-  // the sandbox, then the wait until the gateway forgets it; the cache
-  // trees it mounted stay held until then, since a bind is not moved by
-  // a tree published again at the same path
-  private async delete(lease: Lease): Promise<void> {
-    const ctl = new AbortController();
-    const cancel = after(this.deps.clock, DELETE_TIMEOUT_MS, () =>
-      ctl.abort(new Error("delete timed out")),
-    );
-    try {
-      await this.deps.gateway.delete(lease.name, ctl.signal);
-      await this.deps.gateway.waitDeleted(lease.name, ctl.signal);
-      this.book.forget(lease);
-    } catch (error) {
-      // a delete past its timeout is stuck; another failure, a blip,
-      // is asked again a few times first
-      const timedOut = ctl.signal.aborted;
-      if (!timedOut && lease.tries < DELETE_TRIES - 1 && !this.closed) {
-        const wait = DELETE_RETRY_MS * 3 ** lease.tries;
-        lease.tries++;
-        lease.timer = after(this.deps.clock, wait, () => {
-          lease.timer = null;
-          void this.delete(lease);
-        });
-        return;
-      }
-      lease.state = "stuck";
-      lease.evicted = false;
-      this.deps.log.warn("sandbox delete stuck", {
-        sandbox: lease.name,
-        ...errorFields(error, false),
-      });
-      await this.stuck(lease);
-    } finally {
-      cancel();
-    }
-    this.changes.changed();
-    this.refill();
-  }
-
-  // a stuck sandbox's phase, never another delete: one the gateway can
-  // no longer remove (a driver operation left pending) would only be
-  // asked again forever
-  private async stuck(lease: Lease): Promise<void> {
-    if (this.closed || lease.state !== "stuck") return;
-    const phase = await ask(this.deps.clock, this.deps.log, STEP_MS, (signal) =>
-      this.deps.gateway.phase(lease.name, signal),
-    );
-    if (phase === "gone") {
-      this.book.forget(lease);
-      this.changes.changed();
-      return;
-    }
-    if (phase !== null) lease.phase = phase;
-    if (this.closed) return;
-    lease.timer = after(this.deps.clock, STUCK_CHECK_MS, () => {
-      lease.timer = null;
-      void this.stuck(lease);
-    });
+    this.deletes.destroy(lease, reason);
   }
 
   // the pool topped up in the background, never past the cap and never
   // while a command waits for room
   private refill(): void {
-    if (this.closed || this.blocked || this.backoff !== null) return;
+    if (this.closed || this.draining || this.backoff !== null) return;
+    if (this.policy.blocked || this.image.refused !== null) return;
     const caps = this.deps.limits();
     let warm = this.book.warm();
     while (
       warm < caps.sandboxWarm &&
-      this.book.counted() < caps.sandboxesMax &&
+      this.total() < caps.sandboxesMax &&
       this.changes.waiting === 0
     ) {
       warm++;
@@ -436,16 +453,17 @@ export class Leases {
       ctl.abort(new Error("warm create timed out")),
     );
     try {
-      await this.build(lease, [], ctl.signal);
-      if (lease.doomed || this.closed) this.destroy(lease, "settings");
-      else lease.state = "warm";
+      await this.build(lease, [], undefined, ctl.signal);
+      if (lease.doomed || this.closed || this.draining) {
+        this.deletes.destroy(lease, "settings");
+      } else lease.state = "warm";
     } catch (error) {
-      this.destroy(lease, "failed");
+      this.deletes.destroy(lease, "failed");
       this.deps.log.warn("sandbox create failed", {
         sandbox: lease.name,
         ...errorFields(error),
       });
-      if (!this.closed && this.backoff === null) {
+      if (!this.closed && !this.draining && this.backoff === null) {
         this.backoff = after(this.deps.clock, REFILL_BACKOFF_MS, () => {
           this.backoff = null;
           this.refill();
@@ -462,29 +480,19 @@ export class Leases {
       {
         ...this.deps,
         held: (name) =>
-          this.book.holds(name) || this.deps.foreign?.(name) === true,
-        adopt: (name, phase) => this.adopt(name, phase),
+          this.book.holds(name) ||
+          this.others().some((other) => other.holds(name)),
+        dropProvider: (name) =>
+          this.net.sweep(name, (provider) =>
+            this.others().some((other) => other.holdsProvider(provider)),
+          ),
+        dropProfile: (id) => this.net.sweepProfile(id),
+        adopt: (name, phase) => this.deletes.adopt(name, phase),
       },
       when,
     );
     // a sweep that could not list runs again at the next good probe
     if (!listed) this.watch.markLost();
-    if (globalPolicy === true && !this.blocked) {
-      this.deps.log.warn("sandbox gateway has a global policy");
-    }
-    if (globalPolicy !== null) this.blocked = globalPolicy;
-  }
-
-  // a sandbox no lease uses, or a stuck one, deleted again
-  private adopt(name: string, phase: SandboxPhase): Promise<void> {
-    const lease =
-      this.book.records.get(name) ??
-      this.book.add(name, null, mountsKey([]), this.deps.clock());
-    lease.timer?.();
-    lease.timer = null;
-    lease.phase = phase;
-    lease.state = "deleting";
-    lease.tries = 0;
-    return this.delete(lease);
+    this.policy.seen(globalPolicy);
   }
 }

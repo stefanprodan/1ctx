@@ -10,8 +10,12 @@ import {
   defaultImage,
   INSTANCE_LABEL,
 } from "../../../src/server/sandbox/index.ts";
-import type { SandboxResponse } from "../../../src/shared/api/sandbox.ts";
+import type {
+  SandboxLeasesResponse,
+  SandboxResponse,
+} from "../../../src/shared/api/sandbox.ts";
 import { type TestApp, testApp } from "../../helpers/app.ts";
+import { rejection } from "../../helpers/async.ts";
 import { fakeGateway, until } from "../../helpers/sandbox.ts";
 
 const KEYS = {
@@ -211,6 +215,44 @@ describe("sandbox settings", () => {
         expect(fake.deletes).toEqual([]);
         hold.release();
         await until(() => fake.deletes.includes(hold.sandbox));
+      },
+      KEYS,
+      fake,
+    );
+  });
+
+  test("an image that fails its root check is named on the leases route", async () => {
+    const fake = fakeGateway();
+    fake.rootProblems = ["missing /repos"];
+    await run(
+      async (app, admin) => {
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { shell: "sandbox", endpoint: ENDPOINT },
+        });
+        let res = await admin.call("GET", "/api/admin/sandbox/leases");
+        expect(((await res.json()) as SandboxLeasesResponse).refused).toBe(
+          null,
+        );
+        const error = await rejection(
+          app.sandbox.leases()!.acquire(
+            {
+              projectId: "project",
+              workspace: { id: "chat", sessionId: "chat" },
+              sendId: "send",
+              subagent: false,
+              repos: [],
+              repoFileBytes: 0,
+              web: null,
+              credentials: [],
+            },
+            app.now.value + 20_000,
+            new AbortController().signal,
+          ),
+        );
+        expect(error.message).toContain("fails its root check");
+        res = await admin.call("GET", "/api/admin/sandbox/leases");
+        const body = (await res.json()) as SandboxLeasesResponse;
+        expect(body.refused).toBe(error.message);
       },
       KEYS,
       fake,

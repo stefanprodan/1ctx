@@ -16,6 +16,7 @@ import {
   sandboxError,
   sandboxLeases,
   sandboxLeasesError,
+  sandboxRefused,
   saveSandbox,
   watchSandboxLeases,
 } from "../../data/sandbox.ts";
@@ -52,6 +53,7 @@ import {
   leaseWord,
   missingKeys,
   offLine,
+  refusedLine,
   type SandboxDraft,
   type SandboxField,
   SHELL_OPTIONS,
@@ -111,9 +113,11 @@ export function SandboxCards({
   drafted: Signal<SandboxDraft | null>;
 }) {
   const off = offLine(state);
+  const refused = sandboxRefused.value;
   return (
     <SettingStack>
       {off !== null && <SettingAlert>{off}</SettingAlert>}
+      {refused !== null && <SettingAlert>{refusedLine(refused)}</SettingAlert>}
       <Shell state={state} drafted={drafted} />
       <Leases
         rows={sandboxLeases.value}
@@ -221,28 +225,40 @@ function Shell({
                 ...o,
                 disabled: save.busy,
               }))}
-              onPick={(shell) => set({ shell })}
+              // the built-in shell hides the gateway and image, so they
+              // go back to their saved values rather than fail unseen
+              onPick={(shell) =>
+                set(
+                  shell === "sandbox"
+                    ? { shell }
+                    : { ...draftOf(state.settings), shell },
+                )
+              }
             />
             <FieldError save={save} field="shell" />
           </div>
-          <Text
-            label="Gateway"
-            field="endpoint"
-            draft={d}
-            save={save}
-            placeholder="https://127.0.0.1:17671"
-            hint="The OpenShell gateway's https address."
-            onInput={(endpoint) => set({ endpoint })}
-          />
-          <Text
-            label="Image"
-            field="image"
-            draft={d}
-            save={save}
-            placeholder={state.defaultImage}
-            hint="Empty runs the default image."
-            onInput={(image) => set({ image })}
-          />
+          {d.shell === "sandbox" && (
+            <>
+              <Text
+                label="Gateway"
+                field="endpoint"
+                draft={d}
+                save={save}
+                placeholder="https://127.0.0.1:17671"
+                hint="The OpenShell gateway's https address."
+                onInput={(endpoint) => set({ endpoint })}
+              />
+              <Text
+                label="Image"
+                field="image"
+                draft={d}
+                save={save}
+                placeholder={state.defaultImage}
+                hint="Empty runs the default image."
+                onInput={(image) => set({ image })}
+              />
+            </>
+          )}
         </div>
       </Setting>
     </SettingForm>

@@ -74,8 +74,10 @@ install_() {
   if [ "$(cat "$dir/bin/version" 2>/dev/null)" != "$VERSION $t" ]; then
     local name=openshell-gateway-$t.tar.gz tmp
     tmp=$(mktemp -d "$dir/fetch.XXXXXX")
-    # shellcheck disable=SC2064 # the path is fixed now, the local gone then
-    trap "rm -rf '$tmp'" EXIT
+    # a global, since the local is gone when the trap runs; read there,
+    # never pasted into the trap's source
+    FETCH_TMP=$tmp
+    trap 'rm -rf "$FETCH_TMP"' EXIT
     curl -fsSL --retry 2 -o "$tmp/$name" "$RELEASES/v$VERSION/$name" ||
       fail "could not download $name"
     [ "$(sha256 "$tmp/$name")" = "$sha" ] ||

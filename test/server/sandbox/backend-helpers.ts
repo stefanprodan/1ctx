@@ -7,6 +7,7 @@
 
 import type {
   Answer,
+  CommandCredential,
   Job,
   Mounted,
   Settled,
@@ -17,6 +18,7 @@ import { silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { sandboxBackend } from "../../../src/server/sandbox/backend.ts";
 import { Leases, type SandboxHold } from "../../../src/server/sandbox/index.ts";
+import type { WebSnapshot } from "../../../src/shared/web.ts";
 import { fakeClock, fakeGateway, until } from "../../helpers/sandbox.ts";
 import type {
   CommandCall,
@@ -43,6 +45,8 @@ export type Rows = {
   subagent?: boolean;
   ioBytes?: number;
   visuals?: boolean;
+  web?: WebSnapshot | null;
+  credentials?: CommandCredential[];
 };
 
 export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
@@ -69,15 +73,15 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
     log: silent,
     limits: () => limits,
   });
-  const call = (subagent = false): ShellCall => ({
+  const call = (rows: Rows = {}): ShellCall => ({
     projectId: "project",
     workspace: { id: "chat", sessionId: "chat" },
     sendId: "send",
-    subagent,
+    subagent: rows.subagent ?? false,
     repos: [],
     repoFileBytes: 0,
-    web: null,
-    credentials: [],
+    web: rows.web ?? null,
+    credentials: rows.credentials ?? [],
   });
 
   function jobOf(rows: Rows, command: string): { job: Job; mounted: Mounted } {
@@ -159,7 +163,7 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
     } = {},
   ) {
     const hold = (await leases.acquire(
-      call(rows.subagent),
+      call(rows),
       time.now() + 20_000,
       new AbortController().signal,
     )) as SandboxHold;
@@ -176,7 +180,7 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
     const phases: string[] = [];
     const ran = await backend.run(
       job,
-      { ...call(rows.subagent), mounted, hold },
+      { ...call(rows), mounted, hold },
       {
         kept: (index) => {
           options.reads?.push(index);

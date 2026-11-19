@@ -34,5 +34,9 @@ export type PutSandboxRequest = {
 };
 
 // GET /api/admin/sandbox/leases: every sandbox the instance holds,
-// stuck ones included, oldest first
-export type SandboxLeasesResponse = { leases: LeaseRow[] };
+// stuck ones included, oldest first, and while every command is refused
+// (the image failed its root check, a gateway-global policy) why
+export type SandboxLeasesResponse = {
+  leases: LeaseRow[];
+  refused: string | null;
+};

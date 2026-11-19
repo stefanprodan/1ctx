@@ -82,9 +82,12 @@ reporting.
   and cost, "not priced" while no clip named one.
 - **Sandbox is its own Config page, after Web access.** One Shell card
   (the shell as a `Seg`, the gateway's https address, the image, empty
-  for the default) saves the whole row, as SMTP's Server card does;
+  for the default) saves the whole row, as SMTP's Server card does.
+  Built-in hides the gateway and image and puts their drafts back to
+  the saved values, which the save keeps;
   `sandboxFieldOf()` matches the server's whole phrases. A saved
-  sandbox shell missing a key file says so in a `SettingAlert`. The
+  sandbox shell missing a key file says so in a `SettingAlert`, and so
+  does the leases route's `refused` while every command is refused. The
   Sandboxes card lists the leases as `RowsLine`s, read again every 15
   seconds while seen, a stuck one in bad words with its next step
   (`stuckLine()`). The aside counts them, names the gateway label and

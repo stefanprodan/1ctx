@@ -149,7 +149,7 @@ export type ToolsDeps = {
     "offered" | "offeredSides" | "switchable" | "call" | "validateArguments"
   >;
   memory?: Pick<MemoryCapability, "work" | "edit" | "refuse">;
-  bash?: Pick<BashCapability, "run">;
+  bash?: Pick<BashCapability, "run" | "sandboxed">;
   // the project's credentials for a send, and each row and key again at
   // each command
   credentials?: CredentialsPort & CredentialKeysPort;

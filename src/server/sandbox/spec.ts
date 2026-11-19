@@ -4,7 +4,11 @@
 // What a sandbox is made with: pure, from the settings, the caps and the
 // repositories a command prepared, so a test reads the exact create.
 
-import { MAX_OPENS_PER_COMMAND, type ShellRepo } from "../bash/index.ts";
+import {
+  MAX_OPENS_PER_COMMAND,
+  type ShellRepo,
+  type StoredBytes,
+} from "../bash/index.ts";
 import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
 import type { CreateSpec, SandboxPolicy } from "./gateway.ts";
 
@@ -100,22 +104,37 @@ export function mountsKey(repos: readonly ShellRepo[]): string {
   );
 }
 
+// whether a sandbox sized from the caps alone holds what is stored: a
+// tree over a lowered cap needs its own
+export function fitsCaps(caps: KnowledgeCaps, stored: StoredBytes): boolean {
+  return (
+    stored.docs <= caps.knowledgeProjectBytes &&
+    stored.scratch <= caps.scratchBytes &&
+    stored.uploads <= caps.uploadBytes &&
+    stored.kept <= caps.mcpKeptBytes
+  );
+}
+
 export function createSpec(input: {
   name: string;
   instanceId: string;
   image: string;
   caps: KnowledgeCaps & SandboxCaps;
   repos: readonly ShellRepo[];
+  // what the call's trees hold; none for a warm sandbox
+  stored?: StoredBytes;
 }): CreateSpec {
   const { caps } = input;
   // Docker mounts a tmpfs noexec unless told: a script in /tmp or a
-  // tool uv installs in HOME must run
-  const tree = (target: string, cap: number, exec = false) => ({
+  // tool uv installs in HOME must run. A tree over a lowered cap is
+  // sized to what it holds, so the command that shrinks it can mount it
+  const tree = (target: string, cap: number, held = 0, exec = false) => ({
     type: "tmpfs" as const,
     target,
-    sizeBytes: cap + TREE_SLACK_BYTES,
+    sizeBytes: Math.max(cap, held) + TREE_SLACK_BYTES,
     exec,
   });
+  const stored = input.stored;
   const home = caps.sandboxHomeMiB * MiB;
   return {
     name: input.name,
@@ -126,10 +145,10 @@ export function createSpec(input: {
     memoryMiB: caps.sandboxMemoryMiB,
     policy: POLICY,
     mounts: [
-      tree("/tmp", caps.scratchBytes, true),
-      tree("/knowledge", caps.knowledgeProjectBytes),
-      tree("/uploads", caps.uploadBytes),
-      tree("/mcp", caps.mcpKeptBytes),
+      tree("/tmp", caps.scratchBytes, stored?.scratch, true),
+      tree("/knowledge", caps.knowledgeProjectBytes, stored?.docs),
+      tree("/uploads", caps.uploadBytes, stored?.uploads),
+      tree("/mcp", caps.mcpKeptBytes, stored?.kept),
       { type: "tmpfs", target: HOME, sizeBytes: home, exec: true },
       { type: "tmpfs", target: "/sandbox/tmp", sizeBytes: home, exec: true },
       {

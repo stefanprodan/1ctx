@@ -13,10 +13,14 @@ import type {
   ExecRequest,
   Gateway,
   GatewayConfig,
+  ProfileSpec,
+  ProviderSpec,
+  ProviderState,
   SandboxPhase,
 } from "../../src/server/sandbox/index.ts";
 import { KEEP_ALIVE_COMMAND } from "../../src/server/sandbox/index.ts";
 import { START_TIME_COMMAND } from "../../src/server/sandbox/keepalive.ts";
+import { ROOTS_COMMAND } from "../../src/server/sandbox/roots.ts";
 import { FakeFs } from "./sandbox-fs.ts";
 
 type Method =
@@ -29,7 +33,11 @@ type Method =
   | "waitDeleted"
   | "phase"
   | "list"
-  | "setPolicy";
+  | "setPolicy"
+  | "importProfile"
+  | "put"
+  | "attach"
+  | "state";
 
 type Box = { phase: SandboxPhase; labels: Record<string, string> };
 
@@ -43,6 +51,19 @@ export type FakeGateway = {
   deletes: string[];
   providerDeletes: string[];
   policies: { name: string; network: Record<string, unknown> }[];
+  // the endpointless profiles, by id, with their annotations
+  profiles: Map<string, ProfileSpec>;
+  profileDeletes: string[];
+  // every put, its key included: the keys a test makes up
+  puts: ProviderSpec[];
+  // the providers attached to each sandbox
+  attached: Map<string, Set<string>>;
+  // the order of the network's calls: attach:<provider>,
+  // policy:<sandbox>, state:<provider>
+  calls: string[];
+  // a provider's readiness; by default withheld until a policy of the
+  // sandbox binds it, then ready
+  providerState?: (sandbox: string, provider: string) => ProviderState;
   globalPolicy: boolean;
   // the keep-alive's pid each sandbox reports
   pid: number;
@@ -53,6 +74,10 @@ export type FakeGateway = {
   unfail(method: Method): void;
   // the next calls of a method wait until their signal ends them
   hang(method: Method): void;
+  // the next calls of a method wait until the returned resume runs;
+  // paused counts the calls waiting
+  pause(method: Method): () => void;
+  paused: number;
   // a pending delete observed
   finish(name: string): void;
   // the gateway is unreachable; recover() brings it back with every
@@ -67,6 +92,10 @@ export type FakeGateway = {
   ): void;
   // the keep-alive's start time each sandbox reports
   started: string;
+  // what the root check prints before its ok, as "missing /repos"
+  rootProblems: string[];
+  // the root checks run, by sandbox
+  rootChecks: string[];
   // each sandbox's filesystem, which answers the helpers' execs
   files: Map<string, FakeFs>;
   // every new sandbox's filesystem is set up by this, as a test asks
@@ -80,6 +109,7 @@ const text = (value: string) => new TextEncoder().encode(value);
 export function fakeGateway(): FakeGateway {
   const failing = new Map<Method, Error>();
   const hanging = new Set<Method>();
+  const pausing = new Map<Method, Promise<void>>();
   const pending = new Map<string, () => void>();
   let down = false;
   const fake: FakeGateway = {
@@ -95,17 +125,39 @@ export function fakeGateway(): FakeGateway {
     deletes: [],
     providerDeletes: [],
     policies: [],
+    profiles: new Map(),
+    profileDeletes: [],
+    puts: [],
+    attached: new Map(),
+    calls: [],
     globalPolicy: false,
     pid: 7,
     started: "4242",
+    rootProblems: [],
+    rootChecks: [],
     files: new Map(),
     deleteMode: "complete",
     fail: (method, error = new Error(`fake ${method} failed`)) =>
       failing.set(method, error),
     unfail: (method) => failing.delete(method),
     hang: (method) => hanging.add(method),
+    pause(method) {
+      let resume = () => {};
+      pausing.set(
+        method,
+        new Promise<void>((resolve) => {
+          resume = resolve;
+        }),
+      );
+      return () => {
+        pausing.delete(method);
+        resume();
+      };
+    },
+    paused: 0,
     finish(name) {
       fake.sandboxes.delete(name);
+      fake.attached.delete(name);
       pending.get(name)?.();
       pending.delete(name);
     },
@@ -127,6 +179,12 @@ export function fakeGateway(): FakeGateway {
     const error = failing.get(method);
     if (error) throw error;
     if (hanging.has(method)) await until(signal);
+    const gate = pausing.get(method);
+    if (gate !== undefined) {
+      fake.paused++;
+      await gate;
+      fake.paused--;
+    }
   };
   const until = (signal: AbortSignal) =>
     new Promise<never>((_, reject) => {
@@ -181,6 +239,13 @@ export function fakeGateway(): FakeGateway {
         yield { exit: 0 };
         return;
       }
+      if (request.command.join("\0") === ROOTS_COMMAND.join("\0")) {
+        fake.rootChecks.push(request.sandbox);
+        const lines = [...fake.rootProblems, "ok"].join("\n");
+        yield { stream: "stdout", data: text(`${lines}\n`) };
+        yield { exit: 0 };
+        return;
+      }
       if (fake.onExec) {
         for (const event of fake.onExec(request)) yield event;
         return;
@@ -194,8 +259,10 @@ export function fakeGateway(): FakeGateway {
       await enter("delete", signal);
       const box = fake.sandboxes.get(name);
       if (box === undefined) return;
-      if (fake.deleteMode === "complete") fake.sandboxes.delete(name);
-      else box.phase = box.phase === "error" ? "error" : "deleting";
+      if (fake.deleteMode === "complete") {
+        fake.sandboxes.delete(name);
+        fake.attached.delete(name);
+      } else box.phase = box.phase === "error" ? "error" : "deleting";
     },
     async waitDeleted(name, signal) {
       await enter("waitDeleted", signal);
@@ -217,7 +284,14 @@ export function fakeGateway(): FakeGateway {
         .map(([name, box]) => ({ name, phase: box.phase, labels: box.labels }));
     },
     async setPolicy(name, _policy, network, signal) {
+      fake.calls.push(`policy:${name}`);
       await enter("setPolicy", signal);
+      // as OpenShell, a binding to a provider not attached refuses all
+      for (const provider of bindings(network)) {
+        if (!fake.attached.get(name)?.has(provider)) {
+          throw new Error(`provider ${provider} is not attached`);
+        }
+      }
       fake.policies.push({ name, network });
     },
     providers: {
@@ -229,13 +303,78 @@ export function fakeGateway(): FakeGateway {
       },
       async delete(name, signal) {
         await enter("delete", signal);
+        for (const set of fake.attached.values()) {
+          if (set.has(name)) throw new Error(`provider ${name} is attached`);
+        }
         fake.providerDeletes.push(name);
         fake.providers.delete(name);
+      },
+      async importProfile(profile, signal) {
+        await enter("importProfile", signal);
+        if (!fake.profiles.has(profile.id)) {
+          fake.profiles.set(profile.id, profile);
+        }
+      },
+      async profiles(annotations, signal) {
+        await enter("list", signal);
+        return [...fake.profiles.values()]
+          .filter((profile) => matches(profile.annotations, annotations))
+          .map((profile) => profile.id);
+      },
+      async deleteProfile(id, signal) {
+        await enter("delete", signal);
+        fake.profileDeletes.push(id);
+        fake.profiles.delete(id);
+      },
+      async put(spec, signal) {
+        await enter("put", signal);
+        if (!fake.profiles.has(spec.profile)) {
+          throw new Error(`profile ${spec.profile} not found`);
+        }
+        fake.puts.push(spec);
+        if (!fake.providers.has(spec.name)) {
+          fake.providers.set(spec.name, spec.labels);
+        }
+      },
+      async attach(sandbox, provider, signal) {
+        fake.calls.push(`attach:${provider}`);
+        await enter("attach", signal);
+        if (!fake.providers.has(provider)) {
+          throw new Error(`provider ${provider} not found`);
+        }
+        const set = fake.attached.get(sandbox) ?? new Set();
+        set.add(provider);
+        fake.attached.set(sandbox, set);
+      },
+      async state(sandbox, provider, signal) {
+        fake.calls.push(`state:${provider}`);
+        await enter("state", signal);
+        if (fake.providerState) return fake.providerState(sandbox, provider);
+        const latest = fake.policies.findLast((one) => one.name === sandbox);
+        return latest !== undefined &&
+          bindings(latest.network).includes(provider)
+          ? "ready"
+          : "withheld";
       },
     },
     close() {},
   };
   return fake;
+}
+
+// the providers a network policy binds
+export function bindings(network: Record<string, unknown>): string[] {
+  const out: string[] = [];
+  for (const rule of Object.values(network) as {
+    endpoints: { credentialBinding?: { provider: string } }[];
+  }[]) {
+    for (const endpoint of rule.endpoints) {
+      if (endpoint.credentialBinding) {
+        out.push(endpoint.credentialBinding.provider);
+      }
+    }
+  }
+  return out;
 }
 
 // a clock that moves only when told, as testApp's does

@@ -198,7 +198,7 @@ export class FakeFs {
         };
       }
       default: {
-        let frames = this.pull(request.stdin ?? new Uint8Array());
+        let frames = this.pull(request.stdin ?? new Uint8Array(), argv[5]!);
         frames = this.pullFrames?.(frames) ?? frames;
         return { stdout: frames, exit: 0 };
       }
@@ -311,7 +311,11 @@ export class FakeFs {
     return lines;
   }
 
-  private pull(stdin: Uint8Array): Uint8Array[] {
+  // every pull request's stdin, in order
+  readonly pulled: Uint8Array[] = [];
+
+  private pull(stdin: Uint8Array, cap: string): Uint8Array[] {
+    this.pulled.push(stdin);
     const asked = new TextDecoder().decode(stdin).split("\n").filter(Boolean);
     const out: Uint8Array[] = [];
     for (const esc of asked) {
@@ -320,6 +324,10 @@ export class FakeFs {
       if (node?.kind !== "file") {
         out.push(text(`${JSON.stringify({ path: esc, missing: true })}\n`));
         continue;
+      }
+      if (node.data.byteLength > Number(cap)) {
+        out.push(text("PULL refused size\n"));
+        return out;
       }
       out.push(
         text(

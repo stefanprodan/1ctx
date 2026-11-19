@@ -53,6 +53,7 @@ const quotes = (
   prefix: PREFIX,
   key: KEY,
   header: "X-Api-Key",
+  template: "Token {key}",
   value: `Token ${KEY}`,
   methods: ["GET", "HEAD"],
   ...fields,
@@ -63,6 +64,7 @@ const prices: CommandCredential = {
   prefix: "https://prices.example.test/",
   key: OTHER_KEY,
   header: "Authorization",
+  template: "Bearer {key}",
   value: `Bearer ${OTHER_KEY}`,
   methods: ["GET"],
 };

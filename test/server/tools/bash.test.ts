@@ -466,6 +466,7 @@ describe("bash with credentials", () => {
         prefix: quotes.prefix,
         key: KEY,
         header: "X-Api-Key",
+        template: "Token {key}",
         value: `Token ${KEY}`,
         methods: ["GET"],
       },
@@ -578,5 +579,94 @@ describe("bash with credentials", () => {
     });
     await tool.run({ command: "ls" }, context());
     expect(caps).not.toHaveProperty("credentials");
+  });
+});
+
+describe("bash's description under the sandbox shell", () => {
+  const github = {
+    id: "gh1",
+    name: "gh-api",
+    keyName: "http-gh",
+    prefix: "https://api.github.test/",
+    header: "Authorization",
+    template: "token {key}",
+    methods: ["GET" as const, "POST" as const],
+  };
+  const cookie = {
+    ...github,
+    id: "c1",
+    name: "session",
+    header: "Cookie",
+    template: "s={key}",
+  };
+  const listed = {
+    mode: "listed" as const,
+    domains: ["api.github.test", "pypi.test"],
+  };
+
+  test("it names the placeholder, the header it goes in and the differences", () => {
+    const words = makeBashTool({
+      web: listed,
+      credentials: { offered: [github, cookie], off: [] },
+      sandbox: true,
+    }).description;
+    expect(words).toContain(
+      'For https://api.github.test/ (gh-api) send -H "Authorization: token $ONECTX_CRED_GH_API", a placeholder the key replaces there alone.',
+    );
+    expect(words).not.toContain("session");
+    expect(words).toContain("these hosts only: api.github.test, pypi.test.");
+    expect(words).toContain("run Python with uv run or uvx, never pip");
+    expect(words).toContain("into a venv under $HOME, never in /tmp");
+    expect(words).toContain("Redirect a background job's output");
+    expect(words).toContain("A hard link or an unreadable file");
+    expect(words).toContain("responses are never redacted");
+    expect(words).not.toContain(";");
+    expect(words).not.toContain("send no key");
+  });
+
+  test("all mode says two-label hosts need listing and requests go unsigned", () => {
+    const words = makeBashTool({
+      web: { mode: "all", domains: ["pypi.test"] },
+      credentials: { offered: [github], off: [] },
+      sandbox: true,
+    }).description;
+    expect(words).toContain(
+      "any host of three labels or more (api.github.com), and one of two labels (pypi.org) only when listed: pypi.test.",
+    );
+    expect(words).toContain("Requests go unsigned here.");
+    expect(words).not.toContain("ONECTX_CRED");
+  });
+
+  test("the built-in shell's words are untouched, and a subagent's follow the sandbox's", () => {
+    const options = {
+      web: listed,
+      credentials: { offered: [github], off: [] },
+    };
+    expect(makeBashTool({ ...options, sandbox: false }).description).toBe(
+      makeBashTool(options).description,
+    );
+    expect(makeBashTool(options).description).toContain(
+      "jq, yq, awk and diff are there, git, python and node are not.",
+    );
+    const parent = makeBashTool({ ...options, sandbox: true }).description;
+    const child = asSubagent(
+      parent,
+      listed,
+      [github],
+      [{ ...github, readOnly: true }],
+    );
+    expect(child).toContain("(gh-api, GET and HEAD only) send -H");
+  });
+
+  test("bash's own word picks the variant", () => {
+    const run = async () => ({ content: "", error: false });
+    expect(
+      makeBashTool({ bash: { run, sandboxed: () => true }, web: listed })
+        .description,
+    ).toContain("uv run");
+    expect(
+      makeBashTool({ bash: { run, sandboxed: () => false }, web: listed })
+        .description,
+    ).not.toContain("uv run");
   });
 });

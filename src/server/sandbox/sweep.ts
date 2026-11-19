@@ -23,6 +23,12 @@ export type SweepDeps = {
   // a lease holds it, so it stays; a stuck one is not held and is asked
   // to delete again
   held(name: string): boolean;
+  // a provider deleted unless a lease of any manager uses it now, asked
+  // under the attach's lock; true when it went
+  dropProvider(name: string): Promise<boolean>;
+  // a profile deleted unless a lease of any manager uses it, asked
+  // under the import's lock right before its delete
+  dropProfile(id: string): Promise<void>;
   // recorded as deleting, so it counts against the cap until its delete
   // is observed; settles when that delete ended
   adopt(name: string, phase: SandboxPhase): Promise<void>;
@@ -53,12 +59,13 @@ export async function sweepLabelled(
     )) ?? [];
   let removed = 0;
   for (const name of providers) {
-    const done = await ask(clock, log, STEP_MS, async (signal) => {
-      await gateway.providers.delete(name, signal);
-      return true;
-    });
-    if (done) removed++;
+    if (await deps.dropProvider(name)) removed++;
   }
+  const profiles =
+    (await ask(clock, log, STEP_MS, (signal) =>
+      gateway.providers.profiles(labels, signal),
+    )) ?? [];
+  for (const id of profiles) await deps.dropProfile(id);
   if (deletes.length > 0 || removed > 0) {
     log.info("sandboxes swept", {
       when,

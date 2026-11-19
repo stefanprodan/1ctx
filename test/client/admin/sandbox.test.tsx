@@ -17,6 +17,7 @@ import {
   sandboxError,
   sandboxLeases,
   sandboxLeasesError,
+  sandboxRefused,
   watchSandboxLeases,
 } from "../../../src/client/data/sandbox.ts";
 import { Save } from "../../../src/client/lib/save.ts";
@@ -182,6 +183,7 @@ describe("the Sandbox page", () => {
     sandboxError.value = null;
     sandboxLeases.value = null;
     sandboxLeasesError.value = null;
+    sandboxRefused.value = null;
   });
 
   test("Config lists it right after Web access", () => {
@@ -219,6 +221,19 @@ describe("the Sandbox page", () => {
     expect(html).not.toContain("setting-alert");
   });
 
+  test.serial("the built-in shell hides the gateway and the image", () => {
+    sandbox.value = response({
+      settings: { ...settings, shell: "builtin" },
+      active: false,
+    });
+    sandboxLeases.value = [];
+    const html = render(<Sandbox />);
+    expect(html).toContain('name="shell"');
+    for (const name of ["endpoint", "image"]) {
+      expect(html).not.toContain(`name="${name}"`);
+    }
+  });
+
   test.serial("says the shell is off and that there are no sandboxes", () => {
     sandbox.value = response({
       active: false,
@@ -229,6 +244,18 @@ describe("the Sandbox page", () => {
     expect(html).toContain("openshell-gateway-cert.key is missing.");
     expect(html).toContain("No sandboxes. The built-in shell runs.");
     expect(html).toMatch(/>missing</);
+  });
+
+  test.serial("says why every command is refused", () => {
+    sandbox.value = response();
+    sandboxLeases.value = [];
+    sandboxRefused.value =
+      "the sandbox image img fails its root check (missing /repos). An admin must fix the image or pick another";
+    const html = render(<Sandbox />);
+    expect(html).toContain("setting-alert");
+    expect(html).toContain(
+      "Every command is refused: the sandbox image img fails its root check (missing /repos). An admin must fix the image or pick another.",
+    );
   });
 });
 
@@ -357,6 +384,7 @@ describe("the Sandbox list's poll", () => {
     sandbox.value = null;
     sandboxLeases.value = null;
     sandboxLeasesError.value = null;
+    sandboxRefused.value = null;
   });
 
   test.serial(
@@ -367,9 +395,12 @@ describe("the Sandbox list's poll", () => {
       expect(calls).toHaveLength(0);
       fake.tick();
       expect(calls.map((c) => c.url)).toEqual(["/api/admin/sandbox/leases"]);
-      calls[0]!.answer(Response.json({ leases: [lease()] }));
+      calls[0]!.answer(
+        Response.json({ leases: [lease()], refused: "a global policy" }),
+      );
       await settle();
       expect(sandboxLeases.value).toEqual([lease()]);
+      expect(sandboxRefused.value).toBe("a global policy");
       fake.set("hidden");
       fake.tick();
       expect(calls).toHaveLength(1);
@@ -377,9 +408,11 @@ describe("the Sandbox list's poll", () => {
       expect(calls).toHaveLength(2);
       calls[1]!.answer(Response.json({ error: "gone" }, { status: 502 }));
       await settle();
-      // a failed read keeps the last list and says so
+      // a failed read keeps the last list and says so, and drops the
+      // refusal it can no longer vouch for
       expect(sandboxLeases.value).toEqual([lease()]);
       expect(sandboxLeasesError.value).not.toBeNull();
+      expect(sandboxRefused.value).toBeNull();
       stop();
       expect(fake.timers()).toBe(0);
       expect(fake.listeners()).toBe(0);

@@ -110,6 +110,10 @@ export function offLine(state: SandboxResponse): string | null {
   } missing.`;
 }
 
+// the server's words for why no command runs
+export const refusedLine = (refused: string) =>
+  `Every command is refused: ${refused}.`;
+
 const STATE_WORDS: Record<LeaseState, string> = {
   creating: "Creating",
   warm: "Warm",

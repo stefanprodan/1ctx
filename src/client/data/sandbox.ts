@@ -20,6 +20,8 @@ export const sandbox = signal<SandboxResponse | null>(null);
 export const sandboxError = signal<Failure | null>(null);
 export const sandboxLeases = signal<LeaseRow[] | null>(null);
 export const sandboxLeasesError = signal<Failure | null>(null);
+// why every command is refused, from the leases' answer, else null
+export const sandboxRefused = signal<string | null>(null);
 
 // a lease moves in seconds; the list is a glance, not a monitor
 export const LEASES_EVERY_MS = 15_000;
@@ -36,6 +38,7 @@ effect(() => {
   sandboxError.value = null;
   sandboxLeases.value = null;
   sandboxLeasesError.value = null;
+  sandboxRefused.value = null;
 });
 
 export async function loadSandbox(): Promise<void> {
@@ -59,10 +62,13 @@ export async function loadSandboxLeases(): Promise<void> {
     const body = await api<SandboxLeasesResponse>("/api/admin/sandbox/leases");
     if (owner !== forUser || leasesTurn !== mine) return;
     sandboxLeases.value = body.leases;
+    sandboxRefused.value = body.refused;
     sandboxLeasesError.value = null;
   } catch (err) {
     if (owner === forUser && leasesTurn === mine) {
       sandboxLeasesError.value = failure(err);
+      // unknown now: the list says the read failed
+      sandboxRefused.value = null;
     }
   }
 }

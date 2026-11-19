@@ -245,6 +245,16 @@ export class UploadStore {
 
   // the session's files with their text as bytes, which a command's
   // mount transfers to its worker as they come from SQLite
+  bytes(sessionId: string): number {
+    return (
+      this.db
+        .query<{ bytes: number }, [string]>(
+          "select bytes from session_uploads where session_id = ?",
+        )
+        .get(sessionId)?.bytes ?? 0
+    );
+  }
+
   mounted(sessionId: string): MountedUploads {
     const row = this.db
       .query<{ revision: number; bytes: number }, [string]>(

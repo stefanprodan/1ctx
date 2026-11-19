@@ -22,3 +22,9 @@ log scrub.
   secrets folder:** its CA key and the client key the `openshell-` files
   copy, in `.preview/openshell/tls` and on staging
   `~/.1ctx/openshell/tls`, owner-only (`docs/deploy.md`).
+- **The sandbox shell copies `http-` keys into the gateway.** Each
+  credential a listed-mode send attaches is an OpenShell provider
+  holding its key in the gateway's encrypted provider store, the one
+  copy of a key outside the secret files. 1ctx keeps only its hash in
+  memory, to tell a rotation; the provider is deleted once no sandbox
+  uses it, and the start sweep deletes any left (`docs/sandbox.md`).

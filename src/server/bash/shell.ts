@@ -34,6 +34,16 @@ export type ShellCall = {
   web: WebSnapshot | null;
   // the send's credentials, their keys read for this command
   credentials: readonly CommandCredential[];
+  // what each tree's rows hold now, read only by a shell that sizes its
+  // trees before the mount, so a lowered cap still mounts them
+  stored?(): StoredBytes;
+};
+
+export type StoredBytes = {
+  docs: number;
+  scratch: number;
+  uploads: number;
+  kept: number;
 };
 
 // The identities of what the job's bytes were read from, so a backend

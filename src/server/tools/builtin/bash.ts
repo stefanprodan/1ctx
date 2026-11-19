@@ -14,6 +14,11 @@ import {
   scrubKeys,
 } from "../../bash/index.ts";
 import { headerValue, type KeyRead } from "../../credentials/index.ts";
+import {
+  placeholderValue,
+  placement,
+  prefixGlob,
+} from "../../sandbox/rules.ts";
 import type { OfferedCredential, Tool, ToolResult } from "../types.ts";
 import { domainWords } from "../web.ts";
 
@@ -63,6 +68,37 @@ function networkWords(
   ].join(" ");
 }
 
+// the sandbox shell's network: OpenShell's rules, and a placeholder the
+// agent places where the built-in shell's curl signs on its own
+function sandboxNetworkWords(
+  web: WebSnapshot | null,
+  credentials: readonly OfferedCredential[],
+): string {
+  if (web === null) return "No network.";
+  const listed = web.domains.length > 0 ? `: ${domainWords(web)}` : ", none is";
+  const where =
+    web.mode === "all"
+      ? `any host of three labels or more (api.github.com), and one of two labels (pypi.org) only when listed${listed}`
+      : `these hosts only: ${domainWords(web)}`;
+  const placed = credentials.filter(
+    (credential) =>
+      placement(credential.header, credential.template) !== null &&
+      prefixGlob(credential.prefix) !== null,
+  );
+  return [
+    `curl, python and uv reach HTTP and HTTPS on ports 80 and 443 of ${where}. Save downloads in /tmp.`,
+    ...(web.mode === "all"
+      ? credentials.length > 0
+        ? ["Requests go unsigned here."]
+        : []
+      : placed.map(
+          (credential) =>
+            `For ${prefixWords(credential.prefix)} (${credential.name}${credential.readOnly ? ", GET and HEAD only" : ""}) send -H "${credential.header}: ${placeholderValue(credential.template, credential.name)}", a placeholder the key replaces there alone.`,
+        )),
+    "Each redirect is checked as a new request, responses are never redacted, and a refusal is a 403 from the proxy or a refused connection.",
+  ].join(" ");
+}
+
 export const isReadMethod = (method: HttpMethod) =>
   method === "GET" || method === "HEAD";
 
@@ -108,6 +144,7 @@ export function commandCredentials(
         prefix: credential.prefix,
         key: read.key,
         header: credential.header,
+        template: credential.template,
         value: headerValue(credential.template, read.key),
         methods: credential.readOnly
           ? credential.methods.filter(isReadMethod)
@@ -120,7 +157,9 @@ export function commandCredentials(
   ];
 }
 
-// the tail keeps its length, the receipts the registry keeps apart
+// the printed output was scrubbed whole before its cut (mount.ts); this
+// pass takes the notices and receipts around it. The tail keeps its
+// length, the receipts the registry keeps apart
 function scrubbed(
   result: ToolResult,
   credentials: readonly CommandCredential[],
@@ -143,7 +182,7 @@ function scrubbed(
 }
 
 export type BashToolOptions = {
-  bash?: Pick<BashCapability, "run">;
+  bash?: Pick<BashCapability, "run" | "sandboxed">;
   web?: WebSnapshot | null;
   visuals?: boolean;
   credentials?: BashCredentials;
@@ -152,7 +191,17 @@ export type BashToolOptions = {
   docs?: boolean;
   // a subagent's: no open, so the description leaves it out
   subagent?: boolean;
+  // the sandbox shell runs the commands: a real shell and OpenShell's
+  // network, so the description says what differs; bash's own word
+  // when not given
+  sandbox?: boolean;
 };
+
+const BUILTIN_TOOLS =
+  "jq, yq, awk and diff are there, git, python and node are not.";
+// what the agent does differently in a real shell
+const SANDBOX_TOOLS =
+  "jq, yq, git, python3 and uv are there, node is not: run Python with uv run or uvx, never pip. Only /knowledge and /tmp are kept, other files may go between commands. /tmp is small and saved after each command, so install packages with uv run --with pkg, or into a venv under $HOME, never in /tmp or /knowledge. $HOME lasts until the sandbox is recycled, so check a venv exists before using it. Redirect a background job's output (job >/tmp/log 2>&1 &), or the command waits to its deadline. A hard link or an unreadable file in /tmp or /knowledge saves nothing.";
 
 const OPEN_WORDS =
   "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. To point to one, write its /knowledge/ path. ";
@@ -167,7 +216,10 @@ export const asSubagent = (
 ): string =>
   description
     .replace(OPEN_WORDS, "")
-    .replace(networkWords(web, parent), () => networkWords(web, own));
+    .replace(networkWords(web, parent), () => networkWords(web, own))
+    .replace(sandboxNetworkWords(web, parent), () =>
+      sandboxNetworkWords(web, own),
+    );
 
 export function makeBashTool({
   bash,
@@ -177,15 +229,16 @@ export function makeBashTool({
   keys,
   docs = true,
   subagent = false,
+  sandbox = bash?.sandboxed?.() ?? false,
 }: BashToolOptions = {}): Tool<ToolResult> {
   return {
     name: "bash",
     // past the mount's own backstop, so its words end a stuck command
     graceMs: BACKSTOP_MS + 500,
     description:
-      "Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. jq, yq, awk and diff are there, git, python and node are not. Never write secrets, since others can read this chat and the project. " +
+      `Run a bash command in a sandbox over the project's files. /knowledge holds the project docs: UTF-8 text shared with everyone in the project, often many large files. /tmp is this chat's scratch for any bytes, kept between commands. /uploads holds the files the user attached, read-only. Navigate, never dump, since a long result is cut. Find the file first: ls and find for names, rg -il 'word' /knowledge for the files that mention a word. Then grep -n in that file for the line, grep -n '^#' for its outline, and read around a line with sed -n '40,120p'. Check wc -l before reading. Never cat a big file or print matching lines from the whole tree. Edit in place with sed -i, create a file with cat > file <<'EOF', read a file before replacing it whole, and print the changed lines after. Changes are saved as a new version when the command ends. If someone else changed the file meanwhile nothing is saved and the result says so: read again and retry. Prefer small Markdown files whose first line says their purpose, named with letters, digits, dot, dash and underscore. Each command is a new shell that starts in the last directory, so variables do not carry over. Put the steps of one task in one command, and independent commands in one round, where they run in parallel. ${sandbox ? SANDBOX_TOOLS : BUILTIN_TOOLS} Never write secrets, since others can read this chat and the project. ` +
       (subagent ? "" : OPEN_WORDS) +
-      networkWords(web, credentials.offered),
+      (sandbox ? sandboxNetworkWords : networkWords)(web, credentials.offered),
     parameters: {
       type: "object",
       properties: {

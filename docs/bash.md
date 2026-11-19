@@ -160,7 +160,14 @@ that shell that shows a file on the chat page.
   Header names containing a key, case-insensitively, are dropped.
   Redirect history is kept, with the same rules on every hop's status
   text and headers, even for an unsigned request with an unrelated key
-  loaded. The tool scrubs the result again, the tail kept apart.
+  loaded. The mount scrubs stdout and stderr whole before the result's
+  cut, so no key is cut into a fragment; the tool scrubs the result
+  again, the tail kept apart.
+- **The sandbox shell has OpenShell's network, not this one.** Its
+  policy, placeholders, scrub of pulled files and the accepted
+  differences from `commandFetch()` are in `docs/sandbox.md`; the tool
+  description says them when the sandbox shell is on, and the
+  built-in shell's description is unchanged.
 
 ## The writable trees
 

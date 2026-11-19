@@ -31,6 +31,8 @@ export type Lease = {
   // what the shell backend last left in the sandbox; the leases never
   // read it, and it goes with the record
   synced: { value: unknown };
+  // what network.ts last gave the sandbox, the same way
+  network: { value: unknown };
   phase: SandboxPhase | null;
   createdAt: number;
   usedAt: number;
@@ -43,6 +45,9 @@ export class Book {
   readonly byWorkspace = new Map<string, Lease>();
   // an order of events, so a probe knows what was ready before it listed
   private serial = 0;
+
+  // a sandbox whose delete was observed, so what it used may go too
+  constructor(private readonly forgotten: (lease: Lease) => void = () => {}) {}
 
   tick(): number {
     return ++this.serial;
@@ -67,6 +72,7 @@ export class Book {
       pid: null,
       started: null,
       synced: { value: null },
+      network: { value: null },
       phase: null,
       createdAt: now,
       usedAt: now,
@@ -94,6 +100,7 @@ export class Book {
     this.records.delete(lease.name);
     for (const release of lease.holds) release();
     lease.holds = [];
+    this.forgotten(lease);
   }
 
   // what counts against sandboxesMax: everything the gateway may still
@@ -111,10 +118,6 @@ export class Book {
   holds(name: string): boolean {
     const lease = this.records.get(name);
     return lease !== undefined && lease.state !== "stuck";
-  }
-
-  holding(): boolean {
-    return [...this.records.keys()].some((name) => this.holds(name));
   }
 
   // deletes the cap asked for and the gateway has not finished

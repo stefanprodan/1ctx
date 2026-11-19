@@ -20,7 +20,8 @@ export type RecycleReason =
   | "restart"
   | "settings"
   | "failed"
-  | "discard";
+  | "discard"
+  | "credentials";
 
 // a workspace's sandbox, held by one command from acquire to settle
 export type SandboxHold = ShellHold & {
@@ -33,6 +34,10 @@ export type SandboxHold = ShellHold & {
   gateway: Gateway;
   // the backend's record of what the sandbox holds, kept with the lease
   synced: { value: unknown };
+  // what network.ts last gave the sandbox, kept with the lease
+  network: { value: unknown };
+  // what the network leaves out, named in this command's result
+  notice: string;
   // drops the lease and deletes the sandbox, in place of release
   recycle(reason: RecycleReason): void;
   // an exec found the sandbox not ready or the gateway unavailable;

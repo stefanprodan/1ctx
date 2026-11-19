@@ -32,6 +32,11 @@ ours() {
   [ "$(lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')" = "$HERE" ]
 }
 running() { [ -f "$PID" ] && ours "$(cat "$PID")"; }
+# the port's only listener is the given pid, so a stranger answering
+# health is never taken for ours nor sent the admin password
+listens() {
+  [ "$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true)" = "$1" ]
+}
 
 # the gateway is ours when its pid runs our binary from this checkout
 gw_running() {
@@ -40,10 +45,16 @@ gw_running() {
     grep -q -- "$HERE/$GW/bin/openshell-gateway"
 }
 
+# the pid file goes only with the process: a clean that went on under a
+# live gateway would remove its certificates and state
 gw_stop() {
   if gw_running; then
     kill "$(cat "$GW_PID")"
     for _ in $(seq 1 100); do gw_running || break; sleep 0.1; done
+    if gw_running; then
+      echo "the gateway (pid $(cat "$GW_PID")) did not stop within 10 s; stop it, then run this again" >&2
+      exit 1
+    fi
   fi
   rm -f "$GW_PID"
 }
@@ -166,11 +177,21 @@ start() {
     --listen "127.0.0.1:$PORT" --db "$DIR/1ctx.sqlite" \
     --secrets "$DIR/secrets" --drain 0 >"$LOG" 2>&1 &
   echo $! >"$PID"
+  local pid holders
+  pid=$(cat "$PID")
   for _ in $(seq 1 50); do
     if curl -sf -o /dev/null "$URL/api/health"; then
-      echo "preview up at $URL (pid $(cat "$PID"), log $LOG)"
-      if [ "${PREVIEW_SHELL:-}" = sandbox ]; then sandbox; fi
-      return 0
+      if listens "$pid"; then
+        echo "preview up at $URL (pid $pid, log $LOG)"
+        if [ "${PREVIEW_SHELL:-}" = sandbox ]; then sandbox; fi
+        return 0
+      fi
+      holders=$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | grep -vx "$pid" | tr "\n" " " || true)
+      if [ -n "$holders" ]; then
+        echo "port $PORT is held by another process (pid ${holders% }); stop it or pick another PREVIEW_PORT" >&2
+        stop
+        exit 1
+      fi
     fi
     running || break
     sleep 0.2

@@ -163,50 +163,67 @@ function checkManifest(manifest: PushManifest, roots: readonly string[]) {
 
 // The manifest as the stdin of one exec per chunk, each strictly under
 // `limit` bytes, run in order. It throws on a manifest checkManifest
-// refuses, a fault in the caller. Removes go deepest first, then folders
-// shallowest first with the owner's rwx so the files can land, then the
-// files, then every folder's and meta entry's exact mode and time,
-// deepest first: a write would move a folder's time, and a folder
-// without the owner's x would close the way to the ones below it. A
-// file larger than a chunk goes as a first part and appended parts,
-// writable until its last part sets its mode.
-export function encodePush(
+// refuses, a fault in the caller, before the first chunk. Removes go
+// deepest first, then folders shallowest first with the owner's rwx so
+// the files can land, then the files, then every folder's and meta
+// entry's exact mode and time, deepest first: a write would move a
+// folder's time, and a folder without the owner's x would close the way
+// to the ones below it. A file larger than a chunk goes as a first part
+// and appended parts, writable until its last part sets its mode. Each
+// chunk is made only when the one before it was taken, so a push holds
+// one chunk beside the rows it frames.
+export function pushChunks(
   manifest: PushManifest,
   options: { roots?: readonly string[]; limit?: number } = {},
-): Uint8Array[] {
-  const limit = options.limit ?? PUSH_CHUNK_BYTES;
+): Generator<Uint8Array, void, undefined> {
   checkManifest(manifest, options.roots ?? SANDBOX_ROOTS);
-  const chunks: Uint8Array[] = [];
+  return chunksOf(manifest, options.limit ?? PUSH_CHUNK_BYTES);
+}
+
+// every chunk at once, for a test that reads them all
+export const encodePush = (
+  manifest: PushManifest,
+  options: { roots?: readonly string[]; limit?: number } = {},
+): Uint8Array[] => [...pushChunks(manifest, options)];
+
+function* chunksOf(
+  manifest: PushManifest,
+  limit: number,
+): Generator<Uint8Array, void, undefined> {
   let parts: Uint8Array[] = [];
   let used = 0;
-  const flush = () => {
-    if (used === 0) return;
+  const take = (): Uint8Array => {
     const chunk = new Uint8Array(used);
     let at = 0;
     for (const part of parts) {
       chunk.set(part, at);
       at += part.byteLength;
     }
-    chunks.push(chunk);
     parts = [];
     used = 0;
+    return chunk;
   };
-  const add = (...pieces: Uint8Array[]) => {
+  // the chunk made full by the pieces, if any; the pieces are kept
+  const add = (...pieces: Uint8Array[]): Uint8Array | null => {
     const size = pieces.reduce((sum, piece) => sum + piece.byteLength, 0);
-    if (used + size >= limit) flush();
+    const full = used > 0 && used + size >= limit ? take() : null;
     if (size >= limit) throw new RangeError("a push frame past the chunk");
     parts.push(...pieces);
     used += size;
+    return full;
   };
   const remove = [...(manifest.remove ?? [])].sort(
     (a, b) => depth(b) - depth(a),
   );
-  for (const path of remove) add(header({ op: "rm", path: escapePath(path) }));
+  for (const path of remove) {
+    const full = add(header({ op: "rm", path: escapePath(path) }));
+    if (full) yield full;
+  }
   const folders = [...(manifest.folders ?? [])].sort(
     (a, b) => depth(a.path) - depth(b.path),
   );
   for (const folder of folders) {
-    add(
+    const full = add(
       header({
         op: "dir",
         path: escapePath(folder.path),
@@ -214,6 +231,7 @@ export function encodePush(
         mtime: folder.mtime,
       }),
     );
+    if (full) yield full;
   }
   for (const file of manifest.files ?? []) {
     const path = escapePath(file.path);
@@ -232,7 +250,7 @@ export function encodePush(
     do {
       let room = limit - 1 - used - widest;
       if (room < Math.min(total - sent, 4096) && used > 0) {
-        flush();
+        yield take();
         room = limit - 1 - widest;
       }
       const size = Math.min(total - sent, room);
@@ -245,7 +263,8 @@ export function encodePush(
         size,
         ...(sent > 0 ? { append: true } : {}),
       };
-      add(header(fields), file.data.subarray(sent, sent + size));
+      const full = add(header(fields), file.data.subarray(sent, sent + size));
+      if (full) yield full;
       sent += size;
     } while (sent < total);
   }
@@ -254,7 +273,7 @@ export function encodePush(
     ...(manifest.meta ?? []),
   ].sort((a, b) => depth(b.path) - depth(a.path));
   for (const entry of settle) {
-    add(
+    const full = add(
       header({
         op: "meta",
         path: escapePath(entry.path),
@@ -262,9 +281,9 @@ export function encodePush(
         mtime: entry.mtime,
       }),
     );
+    if (full) yield full;
   }
-  flush();
-  return chunks;
+  if (used > 0) yield take();
 }
 
 // the push helper's last line: the frames it applied, or why it stopped

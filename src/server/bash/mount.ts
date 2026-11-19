@@ -11,8 +11,13 @@ import { errorFields, type Log } from "../lib/log.ts";
 import type { KnowledgeCaps } from "../limits/index.ts";
 import { BACKSTOP_MS } from "./commands.ts";
 import { checked, commit } from "./commit.ts";
-import { commandFetch } from "./credentials.ts";
-import { type CommandCaps, type DocsPort, mountJob } from "./job.ts";
+import { commandFetch, scrubKeys } from "./credentials.ts";
+import {
+  type CommandCaps,
+  type DocsPort,
+  mountJob,
+  storedBytes,
+} from "./job.ts";
 import { readKept } from "./kept.ts";
 import { checkOpened, type OpenedRecord, openedReceipt } from "./open.ts";
 import { failed, refused } from "./output.ts";
@@ -83,6 +88,18 @@ function busy(waitedMs: number, timeoutMs: number, longest: Wait) {
 // what a command waited for longest: the chat's own earlier commands,
 // a shell, or a process slot
 type Wait = "own" | "shell" | "slot";
+
+function scrubbedAnswer(
+  answer: Answer,
+  credentials: ShellCall["credentials"],
+): Answer {
+  if (!credentials.some((credential) => "key" in credential)) return answer;
+  return {
+    ...answer,
+    stdout: scrubKeys(answer.stdout, credentials),
+    stderr: scrubKeys(answer.stderr, credentials),
+  };
+}
 
 // 124 is the interpreter's own deadline, 126 another of its limits: the
 // exit decides, whatever changes came with it
@@ -209,6 +226,7 @@ export async function run(
     repoFileBytes: caps.repos?.fileBytes ?? 0,
     web: caps.web ?? null,
     credentials: caps.web ? (caps.credentials ?? []) : [],
+    stored: () => storedBytes(deps, caps, projectId, workspace),
   };
   try {
     releaseSession = await acquireSession(workspace, combined);
@@ -278,7 +296,9 @@ export async function run(
       ended = settled.cause;
       throw combined.aborted ? combined.reason : settled.error;
     }
-    answer = settled.answer;
+    // a key crossing the cut would leave a fragment no scrub matches,
+    // so the output is scrubbed whole before any cut
+    answer = scrubbedAnswer(settled.answer, call.credentials);
     phase = "diff";
     notice = left + answer.notice;
     combined.throwIfAborted();

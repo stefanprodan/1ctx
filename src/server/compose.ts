@@ -504,6 +504,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     knowledge: {
       mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
       mountedUploads: (sessionId) => knowledge.mountedUploads(sessionId),
+      docBytes: (projectId) => knowledge.docBytes(projectId),
+      uploadBytes: (sessionId) => knowledge.uploadBytes(sessionId),
       commitDocs: (projectId, author, changes, caps, now) =>
         knowledge.commitDocs(projectId, author, changes, caps, now),
     },
