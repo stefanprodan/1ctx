@@ -97,8 +97,10 @@ reporting.
   the saved hosts, or the defaults while none are saved. Use defaults,
   as on a `LimitsSetting` card, fills the draft with Hosts and the
   defaults without saving, disabled while the draft is already that. A saved
-  sandbox shell missing a key file says so in a `SettingAlert`, and so
-  does the leases route's `refused` while every command is refused. The
+  sandbox shell, or a project's, missing a key file or a gateway says
+  so in a `SettingAlert` (`offLine()`), and the Sandboxes card claims
+  none runs (`sandboxOn()`). So does the leases route's `refused`
+  while every command is refused. The
   Sandboxes card lists the leases as `RowsLine`s, read again every 15
   seconds while seen, a stuck one in bad words with its next step
   (`stuckLine()`). The aside counts them, names the gateway label and

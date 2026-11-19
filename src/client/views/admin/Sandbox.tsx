@@ -76,6 +76,7 @@ import {
   sandboxBody,
   sandboxDirty,
   sandboxFieldOf,
+  sandboxOn,
   stuckLine,
 } from "./Sandbox.model.ts";
 
@@ -129,6 +130,7 @@ export function SandboxCards({
 }) {
   const off = offLine(state);
   const refused = sandboxRefused.value;
+  const backend = (drafted.value ?? draftOf(state.settings)).backend;
   return (
     <SettingStack>
       {off !== null && <SettingAlert>{off}</SettingAlert>}
@@ -136,14 +138,11 @@ export function SandboxCards({
       <Shell state={state} drafted={drafted} />
       {/* the built-in shell has no network of its own, as it has no
           gateway or image, unless a project runs openshell over it */}
-      {gatewayShown(
-        (drafted.value ?? draftOf(state.settings)).backend,
-        state.overrides,
-      ) && <Network state={state} />}
+      {gatewayShown(backend, state.overrides) && <Network state={state} />}
       <Leases
         rows={sandboxLeases.value}
         failed={sandboxLeasesError.value !== null}
-        on={state.active || state.overrides.openshell > 0}
+        on={sandboxOn(state)}
       />
     </SettingStack>
   );

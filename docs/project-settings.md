@@ -67,8 +67,8 @@ its MCP servers (`views/projects/McpServers.tsx`,
   servers: a Shell section on every project's Settings tab and a Shell
   card on a team project's admin page, its select in the card's head.
   The options are `Instance default (<backend>)`, named from the
-  detail's `instanceBackend`, then `builtin` and `openshell`
-  (`shellOptions()`); the default sends null.
+  detail's `instanceBackend`, then Built-in and OpenShell, the Sandbox
+  page's words (`shellOptions()`); the default sends null.
 - **A pick is written at once** (`saveShell()`), as an MCP side is: the
   owner's on a personal project through `PATCH /api/profile/project`,
   an admin's on a team project through `PATCH /api/projects/:id`. The

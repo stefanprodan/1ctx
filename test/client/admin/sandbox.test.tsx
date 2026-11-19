@@ -43,6 +43,7 @@ import {
   sandboxBody,
   sandboxDirty,
   sandboxFieldOf,
+  sandboxOn,
   stuckLine,
 } from "../../../src/client/views/admin/Sandbox.model.ts";
 import {
@@ -224,6 +225,48 @@ describe("the Sandbox words", () => {
     );
     expect(netFieldOf("the hosts network needs a host at least")).toBe("hosts");
     expect(netFieldOf("backend must be builtin or openshell")).toBeUndefined();
+  });
+
+  test("a project on openshell without a working gateway is named, and no sandbox is claimed", () => {
+    const builtinWith = (over: Partial<SandboxResponse>) =>
+      response({
+        settings: { ...settings, backend: "builtin" },
+        active: false,
+        ...over,
+      });
+    const one = { builtin: 0, openshell: 1 };
+    expect(
+      offLine(
+        builtinWith({
+          settings: { ...settings, backend: "builtin", endpoint: null },
+          overrides: one,
+        }),
+      ),
+    ).toBe(
+      "1 project on openshell runs the built-in shell until a gateway is saved.",
+    );
+    expect(
+      offLine(
+        builtinWith({
+          settings: { ...settings, backend: "builtin", endpoint: null },
+          overrides: { builtin: 0, openshell: 2 },
+        }),
+      ),
+    ).toBe(
+      "2 projects on openshell run the built-in shell until a gateway is saved.",
+    );
+    const keyless = builtinWith({
+      overrides: one,
+      keys: { ca: true, cert: true, key: false },
+    });
+    expect(offLine(keyless)).toBe(
+      "The sandbox shell is off: openshell-gateway-key.key is missing.",
+    );
+    expect(sandboxOn(keyless)).toBe(false);
+    expect(offLine(builtinWith({ overrides: one }))).toBeNull();
+    expect(sandboxOn(builtinWith({ overrides: one }))).toBe(true);
+    expect(sandboxOn(builtinWith({}))).toBe(false);
+    expect(sandboxOn(response())).toBe(true);
   });
 
   test("counts the projects that pick their own shell, and keeps the gateway for their openshell", () => {

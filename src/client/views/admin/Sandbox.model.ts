@@ -130,15 +130,29 @@ export const gatewayShown = (
   overrides: SandboxResponse["overrides"],
 ): boolean => backend === "openshell" || overrides.openshell > 0;
 
-// why the saved sandbox shell is not running, null while it runs or
-// the built-in one is picked
+// the gateway is saved and every key file found, whatever the backend
+const gatewayReady = (state: SandboxResponse): boolean =>
+  state.settings.endpoint !== null && missingKeys(state).length === 0;
+
+// a sandbox may run: the instance's shell, or a project's openshell
+export const sandboxOn = (state: SandboxResponse): boolean =>
+  state.active || (state.overrides.openshell > 0 && gatewayReady(state));
+
+// why the sandbox shell the instance or a project picked is not
+// running, null while it runs or nothing picks it
 export function offLine(state: SandboxResponse): string | null {
-  if (state.settings.backend !== "openshell" || state.active) return null;
+  const projects = state.overrides.openshell;
+  if (state.settings.backend !== "openshell" && projects === 0) return null;
+  if (state.active || gatewayReady(state)) return null;
   const missing = missingKeys(state);
-  if (missing.length === 0) return null;
-  return `The sandbox shell is off: ${missing.join(", ")} ${
-    missing.length === 1 ? "is" : "are"
-  } missing.`;
+  if (missing.length > 0) {
+    return `The sandbox shell is off: ${missing.join(", ")} ${
+      missing.length === 1 ? "is" : "are"
+    } missing.`;
+  }
+  return `${plural(projects, "project")} on openshell ${
+    projects === 1 ? "runs" : "run"
+  } the built-in shell until a gateway is saved.`;
 }
 
 // the server's words for why no command runs
