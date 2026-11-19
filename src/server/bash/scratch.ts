@@ -66,13 +66,14 @@ export class ScratchStore {
     );
   }
 
-  // The caller owns the transaction so knowledge and scratch roll back together.
+  // The caller owns the transaction so knowledge and scratch roll back
+  // together. Answers the revision written.
   write(
     workspace: Workspace,
     expectedRevision: number,
     changes: ScratchChanges,
     now: number,
-  ): void {
+  ): number {
     const id = workspaceId(workspace);
     const current = this.db
       .query<{ revision: number }, [string]>(
@@ -123,6 +124,7 @@ export class ScratchStore {
          ) where workspace_id = ?`,
       )
       .run(id, id);
+    return expectedRevision + 1;
   }
 
   // the stored names and sizes, which a commit checks inside its

@@ -1,7 +1,11 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { bashArea, type Workspace } from "../../../src/server/bash/index.ts";
+import {
+  type BashDeps,
+  bashArea,
+  type Workspace,
+} from "../../../src/server/bash/index.ts";
 import type { CommandCaps } from "../../../src/server/bash/mount.ts";
 import type { ScratchChanges } from "../../../src/server/bash/scratch.ts";
 import { transact } from "../../../src/server/db/index.ts";
@@ -20,6 +24,7 @@ export function setup(
   overrides: Partial<KnowledgeCaps> = {},
   worker = COMMAND_WORKER,
   backstopMs?: number,
+  shell?: BashDeps["shell"],
 ) {
   const { area: knowledge, ...base } = knowledgeSetup(overrides);
   const phases: { sessionId: string; phase: string }[] = [];
@@ -31,6 +36,7 @@ export function setup(
     log: silent,
     worker,
     ...(backstopMs ? { backstopMs } : {}),
+    ...(shell ? { shell } : {}),
     onCommandPhase: (sessionId, phase) => {
       phases.push({ sessionId, phase });
       for (const wake of [...waking]) wake();
@@ -49,6 +55,7 @@ export const callCaps = {
   knowledge: true,
 };
 export const freshSignal = () => new AbortController().signal;
+export const SEND_ID = "send00000001";
 
 export const run = (
   s: Setup,
@@ -65,6 +72,7 @@ export const run = (
     command,
     caps,
     signal,
+    SEND_ID,
   );
 
 export function seedScratch(s: Setup, changes: Partial<ScratchChanges>) {

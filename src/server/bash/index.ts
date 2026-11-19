@@ -25,6 +25,7 @@ import {
   run,
 } from "./mount.ts";
 import { ScratchStore } from "./scratch.ts";
+import { builtinShell, type ShellBackend } from "./shell.ts";
 import { commandWorkers } from "./worker.ts";
 import type { Workspace } from "./workspace.ts";
 
@@ -35,6 +36,10 @@ export type BashDeps = {
   log: Log;
   // the command worker entry, built where the binary resolves it
   worker: URL;
+  // the shell of the next command, asked once per command so a setting
+  // can switch it between commands; without it every command runs in
+  // the builtin one, just-bash in that worker
+  shell?(builtin: ShellBackend): ShellBackend;
   // each phase a command's worker reports, by chat; a test waits on it
   onCommandPhase?(sessionId: string, phase: "run" | "diff"): void;
   // BACKSTOP_MS unless a test needs the deadline alone to decide
@@ -49,6 +54,8 @@ export type BashCapability = {
     command: string,
     caps: CommandCaps,
     signal: AbortSignal,
+    // the send the command is a call of, which a shell may key on
+    sendId: string,
   ): Promise<CommandResult>;
   // a send's start: the session's kept MCP files trimmed to the budget,
   // and the number the next kept folder takes; files of rows past
@@ -87,16 +94,19 @@ export type BashArea = BashCapability & {
 export function bashArea(deps: BashDeps): BashArea {
   const scratch = new ScratchStore(deps.db);
   const workers = commandWorkers(deps.worker, deps.log);
+  const builtin = builtinShell(workers);
+  const pick = deps.shell;
   return {
     scratch,
-    run: (projectId, workspace, author, command, caps, signal) =>
+    run: (projectId, workspace, author, command, caps, signal, sendId) =>
       run(
         {
           db: deps.db,
           knowledge: deps.knowledge,
           scratch,
           clock: deps.clock,
-          workers,
+          log: deps.log,
+          shell: pick ? () => pick(builtin) : () => builtin,
           current: () => deps.limits.current(),
           ...(deps.onCommandPhase ? { onPhase: deps.onCommandPhase } : {}),
           ...(deps.backstopMs ? { backstopMs: deps.backstopMs } : {}),
@@ -107,6 +117,7 @@ export function bashArea(deps: BashDeps): BashArea {
         command,
         caps,
         signal,
+        sendId,
       ),
     startKept: (workspace, afterSeq) =>
       transact(deps.db, () => {
@@ -160,8 +171,50 @@ export {
   writeKeptFrame,
 } from "./kept.ts";
 export type { CommandResult } from "./mount.ts";
-export type { OpenedRecord } from "./open.ts";
-export type { CommandEnd, JobRepo } from "./protocol.ts";
+export { type OpenedRecord, openedRecord } from "./open.ts";
+export {
+  mountPath,
+  normalizePath,
+  prefixes,
+  underKnowledge,
+  underRoot,
+} from "./paths.ts";
+export type {
+  Answer,
+  Changes,
+  CommandEnd,
+  Job,
+  JobRepo,
+} from "./protocol.ts";
+export {
+  discardNotices,
+  type EntryKind,
+  exitAt,
+  READ_ONLY_TO_SUBAGENT,
+  type ReadBack,
+  readBack,
+  savedCwd,
+  sharedChange,
+  startNotice,
+  type TreeEntry,
+  type TreeMount,
+  treeChanges,
+} from "./readback.ts";
+export type {
+  Mounted,
+  SettleOutcome,
+  ShellBackend,
+  ShellCall,
+  ShellContext,
+  ShellHold,
+  ShellRepo,
+  ShellRun,
+} from "./shell.ts";
+export type {
+  CommandHooks,
+  CommandStops,
+  Settled,
+} from "./worker.ts";
 export {
   sessionWorkspace,
   type Workspace,

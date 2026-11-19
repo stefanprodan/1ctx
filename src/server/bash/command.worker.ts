@@ -16,12 +16,8 @@ import {
 } from "just-bash";
 import { messageOf } from "../lib/errors.ts";
 import { KNOWLEDGE_COMMANDS } from "./commands.ts";
-import {
-  makeOpenCommand,
-  type OpenedRecord,
-  prefixes,
-  underKnowledge,
-} from "./open.ts";
+import { makeOpenCommand, type OpenedRecord } from "./open.ts";
+import { prefixes } from "./paths.ts";
 import {
   type Answer,
   type FetchRequest,
@@ -31,13 +27,14 @@ import {
   transferOf,
 } from "./protocol.ts";
 import {
-  diff,
-  executionLimits,
+  discardNotices,
   exitAt,
-  notices,
+  readBack,
   savedCwd,
-  sharedChanged,
-} from "./tree.ts";
+  startNotice,
+  type TreeEntry,
+} from "./readback.ts";
+import { executionLimits, isDirectoryIn, listTree } from "./tree.ts";
 
 declare var self: Worker;
 
@@ -210,13 +207,9 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
     });
   });
   const mounted = withRepos(fs, job);
-  const cwd = await savedCwd(mounted.fs, job.cwd, job.docs);
-  // a cwd in the docs while they are off moves without a word
-  let notice =
-    mounted.notice +
-    (cwd !== job.cwd && (job.docs || !underKnowledge(job.cwd))
-      ? `started in ${cwd}: ${job.cwd} no longer exists\n`
-      : "");
+  const isDirectory = (path: string) => isDirectoryIn(mounted.fs, path);
+  const cwd = await savedCwd(job.cwd, job.docs, isDirectory);
+  let notice = mounted.notice + startNotice(job.cwd, cwd, job.docs);
   post({ type: "phase", id, phase: "run", notice });
   const opened: OpenedRecord[] = [];
   const bash = new Bash({
@@ -245,8 +238,17 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
   const exitCode = exitAt(result.exitCode, Date.now(), job.endsAt);
   const stdout = decodeBytesToUtf8(stdoutAsBytes(result));
   signal.throwIfAborted();
-  notice = (await notices(fs, job)) + notice;
-  // a diff that throws still opens its result with every notice
+  // a tree that cannot be listed (a lazy file whose read fails) saves
+  // nothing, and the command's output still goes back with why
+  let entries: TreeEntry[] | null = null;
+  let unlisted: unknown;
+  try {
+    entries = await listTree(fs, job);
+  } catch (error) {
+    unlisted = error;
+  }
+  if (entries !== null) notice = discardNotices(entries, job) + notice;
+  // a read back that refuses still opens its result with every notice
   post({ type: "phase", id, phase: "diff", notice });
   const printed = {
     stdout,
@@ -257,30 +259,16 @@ async function run(id: string, job: Job, running: Running): Promise<Answer> {
   };
   if (exitCode === 124 || exitCode === 126)
     return { ...printed, changes: null, refused: null };
-  let changes: Awaited<ReturnType<typeof diff>>;
-  try {
-    changes = await diff(fs, job);
-  } catch (error) {
-    // the command ran, so its output goes back with why nothing saves
-    return {
-      ...printed,
-      changes: null,
-      refused: messageOf(error),
-    };
-  }
-  const shared = job.subagent ? await sharedChanged(fs, job, changes) : null;
-  if (shared !== null) return { ...printed, changes: null, refused: shared };
-  const after = await savedCwd(mounted.fs, result.env.PWD, job.docs);
+  if (entries === null)
+    return { ...printed, changes: null, refused: messageOf(unlisted) };
   return {
     ...printed,
-    changes: {
-      ...changes,
-      // a cwd in the docs waits in /tmp until they are on again, unless
-      // the command moved
-      cwd:
-        !job.docs && underKnowledge(job.cwd) && after === cwd ? job.cwd : after,
-    },
-    refused: null,
+    ...(await readBack(entries, job, {
+      exitCode,
+      start: cwd,
+      pwd: result.env.PWD,
+      isDirectory,
+    })),
   };
 }
 

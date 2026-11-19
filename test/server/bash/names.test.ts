@@ -10,7 +10,7 @@ import {
   MAX_SCRATCH_SEGMENTS,
   parseScratchName,
 } from "../../../src/server/bash/names.ts";
-import { mountPath } from "../../../src/server/bash/open.ts";
+import { mountPath } from "../../../src/server/bash/paths.ts";
 import { BadRequest, Conflict } from "../../../src/server/lib/errors.ts";
 
 describe("the scratch name rule", () => {

@@ -1,222 +1,60 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The tree read back in the worker; /repos is mounted over it, never read back.
+// The just-bash tree as a listing for the read-back rules (readback.ts); /repos
+// is mounted over it, never listed.
 
 import type { BashOptions, IFileSystem, InMemoryFs } from "just-bash";
-import {
-  checkFile,
-  checkNames,
-  parseName,
-  textFromBytes,
-} from "../knowledge/rules.ts";
 import { INPUT_PASSES } from "./commands.ts";
-import { checkScratchNames, parseScratchName } from "./names.ts";
-import { mountPath, prefixes, underKnowledge } from "./open.ts";
-import type { Changes, Job, MountFile, ScratchEntry } from "./protocol.ts";
+import { prefixes, underKnowledge, underRoot } from "./paths.ts";
+import type { Job } from "./protocol.ts";
+import type { EntryKind, TreeEntry } from "./readback.ts";
 
-const same = (a: Uint8Array, b: Uint8Array) =>
-  Buffer.from(a.buffer, a.byteOffset, a.byteLength).equals(b);
+const read = (path: string, docs: boolean) =>
+  path.startsWith("/tmp/") ||
+  path.startsWith("/uploads/") ||
+  (docs && underKnowledge(path));
 
-export async function diff(
-  fs: InMemoryFs,
-  job: Job,
-): Promise<Omit<Changes, "cwd">> {
-  const mounted = new Map(job.knowledge.map((file) => [file.name, file]));
-  const temporary = new Map(job.scratch.map((file) => [file.name, file]));
-  const names: string[] = [];
-  const scratchNames: string[] = [];
-  const knowledge: Changes["knowledge"] = [];
-  const written: ScratchEntry[] = [];
-  const root = await fs.lstat("/tmp");
-  if (!root.isDirectory || root.isSymbolicLink)
-    throw new Error("/tmp is not a directory");
-  const paths = fs
-    .getAllPaths()
-    // with the docs off nothing under /knowledge is read, so an empty
-    // mount never reads as every file deleted
-    .filter(
-      (path) => (job.docs && underKnowledge(path)) || path.startsWith("/tmp/"),
-    )
-    .sort();
-  for (const path of paths) {
-    const stat = await fs.lstat(path);
-    if (stat.isSymbolicLink || (!stat.isFile && !stat.isDirectory)) {
-      throw new Error(`${path} is not a regular file`);
-    }
-    if (stat.isDirectory) continue;
-    if (path.startsWith("/tmp/")) {
-      const name = parseScratchName(path.slice("/tmp/".length));
-      scratchNames.push(name);
-      const data = await fs.readFileBuffer(path);
-      const before = temporary.get(name);
-      temporary.delete(name);
-      if (
-        before === undefined ||
-        before.mode !== stat.mode ||
-        !same(before.data, data)
-      ) {
-        // its own copy, so the reply's transfer detaches nothing else
-        written.push({
-          path: name,
-          data: new Uint8Array(data),
-          mode: stat.mode,
-        });
-      }
+// Every path of the trees in the base, with the bytes the rules read.
+// Nothing under /mcp is stated, since a stat would load a lazy file
+// and the rules judge only names there: a path is listed by the shape
+// it was mounted with, or as other when the mount never held it.
+export async function listTree(fs: InMemoryFs, job: Job): Promise<TreeEntry[]> {
+  const kept = new Map<string, EntryKind>();
+  for (const path of job.kept) {
+    for (const folder of prefixes(path).slice(0, -1)) kept.set(folder, "dir");
+    kept.set(path, "file");
+  }
+  const entries: TreeEntry[] = [];
+  for (const path of fs.getAllPaths()) {
+    if (!underRoot(path)) continue;
+    if (path === "/mcp" || path.startsWith("/mcp/")) {
+      entries.push({ path, kind: kept.get(path) ?? "other", mode: 0 });
       continue;
     }
-    const name = parseName(path.slice("/knowledge/".length));
-    names.push(name);
-    const before = mounted.get(name);
-    const bytes = await fs.readFileBuffer(path);
-    mounted.delete(name);
-    if (before !== undefined && same(before.data, bytes)) continue;
-    const text = textFromBytes(bytes);
-    checkFile(name, Buffer.byteLength(text), before?.data.byteLength ?? 0, job);
-    knowledge.push({ name, text });
-  }
-  checkNames(names);
-  checkScratchNames(scratchNames);
-  for (const before of mounted.values()) {
-    knowledge.push({ name: before.name, text: null });
-  }
-  return {
-    knowledge,
-    written,
-    removed: [...temporary.keys()],
-  };
-}
-
-async function directory(fs: IFileSystem, path: string): Promise<boolean> {
-  return (await fs.exists(path)) && (await fs.stat(path)).isDirectory;
-}
-
-// an empty folder under /knowledge loses nothing worth a notice
-async function docsWritten(fs: InMemoryFs): Promise<boolean> {
-  for (const path of fs.getAllPaths())
-    if (underKnowledge(path) && !(await fs.lstat(path)).isDirectory)
-      return true;
-  return false;
-}
-
-async function uploadsChanged(
-  fs: InMemoryFs,
-  uploads: readonly MountFile[],
-): Promise<boolean> {
-  const paths = fs.getAllPaths().sort();
-  if (!paths.includes("/uploads")) return true;
-  const root = await fs.lstat("/uploads");
-  if (!root.isDirectory || root.isSymbolicLink) return true;
-  const expected = new Map<string, Uint8Array | null>();
-  for (const file of uploads) {
-    const path = `/uploads/${file.name}`;
-    for (const folder of prefixes(path).slice(1, -1))
-      expected.set(folder, null);
-    expected.set(path, file.data);
-  }
-  for (const path of paths) {
-    if (!path.startsWith("/uploads/")) continue;
-    const before = expected.get(path);
-    if (before === undefined) return true;
     const stat = await fs.lstat(path);
-    if (stat.isSymbolicLink) return true;
-    if (before === null) {
-      if (!stat.isDirectory) return true;
-    } else if (!stat.isFile || !same(before, await fs.readFileBuffer(path))) {
-      return true;
-    }
-    expected.delete(path);
+    const kind: EntryKind = stat.isSymbolicLink
+      ? "link"
+      : stat.isDirectory
+        ? "dir"
+        : stat.isFile
+          ? "file"
+          : "other";
+    entries.push(
+      kind === "file" && read(path, job.docs)
+        ? { path, kind, mode: stat.mode, bytes: await fs.readFileBuffer(path) }
+        : { path, kind, mode: stat.mode },
+    );
   }
-  return expected.size !== 0;
+  return entries;
 }
 
-// Names alone, from the tree's own list: a stat would load every lazy
-// file to size it. A changed file under /mcp goes unnoticed and is
-// discarded all the same.
-function keptChanged(fs: InMemoryFs, kept: readonly string[]): boolean {
-  const expected = new Set<string>();
-  for (const path of kept) for (const at of prefixes(path)) expected.add(at);
-  let seen = 0;
-  for (const path of fs.getAllPaths()) {
-    if (path !== "/mcp" && !path.startsWith("/mcp/")) continue;
-    if (!expected.has(path)) return true;
-    seen++;
-  }
-  return seen !== expected.size;
-}
-
-// a write beside the mounted repositories lands in the base, and goes;
-// a folder alone is no write, as the shell makes its cwd's
-async function reposWritten(fs: InMemoryFs): Promise<boolean> {
-  for (const path of fs.getAllPaths())
-    if (path.startsWith("/repos/") && !(await fs.lstat(path)).isDirectory)
-      return true;
-  return false;
-}
-
-// why a subagent's command that changed the shared trees saved nothing
-export const READ_ONLY_TO_SUBAGENT =
-  "/knowledge and /uploads are read-only to a subagent: write to /tmp";
-
-// a subagent's command that changed /knowledge or /uploads saves
-// nothing, /tmp included; with the docs off diff() reads no
-// /knowledge, so a file written there counts here. The server refuses
-// doc changes on its own
-export async function sharedChanged(
-  fs: InMemoryFs,
-  job: Job,
-  changes: Pick<Changes, "knowledge">,
-): Promise<string | null> {
-  return changes.knowledge.length > 0 ||
-    (!job.docs && (await docsWritten(fs))) ||
-    (await uploadsChanged(fs, job.uploads))
-    ? READ_ONLY_TO_SUBAGENT
-    : null;
-}
-
-// the discard notices, before the start notice
-export async function notices(fs: InMemoryFs, job: Job): Promise<string> {
-  let notice = "";
-  if (await reposWritten(fs)) {
-    notice =
-      "changes under /repos were discarded: copy a file to /tmp to change it\n";
-  }
-  if (keptChanged(fs, job.kept)) {
-    notice =
-      "changes under /mcp were discarded: copy a file to /tmp to change it\n" +
-      notice;
-  }
-  if (await uploadsChanged(fs, job.uploads)) {
-    notice =
-      "changes under /uploads were discarded: copy a file to /tmp to change it\n" +
-      notice;
-  }
-  if (!job.docs && (await docsWritten(fs))) {
-    notice =
-      "changes under /knowledge were discarded: the project docs are off\n" +
-      notice;
-  }
-  return notice;
-}
-
-const home = (docs: boolean) => (docs ? "/knowledge" : "/tmp");
-
-export async function savedCwd(
+// a folder in the mounted tree, /repos included, links followed
+export async function isDirectoryIn(
   fs: IFileSystem,
-  pwd: string | undefined,
-  docs: boolean,
-): Promise<string> {
-  if (pwd === undefined || !pwd.startsWith("/")) return home(docs);
-  const path = fs.resolvePath("/", pwd);
-  // the cwd the server takes, as mountPath allows it
-  if (!mountPath(path) || (!docs && underKnowledge(path))) return home(docs);
-  return (await directory(fs, path)) ? path : home(docs);
-}
-
-// a command that ended at or past its deadline was cut, whatever exit the
-// interpreter gave, so it is the deadline's 124 and saves nothing
-export function exitAt(exitCode: number, endedAt: number, endsAt: number) {
-  return endedAt >= endsAt ? 124 : exitCode;
+  path: string,
+): Promise<boolean> {
+  return (await fs.exists(path)) && (await fs.stat(path)).isDirectory;
 }
 
 export function executionLimits(

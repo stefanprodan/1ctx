@@ -8,8 +8,8 @@
 import { describe, expect, test } from "bun:test";
 import { copyBack, copyIn } from "../../../src/server/bash/handoff.ts";
 import { checkOpened } from "../../../src/server/bash/open.ts";
+import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/readback.ts";
 import { ScratchStore } from "../../../src/server/bash/scratch.ts";
-import { READ_ONLY_TO_SUBAGENT } from "../../../src/server/bash/tree.ts";
 import { transact } from "../../../src/server/db/index.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { type ChatApp, startChat, waitScript } from "../../helpers/chat.ts";

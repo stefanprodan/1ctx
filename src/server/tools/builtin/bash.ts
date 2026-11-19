@@ -259,6 +259,7 @@ export function makeBashTool({
               ...(signing.length === 0 ? {} : { credentials: signing }),
             },
         ctx.signal,
+        ctx.sendId,
       );
       return scrubbed(result, signing);
     },

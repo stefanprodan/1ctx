@@ -26,6 +26,37 @@ that shell that shows a file on the chat page.
   and copies them; `tools/kept.ts` only decides what a result keeps
   (`docs/mcp.md`).
 
+## The shell
+
+- **A command runs behind `ShellBackend` (`bash/shell.ts`).**
+  `mount.ts` keeps the workspace's queue, the process slot, the mount
+  and the commit; the backend runs the `Job` and answers a `Settled`.
+  `shell` in `BashDeps` picks one per command; without it every command
+  runs on `builtinShell`, the worker below, whose settle does nothing.
+- **A backend gets a trusted context the command never sees.** Project,
+  workspace, send id, each repository's tree folder, the web snapshot,
+  the credentials, and `mounted`: each doc's id and revision, the
+  scratch revision and `used_at` (the pair, since a dropped row
+  restarts the revision at 0), the uploads' session revision (the
+  parent's for a subagent; a file's time can repeat) and each kept
+  file's row.
+- **`settle()` is called exactly once after the command ran.** Landed
+  carries what the transaction wrote: each doc's id, revision,
+  `updated_at` and stored text (null for a delete), the scratch
+  revision and `used_at`. Thrown: a check or the commit threw. Skipped:
+  nothing was committed. A settle that throws is logged and changes no
+  result.
+- **`acquire()` runs under the workspace's queue, before the process
+  slot,** so a command waiting for its shell holds no slot. `busy` at
+  the deadline ends it in phase `queue`, cause `busy`. Its hold goes to
+  the run, or is released when the command never runs.
+- **The read back is pure (`bash/readback.ts`).** A backend lists its
+  trees as entries (path, kind, mode, bytes) and calls
+  `discardNotices()` and `readBack()`, which judge names, text docs,
+  links and special files, deletes, modes, discards, a subagent's
+  shared write and the cwd. `test/fixtures/bash/tree-cases.ts` is the
+  one fixture set every listing runs against.
+
 ## The command
 
 - **Each command runs in its own worker.** `bash/worker.ts` starts one
@@ -55,7 +86,8 @@ that shell that shows a file on the chat page.
   registry's timer, passes before it holds its slots, or that holds them
   with under `MIN_RUN_MS` of the call timeout left, never runs: cause
   `busy`, phase `queue`. The longer of its two waits picks the words:
-  the process slot, or the chat's own commands (combine steps).
+  the process slot or the shell, or the chat's own commands (combine
+  steps).
   Neither invites a retry at once, which rejoins the queue at its back.
   An abort or shutdown while queued stays `abort`.
 - **A late start is named.** A command that waited over a second for
@@ -229,7 +261,7 @@ that shell that shows a file on the chat page.
   `maxFileReadSize` at `repoFileBytes`, so a larger file is listed and
   reads as File too large. With no repository the worker mounts the
   base alone.
-- **`/repos` never reaches a commit.** `tree.ts` reads the base only.
+- **`/repos` never reaches a commit.** `tree.ts` lists the base only.
   A write under `/repos` fails at the command with Read-only file
   system; one beside the mounts lands in the base and is discarded
   with a notice, a folder alone silently, since the shell makes its

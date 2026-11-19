@@ -10,7 +10,7 @@
 import { describe, expect, test } from "bun:test";
 import type { Job } from "../../../src/server/bash/protocol.ts";
 import { heldWorkspaces } from "../../../src/server/bash/queue.ts";
-import { exitAt } from "../../../src/server/bash/tree.ts";
+import { exitAt } from "../../../src/server/bash/readback.ts";
 import {
   type CommandHooks,
   commandWorkers,

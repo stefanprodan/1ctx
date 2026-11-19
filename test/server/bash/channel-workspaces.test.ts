@@ -9,7 +9,7 @@ import {
 } from "../../../src/server/bash/index.ts";
 import { listKept } from "../../../src/server/bash/kept.ts";
 import { acquireSession } from "../../../src/server/bash/queue.ts";
-import { callCaps, freshSignal, setup } from "./helpers.ts";
+import { callCaps, freshSignal, SEND_ID, setup } from "./helpers.ts";
 
 const kept = (folder: number, text: string): KeptFile => ({
   folder,
@@ -59,6 +59,7 @@ function channelSetup() {
       command,
       callCaps,
       freshSignal(),
+      SEND_ID,
     );
   return { s, team, channel, first, second, run };
 }
