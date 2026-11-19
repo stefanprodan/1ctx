@@ -46,14 +46,17 @@ only to the gateway, over gRPC with mutual TLS.
   GET answer is the instance's alone; `overrides` counts the projects
   that pick each backend.
 - **One gateway manager serves every project,** keyed by the endpoint,
-  the keys and the image. It is made when a command needs it, or at
-  start or a save while the instance or a project runs `openshell`. A
-  save that changes the endpoint, a key or the image drains the old
-  gateway's leases: every sandbox deleted, and so does the instance's
-  switch to `builtin` while no project runs `openshell`. A project's
-  change drains nothing: its next command takes the other shell, `$HOME`
-  and `/tmp` of the old one stay behind, and an unused sandbox goes by
-  the idle sweep.
+  the keys and the image. It is made when a command needs it, at a
+  save while the instance or a project runs `openshell`, and at start
+  whenever a gateway is saved, so its sweep takes what an earlier run
+  left. A save that changes the endpoint, a key or the image drains the
+  old gateway's leases: every sandbox deleted, and so does a key file
+  gone, at the next command, and the instance's switch to `builtin`
+  while no project runs `openshell`. A project's change drains nothing:
+  its next command takes the other shell, `$HOME` and `/tmp` of the old
+  one stay behind, and an unused sandbox goes by the idle sweep. While
+  nothing runs `openshell` the warm pool empties and makes none, and the
+  manager goes once it holds no sandbox.
 - **The hosts are the sandbox's own, never Web access's list.**
   `shared/sandbox-net.ts` parses them for the page and the route: at
   most 200, each a host name (an IDN in its ASCII form) or an OpenShell

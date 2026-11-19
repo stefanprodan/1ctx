@@ -96,12 +96,10 @@ export type Sandbox = {
   // backend is openshell and the gateway is set up; without a project,
   // the instance's
   shell(builtin: ShellBackend, projectId?: string | null): ShellBackend;
-  // the instance's backend is openshell, with an endpoint and every key
-  // file in place
-  active(): boolean;
   // the network a command in a sandbox runs under
   net(): SandboxNet;
   // the current gateway's leases, null while no backend asks for it
+  // and none is left to sweep
   leases(): Leases | null;
   // at start: the leases made and an earlier process's sandboxes swept
   start(): Promise<void>;
@@ -166,12 +164,19 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       retired = retired.filter((old) => old.leases !== leases);
     });
   };
+  // nothing runs openshell: an empty manager goes, and its warm pool
+  // empties, so the last idle sandbox's delete lets it go. Never a drain
+  // of a held or idle sandbox, which only a settings save does
+  const tidy = () => {
+    if (current === null || wanted()) return;
+    if (current.leases.rows().length === 0) drop();
+    else current.leases.poke();
+  };
   // the leases of the gateway the settings name, made only when create
   // asks: a new endpoint, key or image deletes every sandbox of the old
-  // one. One manager serves every project, so a project's change never
-  // makes or drops one
-  const ensure = (create: boolean): Leases | null => {
-    const next = config();
+  // one, and so does a key file gone. One manager serves every project,
+  // so a project's change never makes one
+  const ensure = (create: boolean, next = config()): Leases | null => {
     const key = next === null ? "" : JSON.stringify(next);
     if (current !== null && current.key === key) return current.leases;
     drop();
@@ -184,15 +189,21 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       gateway,
       instanceId: store.settings().instanceId,
       image,
-      limits: deps.limits,
+      // no warm sandbox while nothing runs openshell
+      limits: () =>
+        wanted() ? deps.limits() : { ...deps.limits(), sandboxWarm: 0 },
       repos: deps.repos,
       // every other manager, the replacement included once this retires
       others: () => [
         ...retired.map((old) => old.leases),
         ...(current === null ? [] : [current.leases]),
       ],
-      // a retired manager's delete frees room under the instance's cap
-      freed: () => current?.leases.poke(),
+      // a retired manager's delete frees room under the instance's cap;
+      // this one's last delete may leave it unwanted and empty
+      freed: () => {
+        current?.leases.poke();
+        queueMicrotask(tidy);
+      },
       locks,
       net: () => sandboxNet(store.settings()),
     });
@@ -247,8 +258,6 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       overrides: deps.projects.counts(),
     };
   };
-  const on = (projectId?: string | null): boolean =>
-    backendOf(projectId) === "openshell" && config() !== null;
 
   return {
     store,
@@ -272,17 +281,30 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
         if (!want) drop();
       },
     }),
-    shell: (builtin, projectId) =>
-      on(projectId) && ensure(true) !== null ? backend : builtin,
-    active: () => on(),
+    shell: (builtin, projectId) => {
+      const next = config();
+      // a key file gone still retires the old manager
+      if (next === null) {
+        ensure(false, next);
+        return builtin;
+      }
+      if (backendOf(projectId) !== "openshell") {
+        tidy();
+        return builtin;
+      }
+      return ensure(true, next) === null ? builtin : backend;
+    },
     net: () => sandboxNet(store.settings()),
     leases: () => ensure(wanted()),
     async start() {
       running = true;
-      ensure(wanted());
+      // a saved gateway is swept even while nothing runs openshell, since
+      // an earlier run may have left a project's sandboxes there
+      ensure(true);
       if (current === null) return;
       current.started ??= current.leases.start();
       await current.started;
+      tidy();
     },
     poke: () => current?.leases.poke(),
     idle: () => commands.idle(),

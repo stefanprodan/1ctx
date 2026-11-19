@@ -19,7 +19,7 @@ import type { ProjectDetail } from "../../../src/shared/contracts/project.ts";
 import { hashPassword, type TestApp, testApp } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 import { createTeam } from "../../helpers/projects.ts";
-import { fakeGateway } from "../../helpers/sandbox.ts";
+import { fakeGateway, until } from "../../helpers/sandbox.ts";
 import { callCaps, run as runCommand, setup } from "../bash/helpers.ts";
 
 const KEYS = {
@@ -86,6 +86,29 @@ function offeredSandbox(app: TestApp, projectId: string): boolean {
     phase: "main",
   });
   return offered.sandbox === true;
+}
+
+// a sandbox a chat of the project used and let go, idle
+async function idleLease(app: TestApp, projectId: string, chat = "chat") {
+  const leases = app.sandbox.leases()!;
+  const hold = await leases.acquire(
+    {
+      projectId,
+      workspace: { id: chat, sessionId: chat },
+      root: chat,
+      sendId: "send",
+      subagent: false,
+      repos: [],
+      repoFileBytes: 0,
+      network: false,
+      credentials: [],
+    },
+    app.now.value + 20_000,
+    new AbortController().signal,
+  );
+  if (hold === "busy") throw new Error("busy");
+  hold.release();
+  return { leases, sandbox: hold.sandbox };
 }
 
 const shellOf = (app: TestApp, projectId: string) =>
@@ -291,5 +314,137 @@ describe("who sets a project's shell", () => {
         expect(res.status, JSON.stringify(body)).toBe(400);
       }
     });
+  });
+});
+
+describe("the one manager, as projects come and go", () => {
+  test("the instance saved builtin while a project stays on openshell drains nothing", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        const box = await createTeam(admin, "box");
+        await instance(admin, { backend: "openshell", endpoint: ENDPOINT });
+        await setBackend(admin, box, "openshell");
+        const { leases } = await idleLease(app, box.id);
+        await instance(admin, { backend: "builtin" });
+        expect(app.sandbox.leases()).toBe(leases);
+        expect(shellOf(app, box.id)).toBe("openshell");
+        expect(fake.deletes).toEqual([]);
+      },
+      KEYS,
+      fake,
+    );
+  });
+
+  test("an image change with only a project on openshell drains the old gateway's sandboxes", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        const box = await createTeam(admin, "box");
+        await instance(admin, { endpoint: ENDPOINT });
+        await setBackend(admin, box, "openshell");
+        expect(shellOf(app, box.id)).toBe("openshell");
+        const { leases, sandbox } = await idleLease(app, box.id);
+        await instance(admin, { image: "registry.test/sbx:2" });
+        await until(() => fake.deletes.includes(sandbox));
+        const next = app.sandbox.leases();
+        expect(next).not.toBeNull();
+        expect(next).not.toBe(leases);
+      },
+      KEYS,
+      fake,
+    );
+  });
+
+  test("a key file gone retires the manager at the next command", async () => {
+    const fake = fakeGateway();
+    const secrets: Record<string, string> = { ...KEYS };
+    await run(
+      async (app, admin) => {
+        const box = await createTeam(admin, "box");
+        await instance(admin, { endpoint: ENDPOINT });
+        await setBackend(admin, box, "openshell");
+        expect(shellOf(app, box.id)).toBe("openshell");
+        const { sandbox } = await idleLease(app, box.id);
+        delete secrets["openshell-gateway-key"];
+        expect(shellOf(app, box.id)).toBe("builtin");
+        await until(() => fake.deletes.includes(sandbox));
+      },
+      secrets,
+      fake,
+    );
+  });
+
+  test("the last openshell project gone, the warm pool empties and the manager goes with its last sandbox", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        const box = await createTeam(admin, "box");
+        const plain = await createTeam(admin, "plain");
+        const res = await admin.call("PUT", "/api/limits", {
+          body: { values: { sandboxWarm: 1 } },
+        });
+        expect(res.status).toBe(200);
+        await instance(admin, { endpoint: ENDPOINT });
+        await setBackend(admin, box, "openshell");
+        expect(shellOf(app, box.id)).toBe("openshell");
+        const warm = () =>
+          app.sandbox
+            .leases()!
+            .rows()
+            .filter((row) => row.state === "warm");
+        await until(() => warm().length === 1);
+        const { leases, sandbox } = await idleLease(app, box.id);
+        await until(() => warm().length === 1);
+        const spare = warm()[0]!.sandbox;
+        await setBackend(admin, box, null);
+        // a command of a builtin project lets the pool empty, never the
+        // idle sandbox a chat may come back to
+        expect(shellOf(app, plain.id)).toBe("builtin");
+        await until(() => fake.deletes.includes(spare));
+        await until(() => leases.rows().length === 1);
+        expect(fake.deletes).not.toContain(sandbox);
+        expect(app.sandbox.leases()).toBe(leases);
+        expect(leases.rows().map((row) => row.state)).toEqual(["idle"]);
+        // the idle sweep takes the last one, and the manager goes
+        app.now.value += 31 * 60_000;
+        await until(() => fake.deletes.includes(sandbox));
+        await until(() => app.sandbox.leases() === null);
+      },
+      KEYS,
+      fake,
+    );
+  });
+
+  test("a restart sweeps a project's sandbox though nothing runs openshell", async () => {
+    const fake = fakeGateway();
+    const app = await testApp({ secrets: KEYS, sandboxGateway: fake.connect });
+    try {
+      const admin = app.client();
+      await admin.login("admin", "hunter2-test");
+      const box = await createTeam(admin, "box");
+      await instance(admin, { endpoint: ENDPOINT });
+      await setBackend(admin, box, "openshell");
+      expect(shellOf(app, box.id)).toBe("openshell");
+      await app.sandbox.start();
+      const { sandbox } = await idleLease(app, box.id);
+      await setBackend(admin, box, null);
+      await app.shutdown();
+      expect(fake.sandboxes.has(sandbox)).toBe(true);
+      const again = await testApp({
+        secrets: KEYS,
+        sandboxGateway: fake.connect,
+        db: app.db,
+      });
+      try {
+        await again.sandbox.start();
+        await until(() => fake.deletes.includes(sandbox));
+        await until(() => again.sandbox.leases() === null);
+      } finally {
+        await again.shutdown();
+      }
+    } finally {
+      app.db.close();
+    }
   });
 });
