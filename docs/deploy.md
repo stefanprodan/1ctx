@@ -87,6 +87,10 @@ never written in a tracked file.
   needs, which hangs or corrupts the database. A named volume takes
   the image's `/data` with its owner 65532. On a Linux host a bind
   mount works once it is `chown 65532:65532`.
+- **The sandbox image (`deploy/sandbox/Dockerfile`) pins its base by
+  digest and uv and yq by version and the sha256 their releases
+  publish,** checked at build. It makes every root the sandbox policy
+  names and holds no helper: the server passes them with each exec.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
   would kill the shutdown after the drain. Docker Compose sets
   `stop_grace_period: 25s`; a plain run passes `--stop-timeout 25`.
@@ -186,6 +190,11 @@ deletes the cluster with every release in it.
 - **The release pushes `ghcr.io/stefanprodan/1ctx:<tag>`, never
   `latest`.** The image is amd64 and arm64, with provenance attested
   for it and for the archives' checksums.
+- **The release pushes `ghcr.io/stefanprodan/1ctx-shell:<tag>`
+  beside it,** built from `deploy/sandbox/Dockerfile` for the same
+  platforms, with provenance attested. `make sandbox-image` builds it
+  locally as `1ctx-shell:dev`. The first push creates the GHCR
+  package `1ctx-shell` private; make it public once by hand.
 - **The release pushes the Helm chart beside the image.** Its version is
   the tag without the `v` and its `appVersion` the tag, at
   `oci://ghcr.io/stefanprodan/charts/onectx`, with provenance attested.

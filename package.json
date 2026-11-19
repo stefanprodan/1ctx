@@ -16,6 +16,7 @@
     "smoke": "scripts/smoke.sh",
     "image": "scripts/image.sh",
     "image-smoke": "scripts/image-smoke.sh",
+    "sandbox-image": "scripts/sandbox-image.sh",
     "kind-up": "scripts/kind.sh up",
     "kind-image": "scripts/kind.sh image",
     "kind-down": "scripts/kind.sh down",

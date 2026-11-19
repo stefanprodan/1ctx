@@ -128,7 +128,7 @@ export const FORBIDDEN_HOSTS = [
 const SERVER_ROOT_FILES = new Set(["main.ts", "compose.ts"]);
 
 // the extensions an import may name; a bare specifier is refused
-const IMPORT_EXTENSIONS = /\.(?:ts|tsx|css|html|json|svg|woff2|png|md)$/;
+const IMPORT_EXTENSIONS = /\.(?:ts|tsx|css|html|json|svg|woff2|png|md|py|sh)$/;
 
 // the aside's line shapes, drawn only by ui/Split.tsx, so every aside
 // lays its lines on the section's two columns the same way
