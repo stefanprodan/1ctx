@@ -16,7 +16,7 @@ import {
   utimesSync,
   writeSync,
 } from "node:fs";
-import { join, posix } from "node:path";
+import { dirname, join, posix } from "node:path";
 import type { RepoError } from "../../shared/contracts/repo.ts";
 import type { TarMember } from "../lib/archive.ts";
 import { normalizePath, validPath } from "../lib/paths.ts";
@@ -89,7 +89,9 @@ export class TreeWriter {
   ) {
     // the sandbox shell binds files/ for an unprivileged user, so the
     // tree is readable by others; chmod, since mkdir's mode is masked
-    mkdirSync(files, { recursive: true, mode: 0o755 });
+    // the job folder, published as the tree's, stays the server's own
+    mkdirSync(dirname(files), { recursive: true, mode: 0o700 });
+    mkdirSync(files, { mode: 0o755 });
     chmodSync(files, 0o755);
   }
 

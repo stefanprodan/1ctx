@@ -89,7 +89,12 @@ export type Repos = {
   hold(files: string): (() => void) | null;
   // at startup: fetching rows back to pending, the cache indexed and
   // its tmp/ cleared; null without a cache directory
-  start(): { dir: string; trees: number; bytes: number } | null;
+  start(): {
+    dir: string;
+    trees: number;
+    bytes: number;
+    dropped: number;
+  } | null;
   // hourly: the cache kept under repoCacheBytes
   sweep(): void;
   // the drain: every fetch ends

@@ -45,8 +45,8 @@ const freeSpace: FreeSpace = (dir) => {
 };
 
 // whether others may list and enter a tree's files/, as the sandbox
-// shell's user must; one stat, as the writer that opened the root
-// opened everything inside
+// shell's user must; one stat, since a writer that made the root
+// readable made everything inside readable
 const othersRead = (folder: string) => {
   try {
     return (statSync(join(folder, "files")).mode & 0o005) === 0o005;
@@ -68,13 +68,15 @@ export class RepoCache {
     private readonly free: FreeSpace = freeSpace,
   ) {}
 
-  // at startup: the folders made, tmp/ cleared, every tree indexed
-  start(): { trees: number; bytes: number } {
+  // at startup: the folders made, tmp/ cleared, every tree indexed;
+  // dropped counts the trees others could not read
+  start(): { trees: number; bytes: number; dropped: number } {
     mkdirSync(this.dir, { recursive: true, mode: 0o700 });
     rmSync(tmpDir(this.dir), { recursive: true, force: true });
     mkdirSync(tmpDir(this.dir), { mode: 0o700 });
     mkdirSync(treesDir(this.dir), { recursive: true, mode: 0o700 });
     this.index.clear();
+    let dropped = 0;
     for (const source of readdirSync(treesDir(this.dir))) {
       const sourceDir = join(treesDir(this.dir), source);
       let names: string[];
@@ -93,15 +95,21 @@ export class RepoCache {
         }
         if (!othersRead(folder)) {
           // written before trees were readable by others: the sandbox
-          // shell cannot read it, so it goes and is fetched again
-          this.drop(folder);
+          // shell cannot read it, so it goes and is fetched again; left in
+          // trees/, a lookup would index it from its tree.json
+          if (!this.drop(folder)) {
+            try {
+              rmSync(folder, { recursive: true, force: true });
+            } catch {}
+          }
+          dropped++;
           continue;
         }
         const lastRead = statSync(folder).mtimeMs;
         this.index.set(folder, { folder, meta, lastRead });
       }
     }
-    return { trees: this.index.size, bytes: this.bytes() };
+    return { trees: this.index.size, bytes: this.bytes(), dropped };
   }
 
   trees(): number {

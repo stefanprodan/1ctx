@@ -160,7 +160,12 @@ export type App = {
   searches: SearchQueue;
   repos: Repos;
   // the cache directory as startup found it
-  repoCache: { dir: string; trees: number; bytes: number } | null;
+  repoCache: {
+    dir: string;
+    trees: number;
+    bytes: number;
+    dropped: number;
+  } | null;
   bash: BashArea;
   sandbox: Sandbox;
   sessions: SessionStore;

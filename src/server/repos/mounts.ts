@@ -107,7 +107,7 @@ export class Mounts {
 
   // at startup: a fetch the process was running goes back to pending,
   // and every pending row is fetched, so none waits for a turn
-  start(): { trees: number; bytes: number } | null {
+  start(): { trees: number; bytes: number; dropped: number } | null {
     this.deps.store.resetFetching();
     const started = this.deps.cache?.start() ?? null;
     if (started !== null) {

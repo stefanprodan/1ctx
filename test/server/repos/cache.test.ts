@@ -70,7 +70,7 @@ test("startup clears tmp/, indexes every tree and drops a folder with no tree.js
   });
   mkdirSync(join(dir, "tmp", "job", "files"), { recursive: true });
   const again = new RepoCache(dir, () => Date.now());
-  expect(again.start()).toEqual({ trees: 2, bytes: 150 });
+  expect(again.start()).toEqual({ trees: 2, bytes: 150, dropped: 0 });
   expect(readdirSync(join(dir, "tmp"))).toEqual([]);
   expect(existsSync(join(dir, "trees", "s3", `${COMMIT}-k`))).toBe(false);
   expect(again.get("s1", COMMIT, "k")?.meta.disk).toBe(100);
@@ -82,7 +82,7 @@ test("startup drops a tree whose files/ others cannot read", () => {
   const locked = publish("s2", COMMIT, 50);
   chmodSync(join(locked.folder, "files"), 0o700);
   const again = new RepoCache(dir, () => Date.now());
-  expect(again.start()).toEqual({ trees: 1, bytes: 100 });
+  expect(again.start()).toEqual({ trees: 1, bytes: 100, dropped: 1 });
   expect(existsSync(locked.folder)).toBe(false);
   expect(again.get("s2", COMMIT, "k")).toBeNull();
 });
@@ -94,7 +94,7 @@ test("startup drops a tree whose tree.json has no size on disk", () => {
   const { disk: _disk, ...old } = meta(COMMIT, 100);
   writeFileSync(join(folder, "tree.json"), JSON.stringify(old));
   const again = new RepoCache(dir, () => Date.now());
-  expect(again.start()).toEqual({ trees: 0, bytes: 0 });
+  expect(again.start()).toEqual({ trees: 0, bytes: 0, dropped: 0 });
   expect(existsSync(folder)).toBe(false);
 });
 

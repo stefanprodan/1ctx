@@ -165,6 +165,8 @@ test.serial(
       ]);
       expect(result.ok).toBe(true);
       const mode = (path: string) => statSync(join(files, path)).mode & 0o777;
+      // the tree folder, beside its tree.json, stays the server's own
+      expect(mode("..")).toBe(0o700);
       expect(mode("")).toBe(0o755);
       expect(mode("src")).toBe(0o755);
       expect(mode("deep/a")).toBe(0o755);

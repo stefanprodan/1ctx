@@ -193,7 +193,8 @@ may call them are in `docs/access.md`.
   and the loser removes its own. Startup removes `tmp/` and indexes the
   trees; a folder without `tree.json` is removed, and one whose `files/`
   others cannot list (written before trees were readable) is renamed
-  out and removed in the background, so it is fetched again.
+  out and removed in the background (`cache_dropped` on the startup
+  line), so it is fetched again. The tree folder itself stays 0700.
 - **A tree counts its size on disk** (`disk` in `tree.json`): each
   kept file rounded up to 4 KiB blocks, an empty one a block, and a
   block per folder and link, so a tree of empty files still counts.
