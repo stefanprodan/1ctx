@@ -91,7 +91,12 @@ describe("the shell port", () => {
     for (const sandboxTimeout of [true, false]) {
       const ends: number[] = [];
       const s = setup({}, undefined, undefined, (builtin) => ({
-        ...(sandboxTimeout ? { sandboxTimeout: true as const } : {}),
+        ...(sandboxTimeout
+          ? {
+              sandboxTimeout: true as const,
+              sharedWithSubagents: true as const,
+            }
+          : {}),
         async run(job, context, hooks, stops) {
           ends.push(job.endsAt);
           return builtin.run(job, context, hooks, stops);
@@ -99,10 +104,14 @@ describe("the shell port", () => {
       }));
       try {
         const before = Date.now();
-        const result = await run(s, "true", {
-          ...callCaps,
-          sandboxCommandMs: 600_000,
-        });
+        // only the sandbox's offer gives its own time
+        const result = await run(
+          s,
+          "true",
+          sandboxTimeout
+            ? { ...callCaps, sandboxCommandMs: 600_000 }
+            : callCaps,
+        );
         const after = Date.now();
         expect(result.error).toBe(false);
         const limit = sandboxTimeout ? 600_000 : callCaps.callTimeoutMs;
@@ -200,6 +209,30 @@ describe("the shell port", () => {
           // the sandbox's offer gives its own time; the builtin's none
           ...(shared ? {} : { sandboxCommandMs: 4000 }),
           subagent: { uploadsFrom: "parent", workspace: "parent" },
+        });
+        expect(result).toMatchObject({
+          content: `nothing saved: ${SHELL_SWITCHED}`,
+          error: true,
+          ended: { phase: "queue", cause: "error" },
+        });
+        expect(seen.contexts).toHaveLength(0);
+      } finally {
+        s.db.close();
+      }
+    }
+  });
+
+  test("a turn offered for another shell than the one now on runs nothing", async () => {
+    const { seen, shell } = watched();
+    for (const shared of [false, true]) {
+      const s = setup({}, undefined, undefined, (builtin) => ({
+        ...shell(builtin),
+        ...(shared ? { sharedWithSubagents: true as const } : {}),
+      }));
+      try {
+        const result = await run(s, "true", {
+          ...callCaps,
+          ...(shared ? {} : { sandboxCommandMs: 4000 }),
         });
         expect(result).toMatchObject({
           content: `nothing saved: ${SHELL_SWITCHED}`,

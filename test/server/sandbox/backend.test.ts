@@ -504,22 +504,28 @@ describe("records, kept reads, put-back frames and a lost sandbox", () => {
     ran.settle({ landed: false, why: "skipped" });
   });
 
-  test("a kept file the store cannot read runs nothing and saves nothing", async () => {
-    const t = setup();
-    const ran = await t.run(ROWS, {}, { keptFails: true });
-    expect(ran.settled).toMatchObject({
-      ok: false,
-      phase: "mount",
-      cause: "error",
-    });
-    if (!ran.settled.ok)
-      expect(ran.settled.error?.message).toBe(
-        "the kept file could not be read",
-      );
-    expect(ran.fs.calls).not.toContain("command");
-    ran.settle({ landed: false, why: "skipped" });
-    expect(await t.settled(ran.hold)).not.toBe("idle");
-  });
+  test.each([
+    ["throws", true],
+    ["finds no row", "gone"],
+  ] as const)(
+    "a kept file whose read %s runs nothing and saves nothing",
+    async (_, keptFails) => {
+      const t = setup();
+      const ran = await t.run(ROWS, {}, { keptFails });
+      expect(ran.settled).toMatchObject({
+        ok: false,
+        phase: "mount",
+        cause: "error",
+      });
+      if (!ran.settled.ok)
+        expect(ran.settled.error?.message).toBe(
+          "the kept file could not be read",
+        );
+      expect(ran.fs.calls).not.toContain("command");
+      ran.settle({ landed: false, why: "skipped" });
+      expect(await t.settled(ran.hold)).not.toBe("idle");
+    },
+  );
 
   test("a put-back frames only what changed and the times that moved", async () => {
     const t = setup();

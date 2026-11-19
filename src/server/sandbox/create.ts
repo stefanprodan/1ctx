@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // One sandbox made: the create, ready, the keep-alive's pid and start
-// time, and for an image's first sandbox its roots, every step on the
-// caller's signal. A throw leaves the delete to the caller.
+// time, for an image's first sandbox its roots, and its repositories'
+// binds, every step on the caller's signal. A throw leaves the delete to
+// the caller.
 
 import type { ShellRepo, StoredBytes } from "../bash/index.ts";
 import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
+import { checkBinds } from "./binds.ts";
 import type { Lease } from "./book.ts";
 import type { Gateway } from "./gateway.ts";
 import { readKeepAlive, readStartTime } from "./keepalive.ts";
@@ -43,4 +45,5 @@ export async function buildSandbox(
   lease.pid = await readKeepAlive(gateway, lease.name, signal);
   lease.started = await readStartTime(gateway, lease.name, lease.pid, signal);
   await check.verify(gateway, lease.name, signal);
+  await checkBinds(gateway, lease.name, repos, signal);
 }

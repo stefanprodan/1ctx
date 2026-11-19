@@ -82,8 +82,17 @@ def main():
             mode = stat.S_IMODE(st.st_mode)
             kind = st.st_mode
             if stat.S_ISDIR(kind) and st.st_dev == dev:
+                # each name waiting is an entry to come, so a folder wider
+                # than what is left stops before it is held or sorted
+                room = limit - n - len(stack)
+                names = []
                 try:
-                    names = sorted(os.listdir(path), reverse=True)
+                    with os.scandir(path) as found:
+                        for entry in found:
+                            if len(names) >= room:
+                                over("entries", limit)
+                            names.append(entry.name)
+                    names.sort(reverse=True)
                 except OSError as e:
                     n -= 1
                     failed(e, path)

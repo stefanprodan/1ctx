@@ -108,7 +108,7 @@ export type ShellRun = {
 
 export type ShellBackend = {
   // /tmp is the shell's own: no scratch row is mounted, and a command
-  // writes or deletes none, only the cwd and the time of its last use
+  // writes or deletes none and commits only the cwd, never its last use
   ownTmp?: true;
   // a command may run to its caps' sandboxCommandMs, when the call
   // gives one, instead of the call timeout

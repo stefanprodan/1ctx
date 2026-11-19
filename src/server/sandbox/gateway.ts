@@ -104,11 +104,13 @@ export type Gateway = {
   // a gateway-global policy replaces every sandbox's own, so the sandbox
   // shell refuses to run while one is set
   globalPolicy(signal: AbortSignal): Promise<boolean>;
+  // NameTaken when the gateway answers that the name is held
   create(spec: CreateSpec, signal: AbortSignal): Promise<void>;
   // until the sandbox is ready; a throw for an error or stopped phase
   waitReady(name: string, signal: AbortSignal): Promise<void>;
-  // one launch, never retried: a fresh request id makes a lost
-  // transport fail rather than run the command twice
+  // one launch, never retried and with no request id (the gateway
+  // keeps each for its replay window), so a lost transport fails
+  // rather than runs the command twice
   exec(request: ExecRequest): AsyncIterable<ExecEvent>;
   // accepted or already absent; the delete itself goes on in the gateway
   delete(name: string, signal: AbortSignal): Promise<void>;
@@ -176,4 +178,10 @@ export type Connect = (config: GatewayConfig) => Gateway;
 // gateway is unavailable: the lease goes, not only the command
 export class SandboxUnavailable extends Error {
   override name = "SandboxUnavailable";
+}
+
+// a create the gateway refused since the name is held: not ours, so it
+// is never deleted by that name
+export class NameTaken extends Error {
+  override name = "NameTaken";
 }

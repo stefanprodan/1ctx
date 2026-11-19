@@ -72,7 +72,9 @@ gateway add`.
 
 - **macOS needs Apple silicon and Docker Desktop running.** OpenShell
   0.1.9 publishes no Intel macOS gateway. The script fails at once when
-  `docker info` does not answer.
+  `docker info` does not answer. Repositories need Docker Desktop on
+  Docker VMM: on the Apple Virtualization framework its shares refuse
+  every read of a repository's bind (`docs/sandbox.md`).
 - **The config is fixed:** the Docker driver with bridge supervisor
   networking calling back on `https://host.openshell.internal:<port>`
   (under Docker Desktop `127.0.0.1` is the container's own), push

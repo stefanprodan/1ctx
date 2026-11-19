@@ -158,7 +158,11 @@ is its root.
   installs, network and credentials. It saves `/knowledge` as the
   parent does, its setup copies nothing in, nothing comes back, its end
   recycles nothing, and its kept folders take the parent's numbers. Its
-  cwd and command queue stay its own. The delegate description and the
+  cwd and command queue stay its own. A command whose network or
+  credentials differ from those running there (a setting or key moved
+  since the parent's) retires the shared sandbox and waits for them to
+  end (`docs/sandbox-network.md`), so its `/tmp` and installs are lost
+  then. The delegate description and the
   subagent's line say it shares the sandbox; the built-in words are
   unchanged.
 - **In the built-in shell `/knowledge` and `/uploads` are read-only to

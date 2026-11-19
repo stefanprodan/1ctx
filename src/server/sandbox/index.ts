@@ -7,6 +7,7 @@
 // one gateway's leases at a time, and the ShellBackend bash asks for at
 // each command.
 
+import { randomBytes } from "node:crypto";
 import type { SandboxResponse } from "../../shared/api/sandbox.ts";
 import {
   SANDBOX_KEYS,
@@ -206,6 +207,9 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
         ...retired.map((old) => old.leases),
         ...(current === null ? [] : [current.leases]),
       ],
+      // its providers' and profiles' own names: two endpoints may be one
+      // gateway, and a provider another gateway uses never keeps one here
+      owner: randomBytes(8).toString("hex"),
       // a retired manager's delete frees room under the instance's cap;
       // this one's last delete may leave it unwanted and empty
       freed: () => {

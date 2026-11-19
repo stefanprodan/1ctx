@@ -23,8 +23,9 @@ in `docs/sandbox-network.md`.
   pushes everything; kept MCP files are pushed, never read lazily. A
   push is one exec per chunk under 1,000 KiB, each chunk made once the
   one before it applied, so a push holds one chunk beside its rows. A
-  kept file the store cannot read runs no command and saves nothing,
-  with the builtin shell's words.
+  kept file the store cannot read, or whose row went since the mount,
+  runs no command and saves nothing, with the builtin shell's words;
+  the builtin shell reads a gone row as empty, but a push is eager.
 - **Modes and times are the builtin shell's:** docs and uploads `0644`,
   folders `0755`; a doc its `updated_at`, an upload its `created_at`, a
   folder its newest file's time, a kept file 0.
@@ -158,7 +159,15 @@ never counts, so one alone still fences.
   others it removes only files the save read. Each file it writes or
   removes there holds to the bytes the walk read (`was`, checked by the
   push helper): one a running command wrote since is skipped, and a
-  later save takes it, since the base holds the rows.
+  later save takes it, since the base holds the rows. The helper acts
+  on the file it hashed, rewriting it in place and removing it only
+  while the name holds it unwritten; a hard-linked one is skipped. This
+  narrows a sibling's race, never closes it: a write between the last
+  check and the truncate is lost, so is a rewrite between the remove's
+  check and its unlink; a command holding the file open lands later
+  bytes at its own offset in the rewritten file, which may mix the two;
+  a write between two parts of a large file skips the parts after it.
+  A rewrite that fails its check leaves the file's mode as it was.
 - **Beside other commands a save that did not land puts back only
   what a conflict names.** A conflict puts back the moved docs and the
   words say other changes stay. Any other refusal, or a thrown commit

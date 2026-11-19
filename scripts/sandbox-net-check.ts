@@ -397,7 +397,7 @@ async function main() {
         `-L "https://httpbin.org/redirect-to?url=https://example.org/"`,
       ),
       probe("encoded", "https://httpbin.org/anything/a%2Fb"),
-      probe("unlisted", "https://www.example.org/"),
+      refusalProbe("unlisted", "https://www.example.org/"),
       `printf 'raw-socket '; (exec 3<>/dev/tcp/1.1.1.1/443 && echo connected) 2>&1 | head -1`,
       `printf 'python '; python3 -c "import urllib.request as u;print(u.urlopen('https://httpbin.org/get',timeout=10).status)" 2>&1 | tail -1`,
       `(python3 -m http.server 8099 --bind 127.0.0.1 >/dev/null 2>&1 &); sleep 1`,
@@ -422,7 +422,8 @@ async function main() {
   );
   report(
     "an encoded path and an unlisted host are refused",
-    status(two, "encoded") !== "200" && status(two, "unlisted") === "000",
+    // httpbin answers 200 to any path, so a 4xx is the proxy's
+    /^4\d\d$/.test(status(two, "encoded")) && proxyRefused(two, "unlisted"),
     `${lineOf(two, "encoded").slice(0, 120)} / ${lineOf(two, "unlisted")}`,
   );
   report(
@@ -578,10 +579,10 @@ async function main() {
       // any answer at all, which a refused name never gets
       probe("deep-wildcard", "https://us.aws.cdn.hf.co/"),
       probe("listed", "https://httpbin.org/get"),
-      probe("two-label", "https://example.org/"),
-      probe("unlisted", "https://www.example.com/"),
-      probe("literal", "https://1.1.1.1/"),
-      probe("port-8443", "https://httpbin.org:8443/get"),
+      refusalProbe("two-label", "https://example.org/"),
+      refusalProbe("unlisted", "https://www.example.com/"),
+      refusalProbe("literal", "https://1.1.1.1/"),
+      refusalProbe("port-8443", "https://httpbin.org:8443/get"),
       refusalProbe("metadata", "http://169.254.169.254/latest/meta-data/"),
     ].join("\n"),
   );
@@ -597,12 +598,11 @@ async function main() {
   );
   report(
     "unlisted names, raw addresses, metadata and other ports are refused",
-    ["two-label", "unlisted", "literal", "port-8443"].every(
-      (label) => status(w, label) === "000",
-    ) && proxyRefused(w, "metadata"),
-    ["two-label", "unlisted", "literal", "port-8443"]
-      .map((label) => `${label} ${status(w, label)}`)
-      .concat(lineOf(w, "metadata"))
+    ["two-label", "unlisted", "literal", "port-8443", "metadata"].every(
+      (label) => proxyRefused(w, label),
+    ),
+    ["two-label", "unlisted", "literal", "port-8443", "metadata"]
+      .map((label) => lineOf(w, label))
       .join(", "),
   );
 
@@ -681,14 +681,17 @@ async function main() {
     [HEADER],
     [
       `env | grep -c '^ONECTX_CRED_'`,
-      probe("off", "https://httpbin.org/get"),
+      refusalProbe("off", "https://httpbin.org/get"),
     ].join("\n"),
   );
   report(
     "off recycles, attaches nothing and nothing reaches out",
     off.sandbox !== bun.sandbox &&
       off.raw.startsWith("0\n") &&
-      status(off.raw, "off") === "000",
+      // the proxy's refusal, or no answer from a URL the wildcard
+      // sandbox reached in this run
+      (proxyRefused(off.raw, "off") ||
+        (status(off.raw, "off") === "000" && status(w, "listed") === "200")),
     `${bun.sandbox} -> ${off.sandbox} (${off.loaded} load); ${lineOf(off.raw, "off")}`,
   );
 }

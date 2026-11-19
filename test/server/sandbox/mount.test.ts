@@ -19,13 +19,19 @@ import { fakeGateway } from "../../helpers/sandbox.ts";
 import type { CommandEffect, FakeFs } from "../../helpers/sandbox-fs.ts";
 import { freeSlots } from "../../helpers/slots.ts";
 import {
-  callCaps,
+  callCaps as builtinCaps,
   freshSignal,
   run,
   scratchState,
   seedScratch,
   setup,
 } from "../bash/helpers.ts";
+
+// a send offered the sandbox carries its command time
+const callCaps = {
+  ...builtinCaps,
+  sandboxCommandMs: builtinCaps.callTimeoutMs,
+};
 
 function sandboxed(
   plays: Record<string, (fs: FakeFs) => CommandEffect | Promise<CommandEffect>>,

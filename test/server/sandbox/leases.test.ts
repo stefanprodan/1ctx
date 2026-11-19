@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ShellCall, ShellRepo } from "../../../src/server/bash/index.ts";
 import { MINUTE_MS } from "../../../src/server/lib/clock.ts";
-import { silent } from "../../../src/server/lib/log.ts";
+import { type Log, silent } from "../../../src/server/lib/log.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { SANDBOX_COMMANDS } from "../../../src/server/sandbox/holders.ts";
 import {
@@ -27,14 +27,14 @@ import { fakeClock, fakeGateway, until } from "../../helpers/sandbox.ts";
 
 const INSTANCE = "a1b2c3d4e5f6";
 
-function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
+function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}, log: Log = silent) {
   const time = fakeClock();
   const fake = fakeGateway();
   const held = new Map<string, number>();
   const limits = { ...DEFAULT_LIMITS, ...caps };
   const leases = new Leases({
     clock: time.clock,
-    log: silent,
+    log,
     gateway: fake.connect({
       endpoint: "https://gateway.test:17670",
       ca: "ca",
@@ -133,6 +133,42 @@ describe("sandbox leases", () => {
     const other = await t.acquire("chat", []);
     expect(other.sandbox).not.toBe(first.sandbox);
     expect(t.fake.deletes).toEqual([first.sandbox]);
+  });
+
+  test("a repository the host cannot share refuses its sandbox once, never the image", async () => {
+    const warned: [string, unknown][] = [];
+    const t = setup(
+      {},
+      {
+        ...silent,
+        warn: (msg, fields) => warned.push([msg, fields]),
+      },
+    );
+    const lib: ShellRepo = { name: "lib", tree: "/cache/trees/c/d/files" };
+    t.fake.unsharedRepos = ["lib"];
+    const error = await rejection(t.acquire("chat", [REPO, lib]));
+    expect(error.message).toBe(
+      "the repository lib cannot be read in the sandbox: this host's Docker does not share its files. Docker Desktop needs Docker VMM as its virtual machine",
+    );
+    await until(() => t.leases.rows().length === 0);
+    expect(t.fake.deletes).toEqual([t.fake.creates[0]!.name]);
+    expect(t.leases.refused()).toBeNull();
+    // the operator sees it too, with no repository's name
+    expect(warned).toEqual([
+      [
+        "sandbox repository unreadable",
+        { sandbox: t.fake.creates[0]!.name, repos: 1 },
+      ],
+    ]);
+    // a sandbox without repositories is never asked, one with them once
+    const plain = await t.acquire("plain");
+    t.fake.unsharedRepos = [];
+    const app = await t.acquire("app", [REPO]);
+    app.release();
+    const again = await t.acquire("app", [REPO]);
+    expect(again.sandbox).toBe(app.sandbox);
+    expect(t.fake.bindChecks).toEqual([t.fake.creates[0]!.name, app.sandbox]);
+    expect(plain.sandbox).not.toBe(app.sandbox);
   });
 
   test("a mounted tree stays held until its sandbox's delete is observed", async () => {

@@ -13,6 +13,7 @@ import type { ShellCall, ShellRepo, StoredBytes } from "../bash/index.ts";
 import { after, type Clock, MINUTE_MS } from "../lib/clock.ts";
 import { errorFields, type Log } from "../lib/log.ts";
 import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
+import { RepoUnshared } from "./binds.ts";
 import { Book, type Lease } from "./book.ts";
 import { buildSandbox } from "./create.ts";
 import { Deletes } from "./deletes.ts";
@@ -49,8 +50,11 @@ export type LeasesDeps = {
   // the repository cache's hold on a mounted tree
   repos: { hold(tree: string): (() => void) | null };
   // the managers the settings moved off, still deleting: their sandboxes
-  // count against the cap, and no sweep of this one takes what they hold
+  // count against the cap
   others?(): readonly Leases[];
+  // a salt in this manager's provider and profile names, so a delete of
+  // its own never takes another manager's, on whatever gateway
+  owner?: string;
   // a delete of this manager was observed, so another may admit one
   freed?(): void;
   // the provider locks every manager of the instance shares
@@ -383,12 +387,16 @@ export class Leases {
     this.seats.changed();
     lease.usedAt = this.deps.clock();
     if (lease.holders > 0) return;
-    if (lease.recycled !== null) {
-      this.deletes.destroy(lease, lease.recycled);
-      return;
-    }
-    if (lease.doomed || this.closed || this.draining) {
-      this.deletes.destroy(lease, "discard");
+    if (
+      lease.recycled !== null ||
+      lease.doomed ||
+      this.closed ||
+      this.draining
+    ) {
+      this.deletes.destroy(lease, lease.recycled ?? "discard");
+      // a command waiting for its workspace's doomed sandbox makes
+      // another now, never after the delete; the cap counts this one
+      this.changes.changed();
       return;
     }
     lease.state = "idle";
@@ -429,10 +437,17 @@ export class Leases {
     try {
       await this.build(lease, repos, stored, step.signal);
     } catch (error) {
-      this.deletes.destroy(lease, "failed");
+      this.deletes.failed(lease, error);
       signal.throwIfAborted();
       if (step.signal.aborted) return "busy";
-      if (error instanceof ImageRefused) throw error;
+      // a host that cannot share a repository, seen outside the chat too
+      if (error instanceof RepoUnshared)
+        this.deps.log.warn("sandbox repository unreadable", {
+          sandbox: lease.name,
+          repos: error.unreadable,
+        });
+      if (error instanceof ImageRefused || error instanceof RepoUnshared)
+        throw error;
       this.deps.log.warn("sandbox create failed", {
         sandbox: lease.name,
         ...errorFields(error),

@@ -149,26 +149,111 @@ def drain(size):
         left -= len(b)
 
 
-# the path holds what the frame expects: a regular file with these
-# bytes, or nothing for None
-def same(name, fd, st, was):
-    if st is None or was is None:
-        return st is None and was is None
-    if not stat.S_ISREG(st.st_mode):
-        return False
+def digest(f):
+    h = hashlib.sha256()
+    while True:
+        b = os.read(f, PIECE)
+        if not b:
+            return h.hexdigest()
+        h.update(b)
+
+
+def unchanged(a, b):
+    return (a.st_dev, a.st_ino, a.st_size, a.st_mtime_ns) == (
+        b.st_dev,
+        b.st_ino,
+        b.st_size,
+        b.st_mtime_ns,
+    )
+
+
+# the file at the name, opened without following a link, while it is a
+# lone regular file holding the bytes `was` names and unwritten while
+# hashed; None for anything else
+def holding(name, fd, flags, was):
     try:
-        f = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
+        f = os.open(name, flags | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)
     except OSError:
-        return False
+        return None
+    st = os.fstat(f)
+    ok = stat.S_ISREG(st.st_mode) and st.st_nlink == 1
+    if ok and digest(f) == was and unchanged(st, os.fstat(f)):
+        return f, st
+    os.close(f)
+    return None
+
+
+# A frame with `was` acts on the very file it hashed, which narrows a
+# sibling's race without closing it: a write between the last check and
+# the truncate is lost, and so is a rewrite between the remove's lstat
+# and its unlink; a writer holding the file open lands its later bytes
+# at its own offset in the rewritten file, which may mix the two; a
+# write between two parts of an append skips the parts after it.
+def contested(h, name, fd, st):
+    was = h["was"]
+    if was is None:
+        if st is None and h["op"] == "file":
+            create(name, fd, h, skip_made=True)
+        else:
+            drain(h["size"])
+        return
+    if h["op"] == "file" and h.get("append"):
+        held = holding(name, fd, os.O_RDWR | os.O_APPEND, was)
+        if held is None:
+            drain(h["size"])
+        else:
+            write(held[0], h)
+        return
+    held = holding(name, fd, os.O_RDONLY, was)
+    if held is None:
+        drain(h["size"])
+        return
+    f, st = held
     try:
-        h = hashlib.sha256()
-        while True:
-            b = os.read(f, PIECE)
-            if not b:
-                return h.hexdigest() == was
-            h.update(b)
+        if h["op"] == "rm":
+            now = lstat_at(name, fd)
+            if now is not None and unchanged(st, now):
+                writable(fd)
+                os.unlink(name, dir_fd=fd)
+            return
+        # opening to write needs the bit; a check that fails gives the
+        # file its mode back
+        added = st.st_mode & 0o200 == 0
+        if added:
+            os.fchmod(f, stat.S_IMODE(st.st_mode) | 0o200)
+        try:
+            out = os.open(
+                name, os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd
+            )
+        except OSError:
+            if added:
+                os.fchmod(f, stat.S_IMODE(st.st_mode))
+            raise
+        if not unchanged(st, os.fstat(out)):
+            os.close(out)
+            if added:
+                os.fchmod(f, stat.S_IMODE(st.st_mode))
+            drain(h["size"])
+            return
+        os.ftruncate(out, 0)
+        write(out, h)
     finally:
         os.close(f)
+
+
+# a new inode every time, so a hard link never carries a write to
+# another name; a file made since a `was` of nothing is the other's
+def create(name, fd, h, skip_made=False):
+    writable(fd)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    try:
+        out = os.open(name, flags, 0o600, dir_fd=fd)
+    except FileExistsError:
+        if not skip_made:
+            raise
+        drain(h["size"])
+        return
+    write(out, h)
 
 
 def copy(fd, size):
@@ -223,8 +308,8 @@ def apply(h):
     name = parts[-1]
     try:
         st = lstat_at(name, fd)
-        if "was" in h and not same(name, fd, st, h["was"]):
-            drain(h["size"])
+        if "was" in h:
+            contested(h, name, fd, st)
         elif op == "rm":
             if st is None:
                 return
@@ -264,16 +349,12 @@ def apply(h):
             out = os.open(name, flags, dir_fd=fd)
             write(out, h)
         else:
-            # a new inode every time, so a hard link never carries a write
-            # to another name
             if st is not None and stat.S_ISDIR(st.st_mode):
                 raise Refused("kind", path)
-            writable(fd)
             if st is not None:
+                writable(fd)
                 os.unlink(name, dir_fd=fd)
-            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
-            out = os.open(name, flags, 0o600, dir_fd=fd)
-            write(out, h)
+            create(name, fd, h)
     finally:
         os.close(fd)
 

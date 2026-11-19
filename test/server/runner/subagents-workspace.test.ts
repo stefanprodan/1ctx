@@ -85,27 +85,35 @@ describe("a subagent's /tmp", () => {
 
   test("under the sandbox shell nothing is copied in or back, and the subagent is told it shares the sandbox", async () => {
     const chat = await subagentApp();
-    // the offer reads bash's word on the shell; the commands still run
-    // in the built-in one, whose rows show what the handoff did
+    // the offer reads bash's word on the shell while the built-in one
+    // runs, so a command is refused as switched; the rows show what the
+    // handoff did
     chat.app.bash.sandbox = () => ({ mode: "off", hosts: [] });
     try {
       const { script, sessionId } = await startChat(chat, "write a report");
-      script.toolRound([bashCall("b1", "printf seed > /tmp/seed.txt")]);
+      const parent = { id: sessionId, sessionId };
+      const seed = { path: "seed.txt", data: Buffer.from("seed"), mode: 0o644 };
+      transact(chat.app.db, () => ({
+        result: new ScratchStore(chat.app.db).write(
+          parent,
+          0,
+          { written: [seed], removed: [], cwd: "/tmp" },
+          0,
+        ),
+      }));
+      script.toolRound([delegateCall("d1", "Write the report.")]);
       script.end();
-      const second = await waitScript(chat.scripted, 2);
-      second.toolRound([delegateCall("d1", "Write the report.")]);
-      second.end();
-      const child = await waitScript(chat.scripted, 3);
+      const child = await waitScript(chat.scripted, 2);
       expect(isChild(child)).toBe(false);
       expect(system(child)).toContain(SANDBOX_SUBAGENT_LINE);
       child.toolRound([
         bashCall("c1", "ls /tmp; printf report > /tmp/report.md"),
       ]);
       child.end();
-      const answer = await waitScript(chat.scripted, 4);
+      const answer = await waitScript(chat.scripted, 3);
       expect(lastResult(answer)).not.toContain("seed.txt");
       answer.reply("The report says hi.");
-      const back = await waitScript(chat.scripted, 5);
+      const back = await waitScript(chat.scripted, 4);
       expect(lastResult(back)).toBe("The report says hi.");
       back.reply("done");
       await settled(chat, sessionId);

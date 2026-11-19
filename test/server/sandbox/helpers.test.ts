@@ -10,11 +10,13 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import {
   chmodSync,
+  closeSync,
   existsSync,
   linkSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -22,6 +24,7 @@ import {
   symlinkSync,
   truncateSync,
   writeFileSync,
+  writeSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -312,6 +315,60 @@ describe("push helper", () => {
     expect(bad.text).toStartWith("PUSH refused header");
   });
 
+  test("a held file is rewritten in place, so a writer that has it open still lands its bytes", async () => {
+    const { roots } = scratch();
+    const tmp = roots[1]!;
+    const at = (name: string) => join(tmp, name);
+    const sha = (text: string) =>
+      new Bun.CryptoHasher("sha256").update(text).digest("hex");
+    writeFileSync(at("open"), "mine\n");
+    // a running command holds the file open across the put-back
+    const writer = openSync(at("open"), "r+");
+    chmodSync(at("open"), 0o444);
+    const [chunk] = encodePush(
+      {
+        files: [
+          {
+            path: at("open"),
+            mode: 0o644,
+            mtime: 1,
+            data: new TextEncoder().encode("rows\n"),
+          },
+        ],
+        was: new Map([[at("open"), sha("mine\n")]]),
+      },
+      { roots, limit: 64 * 1024 },
+    );
+    expect((await push(roots, chunk!)).text).toStartWith("PUSH ok");
+    expect(readFileSync(at("open"), "utf8")).toBe("rows\n");
+    expect(statSync(at("open")).mode & 0o777).toBe(0o644);
+    writeSync(writer, "late\n", 0);
+    closeSync(writer);
+    expect(readFileSync(at("open"), "utf8")).toBe("late\n");
+  });
+
+  test("a file another made where nothing was expected is kept", async () => {
+    const { roots } = scratch();
+    const tmp = roots[1]!;
+    writeFileSync(join(tmp, "made"), "theirs");
+    const result = await push(
+      roots,
+      frame(
+        {
+          op: "file",
+          path: escapePath(join(tmp, "made")),
+          mode: 0o644,
+          mtime: 1,
+          size: 4,
+          was: null,
+        },
+        "ours",
+      ),
+    );
+    expect(result.text).toStartWith("PUSH ok");
+    expect(readFileSync(join(tmp, "made"), "utf8")).toBe("theirs");
+  });
+
   test("refuse a mode on a hard-linked file, which would reach its other name", async () => {
     const { base, roots } = scratch();
     writeFileSync(join(base, "secret"), "s");
@@ -374,6 +431,19 @@ describe("walk helper", () => {
     expect(result.text).toEndWith("WALK over entries 3\n");
     const walk = decodeWalk(result.stdout, roots, WIDE);
     expect(walk.ok ? "ok" : walk.reason).toBe("over");
+  });
+
+  test("stop at a folder whose entries would pass the bound, before listing one", async () => {
+    const { roots } = scratch();
+    const wide = join(roots[1]!, "wide");
+    mkdirSync(wide);
+    for (let i = 0; i < 200; i++) writeFileSync(join(wide, `f${i}`), "");
+    const result = await run(
+      walkArgv({ ...LIMITS, entries: 10 }, roots, using),
+    );
+    expect(result.code).toBe(5);
+    expect(result.text).toEndWith("WALK over entries 10\n");
+    expect(result.text).not.toContain(`${wide}/`);
   });
 
   test("stop at a file past its cap before reading a byte of it", async () => {

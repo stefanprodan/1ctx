@@ -4,30 +4,34 @@
 // The gateway port over OpenShell's SDK: Connect gRPC over node:http2
 // with mutual TLS. Exec goes through the raw RPC, since the SDK's
 // curated stream retries on a transport error before response headers
-// and a command must launch once or not at all.
+// and a command must launch once or not at all. Create, list and policy
+// go through the raw RPCs too, since only those take a signal: a wait
+// that ends must end the RPC, or a gateway that never answers keeps one
+// more on every probe.
 
-import { Code } from "@connectrpc/connect";
+import { Code, type Transport } from "@connectrpc/connect";
 import {
   createGrpcTransport,
   Http2SessionManager,
 } from "@connectrpc/connect-node";
+import { fromConnect, SandboxClient, SdkError } from "openshell-sdk";
 import {
-  fromConnect,
-  SandboxClient,
-  type SandboxPhaseName,
-  SdkError,
-} from "openshell-sdk";
-import { PolicyStatus, ServiceStatus } from "openshell-sdk/raw";
+  SandboxPhase as Phase,
+  PolicyStatus,
+  SandboxRestartPolicy,
+  ServiceStatus,
+} from "openshell-sdk/raw";
 import type {
   Connect,
   CreateSpec,
   ExecEvent,
   ExecRequest,
   Gateway,
+  SandboxInfo,
   SandboxPhase,
   SandboxPolicy,
 } from "./gateway.ts";
-import { SandboxUnavailable } from "./gateway.ts";
+import { NameTaken, SandboxUnavailable } from "./gateway.ts";
 import { providerCalls } from "./providers.ts";
 
 // 1ctx keeps every sandbox and provider in the gateway's default
@@ -39,15 +43,17 @@ const WAIT_SECONDS = 24 * 3600;
 // how often a policy's load is asked: push delivery loads in about 60 ms
 const POLICY_POLL_MS = 50;
 
-const PHASES: Partial<Record<SandboxPhaseName, SandboxPhase>> = {
-  provisioning: "provisioning",
-  starting: "provisioning",
-  ready: "ready",
-  error: "error",
-  deleting: "deleting",
-  stopping: "stopped",
-  stopped: "stopped",
+const PHASES: Partial<Record<Phase, SandboxPhase>> = {
+  [Phase.PROVISIONING]: "provisioning",
+  [Phase.STARTING]: "provisioning",
+  [Phase.READY]: "ready",
+  [Phase.ERROR]: "error",
+  [Phase.DELETING]: "deleting",
+  [Phase.STOPPING]: "stopped",
+  [Phase.STOPPED]: "stopped",
 };
+const phaseOf = (phase: Phase | undefined): SandboxPhase =>
+  PHASES[phase ?? Phase.UNSPECIFIED] ?? "other";
 
 const notFound = (error: unknown) =>
   (error instanceof SdkError ? error : fromConnect(error)).code === "not_found";
@@ -120,20 +126,6 @@ const pause = (ms: number, signal: AbortSignal) =>
     );
   });
 
-// a call whose RPC takes no signal: the caller stops waiting at the
-// signal, and what the gateway still does is the sweep's to find
-function unless<T>(call: Promise<T>, signal: AbortSignal): Promise<T> {
-  call.catch(() => {});
-  if (signal.aborted) return Promise.reject(signal.reason);
-  return new Promise<T>((resolve, reject) => {
-    const stop = () => reject(signal.reason);
-    signal.addEventListener("abort", stop, { once: true });
-    call.then(resolve, reject).finally(() => {
-      signal.removeEventListener("abort", stop);
-    });
-  });
-}
-
 export const openshellGateway: Connect = (config) => {
   // our own session, the SDK's transport built over it, so close() ends
   // the connection the SDK would keep open
@@ -146,6 +138,11 @@ export const openshellGateway: Connect = (config) => {
     baseUrl: config.endpoint,
     sessionManager: session,
   });
+  return gatewayOver(transport, () => session.abort());
+};
+
+// the port over a transport, which a test gives in memory
+export function gatewayOver(transport: Transport, close: () => void): Gateway {
   const sdk = new SandboxClient(transport);
   const client = { raw: sdk.raw, sandbox: sdk };
   const gateway: Gateway = {
@@ -179,17 +176,32 @@ export const openshellGateway: Connect = (config) => {
       }
     },
     async create(spec, signal) {
-      await unless(
-        client.sandbox.create({
-          name: spec.name,
-          labels: spec.labels,
-          command: spec.command,
-          // network rules are plain objects here; the proto checks them
-          policy: protoPolicy(spec.policy) as never,
-          rawSpec: { template: template(spec) as never },
-        }),
-        signal,
-      );
+      try {
+        await client.raw.createSandbox(
+          {
+            workspaceScope: SCOPE,
+            name: spec.name,
+            labels: spec.labels,
+            spec: {
+              environment: {},
+              providers: [],
+              command: spec.command,
+              tty: false,
+              restartPolicy: SandboxRestartPolicy.NEVER,
+              // network rules are plain objects here; the proto checks them
+              policy: protoPolicy(spec.policy) as never,
+              template: template(spec) as never,
+            },
+            serviceExposures: [],
+          },
+          { signal },
+        );
+      } catch (error) {
+        const sdk = fromConnect(error);
+        // answered, so another's: never deleted by its name
+        if (sdk.code === "already_exists") throw new NameTaken(sdk.message);
+        throw sdk;
+      }
     },
     async waitReady(name, signal) {
       await client.sandbox.waitReady(name, WAIT_SECONDS, {
@@ -216,37 +228,61 @@ export const openshellGateway: Connect = (config) => {
     },
     async phase(name, signal) {
       try {
-        const ref = await client.sandbox.get(name, {
-          signal,
-          workspace: WORKSPACE,
-        });
-        return PHASES[ref.phase] ?? "other";
+        const resp = await client.raw.getSandbox(
+          { name, workspaceScope: SCOPE },
+          { signal },
+        );
+        return phaseOf(resp.sandbox?.status?.phase);
       } catch (error) {
         if (notFound(error)) return "gone";
         throw error;
       }
     },
     async list(labels, signal) {
-      const refs = await unless(
-        client.sandbox.listAll({
-          labelSelector: selector(labels),
-          workspace: WORKSPACE,
-        }),
-        signal,
-      );
-      return refs.map((ref) => ({
-        name: ref.name,
-        phase: PHASES[ref.phase] ?? "other",
-        labels: ref.labels,
-      }));
+      const found: SandboxInfo[] = [];
+      let pageToken = "";
+      try {
+        do {
+          const page = await client.raw.listSandboxes(
+            {
+              workspaceScope: SCOPE,
+              labelSelector: selector(labels),
+              pageSize: 0,
+              pageToken,
+            },
+            { signal },
+          );
+          for (const box of page.sandboxes) {
+            const name = box.metadata?.name;
+            if (!name) continue;
+            found.push({
+              name,
+              phase: phaseOf(box.status?.phase),
+              labels: box.metadata?.labels ?? {},
+            });
+          }
+          pageToken = page.nextPageToken;
+        } while (pageToken !== "");
+      } catch (error) {
+        throw fromConnect(error);
+      }
+      return found;
     },
     async setPolicy(name, policy, network, signal) {
-      const saved = await unless(
-        client.sandbox.setPolicy(name, protoPolicy(policy, network) as never, {
-          workspace: WORKSPACE,
-        }),
-        signal,
-      );
+      let saved: { version: number };
+      try {
+        saved = await client.raw.updateConfig(
+          {
+            sandbox: name,
+            workspaceScope: SCOPE,
+            policy: protoPolicy(policy, network) as never,
+            global: false,
+          },
+          { signal },
+        );
+      } catch (error) {
+        throw fromConnect(error);
+      }
       // saved is not loaded: the sandbox's own report of this version
       // as active is
       for (;;) {
@@ -308,12 +344,10 @@ export const openshellGateway: Connect = (config) => {
       },
       ...providerCalls(client.raw, SCOPE, WORKSPACE),
     },
-    close() {
-      session.abort();
-    },
+    close,
   };
   return gateway;
-};
+}
 
 async function* execOnce(
   client: SandboxClient,

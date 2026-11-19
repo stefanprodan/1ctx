@@ -186,8 +186,9 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
       stop?: AbortController;
       deadline?: AbortController;
       reads?: number[];
-      // the kept file's read throws, as a failed store read does
-      keptFails?: boolean;
+      // the kept file's read throws, as a failed store read does, or
+      // finds no row, as one gone since the mount does
+      keptFails?: boolean | "gone";
       // the command's text, which picks its effect when commands overlap
       command?: string;
       // the doc rows as they stand at the save
@@ -232,6 +233,7 @@ export function setup(caps: Partial<typeof DEFAULT_LIMITS> = {}) {
       {
         kept: (index) => {
           options.reads?.push(index);
+          if (options.keptFails === "gone") return null;
           if (options.keptFails) throw new Error("store read failed");
           return bytes(kept[index]!);
         },

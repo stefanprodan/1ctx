@@ -12,8 +12,12 @@
 //   bun scripts/sandbox-check.ts --endpoint https://127.0.0.1:17670 \
 //     --ca ca.crt --cert tls.crt --key tls.key [--image 1ctx-shell:dev] \
 //     [--repo-dir <a folder Docker Desktop shares>]
+//
+// The repository is a fresh folder made under --repo-dir (the system's
+// temporary folder by default) and removed at the end; nothing else
+// there is written.
 
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
@@ -292,11 +296,13 @@ async function command(r: Rows, text: string, timeoutMs = 30_000) {
   );
   const settled = ran.settled;
   const answer = settled.ok ? settled.answer : null;
+  // as mount.ts settles a shell whose exits are the command's own: a
+  // stop or a refusal saves nothing, any exit code commits
   const commits =
     answer !== null &&
     answer.changes !== null &&
-    answer.exitCode !== 124 &&
-    answer.exitCode !== 126;
+    answer.refused === null &&
+    answer.stopped === undefined;
   ran.settle(commits ? commit(r, answer) : { landed: false, why: "skipped" });
   await backend.idle();
   const total = Math.round(performance.now() - started);
@@ -459,8 +465,7 @@ except Exception as e: print('mem', type(e).__name__)"`,
     `total ${warm.total}ms: ${stepsOf(warm.steps)}`,
   );
 
-  const repoDir =
-    flags["repo-dir"] ?? mkdtempSync(join(tmpdir(), "sandbox-check-"));
+  repoDir = mkdtempSync(join(flags["repo-dir"] ?? tmpdir(), "sandbox-check-"));
   writeFileSync(join(repoDir, "README.md"), "repo\n");
   const withRepo = rows("check-repo", [{ name: "app", tree: repoDir }]);
   const repo = await command(
@@ -546,11 +551,21 @@ except Exception as e: print('mem', type(e).__name__)"`,
     `exit ${twoGiB.answer?.exitCode}, ${twoGiB.total}ms, ${twoGiB.state}; ${brief((twoGiB.answer?.stdout ?? "") + (twoGiB.answer?.stderr ?? ""))}`,
   );
 
-  // /tmp lasts with the sandbox and goes when it is recycled
+  // /tmp lasts with the sandbox, a command's own exit 126 included,
+  // and goes when it is recycled, as a cleared chat's is
   const keep = rows("check-keep");
   await command(keep, "echo kept > /tmp/keep.txt");
+  const own = await command(keep, "exit 126");
   const kept = await command(keep, "cat /tmp/keep.txt");
-  await command(keep, "exit 126");
+  report(
+    "a command's own exit 126 commits and keeps the sandbox",
+    own.answer?.exitCode === 126 &&
+      own.answer.stopped === undefined &&
+      own.state === "idle" &&
+      own.hold.sandbox === kept.hold.sandbox,
+    `exit ${own.answer?.exitCode}, stopped ${own.answer?.stopped}, ${own.state}`,
+  );
+  leases.recycleSession(keep.workspace, "clear");
   const gone = await command(keep, "cat /tmp/keep.txt 2>&1; true");
   report(
     "/tmp lasts between commands and goes with a recycle",
@@ -561,7 +576,11 @@ except Exception as e: print('mem', type(e).__name__)"`,
   );
 }
 
+// the repository folder this run made, the only one it removes
+let repoDir: string | null = null;
+
 async function cleanup() {
+  if (repoDir !== null) rmSync(repoDir, { recursive: true, force: true });
   leases.drain();
   const labels = { [INSTANCE_LABEL]: instanceId };
   const deadline = Date.now() + 120_000;

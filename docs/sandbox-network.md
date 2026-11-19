@@ -22,6 +22,13 @@ what the bash tool's description shares with it.
 - **It loads only when it changed,** waited for until the sandbox
   reports its version active. A fresh sandbox's empty policy is the
   create's, so off loads nothing.
+- **Commands sharing a sandbox run under one plan:** the same policy
+  and credentials. A command whose plan differs (the setting, a key or
+  its send's web access moved) while others whose network was set up
+  hold the sandbox never changes it: it retires the sandbox and waits
+  for them to end, then gets another. So no running command's network
+  widens or ends, and each save's scrub holds every key the sandbox
+  was given. Alone, a change applies in place or recycles (below).
 - **A send without web access runs as off.** Its snapshot is null
   (Web access off, or the chat's or automation's own switch off), so
   `ShellCall.network` is false: no endpoint, no credential, a sandbox
@@ -31,9 +38,13 @@ what the bash tool's description shares with it.
   registry.npmjs.org and github.com, never the other hosts.
 - **A credential is a provider, in hosts mode only.** One endpointless
   profile per credential shape (`1ctx-` and a hash of the instance, the
-  variable and the placement, annotated with the instance id) and one
-  provider per credential, prefix and key (`1ctx-` and a hash, the
-  key's hash salted per process, labelled). A provider's key is put
+  manager, the variable and the placement, annotated with the instance
+  id) and one provider per credential, prefix and key (`1ctx-` and a
+  hash, with the manager, and the key's hash salted per process,
+  labelled). Each gateway manager salts its names with a random value
+  of its own (`owner`), so two managers never share a provider or
+  profile, even on one gateway saved under two endpoints, and a delete
+  of one manager's never takes another's. A provider's key is put
   once and never changed: a rotation is a new provider, so a sandbox
   bound to the old one keeps the key its send read and scrubs.
 - **Its rule binds the prefix's host, port and glob** (`/v1/` as
@@ -43,10 +54,11 @@ what the bash tool's description shares with it.
   denied. Its host joins even when not listed. Credentials come with
   Web access on, as for the built-in shell. A subagent runs in its
   parent's sandbox and is offered its parent's credentials, so one
-  policy serves both. Its offer reads the shell at its send's start;
-  once the setting moved to the other shell, `mount.ts` runs none of
-  its commands (`SHELL_SWITCHED`), so its credentials never meet a
-  shell they were not offered for.
+  policy serves both. A send's offer, a chat's or a subagent's, reads
+  the shell at the send's start; once the setting moved to the other
+  shell, `mount.ts` runs none of its commands (`SHELL_SWITCHED`), so
+  its network and credentials never meet a shell they were not offered
+  for. The next send's offer names the new shell.
 - **The order is attach, bind, ready.** Providers are attached first
   (withheld until bound, never an error), the policy binds them, then
   each provider's current state is polled until `ready`, at most
@@ -54,7 +66,8 @@ what the bash tool's description shares with it.
   its provider only until the command's deadline. A failure fails the
   command and retires the lease (`retire()`): doomed, so no command
   joins it, it goes at its last release while the commands beside it
-  run on. The profile and key are asked again next time.
+  run on. A command that waited for that setup's turn goes to another
+  sandbox. The profile and key are asked again next time.
 - **Placeholders are the provider's variable**, `ONECTX_CRED_<NAME>`,
   which OpenShell's supervisor puts in every new exec's environment.
   `Authorization` takes any template (bearer style); another header
@@ -70,7 +83,7 @@ what the bash tool's description shares with it.
   (`credentials`), since an echoed key or an old placeholder may
   outlive the send there; so does the network turned off, by the
   setting or the send's web access (`network`), since a new sandbox
-  starts with none.
+  starts with none. Beside running commands it retires instead.
 - **Keys are scrubbed from what leaves.** OpenShell never redacts a
   response. The mount scrubs the output before its cut; `scrub.ts`
   replaces every key the send read, with `escapedForms()`, in the
@@ -81,10 +94,11 @@ what the bash tool's description shares with it.
   manager uses is deleted once its sandbox's delete is observed (it
   cannot go while attached; a failed delete is asked again after 5 and
   15 s), then its profile once no provider of any manager uses it, one
-  still attaching included. The sweeps keep providers and profiles
-  a lease of any manager uses and delete the rest of the instance's,
-  each asked again right before its delete under the attach's lock:
-  one per provider name and one per profile, across managers.
+  still attaching included. The sweeps keep sandboxes, providers and
+  profiles a lease of any manager uses and delete the rest of the
+  instance's, whatever their names, each asked again right before its
+  delete under the attach's lock: one per provider name and one per
+  profile, across managers.
 - **`scripts/sandbox-net-check.ts`** (`make sandbox-net-check`) runs
   the request matrix against a real gateway with made-up keys.
 
