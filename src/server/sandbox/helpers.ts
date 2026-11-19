@@ -19,7 +19,7 @@ import wrapper from "./helpers/wrapper.sh" with { type: "text" };
 
 export const HELPER_SOURCES = { fence, open, pull, push, walk, wrapper };
 
-export const PYTHON = "/usr/bin/python3";
+export const PYTHON = "/usr/local/bin/python3";
 export const BASH = "/usr/bin/bash";
 
 // where a command's records go: writable by the workload and never

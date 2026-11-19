@@ -36,7 +36,6 @@ export const HOME = "/opt/home";
 export const SANDBOX_ENV: Readonly<Record<string, string>> = {
   HOME,
   TMPDIR: "/sandbox/tmp",
-  UV_PYTHON_DOWNLOADS: "never",
   UV_CACHE_DIR: `${HOME}/.cache/uv`,
   UV_LINK_MODE: "copy",
   // bun's cache and global packages stay in HOME, never /knowledge,

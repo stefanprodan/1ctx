@@ -628,6 +628,44 @@ async function main() {
     `${bun.ms}ms; ${brief(n)}; /tmp written ${bun.changes?.written.length ?? 0}`,
   );
 
+  // the image's tools, then uv: a package from PyPI and another Python
+  // from uv's download host, both into HOME
+  const uv = await command(
+    DEFAULTS,
+    [],
+    [
+      `printf 'python '; python3 --version 2>&1`,
+      `printf 'bun '; bun --version`,
+      `printf 'git '; git --version | cut -d' ' -f3`,
+      `printf 'rg '; rg --version | head -1 | cut -d' ' -f2`,
+      `printf 'yq '; yq --version | grep -o 'v[0-9][0-9.]*'`,
+      `printf 'jq '; jq --version`,
+      `printf 'uvx '; uvx --version | cut -d' ' -f2`,
+      `printf 'requests '; uv run -q --with requests python -c 'import requests; print(requests.__name__)' 2>&1 | tail -1`,
+      `printf 'other '; uv run -q --python 3.14 python --version 2>&1 | tail -1`,
+      `printf 'where '; ls "$HOME/.local/share/uv/python" | grep -c 3.14`,
+    ].join("\n"),
+  );
+  const u = uv.raw;
+  report(
+    "the image's tools answer: Python 3.15, bun, git, rg, yq, jq and uvx",
+    /^python Python 3\.15\.\d+$/.test(lineOf(u, "python")) &&
+      lineOf(u, "bun") === "bun 1.4.4" &&
+      ["git", "rg", "yq", "jq", "uvx"].every(
+        (label) => lineOf(u, label).length > label.length + 1,
+      ),
+    ["python", "bun", "git", "rg", "yq", "jq", "uvx"]
+      .map((label) => lineOf(u, label))
+      .join(", "),
+  );
+  report(
+    "uv installs a package and downloads another Python into HOME",
+    lineOf(u, "requests") === "requests requests" &&
+      /^other Python 3\.14\.\d+$/.test(lineOf(u, "other")) &&
+      Number(lineOf(u, "where").split(" ")[1]) > 0,
+    `${uv.ms}ms; ${lineOf(u, "requests")}, ${lineOf(u, "other")}, ${lineOf(u, "where")}`,
+  );
+
   const off = await command(
     OFF,
     [HEADER],

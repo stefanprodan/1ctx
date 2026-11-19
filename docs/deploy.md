@@ -144,9 +144,10 @@ gateway add`.
   needs, which hangs or corrupts the database. A named volume takes
   the image's `/data` with its owner 65532. On a Linux host a bind
   mount works once it is `chown 65532:65532`.
-- **The sandbox image (`deploy/sandbox/Dockerfile`) pins its base by
-  digest and uv, yq and bun by version and the sha256 their releases
-  publish,** checked at build. Bun is the root Dockerfile's version,
+- **The sandbox image (`deploy/sandbox/Dockerfile`) pins its base, uv's
+  Python 3.15 trixie-slim image that brings Python and uv, by digest,
+  and yq and bun by version and the sha256 their releases publish,**
+  checked at build. Bun is the root Dockerfile's version,
   so the two move together. It makes every root the sandbox policy
   names and holds no helper: the server passes them with each exec.
 - **Stop grace is the drain plus 15.** Docker's 10 second default

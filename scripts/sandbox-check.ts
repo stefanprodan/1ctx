@@ -393,7 +393,7 @@ async function main() {
 
   const renamed = await command(
     chat,
-    `/usr/bin/python3 -c "import ctypes,os,time
+    `/usr/local/bin/python3 -c "import ctypes,os,time
 libc=ctypes.CDLL(None)
 if os.fork()==0:
   n=os.open('/dev/null', os.O_RDWR)
@@ -424,7 +424,7 @@ print('forked')"`,
   const pid = renamed.hold.keepAlivePid;
   const ptrace = await command(
     chat,
-    `/usr/bin/python3 -c "import ctypes,os
+    `/usr/local/bin/python3 -c "import ctypes,os
 libc=ctypes.CDLL(None, use_errno=True)
 r=libc.ptrace(16, ${pid}, 0, 0)
 print('attach', r, os.strerror(ctypes.get_errno()))
@@ -441,7 +441,7 @@ except Exception as e: print('mem', type(e).__name__)"`,
 
   const ptmx = await command(
     chat,
-    `/usr/bin/python3 -c "import os; os.close(os.open('/dev/ptmx', os.O_RDWR)); print('ptmx ok')"`,
+    `/usr/local/bin/python3 -c "import os; os.close(os.open('/dev/ptmx', os.O_RDWR)); print('ptmx ok')"`,
   );
   report(
     "/dev/ptmx opens, as the fence's wait needs",

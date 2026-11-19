@@ -12,7 +12,7 @@ import { hostOf, MAX_WEB_DOMAIN } from "./web.ts";
 
 export const MAX_SANDBOX_HOSTS = 200;
 
-// Package registries, code hosts, CDNs and reference docs an agent
+// Package and container registries, code hosts, CDNs, reference docs and news an agent
 // installs from or reads, sorted as a save stores them
 export const SANDBOX_DEFAULT_HOSTS: readonly string[] = [
   // package registries and the hosts their installers download from
@@ -37,6 +37,8 @@ export const SANDBOX_DEFAULT_HOSTS: readonly string[] = [
   "go.dev",
   "dl.google.com",
   "astral.sh",
+  // uv's Python downloads
+  "releases.astral.sh",
   "bun.sh",
   // code hosts, raw files and release downloads included
   "github.com",
@@ -47,6 +49,22 @@ export const SANDBOX_DEFAULT_HOSTS: readonly string[] = [
   "huggingface.co",
   // Hugging Face's file downloads redirect to its CDNs under hf.co
   "**.hf.co",
+  // container registries and the CDNs their layers download from;
+  // ghcr.io's land under *.githubusercontent.com
+  "ghcr.io",
+  "registry-1.docker.io",
+  "auth.docker.io",
+  "index.docker.io",
+  "hub.docker.com",
+  "production.cloudflare.docker.com",
+  "quay.io",
+  "*.quay.io",
+  "registry.k8s.io",
+  "gcr.io",
+  "**.pkg.dev",
+  "public.ecr.aws",
+  "mcr.microsoft.com",
+  "*.data.mcr.microsoft.com",
   // CDNs a page or visual pulls front-end libraries from
   "cdn.jsdelivr.net",
   "unpkg.com",
@@ -61,6 +79,42 @@ export const SANDBOX_DEFAULT_HOSTS: readonly string[] = [
   "*.readthedocs.io",
   "*.wikipedia.org",
   "stackoverflow.com",
+  "docs.github.com",
+  "docs.docker.com",
+  "kubernetes.io",
+  "helm.sh",
+  "fluxcd.io",
+  "fluxoperator.dev",
+  "artifacthub.io",
+  "prometheus.io",
+  "cert-manager.io",
+  // news sites, their feeds and news APIs that answer a plain request;
+  // Reuters, AP, the NYT site, FT and Bloomberg refuse one, so they are
+  // left out (the NYT's feeds answer)
+  "www.bbc.com",
+  "www.bbc.co.uk",
+  "feeds.bbci.co.uk",
+  "www.theguardian.com",
+  "content.guardianapis.com",
+  "rss.nytimes.com",
+  "www.npr.org",
+  "feeds.npr.org",
+  "www.aljazeera.com",
+  "www.theverge.com",
+  "techcrunch.com",
+  "news.ycombinator.com",
+  "hacker-news.firebaseio.com",
+  "hn.algolia.com",
+  "lobste.rs",
+  "newsapi.org",
+  // Google's APIs (search, YouTube, Books, Maps, Translation, Storage,
+  // Gemini; a key goes in the X-Goog-Api-Key header) and its fonts
+  "*.googleapis.com",
+  "fonts.gstatic.com",
+  // Yahoo and every name under it, Finance's APIs and cookie hosts
+  // included; a wildcard never covers the bare name, so it is listed
+  "yahoo.com",
+  "**.yahoo.com",
   // public data
   "query.wikidata.org",
 ].sort();

@@ -42,7 +42,7 @@ only to the gateway, over gRPC with mutual TLS.
   wildcard, three labels at least, `*` within the first label or as a
   whole later one, `**` only as the whole first label. No port,
   scheme, path or IPv6 literal. `SANDBOX_DEFAULT_HOSTS` holds the
-  defaults: package registries, code hosts, CDNs and reference docs.
+  defaults: package and container registries, code hosts, CDNs, reference docs and news.
   A list equal to them, in any order, is stored as null, so a later
   release's defaults reach the instance. The hosts network needs one
   host.
@@ -111,6 +111,11 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   `PATH`, uv's settings and bun's (its cache and global packages under
   HOME, never `/knowledge`, and `DO_NOT_TRACK`). An
   OpenShell exec sees none of the image's `ENV`.
+- **The image (`deploy/sandbox/Dockerfile`) is uv's Python 3.15 on
+  Debian trixie,** with bash, git, curl, jq, yq, ripgrep and bun. The
+  helpers run `/usr/local/bin/python3 -I -S` and `/usr/bin/bash`.
+  `uv run --python 3.X` downloads another Python into HOME from
+  `releases.astral.sh`, a default host.
 - **The policy opens the devices shells and the fence use:**
   `/dev/null`, `/dev/zero`, `/dev/random`, `/dev/tty`, `/dev/ptmx` and
   `/dev/pts` read-write, `/dev/urandom` and `/sys/fs/cgroup` read-only.

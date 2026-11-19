@@ -97,7 +97,7 @@ describe("the sandbox's hosts", () => {
     expect(hosts([...SANDBOX_DEFAULT_HOSTS])).toEqual([
       ...SANDBOX_DEFAULT_HOSTS,
     ]);
-    expect(SANDBOX_DEFAULT_HOSTS.length).toBeLessThan(MAX_SANDBOX_HOSTS / 4);
+    expect(SANDBOX_DEFAULT_HOSTS.length).toBeLessThan(MAX_SANDBOX_HOSTS / 2);
     expect(SANDBOX_DEFAULT_HOSTS).toContain("*.githubusercontent.com");
   });
 

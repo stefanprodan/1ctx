@@ -231,7 +231,7 @@ const PARENT_TMP =
   /\/tmp and \$HOME hold any bytes but last only while this chat's sandbox does: [^.]*\./;
 // what the agent does differently in a real shell
 const SANDBOX_TOOLS =
-  "jq, yq, git, python3, uv and bun are there, node is not: run Python with uv run or uvx, never pip, and TypeScript with bun file.ts. Install packages with uv run --with pkg, into a venv under $HOME, or with bun add in a project under $HOME, never in /knowledge, and check a venv or node_modules exists before using it. Redirect a background job's output (job >/tmp/log 2>&1 &), or the command waits to its deadline. A hard link or an unreadable file in /knowledge saves nothing.";
+  "jq, yq, git, python3 (3.15), uv and bun are there, node is not: run Python with uv run or uvx, never pip, another Python with uv run --python 3.X, and TypeScript with bun file.ts. Install packages with uv run --with pkg, into a venv under $HOME, or with bun add in a project under $HOME, never in /knowledge, and check a venv or node_modules exists before using it. Redirect a background job's output (job >/tmp/log 2>&1 &), or the command waits to its deadline. A hard link or an unreadable file in /knowledge saves nothing.";
 
 const OPEN_WORDS =
   "open <file> shows a file to the user as it is: HTML and SVG as a visual, Markdown rendered, other text as code. To show a file, open it rather than reading it out. To point to one, write its /knowledge/ path. ";
