@@ -26,6 +26,7 @@ import {
   BACKEND_OPTIONS,
   backendLine,
   draftOf,
+  gatewayShown,
   HOSTS_HINT,
   leaseCounts,
   leaseSub,
@@ -37,6 +38,7 @@ import {
   netDraftOf,
   netFieldOf,
   offLine,
+  overridesLine,
   type SandboxDraft,
   sandboxBody,
   sandboxDirty,
@@ -224,6 +226,19 @@ describe("the Sandbox words", () => {
     expect(netFieldOf("backend must be builtin or openshell")).toBeUndefined();
   });
 
+  test("counts the projects that pick their own shell, and keeps the gateway for their openshell", () => {
+    expect(overridesLine({ builtin: 0, openshell: 0 })).toBeNull();
+    expect(overridesLine({ builtin: 0, openshell: 1 })).toBe(
+      "1 project picks its own shell: 1 openshell.",
+    );
+    expect(overridesLine({ builtin: 2, openshell: 1 })).toBe(
+      "3 projects pick their own shell: 2 builtin, 1 openshell.",
+    );
+    expect(gatewayShown("openshell", { builtin: 0, openshell: 0 })).toBe(true);
+    expect(gatewayShown("builtin", { builtin: 3, openshell: 0 })).toBe(false);
+    expect(gatewayShown("builtin", { builtin: 0, openshell: 1 })).toBe(true);
+  });
+
   test("a lease names its chat and phase, a stuck one its next step", () => {
     expect(leaseSub(lease())).toBe("s1 · ready");
     expect(leaseSub(lease({ workspace: null, phase: null }))).toBe(
@@ -324,6 +339,26 @@ describe("the Sandbox page", () => {
       expect(html).toContain(
         "Commands run in the built-in shell, inside the server.",
       );
+    },
+  );
+
+  test.serial(
+    "a project on openshell keeps the gateway, the image and the network under the built-in shell",
+    () => {
+      sandbox.value = response({
+        settings: { ...settings, backend: "builtin" },
+        active: false,
+        overrides: { builtin: 0, openshell: 1 },
+      });
+      sandboxLeases.value = [];
+      const html = render(<Sandbox />);
+      for (const name of ["endpoint", "image", "hosts"]) {
+        expect(html).toContain(`name="${name}"`);
+      }
+      expect(html).toContain(
+        "Commands run in the built-in shell, inside the server. 1 project picks its own shell: 1 openshell.",
+      );
+      expect(html).toContain("No sandboxes yet.");
     },
   );
 

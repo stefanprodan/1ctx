@@ -1,9 +1,10 @@
 # Project settings
 
-Governs the lists a project's Settings tab and a team project's admin
-page share: its repositories (`views/projects/Repos.tsx`,
-`data/repos.ts`) and its MCP servers (`views/projects/McpServers.tsx`,
-`data/project-mcp.ts`). The rest of the Settings tab is in
+Governs what a project's Settings tab and a team project's admin page
+share: its repositories (`views/projects/Repos.tsx`, `data/repos.ts`),
+its MCP servers (`views/projects/McpServers.tsx`,
+`data/project-mcp.ts`) and its shell
+(`views/projects/ProjectShell.tsx`). The rest of the Settings tab is in
 `docs/views.md`.
 
 ## Repositories
@@ -59,3 +60,20 @@ page share: its repositories (`views/projects/Repos.tsx`,
   (`reloadProjectAgents()`), so the composer's servers follow; another
   project's held answer is dropped instead. A refused write reads the
   list again.
+
+## Shell
+
+- **One `views/projects/ProjectShell.tsx` draws both,** after MCP
+  servers: a Shell section on every project's Settings tab and a Shell
+  card on a team project's admin page, its select in the card's head.
+  The options are `Instance default (<backend>)`, named from the
+  detail's `instanceBackend`, then `builtin` and `openshell`
+  (`shellOptions()`); the default sends null.
+- **A pick is written at once** (`saveShell()`), as an MCP side is: the
+  owner's on a personal project through `PATCH /api/profile/project`,
+  an admin's on a team project through `PATCH /api/projects/:id`. The
+  answer is the detail, kept as a metadata write's. On the admin page
+  it holds the page's `saving`, since the answer replaces the row.
+- **A team's member reads the value** in the same select, disabled,
+  with "An admin sets it." under it. A refused write is the hint's
+  error line on the tab, the card's line on the admin page.

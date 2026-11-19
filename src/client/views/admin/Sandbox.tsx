@@ -49,6 +49,7 @@ import {
   BACKEND_OPTIONS,
   backendLine,
   draftOf,
+  gatewayShown,
   HOSTS_HINT,
   keyFiles,
   leaseAge,
@@ -68,6 +69,7 @@ import {
   netFieldOf,
   netRows,
   offLine,
+  overridesLine,
   refusedLine,
   type SandboxDraft,
   type SandboxField,
@@ -133,14 +135,15 @@ export function SandboxCards({
       {refused !== null && <SettingAlert>{refusedLine(refused)}</SettingAlert>}
       <Shell state={state} drafted={drafted} />
       {/* the built-in shell has no network of its own, as it has no
-          gateway or image */}
-      {(drafted.value ?? draftOf(state.settings)).backend === "openshell" && (
-        <Network state={state} />
-      )}
+          gateway or image, unless a project runs openshell over it */}
+      {gatewayShown(
+        (drafted.value ?? draftOf(state.settings)).backend,
+        state.overrides,
+      ) && <Network state={state} />}
       <Leases
         rows={sandboxLeases.value}
         failed={sandboxLeasesError.value !== null}
-        on={state.active}
+        on={state.active || state.overrides.openshell > 0}
       />
     </SettingStack>
   );
@@ -210,6 +213,8 @@ function Shell({
     drafted.value = { ...d, ...patch };
     save.touch();
   };
+  const gateway = gatewayShown(d.backend, state.overrides);
+  const overrides = overridesLine(state.overrides);
   return (
     <SettingForm
       save={save}
@@ -220,7 +225,11 @@ function Shell({
     >
       <Setting
         title="Shell"
-        line={backendLine(d.backend)}
+        line={
+          overrides === null
+            ? backendLine(d.backend)
+            : `${backendLine(d.backend)} ${overrides}`
+        }
         foot={
           <DraftFoot
             save={save}
@@ -244,10 +253,11 @@ function Shell({
                 disabled: save.busy,
               }))}
               // the built-in shell hides the gateway and image, so they
-              // go back to their saved values rather than fail unseen
+              // go back to their saved values rather than fail unseen,
+              // unless a project's openshell keeps them shown
               onPick={(backend) =>
                 set(
-                  backend === "openshell"
+                  gatewayShown(backend, state.overrides)
                     ? { backend }
                     : { ...draftOf(state.settings), backend },
                 )
@@ -255,7 +265,7 @@ function Shell({
             />
             <FieldError save={save} field="backend" />
           </div>
-          {d.backend === "openshell" && (
+          {gateway && (
             <>
               <Text
                 label="Gateway"

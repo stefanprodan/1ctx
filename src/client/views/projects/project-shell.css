@@ -1,0 +1,11 @@
+@layer tokens, base, owners;
+
+@layer owners {
+  /* the card head's select: wide enough for its longest option, never
+     wider than the card on a phone */
+  .project-shell-pick {
+    display: grid;
+    width: 240px;
+    max-width: 100%;
+  }
+}

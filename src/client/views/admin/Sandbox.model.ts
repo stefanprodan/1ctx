@@ -21,7 +21,7 @@ import {
   parseSandboxHosts,
   SANDBOX_DEFAULT_HOSTS,
 } from "../../../shared/sandbox-net.ts";
-import { ago } from "../../lib/format.ts";
+import { ago, plural } from "../../lib/format.ts";
 import { hostsCount, lineError } from "./Tools.model.ts";
 
 // what the form holds: text as typed, empty for none
@@ -108,6 +108,27 @@ export function backendLine(backend: SandboxBackend): string {
     ? "Commands run in an OpenShell sandbox, one per chat or run."
     : "Commands run in the built-in shell, inside the server.";
 }
+
+// the projects that pick their own shell over this one, null for none
+export function overridesLine(
+  overrides: SandboxResponse["overrides"],
+): string | null {
+  const total = overrides.builtin + overrides.openshell;
+  if (total === 0) return null;
+  const parts = (["builtin", "openshell"] as const)
+    .filter((backend) => overrides[backend] > 0)
+    .map((backend) => `${overrides[backend]} ${backend}`);
+  return `${plural(total, "project")} ${
+    total === 1 ? "picks its" : "pick their"
+  } own shell: ${parts.join(", ")}.`;
+}
+
+// the gateway, image and network are the sandbox's: shown while the
+// shell picked is OpenShell or a project runs openshell over Built-in
+export const gatewayShown = (
+  backend: SandboxBackend,
+  overrides: SandboxResponse["overrides"],
+): boolean => backend === "openshell" || overrides.openshell > 0;
 
 // why the saved sandbox shell is not running, null while it runs or
 // the built-in one is picked
