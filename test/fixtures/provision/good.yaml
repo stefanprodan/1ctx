@@ -91,6 +91,7 @@ metadata:
 spec:
   backend: builtin
   endpoint: https://gateway.test:17670
+  variant: bun
   image: null
 ---
 apiVersion: config.1ctx.dev/v1

@@ -71,8 +71,9 @@ they name.
 - **`Sandbox` is the instance's one sandbox shell setting**
   (`docs/sandbox.md`). A second `Sandbox` document is refused, and any
   name updates the row the database made, so it is never created.
-  `backend` (`builtin` or `openshell`), `endpoint`, `image`, `network`
-  (`off` or `hosts`) and `hosts` are optional; `endpoint`, `image` and
+  `backend` (`builtin` or `openshell`), `endpoint`, `variant`
+  (`python`, `bun`, `go` or `rust`), `image`, `network` (`off` or
+  `hosts`) and `hosts` are optional; `endpoint`, `image` and
   `hosts` take null, null hosts being the defaults. Validation refuses
   an endpoint that is not an https origin, a host the sandbox does not
   take (`docs/sandbox.md`) and, for `backend: openshell`, a missing

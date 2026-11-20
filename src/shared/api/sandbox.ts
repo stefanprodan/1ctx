@@ -9,6 +9,7 @@ import type {
   SandboxKeyRole,
   SandboxNetwork,
   SandboxSettings,
+  SandboxVariant,
 } from "../contracts/sandbox.ts";
 
 // GET /api/admin/sandbox, and what PUT answers. keys: whether each of
@@ -16,8 +17,8 @@ import type {
 // next command runs in a sandbox (backend openshell, an endpoint, every key)
 export type SandboxResponse = {
   settings: SandboxSettings;
-  // the image run when settings.image is null
-  defaultImage: string;
+  // the image each variant runs when settings.image is null
+  defaultImages: Record<SandboxVariant, string>;
   // the sandbox_label a Docker gateway serving this instance must set
   gatewayLabel: string;
   keys: Record<SandboxKeyRole, boolean>;
@@ -28,13 +29,14 @@ export type SandboxResponse = {
 
 // PUT /api/admin/sandbox: fields left out stay. endpoint must be an
 // https origin; null takes it off, which the builtin backend allows alone.
-// image null runs the default. Backend openshell needs an endpoint and every
+// image null runs the variant's default image. Backend openshell needs an endpoint and every
 // key file, else a 400. hosts: at most MAX_SANDBOX_HOSTS, each a host or
 // a wildcard (shared/sandbox-net.ts); null takes the defaults, and the
 // hosts network needs one at least
 export type PutSandboxRequest = {
   backend?: SandboxBackend;
   endpoint?: string | null;
+  variant?: SandboxVariant;
   image?: string | null;
   network?: SandboxNetwork;
   hosts?: string[] | null;

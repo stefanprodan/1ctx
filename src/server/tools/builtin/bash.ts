@@ -5,6 +5,7 @@
 // execution takes its identity only from the runner's call context.
 
 import type { HttpMethod } from "../../../shared/contracts/credential.ts";
+import type { SandboxVariant } from "../../../shared/contracts/sandbox.ts";
 import type { SandboxNet } from "../../../shared/sandbox-net.ts";
 import type { WebSnapshot } from "../../../shared/web.ts";
 import {
@@ -29,6 +30,7 @@ import type {
 } from "../types.ts";
 import { domainWords } from "../web.ts";
 import { durationWords } from "./automation-text.ts";
+import { type ShellTools, shellTools } from "./shell-tools.ts";
 
 // what a command asks of the credentials area: the row as it is now and
 // the key its file holds now
@@ -214,6 +216,9 @@ export type BashToolOptions = {
   // shell and OpenShell's rules, so the description says what differs.
   // null is the built-in shell; bash's own word when not given
   sandbox?: SandboxNet | null;
+  // the sandbox image's variant, whose tools the description names;
+  // null for a custom image. bash's own word when not given
+  variant?: SandboxVariant | null;
   // how long a command may run under the sandbox shell; bash's own
   // word when not given
   commandSeconds?: number;
@@ -230,11 +235,15 @@ export function offeredShell(
   shell: OfferedShell | undefined,
   // the send's project, whose shell gives the network
   projectId: string | null = null,
-): Pick<BashToolOptions, "sandbox" | "commandSeconds"> {
+): Pick<BashToolOptions, "sandbox" | "variant" | "commandSeconds"> {
   if (shell === undefined) return {};
   return {
     sandbox:
       shell.sandbox === true ? (bash?.sandbox?.(projectId) ?? NO_NET) : null,
+    // read with the network, so the words name the sandbox's own tools
+    ...(shell.sandbox === true && bash?.sandboxVariant !== undefined
+      ? { variant: bash.sandboxVariant(projectId) }
+      : {}),
     ...(shell.commandSeconds === undefined
       ? {}
       : { commandSeconds: shell.commandSeconds }),
@@ -258,13 +267,14 @@ const SANDBOX_OPEN =
   "open <file> shows a file to the user: HTML and SVG as visuals, Markdown rendered. ";
 
 function sandboxWords(
+  tools: ShellTools,
   idleMinutes: number,
   promisedMs: number,
   open: boolean,
   network: string,
 ): string {
   const idle = `${idleMinutes} idle minute${idleMinutes === 1 ? "" : "s"}`;
-  return `Run a bash command in this chat's Linux sandbox: Python 3.15 with uv, Bun, git, jq, yq and rg; no node. /knowledge is the project's shared docs, saved as a new version when the command ends; if someone else changed a file meanwhile, nothing is saved: read it again and retry. /uploads holds the user's attachments, read-only. /tmp and $HOME are yours until the sandbox is recycled (after ${idle}, a restart, a timeout or a failed save), so keep what must last in /knowledge. Search before reading: rg -il 'word' /knowledge, grep -n, sed -n '40,120p'. Never print whole files or trees; long output is cut. Each call is a new shell in the last directory: chain one task's steps in one call, and make independent calls in parallel. A call may run ${durationWords(promisedMs)}; send a background job's output to a file. Install with uv run --with pkg, a venv under $HOME, or bun add in a project under $HOME. ${open ? SANDBOX_OPEN : ""}${network} Never write secrets.`;
+  return `Run a bash command in this chat's Linux sandbox: ${tools.tools}. /knowledge is the project's shared docs, saved as a new version when the command ends; if someone else changed a file meanwhile, nothing is saved: read it again and retry. /uploads holds the user's attachments, read-only. /tmp and $HOME are yours until the sandbox is recycled (after ${idle}, a restart, a timeout or a failed save), so keep what must last in /knowledge. Search before reading: rg -il 'word' /knowledge, grep -n, sed -n '40,120p'. Never print whole files or trees; long output is cut. Each call is a new shell in the last directory: chain one task's steps in one call, and make independent calls in parallel. A call may run ${durationWords(promisedMs)}; send a background job's output to a file. Install with ${tools.install}. ${open ? SANDBOX_OPEN : ""}${network} Never write secrets.`;
 }
 
 // a send's bash description as a subagent's, whatever was added after:
@@ -296,6 +306,7 @@ export function makeBashTool({
   docs = true,
   subagent = false,
   sandbox = bash?.sandbox?.() ?? null,
+  variant = bash?.sandboxVariant ? bash.sandboxVariant() : "python",
   commandSeconds = bash?.sandboxCommandSeconds?.() ?? COMMAND_SECONDS,
   idleMinutes = bash?.sandboxIdleMinutes?.() ?? IDLE_MINUTES,
   deadlineMs = null,
@@ -316,6 +327,7 @@ export function makeBashTool({
     description:
       sandbox !== null
         ? sandboxWords(
+            shellTools(variant),
             idleMinutes,
             promisedMs,
             !subagent,

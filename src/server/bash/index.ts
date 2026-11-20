@@ -7,6 +7,7 @@
 // to both land in one transaction.
 
 import type { KnowledgeAuthor } from "../../shared/contracts/knowledge.ts";
+import type { SandboxVariant } from "../../shared/contracts/sandbox.ts";
 import type { SandboxNet } from "../../shared/sandbox-net.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -46,6 +47,9 @@ export type BashDeps = {
   shell?(builtin: ShellBackend, projectId: string | null): ShellBackend;
   // the sandbox shell's network setting; off without it
   sandboxNet?(): SandboxNet;
+  // the variant a project's sandbox runs, null for a custom image;
+  // python without it
+  sandboxVariant?(projectId: string | null): SandboxVariant | null;
   // each phase a command's worker reports, by chat; a test waits on it
   onCommandPhase?(sessionId: string, phase: "run" | "diff"): void;
   // a process slot, acquireProcess unless a test watches the waits
@@ -59,6 +63,9 @@ export type BashCapability = {
   // so the tool's description says what differs; null under just-bash.
   // Without a project, the instance's shell
   sandbox?(projectId?: string | null): SandboxNet | null;
+  // the image variant of that sandbox, so the description names its
+  // tools; null for a custom image
+  sandboxVariant?(projectId?: string | null): SandboxVariant | null;
   // how long a command may run under the sandbox shell, and an unused
   // sandbox is kept
   sandboxCommandSeconds?(): number;
@@ -103,7 +110,11 @@ export type BashCapability = {
 // shell's words
 export type BashToolPort = Pick<
   BashCapability,
-  "run" | "sandbox" | "sandboxCommandSeconds" | "sandboxIdleMinutes"
+  | "run"
+  | "sandbox"
+  | "sandboxVariant"
+  | "sandboxCommandSeconds"
+  | "sandboxIdleMinutes"
 >;
 export type BashArea = BashCapability & {
   scratch: ScratchStore;
@@ -124,6 +135,8 @@ export function bashArea(deps: BashDeps): BashArea {
       pick !== undefined && pick(builtin, projectId ?? null) !== builtin
         ? (deps.sandboxNet?.() ?? { mode: "off", hosts: [] })
         : null,
+    sandboxVariant: (projectId) =>
+      deps.sandboxVariant ? deps.sandboxVariant(projectId ?? null) : "python",
     sandboxCommandSeconds: () => deps.limits.current().sandboxCommandSeconds,
     sandboxIdleMinutes: () => deps.limits.current().sandboxIdleMinutes,
     run: (projectId, workspace, author, command, caps, signal, sendId) =>

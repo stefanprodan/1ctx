@@ -5,6 +5,7 @@ import type {
   SandboxBackend,
   SandboxNetwork,
   SandboxSettings,
+  SandboxVariant,
 } from "../../shared/contracts/sandbox.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -12,6 +13,7 @@ import { newId } from "../lib/ids.ts";
 type Raw = {
   backend: SandboxBackend;
   endpoint: string | null;
+  variant: SandboxVariant;
   image: string | null;
   instance_id: string | null;
   network: SandboxNetwork;
@@ -21,7 +23,7 @@ type Raw = {
 
 export type SavedFields = Pick<
   SandboxSettings,
-  "backend" | "endpoint" | "image" | "network" | "hosts"
+  "backend" | "endpoint" | "variant" | "image" | "network" | "hosts"
 >;
 
 // the one settings row, made by its migration; the instance id at its
@@ -43,6 +45,7 @@ export class SandboxStore {
     return {
       backend: raw.backend,
       endpoint: raw.endpoint,
+      variant: raw.variant,
       image: raw.image,
       network: raw.network,
       hosts: raw.hosts === null ? null : (JSON.parse(raw.hosts) as string[]),
@@ -54,7 +57,7 @@ export class SandboxStore {
   private raw(): Raw {
     return this.db
       .query<Raw, []>(
-        "select backend, endpoint, image, instance_id, network, hosts, updated_at from sandbox_settings where id = 1",
+        "select backend, endpoint, variant, image, instance_id, network, hosts, updated_at from sandbox_settings where id = 1",
       )
       .get()!;
   }
@@ -63,13 +66,14 @@ export class SandboxStore {
     this.db
       .query(
         `update sandbox_settings
-           set backend = ?, endpoint = ?, image = ?, network = ?, hosts = ?,
-               updated_at = ?
+           set backend = ?, endpoint = ?, variant = ?, image = ?,
+               network = ?, hosts = ?, updated_at = ?
          where id = 1`,
       )
       .run(
         fields.backend,
         fields.endpoint,
+        fields.variant,
         fields.image,
         fields.network,
         fields.hosts === null ? null : JSON.stringify(fields.hosts),

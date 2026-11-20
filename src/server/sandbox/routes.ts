@@ -48,6 +48,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         const next = {
           backend: body.backend ?? held.backend,
           endpoint: body.endpoint === undefined ? held.endpoint : body.endpoint,
+          variant: body.variant ?? held.variant,
           image: body.image === undefined ? held.image : body.image,
           network: body.network ?? held.network,
           hosts: body.hosts === undefined ? held.hosts : body.hosts,
@@ -66,6 +67,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         deps.store.save(next, deps.clock());
         deps.log.info("sandbox settings saved", {
           backend: next.backend,
+          variant: next.variant,
           network: next.network,
         });
         deps.saved();

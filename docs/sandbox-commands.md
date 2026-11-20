@@ -35,8 +35,8 @@ in `docs/sandbox-network.md`.
   retried.
 - **The command runs through the wrapper** with a fresh 128-bit id and
   `SANDBOX_ENV`, as every exec of ours, since OpenShell passes none of
-  the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH`, uv's
-  and bun's, nothing secret. Each of stdout and stderr keeps four
+  the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH`, uv's,
+  bun's, Go's and Rust's, nothing secret. Each of stdout and stderr keeps four
   bytes a character of the result cut plus the longest form of a key
   the send read, so a key the cut crosses is whole for the scrub; the
   rest is drained. A stream cut there is scrubbed, then drops a tail

@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Config / Sandbox: which shell runs the bash tool's commands, the
-// OpenShell gateway and image of the sandbox one, where its commands may
-// connect, and the sandboxes the instance holds, stuck deletes named. The gateway's key files are
-// shown by name only, never their values.
+// OpenShell gateway, image variant or custom image of the sandbox one,
+// where its commands may connect, and the sandboxes the instance holds
+// (SandboxLeases.tsx). The gateway's key files are shown by name only,
+// never their values.
 
 import { type Signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { SandboxResponse } from "../../../shared/api/sandbox.ts";
-import type { LeaseRow } from "../../../shared/contracts/sandbox.ts";
 import { zoneStep } from "../../app/zones.ts";
 import {
   sandbox,
@@ -20,20 +20,16 @@ import {
   saveSandbox,
   watchSandboxLeases,
 } from "../../data/sandbox.ts";
-import { BACKEND_OPTIONS } from "../../lib/backends.ts";
+import {
+  BACKEND_OPTIONS,
+  VARIANT_OPTIONS,
+  variantLine,
+} from "../../lib/backends.ts";
 import { count } from "../../lib/format.ts";
-import { useNow } from "../../lib/now.ts";
 import { browserTab, type PollDriver } from "../../lib/poll.ts";
 import { at, type Save, useSave } from "../../lib/save.ts";
 import { FieldError } from "../../ui/FieldError.tsx";
 import { Page } from "../../ui/Page.tsx";
-import {
-  RowsFailed,
-  RowsLine,
-  RowsMeta,
-  RowsNote,
-  RowsTitle,
-} from "../../ui/Rows.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import {
   Setting,
@@ -52,10 +48,7 @@ import {
   gatewayShown,
   HOSTS_HINT,
   keyFiles,
-  leaseAge,
   leaseCounts,
-  leaseSub,
-  leaseWord,
   missingKeys,
   NET_DEFAULTS,
   NETWORK_LINE,
@@ -77,8 +70,8 @@ import {
   sandboxDirty,
   sandboxFieldOf,
   sandboxOn,
-  stuckLine,
 } from "./Sandbox.model.ts";
+import { Leases } from "./SandboxLeases.tsx";
 
 export function Sandbox() {
   return <SandboxView tab={browserTab} />;
@@ -275,13 +268,32 @@ function Shell({
                 hint="The OpenShell gateway's https address."
                 onInput={(endpoint) => set({ endpoint })}
               />
+              <div class="field pair-wide">
+                <span class="label">Variant</span>
+                <Seg
+                  label="Variant"
+                  name="variant"
+                  value={d.variant}
+                  invalid={save.fieldError("variant") !== null}
+                  options={VARIANT_OPTIONS.map((o) => ({
+                    ...o,
+                    disabled: save.busy,
+                  }))}
+                  onPick={(variant) => set({ variant })}
+                />
+                {save.fieldError("variant") !== null ? (
+                  <FieldError save={save} field="variant" />
+                ) : (
+                  <span class="hint">{variantLine(d.variant)}</span>
+                )}
+              </div>
               <Text
                 label="Image"
                 field="image"
                 draft={d}
                 save={save}
-                placeholder={state.defaultImage}
-                hint="Empty runs the default image."
+                placeholder={state.defaultImages[d.variant]}
+                hint="Empty runs the variant's image. A custom image replaces the variant."
                 onInput={(image) => set({ image })}
               />
             </>
@@ -383,88 +395,6 @@ function Network({ state }: { state: SandboxResponse }) {
         </div>
       </Setting>
     </SettingForm>
-  );
-}
-
-function Leases({
-  rows,
-  failed,
-  on,
-}: {
-  rows: LeaseRow[] | null;
-  failed: boolean;
-  on: boolean;
-}) {
-  const now = useNow(30_000);
-  return (
-    <Setting
-      list
-      title="Sandboxes"
-      count={rows === null ? undefined : String(rows.length)}
-      line="What the gateway runs for this instance, oldest first."
-    >
-      {rows === null ? (
-        failed ? (
-          <RowsFailed
-            failure={{
-              words: "The sandboxes did not load.",
-              status: null,
-            }}
-          />
-        ) : (
-          <RowsNote>Loading the sandboxes.</RowsNote>
-        )
-      ) : (
-        <>
-          {failed && (
-            <RowsNote>
-              The list could not be read again. It shows the last answer.
-            </RowsNote>
-          )}
-          <LeaseRows rows={rows} on={on} now={now} />
-        </>
-      )}
-    </Setting>
-  );
-}
-
-function LeaseRows({
-  rows,
-  on,
-  now,
-}: {
-  rows: LeaseRow[];
-  on: boolean;
-  now: number;
-}) {
-  return (
-    <>
-      {rows.length === 0 ? (
-        <RowsNote>
-          {on ? "No sandboxes yet." : "No sandboxes. The built-in shell runs."}
-        </RowsNote>
-      ) : (
-        rows.map((row) => {
-          const stuck = stuckLine(row);
-          return (
-            <RowsLine key={row.sandbox}>
-              <RowsTitle
-                name={row.sandbox}
-                mono
-                sub={leaseSub(row)}
-                lines={
-                  stuck === null ? undefined : [{ text: stuck, bad: true }]
-                }
-                wrap={stuck !== null}
-              />
-              <RowsMeta bad={stuck !== null} under={leaseAge(row, now)}>
-                {leaseWord(row.state)}
-              </RowsMeta>
-            </RowsLine>
-          );
-        })
-      )}
-    </>
   );
 }
 

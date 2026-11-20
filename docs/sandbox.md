@@ -17,7 +17,8 @@ only to the gateway, over gRPC with mutual TLS.
 
 - **One row, `sandbox_settings`, made by its migration.** The backend
   (`builtin` by default, or `openshell`), the gateway endpoint, the
-  image, the network (`hosts` by default, or `off`), the hosts (JSON,
+  image variant (`python` by default, `bun`, `go` or `rust`), the
+  custom image, the network (`hosts` by default, or `off`), the hosts (JSON,
   null for the defaults), and the instance id. The id is random, made at the row's
   first read and never changed; the migration leaves it null, so a
   database built from the migrations alone is the same file each time.
@@ -31,9 +32,23 @@ only to the gateway, over gRPC with mutual TLS.
   files `openshell-gateway-ca.key`, `openshell-gateway-cert.key` and
   `openshell-gateway-key.key`, PEM. A route says only whether each is
   there.
-- **Image null runs the default**, `ghcr.io/stefanprodan/1ctx-shell`
-  tagged with the binary's version for a release, `dev` for a source
-  run or a dev build, so an upgrade moves it along.
+- **Image null runs the variant's default**,
+  `ghcr.io/stefanprodan/1ctx-shell:<version>-<variant>` for a release,
+  `dev-<variant>` for a source run or a dev build (`defaultImage()`),
+  so an upgrade moves it along. The server never runs a moving tag:
+  `SANDBOX_ENV` and the image's layout ship together. A custom image
+  runs as saved and the variant is kept but ignored (`imageOf()`).
+  `defaultImages` in the GET answer names each variant's. An instance
+  on the default image before the variants, which held Bun, runs
+  `python` until an admin picks `bun`.
+- **Bash's description names the variant's tools.** `variant()`
+  answers the effective variant, null for a custom image, and
+  `offeredShell()` reads it with the network, so a turn's words and its
+  sandbox agree. `tools/builtin/shell-tools.ts` holds one row per
+  variant (its tools line and install hint, at the Dockerfile's
+  versions) and the custom image's: Python 3 with uv, and `command -v`
+  for the rest. A test reads the Dockerfile's `FROM` tag and version
+  args and fails when a row disagrees.
 - **A project may pick its own backend** (`projects.backend`,
   `builtin` or `openshell`); null follows the instance's. The sandbox
   area reads it through a port from `compose.ts`, since projects sit
@@ -49,7 +64,8 @@ only to the gateway, over gRPC with mutual TLS.
   the keys and the image. It is made when a command needs it, at a
   save while the instance or a project runs `openshell`, and at start
   whenever a gateway is saved, so its sweep takes what an earlier run
-  left. A save that changes the endpoint, a key or the image drains the
+  left. A save that changes the endpoint, a key, the variant or the
+  custom image drains the
   old gateway's leases: every sandbox deleted, and so does a key file
   gone, at the next command, and any save while nothing runs
   `openshell`, once a sweep of the manager listed every kind; a new
@@ -143,14 +159,31 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   the image is never refused, and a sandbox without repositories is
   never asked.
 - **Every exec runs with `SANDBOX_ENV`** (`spec.ts`): HOME, `TMPDIR`,
-  `PATH`, uv's settings and bun's (its cache and global packages under
-  HOME, never `/knowledge`, and `DO_NOT_TRACK`). An
-  OpenShell exec sees none of the image's `ENV`.
-- **The image (`deploy/sandbox/Dockerfile`) is uv's Python 3.15 on
-  Debian trixie,** with bash, git, curl, jq, yq, ripgrep and bun. The
-  helpers run `/usr/local/bin/python3 -I -S` and `/usr/bin/bash`.
-  `uv run --python 3.X` downloads another Python into HOME from
-  `releases.astral.sh`, a default host.
+  `PATH` (with `/usr/local/go/bin`, `$HOME/go/bin` and
+  `$HOME/.cargo/bin`), uv's settings, bun's (its cache and global
+  packages under HOME, never `/knowledge`), Go's (`GOPATH`, `GOCACHE`
+  and `GOMODCACHE` under `$HOME/go`, `CGO_ENABLED=1`, `CC=gcc`),
+  `CARGO_HOME` and `RUSTUP_HOME` under HOME, and `DO_NOT_TRACK`. One
+  set for every variant, never branched on it. An OpenShell exec sees
+  none of the image's `ENV`.
+- **The image (`deploy/sandbox/Dockerfile`) is one target per
+  variant.** `base` is uv's Python 3.15 on Debian trixie with bash,
+  git, make, curl, jq, yq and ripgrep, the sandbox user and every root;
+  the helpers run `/usr/local/bin/python3 -I -S` and `/usr/bin/bash`,
+  so every variant keeps it. `python` is `base`; `bun` adds Bun, with
+  `node` and `npx` linked to `bun` and `bunx` (`node --version` is not
+  answered); `cc` (never pushed) adds `gcc` and `libc6-dev`, shared by
+  `go` (Go in `/usr/local/go`) and `rust` (a pinned stable toolchain
+  through `rustup-init`, minimal profile, in `/opt/home/.rustup` and
+  `/opt/home/.cargo`, owned by the sandbox user, since `/usr` is
+  read-only under Landlock and HOME is the container's own disk).
+  `rustup` adds a toolchain or target beside it from
+  `static.rust-lang.org`, and `uv run --python 3.X` another Python
+  from `releases.astral.sh`, both default hosts, into HOME until the
+  sandbox is recycled. Nothing of ours walks, pushes or pulls HOME; the
+  root check only writes and removes its probe file there. Measured
+  locally (`docker images`, linux/arm64, 2026-11-20): python 439 MB,
+  bun 602 MB, go 1.06 GB, rust 1.44 GB.
 - **The policy opens the devices shells and the fence use:**
   `/dev/null`, `/dev/zero`, `/dev/random`, `/dev/tty`, `/dev/ptmx` and
   `/dev/pts` read-write, `/dev/urandom` and `/sys/fs/cgroup` read-only.

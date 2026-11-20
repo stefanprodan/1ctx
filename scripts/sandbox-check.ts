@@ -10,7 +10,8 @@
 // through the gateway at the end; no other sandbox is touched.
 //
 //   bun scripts/sandbox-check.ts --endpoint https://127.0.0.1:17670 \
-//     --ca ca.crt --cert tls.crt --key tls.key [--image 1ctx-shell:dev] \
+//     --ca ca.crt --cert tls.crt --key tls.key [--variant python] \
+//     [--image 1ctx-shell:dev-<variant>] \
 //     [--repo-dir <a folder Docker Desktop shares>]
 //
 // The repository is a fresh folder made under --repo-dir (the system's
@@ -41,6 +42,10 @@ import {
   openshellGateway,
   type SandboxHold,
 } from "../src/server/sandbox/index.ts";
+import {
+  isSandboxVariant,
+  type SandboxVariant,
+} from "../src/shared/contracts/sandbox.ts";
 
 const { values: flags } = parseArgs({
   options: {
@@ -48,16 +53,23 @@ const { values: flags } = parseArgs({
     ca: { type: "string" },
     cert: { type: "string" },
     key: { type: "string" },
-    image: { type: "string", default: "1ctx-shell:dev" },
+    variant: { type: "string", default: "python" },
+    image: { type: "string" },
     "repo-dir": { type: "string" },
   },
 });
-if (!flags.ca || !flags.cert || !flags.key) {
+if (
+  !flags.ca ||
+  !flags.cert ||
+  !flags.key ||
+  !isSandboxVariant(flags.variant)
+) {
   console.error(
-    "usage: --ca <pem> --cert <pem> --key <pem> [--endpoint] [--image] [--repo-dir]",
+    "usage: --ca <pem> --cert <pem> --key <pem> [--endpoint] [--variant python|bun|go|rust] [--image] [--repo-dir]",
   );
   process.exit(2);
 }
+const variant: SandboxVariant = flags.variant;
 
 const encoder = new TextEncoder();
 const instanceId = Array.from(
@@ -108,7 +120,7 @@ const leases = new Leases({
   log,
   gateway,
   instanceId,
-  image: flags.image!,
+  image: flags.image ?? `1ctx-shell:dev-${variant}`,
   limits: () => limits,
   repos: { hold: () => () => {} },
 });
@@ -455,6 +467,22 @@ except Exception as e: print('mem', type(e).__name__)"`,
     "/dev/ptmx opens, as the fence's wait needs",
     (ptmx.answer?.stdout ?? "").includes("ptmx ok"),
     `${brief((ptmx.answer?.stdout ?? "") + (ptmx.answer?.stderr ?? ""))}; fence ${ptmx.steps.find((s) => s.step === "fence")?.ms}ms`,
+  );
+
+  // the variant's toolchain builds with no network, under Landlock's
+  // read-only /usr, its caches and the Rust toolchain in HOME
+  const builds: Record<SandboxVariant, string> = {
+    python: `python3 -c 'print("built", 6 * 7)'`,
+    bun: `node -e 'console.log("built", 6 * 7)'`,
+    go: `mkdir -p "$HOME/cgo" && cd "$HOME/cgo" && printf 'package main\\n\\n// static int twice(int x) { return 2 * x; }\\nimport "C"\\nimport "fmt"\\n\\nfunc main() { fmt.Println("built", C.twice(21)) }\\n' > main.go && go run main.go`,
+    rust: `cd "$HOME" && cargo new -q --offline built && cd built && printf 'fn main() { println!("built {}", 6 * 7); }\\n' > src/main.rs && cargo run -q --offline`,
+  };
+  // in a subshell, so the chat's cwd stays for the steps after
+  const built = await command(chat, `(${builds[variant]})`, 120_000);
+  report(
+    `the ${variant} variant builds and runs a program offline`,
+    (built.answer?.stdout ?? "").includes("built 42"),
+    `${built.total}ms; ${brief((built.answer?.stdout ?? "") + (built.answer?.stderr ?? ""))}`,
   );
 
   const warm = await command(chat, "true");

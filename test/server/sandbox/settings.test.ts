@@ -10,6 +10,7 @@ import { publish } from "../../../src/server/lib/bus.ts";
 import {
   defaultImage,
   INSTANCE_LABEL,
+  imageOf,
   type Leases,
 } from "../../../src/server/sandbox/index.ts";
 import type {
@@ -53,11 +54,18 @@ describe("sandbox settings", () => {
       expect(body.settings).toMatchObject({
         backend: "builtin",
         endpoint: null,
+        variant: "python",
         image: null,
       });
       expect(body.settings.instanceId).toMatch(/^[0-9a-z]{12}$/);
       expect(body.gatewayLabel).toBe(`1ctx-${body.settings.instanceId}`);
-      expect(body.defaultImage).toBe("ghcr.io/stefanprodan/1ctx-shell:dev");
+      expect(body.defaultImages).toEqual({
+        python: "ghcr.io/stefanprodan/1ctx-shell:dev-python",
+        bun: "ghcr.io/stefanprodan/1ctx-shell:dev-bun",
+        go: "ghcr.io/stefanprodan/1ctx-shell:dev-go",
+        rust: "ghcr.io/stefanprodan/1ctx-shell:dev-rust",
+      });
+      expect(app.sandbox.variant()).toBe("python");
       expect(body.keys).toEqual({ ca: true, cert: true, key: true });
       expect(body.active).toBe(false);
       expect(app.sandbox.store.settings().instanceId).toBe(
@@ -416,22 +424,123 @@ describe("sandbox settings", () => {
     );
   });
 
-  test("the default image follows a release's version, a dev build the dev tag", () => {
-    expect(defaultImage("v1.2.3")).toBe(
-      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3",
+  test("the default image follows a release's version and the variant, a dev build the dev tag", () => {
+    expect(defaultImage("v1.2.3", "python")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-python",
     );
-    expect(defaultImage("v1.2.3-rc.1")).toBe(
-      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-rc.1",
+    expect(defaultImage("v1.2.3-rc.1", "go")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-rc.1-go",
     );
     // a hyphen inside the prerelease, as the release workflow allows
-    expect(defaultImage("v1.2.3-rc-hotfix")).toBe(
-      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-rc-hotfix",
+    expect(defaultImage("v1.2.3-rc-hotfix", "rust")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-rc-hotfix-rust",
     );
-    expect(defaultImage("v0.0.0-dev")).toBe(
-      "ghcr.io/stefanprodan/1ctx-shell:dev",
+    expect(defaultImage("v0.0.0-dev", "bun")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:dev-bun",
     );
-    expect(defaultImage("main-abc123")).toBe(
-      "ghcr.io/stefanprodan/1ctx-shell:dev",
+    expect(defaultImage("main-abc123", "python")).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:dev-python",
+    );
+  });
+
+  test("a custom image wins over the variant", () => {
+    expect(imageOf("v1.2.3", "go", null)).toBe(
+      "ghcr.io/stefanprodan/1ctx-shell:v1.2.3-go",
+    );
+    expect(imageOf("v1.2.3", "go", "registry.test/sbx:1")).toBe(
+      "registry.test/sbx:1",
+    );
+  });
+
+  test("the variant is one of four words, and a custom image hides it from bash", async () => {
+    await run(async (app, admin) => {
+      for (const variant of ["node", "", null, 1, "Python"]) {
+        const res = await admin.call("PUT", "/api/admin/sandbox", {
+          body: { variant },
+        });
+        expect(res.status, JSON.stringify(variant)).toBe(400);
+        expect(await res.text()).toContain(
+          "variant must be one of python, bun, go, rust",
+        );
+      }
+      const res = await admin.call("PUT", "/api/admin/sandbox", {
+        body: { variant: "rust" },
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as SandboxResponse;
+      expect(body.settings.variant).toBe("rust");
+      expect(app.sandbox.variant()).toBe("rust");
+      await admin.call("PUT", "/api/admin/sandbox", {
+        body: { image: "registry.test/sbx:1" },
+      });
+      // the variant stays saved, but the custom image's tools are its own
+      expect(app.sandbox.store.settings().variant).toBe("rust");
+      expect(app.sandbox.variant()).toBeNull();
+    });
+  });
+
+  test("a new variant drains the old manager as a new image does", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { backend: "openshell", endpoint: ENDPOINT },
+        });
+        const old = app.sandbox.leases()!;
+        const hold = await old.acquire(
+          {
+            projectId: "project",
+            workspace: { id: "chat", sessionId: "chat" },
+            root: "chat",
+            sendId: "send",
+            subagent: false,
+            repos: [],
+            repoFileBytes: 0,
+            network: false,
+            credentials: [],
+          },
+          app.now.value + 20_000,
+          new AbortController().signal,
+        );
+        if (hold === "busy") throw new Error("busy");
+        expect(fake.creates.map((spec) => spec.image)).toEqual([
+          "ghcr.io/stefanprodan/1ctx-shell:dev-python",
+        ]);
+        // the same variant saved again keeps the manager
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { variant: "python" },
+        });
+        expect(app.sandbox.leases()).toBe(old);
+        await admin.call("PUT", "/api/admin/sandbox", {
+          body: { variant: "go" },
+        });
+        const next = app.sandbox.leases()!;
+        expect(next).not.toBe(old);
+        hold.release();
+        await until(() => fake.deletes.includes(hold.sandbox));
+        const again = await next.acquire(
+          {
+            projectId: "project",
+            workspace: { id: "chat", sessionId: "chat" },
+            root: "chat",
+            sendId: "send2",
+            subagent: false,
+            repos: [],
+            repoFileBytes: 0,
+            network: false,
+            credentials: [],
+          },
+          app.now.value + 20_000,
+          new AbortController().signal,
+        );
+        if (again === "busy") throw new Error("busy");
+        expect(fake.creates.at(-1)?.image).toBe(
+          "ghcr.io/stefanprodan/1ctx-shell:dev-go",
+        );
+        again.release();
+      },
+      KEYS,
+      fake,
     );
   });
 });

@@ -11,8 +11,10 @@ import { randomBytes } from "node:crypto";
 import type { SandboxResponse } from "../../shared/api/sandbox.ts";
 import {
   SANDBOX_KEYS,
+  SANDBOX_VARIANTS,
   type SandboxBackend,
   type SandboxKeyRole,
+  type SandboxVariant,
 } from "../../shared/contracts/sandbox.ts";
 import { type SandboxNet, sandboxNet } from "../../shared/sandbox-net.ts";
 import type { ShellBackend } from "../bash/index.ts";
@@ -27,7 +29,7 @@ import { recyclesOf } from "./events.ts";
 import type { Connect, Gateway, GatewayConfig } from "./gateway.ts";
 import { Leases } from "./leases.ts";
 import { routes } from "./routes.ts";
-import { defaultImage, gatewayLabel } from "./spec.ts";
+import { defaultImage, gatewayLabel, imageOf } from "./spec.ts";
 import { SandboxStore } from "./store.ts";
 
 export type {
@@ -64,6 +66,7 @@ export {
   createSpec,
   defaultImage,
   INSTANCE_LABEL,
+  imageOf,
   KEEP_ALIVE,
   POLICY,
   SANDBOX_ENV,
@@ -101,6 +104,9 @@ export type Sandbox = {
   shell(builtin: ShellBackend, projectId?: string | null): ShellBackend;
   // the network a command in a sandbox runs under
   net(): SandboxNet;
+  // the variant of the image a project's next sandbox runs, null for a
+  // custom image, whose tools are its own
+  variant(projectId?: string | null): SandboxVariant | null;
   // the current gateway's leases, null while no backend asks for it
   // and none is left to sweep
   leases(): Leases | null;
@@ -150,7 +156,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     if (held.endpoint === null) return null;
     const { ca, cert, key } = keys();
     if (ca === null || cert === null || key === null) return null;
-    const image = held.image ?? defaultImage(deps.version);
+    const image = imageOf(deps.version, held.variant, held.image);
     return { endpoint: held.endpoint, ca, cert, key, image };
   };
   // a project's backend, its own over the instance's
@@ -182,9 +188,9 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     else current.leases.poke();
   };
   // the leases of the gateway the settings name, made only when create
-  // asks: a new endpoint, key or image deletes every sandbox of the old
-  // one, and so does a key file gone. One manager serves every project,
-  // so a project's change never makes one
+  // asks: a new endpoint, key or image (a variant names one) deletes
+  // every sandbox of the old one, and so does a key file gone. One
+  // manager serves every project, so a project's change never makes one
   const ensure = (create: boolean, next = config()): Leases | null => {
     const key = next === null ? "" : JSON.stringify(next);
     if (current !== null && current.key === key) return current.leases;
@@ -265,7 +271,12 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     const held = keys();
     return {
       settings,
-      defaultImage: defaultImage(deps.version),
+      defaultImages: Object.fromEntries(
+        SANDBOX_VARIANTS.map((variant) => [
+          variant,
+          defaultImage(deps.version, variant),
+        ]),
+      ) as Record<SandboxVariant, string>,
       gatewayLabel: gatewayLabel(settings.instanceId),
       keys: {
         ca: held.ca !== null,
@@ -321,6 +332,10 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       return ensure(true, next) === null ? builtin : backend;
     },
     net: () => sandboxNet(store.settings()),
+    variant: () => {
+      const held = store.settings();
+      return held.image === null ? held.variant : null;
+    },
     leases: () => ensure(wanted()),
     async start() {
       running = true;

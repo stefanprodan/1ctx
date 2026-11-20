@@ -11,9 +11,12 @@ import {
   isSandboxBackend,
   isSandboxImage,
   isSandboxNetwork,
+  isSandboxVariant,
   SANDBOX_KEYS,
+  SANDBOX_VARIANTS,
   type SandboxBackend,
   type SandboxNetwork,
+  type SandboxVariant,
 } from "../../shared/contracts/sandbox.ts";
 import {
   foldDefaults,
@@ -29,7 +32,8 @@ export type SandboxSpec = {
   backend?: SandboxBackend;
   // null takes it off; the builtin backend alone allows that
   endpoint?: string | null;
-  // null runs the default image
+  variant?: SandboxVariant;
+  // null runs the variant's default image; a custom one replaces it
   image?: string | null;
   network?: SandboxNetwork;
   // null takes the defaults; stored sorted
@@ -73,6 +77,10 @@ export function sandboxSpec(value: unknown): SandboxSpec {
       isGatewayEndpoint,
       "must be null or an https origin (https://host:port)",
     ),
+    variant: guarded(
+      isSandboxVariant,
+      `must be one of ${SANDBOX_VARIANTS.join(", ")}`,
+    ),
     image: orNull(isSandboxImage, "must be null or an image reference"),
     network: guarded(isSandboxNetwork, "must be off or hosts"),
     hosts,
@@ -106,6 +114,7 @@ export async function applySandbox(
   for (const field of [
     "backend",
     "endpoint",
+    "variant",
     "image",
     "network",
     "hosts",

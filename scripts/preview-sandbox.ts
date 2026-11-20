@@ -4,7 +4,9 @@
 // The preview's side of its OpenShell gateway, for scripts/preview.sh:
 //
 //   id <url> <secrets>                        the instance id, from the admin route
-//   configure <url> <secrets> <endpoint> <image>  the sandbox shell turned on
+//   image <url> <secrets>                     the default image of the saved variant
+//   configure <url> <secrets> <endpoint>      the sandbox shell turned on, on
+//                                             the variant's default image
 //   sweep <tls-dir> <endpoint> <instance id>  every sandbox and provider under
 //                                             the instance label deleted
 //
@@ -147,17 +149,26 @@ switch (command) {
     console.log(answer.settings.instanceId);
     break;
   }
+  case "image": {
+    const [url, secrets] = args;
+    if (!url || !secrets) fail("usage: image <url> <secrets>");
+    const answer = await call(url, await signIn(url, secrets), "GET");
+    console.log(answer.defaultImages[answer.settings.variant]);
+    break;
+  }
   case "configure": {
-    const [url, secrets, endpoint, image] = args;
-    if (!url || !secrets || !endpoint || !image) {
-      fail("usage: configure <url> <secrets> <endpoint> <image>");
+    const [url, secrets, endpoint] = args;
+    if (!url || !secrets || !endpoint) {
+      fail("usage: configure <url> <secrets> <endpoint>");
     }
+    // no custom image, so the description names the variant's tools
     const answer = await call(url, await signIn(url, secrets), "PUT", {
       backend: "openshell",
       endpoint,
-      image,
+      image: null,
     });
     if (!answer.active) fail("the sandbox shell did not turn on");
+    const image = answer.defaultImages[answer.settings.variant];
     console.log(`sandbox shell on, gateway ${endpoint}, image ${image}`);
     break;
   }
@@ -170,7 +181,7 @@ switch (command) {
     break;
   }
   default:
-    fail("usage: preview-sandbox.ts id|configure|sweep");
+    fail("usage: preview-sandbox.ts id|image|configure|sweep");
 }
 // the gateway's http2 session would hold the process open
 process.exit(0);
