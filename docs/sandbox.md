@@ -64,10 +64,10 @@ only to the gateway, over gRPC with mutual TLS.
   GET answer is the instance's alone; `overrides` counts the projects
   that pick each backend.
 - **One gateway manager serves every project,** keyed by the endpoint,
-  the keys and the instance's image. It is made when a command needs it, at a
-  save while the instance or a project runs `openshell`, and at start
-  whenever a gateway is saved, so its sweep takes what an earlier run
-  left. A save that changes the endpoint, a key, the variant or the
+  the keys and the instance's image. It is made when a command needs
+  it, at a save while the instance or a project runs `openshell`, and
+  at start whenever a gateway is saved, so its sweep takes what an
+  earlier run left. A save that changes the endpoint, a key, the variant or the
   custom image drains the
   old gateway's leases: every sandbox deleted, and so does a key file
   gone, at the next command, and any save while nothing runs
@@ -82,13 +82,11 @@ only to the gateway, over gRPC with mutual TLS.
   (`projectsChanged()`); whether any project runs `openshell` is one
   indexed lookup, since it is asked often.
 - **A lease carries the image it was made from** (`Lease.image`), its
-  project's (`imageOf`, read again at each pass of the lease loop). A
-  command whose project now names another image than its chat's
-  sandbox lets that one go once its commands end, as other
-  repositories do, and gets a sandbox of the new image; other
-  projects' sandboxes stay. A project's variant change drains nothing.
-  The warm pool makes the instance's image alone, so a lease of
-  another image is made cold.
+  project's (`imageOf`, read at each pass of the lease loop). A command
+  whose project now names another image lets its chat's sandbox go
+  once its commands end, as other repositories do, and gets one of the
+  new image; other projects' sandboxes stay, and nothing drains. The
+  warm pool makes the instance's image alone; another is made cold.
 - **The hosts are the sandbox's own, never Web access's list.**
   `shared/sandbox-net.ts` parses them for the page and the route: at
   most 200, each a host name (an IDN in its ASCII form) or an OpenShell
@@ -159,10 +157,10 @@ sizes of when it was made. No limit of ours bounds its disk (below).
 - **The image's first sandbox is checked for every root** (`roots.ts`),
   since Landlock skips a missing path: each writable root a folder that
   takes a file, `/repos` a folder. A manager checks each image until
-  one of its sandboxes passes (`ImageChecks`); a failed check refuses
-  that image's commands for good with the image named, and for the
-  instance's image the pool too, shown as the leases route's
-  `refused`.
+  one sandbox passes (`ImageChecks`); a failure refuses that image's
+  commands for good, naming it, so a project variant's image refuses
+  that project's alone. Only the instance's stops the pool and shows as
+  the leases route's `refused`.
 - **A sandbox made with repositories lists each once** (`binds.ts`),
   after the root check, since some Docker hosts bind one so every read
   under it is refused (Docker Desktop on the Apple Virtualization

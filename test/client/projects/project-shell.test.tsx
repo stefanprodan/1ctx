@@ -196,6 +196,9 @@ describe("the select", () => {
   test("the admin page's cards hold the selects in their heads", () => {
     const html = render(<ProjectShell project={team} section={false} edit />);
     expect(html.match(/setting-title/g)?.length).toBe(2);
+    expect(html).toContain(">Variant<");
+    expect(html).toContain('aria-label="Shell variant"');
+    expect(html).toContain('aria-label="Shell backend"');
     expect(html.match(/project-shell-pick/g)?.length).toBe(2);
     expect(html).toContain(SHELL_TEXT);
     expect(html).toContain(VARIANT_TEXT);

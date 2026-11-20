@@ -70,7 +70,7 @@ its MCP servers (`views/projects/McpServers.tsx`,
   detail's `instanceBackend`, then Built-in and OpenShell, the Sandbox
   page's words (`shellOptions()`); the default sends null.
 - **The image variant is a second select beside it,** a Variant field
-  in the section and a Shell variant card on the admin page:
+  in the section and a Variant card on the admin page:
   `Instance default (<variant>)` from the detail's `instanceVariant`,
   `custom image` while that is null, then the four variants
   (`variantOptions()`). Its hint names the effective variant's tools,
@@ -84,6 +84,6 @@ its MCP servers (`views/projects/McpServers.tsx`,
   shows another user's personal project, so its shell is set through
   the API alone.
 - **Anyone else reads the values,** a personal project's owner included,
-  in the same selects, disabled, with "An admin sets it." under it. A
-  refused write is the hint's error line on the tab, the card's line on
-  the admin page.
+  in the same selects, disabled: "An admin sets it." under the backend,
+  the variant's tools hint under the variant. A refused write is the
+  hint's error line on the tab, the card's line on the admin page.

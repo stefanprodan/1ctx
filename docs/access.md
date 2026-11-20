@@ -266,8 +266,8 @@ from `emailOn` in `GET /api/me`.
   on `PATCH /api/projects/:id`, the only fields that route takes for a
   personal project, whose name and description stay a 404 there. On
   another user's personal project it answers `{ id, backend, variant }`
-  alone, never the detail the admin may not read. Anyone who sees the project reads it, with the instance's, in
-  the detail.
+  alone, never the detail the admin may not read. Anyone who sees the
+  project reads it, with the instance's, in the detail.
 - **Removing a member drops their waiting messages in the same
   transaction.** If they lose visibility, it also unclaims their
   external tasks there. An admin made a member unclaims external tasks

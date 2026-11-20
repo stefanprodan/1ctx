@@ -70,7 +70,7 @@ export function ProjectShell({
   );
   const variantSelect = (small: boolean) => (
     <Select
-      label="Image variant"
+      label="Shell variant"
       name="variant"
       small={small}
       value={variant}
@@ -122,7 +122,7 @@ export function ProjectShell({
         action={<span class="project-shell-pick">{backendSelect(true)}</span>}
       />
       <Setting
-        title="Shell variant"
+        title="Variant"
         line={
           variantFailed !== null ? (
             <span class="error">{variantFailed}</span>
