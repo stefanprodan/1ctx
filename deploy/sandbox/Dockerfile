@@ -80,7 +80,8 @@ ARG BUN_SHA256_AMD64=bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fcc
 ARG BUN_SHA256_ARM64=baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e
 ARG TARGETARCH
 USER root
-# node and npx run on Bun, so npm CLIs and #!/usr/bin/env node scripts work
+# node and npx run on Bun, so npm CLIs and #!/usr/bin/env node scripts
+# work. Bun is bunx only when called by that name, so npx is a wrapper
 RUN set -eu; \
     case "$TARGETARCH" in \
       amd64) bun=bun-linux-x64; bun_sha=$BUN_SHA256_AMD64 ;; \
@@ -95,7 +96,8 @@ RUN set -eu; \
     chmod 0755 /usr/local/bin/bun; \
     ln -s bun /usr/local/bin/bunx; \
     ln -s bun /usr/local/bin/node; \
-    ln -s bunx /usr/local/bin/npx; \
+    printf '#!/bin/sh\nexec /usr/local/bin/bun x "$@"\n' > /usr/local/bin/npx; \
+    chmod 0755 /usr/local/bin/npx; \
     rm -r /tmp/bun.zip /tmp/bun
 USER sandbox
 

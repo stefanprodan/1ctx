@@ -39,6 +39,9 @@ jobs:
             echo "tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH[-PRERELEASE]" >&2
             exit 1
           fi
+      # every stage runs on the target platform: arm64 needs emulation
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Setup Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Log in to GHCR

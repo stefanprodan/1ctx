@@ -706,7 +706,8 @@ async function toolchain() {
       [
         `printf 'bun '; bun --version`,
         `printf 'node '; node -e 'console.log(process.versions.bun)'`,
-        `printf 'npx '; npx --version`,
+        // a real package, since plain bun also answers --version
+        `printf 'npx '; npx cowsay npx-ok 2>&1 | grep -c 'npx-ok'`,
         `mkdir -p "$HOME/bun-check" && cd "$HOME/bun-check"`,
         `printf '{"name":"bun-check","private":true}' > package.json`,
         `printf 'import { z } from "zod";\\nconsole.log(z.string().parse("zod-ok"));\\n' > x.ts`,
@@ -720,10 +721,10 @@ async function toolchain() {
     );
     const n = bun.raw;
     report(
-      "bun 1.4.4 answers, and node and npx run on it",
+      "bun 1.4.4 answers, node runs on it and npx runs a package from npm",
       lineOf(n, "bun") === "bun 1.4.4" &&
         lineOf(n, "node") === "node 1.4.4" &&
-        lineOf(n, "npx") === "npx 1.4.4",
+        lineOf(n, "npx") === "npx 1",
       ["bun", "node", "npx"].map((label) => lineOf(n, label)).join(", "),
     );
     report(

@@ -43,8 +43,10 @@ only to the gateway, over gRPC with mutual TLS.
   `python` until an admin picks `bun`.
 - **Bash's description names the variant's tools.** `variant()`
   answers the effective variant, null for a custom image, and
-  `offeredShell()` reads it with the network, so a turn's words and its
-  sandbox agree. `tools/builtin/shell-tools.ts` holds one row per
+  `offeredShell()` reads it at the turn's start, as it reads the
+  network; a variant saved mid-turn drains the manager, so the turn's
+  later commands run the new variant under the old words, as with an
+  image or network change. `tools/builtin/shell-tools.ts` holds one row per
   variant (its tools line and install hint, at the Dockerfile's
   versions) and the custom image's: Python 3 with uv, and `command -v`
   for the rest. A test reads the Dockerfile's `FROM` tag and version
@@ -171,8 +173,8 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   git, make, curl, jq, yq and ripgrep, the sandbox user and every root;
   the helpers run `/usr/local/bin/python3 -I -S` and `/usr/bin/bash`,
   so every variant keeps it. `python` is `base`; `bun` adds Bun, with
-  `node` and `npx` linked to `bun` and `bunx` (`node --version` is not
-  answered); `cc` (never pushed) adds `gcc` and `libc6-dev`, shared by
+  `node` linked to `bun` (`node --version` is not answered) and `npx`
+  a wrapper running `bun x`; `cc` (never pushed) adds `gcc` and `libc6-dev`, shared by
   `go` (Go in `/usr/local/go`) and `rust` (a pinned stable toolchain
   through `rustup-init`, minimal profile, in `/opt/home/.rustup` and
   `/opt/home/.cargo`, owned by the sandbox user, since `/usr` is
