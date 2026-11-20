@@ -107,6 +107,9 @@ const SALT = randomBytes(32).toString("hex");
 // send binds, whose prefix check must keep refusing %2F
 export const ENCODED_SLASH_HOSTS: readonly string[] = ["registry.npmjs.org"];
 
+// The path ranks the exception above a pathless wildcard covering its
+// host (`**.*.*`): OpenShell refuses the whole policy when overlapping
+// endpoints of one rank disagree on the encoded slash
 const hostEndpoints = (host: string, bound: ReadonlySet<string>) =>
   PORTS.map((port) => ({
     host,
@@ -115,7 +118,7 @@ const hostEndpoints = (host: string, bound: ReadonlySet<string>) =>
     enforcement: ENFORCE,
     rules: allow(HTTP_METHODS, "**"),
     ...(ENCODED_SLASH_HOSTS.includes(host) && !bound.has(host)
-      ? { allowEncodedSlash: true }
+      ? { path: "/**", allowEncodedSlash: true }
       : {}),
   }));
 
