@@ -112,7 +112,10 @@ what the bash tool's description shares with it.
   `%2F` on the hosts of `ENCODED_SLASH_HOSTS` (`netpolicy.ts`), where
   bun and npm ask for a scoped package as `@scope%2fname`. A host a
   credential of the send binds never takes the exception, so its
-  prefix check keeps refusing `%2F`.
+  prefix check keeps refusing `%2F`. The exception's endpoint carries
+  the path `/**`, ranking it over a wildcard covering its host
+  (`**.*.*`): OpenShell refuses a policy whose overlapping endpoints of
+  one rank disagree.
 - A credential's methods hold only on servers that ignore
   method-override headers (`X-HTTP-Method-Override`), which the
   builtin refuses on a signed request.

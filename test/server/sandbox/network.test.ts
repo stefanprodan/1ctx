@@ -120,29 +120,34 @@ describe("the network policy", () => {
     ]);
   });
 
-  test("an encoded slash passes on the npm registry alone, unless a credential binds it", () => {
+  test("an encoded slash passes on the npm registry alone, ranked over a wildcard, unless a credential binds it", () => {
     expect(ENCODED_SLASH_HOSTS).toEqual(["registry.npmjs.org"]);
     const net: SandboxNet = {
       mode: "hosts",
-      hosts: ["registry.npmjs.org", "pypi.org"],
+      hosts: ["registry.npmjs.org", "pypi.org", "**.*.*"],
     };
     const slash = (made: ReturnType<typeof plan>) =>
       (made.network.web as Rule).endpoints.map((endpoint) => [
         endpoint.host,
         endpoint.port,
         endpoint.allowEncodedSlash ?? false,
+        endpoint.path ?? "",
       ]);
     expect(slash(plan(net))).toEqual([
-      ["registry.npmjs.org", 443, true],
-      ["registry.npmjs.org", 80, true],
-      ["pypi.org", 443, false],
-      ["pypi.org", 80, false],
+      ["registry.npmjs.org", 443, true, "/**"],
+      ["registry.npmjs.org", 80, true, "/**"],
+      ["pypi.org", 443, false, ""],
+      ["pypi.org", 80, false, ""],
+      ["**.*.*", 443, false, ""],
+      ["**.*.*", 80, false, ""],
     ]);
     const bound = plan(net, [
       signed({ prefix: "https://registry.npmjs.org/-/npm/" }),
     ]);
     expect(bound.attach).toHaveLength(1);
-    expect(slash(bound).every(([, , open]) => open === false)).toBe(true);
+    expect(slash(bound).every(([, , open, path]) => !open && path === "")).toBe(
+      true,
+    );
     expect(
       (bound.network.cred_quotes as Rule).endpoints[0]!.allowEncodedSlash,
     ).toBeUndefined();
@@ -155,7 +160,7 @@ describe("the network policy", () => {
       },
     ]);
     expect(refused.attach).toHaveLength(0);
-    expect(slash(refused)[0]).toEqual(["registry.npmjs.org", 443, true]);
+    expect(slash(refused)[0]).toEqual(["registry.npmjs.org", 443, true, "/**"]);
   });
 
   test("a credential binds its prefix and denies every method it lacks", () => {
