@@ -87,27 +87,30 @@ export function ProjectShell({
   if (section) {
     return (
       <Section title="Shell" text={SHELL_TEXT}>
-        <div class="field">
-          <span class="label">Backend</span>
-          {backendSelect(false)}
-          {failed !== null ? (
-            <span class="hint error" role="alert">
-              {failed}
-            </span>
-          ) : (
-            !edit && <span class="hint">{SHELL_ADMIN_HINT}</span>
-          )}
-        </div>
-        <div class="field">
-          <span class="label">Variant</span>
-          {variantSelect(false)}
-          {variantFailed !== null ? (
-            <span class="hint error" role="alert">
-              {variantFailed}
-            </span>
-          ) : (
-            <span class="hint">{variantHint(project)}</span>
-          )}
+        {/* both fields in the form's column, beside the head */}
+        <div class="section-form">
+          <div class="field">
+            <span class="label">Backend</span>
+            {backendSelect(false)}
+            {failed !== null ? (
+              <span class="hint error" role="alert">
+                {failed}
+              </span>
+            ) : (
+              !edit && <span class="hint">{SHELL_ADMIN_HINT}</span>
+            )}
+          </div>
+          <div class="field">
+            <span class="label">Variant</span>
+            {variantSelect(false)}
+            {variantFailed !== null ? (
+              <span class="hint error" role="alert">
+                {variantFailed}
+              </span>
+            ) : (
+              <span class="hint">{variantHint(project)}</span>
+            )}
+          </div>
         </div>
       </Section>
     );
