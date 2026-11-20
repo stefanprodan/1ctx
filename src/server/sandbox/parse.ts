@@ -7,8 +7,10 @@ import {
   isSandboxBackend,
   isSandboxImage,
   isSandboxNetwork,
+  isSandboxVariant,
   MAX_GATEWAY_ENDPOINT,
   MAX_SANDBOX_IMAGE,
+  SANDBOX_VARIANTS,
 } from "../../shared/contracts/sandbox.ts";
 import {
   foldDefaults,
@@ -19,10 +21,18 @@ import { fields } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 
 export const ENDPOINT_RULE = `an https origin (https://host:port) of at most ${MAX_GATEWAY_ENDPOINT} characters`;
+export const VARIANT_RULE = `one of ${SANDBOX_VARIANTS.join(", ")}`;
 export const IMAGE_RULE = `an image reference of at most ${MAX_SANDBOX_IMAGE} characters`;
 
 export function parseSandbox(body: unknown): PutSandboxRequest {
-  const b = fields(body, ["backend", "endpoint", "image", "network", "hosts"]);
+  const b = fields(body, [
+    "backend",
+    "endpoint",
+    "variant",
+    "image",
+    "network",
+    "hosts",
+  ]);
   const out: PutSandboxRequest = {};
   if ("backend" in b) {
     if (!isSandboxBackend(b.backend)) {
@@ -35,6 +45,12 @@ export function parseSandbox(body: unknown): PutSandboxRequest {
       throw new BadRequest(`endpoint must be null or ${ENDPOINT_RULE}`);
     }
     out.endpoint = b.endpoint;
+  }
+  if ("variant" in b) {
+    if (!isSandboxVariant(b.variant)) {
+      throw new BadRequest(`variant must be ${VARIANT_RULE}`);
+    }
+    out.variant = b.variant;
   }
   if ("image" in b) {
     if (b.image !== null && !isSandboxImage(b.image)) {
@@ -51,7 +67,7 @@ export function parseSandbox(body: unknown): PutSandboxRequest {
   if ("hosts" in b) out.hosts = hostsOf(b.hosts);
   if (Object.keys(out).length === 0) {
     throw new BadRequest(
-      "body must name backend, endpoint, image, network or hosts",
+      "body must name backend, endpoint, variant, image, network or hosts",
     );
   }
   return out;

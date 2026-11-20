@@ -12,6 +12,14 @@ export function isSandboxBackend(value: unknown): value is SandboxBackend {
   return SANDBOX_BACKENDS.some((backend) => backend === value);
 }
 
+// the shell image's variants: Python and uv in each, and one language
+// toolchain more past python
+export const SANDBOX_VARIANTS = ["python", "bun", "go", "rust"] as const;
+export type SandboxVariant = (typeof SANDBOX_VARIANTS)[number];
+export function isSandboxVariant(value: unknown): value is SandboxVariant {
+  return SANDBOX_VARIANTS.some((variant) => variant === value);
+}
+
 // where a sandbox's commands may connect: nowhere, or the hosts listed.
 // Web access never applies to it
 export const SANDBOX_NETWORKS = ["off", "hosts"] as const;
@@ -61,7 +69,10 @@ export type SandboxSettings = {
   backend: SandboxBackend;
   // null until an admin saves one
   endpoint: string | null;
-  // null runs the default image, named after the server's version
+  // the default image's variant; a custom image replaces it
+  variant: SandboxVariant;
+  // null runs the default image of the variant, named after the
+  // server's version
   image: string | null;
   network: SandboxNetwork;
   // null until an admin saves a list: the defaults

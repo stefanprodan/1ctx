@@ -1,12 +1,13 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A project's shell backend: a section on its Settings tab and a card on
-// a team project's admin page, one select written at once. An admin
-// picks it on any project; anyone else, a personal project's owner
-// included, reads it in the same select, disabled.
+// A project's shell backend and image variant: a section on its Settings
+// tab and two cards on a team project's admin page, each select written
+// at once. An admin picks them on any project; anyone else, a personal
+// project's owner included, reads them in the same selects, disabled.
 
-import type { Signal } from "@preact/signals";
+import { type Signal, useSignal } from "@preact/signals";
+import type { UpdateProjectRequest } from "../../../shared/api/projects.ts";
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import { saveShell } from "../../data/projects.ts";
 import { useAction } from "../../lib/save.ts";
@@ -17,10 +18,15 @@ import { holding } from "../admin/drafts.ts";
 import "./project-shell.css";
 import {
   pickedBackend,
+  pickedVariant,
   SHELL_ADMIN_HINT,
   SHELL_TEXT,
   shellOptions,
   shellValue,
+  VARIANT_TEXT,
+  variantHint,
+  variantOptions,
+  variantValue,
 } from "./ProjectShell.model.ts";
 
 export function ProjectShell({
@@ -30,57 +36,105 @@ export function ProjectShell({
   saving,
 }: {
   project: ProjectDetail;
-  // a Settings tab's section rather than the admin page's card
+  // a Settings tab's section rather than the admin page's cards
   section: boolean;
   edit: boolean;
   // the admin page's one save at a time, since the answer is the row
   saving?: Signal<boolean>;
 }) {
   const picking = useAction();
-  const current = shellValue(project);
+  // the select last picked, whose refusal is drawn beside it
+  const picked = useSignal<"backend" | "variant">("backend");
   const busy = picking.busy.value || saving?.value === true;
-  const pick = (value: string) => {
-    if (value === current) return;
-    const backend = pickedBackend(value);
-    const write = () => saveShell(project.id, backend);
+  const write = (body: Pick<UpdateProjectRequest, "backend" | "variant">) => {
+    picked.value = body.variant === undefined ? "backend" : "variant";
+    const save = () => saveShell(project.id, body);
     void picking.run(() =>
-      saving === undefined ? write() : holding(saving, write),
+      saving === undefined ? save() : holding(saving, save),
     );
   };
-  const select = (small: boolean) => (
+  const backend = shellValue(project);
+  const variant = variantValue(project);
+  const backendSelect = (small: boolean) => (
     <Select
       label="Shell backend"
       name="backend"
       small={small}
-      value={current}
+      value={backend}
       options={shellOptions(project.instanceBackend)}
       disabled={!edit || busy}
-      onChange={pick}
+      onChange={(value) => {
+        if (value !== backend) write({ backend: pickedBackend(value) });
+      }}
     />
   );
-  const failed = picking.failure.value;
+  const variantSelect = (small: boolean) => (
+    <Select
+      label="Shell variant"
+      name="variant"
+      small={small}
+      value={variant}
+      options={variantOptions(project.instanceVariant)}
+      disabled={!edit || busy}
+      onChange={(value) => {
+        if (value !== variant) write({ variant: pickedVariant(value) });
+      }}
+    />
+  );
+  const failure = picking.failure.value;
+  const failed = picked.value === "backend" ? failure : null;
+  const variantFailed = picked.value === "variant" ? failure : null;
   if (section) {
     return (
       <Section title="Shell" text={SHELL_TEXT}>
-        <div class="field">
-          <span class="label">Backend</span>
-          {select(false)}
-          {failed !== null ? (
-            <span class="hint error" role="alert">
-              {failed}
-            </span>
-          ) : (
-            !edit && <span class="hint">{SHELL_ADMIN_HINT}</span>
-          )}
+        {/* both fields in the form's column, beside the head */}
+        <div class="section-form">
+          <div class="field">
+            <span class="label">Backend</span>
+            {backendSelect(false)}
+            {failed !== null ? (
+              <span class="hint error" role="alert">
+                {failed}
+              </span>
+            ) : (
+              !edit && <span class="hint">{SHELL_ADMIN_HINT}</span>
+            )}
+          </div>
+          <div class="field">
+            <span class="label">Variant</span>
+            {variantSelect(false)}
+            {variantFailed !== null ? (
+              <span class="hint error" role="alert">
+                {variantFailed}
+              </span>
+            ) : (
+              <span class="hint">{variantHint(project)}</span>
+            )}
+          </div>
         </div>
       </Section>
     );
   }
   return (
-    <Setting
-      title="Shell"
-      line={failed !== null ? <span class="error">{failed}</span> : SHELL_TEXT}
-      action={<span class="project-shell-pick">{select(true)}</span>}
-    />
+    <>
+      <Setting
+        title="Shell"
+        line={
+          failed !== null ? <span class="error">{failed}</span> : SHELL_TEXT
+        }
+        action={<span class="project-shell-pick">{backendSelect(true)}</span>}
+      />
+      <Setting
+        title="Variant"
+        line={
+          variantFailed !== null ? (
+            <span class="error">{variantFailed}</span>
+          ) : (
+            `${VARIANT_TEXT} ${variantHint(project)}`
+          )
+        }
+        action={<span class="project-shell-pick">{variantSelect(true)}</span>}
+      />
+    </>
   );
 }

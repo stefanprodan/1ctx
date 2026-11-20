@@ -99,6 +99,8 @@ describe("the sandbox's hosts", () => {
     ]);
     expect(SANDBOX_DEFAULT_HOSTS.length).toBeLessThan(MAX_SANDBOX_HOSTS / 2);
     expect(SANDBOX_DEFAULT_HOSTS).toContain("*.githubusercontent.com");
+    // rustup fetches toolchains and targets there
+    expect(SANDBOX_DEFAULT_HOSTS).toContain("static.rust-lang.org");
   });
 
   test("a wildcard within the first label keeps inner hyphens", () => {

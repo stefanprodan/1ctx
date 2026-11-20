@@ -36,6 +36,8 @@ export const SANDBOX_DEFAULT_HOSTS: readonly string[] = [
   "nodejs.org",
   "go.dev",
   "dl.google.com",
+  // rustup's toolchains, components and targets
+  "static.rust-lang.org",
   "astral.sh",
   // uv's Python downloads
   "releases.astral.sh",

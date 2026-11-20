@@ -22,7 +22,6 @@ ENTRY=src/server/main.ts
 GW=$DIR/openshell
 GW_PORT=${PREVIEW_GATEWAY_PORT:-17671}
 GW_PID=$GW/pid
-SANDBOX_IMAGE=1ctx-shell:dev
 
 # only a process running our entry from this checkout is ours to kill:
 # a reused pid, another checkout, or a stranger on the port is left alone
@@ -79,7 +78,7 @@ gw_sweep() {
 # after the server is up, since the instance id that labels the
 # gateway's sandboxes is made at the server's first read of its row
 sandbox() {
-  local id old changed
+  local id old changed image
   scripts/openshell.sh docker
   id=$(bun scripts/preview-sandbox.ts id "$URL" "$DIR/secrets")
   # a new database under a kept gateway: the old instance's sandboxes go
@@ -95,10 +94,13 @@ sandbox() {
     gw_start
   fi
   scripts/openshell.sh bundle "$HERE/$GW" "$DIR/secrets"
-  docker image inspect "$SANDBOX_IMAGE" >/dev/null 2>&1 ||
-    scripts/sandbox-image.sh
+  # the saved variant's dev image, built when missing: the gateway uses a
+  # local image before it pulls
+  image=$(bun scripts/preview-sandbox.ts image "$URL" "$DIR/secrets")
+  docker image inspect "$image" >/dev/null 2>&1 ||
+    VARIANT=${image##*:dev-} scripts/sandbox-image.sh
   bun scripts/preview-sandbox.ts configure "$URL" "$DIR/secrets" \
-    "https://127.0.0.1:$GW_PORT" "$SANDBOX_IMAGE"
+    "https://127.0.0.1:$GW_PORT"
   echo "gateway up at https://127.0.0.1:$GW_PORT (pid $(cat "$GW_PID"), log $GW/gateway.log)"
 }
 

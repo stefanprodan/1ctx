@@ -4,7 +4,10 @@
 import type { HttpMethod } from "../../shared/contracts/credential.ts";
 import { MAX_LABELS_PER_PROJECT } from "../../shared/contracts/label.ts";
 import type { McpSide } from "../../shared/contracts/mcp.ts";
-import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
+import type {
+  SandboxBackend,
+  SandboxVariant,
+} from "../../shared/contracts/sandbox.ts";
 import { sourceKind } from "../../shared/skills.ts";
 import { isWebAccessMode, type WebAccessMode } from "../../shared/web.ts";
 import {
@@ -55,6 +58,7 @@ import {
   parseBackend,
   parseLabelDescription,
   parseLabelName,
+  parseVariant,
 } from "../projects/index.ts";
 import {
   azureBaseUrlProblem,
@@ -102,6 +106,8 @@ export type ProjectSpec = {
   knowledge?: string;
   // the project's own shell backend; null follows the instance's
   backend?: SandboxBackend | null;
+  // the project's own image variant; null follows the instance's
+  variant?: SandboxVariant | null;
 };
 
 export type LabelSpec = { name: string; description?: string };
@@ -300,6 +306,7 @@ export function project(value: unknown): ProjectSpec {
     labels,
     knowledge: folderPath,
     backend: parseBackend,
+    variant: parseVariant,
   });
 }
 

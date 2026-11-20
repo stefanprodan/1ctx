@@ -37,8 +37,8 @@ import {
 } from "./baseline.ts";
 import { type Execs, isFolder, push, refusal, StepFailure } from "./execs.ts";
 import { SandboxUnavailable } from "./gateway.ts";
+import type { RecycleReason, SandboxHold } from "./hold.ts";
 import { commandId, launch } from "./launch.ts";
-import type { RecycleReason, SandboxHold } from "./leases.ts";
 import type { Readout } from "./readout.ts";
 import {
   type Docs,

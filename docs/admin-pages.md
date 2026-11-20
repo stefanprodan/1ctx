@@ -82,12 +82,14 @@ reporting.
   and cost, "not priced" while no clip named one.
 - **Sandbox is its own Config page, after Web access.** One Shell card
   (the `backend` field as a `Seg`, Built-in or OpenShell, the gateway's
-  https address, the image, empty for the default) saves the backend,
-  endpoint and image, as SMTP's Server card does. Its line follows the
+  https address, the variant as a `Seg` with its tools in the hint, the
+  image, empty for the variant's, whose image is the placeholder)
+  saves the backend, endpoint, variant and image, as SMTP's Server card
+  does. Its line follows the
   backend picked, saved or not, and then `overridesLine()`, how many
   projects pick their own shell, when any do. Built-in hides the
   gateway and image and puts their drafts back to the saved values,
-  which the save keeps, unless a project picks `openshell`
+  which the save keeps (the variant too), unless a project picks `openshell`
   (`gatewayShown()`); `sandboxFieldOf()` matches the server's whole
   phrases.
 - **The Sandbox page's Network card shows while `gatewayShown()`**, its

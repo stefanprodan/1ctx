@@ -4,6 +4,7 @@
 // What a sandbox is made with: pure, from the settings, the caps and the
 // repositories a command prepared, so a test reads the exact create.
 
+import type { SandboxVariant } from "../../shared/contracts/sandbox.ts";
 import {
   MAX_OPENS_PER_COMMAND,
   type ShellRepo,
@@ -32,7 +33,9 @@ export const KEEP_ALIVE = ["/usr/bin/sleep", "infinity"];
 export const HOME = "/opt/home";
 
 // what every exec of ours and every command runs with: OpenShell's
-// execs see none of the image's ENV, and HOME would be the passwd one
+// execs see none of the image's ENV, and HOME would be the passwd one.
+// One set for every variant: a language's variables do nothing where
+// its toolchain is missing
 export const SANDBOX_ENV: Readonly<Record<string, string>> = {
   HOME,
   TMPDIR: "/sandbox/tmp",
@@ -42,8 +45,18 @@ export const SANDBOX_ENV: Readonly<Record<string, string>> = {
   // which is saved after a command
   BUN_INSTALL: `${HOME}/.bun`,
   BUN_INSTALL_CACHE_DIR: `${HOME}/.bun/install/cache`,
+  // Go's caches and modules, and what go install builds, in HOME
+  GOPATH: `${HOME}/go`,
+  GOCACHE: `${HOME}/go/cache`,
+  GOMODCACHE: `${HOME}/go/pkg/mod`,
+  CGO_ENABLED: "1",
+  CC: "gcc",
+  // the image's Rust toolchain is in HOME, since /usr is read-only, so
+  // rustup can add another beside it
+  CARGO_HOME: `${HOME}/.cargo`,
+  RUSTUP_HOME: `${HOME}/.rustup`,
   DO_NOT_TRACK: "1",
-  PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+  PATH: `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:${HOME}/go/bin:${HOME}/.cargo/bin`,
 };
 
 // the roots the image makes; only these are writable, never /sandbox
@@ -77,14 +90,23 @@ export const POLICY: SandboxPolicy = {
   ],
 };
 
-// the image the release that built this binary pushed beside its own;
-// a source run or a dev build runs the dev tag
-export function defaultImage(version: string): string {
+// the variant's image the release that built this binary pushed beside
+// its own, never a moving tag, since the environment above and the
+// image's layout ship together; a source run or a dev build runs the
+// dev tag make sandbox-image loads
+export function defaultImage(version: string, variant: SandboxVariant): string {
   const release =
     /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version) &&
     !version.startsWith("v0.0.0");
-  return `ghcr.io/stefanprodan/1ctx-shell:${release ? version : "dev"}`;
+  return `ghcr.io/stefanprodan/1ctx-shell:${release ? version : "dev"}-${variant}`;
 }
+
+// the image a sandbox runs: a custom one as saved, else the variant's
+export const imageOf = (
+  version: string,
+  variant: SandboxVariant,
+  image: string | null,
+): string => image ?? defaultImage(version, variant);
 
 export const gatewayLabel = (instanceId: string) => `1ctx-${instanceId}`;
 

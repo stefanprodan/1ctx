@@ -14,6 +14,7 @@ import {
   type SandboxBackend,
   type SandboxNetwork,
   type SandboxSettings,
+  type SandboxVariant,
 } from "../../../shared/contracts/sandbox.ts";
 import {
   foldDefaults,
@@ -29,6 +30,7 @@ import { hostsCount, lineError } from "./Tools.model.ts";
 export type SandboxDraft = {
   backend: SandboxBackend;
   endpoint: string;
+  variant: SandboxVariant;
   image: string;
 };
 
@@ -38,6 +40,7 @@ export function draftOf(settings: SandboxSettings): SandboxDraft {
   return {
     backend: settings.backend,
     endpoint: settings.endpoint ?? "",
+    variant: settings.variant,
     image: settings.image ?? "",
   };
 }
@@ -63,6 +66,7 @@ export function sandboxBody(
     body: {
       backend: d.backend,
       endpoint: endpoint === "" ? null : endpoint,
+      variant: d.variant,
       image: image === "" ? null : image,
     },
   };
@@ -79,6 +83,7 @@ export function sandboxDirty(d: SandboxDraft, settings: SandboxSettings) {
 const FIELDS: [RegExp, SandboxField][] = [
   [/^backend must be /, "backend"],
   [/^endpoint must be /, "endpoint"],
+  [/^variant must be /, "variant"],
   [/^image must be /, "image"],
   [/^the sandbox shell needs a gateway endpoint$/, "endpoint"],
   [/^the sandbox shell needs openshell-/, "backend"],

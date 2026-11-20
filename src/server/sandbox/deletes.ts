@@ -74,7 +74,8 @@ export class Deletes {
   adopt(name: string, phase: SandboxPhase): Promise<void> {
     const { book, clock } = this.deps;
     const lease =
-      book.records.get(name) ?? book.add(name, null, mountsKey([]), clock());
+      book.records.get(name) ??
+      book.add(name, null, mountsKey([]), "", clock());
     lease.timer?.();
     lease.timer = null;
     lease.phase = phase;

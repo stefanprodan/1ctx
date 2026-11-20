@@ -71,8 +71,9 @@ they name.
 - **`Sandbox` is the instance's one sandbox shell setting**
   (`docs/sandbox.md`). A second `Sandbox` document is refused, and any
   name updates the row the database made, so it is never created.
-  `backend` (`builtin` or `openshell`), `endpoint`, `image`, `network`
-  (`off` or `hosts`) and `hosts` are optional; `endpoint`, `image` and
+  `backend` (`builtin` or `openshell`), `endpoint`, `variant`
+  (`python`, `bun`, `go` or `rust`), `image`, `network` (`off` or
+  `hosts`) and `hosts` are optional; `endpoint`, `image` and
   `hosts` take null, null hosts being the defaults. Validation refuses
   an endpoint that is not an https origin, a host the sandbox does not
   take (`docs/sandbox.md`) and, for `backend: openshell`, a missing
@@ -131,10 +132,11 @@ they name.
   carries it. A new project gets the listed labels alone, at least one,
   in place of the defaults. Preflight checks the API's rules and that
   the held and listed labels stay within the cap of 20.
-- **A `Project`'s `backend` is `builtin`, `openshell` or null,** its
-  own shell over the instance's (`docs/sandbox.md`); null follows the
-  instance's, and left out it stays. A new project gets it after its
-  create.
+- **A `Project`'s `backend` is `builtin`, `openshell` or null, and its
+  `variant` `python`, `bun`, `go`, `rust` or null,** its own shell over
+  the instance's (`docs/sandbox.md`); null follows the instance's, and
+  left out it stays. Either changed goes in one PATCH; a new project
+  gets them after its create.
 - **A `Project`'s `knowledge` is a folder relative to its YAML file.**
   It is never read from stdin, may not leave the file's directory, and
   refuses a symlink. Docs are named by their path and checked with the

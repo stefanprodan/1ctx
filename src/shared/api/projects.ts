@@ -5,7 +5,7 @@
 
 import type { LabelInput } from "../contracts/label.ts";
 import type { ProjectDetail, ProjectSummary } from "../contracts/project.ts";
-import type { SandboxBackend } from "../contracts/sandbox.ts";
+import type { SandboxBackend, SandboxVariant } from "../contracts/sandbox.ts";
 
 // GET /api/projects: the caller's projects, the personal one first
 export type ProjectsResponse = { projects: ProjectSummary[] };
@@ -13,10 +13,11 @@ export type ProjectsResponse = { projects: ProjectSummary[] };
 // GET /api/projects/:id and every project write
 export type ProjectResponse = { project: ProjectDetail };
 // PATCH /api/projects/:id on another user's personal project, which its
-// admin may not read: the backend it set alone
-export type ProjectBackendResponse = {
+// admin may not read: the shell it set alone
+export type ProjectShellResponse = {
   id: string;
   backend: SandboxBackend | null;
+  variant: SandboxVariant | null;
 };
 
 // labels left out start the project with DEFAULT_LABELS
@@ -25,12 +26,13 @@ export type CreateProjectRequest = {
   description: string;
   labels?: LabelInput[];
 };
-// at least one field; a personal project takes backend alone. backend
-// null follows the instance's sandbox setting
+// at least one field; a personal project takes backend and variant
+// alone. Either null follows the instance's sandbox setting
 export type UpdateProjectRequest = {
   name?: string;
   description?: string;
   backend?: SandboxBackend | null;
+  variant?: SandboxVariant | null;
 };
 // PATCH /api/projects/:id/about: any user who sees the project
 export type UpdateAboutRequest = { description: string };

@@ -394,6 +394,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     // a closure: the sandbox area is built later
     shell: {
       instanceBackend: () => sandbox.store.settings().backend,
+      instanceVariant: () => sandbox.variant(),
       changed: () => sandbox.projectsChanged(),
     },
   });
@@ -514,6 +515,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     // a closure: the sandbox area is built after bash
     shell: (builtin, projectId) => sandbox.shell(builtin, projectId),
     sandboxNet: () => sandbox.net(),
+    sandboxVariant: (projectId) => sandbox.variant(projectId),
     knowledge: {
       mountedDocs: (projectId) => knowledge.mountedDocs(projectId),
       mountedUploads: (sessionId) => knowledge.mountedUploads(sessionId),
@@ -534,6 +536,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     connect: options.sandboxGateway ?? openshellGateway,
     projects: {
       backend: (projectId) => projects.store.backendOf(projectId),
+      variant: (projectId) => projects.store.variantOf(projectId),
       openshell: () => projects.store.anyOpenshell(),
       counts: () => projects.store.backendCounts(),
     },

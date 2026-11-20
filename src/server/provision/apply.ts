@@ -11,6 +11,7 @@ import type {
 import type {
   ProjectResponse,
   ProjectsResponse,
+  UpdateProjectRequest,
 } from "../../shared/api/projects.ts";
 import type { ProvidersResponse } from "../../shared/api/providers.ts";
 import type {
@@ -110,10 +111,13 @@ async function project(
   if (before && doc.spec.labels !== undefined) {
     if (await labels(api, project, doc.spec.labels)) action = "updated";
   }
-  if (doc.spec.backend !== undefined && doc.spec.backend !== project.backend) {
-    await api.call("PATCH", `/api/projects/${project.id}`, {
-      backend: doc.spec.backend,
-    });
+  const shell: UpdateProjectRequest = {};
+  if (doc.spec.backend !== undefined && doc.spec.backend !== project.backend)
+    shell.backend = doc.spec.backend;
+  if (doc.spec.variant !== undefined && doc.spec.variant !== project.variant)
+    shell.variant = doc.spec.variant;
+  if (Object.keys(shell).length > 0) {
+    await api.call("PATCH", `/api/projects/${project.id}`, shell);
     if (before) action = "updated";
   }
   if (doc.spec.members !== undefined) {

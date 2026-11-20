@@ -24,6 +24,7 @@ export {
   parseBackend,
   parseLabelDescription,
   parseLabelName,
+  parseVariant,
 } from "./parse.ts";
 export { type ProjectRow, ProjectStore } from "./store.ts";
 export { visible } from "./visible.ts";

@@ -3,8 +3,8 @@
 //
 // One sandbox made: the create, ready, the keep-alive's pid and start
 // time, for an image's first sandbox its roots, and its repositories'
-// binds, every step on the caller's signal. A throw leaves the delete to
-// the caller.
+// binds, every step on the caller's signal. The image is the lease's.
+// A throw leaves the delete to the caller.
 
 import type { ShellRepo, StoredBytes } from "../bash/index.ts";
 import type { KnowledgeCaps, SandboxCaps } from "../limits/index.ts";
@@ -18,7 +18,6 @@ import { createSpec } from "./spec.ts";
 export type BuildDeps = {
   gateway: Gateway;
   instanceId: string;
-  image: string;
   limits(): KnowledgeCaps & SandboxCaps;
 };
 
@@ -34,7 +33,7 @@ export async function buildSandbox(
   const spec = createSpec({
     name: lease.name,
     instanceId: deps.instanceId,
-    image: deps.image,
+    image: lease.image,
     caps: deps.limits(),
     repos,
     ...(stored === undefined ? {} : { stored }),

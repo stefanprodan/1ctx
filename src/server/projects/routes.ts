@@ -4,8 +4,8 @@
 import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   DeleteProjectResponse,
-  ProjectBackendResponse,
   ProjectResponse,
+  ProjectShellResponse,
   ProjectsResponse,
 } from "../../shared/api/projects.ts";
 import type {
@@ -13,7 +13,10 @@ import type {
   KnowledgeFile,
 } from "../../shared/contracts/knowledge.ts";
 import type { ProjectDetail } from "../../shared/contracts/project.ts";
-import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
+import type {
+  SandboxBackend,
+  SandboxVariant,
+} from "../../shared/contracts/sandbox.ts";
 import type { UserSummary } from "../../shared/contracts/user.ts";
 import { LATEST_FILES } from "../../shared/knowledge.ts";
 import { isRecord, RESERVED_PROJECT_NAMES } from "../../shared/words.ts";
@@ -78,10 +81,12 @@ export type UsagePort = {
   projectTotal(projectId: string, since: number, until: number): SendTotals;
 };
 
-// the instance's sandbox setting, which a project without a backend of
-// its own follows: an area built later
+// the instance's sandbox setting, which a project without a backend or
+// variant of its own follows: an area built later
 export type ShellPort = {
   instanceBackend(): SandboxBackend;
+  // null while a custom image replaces every variant
+  instanceVariant(): SandboxVariant | null;
   // a project's backend changed or a project went, after the commit
   changed(): void;
 };
@@ -131,6 +136,8 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       latestFiles: deps.knowledge.latest(project.id, LATEST_FILES),
       backend: project.backend,
       instanceBackend: deps.shell.instanceBackend(),
+      variant: project.variant,
+      instanceVariant: deps.shell.instanceVariant(),
     };
   };
   // a reserved name reads as taken, since a personal project holds it
@@ -217,14 +224,16 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/projects/:id",
       policy: "admin",
       async handle(req, ctx) {
-        // a personal project's backend is an admin's too, and nothing else
+        // a personal project's shell is an admin's too, and nothing else
         // of it is: any other field, a bad one included, is a 404 there
         const editable = (body: unknown): ProjectRow => {
           const project = deps.store.byId(ctx.params.id);
-          const backendOnly =
+          const shellOnly =
             isRecord(body) &&
-            Object.keys(body).every((field) => field === "backend");
-          if (project === null || (project.kind !== "team" && !backendOnly)) {
+            Object.keys(body).every(
+              (field) => field === "backend" || field === "variant",
+            );
+          if (project === null || (project.kind !== "team" && !shellOnly)) {
             throw new NotFound("no such project");
           }
           return project;
@@ -254,6 +263,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           if (updated !== null && change.backend !== undefined) {
             updated = deps.store.setBackend(current.id, change.backend);
           }
+          // its next command takes the new image: nothing to drain
+          if (updated !== null && change.variant !== undefined) {
+            updated = deps.store.setVariant(current.id, change.variant);
+          }
           if (updated === null) throw new NotFound("no such project");
           return { result: updated, events };
         });
@@ -261,9 +274,10 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
         // another user's personal project: what changed alone, since its
         // admin may not read the rest
         if (!visible(project, ctx.principal!, false)) {
-          const own: ProjectBackendResponse = {
+          const own: ProjectShellResponse = {
             id: project.id,
             backend: project.backend,
+            variant: project.variant,
           };
           return json(own);
         }

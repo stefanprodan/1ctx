@@ -1,15 +1,23 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// A project's shell backend as its select draws it: the instance's
-// default first, named with the instance's backend, then the two words.
+// A project's shell backend and image variant as their selects draw
+// them: the instance's default first, named with the instance's value,
+// then the words.
 
 import type { ProjectDetail } from "../../../shared/contracts/project.ts";
 import {
   SANDBOX_BACKENDS,
+  SANDBOX_VARIANTS,
   type SandboxBackend,
+  type SandboxVariant,
 } from "../../../shared/contracts/sandbox.ts";
-import { backendWord } from "../../lib/backends.ts";
+import {
+  backendWord,
+  VARIANT_OPTIONS,
+  variantLine,
+  variantWord,
+} from "../../lib/backends.ts";
 import type { Option } from "../../ui/Select.model.ts";
 
 export const SHELL_TEXT = "Where the bash tool runs this project's commands.";
@@ -39,4 +47,34 @@ export function shellOptions(instance: SandboxBackend): Option[] {
 export function pickedBackend(value: string): SandboxBackend | null {
   if (value === INSTANCE_DEFAULT) return null;
   return SANDBOX_BACKENDS.find((backend) => backend === value) ?? null;
+}
+
+export const VARIANT_TEXT = "The tools the sandbox shell's image holds.";
+// a custom image on the instance replaces every variant
+export const CUSTOM_IMAGE_HINT = "The instance's custom image replaces it.";
+
+export const variantValue = (project: Pick<ProjectDetail, "variant">): string =>
+  project.variant ?? INSTANCE_DEFAULT;
+
+// null: the instance runs a custom image
+export function variantOptions(instance: SandboxVariant | null): Option[] {
+  const named = instance === null ? "custom image" : variantWord(instance);
+  return [
+    { value: INSTANCE_DEFAULT, label: `Instance default (${named})` },
+    ...VARIANT_OPTIONS,
+  ];
+}
+
+// the variant a picked value sends, null following the instance
+export function pickedVariant(value: string): SandboxVariant | null {
+  if (value === INSTANCE_DEFAULT) return null;
+  return SANDBOX_VARIANTS.find((variant) => variant === value) ?? null;
+}
+
+// what the project's sandbox holds, the hint under its select
+export function variantHint(
+  project: Pick<ProjectDetail, "variant" | "instanceVariant">,
+): string {
+  if (project.instanceVariant === null) return CUSTOM_IMAGE_HINT;
+  return variantLine(project.variant ?? project.instanceVariant);
 }

@@ -23,29 +23,22 @@ import { configureInTurn, holdOf, SANDBOX_COMMANDS } from "./holders.ts";
 import { GLOBAL_POLICY_REFUSAL, Network, type NetworkDeps } from "./network.ts";
 import { PolicyGate } from "./policy.ts";
 import { WarmPool } from "./pool.ts";
-import { ImageCheck, ImageRefused } from "./roots.ts";
+import { ImageChecks, ImageRefused } from "./roots.ts";
 import { fitsCaps, mountsKey, sandboxName } from "./spec.ts";
 import { Cuts } from "./sweep.ts";
 import { Sweeper } from "./sweeper.ts";
 import { bounded, Changes, Gate } from "./waits.ts";
 import { Watch } from "./watch.ts";
 
-export {
-  DELETE_RETRY_MS,
-  DELETE_TIMEOUT_MS,
-  RETIRED_STUCK_CHECKS,
-  STUCK_CHECK_MS,
-} from "./deletes.ts";
-export type { RecycleReason, SandboxHold } from "./hold.ts";
-
-export { REFILL_BACKOFF_MS, WARM_CREATE_MS } from "./pool.ts";
-
 export type LeasesDeps = {
   clock: Clock;
   log: Log;
   gateway: Gateway;
   instanceId: string;
+  // the instance's image, the one the warm pool makes
   image: string;
+  // a project's image, its own variant's over the instance's
+  imageOf?(projectId: string): string;
   limits(): KnowledgeCaps & SandboxCaps;
   // the repository cache's hold on a mounted tree
   repos: { hold(tree: string): (() => void) | null };
@@ -75,7 +68,7 @@ export class Leases {
   private draining = false;
   private drained: (() => void) | null = null;
   private readonly policy: PolicyGate;
-  private readonly image: ImageCheck;
+  private readonly images: ImageChecks;
   private readonly watch: Watch;
   private readonly cuts = new Cuts();
   private readonly deletes: Deletes;
@@ -96,7 +89,7 @@ export class Leases {
       globalPolicy: (set) => this.policy.seen(set),
       closed: () => this.closed,
     });
-    this.image = new ImageCheck(deps.image, deps.log);
+    this.images = new ImageChecks(deps.log);
     this.deletes = new Deletes({
       ...deps,
       book: this.book,
@@ -117,12 +110,12 @@ export class Leases {
       stopped: () => this.closed || this.draining,
       blocked: () =>
         this.policy.blocked ||
-        this.image.refused !== null ||
+        this.images.refused(deps.image) !== null ||
         this.starting.shut,
       total: () => this.total(),
       waiting: () => this.changes.waiting,
       build: (signal) => {
-        const lease = this.add(null, mountsKey([]));
+        const lease = this.add(null, mountsKey([]), deps.image);
         return { lease, built: this.build(lease, [], undefined, signal) };
       },
       changed: () => this.changes.changed(),
@@ -195,7 +188,9 @@ export class Leases {
       if (this.draining) {
         throw new Error("the sandbox settings changed: run the command again");
       }
-      if (this.image.refused !== null) throw this.image.refused;
+      // read again each pass, so a variant changed meanwhile is seen
+      const image = this.deps.imageOf?.(call.projectId) ?? this.deps.image;
+      this.images.pass(image);
       if (!(await this.policy.open(deadline, signal))) {
         throw new Error(GLOBAL_POLICY_REFUSAL);
       }
@@ -203,13 +198,16 @@ export class Leases {
       const own = this.book.byWorkspace.get(key);
       // a chat's subagents join its commands in their sandbox
       const open = own?.state === "idle" || own?.state === "leased";
-      if (open && own!.mounts === want && !own!.doomed) {
+      const same = own?.mounts === want && own.image === image;
+      if (open && same && !own!.doomed) {
         if (own!.holders < SANDBOX_COMMANDS) return this.take(own!);
         if (!(await this.seats.wait(deadline, signal))) return "busy";
         continue;
       }
+      // other repositories or, its project's variant changed, another
+      // image: it goes once its commands let it go
       if (own?.state === "idle") {
-        this.remove(own, "mounts");
+        this.remove(own, own.image === image ? "mounts" : "image");
         continue;
       }
       if (own === undefined) {
@@ -218,8 +216,11 @@ export class Leases {
         // a warm sandbox is sized from the caps: a tree over a lowered
         // cap needs one of its own
         const fits = held === undefined || fitsCaps(this.deps.limits(), held);
+        // the pool holds the instance's image alone
         const warm =
-          call.repos.length === 0 && fits ? this.book.takeWarm() : null;
+          call.repos.length === 0 && fits && image === this.deps.image
+            ? this.book.takeWarm()
+            : null;
         if (warm !== null) {
           warm.workspace = key;
           this.book.byWorkspace.set(key, warm);
@@ -227,9 +228,10 @@ export class Leases {
           return this.take(warm);
         }
         if (this.total() < this.deps.limits().sandboxesMax) {
-          const made = await this.make(key, call, want, held, deadline, signal);
+          const spec = { mounts: want, image, stored: held };
+          const hold = await this.make(key, call, spec, deadline, signal);
           // doomed while it was made: deleted, and the loop goes again
-          if (made !== null) return made;
+          if (hold !== null) return hold;
           continue;
         }
         // one delete per waiting command: the first one's delete is
@@ -312,8 +314,8 @@ export class Leases {
 
   // why every command is refused, for the admin; null while none is
   refused(): string | null {
-    if (this.image.refused !== null) return this.image.refused.message;
-    return this.policy.blocked ? GLOBAL_POLICY_REFUSAL : null;
+    const refused = this.images.refused(this.deps.image)?.message;
+    return refused ?? (this.policy.blocked ? GLOBAL_POLICY_REFUSAL : null);
   }
 
   // another manager's delete observed: a waiting command may fit now
@@ -413,13 +415,12 @@ export class Leases {
   private async make(
     key: string,
     call: ShellCall,
-    mounts: string,
-    stored: StoredBytes | undefined,
+    spec: { mounts: string; image: string; stored: StoredBytes | undefined },
     deadline: number,
     signal: AbortSignal,
   ): Promise<SandboxHold | "busy" | null> {
     const { repos } = call;
-    const lease = this.add(key, mounts);
+    const lease = this.add(key, spec.mounts, spec.image);
     for (const repo of repos) {
       const release = this.deps.repos.hold(repo.tree);
       if (release === null) {
@@ -435,7 +436,7 @@ export class Leases {
       "the command's time ran out",
     );
     try {
-      await this.build(lease, repos, stored, step.signal);
+      await this.build(lease, repos, spec.stored, step.signal);
     } catch (error) {
       this.deletes.failed(lease, error);
       signal.throwIfAborted();
@@ -463,8 +464,9 @@ export class Leases {
     return this.take(lease);
   }
 
-  private add(workspace: string | null, mounts: string): Lease {
-    return this.book.add(sandboxName(), workspace, mounts, this.deps.clock());
+  private add(workspace: string | null, mounts: string, image: string) {
+    const now = this.deps.clock();
+    return this.book.add(sandboxName(), workspace, mounts, image, now);
   }
 
   // made (create.ts), then in the book's order for the probe
@@ -474,7 +476,8 @@ export class Leases {
     stored: StoredBytes | undefined,
     signal: AbortSignal,
   ): Promise<void> {
-    await buildSandbox(this.deps, this.image, lease, repos, stored, signal);
+    const check = this.images.of(lease.image);
+    await buildSandbox(this.deps, check, lease, repos, stored, signal);
     lease.ready = this.book.tick();
     this.deps.log.info("sandbox created", {
       sandbox: lease.name,

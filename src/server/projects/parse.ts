@@ -21,7 +21,10 @@ import {
 } from "../../shared/contracts/label.ts";
 import {
   isSandboxBackend,
+  isSandboxVariant,
+  SANDBOX_VARIANTS,
   type SandboxBackend,
+  type SandboxVariant,
 } from "../../shared/contracts/sandbox.ts";
 import {
   isDescription,
@@ -124,14 +127,24 @@ export function parseBackend(value: unknown): SandboxBackend | null {
   return value;
 }
 
+export function parseVariant(value: unknown): SandboxVariant | null {
+  if (value !== null && !isSandboxVariant(value)) {
+    throw new BadRequest(
+      `variant must be one of ${SANDBOX_VARIANTS.join(", ")} or null`,
+    );
+  }
+  return value;
+}
+
 export function parseUpdateProject(body: unknown): UpdateProjectRequest {
-  const b = fields(body, ["name", "description", "backend"]);
+  const b = fields(body, ["name", "description", "backend", "variant"]);
   if (
     b.name === undefined &&
     b.description === undefined &&
-    b.backend === undefined
+    b.backend === undefined &&
+    b.variant === undefined
   ) {
-    throw new BadRequest("name, description or backend is required");
+    throw new BadRequest("name, description, backend or variant is required");
   }
   return {
     ...(b.name === undefined ? {} : { name: parseName(b.name) }),
@@ -139,6 +152,7 @@ export function parseUpdateProject(body: unknown): UpdateProjectRequest {
       ? {}
       : { description: parseTeamDescription(b.description) }),
     ...(b.backend === undefined ? {} : { backend: parseBackend(b.backend) }),
+    ...(b.variant === undefined ? {} : { variant: parseVariant(b.variant) }),
   };
 }
 

@@ -82,6 +82,16 @@ describe("provision Sandbox", () => {
     ).toThrow("spec.endpoint: must be null or an https origin");
   });
 
+  test("the variant is one of the image's four", () => {
+    expect(() => documents(sandbox({ variant: "node" }))).toThrow(
+      "spec.variant: must be one of python, bun, go, rust",
+    );
+    expect(() => documents(sandbox({ variant: null }))).toThrow(
+      "spec.variant: must be one of python, bun, go, rust",
+    );
+    documents(sandbox({ variant: "rust" }));
+  });
+
   test("the network is off or hosts, each host one OpenShell takes", () => {
     expect(() => documents(sandbox({ network: "all" }))).toThrow(
       "spec.network: must be off or hosts",
@@ -114,6 +124,19 @@ describe("provision Sandbox", () => {
       "spec.backend secret openshell-gateway-ca.key is missing or empty",
     );
     check(docs, KEYS);
+  });
+
+  test("the variant stays python until a document names another", async () => {
+    await run(async (app, apply) => {
+      expect(app.sandbox.store.settings().variant).toBe("python");
+      expect(await apply(sandbox({ variant: "python" }))).toContain(
+        "unchanged sandbox/sandbox",
+      );
+      expect(await apply(sandbox({ variant: "bun" }))).toContain(
+        "updated sandbox/sandbox",
+      );
+      expect(app.sandbox.store.settings().variant).toBe("bun");
+    });
   });
 
   test("updates the row the database made, then is unchanged", async () => {

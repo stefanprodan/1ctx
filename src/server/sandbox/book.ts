@@ -16,6 +16,9 @@ export type Lease = {
   workspace: string | null;
   // the repositories mounted at create, as mountsKey() writes them
   mounts: string;
+  // the image it was made from, which its project's variant names; empty
+  // for one a sweep found
+  image: string;
   // the repository cache's holds on the trees mounted
   holds: (() => void)[];
   state: LeaseState;
@@ -70,12 +73,14 @@ export class Book {
     name: string,
     workspace: string | null,
     mounts: string,
+    image: string,
     now: number,
   ): Lease {
     const lease: Lease = {
       name,
       workspace,
       mounts,
+      image,
       holds: [],
       state: "creating",
       holders: 0,

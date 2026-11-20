@@ -91,8 +91,9 @@ gateway add`.
   `https://127.0.0.1:<port>`.
 - **The preview: `PREVIEW_SHELL=sandbox make preview`** runs one from
   `.preview/openshell/` on 17671 (`PREVIEW_GATEWAY_PORT` for a second
-  checkout), after the server so its instance id is made, builds
-  `1ctx-shell:dev` when missing, and turns the sandbox shell on. A
+  checkout), after the server so its instance id is made, builds the
+  saved variant's `dev-<variant>` image when missing, and turns the
+  sandbox shell on with no custom image. A
   restart keeps an unchanged gateway. The server counts as up only when
   the preview port's one listener is the pid it started, so a stranger
   on the port is refused before the admin password is sent.
@@ -148,10 +149,15 @@ gateway add`.
   mount works once it is `chown 65532:65532`.
 - **The sandbox image (`deploy/sandbox/Dockerfile`) pins its base, uv's
   Python 3.15 trixie-slim image that brings Python and uv, by digest,
-  and yq and bun by version and the sha256 their releases publish,**
-  checked at build. Bun is the root Dockerfile's version,
-  so the two move together. Dependabot bumps the base's digest; yq and
-  bun are bumped by hand. It makes every root the sandbox policy
+  and every download by version and the sha256 its publisher gives,**
+  checked at build: yq and bun from their releases, Go's tarball from
+  go.dev's list, `rustup-init` from
+  `static.rust-lang.org/rustup/archive/<version>/<target>/rustup-init.sha256`,
+  and the Rust toolchain by its version, which rustup checks against
+  the channel's manifest. Bun is the root Dockerfile's version, so the
+  two move together. Dependabot bumps the base's digest; the rest is
+  bumped by hand, and the bash description's versions with it
+  (`docs/bash.md`). It makes every root the sandbox policy
   names and holds no helper: the server passes them with each exec.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
   would kill the shutdown after the drain. Docker Compose sets
@@ -252,11 +258,15 @@ deletes the cluster with every release in it.
 - **The release pushes `ghcr.io/stefanprodan/1ctx:<tag>`, never
   `latest`.** The image is amd64 and arm64, with provenance attested
   for it and for the archives' checksums.
-- **The release pushes `ghcr.io/stefanprodan/1ctx-shell:<tag>`
-  beside it,** built from `deploy/sandbox/Dockerfile` for the same
-  platforms, with provenance attested. `make sandbox-image` builds it
-  locally as `1ctx-shell:dev`. The first push creates the GHCR
-  package `1ctx-shell` private; make it public once by hand.
+- **The release pushes `ghcr.io/stefanprodan/1ctx-shell:<tag>-<variant>`
+  for each variant first,** python, bun, go and rust, a matrix job
+  building that target of `deploy/sandbox/Dockerfile` for the same
+  platforms, each attested, plus the moving `:<variant>` for a run by
+  hand, never on a prerelease. No bare `:<tag>`. The server runs only
+  the versioned tag. `make sandbox-image` builds every variant locally
+  as `1ctx-shell:dev-<variant>` and the registry name a source run's
+  default names (`VARIANT=go` builds one). The first push creates the
+  GHCR package `1ctx-shell` private; make it public once by hand.
 - **The release pushes the Helm chart beside the image.** Its version is
   the tag without the `v` and its `appVersion` the tag, at
   `oci://ghcr.io/stefanprodan/charts/onectx`, with provenance attested.

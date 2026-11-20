@@ -187,6 +187,8 @@ describe("GET /api/projects/:id", () => {
         latestFiles: [],
         backend: null,
         instanceBackend: "builtin",
+        variant: null,
+        instanceVariant: "python",
         members: [
           {
             id: admin.id,

@@ -7,7 +7,7 @@
 import type { ProjectKind } from "../words.ts";
 import type { KnowledgeCounts, KnowledgeFile } from "./knowledge.ts";
 import type { ProjectLabelUse } from "./label.ts";
-import type { SandboxBackend } from "./sandbox.ts";
+import type { SandboxBackend, SandboxVariant } from "./sandbox.ts";
 import type { UserSummary } from "./user.ts";
 
 export type ProjectSummary = {
@@ -34,4 +34,9 @@ export type ProjectDetail = ProjectSummary & {
   // instance's, which instanceBackend names for every viewer
   backend: SandboxBackend | null;
   instanceBackend: SandboxBackend;
+  // the image variant its sandbox runs, null following the instance's;
+  // instanceVariant is null while the instance runs a custom image,
+  // which replaces every variant
+  variant: SandboxVariant | null;
+  instanceVariant: SandboxVariant | null;
 };

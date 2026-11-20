@@ -65,6 +65,7 @@ import { pollTab } from "../../helpers/poll.ts";
 const settings: SandboxSettings = {
   backend: "openshell",
   endpoint: "https://127.0.0.1:17671",
+  variant: "python",
   image: null,
   network: "hosts",
   hosts: null,
@@ -75,7 +76,12 @@ const DEFAULTS_TEXT = SANDBOX_DEFAULT_HOSTS.join("\n");
 
 const response = (over: Partial<SandboxResponse> = {}): SandboxResponse => ({
   settings,
-  defaultImage: "ghcr.io/stefanprodan/1ctx-shell:dev",
+  defaultImages: {
+    python: "ghcr.io/stefanprodan/1ctx-shell:dev-python",
+    bun: "ghcr.io/stefanprodan/1ctx-shell:dev-bun",
+    go: "ghcr.io/stefanprodan/1ctx-shell:dev-go",
+    rust: "ghcr.io/stefanprodan/1ctx-shell:dev-rust",
+  },
   gatewayLabel: "1ctx-abc123",
   keys: { ca: true, cert: true, key: true },
   active: true,
@@ -99,6 +105,7 @@ describe("the Sandbox words", () => {
       body: {
         backend: "openshell",
         endpoint: "https://127.0.0.1:17671",
+        variant: "python",
         image: null,
       },
     });
@@ -107,7 +114,12 @@ describe("the Sandbox words", () => {
       field: "endpoint",
     });
     expect(sandboxBody({ ...d, backend: "builtin", endpoint: "" })).toEqual({
-      body: { backend: "builtin", endpoint: null, image: null },
+      body: {
+        backend: "builtin",
+        endpoint: null,
+        variant: "python",
+        image: null,
+      },
     });
     expect(
       sandboxBody({ ...d, endpoint: "http://127.0.0.1:17671" }),
@@ -125,6 +137,9 @@ describe("the Sandbox words", () => {
     expect(
       sandboxDirty({ ...draftOf(settings), backend: "builtin" }, settings),
     ).toBe(true);
+    expect(
+      sandboxDirty({ ...draftOf(settings), variant: "go" }, settings),
+    ).toBe(true);
   });
 
   test("a server refusal lands at its field", () => {
@@ -136,6 +151,9 @@ describe("the Sandbox words", () => {
         "the sandbox shell needs openshell-gateway-ca.key, openshell-gateway-cert.key, openshell-gateway-key.key",
       ),
     ).toBe("backend");
+    expect(sandboxFieldOf("variant must be one of python, bun, go, rust")).toBe(
+      "variant",
+    );
     expect(sandboxFieldOf("image must be null or an image reference")).toBe(
       "image",
     );
@@ -350,11 +368,15 @@ describe("the Sandbox page", () => {
     expect(html).toMatch(
       /<button type="button" class="btn btn-small" disabled>Use defaults/,
     );
-    for (const name of ["endpoint", "image"]) {
+    for (const name of ["endpoint", "variant", "image"]) {
       expect(html).toContain(`name="${name}"`);
     }
     expect(html).toContain('value="https://127.0.0.1:17671"');
-    expect(html).toContain('placeholder="ghcr.io/stefanprodan/1ctx-shell:dev"');
+    expect(html).toContain(
+      'placeholder="ghcr.io/stefanprodan/1ctx-shell:dev-python"',
+    );
+    expect(html).toContain("Python and uv, git, make, jq, yq and rg.");
+    expect(html).toContain("A custom image replaces the variant.");
     expect(html).toContain("openshell-gateway-ca.key");
     expect(html).toContain("1ctx-abc123");
     expect(html).toContain("1ctx-abc123-k3v9");
@@ -375,7 +397,7 @@ describe("the Sandbox page", () => {
       sandboxLeases.value = [];
       const html = render(<Sandbox />);
       expect(html).toContain('name="backend"');
-      for (const name of ["endpoint", "image", "hosts", "network"]) {
+      for (const name of ["endpoint", "variant", "image", "hosts", "network"]) {
         expect(html).not.toContain(`name="${name}"`);
       }
       expect(html).not.toContain("Use defaults");
@@ -531,6 +553,7 @@ describe("the Sandbox page flows", () => {
     expect(sentBody(0)).toEqual({
       backend: "openshell",
       endpoint: "https://127.0.0.1:17671",
+      variant: "python",
       image: "1ctx-shell:dev",
     });
     calls[0]!.answer(
@@ -547,6 +570,34 @@ describe("the Sandbox page flows", () => {
     expect(sandboxLeases.value).toEqual([]);
     edited.save.dispose();
   });
+
+  test.serial(
+    "a variant picked names its tools and image, and is sent",
+    async () => {
+      sandbox.value = response();
+      const drafted = signal<SandboxDraft | null>(null);
+      draw(drafted).pick("variant", "rust");
+      const edited = draw(drafted);
+      expect(edited.html).toContain("Unsaved changes");
+      expect(edited.html).toContain(
+        "The Python image, Rust with cargo and gcc.",
+      );
+      expect(edited.html).toContain(
+        'placeholder="ghcr.io/stefanprodan/1ctx-shell:dev-rust"',
+      );
+      edited.submit();
+      await settle();
+      expect(sentBody(0)).toMatchObject({ variant: "rust", image: null });
+      calls[0]!.answer(
+        Response.json(response({ settings: { ...settings, variant: "rust" } })),
+      );
+      await settle();
+      expect(drafted.value).toBeNull();
+      calls[1]!.answer(Response.json({ leases: [] }));
+      await settle();
+      edited.save.dispose();
+    },
+  );
 
   test.serial("a refused save lands at its field", async () => {
     sandbox.value = response({

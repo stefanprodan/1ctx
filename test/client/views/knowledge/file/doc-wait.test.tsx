@@ -50,6 +50,8 @@ const detail: ProjectDetail = {
   latestFiles: [],
   backend: null,
   instanceBackend: "builtin" as const,
+  variant: null,
+  instanceVariant: "python" as const,
 };
 
 const { text: _t, language: _l, html: _h, code: _c, ...row } = fileView();

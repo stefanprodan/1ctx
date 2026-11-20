@@ -314,6 +314,7 @@ export const AUTH_CASES: AuthCase[] = [
       name: "matrix-team",
       description: "A team project.",
       backend: "builtin",
+      variant: "go",
     },
     expect: { anonymous: 401, member: 403, admin: 404 },
   },

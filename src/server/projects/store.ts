@@ -7,7 +7,10 @@ import {
   type ProjectLabel,
 } from "../../shared/contracts/label.ts";
 import type { ProjectSummary } from "../../shared/contracts/project.ts";
-import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
+import type {
+  SandboxBackend,
+  SandboxVariant,
+} from "../../shared/contracts/sandbox.ts";
 import { PERSONAL_PROJECT_NAME, type ProjectKind } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
@@ -21,6 +24,8 @@ export type ProjectRow = {
   description: string;
   // the project's own shell backend, null following the instance's
   backend: SandboxBackend | null;
+  // the project's own image variant, null following the instance's
+  variant: SandboxVariant | null;
 };
 
 type Raw = {
@@ -31,6 +36,7 @@ type Raw = {
   created_at: number;
   description: string;
   backend: SandboxBackend | null;
+  variant: SandboxVariant | null;
 };
 
 const row = (raw: Raw): ProjectRow => ({
@@ -41,6 +47,7 @@ const row = (raw: Raw): ProjectRow => ({
   createdAt: raw.created_at,
   description: raw.description,
   backend: raw.backend,
+  variant: raw.variant,
 });
 
 export const summary = (
@@ -182,6 +189,23 @@ export class ProjectStore {
       .query("update projects set backend = ? where id = ?")
       .run(backend, id);
     return this.byId(id);
+  }
+
+  setVariant(id: string, variant: SandboxVariant | null): ProjectRow | null {
+    this.db
+      .query("update projects set variant = ? where id = ?")
+      .run(variant, id);
+    return this.byId(id);
+  }
+
+  variantOf(id: string): SandboxVariant | null {
+    return (
+      this.db
+        .query<{ variant: SandboxVariant | null }, [string]>(
+          "select variant from projects where id = ?",
+        )
+        .get(id)?.variant ?? null
+    );
   }
 
   backendOf(id: string): SandboxBackend | null {

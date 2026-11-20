@@ -9,7 +9,83 @@ permissions:
   contents: read
 
 jobs:
+  # the sandbox shell image, one variant per run, each pushed as
+  # <tag>-<variant> (what the server runs) and <variant> (moving, for a
+  # run by hand)
+  shell:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push the sandbox images to GHCR
+      id-token: write # mint the OIDC token that signs the attestations
+      attestations: write # write the build provenance attestations
+      artifact-metadata: write # create the artifact storage records
+    strategy:
+      matrix:
+        variant: [python, bun, go, rust]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the tag is on main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "tag $GITHUB_REF_NAME is not on main" >&2
+            exit 1
+          fi
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "tag $GITHUB_REF_NAME is not vMAJOR.MINOR.PATCH[-PRERELEASE]" >&2
+            exit 1
+          fi
+      # every stage runs on the target platform: arm64 needs emulation
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Log in to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Sandbox image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        env:
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/1ctx-shell
+          tags: |
+            type=ref,event=tag,suffix=-${{ matrix.variant }}
+            type=raw,value=${{ matrix.variant }},enable=${{ !contains(github.ref_name, '-') }}
+          flavor: latest=false
+          labels: |
+            org.opencontainers.image.description=The image a 1ctx sandbox shell runs, ${{ matrix.variant }} variant.
+          annotations: |
+            org.opencontainers.image.description=The image a 1ctx sandbox shell runs, ${{ matrix.variant }} variant.
+      - name: Build and push sandbox image
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: deploy/sandbox
+          target: ${{ matrix.variant }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+      - name: Attest sandbox image provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/1ctx-shell
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
   release:
+    # the server names its variant images, so they are pushed first
+    needs: shell
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the GitHub release and upload the archives
@@ -110,35 +186,6 @@ jobs:
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
-      - name: Sandbox image metadata
-        id: sandbox-meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        env:
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
-        with:
-          images: ghcr.io/${{ github.repository_owner }}/1ctx-shell
-          tags: type=ref,event=tag
-          flavor: latest=false
-          labels: |
-            org.opencontainers.image.description=The image a 1ctx sandbox shell runs.
-          annotations: |
-            org.opencontainers.image.description=The image a 1ctx sandbox shell runs.
-      - name: Build and push sandbox image
-        id: sandbox-push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: deploy/sandbox
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.sandbox-meta.outputs.tags }}
-          labels: ${{ steps.sandbox-meta.outputs.labels }}
-          annotations: ${{ steps.sandbox-meta.outputs.annotations }}
-      - name: Attest sandbox image provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
-        with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/1ctx-shell
-          subject-digest: ${{ steps.sandbox-push.outputs.digest }}
           push-to-registry: true
       - name: Setup Helm
         uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
