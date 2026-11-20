@@ -138,6 +138,8 @@ const PROJECT: ProjectDetail = {
   latestFiles: [],
   backend: null,
   instanceBackend: "builtin" as const,
+  variant: null,
+  instanceVariant: "python" as const,
 };
 
 afterEach(() => {

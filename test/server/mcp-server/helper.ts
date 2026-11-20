@@ -49,6 +49,7 @@ export const project = {
   createdAt: 1,
   description: "",
   backend: null,
+  variant: null,
 };
 
 const key = (scope: "read" | "write" = "read"): Principal => ({

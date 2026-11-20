@@ -23,7 +23,6 @@ import type {
   ProjectDetail,
   ProjectSummary,
 } from "../../shared/contracts/project.ts";
-import type { SandboxBackend } from "../../shared/contracts/sandbox.ts";
 import type { SocketEvent } from "../../shared/socket.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { ApiError, api } from "./api.ts";
@@ -147,13 +146,12 @@ async function writeMetadata(
 export const saveAbout = (id: string, body: UpdateAboutRequest) =>
   writeMetadata(id, `${projectPath(id)}/about`, "PATCH", body);
 
-// a project's shell backend, an admin's on any project; the answer is
-// the detail, kept as any write's
+// a project's shell backend or image variant, an admin's on any
+// project; the answer is the detail, kept as any write's
 export function saveShell(
   id: string,
-  backend: SandboxBackend | null,
+  body: Pick<UpdateProjectRequest, "backend" | "variant">,
 ): Promise<void> {
-  const body: UpdateProjectRequest = { backend };
   return writeMetadata(id, projectPath(id), "PATCH", body);
 }
 

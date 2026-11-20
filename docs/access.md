@@ -261,12 +261,12 @@ from `emailOn` in `GET /api/me`.
   split: admins add, remove and choose a team project's on
   `/api/projects/:id/mcp` (`PUT .../:serverId/side`), an owner chooses
   their personal project's on `/api/profile/project/mcp/:serverId/side`
-  (`docs/mcp.md`). A project's shell backend is an admin's alone, a
-  personal project's included: `backend` on `PATCH /api/projects/:id`,
-  the one field that route takes for a personal project, whose name and
-  description stay a 404 there. On another user's personal project it
-  answers `{ id, backend }` alone, never the detail the admin may not
-  read. Anyone who sees the project reads it, with the instance's, in
+  (`docs/mcp.md`). A project's shell (backend and image variant) is an
+  admin's alone, a personal project's included: `backend` and `variant`
+  on `PATCH /api/projects/:id`, the only fields that route takes for a
+  personal project, whose name and description stay a 404 there. On
+  another user's personal project it answers `{ id, backend, variant }`
+  alone, never the detail the admin may not read. Anyone who sees the project reads it, with the instance's, in
   the detail.
 - **Removing a member drops their waiting messages in the same
   transaction.** If they lose visibility, it also unclaims their

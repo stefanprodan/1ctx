@@ -164,6 +164,8 @@ const shown = {
   latestFiles: [],
   backend: null,
   instanceBackend: "builtin" as const,
+  variant: null,
+  instanceVariant: "python" as const,
 };
 
 const realFetch = globalThis.fetch;

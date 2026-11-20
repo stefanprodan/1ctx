@@ -103,6 +103,7 @@ const EXPECTED_IDS = [
   "0088-sandbox-home",
   "0089-project-backend",
   "0090-sandbox-variant",
+  "0091-project-variant",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -135,6 +136,7 @@ const LATER_COLUMNS = [
   "mcp_on",
   "cleared_at",
   "backend",
+  "variant",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -2210,6 +2212,24 @@ describe("the schema", () => {
       db.query("update sandbox_settings set variant = 'rust'").run();
       expect(() =>
         db.query("update sandbox_settings set variant = 'node'").run(),
+      ).toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0091 gives every project a null variant, checked against the four words", () => {
+    const db = seed(MIGRATIONS.slice(0, 90));
+    try {
+      db.query("update projects set backend = 'openshell'").run();
+      expect(migrate(db)).toEqual(expectedFrom("0091-project-variant"));
+      expect(
+        db.query("select id, backend, variant from projects").all(),
+      ).toEqual([{ id: "p", backend: "openshell", variant: null }]);
+      db.query("update projects set variant = 'go'").run();
+      db.query("update projects set variant = null").run();
+      expect(() =>
+        db.query("update projects set variant = 'node'").run(),
       ).toThrow();
     } finally {
       db.close();
@@ -4779,6 +4799,7 @@ describe("project channel migrations", () => {
       "0088-sandbox-home",
       "0089-project-backend",
       "0090-sandbox-variant",
+      "0091-project-variant",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -5006,6 +5027,7 @@ describe("project channel migrations", () => {
           "0088-sandbox-home",
           "0089-project-backend",
           "0090-sandbox-variant",
+          "0091-project-variant",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5182,6 +5204,7 @@ describe("project channel migrations", () => {
         "0088-sandbox-home",
         "0089-project-backend",
         "0090-sandbox-variant",
+        "0091-project-variant",
       ]);
       expect(
         db

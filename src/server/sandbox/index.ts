@@ -32,6 +32,12 @@ import { routes } from "./routes.ts";
 import { defaultImage, gatewayLabel, imageOf } from "./spec.ts";
 import { SandboxStore } from "./store.ts";
 
+export {
+  DELETE_RETRY_MS,
+  DELETE_TIMEOUT_MS,
+  RETIRED_STUCK_CHECKS,
+  STUCK_CHECK_MS,
+} from "./deletes.ts";
 export type {
   BindMount,
   Connect,
@@ -48,20 +54,12 @@ export type {
   SandboxPolicy,
   TmpfsMount,
 } from "./gateway.ts";
+export type { RecycleReason, SandboxHold } from "./hold.ts";
 export { KEEP_ALIVE_COMMAND, keepAlivePid } from "./keepalive.ts";
-export {
-  DELETE_RETRY_MS,
-  DELETE_TIMEOUT_MS,
-  Leases,
-  REFILL_BACKOFF_MS,
-  RETIRED_STUCK_CHECKS,
-  type RecycleReason,
-  type SandboxHold,
-  STUCK_CHECK_MS,
-  WARM_CREATE_MS,
-} from "./leases.ts";
+export { Leases } from "./leases.ts";
 export { GLOBAL_POLICY_REFUSAL, READY_MS } from "./network.ts";
 export { openshellGateway } from "./openshell.ts";
+export { REFILL_BACKOFF_MS, WARM_CREATE_MS } from "./pool.ts";
 export {
   createSpec,
   defaultImage,
@@ -88,6 +86,8 @@ export type SandboxDeps = {
   projects: {
     // null follows the instance's, as does a project not found
     backend(projectId: string): SandboxBackend | null;
+    // the same for its image variant
+    variant(projectId: string): SandboxVariant | null;
     // some project runs openshell, asked often, so cheap
     openshell(): boolean;
     // how many projects pick each backend of their own, for the page
@@ -163,6 +163,15 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
   const backendOf = (projectId?: string | null): SandboxBackend =>
     (projectId ? deps.projects.backend(projectId) : null) ??
     store.settings().backend;
+  // a project's variant, its own over the instance's; null for a custom
+  // image, which replaces every variant
+  const variantOf = (projectId?: string | null): SandboxVariant | null => {
+    const held = store.settings();
+    if (held.image !== null) return null;
+    return (
+      (projectId ? deps.projects.variant(projectId) : null) ?? held.variant
+    );
+  };
   // the instance or some project runs openshell
   const wanted = (): boolean =>
     store.settings().backend === "openshell" || deps.projects.openshell();
@@ -188,9 +197,10 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
     else current.leases.poke();
   };
   // the leases of the gateway the settings name, made only when create
-  // asks: a new endpoint, key or image (a variant names one) deletes
-  // every sandbox of the old one, and so does a key file gone. One
-  // manager serves every project, so a project's change never makes one
+  // asks: a new endpoint, key or instance image (a variant names one)
+  // deletes every sandbox of the old one, and so does a key file gone.
+  // One manager serves every project, so a project's change never makes
+  // one: its next command's lease is made from its own image
   const ensure = (create: boolean, next = config()): Leases | null => {
     const key = next === null ? "" : JSON.stringify(next);
     if (current !== null && current.key === key) return current.leases;
@@ -204,6 +214,14 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       gateway,
       instanceId: store.settings().instanceId,
       image,
+      imageOf: (projectId) => {
+        const held = store.settings();
+        return imageOf(
+          deps.version,
+          variantOf(projectId) ?? held.variant,
+          held.image,
+        );
+      },
       // no warm sandbox while nothing runs openshell
       limits: () =>
         wanted() ? deps.limits() : { ...deps.limits(), sandboxWarm: 0 },
@@ -332,10 +350,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       return ensure(true, next) === null ? builtin : backend;
     },
     net: () => sandboxNet(store.settings()),
-    variant: () => {
-      const held = store.settings();
-      return held.image === null ? held.variant : null;
-    },
+    variant: variantOf,
     leases: () => ensure(wanted()),
     async start() {
       running = true;

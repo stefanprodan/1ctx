@@ -132,10 +132,11 @@ they name.
   carries it. A new project gets the listed labels alone, at least one,
   in place of the defaults. Preflight checks the API's rules and that
   the held and listed labels stay within the cap of 20.
-- **A `Project`'s `backend` is `builtin`, `openshell` or null,** its
-  own shell over the instance's (`docs/sandbox.md`); null follows the
-  instance's, and left out it stays. A new project gets it after its
-  create.
+- **A `Project`'s `backend` is `builtin`, `openshell` or null, and its
+  `variant` `python`, `bun`, `go`, `rust` or null,** its own shell over
+  the instance's (`docs/sandbox.md`); null follows the instance's, and
+  left out it stays. Either changed goes in one PATCH; a new project
+  gets them after its create.
 - **A `Project`'s `knowledge` is a folder relative to its YAML file.**
   It is never read from stdin, may not leave the file's directory, and
   refuses a symlink. Docs are named by their path and checked with the

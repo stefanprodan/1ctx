@@ -623,6 +623,40 @@ describe("provision through the composed app", () => {
     }
   });
 
+  test("a project's variant is set at create and update, and a re-apply writes nothing", async () => {
+    const { app } = await instance();
+    try {
+      const made = documents(
+        object("Project", "finops", {
+          description: "A team project.",
+          backend: "openshell",
+          variant: "go",
+        }),
+      );
+      expect((await app.provision.apply(made, ignore)).created).toBe(1);
+      const id = app.projects.teamProjectIds()[0]!;
+      expect(app.projects.variantOf(id)).toBe("go");
+      expect(app.projects.backendOf(id)).toBe("openshell");
+      const writes = mutations(app.db);
+      expect((await app.provision.apply(made, ignore)).unchanged).toBe(1);
+      expect(writes()).toEqual([]);
+      const moved = documents(object("Project", "finops", { variant: "rust" }));
+      expect((await app.provision.apply(moved, ignore)).updated).toBe(1);
+      expect(app.projects.variantOf(id)).toBe("rust");
+      expect(app.projects.backendOf(id)).toBe("openshell");
+      await app.provision.apply(
+        documents(object("Project", "finops", { variant: null })),
+        ignore,
+      );
+      expect(app.projects.variantOf(id)).toBeNull();
+      expect(() =>
+        documents(object("Project", "finops", { variant: "node" })),
+      ).toThrow("variant must be one of python, bun, go, rust or null");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
   test("diffs project membership, preserves omissions and never prunes unnamed rows", async () => {
     const { app } = await instance();
     try {

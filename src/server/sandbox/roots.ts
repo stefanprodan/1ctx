@@ -88,8 +88,8 @@ export async function checkRoots(
 // a refusal the image earned, which the leases keep and show the admin
 export class ImageRefused extends Error {}
 
-// one manager's image: checked until one sandbox passes, refused for
-// good once one fails, since every sandbox of it is made the same way
+// one image: checked until one sandbox passes, refused for good once
+// one fails, since every sandbox of it is made the same way
 export class ImageCheck {
   private passed = false;
   refused: ImageRefused | null = null;
@@ -122,5 +122,31 @@ export class ImageCheck {
       `the sandbox image ${this.image} fails its root check (${problems.join(", ")}). An admin must fix the image or pick another`,
     );
     throw this.refused;
+  }
+}
+
+// a manager's checks, one per image its projects' variants name
+export class ImageChecks {
+  private readonly checks = new Map<string, ImageCheck>();
+
+  constructor(private readonly log: Log) {}
+
+  of(image: string): ImageCheck {
+    let check = this.checks.get(image);
+    if (check === undefined) {
+      check = new ImageCheck(image, this.log);
+      this.checks.set(image, check);
+    }
+    return check;
+  }
+
+  refused(image: string): ImageRefused | null {
+    return this.checks.get(image)?.refused ?? null;
+  }
+
+  // a throw of the image's refusal, once one sandbox of it failed
+  pass(image: string): void {
+    const refused = this.refused(image);
+    if (refused !== null) throw refused;
   }
 }

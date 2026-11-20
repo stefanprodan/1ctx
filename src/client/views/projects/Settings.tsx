@@ -164,7 +164,7 @@ function SettingsWaiting({
           // its Add lands only with servers left to add
           body: <ListBones at={12} head={null} />,
         },
-        { title: "Shell", text: SHELL_TEXT, fields: ["input"] },
+        { title: "Shell", text: SHELL_TEXT, fields: ["input", "input"] },
       ]}
     />
   );

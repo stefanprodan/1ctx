@@ -24,6 +24,9 @@ export const VARIANT_OPTIONS: { value: SandboxVariant; label: string }[] = [
   { value: "rust", label: "Rust" },
 ];
 
+export const variantWord = (variant: SandboxVariant): string =>
+  VARIANT_OPTIONS.find((option) => option.value === variant)?.label ?? variant;
+
 // what each variant holds past the others, for its hint
 const VARIANT_LINES: Record<SandboxVariant, string> = {
   python: "Python and uv, git, make, jq, yq and rg.",

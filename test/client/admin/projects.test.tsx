@@ -88,6 +88,8 @@ const detail: ProjectDetail = {
   latestFiles: [],
   backend: null,
   instanceBackend: "builtin" as const,
+  variant: null,
+  instanceVariant: "python" as const,
 };
 
 let answer: (url: string, init?: RequestInit) => Response | Promise<Response>;

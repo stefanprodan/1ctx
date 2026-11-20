@@ -308,7 +308,11 @@ describe("who sets a project's shell", () => {
       });
       expect(res.status).toBe(200);
       // what changed alone: the admin may not read the rest of it
-      expect(await res.json()).toEqual({ id: own.id, backend: "openshell" });
+      expect(await res.json()).toEqual({
+        id: own.id,
+        backend: "openshell",
+        variant: null,
+      });
       expect(app.projects.backendOf(own.id)).toBe("openshell");
       // an admin's own personal project answers its whole detail
       const mine = app.projects.personal(app.users.byUsername("admin")!.id)!;

@@ -100,6 +100,8 @@ describe("the projects entity", () => {
         latestFiles: [],
         backend: null,
         instanceBackend: "builtin" as const,
+        variant: null,
+        instanceVariant: "python" as const,
         members: [casey],
         labels: [{ id: "l1", name: "build", description: "", tasks: 1 }],
       };
@@ -134,6 +136,8 @@ describe("the projects entity", () => {
         latestFiles: [],
         backend: null,
         instanceBackend: "builtin" as const,
+        variant: null,
+        instanceVariant: "python" as const,
         members: [casey],
         labels: [{ id: "l1", name: "build", description: "", tasks: 1 }],
       };
@@ -181,6 +185,8 @@ describe("the projects entity", () => {
         latestFiles: [],
         backend: null,
         instanceBackend: "builtin" as const,
+        variant: null,
+        instanceVariant: "python" as const,
         members: [casey],
         labels: [],
       };
@@ -204,6 +210,8 @@ describe("the projects entity", () => {
         latestFiles: [],
         backend: null,
         instanceBackend: "builtin" as const,
+        variant: null,
+        instanceVariant: "python" as const,
         members: [casey],
         labels: [{ id: "l1", name: "build", description: "", tasks: 0 }],
       };
@@ -241,6 +249,8 @@ describe("the projects entity", () => {
         latestFiles: [],
         backend: null,
         instanceBackend: "builtin" as const,
+        variant: null,
+        instanceVariant: "python" as const,
         members: [casey],
         labels: [{ id: "l1", name: "build", description: "", tasks: 0 }],
       };
@@ -297,6 +307,8 @@ describe("the projects entity", () => {
       latestFiles: [],
       backend: null,
       instanceBackend: "builtin" as const,
+      variant: null,
+      instanceVariant: "python" as const,
       members: [casey],
       labels: [],
     };
@@ -386,6 +398,8 @@ describe("the projects entity", () => {
                   latestFiles: [],
                   backend: null,
                   instanceBackend: "builtin" as const,
+                  variant: null,
+                  instanceVariant: "python" as const,
                   members: [],
                 },
               }),
@@ -424,6 +438,8 @@ describe("the projects entity", () => {
                     latestFiles: [],
                     backend: null,
                     instanceBackend: "builtin" as const,
+                    variant: null,
+                    instanceVariant: "python" as const,
                     members: [],
                   },
                 }),
@@ -812,6 +828,8 @@ describe("the pages", () => {
       latestFiles: [],
       backend: null,
       instanceBackend: "builtin" as const,
+      variant: null,
+      instanceVariant: "python" as const,
       members: [casey],
       labels: [],
     };
@@ -849,6 +867,8 @@ describe("the pages", () => {
       latestFiles: [],
       backend: null,
       instanceBackend: "builtin" as const,
+      variant: null,
+      instanceVariant: "python" as const,
       members: [casey],
       labels: [],
     };
@@ -879,6 +899,8 @@ describe("the pages", () => {
       latestFiles: [],
       backend: null,
       instanceBackend: "builtin" as const,
+      variant: null,
+      instanceVariant: "python" as const,
       members: [casey],
       labels: [],
     };
@@ -910,6 +932,8 @@ describe("the pages", () => {
       latestFiles: [],
       backend: null,
       instanceBackend: "builtin" as const,
+      variant: null,
+      instanceVariant: "python" as const,
       members: [casey],
       labels: [],
     });
@@ -1181,6 +1205,8 @@ describe("the pages", () => {
       latestFiles: [],
       backend: null,
       instanceBackend: "builtin" as const,
+      variant: null,
+      instanceVariant: "python" as const,
       members: [casey],
       labels: [],
     };
@@ -1202,6 +1228,8 @@ describe("the pages", () => {
         latestFiles: [],
         backend: null,
         instanceBackend: "builtin" as const,
+        variant: null,
+        instanceVariant: "python" as const,
         members: [casey],
         labels: [],
       };
@@ -1224,6 +1252,8 @@ describe("the pages", () => {
       latestFiles: [],
       backend: null,
       instanceBackend: "builtin" as const,
+      variant: null,
+      instanceVariant: "python" as const,
       members: [casey],
       labels: [],
     };

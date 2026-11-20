@@ -8,6 +8,7 @@ import type { Gateway } from "./gateway.ts";
 
 export type RecycleReason =
   | "mounts"
+  | "image"
   | "cap"
   | "idle"
   | "clear"

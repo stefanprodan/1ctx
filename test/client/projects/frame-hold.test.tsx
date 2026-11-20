@@ -44,6 +44,8 @@ const detail: ProjectDetail = {
   latestFiles: [],
   backend: null,
   instanceBackend: "builtin" as const,
+  variant: null,
+  instanceVariant: "python" as const,
 };
 
 let clock: ReturnType<typeof fakeClock>;
