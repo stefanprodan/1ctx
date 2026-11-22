@@ -179,7 +179,7 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   none of the image's `ENV`.
 - **The image (`deploy/sandbox/Dockerfile`) is one target per
   variant.** `base` is uv's Python 3.15 on Debian trixie with bash,
-  git, make, curl, jq, yq and ripgrep, the sandbox user and every root;
+  git, make, curl, jq, yq, ripgrep and pdftotext, the sandbox user and every root;
   the helpers run `/usr/local/bin/python3 -I -S` and `/usr/bin/bash`,
   so every variant keeps it. `python` is `base`; `bun` adds Bun, with
   `node` linked to `bun` (`node --version` is not answered) and `npx`
@@ -194,7 +194,7 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   sandbox is recycled. Nothing of ours walks, pushes or pulls HOME; the
   root check only writes and removes its probe file there. Measured
   locally (`docker images`, linux/arm64, 2026-11-20): python 439 MB,
-  bun 602 MB, go 1.06 GB, rust 1.44 GB.
+  bun 602 MB, go 1.06 GB, rust 1.44 GB; python 488 MB with pdftotext.
 - **The policy opens the devices shells and the fence use:**
   `/dev/null`, `/dev/zero`, `/dev/random`, `/dev/tty`, `/dev/ptmx` and
   `/dev/pts` read-write, `/dev/urandom` and `/sys/fs/cgroup` read-only.

@@ -22,7 +22,7 @@ export const SHELL_VERSIONS = {
 } as const;
 
 const BASE = `Python ${SHELL_VERSIONS.python} with uv`;
-const DATA = "git, make, jq, yq and rg";
+const DATA = "git, make, jq, yq, rg and pdftotext";
 const UV = "uv run --with pkg, a venv under $HOME";
 
 export const SHELL_TOOLS: Readonly<Record<SandboxVariant, ShellTools>> = {

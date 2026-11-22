@@ -38,25 +38,25 @@ const DOCKERFILE = join(
 describe("bash's tools by image variant", () => {
   test("each variant names its own tools and install hint", () => {
     expect(words("python")).toContain(
-      "Linux sandbox: Python 3.15 with uv, git, make, jq, yq and rg; no node. /knowledge",
+      "Linux sandbox: Python 3.15 with uv, git, make, jq, yq, rg and pdftotext; no node. /knowledge",
     );
     expect(words("python")).toContain(
       "Install with uv run --with pkg or a venv under $HOME. ",
     );
     expect(words("bun")).toContain(
-      "Linux sandbox: Python 3.15 with uv, Bun 1.4 (node and npx run on Bun), git, make, jq, yq and rg. /knowledge",
+      "Linux sandbox: Python 3.15 with uv, Bun 1.4 (node and npx run on Bun), git, make, jq, yq, rg and pdftotext. /knowledge",
     );
     expect(words("bun")).toContain(
       "Install with uv run --with pkg, a venv under $HOME, or bun add in a project under $HOME. ",
     );
     expect(words("go")).toContain(
-      "Linux sandbox: Python 3.15 with uv, Go 1.27 with cgo and gcc, git, make, jq, yq and rg; no node, no extra system libraries. /knowledge",
+      "Linux sandbox: Python 3.15 with uv, Go 1.27 with cgo and gcc, git, make, jq, yq, rg and pdftotext; no node, no extra system libraries. /knowledge",
     );
     expect(words("go")).toContain(
       "Install with uv run --with pkg, a venv under $HOME, or go install; modules come through the proxy. ",
     );
     expect(words("rust")).toContain(
-      "Linux sandbox: Python 3.15 with uv, Rust 1.100 with cargo and gcc, git, make, jq, yq and rg; no node. /knowledge",
+      "Linux sandbox: Python 3.15 with uv, Rust 1.100 with cargo and gcc, git, make, jq, yq, rg and pdftotext; no node. /knowledge",
     );
     expect(words("rust")).toContain(
       "Install with uv run --with pkg, a venv under $HOME, cargo add or cargo install. ",

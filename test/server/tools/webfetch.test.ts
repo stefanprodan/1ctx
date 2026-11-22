@@ -10,12 +10,12 @@
 import { describe, expect, test } from "bun:test";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
-  extractHtml,
   fetchText,
   makeWebfetchTool,
   parseFetchUrl,
   sliceContent,
 } from "../../../src/server/tools/builtin/webfetch.ts";
+import { extractHtml } from "../../../src/server/tools/builtin/webfetch-html.ts";
 import type {
   ToolBudget,
   ToolContext,
@@ -370,7 +370,7 @@ describe("fetch response", () => {
     );
     await expect(
       run({ url: "https://public.example/file.pdf" }, pdf),
-    ).rejects.toThrow('media type "application/pdf" is not allowed');
+    ).rejects.toThrow(/^media type "application\/pdf" is not allowed$/);
 
     const malformed = dependencies(
       () => new Response("body", { headers: { "content-type": "text/" } }),
@@ -378,6 +378,29 @@ describe("fetch response", () => {
     await expect(
       run({ url: "https://public.example/bad" }, malformed),
     ).rejects.toThrow('media type "text/" is not allowed');
+  });
+
+  test("names the sandbox shell's pdftotext only for a PDF there", async () => {
+    const pdf = dependencies(
+      () =>
+        new Response("pdf", { headers: { "content-type": "application/pdf" } }),
+    );
+    await expect(
+      makeWebfetchTool(pdf, null, { sandbox: true }).run(
+        { url: "https://public.example/file.pdf" },
+        context(),
+      ),
+    ).rejects.toThrow(
+      'media type "application/pdf" is not allowed; download it with curl in bash and read it with pdftotext',
+    );
+
+    const zip = dependencies(
+      () =>
+        new Response("zip", { headers: { "content-type": "application/zip" } }),
+    );
+    await expect(
+      fetchText({ url: "https://public.example/a.zip" }, context(), zip, true),
+    ).rejects.toThrow(/^media type "application\/zip" is not allowed$/);
   });
 
   test("decodes the declared charset and falls back on an unknown label", async () => {

@@ -136,7 +136,9 @@ words.
   also needs a provider, null on a fresh instance. Webfetch checks every
   redirect against the listed origins and refuses a private host the
   list does not name, as bash's curl does (`docs/bash.md`). The send
-  keeps its web snapshot.
+  keeps its web snapshot. Webfetch reads only text, JSON and XML; when
+  the send's bash runs in the sandbox shell, a PDF's refusal names
+  curl and pdftotext, and never otherwise, since just-bash has no pdftotext.
 - **Websearch needs no key.** Every provider answers keyless; a
   `search-<provider>.key` file only raises the rate.
 - **Only the `visualize`, `email_user`, `automation` and

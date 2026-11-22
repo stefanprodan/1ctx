@@ -243,7 +243,7 @@ export function toolsArea(deps: ToolsDeps): ToolsArea {
     projectId: string | null = null,
   ): Tool<string | ToolResult>[] => [
     datetimeTool,
-    ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web)]),
+    ...(web === null ? [] : [makeWebfetchTool(deps.fetcher, web, shell)]),
     ...(search === null
       ? []
       : [
