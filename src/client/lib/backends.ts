@@ -29,7 +29,7 @@ export const variantWord = (variant: SandboxVariant): string =>
 
 // what each variant holds past the others, for its hint
 const VARIANT_LINES: Record<SandboxVariant, string> = {
-  python: "Python and uv, git, make, jq, yq and rg.",
+  python: "Python and uv, git, make, jq, yq, rg and pdftotext.",
   bun: "The Python image and Bun, which runs node and npx.",
   go: "The Python image, Go with cgo and gcc.",
   rust: "The Python image, Rust with cargo and gcc.",

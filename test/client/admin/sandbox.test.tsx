@@ -375,7 +375,9 @@ describe("the Sandbox page", () => {
     expect(html).toContain(
       'placeholder="ghcr.io/stefanprodan/1ctx-shell:dev-python"',
     );
-    expect(html).toContain("Python and uv, git, make, jq, yq and rg.");
+    expect(html).toContain(
+      "Python and uv, git, make, jq, yq, rg and pdftotext.",
+    );
     expect(html).toContain("A custom image replaces the variant.");
     expect(html).toContain("openshell-gateway-ca.key");
     expect(html).toContain("1ctx-abc123");

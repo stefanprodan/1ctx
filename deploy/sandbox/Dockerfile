@@ -4,7 +4,8 @@
 # The 1ctx shell image, one target per variant:
 #
 # python:  Python and uv, bash, coreutils, findutils, procps, tar, curl,
-#          git, make, jq, yq, ripgrep (the base, in every variant)
+#          git, make, jq, yq, ripgrep, pdftotext (the base, in every
+#          variant)
 # bun:     the base and Bun, with node and npx running on Bun
 # go:      the base, gcc and Go with cgo
 # rust:    the base, gcc and Rust stable through rustup
@@ -18,7 +19,7 @@ ARG TARGETARCH
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       bash ca-certificates coreutils curl findutils git jq make \
-      procps ripgrep tar \
+      poppler-utils procps ripgrep tar \
  && rm -rf /var/lib/apt/lists/*
 
 RUN set -eu; \

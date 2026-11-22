@@ -9,6 +9,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ShellBackend } from "../../../src/server/bash/index.ts";
 import { silent } from "../../../src/server/lib/log.ts";
+import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import { HEALTH_MS } from "../../../src/server/sandbox/index.ts";
 import { toolsArea } from "../../../src/server/tools/index.ts";
 import type {
@@ -67,13 +68,15 @@ async function instance(admin: Admin, body: Record<string, unknown>) {
   return (await res.json()) as SandboxResponse;
 }
 
-// the offer of a main round in the project, over the app's own bash
-function offeredSandbox(app: TestApp, projectId: string): boolean {
+// the offer of a main round in the project, over the app's own bash;
+// every fetch answers a PDF
+function offer(app: TestApp, projectId: string) {
   const tools = toolsArea({
     db: memoryDb(),
-    fetcher: (async () => {
-      throw new Error("no network in this test");
-    }) as unknown as typeof fetch,
+    fetcher: (async () =>
+      new Response("%PDF", {
+        headers: { "content-type": "application/pdf" },
+      })) as unknown as typeof fetch,
     secret: () => null,
     clock: () => app.now.value,
     log: silent,
@@ -81,12 +84,49 @@ function offeredSandbox(app: TestApp, projectId: string): boolean {
     skills: { forAgent: () => [], body: () => null, file: () => null },
     bash: app.bash,
   });
+  tools.store.setAccess("all", [], app.now.value);
   const offered = tools.offered(app.now.value, "", false, "auto", {
     projectId,
     automation: null,
     phase: "main",
   });
-  return offered.sandbox === true;
+  return { tools, offered };
+}
+
+function offeredSandbox(app: TestApp, projectId: string): boolean {
+  return offer(app, projectId).offered.sandbox === true;
+}
+
+// what webfetch answers a PDF in a main round of the project
+async function pdfRefusal(app: TestApp, projectId: string): Promise<string> {
+  const { tools, offered } = offer(app, projectId);
+  const result = await tools.run(
+    offered,
+    {
+      id: "fetch",
+      name: "webfetch",
+      arguments: '{"url":"https://docs.test/a.pdf"}',
+    },
+    {
+      web: offered.web,
+      sendId: "send00000001",
+      messageId: "tool00000001",
+      disabledCapabilities: [],
+      actor: null,
+      now: () => app.now.value,
+      signal: new AbortController().signal,
+      budget: {
+        bashCalls: 0,
+        fetches: 0,
+        searches: 0,
+        visualBytes: 0,
+        visuals: 0,
+      },
+      caps: DEFAULT_LIMITS,
+    },
+  );
+  expect(result.error).toBe(true);
+  return result.content;
 }
 
 // a sandbox a chat of the project used and let go, idle
@@ -163,6 +203,11 @@ describe("a project's shell", () => {
         expect(app.bash.sandbox?.(plain.id)).toBeNull();
         expect(offeredSandbox(app, box.id)).toBe(true);
         expect(offeredSandbox(app, plain.id)).toBe(false);
+        // only the sandbox shell has pdftotext to name
+        expect(await pdfRefusal(app, box.id)).toContain("pdftotext");
+        expect(await pdfRefusal(app, plain.id)).toBe(
+          'Error: media type "application/pdf" is not allowed',
+        );
         // the instance's own switch keeps the one manager every project
         // shares
         const leases = app.sandbox.leases();

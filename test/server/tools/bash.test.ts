@@ -611,7 +611,7 @@ describe("bash's description under the sandbox shell", () => {
   // the words as the user wrote them: a call's time and the idle time
   // from the limits, then the network and each credential
   const WORDS =
-    "Run a bash command in this chat's Linux sandbox: Python 3.15 with uv, git, make, jq, yq and rg; no node. /knowledge is the project's shared docs, saved as a new version when the command ends; if someone else changed a file meanwhile, nothing is saved: read it again and retry. /uploads holds the user's attachments, read-only. /tmp and $HOME are yours until the sandbox is recycled (after 30 idle minutes, a restart, a timeout or a failed save), so keep what must last in /knowledge. Search before reading: rg -il 'word' /knowledge, grep -n, sed -n '40,120p'. Never print whole files or trees; long output is cut. Each call is a new shell in the last directory: chain one task's steps in one call, and make independent calls in parallel. A call may run 10 minutes; send a background job's output to a file. Install with uv run --with pkg or a venv under $HOME. open <file> shows a file to the user: HTML and SVG as visuals, Markdown rendered. Network: HTTP and HTTPS to the admin's list only: package and container registries, code hosts, docs, news and public APIs (pypi.org, registry.npmjs.org, github.com…); anything else is refused. Never write secrets.";
+    "Run a bash command in this chat's Linux sandbox: Python 3.15 with uv, git, make, jq, yq, rg and pdftotext; no node. /knowledge is the project's shared docs, saved as a new version when the command ends; if someone else changed a file meanwhile, nothing is saved: read it again and retry. /uploads holds the user's attachments, read-only. /tmp and $HOME are yours until the sandbox is recycled (after 30 idle minutes, a restart, a timeout or a failed save), so keep what must last in /knowledge. Search before reading: rg -il 'word' /knowledge, grep -n, sed -n '40,120p'. Never print whole files or trees; long output is cut. Each call is a new shell in the last directory: chain one task's steps in one call, and make independent calls in parallel. A call may run 10 minutes; send a background job's output to a file. Install with uv run --with pkg or a venv under $HOME. open <file> shows a file to the user: HTML and SVG as visuals, Markdown rendered. Network: HTTP and HTTPS to the admin's list only: package and container registries, code hosts, docs, news and public APIs (pypi.org, registry.npmjs.org, github.com…); anything else is refused. Never write secrets.";
 
   test("its words are the short ones, byte for byte", () => {
     const hash = (text: string) =>
@@ -619,17 +619,17 @@ describe("bash's description under the sandbox shell", () => {
     const words = makeBashTool({ web: listed, sandbox: hosts }).description;
     expect(words).toBe(WORDS);
     expect(hash(words)).toBe(
-      "d95c5599e1a5603081c511fc06450c20f0dcb41d22e7f76d6bf5aa954003c10e",
+      "7bbefa9184f00942643b4fbe11f162a1b7f9a9f1cd378adedae0f34df615f772",
     );
     expect(hash(makeBashTool({ web: null, sandbox: hosts }).description)).toBe(
-      "e954594de2624f142016e72f744fff9e3b1975c0680c954df215e70d4766e30f",
+      "2dc3ae9cf44b2c9006c65826185da0cf7c8da17a743f73643e6fa747aa2379b2",
     );
     expect(
       hash(
         makeBashTool({ web: listed, sandbox: hosts, subagent: true })
           .description,
       ),
-    ).toBe("01a0140d4767400accda261b064a7fdc5fbd7ca130823faca3864b3a6518fb5a");
+    ).toBe("9f422efd7db2be00bf750dc338644e6a5ebf248da09a7bc3b168fd5ededea16f");
   });
 
   test("each credential it can place follows the network, its header named", () => {
