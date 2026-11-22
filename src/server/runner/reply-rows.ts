@@ -29,6 +29,11 @@ export const NOT_RUN_REPEAT =
   "not run: the same calls as your previous two rounds, and their results are above. Use them, call something else, or answer.";
 export const OVER_ROUND = "not run: too many calls in one round";
 
+// a call past callsPerRound in a round whose first calls ran
+export function overRound(perRound: number): string {
+  return `not run: a round runs at most ${perRound} calls, so this one was skipped. Call it again if you still need it.`;
+}
+
 export function notRun(reason: string): string {
   return reason === "tool_loop" ? NOT_RUN_LOOP : NOT_RUN;
 }

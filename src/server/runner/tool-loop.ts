@@ -5,9 +5,10 @@
 // (round.ts), then the loop decides: a normal end with no calls is the
 // answer and the send finishes; calls that a cap, the loop check or the
 // answer round forbids are recorded not run and the send ends on that
-// reason; calls to run launch in parallel under the call timeout and the
-// send's signal, their ends written one by one, and the next round
-// begins. Every exit goes through terminate(), never finalizeSend.
+// reason; calls to run, at most callsPerRound with the rest recorded not
+// run, launch in parallel under the call timeout and the send's signal,
+// their ends written one by one, and the next round begins. Every exit
+// goes through terminate(), never finalizeSend.
 
 import { compactsAt } from "../../shared/compaction.ts";
 import type { Message } from "../../shared/contracts/session.ts";
@@ -21,7 +22,7 @@ import { DELEGATE_TOOL, isMemoryTool } from "../tools/index.ts";
 import { runOne, toolContext } from "./call.ts";
 import { ASK_TOKENS } from "./context.ts";
 import type { ToolResult, ToolsPort } from "./policy.ts";
-import { NOT_RUN_REPEAT, notRun } from "./reply-rows.ts";
+import { NOT_RUN_REPEAT, notRun, overRound } from "./reply-rows.ts";
 import { cutResult, fitResults, resultsFit } from "./results.ts";
 import type { RoundDeps } from "./round.ts";
 import { runRound } from "./round.ts";
@@ -192,19 +193,25 @@ export async function toolLoop(
       continue;
     }
 
-    // the caps, weighed before the calls launch
-    const cap = overCap(send, calls, limits);
+    // a round over callsPerRound runs its first calls and the rest are
+    // recorded not run, so the model can call them again next round;
+    // the caps are weighed against the calls that run
+    const ran = calls.slice(0, limits.callsPerRound);
+    const cap = overCap(send, ran, limits);
     if (cap !== null) {
       goToAnswer(deps, send, cap, { calls });
       continue;
     }
 
     // launch the round's calls in parallel, record the send counters,
-    // write one streaming tool row per call, then run them
+    // write one tool row per call in the model's order, then run them
     const toolNames = calls.map(
       (call) => deps.tools.toolName?.(send.policy.offered, call) ?? call.name,
     );
-    send.budget.calls = deps.writer.finishRound(send, toolNames).toolCalls;
+    send.budget.calls = deps.writer.finishRound(send, toolNames, {
+      ran: ran.length,
+      skipped: overRound(limits.callsPerRound),
+    }).toolCalls;
     if (send.cause !== null) return endFor(send.cause);
     goToTools(send);
     const threshold = compactsAt(
@@ -216,7 +223,7 @@ export async function toolLoop(
       threshold === null
         ? null
         : Math.max(0, threshold - round.tokens - ASK_TOKENS);
-    const cut = await runCalls(deps, send, calls, room);
+    const cut = await runCalls(deps, send, ran, room);
     if (send.cause !== null) return endFor(send.cause);
 
     if (cut) {
@@ -232,7 +239,6 @@ function overCap(
   calls: ToolCall[],
   limits: ActiveSend["policy"]["limits"],
 ): CapReason | null {
-  if (calls.length > limits.callsPerRound) return "tool_limit";
   if (send.budget.calls + calls.length > limits.callsPerSend)
     return "tool_limit";
   if (send.roundNo >= limits.rounds - 1) return "tool_limit";

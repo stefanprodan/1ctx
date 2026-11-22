@@ -10,11 +10,12 @@
 // the round numbers, the tool rows, the counters and the terminal cause.
 
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_LIMITS } from "../../src/server/limits/index.ts";
 import { LOOP_LINE } from "../../src/server/runner/context.ts";
 import {
+  NOT_RUN,
   NOT_RUN_LOOP,
   NOT_RUN_REPEAT,
+  overRound,
 } from "../../src/server/runner/reply-rows.ts";
 import { settleRun } from "../helpers/automations.ts";
 import { chatApp, setLimits, startChat, waitScript } from "../helpers/chat.ts";
@@ -285,13 +286,11 @@ describe("the tool loop", () => {
 
   test("the answer round keeps the schemas and asks for the answer in words", async () => {
     const chat = await chatApp();
+    await setLimits(chat, { callsPerSend: 1 });
     const { detail, sessionId } = await startChat(chat, "cap then answer");
-    // over the per-round cap: the calls are recorded not run and the
+    // over the send's call cap: the calls are recorded not run and the
     // loop enters the answer round, which asks for the answer in words
-    const many = Array.from(
-      { length: DEFAULT_LIMITS.callsPerRound + 1 },
-      (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
-    );
+    const many = [time("c0"), time("c1", "Etc/GMT+1")];
     chat.scripted.scripts[0].toolRound(many);
     chat.scripted.scripts[0].end();
     // the answer round: the provider calls anyway, so a local server is
@@ -329,11 +328,9 @@ describe("the tool loop", () => {
 
   test("a hosted wire goes from the answer round straight to no schemas", async () => {
     const chat = await chatApp({ wire: "gemini" });
+    await setLimits(chat, { callsPerSend: 1 });
     const { sessionId } = await startChat(chat, "cap on gemini");
-    const many = Array.from(
-      { length: DEFAULT_LIMITS.callsPerRound + 1 },
-      (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
-    );
+    const many = [time("c0"), time("c1", "Etc/GMT+1")];
     chat.scripted.scripts[0].toolRound(many);
     chat.scripted.scripts[0].end();
     const answer = await chat.scripted.next();
@@ -362,11 +359,9 @@ describe("the tool loop", () => {
   ] as const) {
     test(`a call written as text without schemas is not the answer on ${wire}`, async () => {
       const chat = await chatApp({ wire });
+      await setLimits(chat, { callsPerSend: 1 });
       const { sessionId } = await startChat(chat, `text call on ${wire}`);
-      const many = Array.from(
-        { length: DEFAULT_LIMITS.callsPerRound + 1 },
-        (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
-      );
+      const many = [time("c0"), time("c1", "Etc/GMT+1")];
       chat.scripted.scripts[0].toolRound(many);
       chat.scripted.scripts[0].end();
       // the answer round and its retries with schemas still call
@@ -525,28 +520,112 @@ describe("the tool loop", () => {
     }
   });
 
-  test("the call cap cuts a round over the per-round limit", async () => {
+  test("a round over the per-round cap runs its first calls and goes on", async () => {
     const chat = await chatApp();
+    await setLimits(chat, { callsPerRound: 3 });
     const { detail, sessionId } = await startChat(chat, "too many at once");
-    const many = Array.from(
-      { length: DEFAULT_LIMITS.callsPerRound + 1 },
-      (_, i) => time(`c${i}`, `Etc/GMT+${(i % 12) + 1}`),
+    const many = Array.from({ length: 5 }, (_, i) =>
+      time(`c${i}`, `Etc/GMT+${i + 1}`),
     );
     chat.scripted.scripts[0].toolRound(many);
     chat.scripted.scripts[0].end();
-    // over the per-round cap: the calls are recorded not run, the loop
-    // goes to the answer round
+    // the first three run, the last two are skipped, and the next round
+    // is a work round where the model calls them again
     const r2 = await chat.scripted.next();
-    r2.reply("answered without the tools");
+    expect(asksAnswer(r2.body)).toBe(false);
+    // the request carries a result for every call id, the skipped too
+    const results = (
+      r2.body.messages as {
+        role: string;
+        tool_call_id?: string;
+        content: unknown;
+      }[]
+    ).filter((m) => m.role === "tool");
+    expect(results.map((m) => m.tool_call_id)).toEqual(
+      many.map((call) => call.id),
+    );
+    for (const result of results.slice(3)) {
+      expect(result.content).toBe(overRound(3));
+    }
+    r2.toolRound(many.slice(3).map((call) => ({ ...call, id: `${call.id}b` })));
+    r2.end();
+    const r3 = await chat.scripted.next();
+    r3.reply("all five answered");
     await settle(chat, 10);
     const send = chat.app.sessions.send(detail.send.id)!;
-    expect(send.status).toBe("done");
-    expect(send.toolCalls).toBe(0);
+    expect(send).toMatchObject({ status: "done", rounds: 3, toolCalls: 5 });
     const toolRows = chat.app.sessions
       .messages(sessionId)
       .filter((r) => r.kind === "tool");
-    expect(toolRows.length).toBe(many.length);
-    expect(toolRows.every((r) => r.status === "stopped")).toBe(true);
+    expect(toolRows.map((r) => [r.toolCallId, r.status])).toEqual([
+      ["c0", "done"],
+      ["c1", "done"],
+      ["c2", "done"],
+      ["c3", "stopped"],
+      ["c4", "stopped"],
+      ["c3b", "done"],
+      ["c4b", "done"],
+    ]);
+    for (const row of toolRows.slice(3, 5)) {
+      expect(row.content).toBe(overRound(3));
+    }
+    const replies = chat.app.sessions
+      .messages(sessionId)
+      .filter((r) => r.kind === "reply");
+    expect(replies.map((r) => r.finishReason)).toEqual([
+      "tool_calls",
+      "tool_calls",
+      "stop",
+    ]);
+    answerNodes(chat, sessionId);
+    chat.app.socket.dispose();
+  });
+
+  test("a round over the per-round cap whose kept calls pass the send cap ends on it", async () => {
+    const chat = await chatApp();
+    await setLimits(chat, { callsPerRound: 3, callsPerSend: 4 });
+    const { detail, sessionId } = await startChat(chat, "per send");
+    // round 1 runs three of five, and the skipped two are not counted
+    const first = Array.from({ length: 5 }, (_, i) =>
+      time(`a${i}`, `Etc/GMT+${i + 1}`),
+    );
+    chat.scripted.scripts[0].toolRound(first);
+    chat.scripted.scripts[0].end();
+    const r2 = await chat.scripted.next();
+    expect(asksAnswer(r2.body)).toBe(false);
+    // round 2 keeps three again: 3 + 3 passes four, so the whole round
+    // is recorded not run and the answer round follows
+    const second = Array.from({ length: 5 }, (_, i) =>
+      time(`b${i}`, `Etc/GMT+${i + 6}`),
+    );
+    r2.toolRound(second);
+    r2.end();
+    const r3 = await chat.scripted.next();
+    expect(asksAnswer(r3.body)).toBe(true);
+    r3.reply("answered at the cap");
+    await settle(chat, 10);
+    const send = chat.app.sessions.send(detail.send.id)!;
+    expect(send).toMatchObject({ status: "done", toolCalls: 3 });
+    const toolRows = chat.app.sessions
+      .messages(sessionId)
+      .filter((r) => r.kind === "tool");
+    expect(toolRows.slice(3, 5).map((r) => r.content)).toEqual([
+      overRound(3),
+      overRound(3),
+    ]);
+    const cut = toolRows.slice(5);
+    expect(cut.map((r) => r.toolCallId)).toEqual(second.map((c) => c.id));
+    for (const row of cut) {
+      expect(row).toMatchObject({ status: "stopped", content: NOT_RUN });
+    }
+    const replies = chat.app.sessions
+      .messages(sessionId)
+      .filter((r) => r.kind === "reply");
+    expect(replies.map((r) => r.finishReason)).toEqual([
+      "tool_calls",
+      "tool_limit",
+      "stop",
+    ]);
     answerNodes(chat, sessionId);
     chat.app.socket.dispose();
   });

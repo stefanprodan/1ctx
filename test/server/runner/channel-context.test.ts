@@ -539,7 +539,7 @@ describe("channel context", () => {
   test("the exhaustion line stays after the own results, never in the local context slot", async () => {
     const { chat, summon } = await channelApp();
     try {
-      await setLimits(chat, { callsPerRound: 1 });
+      await setLimits(chat, { callsPerSend: 1 });
       const a = await summon();
       a.script.toolRound([
         { id: "a", name: "datetime", arguments: "{}" },

@@ -66,19 +66,23 @@ describe("socket fixtures for caps", () => {
       "too many at once",
     );
     watch(chat, conn, sessionId);
-    const many = Array.from(
-      { length: DEFAULT_LIMITS.callsPerRound + 1 },
-      (_, i) => call(`c${i}`, { timezone: `Etc/GMT+${(i % 12) + 1}` }),
+    const perRound = DEFAULT_LIMITS.callsPerRound;
+    const many = Array.from({ length: perRound + 1 }, (_, i) =>
+      call(`c${i}`, { timezone: `Etc/GMT+${(i % 12) + 1}` }),
     );
+    // the first perRound run, the last is skipped and the loop goes on
     toolRound(script, many);
     const r2 = await chat.scripted.next();
-    r2.reply("answered without the tools");
+    r2.reply("answered with the tools that ran");
     await settle(chat);
     record("cap-calls", detail, conn);
     const toolRows = chat.app.sessions
       .messages(sessionId)
       .filter((r) => r.kind === "tool");
-    expect(toolRows.every((r) => r.status === "stopped")).toBe(true);
+    expect(toolRows.map((r) => r.status)).toEqual([
+      ...Array.from({ length: perRound }, () => "done" as const),
+      "stopped",
+    ]);
     chat.app.socket.dispose();
   });
 
@@ -264,13 +268,11 @@ describe("socket fixtures for caps", () => {
   test("calls in the answer round", async () => {
     const fake = fakeTools({});
     const chat = await chatApp(fake);
+    await setLimits(chat, { callsPerSend: 1 });
     const conn = await watcher(chat);
     const { detail, script, sessionId } = await startChat(chat, "answer calls");
     watch(chat, conn, sessionId);
-    const many = Array.from(
-      { length: DEFAULT_LIMITS.callsPerRound + 1 },
-      (_, i) => call(`c${i}`, { timezone: `Etc/GMT+${(i % 12) + 1}` }),
-    );
+    const many = [call("c0"), call("c1", { timezone: "Etc/GMT+1" })];
     toolRound(script, many);
     const answer = await chat.scripted.next();
     toolRound(answer, [call("again")]);
