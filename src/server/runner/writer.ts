@@ -207,14 +207,18 @@ export class Writer {
     });
   }
 
+  // the round's first `ran` calls get streaming rows to run; the rest
+  // are stopped with the skipped text and never count as launched
   finishRound(
     send: ActiveSend,
     toolNames: string[] = send.round?.calls.map((call) => call.name) ?? [],
+    split: { ran: number; skipped: string } | null = null,
   ): { rows: Message[]; toolCalls: number } {
     const round = send.round;
     if (round === null) return { rows: [], toolCalls: 0 };
     const now = this.deps.clock();
-    const launched = send.budget.calls + round.calls.length;
+    const ran = Math.min(split?.ran ?? Infinity, round.calls.length);
+    const launched = send.budget.calls + ran;
     const result = transact(this.deps.db, () => {
       const reply = finishReplyRow(
         this.deps,
@@ -233,6 +237,15 @@ export class Writer {
         round.calls,
         now,
         toolNames,
+      ).map((row, i) =>
+        split === null || i < ran
+          ? row
+          : this.deps.sessions.finishTool(row.id, {
+              content: split.skipped,
+              status: "stopped",
+              error: null,
+              finishedAt: now,
+            })!,
       );
       const sendRow = this.deps.sessions.bumpCounters(send.id, {
         rounds: send.roundNo,
@@ -250,7 +263,7 @@ export class Writer {
     // openTools is keyed by the call object, so duplicate call ids stay apart
     send.openTools = new Map();
     send.settled = new Map();
-    round.calls.forEach((call, i) => {
+    round.calls.slice(0, ran).forEach((call, i) => {
       const row = result.rows[i]!;
       send.openTools.set(call, {
         rowId: row.id,

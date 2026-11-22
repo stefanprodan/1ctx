@@ -38,11 +38,16 @@ words. When a cap or a repeated call stops the tools, the loop ends
 with the answer round, one more round that asks for the answer in
 words.
 
-- **Every cap is weighed before a round's calls launch.** Over a cap,
-  the calls are recorded not run and the loop goes to the answer round
-  with `tool_limit`, `token_limit` or `context_limit`. `maxBashCalls`
-  is the exception: excess bash calls get an error result before queue
-  or slot admission, and the loop goes on.
+- **A round over `callsPerRound` runs its first calls.** The first
+  `callsPerRound` in the model's order run; the rest are recorded not
+  run with a text saying to call them again, are not counted in
+  `callsPerSend`, and the loop goes on.
+- **Every other cap is weighed before a round's calls launch,** against
+  the calls that run. Over a cap, all the round's calls are recorded not
+  run and the loop goes to the answer round with `tool_limit`,
+  `token_limit` or `context_limit`. `maxBashCalls` is the exception:
+  excess bash calls get an error result before queue or slot admission,
+  and the loop goes on.
 - **Spend counts cached tokens at a tenth.** A main round spends prompt
   less cached, plus cached / `CACHED_DIVISOR` rounded up, plus
   completion, or an estimate without usage.
