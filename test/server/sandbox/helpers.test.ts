@@ -492,8 +492,10 @@ describe("walk helper", () => {
       ...roots,
       join(tmp, "b"),
     ]);
-    expect(beside.moved.map((entry) => entry.path)).toEqual([
-      join(tmp, "c-moving"),
+    expect(beside.moved.map((entry) => [entry.path, entry.gone])).toEqual([
+      [join(tmp, "a-gone"), true],
+      [join(tmp, "c-moving"), false],
+      [join(tmp, "d-gone"), true],
     ]);
   });
 });

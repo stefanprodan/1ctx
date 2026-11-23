@@ -370,7 +370,7 @@ describe("walk decoding", () => {
     });
   }
 
-  test("beside others read a name gone as absent and one moving as moved, nothing else", () => {
+  test("beside others read a name gone or moving as moved, nothing else", () => {
     const lines = (...more: string[]) =>
       walkOf(
         "d 755 0 3 - /knowledge",
@@ -391,9 +391,16 @@ describe("walk decoding", () => {
     ]);
     expect(result.moved).toEqual([
       {
+        path: "/knowledge/gone",
+        escaped: "/knowledge/gone",
+        unicode: true,
+        gone: true,
+      },
+      {
         path: "/knowledge/a b.md",
         escaped: "/knowledge/a%20b.md",
         unicode: true,
+        gone: false,
       },
     ]);
     const refused: [string, string[]][] = [

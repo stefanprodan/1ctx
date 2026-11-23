@@ -79,7 +79,7 @@ export function readout(
   let discarded = false;
   const seen = new Set<string>();
   const moved = new Set<string>();
-  const named = ({ path, unicode }: WalkMoved) => {
+  const named = ({ path, unicode }: Pick<WalkEntry, "path" | "unicode">) => {
     // read lossily, the name would commit under another spelling
     if (!unicode && saved(path, job)) throw new StepFailure("walk", "unicode");
     // an echoed key a command wrote into a name is never stored
@@ -89,6 +89,13 @@ export function readout(
   // a change where nothing commits recycles however it moved
   for (const at of movedUnder) {
     named(at);
+    // a name gone may be renamed away, so one the base holds stays; one
+    // it never held changes nothing
+    const under = `${at.path}/`;
+    const held =
+      wanted.tree.has(at.path) ||
+      [...wanted.tree.keys()].some((path) => path.startsWith(under));
+    if (at.gone && !held) continue;
     if (keptOnly(at.path, job)) discarded = true;
     else if (saved(at.path, job)) moved.add(at.path);
   }

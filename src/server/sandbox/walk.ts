@@ -5,7 +5,7 @@
 // decides deletes as well as fetches, so anything short of a complete,
 // well-formed listing within its bounds is a failure and saves nothing.
 // Beside other commands an entry that moved under the walk is no
-// failure: one gone is absent, one changing is listed as moved.
+// failure: it is listed as moved, gone or changing.
 
 import {
   escapePath,
@@ -59,7 +59,10 @@ export type WalkFailure = {
 };
 
 // an entry that changed while the walk read it, beside other commands
-export type WalkMoved = Pick<WalkEntry, "path" | "escaped" | "unicode">;
+export type WalkMoved = Pick<WalkEntry, "path" | "escaped" | "unicode"> & {
+  // gone by its stat, open or scandir, maybe renamed away
+  gone: boolean;
+};
 
 export type WalkResult =
   | { ok: true; entries: WalkEntry[]; moved: WalkMoved[] }
@@ -155,8 +158,8 @@ export class WalkDecoder {
     if (!this.folders.has(escaped.slice(0, escaped.lastIndexOf("/"))))
       return "orphan";
     this.seen.add(escaped);
-    if (!gone)
-      this.moved.push({ path: named.path, escaped, unicode: named.unicode });
+    const { path, unicode } = named;
+    this.moved.push({ path, escaped, unicode, gone });
     return null;
   }
 

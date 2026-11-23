@@ -396,12 +396,14 @@ describe("a sandbox shared by a chat and its subagents", () => {
       early?: (call: CommandCall) => void;
       late?: (call: CommandCall) => void;
       rows?: Rows;
+      // what both commands mount, ROWS unless given
+      mount?: Rows;
     } = {},
   ) {
     const started = gate();
     const release = gate();
     const running = t.run(
-      ROWS,
+      parent.mount ?? ROWS,
       async (call) => {
         call.fs.write(`/knowledge/p-${tag}.md`, `${tag}\n`);
         parent.early?.(call);
@@ -414,7 +416,11 @@ describe("a sandbox shared by a chat and its subagents", () => {
     );
     await started.opened;
     const ran = await t.run(
-      { ...(parent.rows ?? ROWS), workspace: "child", subagent: true },
+      {
+        ...(parent.rows ?? parent.mount ?? ROWS),
+        workspace: "child",
+        subagent: true,
+      },
       (call) => {
         child(call);
         return {};
@@ -631,6 +637,58 @@ describe("a sandbox shared by a chat and its subagents", () => {
     expect(await t.settled(done.hold)).toBe("idle");
     expect(rows.text("a.md")).toBe("whole\n");
     expect(t.fake.deletes).toEqual([]);
+  });
+
+  test("beside a running command a doc or folder renamed under the walk keeps its rows until a later save", async () => {
+    const FOLDER = { knowledge: { ...ROWS.knowledge, "d/x.md": "x\n" } };
+    for (const [from, to] of [
+      ["a.md", "z.md"],
+      ["d", "e"],
+    ] as const) {
+      const t = setup();
+      const rows = store(FOLDER.knowledge);
+      const { child, parent } = await besideParent(
+        t,
+        rows,
+        "r",
+        ({ fs }) => {
+          // the walk listed the old name, which was gone by its stat,
+          // and never saw the new one
+          fs.walkLines = (lines) =>
+            moving({ [`/knowledge/${from}`]: "ENOENT" })(
+              lines.filter((line) => !line.includes(` /knowledge/${to}`)),
+            );
+        },
+        {
+          mount: FOLDER,
+          early: ({ fs }) => {
+            if (from === "d") {
+              fs.write("/knowledge/e/x.md", "x\n");
+              fs.remove("/knowledge/d");
+            } else {
+              fs.remove("/knowledge/a.md");
+              fs.write("/knowledge/z.md", "a\n");
+            }
+          },
+          // the renaming command's own save is refused
+          late: ({ fs }) => fs.write("/knowledge/bin.md", "\u0000\u0001"),
+        },
+      );
+      expect(answerOf(child.settled)).toMatchObject({
+        refused: null,
+        changes: { knowledge: [{ name: "p-r.md", text: "r\n" }] },
+      });
+      child.fs.walkLines = undefined;
+      child.settle(rows.commit(answerOf(child.settled), t.time.now()));
+      await t.backend.idle();
+      expect(child.hold.lost.aborted).toBe(false);
+      expect([rows.text("a.md"), rows.text("d/x.md")]).toEqual(["a\n", "x\n"]);
+      const done = await parent();
+      expect(answerOf(done.settled).refused).toContain("not a text");
+      done.settle({ landed: false, why: "skipped" });
+      await t.backend.idle();
+      expect([rows.text("a.md"), rows.text("d/x.md")]).toEqual(["a\n", "x\n"]);
+    }
   });
 
   test("beside a running command a doc that moves or goes between the walk and the pull stays for a later save", async () => {

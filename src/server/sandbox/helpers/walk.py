@@ -6,8 +6,9 @@
 # too, never entered); mode in octal. The path is percent-escaped so a
 # name never breaks a line. A folder or file it cannot read is an E line
 # (E <errno> <path>); the server reads ENOENT as gone and ESTALE, ELOOP
-# or ENOTDIR as moved only while other commands run. A file not listed
-# counts toward no bound. Before going past a bound it stops with
+# or ENOTDIR as moved only while other commands run. A file not hashed
+# counts toward neither the entries nor the bytes here; the server still
+# counts its name's bytes. Before going past a bound it stops with
 # WALK over <entries|file|bytes> <bound>: a file is sized before it is
 # read, so a huge or sparse file costs nothing.
 import errno, hashlib, os, stat, sys
