@@ -28,7 +28,7 @@ import { StepFailure } from "./execs.ts";
 import { escapePath, pathOf, unescapePath } from "./frames.ts";
 import { RECORDS, recordPaths } from "./helpers.ts";
 import type { PullFrame } from "./pull.ts";
-import type { WalkEntry } from "./walk.ts";
+import type { WalkEntry, WalkMoved } from "./walk.ts";
 
 const KINDS = { d: "dir", f: "file", l: "link", o: "other" } as const;
 
@@ -42,6 +42,9 @@ export type Readout = {
   pulls: Map<string, { entry: TreeEntry; walked: WalkEntry }>;
   // a change under /uploads, /mcp or a docs-off /knowledge
   discarded: boolean;
+  // beside other commands, the docs that moved under the walk or before
+  // the pull: left in place for a later save, as leftInPlace() leaves
+  moved: Set<string>;
 };
 
 const keptOnly = (path: string, job: Job) =>
@@ -63,6 +66,7 @@ export function readout(
   job: Job,
   wanted: Wanted,
   credentials: readonly CommandCredential[] = [],
+  movedUnder: readonly WalkMoved[] = [],
 ): Readout {
   // every spelling the scrub replaces, so a name is held to the same
   const forms = credentials.flatMap((credential) =>
@@ -74,14 +78,40 @@ export function readout(
   const pulls: Readout["pulls"] = new Map();
   let discarded = false;
   const seen = new Set<string>();
-  for (const at of walked) {
-    const { path } = at;
+  const moved = new Set<string>();
+  const named = ({ path, unicode }: Pick<WalkEntry, "path" | "unicode">) => {
     // read lossily, the name would commit under another spelling
-    if (!at.unicode && saved(path, job))
-      throw new StepFailure("walk", "unicode");
+    if (!unicode && saved(path, job)) throw new StepFailure("walk", "unicode");
     // an echoed key a command wrote into a name is never stored
     if (saved(path, job) && forms.some((form) => path.includes(form)))
       throw new StepFailure("walk", "credential");
+  };
+  // a change where nothing commits recycles however it moved
+  // the base's paths and every folder above them, built once: gone names
+  // may run to the name-bytes bound
+  let based: Set<string> | null = null;
+  const inBase = (path: string) => {
+    if (based === null) {
+      based = new Set();
+      for (const key of wanted.tree.keys()) {
+        const parts = key.split("/");
+        for (let at = parts.length; at > 0; at--)
+          based.add(parts.slice(0, at).join("/"));
+      }
+    }
+    return based.has(path);
+  };
+  for (const at of movedUnder) {
+    // a name gone may be renamed away, so one the base holds stays; one
+    // it never held changes nothing
+    if (at.gone && !inBase(at.path)) continue;
+    named(at);
+    if (keptOnly(at.path, job)) discarded = true;
+    else if (saved(at.path, job)) moved.add(at.path);
+  }
+  for (const at of walked) {
+    const { path } = at;
+    named(at);
     const kind = KINDS[at.type];
     const top = path.split("/").length === 2;
     const want = wanted.tree.get(path);
@@ -121,11 +151,17 @@ export function readout(
   }
   for (const path of wanted.tree.keys())
     if (keptOnly(path, job) && !seen.has(path)) discarded = true;
-  return { entries, folders, held, pulls, discarded };
+  return { entries, folders, held, pulls, discarded, moved };
 }
 
-// each pulled file's bytes, which must be what the walk hashed
-export function fill(out: Readout, frames: readonly PullFrame[]): void {
+// Each pulled file's bytes, which must be what the walk hashed. Beside
+// other commands one that moved since is theirs to finish: it is left
+// for a later save, never read.
+export function fill(
+  out: Readout,
+  frames: readonly PullFrame[],
+  beside = false,
+): void {
   for (const frame of frames) {
     const pending = out.pulls.get(frame.escaped);
     if (pending === undefined) continue;
@@ -133,8 +169,12 @@ export function fill(out: Readout, frames: readonly PullFrame[]): void {
       frame.missing ||
       frame.sha256 !== pending.walked.sha256 ||
       frame.mode !== pending.walked.mode
-    )
-      throw new StepFailure("pull", "mismatch");
+    ) {
+      if (!beside) throw new StepFailure("pull", "mismatch");
+      out.moved.add(pending.entry.path);
+      out.pulls.delete(frame.escaped);
+      continue;
+    }
     pending.entry.bytes = frame.data;
   }
   for (const pending of out.pulls.values())

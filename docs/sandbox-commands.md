@@ -63,7 +63,8 @@ in `docs/sandbox-network.md`.
   its bytes from the job. `/uploads` and `/mcp` are only compared. The
   pull goes in batches of paths, each exec's stdin under 1,000 KiB; the
   helper is given the file bound and refuses a file past it before its
-  bytes, and an exec ends at the decoder's first refusal. A doc name
+  bytes, pads one that shrank once sized with zeros so its hash shows
+  the move, and an exec ends at the decoder's first refusal. A doc name
   that is not UTF-8 saves nothing and recycles.
 - **The records are hostile.** The cwd record and open's copies are
   pulled with the changed files, the cwd and each opened path within a
@@ -153,8 +154,13 @@ never counts, so one alone still fences.
   file, a name the rules refuse, or a changed doc that is not text or
   is past the file cap under `/knowledge`: neither saved nor refused
   over, kept out of the base, since it may be a running command's work
-  in progress (`leftInPlace()`); a later save judges it. Alone, they
-  refuse the save. The put-back then leaves them and every folder
+  in progress (`leftInPlace()`); a later save judges it. So is a doc
+  that moved under the walk (grew, shrank or was swapped while hashed,
+  turned into a link) or between the walk and the pull (bytes, mode or
+  gone), never read, and so is a name the base holds that went under
+  the walk (renamed away, a folder's docs too); one it never held is
+  absent. Alone, they refuse the save, and a move saves nothing and
+  recycles. The put-back then leaves them and every folder
   (`spared()`), since a running command may write in one, so beside
   others it removes only files the save read. Each file it writes or
   removes there holds to the bytes the walk read (`was`, checked by the

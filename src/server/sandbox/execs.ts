@@ -26,7 +26,12 @@ import {
   pullRequest,
 } from "./pull.ts";
 import { SANDBOX_ENV } from "./spec.ts";
-import { type WalkBounds, WalkDecoder, type WalkEntry } from "./walk.ts";
+import {
+  type WalkBounds,
+  WalkDecoder,
+  type WalkEntry,
+  type WalkMoved,
+} from "./walk.ts";
 
 export type Step =
   | "push"
@@ -176,8 +181,9 @@ export async function walk(
   limits: WalkLimits,
   bounds: WalkBounds,
   roots: readonly string[],
-): Promise<WalkEntry[]> {
-  const decoder = new WalkDecoder(roots, bounds);
+  beside = false,
+): Promise<{ entries: WalkEntry[]; moved: WalkMoved[] }> {
+  const decoder = new WalkDecoder(roots, bounds, beside);
   let code: number;
   try {
     code = await drain(
@@ -198,7 +204,7 @@ export async function walk(
   const result = decoder.end();
   if (!result.ok) throw new StepFailure("walk", result.reason);
   if (code !== 0) throw new StepFailure("walk", "exit");
-  return result.entries;
+  return { entries: result.entries, moved: result.moved };
 }
 
 // The paths in batches, one exec each under the gateway's request

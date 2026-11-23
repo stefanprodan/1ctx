@@ -370,6 +370,59 @@ describe("walk decoding", () => {
     });
   }
 
+  test("beside others read a name gone or moving as moved, nothing else", () => {
+    const lines = (...more: string[]) =>
+      walkOf(
+        "d 755 0 3 - /knowledge",
+        ...more,
+        "d 755 0 3 - /uploads",
+        "WALK done 2",
+      );
+    const result = decodeWalk(
+      lines("E ENOENT /knowledge/gone", "E ESTALE /knowledge/a%20b.md"),
+      ROOTS,
+      WIDE,
+      true,
+    );
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.entries.map((entry) => entry.path)).toEqual([
+      "/knowledge",
+      "/uploads",
+    ]);
+    expect(result.moved).toEqual([
+      {
+        path: "/knowledge/gone",
+        escaped: "/knowledge/gone",
+        unicode: true,
+        gone: true,
+      },
+      {
+        path: "/knowledge/a b.md",
+        escaped: "/knowledge/a%20b.md",
+        unicode: true,
+        gone: false,
+      },
+    ]);
+    const refused: [string, string[]][] = [
+      ["partial", ["E EACCES /knowledge/x"]],
+      ["orphan", ["E ESTALE /knowledge/d/x"]],
+      ["outside", ["E ENOENT /etc/x"]],
+      ["duplicate", ["E ENOENT /knowledge/x", "E ESTALE /knowledge/x"]],
+      ["malformed", ["E ENOENT /knowledge/%zz"]],
+    ];
+    for (const [reason, more] of refused) {
+      const got = decodeWalk(lines(...more), ROOTS, WIDE, true);
+      expect(got.ok ? "ok" : got.reason).toBe(reason);
+    }
+    const root = walkOf(
+      "E ENOENT /knowledge",
+      "d 755 0 3 - /uploads",
+      "WALK done 1",
+    );
+    const gone = decodeWalk(root, ROOTS, WIDE, true);
+    expect(gone.ok ? "ok" : gone.reason).toBe("partial");
+  });
+
   test("fail past each bound as the lines arrive", () => {
     const bytes = walkOf(...good);
     const bounds = {

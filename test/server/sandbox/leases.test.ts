@@ -572,6 +572,83 @@ describe("sandbox leases", () => {
     await waiting;
   });
 
+  test("a command waiting for another's lease is no command at the cap, so one there evicts once", async () => {
+    const t = setup({ sandboxesMax: 3 });
+    t.fake.deleteMode = "pending";
+    const x = await t.acquire("x", [REPO]);
+    const y = await t.acquire("y");
+    t.time.advance(1000);
+    const z = await t.acquire("z");
+    y.release();
+    t.time.advance(1000);
+    z.release();
+    // x's command without the repository waits for x's held lease
+    const own = t.acquire("x");
+    for (let i = 0; i < 200; i++) await Promise.resolve();
+    const capped = t.acquire("w");
+    await until(() => t.fake.deletes.length === 1);
+    t.leases.poke();
+    for (let i = 0; i < 200; i++) await Promise.resolve();
+    expect(t.fake.deletes).toEqual([y.sandbox]);
+    expect(t.state(z.sandbox)).toBe("idle");
+    expect(t.state(x.sandbox)).toBe("leased");
+    t.fake.finish(y.sandbox);
+    (await capped).release();
+    t.leases.close();
+    expect((await rejection(own)).message).toBe(
+      "the sandbox shell is stopping",
+    );
+  });
+
+  test("a drain or a close refuses at once a command held at the start gate", async () => {
+    for (const end of ["drain", "close"] as const) {
+      const t = setup();
+      t.fake.fail("list");
+      await t.leases.start();
+      const deadline = t.time.now() + 600_000;
+      const got = t.leases.acquire(
+        t.call("chat"),
+        deadline,
+        new AbortController().signal,
+      );
+      await until(() => t.time.sleeping().includes(deadline));
+      if (end === "drain") void t.leases.drain();
+      else t.leases.close();
+      const error = await rejection(got);
+      expect(error.message).toBe(
+        end === "drain"
+          ? "the sandbox settings changed: run the command again"
+          : "the sandbox shell is stopping",
+      );
+      expect(t.time.now()).toBeLessThan(deadline);
+    }
+  });
+
+  test("a drain or a close refuses at once a command waiting for a seat", async () => {
+    for (const end of ["drain", "close"] as const) {
+      const t = setup();
+      const holds: SandboxHold[] = [];
+      for (let n = 0; n < SANDBOX_COMMANDS; n++)
+        holds.push(await t.acquire("chat"));
+      const deadline = t.time.now() + 600_000;
+      const next = t.leases.acquire(
+        t.call("chat"),
+        deadline,
+        new AbortController().signal,
+      );
+      await until(() => t.time.sleeping().includes(deadline));
+      if (end === "drain") void t.leases.drain();
+      else t.leases.close();
+      const error = await rejection(next);
+      expect(error.message).toBe(
+        end === "drain"
+          ? "the sandbox settings changed: run the command again"
+          : "the sandbox shell is stopping",
+      );
+      for (const hold of holds) hold.release();
+    }
+  });
+
   test("a start sweep that could not list runs at the next probe that can", async () => {
     const t = setup();
     t.fake.seed("1ctx-leftover0000", { [INSTANCE_LABEL]: INSTANCE });

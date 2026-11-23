@@ -4,7 +4,8 @@
 # a JSON header line {"path","size","mode"} then exactly `size` bytes, or
 # {"path","missing":true} when the path is no longer a regular file
 # reached without a link. Ends with PULL done <n>. A file past <file
-# bytes> ends it with PULL refused size before a byte of it is sent.
+# bytes> ends it with PULL refused size before a byte of it is sent. A
+# file that shrinks under the read is padded with zeros to its size.
 import errno, json, os, re, stat, sys
 
 PIECE = 1 << 16
@@ -96,10 +97,9 @@ def frame(esc, fd):
     while left:
         b = os.read(fd, min(left, PIECE))
         if not b:
-            # the header promised more bytes than the file still holds,
-            # so the stream can only end here, without its last line
-            out.flush()
-            sys.exit(1)
+            # the file shrank once sized: zeros keep the frame whole, and
+            # its hash then differs from the walk's, which shows the move
+            b = bytes(min(left, PIECE))
         out.write(b)
         left -= len(b)
 

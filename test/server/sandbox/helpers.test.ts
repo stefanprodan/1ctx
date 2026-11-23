@@ -469,7 +469,68 @@ describe("walk helper", () => {
     expect(result.code).toBe(5);
     expect(result.text).toEndWith("WALK over bytes 1000\n");
   });
+
+  test("print an entry that moved under it as its error, which only a walk beside others passes", async () => {
+    const { roots } = scratch();
+    const tmp = roots[1]!;
+    // each name gone or changing at the moment the walk reads it
+    for (const name of ["a-gone", "b", "c-moving"])
+      writeFileSync(join(tmp, name), "x".repeat(600));
+    mkdirSync(join(tmp, "d-gone"));
+    const argv = walkArgv({ ...LIMITS, totalBytes: 1300 }, roots, using);
+    argv[4] = `${MOVING}\n${argv[4]}`;
+    const result = await run(argv);
+    expect(result.code).toBe(0);
+    expect(result.text).toContain(`E ENOENT ${join(tmp, "a-gone")}\n`);
+    expect(result.text).toContain(`E ESTALE ${join(tmp, "c-moving")}\n`);
+    expect(result.text).toContain(`E ENOENT ${join(tmp, "d-gone")}\n`);
+    const alone = decodeWalk(result.stdout, roots, WIDE);
+    expect(alone.ok ? "ok" : alone.reason).toBe("partial");
+    const beside = decodeWalk(result.stdout, roots, WIDE, true);
+    if (!beside.ok) throw new Error(beside.reason);
+    expect(beside.entries.map((entry) => entry.path)).toEqual([
+      ...roots,
+      join(tmp, "b"),
+    ]);
+    expect(beside.moved.map((entry) => [entry.path, entry.gone])).toEqual([
+      [join(tmp, "a-gone"), true],
+      [join(tmp, "c-moving"), false],
+      [join(tmp, "d-gone"), true],
+    ]);
+  });
 });
+
+// a walk whose reads meet a sandbox's sibling at work: these names
+// vanish or change while hashed
+const MOVING = `
+import errno, os
+_open, _scandir = os.open, os.scandir
+def _named(path, name):
+    return os.path.basename(os.fsencode(path)) == name
+def _o(path, *args, **kwargs):
+    if _named(path, b"a-gone"):
+        raise OSError(errno.ENOENT, "gone")
+    if _named(path, b"c-moving"):
+        raise OSError(errno.ESTALE, "grew")
+    return _open(path, *args, **kwargs)
+def _s(path):
+    if _named(path, b"d-gone"):
+        raise OSError(errno.ENOENT, "gone")
+    return _scandir(path)
+os.open, os.scandir = _o, _s
+`;
+
+// a pull that sizes each file three bytes past what it then reads, as
+// a file a sibling shortens after it was sized
+const SHRINKING = `
+import os
+_fstat = os.fstat
+def _f(fd):
+    fields = list(_fstat(fd))
+    fields[6] += 3
+    return os.stat_result(fields)
+os.fstat = _f
+`;
 
 describe("pull helper", () => {
   test("frame each file, and a file turned link or fifo as missing", async () => {
@@ -507,6 +568,30 @@ describe("pull helper", () => {
     const first = pull.frames[0]!;
     if (first.missing) throw new Error("missing");
     expect(new TextDecoder().decode(first.data)).toBe("body\n");
+  });
+
+  test("pad a file that shrank once sized, so its hash shows the move and the stream stays whole", async () => {
+    const { roots } = scratch();
+    const tmp = roots[1]!;
+    writeFileSync(join(tmp, "f"), "body\n");
+    writeFileSync(join(tmp, "g"), "next\n");
+    const asked = ["f", "g"].map((name) => escapePath(join(tmp, name)));
+    const argv = pullArgv(LIMITS.fileBytes, roots, using);
+    argv[4] = `${SHRINKING}\n${argv[4]}`;
+    const result = await run(argv, pullRequest(asked));
+    expect(result.code).toBe(0);
+    const pull = decodePull(
+      result.stdout,
+      roots,
+      { fileBytes: 100, totalBytes: 100 },
+      asked,
+    );
+    if (!pull.ok) throw new Error(pull.reason);
+    expect(
+      pull.frames.map((frame) =>
+        frame.missing ? null : new TextDecoder().decode(frame.data),
+      ),
+    ).toEqual(["body\n\0\0\0", "next\n\0\0\0"]);
   });
 
   test("refuse a file past its cap before sending a byte of it", async () => {
