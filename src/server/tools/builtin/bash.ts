@@ -299,12 +299,12 @@ export function asSubagent(
 }
 
 // Refused before either shell: bash ends a command at a NUL, so the
-// sandbox would run only its head, a lone surrogate reads differently in
-// each, and a command past the cap is the
-// same plain answer in both shells, never a lost sandbox.
+// sandbox would run only its head; a lone surrogate reaches the
+// sandbox's stdin as U+FFFD where the built-in shell sees the half; a
+// command past the cap is the same plain answer in both shells, never a
+// lost sandbox.
 function commandRefusal(command: string): string | null {
   if (command.includes("\u0000")) return "the command holds a NUL byte";
-  // the sandbox's stdin would carry U+FFFD where the shell saw a half
   if (!command.isWellFormed()) return "the command is not valid text";
   if (Buffer.byteLength(command) > MAX_COMMAND_BYTES)
     return `the command is over ${MAX_COMMAND_BYTES / 1024} KiB, write a large file in parts`;
