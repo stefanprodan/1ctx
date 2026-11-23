@@ -325,10 +325,12 @@ function Network({
 }) {
   const latest = useLatest(state);
   const save = useSave(async () => {
-    const got = netBody(drafted.value ?? netDraftOf(latest.current.settings));
+    const sent = drafted.value;
+    const got = netBody(sent ?? netDraftOf(latest.current.settings));
     if (!("body" in got)) return;
     await saveSandbox(got.body);
-    drafted.value = null;
+    // an edit made while the save ran, the card hidden and shown, stays
+    if (drafted.value === sent) drafted.value = null;
   }, netFieldOf);
   const d = drafted.value ?? netDraftOf(state.settings);
   const set = (next: NetDraft) => {

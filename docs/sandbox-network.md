@@ -89,10 +89,11 @@ what the bash tool's description shares with it.
   replaces every key the send read, with `escapedForms()`, in the
   pulled files before they commit and in open's copies. A doc or
   scratch name or an opened path holding one, in any of those forms,
-  saves nothing and recycles. The scrub stops a key echoed by accident,
-  not one a command encodes on purpose: a listed host that takes
-  anyone's writes (a public bucket on `storage.googleapis.com`) can
-  carry it, or any file, out.
+  saves nothing and recycles. The scrub covers what comes back to the
+  model and the database, never a request a command sends: a listed
+  host that takes anyone's writes (a publicly writable bucket on
+  `storage.googleapis.com`) can carry a key or any file out, encoded or
+  not.
 - **Providers go with their last sandbox.** One no lease of any
   manager uses is deleted once its sandbox's delete is observed (it
   cannot go while attached; a failed delete is asked again after 5 and
