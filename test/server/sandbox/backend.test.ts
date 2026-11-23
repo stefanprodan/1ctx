@@ -54,6 +54,14 @@ describe("the sandbox backend", () => {
     ran.settle({ landed: false, why: "skipped" });
   });
 
+  test("a command past the gateway's 32 KiB argument runs, as stdin", async () => {
+    const t = setup();
+    const command = `cat > /tmp/big.md <<'EOF'\n${"line\n".repeat(8000)}EOF`;
+    const ran = await t.run(ROWS, {}, { command });
+    expect(answerOf(ran.settled).exitCode).toBe(0);
+    ran.settle({ landed: false, why: "skipped" });
+  });
+
   test("a warm command with nothing changed pushes nothing", async () => {
     const t = setup();
     const first = await t.run(ROWS);

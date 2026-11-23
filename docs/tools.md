@@ -48,10 +48,12 @@ words.
   `token_limit` or `context_limit`. `maxBashCalls` is the exception:
   excess bash calls get an error result before queue or slot admission,
   and the loop goes on.
-- **A bash command with a NUL or over `MAX_COMMAND_BYTES`** (64 KiB,
-  the built-in shell's source cap) gets an error result before either
-  shell, spending no bash call: bash would end it at the NUL, and one
-  past the sandbox gateway's 1 MiB request would lose the sandbox.
+- **A bash command with a NUL, a lone surrogate or over
+  `MAX_COMMAND_BYTES`** (64 KiB, the built-in shell's source cap) gets
+  an error result before either shell, spending no bash call: bash
+  would end it at the NUL, the sandbox's stdin would carry U+FFFD for
+  the surrogate, and one past the gateway's 1 MiB request would lose
+  the sandbox.
 - **Spend counts cached tokens at a tenth.** A main round spends prompt
   less cached, plus cached / `CACHED_DIVISOR` rounded up, plus
   completion, or an estimate without usage.

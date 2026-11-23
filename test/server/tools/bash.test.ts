@@ -161,6 +161,11 @@ describe("bash", () => {
     try {
       for (const [command, content] of [
         ["echo a\u0000echo b > f", "the command holds a NUL byte"],
+        ["echo \ud800 > f", "the command is not valid text"],
+        [
+          `: ${"é".repeat(MAX_COMMAND_BYTES / 2)}`,
+          "the command is over 64 KiB, write a large file in parts",
+        ],
         [
           `echo ${"x".repeat(MAX_COMMAND_BYTES)}`,
           "the command is over 64 KiB, write a large file in parts",
