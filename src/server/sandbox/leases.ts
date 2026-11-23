@@ -27,7 +27,7 @@ import { ImageChecks, ImageRefused } from "./roots.ts";
 import { fitsCaps, mountsKey, sandboxName } from "./spec.ts";
 import { Cuts } from "./sweep.ts";
 import { Sweeper } from "./sweeper.ts";
-import { bounded, Changes, Gate } from "./waits.ts";
+import { bounded, Changes, Gate, wakeAll } from "./waits.ts";
 import { Watch } from "./watch.ts";
 
 export type LeasesDeps = {
@@ -183,6 +183,7 @@ export class Leases {
     if (!(await this.starting.pass(this.deps.clock, deadline, signal)))
       return "busy";
     for (;;) {
+      let capped = false;
       signal.throwIfAborted();
       if (this.closed) throw new Error("the sandbox shell is stopping");
       if (this.draining) {
@@ -234,10 +235,11 @@ export class Leases {
           if (hold !== null) return hold;
           continue;
         }
-        // one delete per waiting command: the first one's delete is
+        // one delete per command at the cap: the first one's delete is
         // still pending when the next wake comes
+        capped = true;
         const victim =
-          this.book.evicting() <= this.changes.waiting
+          this.book.evicting() <= this.changes.capped
             ? this.book.evictable()
             : null;
         if (victim !== null) {
@@ -246,7 +248,7 @@ export class Leases {
         }
       }
       // a delete observed, a release or a create ended may free one
-      if (!(await this.changes.wait(deadline, signal))) return "busy";
+      if (!(await this.changes.wait(deadline, signal, capped))) return "busy";
     }
   }
 
@@ -330,7 +332,7 @@ export class Leases {
     this.watch.close();
     this.pool.stop();
     for (const lease of this.book.records.values()) lease.timer?.();
-    this.changes.changed();
+    wakeAll(this.starting, this.seats, this.changes);
   }
 
   // the settings moved off this gateway or image: every sandbox goes,
@@ -345,7 +347,7 @@ export class Leases {
       this.drained = resolve;
     });
     for (const lease of this.book.live()) this.remove(lease, "settings");
-    this.changes.changed();
+    wakeAll(this.starting, this.seats, this.changes);
     this.settleDrain();
     return done.then(() => this.net.dropped());
   }

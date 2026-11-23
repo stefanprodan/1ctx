@@ -72,6 +72,8 @@ export class Changes {
   private readonly waiters = new Set<() => void>();
   // commands waiting now, which the warm pool leaves room for
   waiting = 0;
+  // those of them waiting at the cap, each owed one delete
+  capped = 0;
 
   constructor(private readonly clock: Clock) {}
 
@@ -80,10 +82,15 @@ export class Changes {
   }
 
   // false at the deadline; a throw when the command was stopped
-  async wait(deadline: number, signal: AbortSignal): Promise<boolean> {
+  async wait(
+    deadline: number,
+    signal: AbortSignal,
+    capped = false,
+  ): Promise<boolean> {
     const left = deadline - this.clock();
     if (left <= 0) return false;
     this.waiting++;
+    if (capped) this.capped++;
     let wake = () => {};
     const woken = new Promise<void>((resolve) => {
       wake = resolve;
@@ -99,6 +106,7 @@ export class Changes {
       stop.abort();
       this.waiters.delete(wake);
       this.waiting--;
+      if (capped) this.capped--;
     }
     signal.throwIfAborted();
     return this.clock() < deadline;
@@ -131,4 +139,11 @@ export class Gate {
     if (this.promise === null) return Promise.resolve(true);
     return within(clock, this.promise, deadline, signal);
   }
+}
+
+// a close or a drain: every command held at the gate, for a seat or at
+// the cap meets it now, since no sweep or release may come after
+export function wakeAll(gate: Gate, ...changes: Changes[]): void {
+  gate.open();
+  for (const each of changes) each.changed();
 }

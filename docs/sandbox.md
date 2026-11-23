@@ -232,8 +232,7 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   a retired manager's (below) included.
   At the cap a warm one goes first, then the least recently used idle
   one, never one in use; the command waits for the delete to be
-  observed. No more deletes are pending for the cap than commands
-  wait.
+  observed, and no more are pending than commands wait at the cap.
 - **A recycle deletes; it never repairs.** A held lease is doomed and
   goes at its last release; one doomed while it was made is deleted,
   never handed out. A holder's own recycle (a failed step or put-back,
@@ -270,8 +269,8 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   sandboxes, providers or profiles marks itself to run again, and the
   next probe that answers sweeps, dropping no lease: a blip of one list
   is never read as a restart. A manager the
-  settings moved off (retired) leases nothing, refuses the commands
-  waiting in it, keeps its held sandboxes, which no other manager's
+  settings moved off (retired) leases nothing, refuses its waiting
+  commands at once, keeps its held sandboxes, which no other manager's
   sweep takes, and deletes each as its command ends, retries included.
   A stuck one it keeps, trees and phase checks included, until the
   gateway forgets it or three phase checks (`RETIRED_STUCK_CHECKS`)
