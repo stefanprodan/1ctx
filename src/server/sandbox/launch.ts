@@ -52,7 +52,6 @@ export async function launch(
         command: wrapperArgv({
           cwd: start,
           id,
-          command: job.command,
           open: open
             ? {
                 docs: job.docs,
@@ -64,6 +63,9 @@ export async function launch(
               }
             : null,
         }),
+        // the wrapper reads the command from stdin: the gateway refuses
+        // an argument past 32 KiB
+        stdin: new TextEncoder().encode(job.command),
         environment: { ...SANDBOX_ENV },
         signal: on.signal,
       }),

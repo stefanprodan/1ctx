@@ -133,6 +133,9 @@ export class FakeFs {
   }
 
   async *exec(request: ExecRequest): AsyncGenerator<ExecEvent> {
+    // the gateway's own refusal, so a command sent as an argument fails
+    if (request.command.some((arg) => Buffer.byteLength(arg) > 32 * 1024))
+      throw new Error("[invalid_config] command argument exceeds 32768 bytes");
     const [head, , , , source] = request.command;
     let step: Step;
     if (head === "/usr/bin/find") step = "records";
@@ -366,7 +369,10 @@ export class FakeFs {
 
   private async *command(request: ExecRequest): AsyncGenerator<ExecEvent> {
     const argv = request.command;
-    const [cwd, id, command, on, records] = argv.slice(6, 11) as string[];
+    const [cwd, id, on, records] = argv.slice(6, 10) as string[];
+    const command = new TextDecoder("utf-8", { ignoreBOM: true }).decode(
+      request.stdin,
+    );
     const base = `${records}/${id}`;
     if (this.nodes.has(`${base}.cwd`) || this.nodes.has(`${base}.opened`)) {
       yield { stream: "stderr", data: text("WRAPPER records exist\n") };

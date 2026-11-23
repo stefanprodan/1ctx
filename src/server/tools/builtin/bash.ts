@@ -12,6 +12,7 @@ import {
   BACKSTOP_MS,
   type BashToolPort,
   type CommandCredential,
+  MAX_COMMAND_BYTES,
   type Refusal,
   scrubKeys,
 } from "../../bash/index.ts";
@@ -297,6 +298,19 @@ export function asSubagent(
   return out.replace(`${signed} `, () => (mine === "" ? "" : `${mine} `));
 }
 
+// Refused before either shell: bash ends a command at a NUL, so the
+// sandbox would run only its head; a lone surrogate reaches the
+// sandbox's stdin as U+FFFD where the built-in shell sees the half; a
+// command past the cap is the same plain answer in both shells, never a
+// lost sandbox.
+function commandRefusal(command: string): string | null {
+  if (command.includes("\u0000")) return "the command holds a NUL byte";
+  if (!command.isWellFormed()) return "the command is not valid text";
+  if (Buffer.byteLength(command) > MAX_COMMAND_BYTES)
+    return `the command is over ${MAX_COMMAND_BYTES / 1024} KiB, write a large file in parts`;
+  return null;
+}
+
 export function makeBashTool({
   bash,
   web = null,
@@ -362,6 +376,8 @@ export function makeBashTool({
       if (bash === undefined) {
         throw new Error("knowledge is not configured");
       }
+      const refused = commandRefusal(args.command);
+      if (refused !== null) return { content: refused, error: true };
       if (ctx.budget.bashCalls >= ctx.caps.maxBashCalls) {
         return {
           content: "the bash budget for this reply is spent",
