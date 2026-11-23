@@ -88,15 +88,17 @@ part is left out of the text and added as its estimate
 (`tools/offer.ts`'s MCP mode, the Tools page) stay in the Chat
 Completions shape, about one token a tool under the azure one.
 
-- **Past reasoning goes back on `openrouter`, `opencode`, `azure` and
-  `anthropic` only.** The history carries a reply's reasoning, with its
-  model, only from sends on the same provider; the window fit counts it
-  only where it is sent.
+- **Past reasoning goes back on `openrouter`, `opencode`,
+  `openai-compatible`, `azure` and `anthropic` only.** The history
+  carries a reply's reasoning, with its model, only from sends on the
+  same provider; the window fit counts it only where it is sent.
   Channel history is always edited: as with a compaction tail, it never
   replays thinking on `anthropic` (`docs/channel-context.md`).
 - **`openai-compatible` (mlx-serve, llama-server) reads
   `enable_thinking` on every request, off included.** It also gets
-  `prompt_cache_key`, and no past reasoning.
+  `prompt_cache_key`, and the requested model's own past reasoning as
+  `reasoning_content`, never an empty one: templates that render it
+  (Inkling) reason worse without it.
 - **OpenRouter takes thinking as the `reasoning` object.** Off is
   `{exclude: true, enabled: false}`, never an effort word. No
   `enable_thinking`, `reasoning_effort`, `prompt_cache_key` or

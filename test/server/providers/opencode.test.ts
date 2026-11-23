@@ -203,12 +203,12 @@ describe("opencode request tokens", () => {
       });
     const own = req(request.model);
     const plain = plainOf(request.model);
-    expect(requestTokens("opencode", own)).toBeGreaterThan(plain + 100);
-    // another model's reasoning is not sent, so it is not counted
-    expect(requestTokens("opencode", req("kimi-k2.6"))).toBe(
-      plainOf("kimi-k2.6"),
-    );
-    for (const wire of ["openai-compatible", "openai-strict", null] as const) {
+    for (const wire of ["opencode", "openai-compatible"] as const) {
+      expect(requestTokens(wire, own)).toBeGreaterThan(plain + 100);
+      // another model's reasoning is not sent, so it is not counted
+      expect(requestTokens(wire, req("kimi-k2.6"))).toBe(plainOf("kimi-k2.6"));
+    }
+    for (const wire of ["openai-strict", null] as const) {
       expect(requestTokens(wire, own)).toBe(plain);
     }
   });

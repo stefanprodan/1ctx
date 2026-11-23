@@ -466,17 +466,14 @@ describe("memory packet room", () => {
         },
         chars,
       );
-    for (const wire of [
-      "openai-compatible",
-      "openai-strict",
-      "gemini",
-      "openrouter",
-    ] as const) {
+    for (const wire of ["openai-strict", "gemini", "openrouter"] as const) {
       expect(fitted(wire)).toEqual(full);
     }
-    // another model's reasoning is not sent, so it is not counted
-    expect(fitted("opencode", "org/other")).toEqual(full);
-    expect(fitted("opencode")).not.toEqual(full);
+    for (const wire of ["opencode", "openai-compatible"] as const) {
+      // another model's reasoning is not sent, so it is not counted
+      expect(fitted(wire, "org/other")).toEqual(full);
+      expect(fitted(wire)).not.toEqual(full);
+    }
   });
 
   test("on azure a reasoning record counts by its summary, never its blob", () => {

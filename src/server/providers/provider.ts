@@ -33,7 +33,7 @@ import {
   Unanswered,
   wireTools,
 } from "./openai.ts";
-import { sendsReasoning } from "./opencode.ts";
+import { sendsReasoning } from "./reasoning.ts";
 import type { ProviderRow } from "./store.ts";
 import type {
   ChatEvent,
@@ -83,7 +83,10 @@ function sentMessages(
   model: string,
   messages: ChatMessageIn[],
 ): ChatMessageIn[] {
-  const sends = wire === "opencode" ? sendsReasoning({ model }) : () => false;
+  const sends =
+    wire === "opencode" || wire === "openai-compatible"
+      ? sendsReasoning({ model })
+      : () => false;
   // the channel's cache flag is no wire's field; images are counted apart
   return withoutImages(messages).map(({ streamMark: _mark, ...message }) => {
     if (message.role === "tool" && message.failed !== undefined) {
