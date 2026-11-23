@@ -35,9 +35,9 @@ in `docs/sandbox-network.md`.
   retried.
 - **The command runs through the wrapper** as its stdin, never an
   argument, since the gateway refuses one past 32 KiB; the wrapper
-  reads it whole, then gives the command no stdin. It runs with a fresh
-  128-bit id and `SANDBOX_ENV`, as every exec of ours, since OpenShell passes none of
-  the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH`, uv's,
+  reads it whole, then gives the command no stdin. It runs with a
+  fresh 128-bit id and `SANDBOX_ENV`, as every exec of ours, since
+  OpenShell passes none of the image's: `HOME=/opt/home`, `TMPDIR=/sandbox/tmp`, `PATH`, uv's,
   bun's, Go's and Rust's, nothing secret. Each of stdout and stderr keeps four
   bytes a character of the result cut plus the longest form of a key
   the send read, so a key the cut crosses is whole for the scrub; the

@@ -6,6 +6,9 @@
 // dependency upgrade cannot silently expose a new runtime.
 
 export const MAX_OPENS_PER_COMMAND = 10;
+// the command line's own bytes, one cap for both shells: the sandbox's
+// gateway would take about 1 MiB, the built-in shell parses this much
+export const MAX_COMMAND_BYTES = 64 * 1024;
 // the cap on a command's commands and on each loop, awk, sed and jq
 export const COMMAND_ITERATIONS = 100_000;
 // the interpreter stops at the call timeout and the worker is ended this

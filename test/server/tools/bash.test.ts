@@ -6,7 +6,10 @@
 // registry alongside the receipts.
 
 import { describe, expect, test } from "bun:test";
-import { BACKSTOP_MS } from "../../../src/server/bash/index.ts";
+import {
+  BACKSTOP_MS,
+  MAX_COMMAND_BYTES,
+} from "../../../src/server/bash/index.ts";
 import {
   acquireSession,
   heldWorkspaces,
@@ -150,6 +153,32 @@ describe("bash", () => {
       expect(ctx.budget.bashCalls).toBe(1);
     },
   );
+
+  test("refuse a NUL or an oversized command before it spends a call", async () => {
+    const s = setup();
+    const ctx = mountedContext(s);
+    const registry = new Registry([makeBashTool({ bash: s.bash })]);
+    try {
+      for (const [command, content] of [
+        ["echo a\u0000echo b > f", "the command holds a NUL byte"],
+        [
+          `echo ${"x".repeat(MAX_COMMAND_BYTES)}`,
+          "the command is over 64 KiB, write a large file in parts",
+        ],
+      ] as const)
+        expect(await registry.run(call({ command }), ctx)).toEqual({
+          content,
+          error: true,
+        });
+      expect(ctx.budget.bashCalls).toBe(0);
+      const fits = `: ${"x".repeat(MAX_COMMAND_BYTES - 2)}`;
+      const ran = await registry.run(call({ command: fits }), ctx);
+      expect(ran.error).toBeFalsy();
+      expect(ctx.budget.bashCalls).toBe(1);
+    } finally {
+      s.db.close();
+    }
+  });
 
   test.serial(
     "a spent count never enters an occupied session queue or process slot",

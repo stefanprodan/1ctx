@@ -5,7 +5,7 @@
 // is mounted over it, never listed.
 
 import type { BashOptions, IFileSystem, InMemoryFs } from "just-bash";
-import { INPUT_PASSES } from "./commands.ts";
+import { INPUT_PASSES, MAX_COMMAND_BYTES } from "./commands.ts";
 import { prefixes, underKnowledge, underRoot } from "./paths.ts";
 import type { Job } from "./protocol.ts";
 import type { EntryKind, TreeEntry } from "./readback.ts";
@@ -73,7 +73,7 @@ export function executionLimits(
     maxOutputSize: job.ioBytes,
     maxHeredocSize: job.knowledgeFileBytes,
     maxStringLength: job.ioBytes,
-    maxSourceBytes: 64 * 1024,
+    maxSourceBytes: MAX_COMMAND_BYTES,
     maxCommandCount: job.iterations,
     maxLoopIterations: job.iterations,
     maxAwkIterations: job.iterations,
