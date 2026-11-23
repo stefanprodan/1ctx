@@ -177,8 +177,14 @@ export async function readSaved(
   const roots = blind
     ? SANDBOX_ROOTS.filter((root) => root !== "/knowledge")
     : SANDBOX_ROOTS;
-  const walked = await walk(on, limits, bounds, roots);
-  const read = readout(walked, job, wanted, context.credentials);
+  const walked = await walk(on, limits, bounds, roots, !alone);
+  const read = readout(
+    walked.entries,
+    job,
+    wanted,
+    context.credentials,
+    walked.moved,
+  );
   const notice = discardNotices(read.entries, job) + printed.notice;
   from.phase?.("diff");
   const shown = { ...printed, notice };
@@ -201,7 +207,7 @@ export async function readSaved(
     },
     [...roots, ...RECORD_ROOTS],
   );
-  fill(read, frames);
+  fill(read, frames, !alone);
   // a key the command was handed is never saved or shown
   const scrubbed = scrubPulled(read, frames, context.credentials);
   const pwd = recordedCwd(id, scrubbed) ?? start;

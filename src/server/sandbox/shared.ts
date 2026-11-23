@@ -204,7 +204,8 @@ export function leftInPlace(
   fresh: Wanted,
   caps: { knowledgeFileBytes: number },
 ): Set<string> {
-  const left = new Set<string>();
+  // what moved under the walk or before the pull is never read
+  const left = new Set(read.moved);
   for (const entry of read.entries) {
     if (!underKnowledge(entry.path) || within(left, entry.path)) continue;
     if (entry.kind === "link" || entry.kind === "other") {

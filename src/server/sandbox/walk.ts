@@ -4,6 +4,8 @@
 // The walk helper's listing, read strictly as it arrives: the walk
 // decides deletes as well as fetches, so anything short of a complete,
 // well-formed listing within its bounds is a failure and saves nothing.
+// Beside other commands an entry that moved under the walk is no
+// failure: one gone is absent, one changing is listed as moved.
 
 import {
   escapePath,
@@ -56,30 +58,45 @@ export type WalkFailure = {
   line: number;
 };
 
-export type WalkResult = { ok: true; entries: WalkEntry[] } | WalkFailure;
+// an entry that changed while the walk read it, beside other commands
+export type WalkMoved = Pick<WalkEntry, "path" | "escaped" | "unicode">;
+
+export type WalkResult =
+  | { ok: true; entries: WalkEntry[]; moved: WalkMoved[] }
+  | WalkFailure;
 
 const ENTRY =
   /^([dflo]) ([0-7]{1,5}) (0|[1-9][0-9]{0,15}) ([1-9][0-9]{0,9}) (-|[0-9a-f]{64}) (\S+)$/;
 const TRAILER =
   /^WALK (?:done (0|[1-9][0-9]{0,9})|over (?:entries|file|bytes) (0|[1-9][0-9]{0,15}))$/;
 const ascii = new TextDecoder("ascii");
+const ERROR = /^E ([A-Z0-9]+) (\S+)$/;
+// a name gone between the listing and its stat, open or scandir
+const GONE = new Set(["ENOENT"]);
+// a file that grew, shrank or was swapped while hashed, or a name
+// turned into a link or a file under the walk
+const MOVED = new Set(["ESTALE", "ELOOP", "ENOTDIR"]);
 
 export class WalkDecoder {
   private readonly lines = new LineReader();
   private readonly entries: WalkEntry[] = [];
+  private readonly moved: WalkMoved[] = [];
   private readonly folders = new Set<string>();
   private readonly seen = new Set<string>();
   private readonly roots: readonly string[];
   private readonly bounds: WalkBounds;
+  // other commands run in the sandbox, so an entry may move under it
+  private readonly beside: boolean;
   private nameBytes = 0;
   private fileBytes = 0;
   private line = 0;
   private done = false;
   private failure: WalkFailure | null = null;
 
-  constructor(roots: readonly string[], bounds: WalkBounds) {
+  constructor(roots: readonly string[], bounds: WalkBounds, beside = false) {
     this.roots = roots;
     this.bounds = bounds;
+    this.beside = beside;
   }
 
   // the failure once there is one; later chunks change nothing
@@ -95,7 +112,7 @@ export class WalkDecoder {
     if (!this.done || !this.lines.empty) return this.fail("unfinished");
     if (this.roots.some((root) => !this.seen.has(escapePath(root))))
       return this.fail("partial");
-    return { ok: true, entries: this.entries };
+    return { ok: true, entries: this.entries, moved: this.moved };
   }
 
   private fail(reason: WalkFailure["reason"]): WalkFailure {
@@ -117,11 +134,8 @@ export class WalkDecoder {
       this.done = true;
       return this.failure === null;
     }
-    if (/^E [A-Z0-9]+ \S+$/.test(text)) {
-      this.failure = this.fail("partial");
-      return false;
-    }
-    const failure = this.entry(text);
+    const error = ERROR.exec(text);
+    const failure = error ? this.error(error[1]!, error[2]!) : this.entry(text);
     if (failure) {
       this.failure = this.fail(failure);
       return false;
@@ -129,11 +143,26 @@ export class WalkDecoder {
     return true;
   }
 
-  private entry(text: string): WalkFailure["reason"] | null {
-    const match = ENTRY.exec(text);
-    if (!match) return "malformed";
-    const [, type, mode, size, nlink, sha, escaped] = match;
-    const raw = unescapePath(escaped!);
+  // an entry the walk could not read: alone, or for a root or any other
+  // error, the listing is partial; beside others, one that moved is no
+  // failure, held to the same checks as a listed name
+  private error(errno: string, escaped: string): WalkFailure["reason"] | null {
+    const gone = GONE.has(errno);
+    if (!this.beside || !(gone || MOVED.has(errno))) return "partial";
+    const named = this.name(escaped);
+    if (typeof named === "string") return named;
+    if (named.top) return "partial";
+    if (!this.folders.has(escaped.slice(0, escaped.lastIndexOf("/"))))
+      return "orphan";
+    this.seen.add(escaped);
+    if (!gone)
+      this.moved.push({ path: named.path, escaped, unicode: named.unicode });
+    return null;
+  }
+
+  // a listed name's path, held to the bounds, the roots and once only
+  private name(escaped: string) {
+    const raw = unescapePath(escaped);
     if (!raw) return "malformed";
     if (this.entries.length >= this.bounds.entries) return "entries";
     this.nameBytes += raw.byteLength;
@@ -143,11 +172,21 @@ export class WalkDecoder {
     // its root; the escaped spelling, one per byte string, is the key
     const at = rootOf(path, this.roots);
     if (!at) return "outside";
-    if (this.seen.has(escaped!)) return "duplicate";
+    if (this.seen.has(escaped)) return "duplicate";
+    return { path, unicode, top: at.top };
+  }
+
+  private entry(text: string): WalkFailure["reason"] | null {
+    const match = ENTRY.exec(text);
+    if (!match) return "malformed";
+    const [, type, mode, size, nlink, sha, escaped] = match;
+    const named = this.name(escaped!);
+    if (typeof named === "string") return named;
+    const { path, unicode } = named;
     const isFile = type === "f";
     if ((sha === "-") === isFile) return "malformed";
     if (Number.parseInt(mode!, 8) > 0o7777) return "malformed";
-    if (at.top) {
+    if (named.top) {
       if (type !== "d") return "root";
     } else if (!this.folders.has(escaped!.slice(0, escaped!.lastIndexOf("/"))))
       return "orphan";
@@ -176,8 +215,9 @@ export function decodeWalk(
   output: Uint8Array,
   roots: readonly string[],
   bounds: WalkBounds,
+  beside = false,
 ): WalkResult {
-  const decoder = new WalkDecoder(roots, bounds);
+  const decoder = new WalkDecoder(roots, bounds, beside);
   decoder.push(output);
   return decoder.end();
 }

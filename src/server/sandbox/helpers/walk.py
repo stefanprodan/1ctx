@@ -5,7 +5,9 @@
 # type d, f, l (a link) or o (anything else, a folder on another mount
 # too, never entered); mode in octal. The path is percent-escaped so a
 # name never breaks a line. A folder or file it cannot read is an E line
-# (E <errno> <path>). Before going past a bound it stops with
+# (E <errno> <path>); the server reads ENOENT as gone and ESTALE, ELOOP
+# or ENOTDIR as moved only while other commands run. A file not listed
+# counts toward no bound. Before going past a bound it stops with
 # WALK over <entries|file|bytes> <bound>: a file is sized before it is
 # read, so a huge or sparse file costs nothing.
 import errno, hashlib, os, stat, sys
@@ -109,6 +111,7 @@ def main():
                     sha = digest(path, st)
                 except OSError as e:
                     n -= 1
+                    held -= st.st_size
                     failed(e, path)
                     continue
                 line("f %o %d %d %s %s" % (mode, st.st_size, st.st_nlink, sha, escape(path)))

@@ -568,6 +568,127 @@ describe("a sandbox shared by a chat and its subagents", () => {
     expect(t.fake.deletes).toEqual([]);
   });
 
+  // the walk's lines as a real walk prints them when entries move under
+  // it: each path's entry turned into its E line, or one added after
+  // /knowledge for a name gone before it was listed
+  const moving =
+    (errors: Record<string, string>) =>
+    (lines: string[]): string[] => {
+      const out = lines.flatMap((line) => {
+        const path = line.split(" ").at(-1)!;
+        if (line.startsWith("WALK")) return [];
+        if (path in errors) return [`E ${errors[path]} ${path}`];
+        if (path !== "/knowledge") return [line];
+        const gone = Object.keys(errors).filter(
+          (at) => !lines.some((each) => each.endsWith(` ${at}`)),
+        );
+        return [line, ...gone.map((at) => `E ${errors[at]} ${at}`)];
+      });
+      const n = out.filter((line) => !line.startsWith("E ")).length;
+      return [...out, `WALK done ${n}`];
+    };
+
+  test("beside a running command a name gone or a doc moving under the walk stays for a later save", async () => {
+    const t = setup();
+    const rows = store(ROWS.knowledge);
+    const { child, parent } = await besideParent(
+      t,
+      rows,
+      "v",
+      ({ fs }) => {
+        fs.write("/knowledge/b.md", "b2\n");
+        // sed -i's temporary file, renamed away, and a.md rewritten
+        // while it was hashed
+        fs.walkLines = moving({
+          "/knowledge/sedAbc12": "ENOENT",
+          "/knowledge/a.md": "ESTALE",
+        });
+      },
+      {
+        early: ({ fs }) => fs.write("/knowledge/a.md", "half"),
+        late: ({ fs }) => fs.write("/knowledge/a.md", "whole\n"),
+      },
+    );
+    expect(answerOf(child.settled)).toMatchObject({
+      refused: null,
+      changes: {
+        knowledge: [
+          { name: "b.md", text: "b2\n" },
+          { name: "p-v.md", text: "v\n" },
+        ],
+      },
+    });
+    child.fs.walkLines = undefined;
+    child.settle(rows.commit(answerOf(child.settled), t.time.now()));
+    await t.backend.idle();
+    expect(child.hold.lost.aborted).toBe(false);
+    expect(child.fs.tree()["/knowledge/a.md"]).toEndWith(" half");
+    const done = await parent();
+    expect(answerOf(done.settled).changes?.knowledge).toEqual([
+      { name: "a.md", text: "whole\n" },
+    ]);
+    done.settle(rows.commit(answerOf(done.settled), t.time.now()));
+    expect(await t.settled(done.hold)).toBe("idle");
+    expect(rows.text("a.md")).toBe("whole\n");
+    expect(t.fake.deletes).toEqual([]);
+  });
+
+  test("beside a running command a doc that moves or goes between the walk and the pull stays for a later save", async () => {
+    const t = setup();
+    const rows = store(ROWS.knowledge);
+    const { child, parent } = await besideParent(t, rows, "q", ({ fs }) => {
+      fs.write("/knowledge/a.md", "mine\n");
+      fs.write("/knowledge/b.md", "b2\n");
+      fs.write("/knowledge/c.md", "c\n");
+      // the parent's writes land once the walk listed the tree
+      fs.walkLines = (lines) => {
+        fs.write("/knowledge/a.md", "parent\n");
+        fs.write("/knowledge/b.md", "b2\n", 0o600);
+        fs.remove("/knowledge/c.md");
+        fs.walkLines = undefined;
+        return lines;
+      };
+    });
+    expect(answerOf(child.settled)).toMatchObject({
+      refused: null,
+      changes: { knowledge: [{ name: "p-q.md", text: "q\n" }] },
+    });
+    child.settle(rows.commit(answerOf(child.settled), t.time.now()));
+    await t.backend.idle();
+    expect(child.hold.lost.aborted).toBe(false);
+    expect(child.fs.tree()["/knowledge/a.md"]).toBe("644 0 parent\n");
+    const done = await parent();
+    expect(answerOf(done.settled).changes?.knowledge).toEqual([
+      { name: "a.md", text: "parent\n" },
+      { name: "b.md", text: "b2\n" },
+    ]);
+    done.settle(rows.commit(answerOf(done.settled), t.time.now()));
+    expect(await t.settled(done.hold)).toBe("idle");
+    expect(rows.text("a.md")).toBe("parent\n");
+    expect(t.fake.deletes).toEqual([]);
+  });
+
+  test("alone, a doc moving under the walk or before the pull saves nothing and recycles", async () => {
+    for (const late of [false, true]) {
+      const t = setup();
+      const ran = await t.run(ROWS, ({ fs }) => {
+        fs.write("/knowledge/a.md", "mine\n");
+        fs.walkLines = late
+          ? (lines) => {
+              fs.write("/knowledge/a.md", "other\n");
+              return lines;
+            }
+          : moving({ "/knowledge/a.md": "ESTALE" });
+        return {};
+      });
+      const answer = answerOf(ran.settled);
+      expect(answer.changes).toBeNull();
+      expect(answer.refused).toContain("nothing was saved");
+      ran.settle({ landed: false, why: "skipped" });
+      expect(await t.settled(ran.hold)).not.toBe("idle");
+    }
+  });
+
   test("alone, a doc that is not text refuses the save and recycles", async () => {
     const t = setup();
     const ran = await t.run(ROWS, ({ fs }) => {
