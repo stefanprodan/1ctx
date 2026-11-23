@@ -496,7 +496,13 @@ function draw(drafted: Signal<SandboxDraft | null>) {
   };
   let html: string;
   try {
-    html = render(<SandboxCards state={sandbox.value!} drafted={drafted} />);
+    html = render(
+      <SandboxCards
+        state={sandbox.value!}
+        drafted={drafted}
+        netDrafted={signal(null)}
+      />,
+    );
   } finally {
     options.vnode = previous;
   }
@@ -670,6 +676,7 @@ describe("the Network card's flows", () => {
     const on: {
       hosts?: (e: Event) => void;
       network?: (value: string) => void;
+      backend?: (value: string) => void;
       defaults?: () => void;
       submits: ((e: Event) => void)[];
     } = { submits: [] };
@@ -681,6 +688,8 @@ describe("the Network card's flows", () => {
         on.hosts = props.onInput as (e: Event) => void;
       if (props.name === "network" && typeof props.onPick === "function")
         on.network = props.onPick as (value: string) => void;
+      if (props.name === "backend" && typeof props.onPick === "function")
+        on.backend = props.onPick as (value: string) => void;
       if (v.type === "button" && props.children === "Use defaults")
         on.defaults = props.onClick as () => void;
       if (v.type === "form")
@@ -691,7 +700,11 @@ describe("the Network card's flows", () => {
     const css = g.CSS;
     g.CSS = { escape: (text: string) => text };
     const view = await mount(
-      <SandboxCards state={sandbox.value!} drafted={signal(null)} />,
+      <SandboxCards
+        state={sandbox.value!}
+        drafted={signal(null)}
+        netDrafted={signal(null)}
+      />,
     );
     return {
       view,
@@ -773,6 +786,33 @@ describe("the Network card's flows", () => {
         calls[0]!.answer(Response.json(response()));
         await settle();
         await answerLeases(1);
+      } finally {
+        await t.done();
+      }
+    },
+  );
+
+  test.serial(
+    "hosts edited outlive the shell switched to built-in and back",
+    async () => {
+      sandbox.value = response({
+        settings: { ...settings, hosts: ["a.test"] },
+      });
+      const t = await mounted();
+      try {
+        await act(() =>
+          t.on.hosts!({
+            currentTarget: { value: "a.test\nb.test" },
+          } as unknown as Event),
+        );
+        await act(() => t.on.backend!("builtin"));
+        expect(t.view.html()).not.toContain('name="hosts"');
+        await act(() => t.on.backend!("openshell"));
+        const html = t.view.html();
+        expect(html).toContain('value="a.test\nb.test"></textarea>');
+        expect(html).toContain('setting-count">2 of 200<');
+        expect(html).toContain("Unsaved changes");
+        expect(calls).toHaveLength(0);
       } finally {
         await t.done();
       }

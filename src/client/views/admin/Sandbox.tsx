@@ -82,6 +82,9 @@ export function SandboxView({ tab }: { tab: PollDriver }) {
   const state = sandbox.value;
   const error = sandboxError.value;
   const drafted = useSignal<SandboxDraft | null>(null);
+  // the page holds it, so a Network card hidden by a built-in pick and
+  // shown again keeps its edits
+  const netDrafted = useSignal<NetDraft | null>(null);
   useEffect(() => watchSandboxLeases(tab), [tab]);
   return (
     <Page
@@ -107,7 +110,11 @@ export function SandboxView({ tab }: { tab: PollDriver }) {
     >
       {state && (
         <Split aside={<Aside state={state} />}>
-          <SandboxCards state={state} drafted={drafted} />
+          <SandboxCards
+            state={state}
+            drafted={drafted}
+            netDrafted={netDrafted}
+          />
         </Split>
       )}
     </Page>
@@ -117,9 +124,11 @@ export function SandboxView({ tab }: { tab: PollDriver }) {
 export function SandboxCards({
   state,
   drafted,
+  netDrafted,
 }: {
   state: SandboxResponse;
   drafted: Signal<SandboxDraft | null>;
+  netDrafted: Signal<NetDraft | null>;
 }) {
   const off = offLine(state);
   const refused = sandboxRefused.value;
@@ -131,7 +140,9 @@ export function SandboxCards({
       <Shell state={state} drafted={drafted} />
       {/* the built-in shell has no network of its own, as it has no
           gateway or image, unless a project runs openshell over it */}
-      {gatewayShown(backend, state.overrides) && <Network state={state} />}
+      {gatewayShown(backend, state.overrides) && (
+        <Network state={state} drafted={netDrafted} />
+      )}
       <Leases
         rows={sandboxLeases.value}
         failed={sandboxLeasesError.value !== null}
@@ -305,8 +316,13 @@ function Shell({
 }
 
 // null until an edit, so a load that lands late shows through
-function Network({ state }: { state: SandboxResponse }) {
-  const drafted = useSignal<NetDraft | null>(null);
+function Network({
+  state,
+  drafted,
+}: {
+  state: SandboxResponse;
+  drafted: Signal<NetDraft | null>;
+}) {
   const latest = useLatest(state);
   const save = useSave(async () => {
     const got = netBody(drafted.value ?? netDraftOf(latest.current.settings));

@@ -93,10 +93,12 @@ reporting.
   (`gatewayShown()`); `sandboxFieldOf()` matches the server's whole
   phrases.
 - **The Sandbox page's Network card shows while `gatewayShown()`**, its
-  own form saving only the network and hosts. Off or
-  Hosts as a `Seg`; Hosts draws the box, one host per line, counted
-  "N of 200", a line's refusal named by `lineError()`. The box holds
-  the saved hosts, or the defaults while none are saved. Use defaults,
+  own form saving only the network and hosts. The page holds its
+  draft, as it holds the Shell card's, so edits outlive a Built-in
+  pick. Off or Hosts as a `Seg`; Hosts draws the box, one host per
+  line, counted "N of 200", a line's refusal named by `lineError()`.
+  The box holds the saved hosts, or the defaults while none are saved.
+  Use defaults,
   as on a `LimitsSetting` card, fills the draft with Hosts and the
   defaults without saving, disabled while the draft is already that. A saved
   sandbox shell, or a project's, missing a key file or a gateway says
