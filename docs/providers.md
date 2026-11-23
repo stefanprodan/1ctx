@@ -66,6 +66,15 @@ with probabilities.
   finishes a round on one channel. A stop by the caller's signal ends
   the stream with no event. The key is read at each request, so a
   rotated file is seen, and scrubbed from every error.
+- **A frame of SSE comments alone makes an `alive`**, one per read,
+  with the wire's thinking state (`streamChat()`). A local server that
+  holds a tool call back until it is whole sends only keepalives while
+  the model writes it, minutes on a large call, so the round's quiet
+  check must not cut it. On every wire, an `alive` not thinking that
+  comes ten minutes or more after the round's last other event or
+  thinking `alive` fails it as quiet (`STREAM_ALIVE_MS`): a chat has
+  no deadline, and an upstream stalled behind OpenRouter's comments
+  would hold its turn forever.
 
 ## Wire rules
 

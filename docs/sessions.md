@@ -153,9 +153,10 @@ arrives.
   five-minute silence limit, never the quiet check, since a local
   server reads a long prompt in silence. The headers wait is two
   minutes. An `alive` event shows nothing and never starts the quiet
-  check; once it runs, an `alive` starts it over, and while one says
-  `thinking` both the check and the silence limit are lifted until
-  thinking ends. `reasoningRefused` starts nothing either, since the
+  check; once it runs, an `alive` starts it over, up to
+  `STREAM_ALIVE_MS` after the last other event (`docs/providers.md`),
+  and while one says `thinking` both the check and the silence limit
+  are lifted until thinking ends. `reasoningRefused` starts nothing either, since the
   request it announces starts afresh.
 - **A round that loops is cut** (`runner/repetition.ts`, a port of
   Hermes Agent's exact-repetition check, and `runner/round-loop.ts`).

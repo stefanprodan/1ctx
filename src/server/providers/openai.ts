@@ -150,14 +150,16 @@ export function wireTokens(tools: readonly ChatTool[]): number {
   return tools.length === 0 ? 0 : tokens(JSON.stringify(wireTools(tools)));
 }
 
-// Frames are returned as their joined data payload. Comments count as bytes
-// for liveness in the reader but carry no event for the runner.
+// Frames are returned as their joined data payload. A frame of comments
+// alone is counted: a server holding back a tool call sends them while the
+// model writes it, so the runner hears an alive.
 export function parseSse(
   buffer: string,
   chunk: string,
-): { frames: string[]; rest: string } {
+): { frames: string[]; rest: string; comments: number } {
   let rest = buffer + chunk;
   const frames: string[] = [];
+  let comments = 0;
   while (true) {
     const split = /\r?\n\r?\n/.exec(rest);
     if (!split || split.index === undefined) break;
@@ -166,17 +168,17 @@ export function parseSse(
       throw new Error(OVERSIZED_SSE_FRAME);
     }
     rest = rest.slice(split.index + split[0].length);
-    const data = raw
-      .split(/\r?\n/)
-      .filter((line) => !line.startsWith(":"))
+    const lines = raw.split(/\r?\n/);
+    const data = lines
       .filter((line) => line === "data" || line.startsWith("data:"))
       .map((line) => line.slice(5).replace(/^ /, ""));
     if (data.length > 0) frames.push(data.join("\n"));
+    else if (lines.some((line) => line.startsWith(":"))) comments++;
   }
   if (Buffer.byteLength(rest) > MAX_SSE_FRAME_BYTES) {
     throw new Error(OVERSIZED_SSE_FRAME);
   }
-  return { frames, rest };
+  return { frames, rest, comments };
 }
 
 type TrackedCall = {
@@ -470,6 +472,9 @@ export async function* streamChat(
           done = true;
           break;
         }
+      }
+      if (!done && parsed.comments > 0) {
+        yield { kind: "alive", thinking: options.thinking?.() ?? false };
       }
     }
     const calls = tracker.flush();
