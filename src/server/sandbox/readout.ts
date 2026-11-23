@@ -87,15 +87,25 @@ export function readout(
       throw new StepFailure("walk", "credential");
   };
   // a change where nothing commits recycles however it moved
+  // the base's paths and every folder above them, built once: gone names
+  // may run to the name-bytes bound
+  let based: Set<string> | null = null;
+  const inBase = (path: string) => {
+    if (based === null) {
+      based = new Set();
+      for (const key of wanted.tree.keys()) {
+        const parts = key.split("/");
+        for (let at = parts.length; at > 0; at--)
+          based.add(parts.slice(0, at).join("/"));
+      }
+    }
+    return based.has(path);
+  };
   for (const at of movedUnder) {
-    named(at);
     // a name gone may be renamed away, so one the base holds stays; one
     // it never held changes nothing
-    const under = `${at.path}/`;
-    const held =
-      wanted.tree.has(at.path) ||
-      [...wanted.tree.keys()].some((path) => path.startsWith(under));
-    if (at.gone && !held) continue;
+    if (at.gone && !inBase(at.path)) continue;
+    named(at);
     if (keptOnly(at.path, job)) discarded = true;
     else if (saved(at.path, job)) moved.add(at.path);
   }

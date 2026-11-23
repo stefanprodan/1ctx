@@ -603,10 +603,11 @@ describe("a sandbox shared by a chat and its subagents", () => {
       "v",
       ({ fs }) => {
         fs.write("/knowledge/b.md", "b2\n");
-        // sed -i's temporary file, renamed away, and a.md rewritten
-        // while it was hashed
+        // sed -i's temporary files, renamed away, one named in bytes
+        // that are not UTF-8, and a.md rewritten while it was hashed
         fs.walkLines = moving({
           "/knowledge/sedAbc12": "ENOENT",
+          "/knowledge/sed%FF": "ENOENT",
           "/knowledge/a.md": "ESTALE",
         });
       },

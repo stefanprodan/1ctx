@@ -158,8 +158,9 @@ never counts, so one alone still fences.
   that moved under the walk (grew, shrank or was swapped while hashed,
   turned into a link) or between the walk and the pull (bytes, mode or
   gone), never read, and so is a name the base holds that went under
-  the walk (renamed away, a folder's docs too).
-  Alone, they refuse the save, and a move saves nothing and recycles. The put-back then leaves them and every folder
+  the walk (renamed away, a folder's docs too); one it never held is
+  absent. Alone, they refuse the save, and a move saves nothing and
+  recycles. The put-back then leaves them and every folder
   (`spared()`), since a running command may write in one, so beside
   others it removes only files the save read. Each file it writes or
   removes there holds to the bytes the walk read (`was`, checked by the
