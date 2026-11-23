@@ -10,6 +10,10 @@ in `docs/sessions.md`; kept MCP files' storage in `docs/bash.md`.
 - **A channel is never archived, packed as an idle chat, or deleted alone.**
   Fork, rename, archive and delete routes refuse it. Its project cascade is
   the only deletion path; aging channel turns is separate channel work.
+- **A project's delete takes its sessions by the cascade** and
+  publishes `project.deleted`, after which the sandbox area recycles
+  every sandbox made for the project's chats (`Lease.projectId`), as a
+  chat's delete does: no session row is left to name them.
 - **An archived chat is read-only for good.** There is no unarchive;
   Fork is the way on. A run is never archived.
 - **Archiving expires pending automation drafts in the same

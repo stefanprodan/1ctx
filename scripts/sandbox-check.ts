@@ -593,7 +593,7 @@ except Exception as e: print('mem', type(e).__name__)"`,
       own.hold.sandbox === kept.hold.sandbox,
     `exit ${own.answer?.exitCode}, stopped ${own.answer?.stopped}, ${own.state}`,
   );
-  leases.recycleSession(keep.workspace, "clear");
+  leases.recycleOf({ sessionId: keep.workspace, reason: "clear" });
   const gone = await command(keep, "cat /tmp/keep.txt 2>&1; true");
   report(
     "/tmp lasts between commands and goes with a recycle",

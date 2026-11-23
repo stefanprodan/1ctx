@@ -249,9 +249,7 @@ export function sandboxArea(deps: SandboxDeps): Sandbox {
       },
     });
     const unsubscribe = subscribe((event) => {
-      for (const { sessionId, reason } of recyclesOf(event)) {
-        leases.recycleSession(sessionId, reason);
-      }
+      for (const recycle of recyclesOf(event)) leases.recycleOf(recycle);
     }, deps.log);
     current = {
       key,

@@ -11,12 +11,16 @@
 import type { BusEvent } from "../lib/bus.ts";
 import type { RecycleReason } from "./hold.ts";
 
-export type Recycle = { sessionId: string; reason: RecycleReason };
+export type Recycle =
+  | { sessionId: string; reason: RecycleReason }
+  | { projectId: string; reason: RecycleReason };
 
 export function recyclesOf(event: BusEvent): Recycle[] {
   switch (event.type) {
     case "session.deleted":
       return [{ sessionId: event.data.sessionId, reason: "delete" }];
+    case "project.deleted":
+      return [{ projectId: event.data.projectId, reason: "delete" }];
     case "session.changed": {
       const { session, send, cleared } = event.data;
       const out: Recycle[] = [];
@@ -35,4 +39,15 @@ export function recyclesOf(event: BusEvent): Recycle[] {
     default:
       return [];
   }
+}
+
+// a session's every workspace (a chat's, or each agent's in a channel),
+// or every one made for a deleted project's chats
+export function recycles(
+  of: Recycle,
+  workspace: string,
+  projectId: string | null,
+): boolean {
+  if ("projectId" in of) return projectId === of.projectId;
+  return workspace === of.sessionId || workspace.startsWith(`${of.sessionId}:`);
 }

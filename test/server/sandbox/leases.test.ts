@@ -290,6 +290,21 @@ describe("sandbox leases", () => {
     t.leases.close();
   });
 
+  test("a warm sandbox a chat takes goes with its project", async () => {
+    const t = setup({ sandboxWarm: 1 });
+    await t.leases.start();
+    await until(() => t.leases.rows().some((row) => row.state === "warm"));
+    const warm = t.leases.rows()[0]!.sandbox;
+    const taken = await t.acquire("chat");
+    expect(taken.sandbox).toBe(warm);
+    taken.release();
+    t.leases.recycleOf({ projectId: "other", reason: "delete" });
+    expect(t.fake.deletes).not.toContain(warm);
+    t.leases.recycleOf({ projectId: "project", reason: "delete" });
+    await until(() => t.fake.deletes.includes(warm));
+    t.leases.close();
+  });
+
   test("a lowered sandboxWarm deletes the warm sandboxes past it", async () => {
     const t = setup({ sandboxWarm: 2 });
     await t.leases.start();
@@ -415,7 +430,7 @@ describe("sandbox leases", () => {
   test("a recycle of a held sandbox waits for its release", async () => {
     const t = setup();
     const hold: SandboxHold = await t.acquire("chat:agent");
-    t.leases.recycleSession("chat", "clear");
+    t.leases.recycleOf({ sessionId: "chat", reason: "clear" });
     expect(t.state(hold.sandbox)).toBe("leased");
     hold.release();
     await until(() => t.leases.rows().length === 0);
