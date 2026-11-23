@@ -301,10 +301,10 @@ export function asSubagent(
 // Refused before either shell: bash ends a command at a NUL, so the
 // sandbox would run only its head, and a command past the cap is the
 // same plain answer in both shells, never a lost sandbox.
-export function commandRefusal(command: string): string | null {
+function commandRefusal(command: string): string | null {
   if (command.includes("\u0000")) return "the command holds a NUL byte";
   if (Buffer.byteLength(command) > MAX_COMMAND_BYTES)
-    return "the command is over 64 KiB, write a large file in parts";
+    return `the command is over ${MAX_COMMAND_BYTES / 1024} KiB, write a large file in parts`;
   return null;
 }
 

@@ -50,7 +50,8 @@ words.
   and the loop goes on.
 - **A bash command with a NUL or over `MAX_COMMAND_BYTES`** (64 KiB,
   the built-in shell's source cap) gets an error result before either
-  shell, spending no bash call: bash would end it at the NUL.
+  shell, spending no bash call: bash would end it at the NUL, and one
+  past the sandbox gateway's 1 MiB request would lose the sandbox.
 - **Spend counts cached tokens at a tenth.** A main round spends prompt
   less cached, plus cached / `CACHED_DIVISOR` rounded up, plus
   completion, or an estimate without usage.
