@@ -3,7 +3,8 @@
 
 import { type ImageData, NO_IMAGE_DATA } from "./images.ts";
 import { baseChatBody } from "./openai.ts";
-import type { ChatMessageIn, ChatRequest } from "./types.ts";
+import { withOwnReasoning } from "./reasoning.ts";
+import type { ChatRequest } from "./types.ts";
 
 // the session headers OpenCode sends, each the chat's cache key: Go's
 // docs require x-opencode-session, and its newer service reads the rest
@@ -19,30 +20,17 @@ export function openCodeHeaders(
   };
 }
 
-// whether a history message's reasoning goes back to the requested model
-export const sendsReasoning =
-  (req: Pick<ChatRequest, "model">) =>
-  (message: ChatMessageIn): boolean =>
-    message.role === "assistant" &&
-    !!message.reasoning &&
-    message.model === req.model;
-
 export function buildChatBody(
   req: ChatRequest,
   images: ImageData = NO_IMAGE_DATA,
 ): Record<string, unknown> {
-  const body = baseChatBody(req, {
-    usageOption: true,
-    effort: true,
-    offAsNone: true,
-    images,
-  });
-  const messages = body.messages as Record<string, unknown>[];
-  const sends = sendsReasoning(req);
-  req.messages.forEach((source, index) => {
-    if (source.role === "assistant" && sends(source)) {
-      messages[index]!.reasoning_content = source.reasoning;
-    }
-  });
-  return body;
+  return withOwnReasoning(
+    req,
+    baseChatBody(req, {
+      usageOption: true,
+      effort: true,
+      offAsNone: true,
+      images,
+    }),
+  );
 }

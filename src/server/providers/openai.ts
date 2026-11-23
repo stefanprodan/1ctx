@@ -6,6 +6,7 @@ import { messageOf } from "../lib/errors.ts";
 import { tokens } from "../lib/tokens.ts";
 import { chatEvents } from "./frames.ts";
 import { chatUserContent, type ImageData, NO_IMAGE_DATA } from "./images.ts";
+import { withOwnReasoning } from "./reasoning.ts";
 import type {
   ChatEvent,
   ChatRequest,
@@ -34,7 +35,7 @@ export function wireName(name: string): string | null {
 export type ChatBodyOptions = {
   // OpenRouter's structured reasoning items go back on its assistant
   // messages; a message's plain reasoning goes back only where a wire's
-  // own builder adds it (opencode.ts)
+  // own builder adds it (withOwnReasoning)
   reasoningDetails?: boolean;
   // enable_thinking, sent on every request, off included
   thinkingFlag?: boolean;
@@ -54,13 +55,16 @@ export function buildChatBody(
   req: ChatRequest,
   images: ImageData = NO_IMAGE_DATA,
 ): Record<string, unknown> {
-  return baseChatBody(req, {
-    thinkingFlag: true,
-    usageOption: true,
-    effort: true,
-    cacheKey: true,
-    images,
-  });
+  return withOwnReasoning(
+    req,
+    baseChatBody(req, {
+      thinkingFlag: true,
+      usageOption: true,
+      effort: true,
+      cacheKey: true,
+      images,
+    }),
+  );
 }
 
 export function baseChatBody(

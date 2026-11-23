@@ -282,20 +282,32 @@ describe("tool loop provider policy", () => {
     });
   });
 
-  test("opencode sends no reasoning another model wrote, and none that is empty", async () => {
-    const other = "z-ai/glm-5.3-flash";
-    expect(await secondTurn("opencode", "greet first", other)).toEqual({
-      model: other,
-      assistant: { role: "assistant", content: "hi there" },
-    });
-    expect((await secondTurn("opencode", "")).assistant).toEqual({
+  test("openai-compatible sends the same model's reasoning back on a later turn", async () => {
+    expect(
+      (await secondTurn("openai-compatible", "greet first")).assistant,
+    ).toEqual({
       role: "assistant",
       content: "hi there",
+      reasoning_content: "greet first",
     });
   });
 
-  test("no other wire sends past reasoning back", async () => {
-    for (const wire of ["openai-compatible", "openai-strict"] as const) {
+  test("no reasoning goes back that another model wrote, or that is empty", async () => {
+    const other = "z-ai/glm-5.3-flash";
+    for (const wire of ["opencode", "openai-compatible"] as const) {
+      expect(await secondTurn(wire, "greet first", other)).toEqual({
+        model: other,
+        assistant: { role: "assistant", content: "hi there" },
+      });
+      expect((await secondTurn(wire, "")).assistant).toEqual({
+        role: "assistant",
+        content: "hi there",
+      });
+    }
+  });
+
+  test("the strict wire sends no past reasoning back", async () => {
+    for (const wire of ["openai-strict"] as const) {
       expect((await secondTurn(wire, "greet first")).assistant).toEqual({
         role: "assistant",
         content: "hi there",
