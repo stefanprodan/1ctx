@@ -613,7 +613,10 @@ function round(
     request: { model: "m", messages: [], thinking: false },
     ...(fields.deadline === undefined ? {} : { deadline: fields.deadline }),
   });
-  return { run, asked: () => asked, sleeps, logs, send, shown };
+  const advance = (ms: number) => {
+    now += ms;
+  };
+  return { run, asked: () => asked, sleeps, logs, send, shown, advance };
 }
 
 const timedOut: ChatEvent = {
@@ -673,6 +676,53 @@ describe("runRound retries", () => {
     await r.run;
     expect(forgot).toEqual(["chat/p/m"]);
     expect(r.send.round!.content).toBe("");
+    expect(r.send.round!.finishReason).toBe("stop");
+  });
+
+  // a local server holding a tool call back sends only keepalives
+  const held = (minutes: number) => {
+    const r = round([], {
+      chat: () =>
+        (async function* (): AsyncGenerator<ChatEvent> {
+          yield { kind: "content", text: "Rendering." };
+          for (let at = 0; at < minutes; at++) {
+            r.advance(60_000);
+            yield { kind: "alive", thinking: false };
+          }
+          yield* answer;
+        })(),
+    });
+    return r;
+  };
+
+  test("keepalives while a tool call is held keep the round", async () => {
+    const r = held(9);
+    await r.run;
+    expect(r.send.round!.finishReason).toBe("stop");
+  });
+
+  test("keepalives alone past their window go quiet", async () => {
+    const r = held(10);
+    expect((await rejection(r.run)).message).toContain(
+      "the provider went quiet",
+    );
+  });
+
+  test("thinking keepalives never run out", async () => {
+    const r = round([], {
+      chat: () =>
+        (async function* (): AsyncGenerator<ChatEvent> {
+          yield { kind: "content", text: "a" };
+          for (let at = 0; at < 30; at++) {
+            r.advance(60_000);
+            yield { kind: "alive", thinking: true };
+          }
+          r.advance(60_000);
+          yield { kind: "alive", thinking: false };
+          yield* answer;
+        })(),
+    });
+    await r.run;
     expect(r.send.round!.finishReason).toBe("stop");
   });
 

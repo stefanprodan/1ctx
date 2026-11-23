@@ -332,6 +332,15 @@ describe("parseSse", () => {
     expect(rest).toBe('data: {"c"');
   });
 
+  test("counts frames of comments alone", () => {
+    const { frames, comments } = parseSse(
+      "",
+      ': keepalive\n\n: a\ndata: {"a":1}\n\n: b\n: c\n\n',
+    );
+    expect(frames).toEqual(['{"a":1}']);
+    expect(comments).toBe(2);
+  });
+
   test("refuses an oversized frame", () => {
     expect(() =>
       parseSse("", `data: ${"x".repeat(1024 * 1024 + 1)}\n\n`),
@@ -353,7 +362,82 @@ describe("ToolCallTracker", () => {
   });
 });
 
+// a stream sent chunk by chunk, each read on its own
+async function chunked(
+  chunks: string[],
+  options: Parameters<typeof streamChat>[4] = {},
+): Promise<ChatEvent[]> {
+  const encoder = new TextEncoder();
+  const fetcher = (async () =>
+    new Response(
+      new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            const next = chunks.shift();
+            if (next === undefined) controller.close();
+            else controller.enqueue(encoder.encode(next));
+          },
+        },
+        { highWaterMark: 0 },
+      ),
+      { headers: { "content-type": "text/event-stream" } },
+    )) as unknown as typeof fetch;
+  const events: ChatEvent[] = [];
+  for await (const event of streamChat(
+    fetcher,
+    "http://models.test/v1/chat/completions",
+    buildChatBody(request),
+    new AbortController().signal,
+    options,
+  )) {
+    events.push(event);
+  }
+  return events;
+}
+
 describe("OpenAI chat stream", () => {
+  test("keepalives while a held tool call is written are alive", async () => {
+    const events = await chunked([
+      frames([{ choices: [{ delta: { content: "Rendering." } }] }], false),
+      ": keepalive\n\n",
+      ": keepalive\n\n",
+      frames([
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: "c1",
+                    function: { name: "render", arguments: "{}" },
+                  },
+                ],
+              },
+              finish_reason: "tool_calls",
+            },
+          ],
+        },
+      ]),
+    ]);
+    expect(events.map((e) => e.kind)).toEqual([
+      "content",
+      "alive",
+      "alive",
+      "toolCallDelta",
+      "finish",
+      "toolCalls",
+    ]);
+    expect(events[1]).toEqual({ kind: "alive", thinking: false });
+  });
+
+  test("a keepalive keeps the wire's thinking", async () => {
+    const events = await chunked([": keepalive\n\n", frames([], true)], {
+      thinking: () => true,
+    });
+    expect(events[0]).toEqual({ kind: "alive", thinking: true });
+  });
+
   test("a recorded reply cut by length streams reasoning, the finish, then usage", async () => {
     const { events, init } = await streamed(plainStream);
     expect(init?.method).toBe("POST");
@@ -574,7 +658,7 @@ describe("OpenAI chat stream", () => {
 
   test("a stream that drops before its first event is unanswered", async () => {
     const { events, thrown } = await dropped(": keepalive\n\n");
-    expect(events).toEqual([]);
+    expect(events).toEqual([{ kind: "alive", thinking: false }]);
     expect(thrown).toBeInstanceOf(Unanswered);
     expect((thrown as Unanswered).timedOut).toBe(false);
   });

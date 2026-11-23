@@ -53,6 +53,9 @@ export type RoundDeps = {
 };
 
 export const STREAM_IDLE_MS = 120_000;
+// keepalives alone after the first event: a held tool call takes minutes,
+// a stalled upstream behind a proxy's comments takes forever
+export const STREAM_ALIVE_MS = 600_000;
 export const MAX_REPLY_BYTES = 1024 * 1024;
 
 type TimedNext =
@@ -260,6 +263,8 @@ async function streamRound(
   let heard = false;
   // the wire says the model is reasoning, which it may do in silence
   let thinking = false;
+  // when the round last heard more than a keepalive, or thinking
+  let heardAt = deps.clock();
   let started = false;
   while (true) {
     const next = await nextEvent(
@@ -326,6 +331,10 @@ async function streamRound(
     // running starts over, and thinking lifts it
     if (event.kind === "alive") {
       thinking = event.thinking;
+      if (thinking) heardAt = deps.clock();
+      else if (heard && deps.clock() - heardAt >= STREAM_ALIVE_MS) {
+        throw new Error("the provider went quiet");
+      }
       continue;
     }
     const loop = watches.feed(event);
@@ -354,6 +363,7 @@ async function streamRound(
       continue;
     }
     heard = true;
+    heardAt = deps.clock();
     // who serves the round reaches neither the writer nor the page, so
     // a failure right after it is still asked again
     if (event.kind !== "served") {
