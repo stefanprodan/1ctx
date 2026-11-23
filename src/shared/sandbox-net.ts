@@ -109,9 +109,18 @@ export const SANDBOX_DEFAULT_HOSTS: readonly string[] = [
   "hn.algolia.com",
   "lobste.rs",
   "newsapi.org",
-  // Google's APIs (search, YouTube, Books, Maps, Translation, Storage,
-  // Gemini; a key goes in the X-Goog-Api-Key header) and its fonts
-  "*.googleapis.com",
+  // Google's APIs (search, YouTube, Books, Maps, Translation, Gemini; a
+  // key goes in the X-Goog-Api-Key header), Storage, which Go toolchains
+  // and image layers come from, and its fonts; named, since the rest of
+  // googleapis.com takes anyone's writes (Firestore, Firebase)
+  "www.googleapis.com",
+  "customsearch.googleapis.com",
+  "youtube.googleapis.com",
+  "maps.googleapis.com",
+  "translation.googleapis.com",
+  "generativelanguage.googleapis.com",
+  "storage.googleapis.com",
+  "fonts.googleapis.com",
   "fonts.gstatic.com",
   // Yahoo and every name under it, Finance's APIs and cookie hosts
   // included; a wildcard never covers the bare name, so it is listed
