@@ -17,6 +17,7 @@ import { RepoUnshared } from "./binds.ts";
 import { Book, type Lease } from "./book.ts";
 import { buildSandbox } from "./create.ts";
 import { Deletes } from "./deletes.ts";
+import { type Recycle, recycles } from "./events.ts";
 import type { Gateway } from "./gateway.ts";
 import type { RecycleReason, SandboxHold } from "./hold.ts";
 import { configureInTurn, holdOf, SANDBOX_COMMANDS } from "./holders.ts";
@@ -223,8 +224,7 @@ export class Leases {
             ? this.book.takeWarm()
             : null;
         if (warm !== null) {
-          warm.workspace = key;
-          this.book.byWorkspace.set(key, warm);
+          this.book.claim(warm, key, call.projectId);
           this.pool.refill();
           return this.take(warm);
         }
@@ -259,12 +259,10 @@ export class Leases {
     if (lease !== undefined) this.remove(lease, reason);
   }
 
-  // every workspace of a session: a chat's, or each agent's in a channel
-  recycleSession(sessionId: string, reason: RecycleReason): void {
+  // what a bus event recycles (events.ts)
+  recycleOf(of: Recycle): void {
     for (const [key, lease] of [...this.book.byWorkspace]) {
-      if (key === sessionId || key.startsWith(`${sessionId}:`)) {
-        this.remove(lease, reason);
-      }
+      if (recycles(of, key, lease.projectId)) this.remove(lease, of.reason);
     }
   }
 
@@ -423,6 +421,7 @@ export class Leases {
   ): Promise<SandboxHold | "busy" | null> {
     const { repos } = call;
     const lease = this.add(key, spec.mounts, spec.image);
+    lease.projectId = call.projectId;
     for (const repo of repos) {
       const release = this.deps.repos.hold(repo.tree);
       if (release === null) {

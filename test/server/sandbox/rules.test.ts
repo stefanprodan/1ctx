@@ -123,6 +123,9 @@ describe("the bus events that recycle", () => {
       }),
     ).toEqual([{ sessionId: "s1", reason: "delete" }]);
     expect(
+      recyclesOf({ type: "project.deleted", data: { projectId: "p" } }),
+    ).toEqual([{ projectId: "p", reason: "delete" }]);
+    expect(
       recyclesOf(
         changed({ origin: "automation" }, { send: { status: "done" } }),
       ),

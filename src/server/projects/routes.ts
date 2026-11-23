@@ -301,7 +301,13 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
           }
           return {
             result: chats,
-            events: [accessChanged(null)],
+            events: [
+              accessChanged(null),
+              {
+                type: "project.deleted" as const,
+                data: { projectId: project.id },
+              },
+            ],
           };
         });
         deps.shell.changed();

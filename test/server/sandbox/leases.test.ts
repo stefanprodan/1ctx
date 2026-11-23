@@ -415,7 +415,7 @@ describe("sandbox leases", () => {
   test("a recycle of a held sandbox waits for its release", async () => {
     const t = setup();
     const hold: SandboxHold = await t.acquire("chat:agent");
-    t.leases.recycleSession("chat", "clear");
+    t.leases.recycleOf({ sessionId: "chat", reason: "clear" });
     expect(t.state(hold.sandbox)).toBe("leased");
     hold.release();
     await until(() => t.leases.rows().length === 0);

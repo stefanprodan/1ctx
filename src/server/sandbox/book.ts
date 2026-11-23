@@ -14,6 +14,9 @@ export type Lease = {
   name: string;
   // null while warm, and for a sandbox a sweep found
   workspace: string | null;
+  // the project of the chat it serves: its delete leaves no session row
+  // to name the workspaces
+  projectId: string | null;
   // the repositories mounted at create, as mountsKey() writes them
   mounts: string;
   // the image it was made from, which its project's variant names; empty
@@ -79,6 +82,7 @@ export class Book {
     const lease: Lease = {
       name,
       workspace,
+      projectId: null,
       mounts,
       image,
       holds: [],
@@ -162,6 +166,13 @@ export class Book {
       if (lease.state === "warm" || lease.state === "creating") n++;
     }
     return n;
+  }
+
+  // a warm sandbox given to a chat of the project
+  claim(lease: Lease, workspace: string, projectId: string): void {
+    lease.workspace = workspace;
+    lease.projectId = projectId;
+    this.byWorkspace.set(workspace, lease);
   }
 
   takeWarm(): Lease | null {

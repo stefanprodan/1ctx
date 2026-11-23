@@ -68,6 +68,8 @@ export type BusEvents = {
     rows: QueuedMessage[];
   };
   "session.deleted": { projectId: string; sessionId: string };
+  // a team project went, its sessions with it by the cascade
+  "project.deleted": { projectId: string };
   "automation.changed": {
     projectId: string;
     automation: AutomationSummary;

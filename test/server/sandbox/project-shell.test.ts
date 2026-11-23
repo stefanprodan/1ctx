@@ -584,4 +584,47 @@ describe("the one manager, as projects come and go", () => {
       fake,
     );
   });
+  test("a project's delete recycles its chats' sandboxes and no other's", async () => {
+    const fake = fakeGateway();
+    await run(
+      async (app, admin) => {
+        await instance(admin, { backend: "openshell", endpoint: ENDPOINT });
+        const box = await createTeam(admin, "box");
+        const kept = await createTeam(admin, "kept");
+        const { leases, sandbox: first } = await idleLease(app, box.id, "a1");
+        const { sandbox: second } = await idleLease(app, box.id, "a2");
+        const { sandbox: other } = await idleLease(app, kept.id, "b1");
+        const held = await leases.acquire(
+          {
+            projectId: box.id,
+            workspace: { id: "a3", sessionId: "a3" },
+            root: "a3",
+            sendId: "send",
+            subagent: false,
+            repos: [],
+            repoFileBytes: 0,
+            network: false,
+            credentials: [],
+          },
+          app.now.value + 20_000,
+          new AbortController().signal,
+        );
+        if (held === "busy") throw new Error("busy");
+        const res = await admin.call("DELETE", `/api/projects/${box.id}`);
+        expect(res.status).toBe(200);
+        await until(
+          () => fake.deletes.includes(first) && fake.deletes.includes(second),
+        );
+        // a command holding one keeps it to its end, as a chat's delete
+        expect(fake.deletes).not.toContain(held.sandbox);
+        held.release();
+        await until(() => fake.deletes.includes(held.sandbox));
+        await until(() => leases.rows().length === 1);
+        expect(fake.deletes).not.toContain(other);
+        expect(leases.rows().map((row) => row.sandbox)).toEqual([other]);
+      },
+      KEYS,
+      fake,
+    );
+  });
 });
