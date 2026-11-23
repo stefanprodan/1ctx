@@ -366,7 +366,8 @@ export class FakeFs {
 
   private async *command(request: ExecRequest): AsyncGenerator<ExecEvent> {
     const argv = request.command;
-    const [cwd, id, command, on, records] = argv.slice(6, 11) as string[];
+    const [cwd, id, on, records] = argv.slice(6, 10) as string[];
+    const command = new TextDecoder().decode(request.stdin);
     const base = `${records}/${id}`;
     if (this.nodes.has(`${base}.cwd`) || this.nodes.has(`${base}.opened`)) {
       yield { stream: "stderr", data: text("WRAPPER records exist\n") };

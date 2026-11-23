@@ -643,10 +643,10 @@ describe("wrapper", () => {
     id = idOf("c1"),
   ) {
     const argv = wrapperArgv(
-      { cwd, id, command: text, open, records: s.records, under: s.under },
+      { cwd, id, open, records: s.records, under: s.under },
       using,
     );
-    return run(argv, undefined, { HOME: s.home });
+    return run(argv, new TextEncoder().encode(text), { HOME: s.home });
   }
 
   test("record the final cwd, and start at home when the saved one is gone", async () => {
@@ -773,6 +773,30 @@ describe("wrapper", () => {
     expect(() => recordPaths(`${"a".repeat(21)}/`)).toThrow(TypeError);
     expect(recordPaths(idOf("x")).cwd).toBe(`/sandbox/.1ctx/${idOf("x")}.cwd`);
   });
+
+  test("take the command whole from stdin, past an argument's size", async () => {
+    const s = setup();
+    const t = join(s.under, "tmp");
+    const body = `${"a \\$x 'q' \"d\"\n".repeat(4096)}\n\n`;
+    const result = await command(
+      s,
+      t,
+      `cat > big.md <<'EOF'\n${body}EOF\nwc -c < big.md; cat\n`,
+    );
+    expect(Buffer.byteLength(body)).toBeGreaterThan(32 * 1024);
+    expect([result.code, result.stderr]).toEqual([0, ""]);
+    expect(result.text.trim()).toBe(String(Buffer.byteLength(body)));
+    expect(readFileSync(join(t, "big.md"), "utf8")).toBe(body);
+    expect(argvBytes(s, t)).toBeLessThan(32 * 1024);
+  });
+
+  function argvBytes(s: ReturnType<typeof setup>, cwd: string) {
+    const argv = wrapperArgv(
+      { cwd, id: idOf("z"), open: caps, records: s.records, under: s.under },
+      using,
+    );
+    return Math.max(...argv.map((arg) => Buffer.byteLength(arg)));
+  }
 
   test("a subagent's shell defines no open", async () => {
     const s = setup();

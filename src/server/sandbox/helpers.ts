@@ -124,7 +124,6 @@ export type WrapperOptions = {
   cwd: string;
   // the server's, never reused: it names the records
   id: string;
-  command: string;
   // null for a subagent, whose shell has no open
   open: OpenCaps | null;
   records?: string;
@@ -159,7 +158,6 @@ export function wrapperArgv(
     ...bash(wrapper, "bash", using),
     options.cwd,
     options.id,
-    options.command,
     caps ? "on" : "off",
     options.records ?? RECORDS,
     using?.python ?? PYTHON,
