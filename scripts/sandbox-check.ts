@@ -538,12 +538,16 @@ except Exception as e: print('mem', type(e).__name__)"`,
       slept.state === "idle",
     `exit ${slept.answer?.exitCode}, ${slept.total}ms, ${slept.state}`,
   );
-  // the slot is freed before the command's exec and taken after it: the
-  // count is the execs ended by then
+  // the slot is freed before the turn the push waits for, and taken
+  // again for the save, right after the command's exec: the count is
+  // the execs ended by then
   const exec = slept.steps.findIndex((s) => s.step === "command");
+  const pushed = slept.steps.findIndex(
+    (s) => s.step === "push" || s.step === "command",
+  );
   report(
-    "the process slot is free while the command runs in the sandbox",
-    slept.slots.join(",") === `free ${exec},take ${exec + 1}`,
+    "the process slot is free from the push's turn through the command",
+    slept.slots.join(",") === `free ${pushed},take ${exec + 1}`,
     `${slept.slots.join(", ")}; ${stepsOf(slept.steps)}`,
   );
 
