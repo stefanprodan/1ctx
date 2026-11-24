@@ -186,7 +186,7 @@ describe("the wake", () => {
     expect(restarted.repaired).toBe(1);
     expect(restarted.runner.registry.size).toBe(0);
     const member = restarted.client();
-    await member.login("casey", "pw");
+    await member.signIn("casey");
     const again = await startChat(
       { ...chat, app: restarted, member },
       "again",

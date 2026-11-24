@@ -8,7 +8,7 @@ import type {
   KnowledgeFileResponse,
   KnowledgePathResponse,
 } from "../../../src/shared/api/knowledge.ts";
-import { hashPassword, testApp } from "../../helpers/app.ts";
+import { testApp } from "../../helpers/app.ts";
 
 const base = (id: string) => `/api/projects/${id}/knowledge`;
 const pathOf = (id: string, name: string) =>
@@ -24,16 +24,14 @@ async function setup() {
         fullName: username,
         email: `${username}@example.com`,
         role: "member",
-        passwordHash: await hashPassword("password-test"),
-        mustChangePassword: false,
         now: app.now.value,
       }),
     );
   }
   const client = app.client();
-  expect((await client.login("writer", "password-test")).status).toBe(200);
+  expect((await client.signIn("writer")).status).toBe(200);
   const stranger = app.client();
-  expect((await stranger.login("reader", "password-test")).status).toBe(200);
+  expect((await stranger.signIn("reader")).status).toBe(200);
   const projectId = app.projects.personal(users[0]!.id)!.id;
   const foreignId = app.projects.personal(users[1]!.id)!.id;
   const create = async (

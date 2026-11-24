@@ -5,9 +5,11 @@
 // a browser sends Origin on the handshake.
 
 import { isIP } from "node:net";
+import { LOGIN_COOKIE } from "../access/index.ts";
 import { BadRequest, HttpError, TooManyRequests } from "../lib/errors.ts";
 import {
   json,
+  loginOf,
   MAX_IDLE_SECONDS,
   type Method,
   type Policy,
@@ -51,6 +53,8 @@ export type RouterDeps = {
   // behind a TLS-terminating proxy the request arrives as http; the
   // proxy's X-Forwarded-Proto says what the browser saw
   trustProxy: boolean;
+  // whether a login's row is still there; none takes every one as held
+  held?: (loginId: string) => boolean;
   log: Log;
 };
 
@@ -101,15 +105,21 @@ export function lastForwarded(req: Request, name: string): string | null {
 
 // a browser sends Origin on every non-GET; a request without one is not
 // from a page, and one from another host or a plaintext page of the
-// same host is refused
+// same host is refused. A form route takes Origin: null, which a
+// no-referrer page's post carries, only when the browser says the page
+// was this origin's
 export function sameOrigin(
   req: Request,
   url: URL,
   trustProxy: boolean,
   key = false,
+  formPost = false,
 ) {
   const origin = req.headers.get("origin");
   if (origin === null) return key || req.headers.get("sec-fetch-site") === null;
+  if (origin === "null") {
+    return formPost && req.headers.get("sec-fetch-site") === "same-origin";
+  }
   let parsed: URL;
   try {
     parsed = new URL(origin);
@@ -140,16 +150,10 @@ async function dispatch(
   if (route.policy === "key" && principal?.via.kind !== "key") {
     return json({ error: "sign in" }, 401);
   }
-  if (route.policy === "key" && principal!.mustChangePassword) {
-    return json({ error: "change your password first" }, 403);
-  }
   if (route.policy === "authenticated" || route.policy === "admin") {
     if (principal === null) return json({ error: "sign in" }, 401);
     if (route.policy === "admin" && principal.role !== "admin") {
       return json({ error: "forbidden" }, 403);
-    }
-    if (principal.mustChangePassword && route.passwordChange !== true) {
-      return json({ error: "change your password first" }, 403);
     }
   }
   // only a caller access let in may hold the connection longer
@@ -246,7 +250,7 @@ export function router(deps: RouterDeps): Router {
       if (
         route.policy !== "key" &&
         (method !== "GET" || route.upgrade) &&
-        !sameOrigin(req, url, deps.trustProxy)
+        !sameOrigin(req, url, deps.trustProxy, false, route.formPost === true)
       ) {
         const res = json({ error: "cross-origin request" }, 403);
         record(route.path, res.status, undefined, route.policy);
@@ -301,9 +305,19 @@ export function router(deps: RouterDeps): Router {
       }
       if (res === undefined) return undefined;
       // the row already moved, so the browser's copy must move with it
-      // whatever the answer was, unless the handler replaced the cookie
-      if (resolution.setCookie !== null && !res.headers.has("set-cookie")) {
-        res.headers.set("set-cookie", resolution.setCookie);
+      // whatever the answer was, unless the handler replaced the login
+      // cookie or a write meanwhile ended the login (a sign-in racing
+      // in the same browser); a handler's other cookie rides beside it
+      const renewed =
+        resolution.principal === null ? null : loginOf(resolution.principal);
+      if (
+        resolution.setCookie !== null &&
+        (renewed === null || deps.held === undefined || deps.held(renewed)) &&
+        !res.headers
+          .getSetCookie()
+          .some((cookie) => cookie.startsWith(`${LOGIN_COOKIE}=`))
+      ) {
+        res.headers.append("set-cookie", resolution.setCookie);
       }
       record(
         route.path,

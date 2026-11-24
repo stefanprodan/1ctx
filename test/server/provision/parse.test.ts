@@ -15,10 +15,7 @@ import {
   type SmtpLogin,
   type Source,
 } from "../../../src/server/provision/parse.ts";
-import {
-  MAX_PASSWORD_BYTES,
-  type SecretKind,
-} from "../../../src/shared/words.ts";
+import type { SecretKind } from "../../../src/shared/words.ts";
 
 const ROOT = "test/fixtures/provision";
 const fixture = async (name: string): Promise<Source> => ({
@@ -45,8 +42,7 @@ const web = { mode: "all" as const, domains: [] };
 const noDocs = () => ({ caps: DEFAULT_LIMITS, live: [], labels: [] });
 // every key usable and nothing bound yet
 const creds: CredentialsView = { key: () => "ok", list: () => [] };
-const secret = (kind: SecretKind, name: string) =>
-  kind === "user-" && name === "user-zed" ? "test-password" : null;
+const secret = (_kind: SecretKind, _name: string) => null;
 function source(
   kind: Kind,
   name: string,
@@ -280,13 +276,13 @@ describe("provision documents", () => {
     [
       "User",
       "zed-user",
-      { role: "member", passwordFrom: "user-zed.key" },
+      { role: "member", passwordFrom: "user-zed" },
       "passwordFrom",
     ],
     [
       "User",
       "zed-user",
-      { role: "member", mustChangePassword: null },
+      { role: "member", mustChangePassword: false },
       "mustChangePassword",
     ],
     ["Project", "nebula", { description: "two\nlines" }, "description"],
@@ -437,7 +433,6 @@ describe("provision documents", () => {
 describe("provision preflight", () => {
   test.each([
     ["missing-reference", "Agent/guide", "spec.provider"],
-    ["missing-password", "User/zed-user", "spec.passwordFrom"],
     ["missing-key", "Provider/mock-provider", "spec.keyFrom"],
   ])("refuses %s before apply", async (file, identity, field) => {
     const docs = parse([await fixture(file!)]);
@@ -586,9 +581,8 @@ describe("provision preflight", () => {
       fullName: "Zed User",
       email: "zed@people.test",
       tz: "UTC",
-      passwordFrom: "user-zed",
     };
-    for (const field of ["fullName", "email", "tz", "passwordFrom"]) {
+    for (const field of ["fullName", "email", "tz"]) {
       const spec = Object.fromEntries(
         Object.entries(fields).filter(([key]) => key !== field),
       );
@@ -613,55 +607,6 @@ describe("provision preflight", () => {
       source("User", "admin", { role: "admin", about: "The administrator." }),
     ]);
     check(docs, { User: ["admin"] });
-  });
-
-  test("checks password references on updates but never validates or returns their values", () => {
-    const docs = parse([
-      source("User", "zed-user", { role: "member", passwordFrom: "user-zed" }),
-    ]);
-    expect(() =>
-      preflight(
-        docs,
-        inventory({ User: ["zed-user"] }),
-        () => null,
-        web,
-        noDocs,
-        creds,
-      ),
-    ).toThrow("spec.passwordFrom");
-    expect(
-      preflight(
-        docs,
-        inventory({ User: ["zed-user"] }),
-        () => "short",
-        web,
-        noDocs,
-        creds,
-      ),
-    ).toBeUndefined();
-    expect(JSON.stringify(docs)).not.toContain("short");
-  });
-
-  test("new user passwords have the API floor and byte cap, without revealing a value", async () => {
-    const docs = parse([await fixture("good")]);
-    for (const value of ["short", "é".repeat(MAX_PASSWORD_BYTES / 2 + 1)]) {
-      expect(() =>
-        preflight(docs, inventory(), () => value, web, noDocs, creds),
-      ).toThrow("spec.passwordFrom");
-      try {
-        preflight(docs, inventory(), () => value, web, noDocs, creds);
-      } catch (error) {
-        expect((error as Error).message).not.toContain(value);
-      }
-    }
-    preflight(
-      docs,
-      inventory(),
-      () => "é".repeat(MAX_PASSWORD_BYTES / 2),
-      web,
-      noDocs,
-      creds,
-    );
   });
 
   test("secret failures never echo the callback error or returned values", () => {

@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { build } from "../../../scripts/load/db/build.ts";
 import { fence, fenced } from "../../../scripts/load/fence.ts";
+import { enabledUsers, newLogins } from "../../../scripts/load/logins.ts";
 import { fakeMcpUrl, fakeModelUrl } from "../../../scripts/load/shapes.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "load-db-"));
@@ -22,7 +23,6 @@ const sha = async (path: string) =>
 const options = {
   modelUrl: fakeModelUrl(),
   mcpUrl: (s: string) => fakeMcpUrl(s),
-  passwordHash: "a-hash",
 };
 
 describe("the database builder", () => {
@@ -66,11 +66,23 @@ describe("the database builder", () => {
       ).run();
       db.query("update mcp_servers set url = 'https://mcp.test/mcp'").run();
       db.query("update tools set mode = 'all' where name = 'web'").run();
-      expect(fenced(db, options).length).toBeGreaterThan(0);
-      const report = fence(db, options);
+      // the build opens no login: a run mints its own
+      const logins = db
+        .query<{ n: number }, []>("select count(*) as n from logins")
+        .get()!;
+      expect(logins.n).toBe(0);
+      const users = enabledUsers(db);
+      const minted = {
+        ...options,
+        logins: newLogins(users).hashes,
+        now: Date.now(),
+      };
+      expect(fenced(db, minted)).toContain(`${users.length} logins not minted`);
+      const report = fence(db, minted);
       expect(report.providers).toBe(2);
       expect(report.servers).toBe(3);
-      expect(fenced(db, options)).toEqual([]);
+      expect(report.users).toBe(users.length);
+      expect(fenced(db, minted)).toEqual([]);
       const web = db
         .query<{ mode: string }, []>(
           "select mode from tools where name = 'web'",
@@ -83,12 +95,6 @@ describe("the database builder", () => {
         )
         .get()!;
       expect(keys.n).toBe(0);
-      const hashes = db
-        .query<{ h: string }, []>(
-          "select distinct password_hash as h from users",
-        )
-        .all();
-      expect(hashes).toEqual([{ h: "a-hash" }]);
       db.close();
     },
   );

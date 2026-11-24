@@ -10,6 +10,14 @@
 # the sandbox shell on (scripts/openshell.sh, docs/deploy.md). `stop`
 # stops it too; `clean` and `reset` delete the preview's sandboxes
 # through it before its directory goes, with or without the variable.
+#
+# Mail goes to a catcher on 127.0.0.1:$PREVIEW_MAIL_PORT (the port + 2),
+# each message a file in .preview/mail/ (`mail <user>` prints the newest).
+# The server trusts its certificate through NODE_EXTRA_CA_CERTS and its
+# SmtpServer is applied with --provision at each start, after any
+# provisioning. PREVIEW_MAIL=real starts no catcher and refuses to start
+# while the SMTP server is still the catcher: provision the real one with
+# the variable set.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -22,6 +30,10 @@ ENTRY=src/server/main.ts
 GW=$DIR/openshell
 GW_PORT=${PREVIEW_GATEWAY_PORT:-17671}
 GW_PID=$GW/pid
+MAIL=$DIR/mail
+MAIL_PORT=${PREVIEW_MAIL_PORT:-$((PORT + 2))}
+MAIL_PID=$MAIL/catcher.pid
+MAIL_ENTRY=scripts/mail/main.ts
 
 # only a process running our entry from this checkout is ours to kill:
 # a reused pid, another checkout, or a stranger on the port is left alone
@@ -32,7 +44,7 @@ ours() {
 }
 running() { [ -f "$PID" ] && ours "$(cat "$PID")"; }
 # the port's only listener is the given pid, so a stranger answering
-# health is never taken for ours nor sent the admin password
+# health is never taken for ours nor sent the admin key
 listens() {
   [ "$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true)" = "$1" ]
 }
@@ -64,6 +76,70 @@ gw_start() {
   nohup scripts/openshell.sh run "$HERE/$GW" >"$GW/gateway.log" 2>&1 &
   echo $! >"$GW_PID"
   scripts/openshell.sh wait "$HERE/$GW" "$(cat "$GW_PID")"
+}
+
+# the catcher is ours when its pid serves our entry from this checkout
+mail_running() {
+  [ -f "$MAIL_PID" ] || return 1
+  ps -o command= -p "$(cat "$MAIL_PID")" 2>/dev/null | grep -q -- "$MAIL_ENTRY serve" || return 1
+  [ "$(lsof -a -p "$(cat "$MAIL_PID")" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')" = "$HERE" ]
+}
+
+# the pid file goes only with the process, as the gateway's does
+mail_stop() {
+  if mail_running; then
+    kill "$(cat "$MAIL_PID")"
+    for _ in $(seq 1 50); do mail_running || break; sleep 0.1; done
+    if mail_running; then
+      echo "the mail catcher (pid $(cat "$MAIL_PID")) did not stop within 5 s; stop it, then run this again" >&2
+      exit 1
+    fi
+  fi
+  rm -f "$MAIL_PID"
+}
+
+# before the server, so its first email has somewhere to go
+mail_start() {
+  mail_stop
+  bun "$MAIL_ENTRY" setup "$MAIL" "$MAIL_PORT" "$URL"
+  nohup bun "$MAIL_ENTRY" serve "$MAIL" "$MAIL_PORT" >"$MAIL/catcher.log" 2>&1 &
+  local pid=$!
+  MAIL_STARTED=$pid
+  echo "$pid" >"$MAIL_PID"
+  for _ in $(seq 1 50); do
+    [ "$(lsof -nP -tiTCP:"$MAIL_PORT" -sTCP:LISTEN 2>/dev/null || true)" = "$pid" ] && return 0
+    mail_running || break
+    sleep 0.1
+  done
+  echo "the mail catcher did not listen on 127.0.0.1:$MAIL_PORT; pick another PREVIEW_MAIL_PORT. Log tail:" >&2
+  tail -5 "$MAIL/catcher.log" >&2
+  mail_stop
+  exit 1
+}
+
+# a failed start undoes only what it launched, by pid, never by a scan of
+# the port, so an older preview that lost its pid file is left alone
+SERVER_STARTED=
+MAIL_STARTED=
+rollback() {
+  local p f
+  for p in "$SERVER_STARTED:$PID" "$MAIL_STARTED:$MAIL_PID"; do
+    f=${p#*:}
+    p=${p%%:*}
+    [ -n "$p" ] || continue
+    if kill -0 "$p" 2>/dev/null; then
+      kill "$p" 2>/dev/null || true
+      for _ in $(seq 1 50); do kill -0 "$p" 2>/dev/null || break; sleep 0.1; done
+    fi
+    if [ "$(cat "$f" 2>/dev/null)" = "$p" ] && ! kill -0 "$p" 2>/dev/null; then
+      rm -f "$f"
+    fi
+  done
+}
+
+mail_show() {
+  [ -n "${1:-}" ] || { echo "usage: $0 mail <username|email>" >&2; exit 1; }
+  bun "$MAIL_ENTRY" show "$MAIL" "$DIR/1ctx.sqlite" "$1"
 }
 
 # every sandbox, then provider, labelled with this instance id deleted
@@ -130,6 +206,7 @@ stop() {
     ours "$pid" && kill "$pid" || true
   done
   rm -f "$PID"
+  mail_stop
 }
 
 keys() {
@@ -137,9 +214,9 @@ keys() {
   mkdir -p "$DIR/secrets"
   chmod 700 "$DIR/secrets"
   if [ ! -f "$DIR/secrets/user-admin.key" ]; then
-    # the bootstrap password for the preview's admin; read once, when the
-    # users table is empty, and hashed into the db
-    (umask 077 && printf 'admin-preview' >"$DIR/secrets/user-admin.key")
+    # the preview admin's key: it makes the admin while the users table
+    # is empty, and signs them in
+    bun "$ENTRY" admin-key admin --secrets "$DIR/secrets" >/dev/null
   fi
   chmod 600 "$DIR/secrets"/*.key
 }
@@ -174,24 +251,51 @@ reset() {
 
 start() {
   keys
+  local mail=() probe=0
+  if [ "${PREVIEW_MAIL:-}" = real ]; then
+    bun "$MAIL_ENTRY" points "$DIR/1ctx.sqlite" "$MAIL" || probe=$?
+    if [ "$probe" = 0 ]; then
+      echo "PREVIEW_MAIL=real, but the preview's SMTP server is still the catcher ($(cat "$MAIL/endpoint")); provision the real one: PREVIEW_MAIL=real make preview-provision FILE=..." >&2
+      exit 1
+    elif [ "$probe" != 1 ]; then
+      echo "PREVIEW_MAIL=real, but the preview's SMTP server could not be read, so it may still be the catcher; fix the error above or provision the real one" >&2
+      exit 1
+    fi
+  fi
+  local held
+  held=$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | tr "\n" " " || true)
+  if [ -n "$held" ]; then
+    echo "port $PORT is already held (pid ${held% }); stop it (make preview-stop) or pick another PREVIEW_PORT" >&2
+    exit 1
+  fi
+  # from here until health and the sandbox step pass, any exit, set -e's
+  # included, stops the server and the catcher this start launched
+  trap rollback EXIT
+  if [ "${PREVIEW_MAIL:-}" != real ]; then
+    mail_start
+    mail=(--provision "$MAIL/smtp.yaml")
+    # the catcher's certificate alone is added to the roots
+    export NODE_EXTRA_CA_CERTS="$HERE/$MAIL/cert.pem"
+  fi
   # no drain, since stop waits only five seconds for the exit
   ONECTX_DEV=1 nohup bun --watch "$ENTRY" \
     --listen "127.0.0.1:$PORT" --db "$DIR/1ctx.sqlite" \
-    --secrets "$DIR/secrets" --drain 0 >"$LOG" 2>&1 &
-  echo $! >"$PID"
-  local pid holders
-  pid=$(cat "$PID")
+    --secrets "$DIR/secrets" --drain 0 ${mail[@]+"${mail[@]}"} >"$LOG" 2>&1 &
+  local pid=$! holders
+  SERVER_STARTED=$pid
+  echo "$pid" >"$PID"
   for _ in $(seq 1 50); do
     if curl -sf -o /dev/null "$URL/api/health"; then
       if listens "$pid"; then
         echo "preview up at $URL (pid $pid, log $LOG)"
+        if mail_running; then echo "mail caught on 127.0.0.1:$MAIL_PORT into $MAIL/"; fi
         if [ "${PREVIEW_SHELL:-}" = sandbox ]; then sandbox; fi
+        trap - EXIT
         return 0
       fi
       holders=$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | grep -vx "$pid" | tr "\n" " " || true)
       if [ -n "$holders" ]; then
         echo "port $PORT is held by another process (pid ${holders% }); stop it or pick another PREVIEW_PORT" >&2
-        stop
         exit 1
       fi
     fi
@@ -212,5 +316,6 @@ case "${1:-restart}" in
   restart) stop; start ;;
   status) if running; then echo "preview up at $URL (pid $(cat "$PID"))"; else echo "preview not running"; exit 1; fi ;;
   log) tail -n "${2:-40}" "$LOG" ;;
-  *) echo "usage: $0 start|stop|restart|status|clean|provision <file>|reset <file> [secrets]|log [lines]" >&2; exit 1 ;;
+  mail) mail_show "${2:-}" ;;
+  *) echo "usage: $0 start|stop|restart|status|clean|provision <file>|reset <file> [secrets]|log [lines]|mail <user>" >&2; exit 1 ;;
 esac

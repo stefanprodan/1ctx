@@ -43,8 +43,6 @@ function build() {
     fullName: "Casey",
     email: "casey@example.test",
     role: "member",
-    passwordHash: "unused",
-    mustChangePassword: false,
     now: now.value,
   });
   const keys = new AccessKeyStore(db);
@@ -65,6 +63,7 @@ function build() {
     presence: { onlineUserIds: () => [] },
     activity: { personDays: (_id, starts) => starts.map(() => 0) },
     dictation: { enabled: () => false },
+    keyFiles: { read: () => null, list: () => [] },
     email: {
       enabled: () => false,
       link: () => {
@@ -73,8 +72,10 @@ function build() {
       enqueue: () => [],
       register: () => {},
       dropQueued: () => 0,
-      hasQueued: () => false,
-      countAsked: () => 0,
+    },
+    pages: {
+      dead: () => new Response(null, { status: 404 }),
+      sent: () => new Response(null, { status: 202 }),
     },
   });
   const make = (projectIds: string[] | null = null) =>
@@ -181,7 +182,7 @@ describe("the key policy", () => {
       const b = build();
       try {
         const { token, key } = b.make();
-        const cookie = b.access.open(b.user).setCookie.split(";")[0]!;
+        const cookie = b.access.open(b.user, null).setCookie.split(";")[0]!;
         for (const authorization of [
           "",
           "Bearer",
@@ -335,20 +336,17 @@ describe("the key policy", () => {
     }
   });
 
-  test("refuses disabled users and must-change users and logs no token", async () => {
+  test("refuses disabled users and logs no token", async () => {
     const b = build();
     try {
       const { token } = b.make();
       const headers = { authorization: `Bearer ${token}` };
-      b.users.setMustChangePassword(b.user.id, true);
-      expect((await b.call(headers)).status).toBe(403);
-      b.users.setMustChangePassword(b.user.id, false);
       b.users.setDisabled(b.user.id, true);
       expect((await b.call(headers)).status).toBe(401);
       b.users.setDisabled(b.user.id, false);
       expect((await b.call(headers)).status).toBe(200);
-      expect(b.logs.events.filter((e) => e.msg === "request")).toHaveLength(1);
-      expect(b.logs.events.at(-1)!.fields.user).toBe("casey");
+      // a key route logs neither its anonymous 401 nor its success
+      expect(b.logs.events.filter((e) => e.msg === "request")).toEqual([]);
       expect(JSON.stringify(b.logs.events)).not.toContain(token);
     } finally {
       b.db.close();
@@ -409,8 +407,6 @@ describe("key visibility and in-transaction checks", () => {
         fullName: "Other",
         email: "other@example.test",
         role: "member",
-        passwordHash: "unused",
-        mustChangePassword: false,
         now: b.now.value,
       });
       const key = b.principal(b.make([team.id]).token);
@@ -446,13 +442,7 @@ describe("key visibility and in-transaction checks", () => {
     }
   });
 
-  for (const change of [
-    "revoke",
-    "expire",
-    "disable",
-    "must-change",
-    "project",
-  ] as const) {
+  for (const change of ["revoke", "expire", "disable", "project"] as const) {
     test(`checkKey refuses ${change} after resolution and rolls a write back`, () => {
       const b = build();
       try {
@@ -463,8 +453,6 @@ describe("key visibility and in-transaction checks", () => {
         if (change === "revoke") b.keys.delete(b.user.id, key.id);
         if (change === "expire") b.now.value = key.expiresAt;
         if (change === "disable") b.users.setDisabled(b.user.id, true);
-        if (change === "must-change")
-          b.users.setMustChangePassword(b.user.id, true);
         // a project the user does not see stands for one lost since
         const target =
           change === "project"
@@ -474,8 +462,6 @@ describe("key visibility and in-transaction checks", () => {
                   fullName: "Other",
                   email: "other@example.test",
                   role: "member",
-                  passwordHash: "unused",
-                  mustChangePassword: false,
                   now: b.now.value,
                 }).id,
               )!.id

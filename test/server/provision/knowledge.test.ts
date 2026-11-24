@@ -258,7 +258,7 @@ describe("provision knowledge apply", () => {
         expect(writes()).toEqual([]);
 
         const admin = app.client();
-        await admin.login("admin", "hunter2-test");
+        await admin.signIn("admin");
         const base = `/api/projects/${id}/knowledge`;
         const made = await admin.call("POST", base, {
           body: { name: "by-hand.md", text: "kept\n" },
@@ -320,7 +320,7 @@ describe("provision knowledge apply", () => {
       );
       const id = app.projects.teamProjectIds()[0]!;
       const admin = app.client();
-      await admin.login("admin", "hunter2-test");
+      await admin.signIn("admin");
       await admin.call("POST", `/api/projects/${id}/knowledge`, {
         body: { name: "notes", text: "in the way\n" },
       });

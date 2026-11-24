@@ -169,6 +169,10 @@ open row's body or a meta. The shared shapes are below.
   dimmed `--backdrop`, closed by Escape, a click on the ground or its
   close button, which takes the focus and keeps Tab; the focus returns
   to the opener the caller passes (`ViewerFocus`).
+- **A form's button with other actions is `ui/SplitButton.tsx`:** the
+  button and an arrow whose menu, as wide as both, holds the rest; with
+  no items it is the button alone, and the arrow is a spinner while the
+  form works.
 - **Shared shapes are `base.css` primitives:** `.menu`, `.seg`,
   `.choice`, `.avatar`, `.switch`, `.tag`, `.textbox`, `.clamp`,
   `.cut`, `.meter`, `.code-tag`, `.notice-failed`, `.hint`, the

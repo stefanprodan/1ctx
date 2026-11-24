@@ -3,8 +3,10 @@
 1ctx {{ include "onectx.version" . }} is installed as {{ $name }} in the namespace {{ .Release.Namespace }}.
 
 The pod starts once the Secret {{ .Values.secrets.existingSecret }} exists in {{ .Release.Namespace }}.
-It holds user-admin.key, the first admin's password, and the provider,
-search and MCP keys as <kind>-<name>.key files. The chart never makes it:
+It holds user-admin.key, the first admin's admin key (made with
+`1ctx admin-key admin --stdout`, never a password), any other admin's
+user-<username>.key, and the provider, search and MCP keys as
+<kind>-<name>.key files. The chart never makes it:
 keep it in Git encrypted with SOPS for Flux to decrypt, or sync it with
 External Secrets.
 {{- if $provision }}
@@ -23,7 +25,7 @@ The HTTPRoute attaches it to the Gateway{{ with .Values.httpRoute.hostnames }} f
 {{- if not (or .Values.ingress.enabled .Values.httpRoute.enabled) }}
 Set ingress.enabled or httpRoute.enabled to reach it from outside.
 {{- end }}
-Sign in as admin with the password in user-admin.key.
+Sign in as admin with the admin key in user-admin.key; members sign in by email.
 {{- if and .Values.secureCookie (not (or .Values.ingress.tls.enabled .Values.httpRoute.enabled)) }}
 
 secureCookie is on, so browsers send the login cookie over https only.

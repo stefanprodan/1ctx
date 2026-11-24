@@ -79,14 +79,12 @@ export async function loadDirectory(api: Api, admin: Who): Promise<Directory> {
 
 export async function signInAll(
   api: Api,
-  d: Directory,
   names: string[],
 ): Promise<Map<string, Who>> {
   const t = now();
   const map = new Map<string, Who>();
-  const index = new Map(d.usernames.map((u, i) => [u, i]));
   await pool(names, 4, async (u) => {
-    map.set(u, await api.signIn(u, (index.get(u) ?? 0) + 1));
+    map.set(u, await api.signIn(u));
   });
   info("signed in", {
     users: map.size,

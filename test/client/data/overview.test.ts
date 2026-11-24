@@ -50,7 +50,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "admin",
-    mustChangePassword: false,
   };
 });
 
@@ -94,7 +93,6 @@ describe("loadOverview", () => {
       username: "other",
       fullName: "Other",
       role: "admin",
-      mustChangePassword: false,
     };
     await settle();
     calls[0].answer(Response.json(body(9)));

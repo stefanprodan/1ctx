@@ -18,7 +18,7 @@ import {
   parseEmailRequest,
 } from "../../../src/server/tools/builtin/email.ts";
 import { EMAIL_OFF_LINE } from "../../../src/shared/capabilities.ts";
-import { collectLogs, hashPassword } from "../../helpers/app.ts";
+import { collectLogs } from "../../helpers/app.ts";
 import {
   createAutomation,
   settleRun,
@@ -72,8 +72,6 @@ async function setup(
       fullName: name,
       email: name === "pat" ? "pat@1ctx.dev" : `${name}@example.test`,
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: name === "finn",
       now: chat.app.now.value,
     });
     ids[name] = user.id;
@@ -385,7 +383,7 @@ describe("a call", () => {
       call("c2", email(["dora", "pat", "nobody", "x@example.test"])),
     ]);
     expect(answers).toEqual([
-      "Error: nothing was emailed. @bob cannot open this chat. @eve cannot open this chat. @finn has not finished setting up their account.",
+      "Error: nothing was emailed. @bob cannot open this chat. @eve cannot open this chat.",
       "Error: nothing was emailed. @dora does not take email from agents. @pat has no email address. @nobody is not a user. x@example.test is an address; email goes to usernames only.",
     ]);
     await finish(chat, next);

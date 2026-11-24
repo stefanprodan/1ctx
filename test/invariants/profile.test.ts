@@ -1,21 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The profile routes: the row, the full name, and a password change
-// that proves the current one, keeps this login and revokes the rest.
+// The profile routes: the row, the full name and the zone, and email
+// from agents.
 
 import { describe, expect, test } from "bun:test";
-import { PASSWORD_LIMIT } from "../../src/server/access/profile.ts";
-import { subscribe } from "../../src/server/lib/bus.ts";
-import { silent } from "../../src/server/lib/log.ts";
 import { testApp } from "../helpers/app.ts";
 import { SMTP } from "../helpers/links.ts";
 
 describe("GET /api/profile", () => {
-  test("answers the signed-in user's row without the hash", async () => {
+  test("answers the signed-in user's row", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2-test");
+    await client.signIn("admin");
     const res = await client.call("GET", "/api/profile");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
@@ -29,7 +26,7 @@ describe("GET /api/profile", () => {
         role: "admin",
         createdAt: app.now.value,
         disabled: false,
-        mustChangePassword: false,
+        signedInAt: app.now.value,
         // the first admin's address is made up
         emailPlaceholder: true,
         emailFromAgents: false,
@@ -43,7 +40,7 @@ describe("PATCH /api/profile", () => {
   test("changes the full name, the about text and the zone, and me follows", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2-test");
+    await client.signIn("admin");
     const res = await client.call("PATCH", "/api/profile", {
       body: {
         fullName: "Casey Doe",
@@ -67,7 +64,7 @@ describe("PATCH /api/profile", () => {
   test("refuses a bad name with a 400 and keeps the old one", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2-test");
+    await client.signIn("admin");
     const res = await client.call("PATCH", "/api/profile", {
       body: { fullName: "  ", about: "", tz: "UTC" },
     });
@@ -76,129 +73,12 @@ describe("PATCH /api/profile", () => {
   });
 });
 
-describe("POST /api/profile/password", () => {
-  test("needs the current password", async () => {
-    const app = await testApp();
-    const client = app.client();
-    await client.login("admin", "hunter2-test");
-    const res = await client.call("POST", "/api/profile/password", {
-      body: { current: "nope", next: "longenough" },
-    });
-    // a 403, since a 401 would make the client drop the signed-in user
-    expect(res.status).toBe(403);
-    expect(await res.json()).toEqual({
-      error: "the current password is wrong",
-    });
-    // the wrong guess did not sign this tab out
-    expect((await client.call("GET", "/api/me")).status).toBe(200);
-    expect((await app.client().login("admin", "hunter2-test")).status).toBe(
-      200,
-    );
-  });
-
-  test.serial(
-    "replaces it, keeps this login and revokes the others",
-    async () => {
-      const app = await testApp();
-      const here = app.client();
-      const elsewhere = app.client();
-      await here.login("admin", "hunter2-test");
-      await elsewhere.login("admin", "hunter2-test");
-      const events: unknown[] = [];
-      const off = subscribe((e) => events.push(e), silent);
-      const res = await here.call("POST", "/api/profile/password", {
-        body: { current: "hunter2-test", next: "longenough" },
-      });
-      off();
-      expect(res.status).toBe(200);
-      expect((await here.call("GET", "/api/me")).status).toBe(200);
-      expect(await (await elsewhere.call("GET", "/api/me")).json()).toEqual({
-        user: null,
-        emailOn: false,
-        dictationOn: false,
-      });
-      expect((await app.client().login("admin", "hunter2-test")).status).toBe(
-        401,
-      );
-      expect((await app.client().login("admin", "longenough")).status).toBe(
-        200,
-      );
-      expect(events).toEqual([
-        {
-          type: "login.revoked",
-          data: { userId: expect.any(String), loginId: null },
-        },
-      ]);
-    },
-  );
-
-  test("two changes racing with the same current password: one wins", async () => {
-    const app = await testApp();
-    const here = app.client();
-    const elsewhere = app.client();
-    await here.login("admin", "hunter2-test");
-    await elsewhere.login("admin", "hunter2-test");
-    const change = (client: typeof here, next: string) =>
-      client.call("POST", "/api/profile/password", {
-        body: { current: "hunter2-test", next },
-      });
-    const [a, b] = await Promise.all([
-      change(here, "first-choice"),
-      change(elsewhere, "second-choice"),
-    ]);
-    const statuses = [a.status, b.status].sort();
-    expect(statuses).toEqual([200, 403]);
-    // the winner's login is the only one left, and only its password works
-    const winner = a.status === 200 ? here : elsewhere;
-    const loser = a.status === 200 ? elsewhere : here;
-    const password = a.status === 200 ? "first-choice" : "second-choice";
-    const other = a.status === 200 ? "second-choice" : "first-choice";
-    expect((await winner.call("GET", "/api/me")).status).toBe(200);
-    expect(await (await loser.call("GET", "/api/me")).json()).toEqual({
-      user: null,
-      emailOn: false,
-      dictationOn: false,
-    });
-    expect((await app.client().login("admin", password)).status).toBe(200);
-    expect((await app.client().login("admin", other)).status).toBe(401);
-  });
-
-  test.serial("publishes nothing when there was no other login", async () => {
-    const app = await testApp();
-    const client = app.client();
-    await client.login("admin", "hunter2-test");
-    const events: unknown[] = [];
-    const off = subscribe((e) => events.push(e), silent);
-    await client.call("POST", "/api/profile/password", {
-      body: { current: "hunter2-test", next: "longenough" },
-    });
-    off();
-    expect(events).toEqual([]);
-  });
-
-  test("limits the guesses at the current password per user", async () => {
-    const app = await testApp();
-    const client = app.client();
-    await client.login("admin", "hunter2-test");
-    const guess = () =>
-      client.call("POST", "/api/profile/password", {
-        body: { current: "nope", next: "longenough" },
-      });
-    for (let i = 0; i < PASSWORD_LIMIT; i++) {
-      expect((await guess()).status).toBe(403);
-    }
-    expect((await guess()).status).toBe(429);
-    app.now.value += 61_000;
-    expect((await guess()).status).toBe(403);
-  });
-});
-
 describe("PUT /api/profile/email", () => {
   test("turns email from agents on and off, and says when email is on", async () => {
     const app = await testApp({ secrets: { "email-relay": "secret-pass" } });
     await app.email.stop();
     const client = app.client();
-    await client.login("admin", "hunter2-test");
+    await client.signIn("admin");
     const before = await (await client.call("GET", "/api/profile")).json();
     expect(before.emailOn).toBe(false);
     expect(before.user.emailFromAgents).toBe(false);
@@ -227,7 +107,7 @@ describe("PUT /api/profile/email", () => {
   test("takes a boolean and nothing else", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2-test");
+    await client.signIn("admin");
     for (const body of [
       {},
       { fromAgents: "yes" },

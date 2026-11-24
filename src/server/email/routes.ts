@@ -12,7 +12,8 @@ import { parseSmtp } from "./parse.ts";
 
 export type RoutesDeps = {
   response(principal: Principal): SmtpResponse;
-  save(fields: PutSmtpRequest): void;
+  // writes only while the caller is still the admin who sent it
+  save(principal: Principal, fields: PutSmtpRequest): void;
   test(principal: Principal): Promise<SmtpTestResponse>;
 };
 
@@ -31,7 +32,7 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       path: "/api/admin/smtp",
       policy: "admin",
       async handle(req, ctx) {
-        deps.save(parseSmtp(await jsonBody(req)));
+        deps.save(ctx.principal!, parseSmtp(await jsonBody(req)));
         return json(deps.response(ctx.principal!));
       },
     },

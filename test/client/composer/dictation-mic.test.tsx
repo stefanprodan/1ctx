@@ -62,7 +62,6 @@ describe("the composer's mic", () => {
       username: "admin",
       fullName: "Admin",
       role: "admin",
-      mustChangePassword: false,
     };
   });
   afterEach(() => {

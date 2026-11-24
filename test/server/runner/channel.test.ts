@@ -11,7 +11,7 @@ import { BadRequest, NotFound } from "../../../src/server/lib/errors.ts";
 import { MAX_QUEUED_PER_CHAT } from "../../../src/server/sessions/index.ts";
 import type { ChannelPostResponse } from "../../../src/shared/api/sessions.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
-import { hashPassword, testApp } from "../../helpers/app.ts";
+import { testApp } from "../../helpers/app.ts";
 import {
   chatApp,
   FLASH,
@@ -642,8 +642,6 @@ describe("channel summons", () => {
       fullName: "Another",
       email: "another@example.test",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     const added = await chat.admin.call(
@@ -653,7 +651,7 @@ describe("channel summons", () => {
     );
     expect(added.status).toBe(201);
     const other = chat.app.client();
-    await other.login("another", "pw");
+    await other.signIn("another");
     const first = await summon("coder");
     const second = await summon("reviewer", other);
     const stop = (id: string, client = chat.member) =>

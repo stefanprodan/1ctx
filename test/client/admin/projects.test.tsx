@@ -59,7 +59,7 @@ const casey: AdminUser = {
   tz: "Europe/Bucharest",
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
-  mustChangePassword: false,
+  signedInAt: null,
   emailPlaceholder: false,
   lastVisitDay: null,
   projectIds: [],

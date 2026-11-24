@@ -32,7 +32,6 @@ const reader: Me = {
   username: "reader",
   fullName: "Reader",
   role: "member",
-  mustChangePassword: false,
 };
 
 const realFetch = globalThis.fetch;

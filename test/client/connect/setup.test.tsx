@@ -117,7 +117,6 @@ describe("the page", () => {
       username: "casey",
       fullName: "Casey Doe",
       role: "member",
-      mustChangePassword: false,
     };
     accessKeys.value = [];
     accessKeysLimit.value = 5;

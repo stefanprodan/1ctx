@@ -97,13 +97,9 @@ import {
 import { type SkillStore, type Skills, skillsArea } from "./skills/index.ts";
 import { type Tools, toolsArea } from "./tools/index.ts";
 import { type UsageStore, usageArea } from "./usage/index.ts";
-import {
-  type PasswordCost,
-  type UserStore,
-  type Users,
-  usersArea,
-} from "./users/index.ts";
+import { type UserStore, type Users, usersArea } from "./users/index.ts";
 import { healthRoutes } from "./web/health.ts";
+import { deadPage, linkPage, sentPage } from "./web/link-page.ts";
 import { type Router, router } from "./web/router.ts";
 import { type Socket, socketArea } from "./web/socket.ts";
 
@@ -135,8 +131,6 @@ export type ComposeOptions = {
   repoJobs?: JobRunner;
   // Provisioning validates before bootstrap and never repairs or schedules.
   activate?: boolean;
-  // argon2id's cost; a test passes the least
-  passwordCost?: PasswordCost;
   // the cores the send caps are sized by; a test passes a fixed number
   cores?: number;
   // what reaches the SMTP server; a test passes a fake that records
@@ -183,6 +177,8 @@ export type App = {
   socket: Socket;
   routes: RouteDescriptor[];
   handle: Router;
+  // GET and HEAD of /link/<token>, drawn outside the router
+  linkPage: (req: Request) => Response;
   provision: Provision;
   repaired: number;
   reconciled: number;
@@ -244,7 +240,6 @@ export async function compose(options: ComposeOptions): Promise<App> {
     clock,
     log: log("users"),
     projects: { createPersonal: (fields) => projects.createPersonal(fields) },
-    passwordCost: options.passwordCost,
   });
   const email = emailArea({
     db,
@@ -254,6 +249,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     keys: () => options.secretNames?.(EMAIL_KEY_PREFIX) ?? [],
     users,
     emailSender: options.emailSender ?? smtpSender(),
+    acting: (principal, write) =>
+      access.actingWrite(principal, "admin", () => ({ result: write() })),
   });
   // the instance's start, as the overview reports it
   const startedAt = clock();
@@ -438,6 +435,14 @@ export async function compose(options: ComposeOptions): Promise<App> {
     presence: { onlineUserIds: () => socket.onlineUserIds() },
     email,
     dictation,
+    keyFiles: {
+      read: (name) => secret("user-", name),
+      list: () => options.secretNames?.("user-") ?? [],
+    },
+    pages: {
+      dead: () => deadPage(email.enabled()),
+      sent: sentPage,
+    },
   });
   agents = agentsArea({
     db,
@@ -867,7 +872,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
   // from the first signal to the exit
   let draining = false;
   if (options.activate !== false) {
-    await users.bootstrap();
+    users.bootstrap();
+    access.startKeyChecks();
     repaired = sessions.repair();
     // before the queue, so a resumed send never sees a tree the cache drops
     repoCache = repos.start();
@@ -909,6 +915,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const handle = router({
     routes,
     resolve: (req, policy) => access.resolve(req, policy),
+    held: (loginId) => access.held(loginId),
     trustProxy: options.trustProxy,
     log: log("router"),
   });
@@ -916,7 +923,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
     handle,
     secret,
     webAccess: () => configuredTools.webAccess(),
-    bootstrap: async () => (await users.bootstrap()) !== null,
+    bootstrap: async () => users.bootstrap() !== null,
     projectDocs: projectDocsOf({
       projects: projects.store,
       limits,
@@ -974,6 +981,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     socket,
     routes,
     handle,
+    linkPage: linkPage({
+      live: (token) => access.linkLive(token),
+      emailOn: () => email.enabled(),
+    }),
     provision,
     repaired,
     reconciled,
@@ -1068,6 +1079,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
       });
       automations.stop();
       automations.dispose();
+      access.stopKeyChecks();
       // a link ask answered before here writes its row; one after does
       // nothing, since the listener still serves until the db closes
       await access.closeLinks();

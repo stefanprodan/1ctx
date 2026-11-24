@@ -2,49 +2,59 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An admin write that awaits its body reads the admin again in its
-// transaction: what happened to the admin meanwhile stops the write.
+// transaction: what happened to the admin meanwhile stops the write, and
+// a key login that no longer holds ends with it.
 
 import { expect, test } from "bun:test";
-import { hashPassword, ORIGIN, testApp } from "../../helpers/app.ts";
+import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
+import { ORIGIN, type TestClient, testApp } from "../../helpers/app.ts";
+import { SMTP } from "../../helpers/links.ts";
+import { createTeam } from "../../helpers/projects.ts";
 
-const PASSWORD = "longenough";
+const ADA_KEY = `1ctx-admin-${"a".repeat(43)}`;
 
 async function setup() {
-  const app = await testApp();
+  const secrets: Record<string, string> = {
+    "user-ada": ADA_KEY,
+    "email-relay": "secret-pass",
+  };
+  const app = await testApp({ secrets });
   const other = app.client();
-  expect((await other.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await other.signIn("admin")).status).toBe(200);
   const make = async (username: string, role: "admin" | "member") =>
     app.createUser({
       username,
       fullName: username,
       email: `${username}@example.test`,
       role,
-      passwordHash: await hashPassword(PASSWORD),
-      mustChangePassword: false,
       now: app.now.value,
     });
   const acting = await make("ada", "admin");
   const casey = await make("casey", "member");
+  // by her key, so a rotation is one of the endings
   const client = app.client();
-  expect((await client.login("ada", PASSWORD)).status).toBe(200);
-  const hashOf = (id: string) =>
-    app.db
-      .query<{ password_hash: string }, [string]>(
-        "select password_hash from users where id = ?",
-      )
-      .get(id)!.password_hash;
-  return { app, other, acting, casey, client, hashOf };
+  const login = await client.call("POST", "/api/login", {
+    body: { key: ADA_KEY },
+  });
+  expect(login.status).toBe(200);
+  return { app, secrets, other, acting, casey, client };
 }
 
 type Setup = Awaited<ReturnType<typeof setup>>;
 
 // the request goes through the router now, its body only when sent
-function slowCall(b: Setup, method: string, path: string) {
+function slowCall(
+  b: Setup,
+  method: string,
+  path: string,
+  client: TestClient = b.client,
+) {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   const response = b.app.handle(
     new Request(`${ORIGIN}${path}`, {
       method,
-      headers: { cookie: b.client.cookie!, origin: ORIGIN },
+      headers: { cookie: client.cookie!, origin: ORIGIN },
       body: new ReadableStream<Uint8Array>({
         start(value) {
           controller = value;
@@ -79,8 +89,9 @@ const ENDINGS = {
         ).status,
       ).toBe(200),
   },
+  // a key login holds only while its user is an admin
   demotion: {
-    status: 403,
+    status: 401,
     run: async (b: Setup) =>
       expect(
         (
@@ -90,16 +101,25 @@ const ENDINGS = {
         ).status,
       ).toBe(200),
   },
-  reset: {
+  "sign out everywhere": {
     status: 401,
     run: async (b: Setup) =>
       expect(
-        (
-          await b.other.call("POST", `/api/users/${b.acting.id}/password`, {
-            body: { password: "reset-password" },
-          })
-        ).status,
+        (await b.other.call("POST", `/api/users/${b.acting.id}/sign-out`))
+          .status,
       ).toBe(204),
+  },
+  "key rotated": {
+    status: 401,
+    run: async (b: Setup) => {
+      b.secrets["user-ada"] = `1ctx-admin-${"b".repeat(43)}`;
+    },
+  },
+  "key file removed": {
+    status: 401,
+    run: async (b: Setup) => {
+      delete b.secrets["user-ada"];
+    },
   },
 };
 
@@ -113,7 +133,6 @@ const WRITES = {
       email: "mallory@example.test",
       role: "admin",
       tz: "UTC",
-      password: PASSWORD,
     },
     unchanged: (b: Setup) =>
       expect(b.app.users.byUsername("mallory")).toBeNull(),
@@ -128,11 +147,20 @@ const WRITES = {
       expect(casey.email).toBe("casey@example.test");
     },
   },
-  password: {
+  "SMTP settings": {
+    method: "PUT",
+    path: () => "/api/admin/smtp",
+    body: SMTP,
+    unchanged: (b: Setup) => expect(b.app.email.settings()).toBeNull(),
+  },
+  "access key": {
     method: "POST",
-    path: (b: Setup) => `/api/users/${b.casey.id}/password`,
-    body: { password: "mallory-knows" },
-    unchanged: () => {},
+    path: () => "/api/profile/keys",
+    body: { name: "laptop", scope: "write", projectIds: null, days: 30 },
+    unchanged: (b: Setup) =>
+      expect(
+        b.app.db.query("select count(*) as n from access_keys").get(),
+      ).toEqual({ n: 0 }),
   },
 };
 
@@ -141,21 +169,118 @@ for (const [ending, end] of Object.entries(ENDINGS)) {
     test(`a ${ending} while the ${name} body arrives writes nothing`, async () => {
       const b = await setup();
       try {
-        const hash = b.hashOf(b.casey.id);
         const send = slowCall(b, write.method, write.path(b));
         await end.run(b);
         expect(await send(write.body)).toBe(end.status);
         write.unchanged(b);
-        expect(b.hashOf(b.casey.id)).toBe(hash);
-        expect((await b.app.client().login("casey", PASSWORD)).status).toBe(
-          200,
-        );
       } finally {
         await b.app.shutdown();
       }
     });
   }
 }
+
+const KEY_ENDINGS = ["key rotated", "key file removed"] as const;
+
+for (const ending of KEY_ENDINGS) {
+  test.serial(
+    `a ${ending} while a body arrives ends the login for good`,
+    async () => {
+      const b = await setup();
+      const events: BusEvent[] = [];
+      const unsubscribe = subscribe((event) => events.push(event), silent);
+      try {
+        const login = b.app.db
+          .query<{ id: string }, []>(
+            "select id from logins where key_digest is not null",
+          )
+          .get()!;
+        const send = slowCall(b, "PATCH", `/api/users/${b.casey.id}`);
+        await ENDINGS[ending].run(b);
+        expect(await send({ role: "admin" })).toBe(401);
+        expect(b.app.users.byId(b.casey.id)!.role).toBe("member");
+        expect(
+          b.app.db
+            .query("select count(*) as n from logins where id = ?")
+            .get(login.id),
+        ).toEqual({ n: 0 });
+        expect(events.filter((e) => e.type === "login.revoked")).toEqual([
+          {
+            type: "login.revoked",
+            data: { userId: b.acting.id, loginId: login.id },
+          },
+        ]);
+        b.secrets["user-ada"] = ADA_KEY;
+        const me = await b.client.call("GET", "/api/me");
+        expect((await me.json()).user).toBeNull();
+      } finally {
+        unsubscribe();
+        await b.app.shutdown();
+      }
+    },
+  );
+}
+
+// an admin signed in by email keeps the login at a demote, but not
+// what only an admin may do
+async function demotedByEmail() {
+  const b = await setup();
+  const eve = b.app.createUser({
+    username: "eve",
+    fullName: "Eve",
+    email: "eve@example.test",
+    role: "admin",
+    now: b.app.now.value,
+  });
+  const tab = b.app.client();
+  expect((await tab.signIn("eve")).status).toBe(200);
+  const demote = async () =>
+    expect(
+      (
+        await b.other.call("PATCH", `/api/users/${eve.id}`, {
+          body: { role: "member" },
+        })
+      ).status,
+    ).toBe(200);
+  return { b, eve, tab, demote };
+}
+
+test("an access key made while its admin is demoted reaches no team project", async () => {
+  const { b, tab, demote } = await demotedByEmail();
+  try {
+    const team = await createTeam(b.other, "ops");
+    const send = slowCall(b, "POST", "/api/profile/keys", tab);
+    await demote();
+    expect(
+      await send({
+        name: "laptop",
+        scope: "write",
+        projectIds: [team.id],
+        days: 30,
+      }),
+    ).toBe(404);
+    expect(
+      b.app.db.query("select count(*) as n from access_keys").get(),
+    ).toEqual({ n: 0 });
+  } finally {
+    await b.app.shutdown();
+  }
+});
+
+test("an SMTP save while its admin is demoted is 403 and writes nothing", async () => {
+  const { b, tab, demote } = await demotedByEmail();
+  try {
+    const send = slowCall(b, "PUT", "/api/admin/smtp", tab);
+    await demote();
+    expect(await send(SMTP)).toBe(403);
+    expect(b.app.email.settings()).toBeNull();
+    expect(
+      (await (await tab.call("GET", "/api/me")).json()).user.username,
+    ).toBe("eve");
+  } finally {
+    await b.app.shutdown();
+  }
+});
 
 test("an admin still signed in finishes a slow write", async () => {
   const b = await setup();

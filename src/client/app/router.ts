@@ -46,13 +46,15 @@ export type Link = {
 // a new tab. An installed app has no tabs: a new one would leave it
 // for the browser, so there a page of the app opens in place even from
 // a rendered reply, and only the API, another origin, mailto and a
-// download leave
+// download leave. An emailed link's page is the server's, never the
+// app's, so it is a full navigation
 export function inApp(
   link: Link,
   origin: string,
   standalone: boolean,
 ): boolean {
   if (link.origin !== origin || link.download) return false;
+  if (link.pathname.startsWith("/link/")) return false;
   if (!link.blank) return true;
   return (
     standalone && link.pathname !== "/api" && !link.pathname.startsWith("/api/")

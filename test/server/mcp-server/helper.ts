@@ -57,7 +57,6 @@ const key = (scope: "read" | "write" = "read"): Principal => ({
   username: "casey",
   fullName: "Casey",
   role: "member",
-  mustChangePassword: false,
   via: {
     kind: "key",
     id: "key000000001",

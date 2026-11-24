@@ -275,8 +275,8 @@ test.serial(
       )
       .run(rows[0]!.id);
     f.app.now.value += 31 * DAY_MS;
-    expect((await f.admin.login("admin", "hunter2-test")).status).toBe(200);
-    expect((await f.member.client.login("member", "pw")).status).toBe(200);
+    expect((await f.admin.signIn("admin")).status).toBe(200);
+    expect((await f.member.client.signIn("member")).status).toBe(200);
     await f.limits({ externalTaskDays: 30 });
     const conn = await f.connect(f.member.client);
     f.app.sweep();

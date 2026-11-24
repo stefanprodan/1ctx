@@ -29,7 +29,6 @@ const user: Me = {
   username: "reader",
   fullName: "Reader",
   role: "member",
-  mustChangePassword: false,
 };
 const base = "/api/projects/p1/knowledge";
 const filePath = (id: string) => `${base}/files/${id}`;

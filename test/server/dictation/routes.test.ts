@@ -22,7 +22,6 @@ import {
   collectLogs,
   fakeFetch,
   GEMINI_URL,
-  hashPassword,
   MLX_URL,
   PROVIDER_URL,
   type TestClient,
@@ -86,7 +85,7 @@ async function setup(options: { fetcher?: typeof fetch } = {}) {
     fetcher: options.fetcher,
   });
   const admin = app.client();
-  await admin.login("admin", "hunter2-test");
+  await admin.signIn("admin");
   const provider = async (name: string, wire: string, baseUrl: string) => {
     const res = await admin.call("POST", "/api/providers", {
       body: {
@@ -106,12 +105,10 @@ async function setup(options: { fetcher?: typeof fetch } = {}) {
     fullName: "Speaker",
     email: "speaker@example.com",
     role: "member",
-    passwordHash: await hashPassword("password-test"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const member = app.client();
-  await member.login("speaker", "password-test");
+  await member.signIn("speaker");
   const save = (providerId: string, model: string) =>
     admin.call("PUT", "/api/admin/dictation", { body: { providerId, model } });
   const flip = (enabled: boolean) =>

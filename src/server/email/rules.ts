@@ -11,6 +11,7 @@ import { DAY_MS, MINUTE_MS } from "../lib/clock.ts";
 // every email the instance sends: the link emails, a security notice, an
 // agent's email and an automation's alert
 export const EMAIL_KINDS = [
+  // no longer sent; the outbox's sent history may still hold one
   "reset",
   "signin",
   "invite",
@@ -40,11 +41,15 @@ export const STALE_CLAIM_MS = MINUTE_MS;
 export const FAILED_KEEP_MS = 7 * DAY_MS;
 // a sent row, for the caps counted per day
 export const SENT_KEEP_MS = DAY_MS;
-// link emails asked for at the sign-in page, so nobody spams a user or
-// spends the server's quota from it: per user a day, per instance an
-// hour
-export const ASKED_LINKS_PER_USER_DAY = 3;
-export const ASKED_LINKS_PER_HOUR = 50;
+// asks at the sign-in page, counted on link_asks, so nobody floods an
+// inbox or the server's quota from it; invites are not counted. A
+// user's cap is per asking browser (its challenge), so a stranger's asks
+// never use up the user's own; the inbox's holds across browsers, since
+// a browser without the cookie gets a new challenge each ask
+export const ASKS_PER_USER_DAY = 3;
+export const ASKS_PER_INBOX_DAY = 10;
+export const ASKS_PER_CHALLENGE_HOUR = 5;
+export const ASKS_PER_HOUR = 50;
 
 // when the row is tried again after its attempts-th failure, or null
 // when it has failed for good

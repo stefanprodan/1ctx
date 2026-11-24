@@ -180,7 +180,6 @@ describe("the mic's spinner", () => {
       username: "admin",
       fullName: "Admin",
       role: "admin",
-      mustChangePassword: false,
     };
     dictationOn.value = true;
   });

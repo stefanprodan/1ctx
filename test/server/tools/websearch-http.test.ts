@@ -123,6 +123,27 @@ describe("websearch HTTP policy", () => {
     expect(rejected.message).toBe("websearch key rejected: Invalid API key");
   });
 
+  test("scrubs a key echoed across the cut of the provider's words", async () => {
+    const key = `tvly-${"k".repeat(40)}`;
+    // the key starts before the 300th character and ends after it
+    const words = `${"w".repeat(280)}${key} tail`;
+    const rejected = await thrown(
+      searchWeb(
+        { query: "find" },
+        context(),
+        search("tavily", key),
+        dependencies(async () =>
+          streamResponse([JSON.stringify({ detail: { error: words } })], {
+            status: 401,
+          }),
+        ),
+      ),
+    );
+    expect(rejected.message).toBe(
+      `websearch key rejected: ${"w".repeat(280)}[key] tail`,
+    );
+  });
+
   test("maps Tavily's nested words for a rejected key and a refusal", async () => {
     const rejected = await thrown(
       searchWeb(

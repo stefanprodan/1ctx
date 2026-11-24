@@ -14,10 +14,7 @@ import {
   isServerName,
   isSkillName,
   isUsername,
-  MAX_PASSWORD_BYTES,
-  MIN_PASSWORD,
   PERSONAL_PROJECT_NAME,
-  passwordProblem,
   type SecretKind,
 } from "../../shared/words.ts";
 import { prefixesOverlap } from "../credentials/index.ts";
@@ -277,20 +274,7 @@ export function preflight(
     const exists = inventory[doc.kind].includes(doc.name);
     switch (doc.kind) {
       case "User": {
-        if (!exists) required(["fullName", "email", "tz", "passwordFrom"]);
-        if (doc.spec.passwordFrom !== undefined) {
-          const password = readSecret(
-            "passwordFrom",
-            "user-",
-            doc.spec.passwordFrom,
-          );
-          if (!exists && passwordProblem(password) !== null) {
-            fail(
-              "passwordFrom",
-              `secret must contain a password of ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
-            );
-          }
-        }
+        if (!exists) required(["fullName", "email", "tz"]);
         break;
       }
       case "SmtpServer": {

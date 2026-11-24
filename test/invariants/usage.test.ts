@@ -95,8 +95,8 @@ describe("GET /api/usage/days", () => {
   test("returns the fixed window with zero-filled visible projects", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-16T12:00:00Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
-    expect((await chat.admin.login("admin", "hunter2-test")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
+    expect((await chat.admin.signIn("admin")).status).toBe(200);
     const visible = chat.app.projects.createTeam({
       ownerId: chat.adminId,
       name: "visible-team",
@@ -163,7 +163,7 @@ describe("GET /api/usage/days", () => {
   test("places a round that crosses midnight on the later day", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-15T23:59:30Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
     const started = await startChat(chat, "cross midnight");
     chat.app.now.value = Date.parse("2026-09-16T00:00:30Z");
     await finish(chat, started.script, 11, 5);
@@ -186,7 +186,7 @@ describe("GET /api/usage/days", () => {
   test("a regenerate adds its tokens but not a turn", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-16T12:00:00Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
     const started = await startChat(chat, "again");
     await finish(chat, started.script, 11, 5);
     const pending = chat.scripted.next();
@@ -237,8 +237,8 @@ describe("GET /api/directory/agents/:name/days", () => {
   test("counts the agent's turns in every project, as one series", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-16T10:00:00Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
-    expect((await chat.admin.login("admin", "hunter2-test")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
+    expect((await chat.admin.signIn("admin")).status).toBe(200);
 
     const mine = await startChat(chat, "mine");
     await finish(chat, mine.script, 11, 5);
@@ -284,7 +284,7 @@ describe("GET /api/directory/agents/:name/days", () => {
   test("counts a send across midnight once in the total", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-15T23:59:30Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
     const started = await startChat(chat, "cross midnight");
     chat.app.now.value = Date.parse("2026-09-16T00:00:30Z");
     await finish(chat, started.script, 11, 5);
@@ -305,7 +305,7 @@ describe("GET /api/directory/agents/:name/days", () => {
 
   test("answers 404 to a stranger and 400 to a bad zone or query", async () => {
     const chat = await chatApp();
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
     const cases: [string, number][] = [
       ["/api/directory/agents/nobody/days?tz=UTC", 404],
       ["/api/directory/agents/coder/days", 400],

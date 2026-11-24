@@ -45,7 +45,7 @@ test("a repository is fetched on create, on a change and on a refresh", async ()
   const writes = rowWrites(app.repos.store);
   const settled = (id: string) => settledState(app.repos.store, writes, id);
   const client = app.client();
-  await client.login("admin", "hunter2-test");
+  await client.signIn("admin");
   const project = await createTeam(client, "platform");
   const created = await client.call(
     "POST",

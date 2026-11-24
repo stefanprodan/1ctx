@@ -9,7 +9,6 @@
 
 import { signal } from "@preact/signals";
 import type {
-  ChangePasswordRequest,
   EmailSettingsRequest,
   ProfileResponse,
   UpdateProfileRequest,
@@ -18,6 +17,7 @@ import type { Profile } from "../../shared/contracts/user.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me, setMe } from "./me.ts";
+import { loadPasskeys } from "./passkeys.ts";
 
 export const profile = signal<Profile | null>(null);
 export const profileError = signal<Failure | null>(null);
@@ -39,7 +39,6 @@ function settle({ user, emailOn }: ProfileResponse): void {
     username: user.username,
     fullName: user.fullName,
     role: user.role,
-    mustChangePassword: user.mustChangePassword,
   });
 }
 
@@ -59,6 +58,12 @@ export async function loadProfile(): Promise<void> {
   }
 }
 
+// the profile route's load: the passkeys land with the row, so the page
+// waits as one
+export async function profilePage(): Promise<void> {
+  await Promise.all([loadProfile(), loadPasskeys()]);
+}
+
 export async function saveProfile(body: UpdateProfileRequest): Promise<void> {
   settle(await api<ProfileResponse>("/api/profile", "PATCH", body));
 }
@@ -67,10 +72,4 @@ export async function saveEmailSettings(
   body: EmailSettingsRequest,
 ): Promise<void> {
   settle(await api<ProfileResponse>("/api/profile/email", "PUT", body));
-}
-
-export async function changePassword(
-  body: ChangePasswordRequest,
-): Promise<void> {
-  settle(await api<ProfileResponse>("/api/profile/password", "POST", body));
 }

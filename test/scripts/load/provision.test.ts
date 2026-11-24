@@ -2,17 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { createMcp } from "../../../scripts/load/fake-mcp.ts";
 import { createModel } from "../../../scripts/load/fake-model.ts";
 import {
   type Counts,
   memberships,
-  names,
   provisionFiles,
+  usernames,
   valuesYaml,
+  writeAdminKey,
 } from "../../../scripts/load/provision.ts";
 import { parse } from "../../../src/server/provision/index.ts";
+import { isAdminKey } from "../../../src/server/users/rules.ts";
 import { testApp } from "../../helpers/app.ts";
+import { tempDirs } from "../../helpers/temp.ts";
+
+const temp = tempDirs();
 
 const COUNTS: Counts = { admins: 2, members: 12, teams: 3, agents: 2 };
 const NS = "1ctx-test";
@@ -37,6 +44,30 @@ describe("the kind provision", () => {
     expect(values).toContain(`http://fake-model.${NS}.svc:1241/v1`);
   });
 
+  test("keeps one admin key and remakes anything else", () => {
+    const dir = temp("load-keys-");
+    const path = join(dir, "user-admin.key");
+    writeFileSync(path, "an-old-password");
+    expect(writeAdminKey(dir)).toBe(true);
+    const key = readFileSync(path, "utf8");
+    expect(isAdminKey(key)).toBe(true);
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+    expect(writeAdminKey(dir)).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe(key);
+  });
+
+  test("mints a login for everyone it makes", () => {
+    expect(usernames(COUNTS)).toEqual([
+      "admin",
+      "adm01",
+      "adm02",
+      ...Array.from(
+        { length: 12 },
+        (_, i) => `u${String(i + 1).padStart(3, "0")}`,
+      ),
+    ]);
+  });
+
   test("puts every member in two to five teams", () => {
     const byTeam = memberships(COUNTS);
     const per = new Map<string, number>();
@@ -51,11 +82,7 @@ describe("the kind provision", () => {
   });
 
   test("applies with the real provision on a throwaway database", async () => {
-    const n = names(COUNTS);
-    const secrets = Object.fromEntries(
-      [...n.admins, ...n.members].map((u) => [`user-${u}`, `password-${u}`]),
-    );
-    const app = await testApp({ activate: false, fetcher: fakes(), secrets });
+    const app = await testApp({ activate: false, fetcher: fakes() });
     try {
       const files = provisionFiles(COUNTS, NS);
       const documents = parse(

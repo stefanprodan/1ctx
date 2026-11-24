@@ -185,7 +185,7 @@ follow `docs/external-task-pages.md`.
   including tasks awaiting input. Access supplies the key ids through a
   closure inside the task transaction; the task area imports no access
   implementation.
-- Revoking a key, disabling a user or resetting their password ends
+- Revoking a key, disabling a user or signing them out everywhere ends
   the affected keys' claims in that write's transaction. Losing a team
   membership or the admin role ends only claims in projects no longer
   visible. Access and projects call closure ports that return bus

@@ -6,19 +6,17 @@
 // client sends, and refuse anything unexpected with a 400.
 
 import type {
+  CodeRequest,
   LinkAskRequest,
   LoginRequest,
-  UseLinkRequest,
 } from "../../shared/api/access.ts";
 import type {
-  ChangePasswordRequest,
   CreateAccessKeyRequest,
   EmailSettingsRequest,
   UpdateProfileRequest,
 } from "../../shared/api/profile.ts";
 import type {
   CreateUserRequest,
-  ResetPasswordRequest,
   UpdateUserRequest,
 } from "../../shared/api/users.ts";
 import {
@@ -35,59 +33,39 @@ import {
   MAX_ABOUT,
   MAX_EMAIL,
   MAX_FULL_NAME,
-  MAX_PASSWORD_BYTES,
   MAX_USERNAME,
-  MIN_PASSWORD,
   MIN_USERNAME,
   NAME_CHARACTERS,
-  passwordProblem,
 } from "../../shared/words.ts";
 import { fields, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
+import { isAdminKey } from "../users/index.ts";
 
-// a password as typed: anything up to the byte cap. The login parser
-// takes any length so an old password stays usable; a new one has a
-// floor as well
-function password(value: unknown, what: string, min = 1): string {
-  if (typeof value !== "string" || passwordProblem(value, min) !== null) {
-    throw new BadRequest(
-      `${what} must be a string of ${min} to ${MAX_PASSWORD_BYTES} bytes`,
-    );
-  }
-  return value;
-}
-
-// a username or an email as typed at sign in: the rule is checked, not
-// enforced, so the answer is the same as for an unknown user. Capped at
-// an email's length; only an email is lowercased, as it is stored
-function loginName(value: unknown): string {
-  if (typeof value !== "string" || value === "") {
-    throw new BadRequest("username must be a string");
-  }
-  if (value.length > MAX_EMAIL) {
-    throw new BadRequest(`username must be at most ${MAX_EMAIL} characters`);
-  }
-  return value.includes("@") ? value.toLowerCase() : value;
-}
-
+// the route answers any refusal here with its one 401
 export function parseLogin(body: unknown): LoginRequest {
-  const b = fields(body, ["username", "password"]);
-  return {
-    username: loginName(b.username),
-    password: password(b.password, "password"),
-  };
+  const b = fields(body, ["key"]);
+  if (!isAdminKey(b.key)) throw new BadRequest("key must be an admin key");
+  return { key: b.key };
 }
 
+// an address, lowercased as it is stored; whose it is stays unknown
 export function parseLinkAsk(body: unknown): LinkAskRequest {
-  const b = fields(body, ["username"]);
-  return { username: loginName(b.username) };
+  const b = fields(body, ["email"]);
+  return { email: parseEmail(b.email) };
 }
 
-export function parseLinkUse(body: unknown): UseLinkRequest {
-  const b = fields(body, ["password"]);
-  return b.password === undefined
-    ? {}
-    : { password: password(b.password, "password", MIN_PASSWORD) };
+// the route answers any refusal here with its one 401
+export function parseCode(body: unknown): CodeRequest {
+  const b = fields(body, ["email", "code"]);
+  if (typeof b.code !== "string" || !/^\d{6}$/.test(b.code)) {
+    throw new BadRequest("code must be six digits");
+  }
+  return { email: parseEmail(b.email), code: b.code };
+}
+
+// the link page's form, which holds no field
+export function parseLinkUse(body: unknown): void {
+  fields(body, []);
 }
 
 // newToken()'s shape: 32 bytes as base64url
@@ -156,14 +134,6 @@ export function parseEmailSettings(body: unknown): EmailSettingsRequest {
   return { fromAgents: b.fromAgents };
 }
 
-export function parsePasswordChange(body: unknown): ChangePasswordRequest {
-  const b = fields(body, ["current", "next"]);
-  return {
-    current: password(b.current, "current password"),
-    next: password(b.next, "new password", MIN_PASSWORD),
-  };
-}
-
 export function parseAccessKey(body: unknown): CreateAccessKeyRequest {
   const b = fields(body, ["name", "scope", "projectIds", "days"]);
   // the agent name rule, so a key reads as a handle in `@user via <key>`
@@ -195,11 +165,9 @@ export function parseNewUser(body: unknown): CreateUserRequest {
     "email",
     "role",
     "tz",
-    "password",
     "invite",
     "about",
     "disabled",
-    "mustChangePassword",
   ]);
   if (!isRole(b.role)) throw new BadRequest("role must be admin or member");
   const parsed: CreateUserRequest = {
@@ -211,18 +179,7 @@ export function parseNewUser(body: unknown): CreateUserRequest {
   };
   if (b.invite !== undefined) {
     if (b.invite !== true) throw new BadRequest("invite must be true");
-    if (b.password !== undefined) {
-      throw new BadRequest("password must be left out with an invite");
-    }
-    // the invite sets the password, so the flag is the invite's own
-    if (b.mustChangePassword !== undefined) {
-      throw new BadRequest(
-        "mustChangePassword must be left out with an invite",
-      );
-    }
     parsed.invite = true;
-  } else {
-    parsed.password = password(b.password, "password", MIN_PASSWORD);
   }
   if (b.about !== undefined) parsed.about = parseAbout(b.about);
   if (b.disabled !== undefined) {
@@ -234,12 +191,6 @@ export function parseNewUser(body: unknown): CreateUserRequest {
   // a disabled user is never emailed, so the invite would not go
   if (parsed.invite === true && parsed.disabled === true) {
     throw new BadRequest("disabled must be left out with an invite");
-  }
-  if (b.mustChangePassword !== undefined) {
-    if (typeof b.mustChangePassword !== "boolean") {
-      throw new BadRequest("mustChangePassword must be a boolean");
-    }
-    parsed.mustChangePassword = b.mustChangePassword;
   }
   return parsed;
 }
@@ -274,9 +225,4 @@ export function parseUserPatch(body: unknown): UpdateUserRequest {
     throw new BadRequest("at least one field is required");
   }
   return patch;
-}
-
-export function parseUserPassword(body: unknown): ResetPasswordRequest {
-  const b = fields(body, ["password"]);
-  return { password: password(b.password, "password", MIN_PASSWORD) };
 }

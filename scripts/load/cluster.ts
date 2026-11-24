@@ -4,6 +4,9 @@
 // The cluster target: the Helm chart's pod on a local kind cluster, the
 // fakes beside it, the driver in a pod, nothing through a port-forward.
 // Only a context named kind-* is used, and only a namespace named 1ctx-*.
+// Before each driver pod the server stops, a pod mints a login per user
+// into its database from hashes, and the tokens go into a Secret that
+// only the driver mounts.
 //
 //   bun scripts/load/cluster.ts install [--tag dev] [--cpu 4]
 //   bun scripts/load/cluster.ts setup [--max-mult 16]
@@ -13,12 +16,26 @@
 // every command: [--context kind-1ctx-test] [--namespace 1ctx-load]
 // `make kind-up` makes that cluster, `make kind-image` loads the image
 
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { OUT_DIR } from "./db/build.ts";
 import { type CapsMode, parseCaps } from "./driver/automations.ts";
-import { mcpBase, modelUrl, writeCluster } from "./provision.ts";
-import { failIfStuck, rolledOut } from "./rollout.ts";
+import {
+  Cancelled,
+  ended,
+  type Kube,
+  LOGINS_SECRET,
+  mint as mint_,
+  RecoveryFailed,
+} from "./pods.ts";
+import {
+  ADMIN_KEY_FILE,
+  mcpBase,
+  modelUrl,
+  usernames,
+  writeCluster,
+} from "./provision.ts";
+import { rolledOut } from "./rollout.ts";
 import { FAKE } from "./shapes.ts";
 import { printTable, summarize } from "./summarize.ts";
 
@@ -131,7 +148,7 @@ spec:
       command: ${JSON.stringify(["bun", "/load/driver.js", ...args])}
       env:
         - { name: BASE, value: "http://onectx.${ns}.svc" }
-        - { name: SECRETS, value: /secrets/ }
+        - { name: LOGINS, value: /logins/logins.json }
         - { name: FAKE_MODEL_URL, value: "${modelUrl(ns)}" }
         - { name: FAKE_MCP_URL, value: "${mcpBase(ns)}" }
       resources:
@@ -139,10 +156,10 @@ spec:
         limits: { cpu: "2", memory: 2Gi }
       volumeMounts:
         - { name: scripts, mountPath: /load }
-        - { name: secrets, mountPath: /secrets, readOnly: true }
+        - { name: logins, mountPath: /logins, readOnly: true }
   volumes:
     - { name: scripts, configMap: { name: load-scripts } }
-    - { name: secrets, secret: { secretName: onectx } }
+    - { name: logins, secret: { secretName: ${LOGINS_SECRET} } }
 `;
 }
 
@@ -153,6 +170,7 @@ async function scripts() {
     ["scripts/load/fake-model.ts", "fake-model.js"],
     ["scripts/load/fake-mcp.ts", "fake-mcp.js"],
     ["scripts/load/driver/main.ts", "driver.js"],
+    ["scripts/load/mint.ts", "mint.js"],
   ];
   for (const [entry, file] of entries) {
     const built = await Bun.build({
@@ -184,37 +202,13 @@ async function scripts() {
   );
 }
 
-// the namespace's database was provisioned with its Secret's keys, so
-// those win over the local folder: fresh local keys would lock the
-// server out of its own users and crash it on every start
-export function restoreKeys(
-  kubectl: (...args: string[]) => string[],
-  dir: string,
-): number {
-  const p = Bun.spawnSync(kubectl("get", "secret", "onectx", "-o", "json"));
-  if (p.exitCode !== 0) {
-    const err = p.stderr.toString();
-    // a fresh namespace has no Secret yet and gets fresh keys
-    if (err.includes("NotFound") || err.includes("not found")) return 0;
-    throw new Error(`reading the namespace's keys: ${err.trim()}`);
-  }
-  const data =
-    (JSON.parse(p.stdout.toString()) as { data?: Record<string, string> })
-      .data ?? {};
-  mkdirSync(dir, { recursive: true });
-  for (const [name, value] of Object.entries(data)) {
-    const path = join(dir, name);
-    writeFileSync(path, Buffer.from(value, "base64"));
-    chmodSync(path, 0o600);
-  }
-  return Object.keys(data).length;
-}
-
+// the database keeps no admin key, so a fresh one works on an existing
+// namespace; the Secret holds that file alone, never older ones beside it
 async function install() {
-  const restored = restoreKeys(k, join(CLUSTER, "secrets"));
-  if (restored > 0) console.log(`${restored} keys taken from the namespace`);
   const { made } = writeCluster(CLUSTER, ns);
-  console.log(`provision written to ${CLUSTER}, ${made} new keys`);
+  console.log(
+    `provision written to ${CLUSTER}${made ? ", a new admin key" : ""}`,
+  );
   apply(
     run(
       [
@@ -239,7 +233,7 @@ async function install() {
         "secret",
         "generic",
         "onectx",
-        `--from-file=${join(CLUSTER, "secrets")}`,
+        `--from-file=${ADMIN_KEY_FILE}=${join(CLUSTER, "secrets", ADMIN_KEY_FILE)}`,
         "--dry-run=client",
         "-o",
         "yaml",
@@ -305,9 +299,17 @@ function checkMetrics() {
   }
 }
 
-// runs the driver in a fresh pod and returns its log; the pod must
-// start within READY_MS and end within doneMs, or the run fails
-const READY_MS = 3 * 60_000;
+// SIGINT or SIGTERM sets it, so the waits throw and every cleanup runs
+let cancelRequested = false;
+const kube: Kube = {
+  k,
+  sleep: (ms) => Bun.sleep(ms),
+  cancelled: () => cancelRequested,
+};
+const mint = () => mint_(kube, usernames(), ns, BUN_IMAGE);
+
+// runs the driver in a fresh pod and returns its log, or throws with
+// the log printed unless it succeeded; mint() goes first
 async function driver(
   name: string,
   args: string[],
@@ -315,33 +317,21 @@ async function driver(
 ): Promise<string> {
   run(k("delete", "pod", name, "--ignore-not-found"), undefined, true);
   apply(driverPod(name, args));
-  const start = Date.now();
-  const phaseOf = () =>
-    run(
-      k("get", "pod", name, "-o", "jsonpath={.status.phase}"),
-      undefined,
-      true,
-    ).trim();
-  for (;;) {
-    await Bun.sleep(5000);
-    const phase = phaseOf();
-    if (phase === "Pending") failIfStuck(k, (pod) => pod === name);
-    if (phase === "Succeeded" || phase === "Failed") break;
-    const waited = Date.now() - start;
-    if (phase === "Pending" && waited > READY_MS) {
-      throw new Error(
-        `pod ${name} did not start in ${READY_MS / 60_000} minutes`,
-      );
+  let phase: string;
+  try {
+    phase = await ended(kube, name, doneMs);
+  } catch (e) {
+    if (e instanceof Cancelled) {
+      Bun.spawnSync(k("delete", "pod", name, "--wait=false"));
     }
-    if (waited > doneMs) {
-      const log = Bun.spawnSync(k("logs", name)).stdout.toString();
-      if (log !== "") console.log(log);
-      throw new Error(
-        `pod ${name} did not end in ${Math.round(doneMs / 60_000)} minutes`,
-      );
-    }
+    throw e;
   }
-  return run(k("logs", name), undefined, true);
+  const log = run(k("logs", name), undefined, true);
+  if (phase !== "Succeeded") {
+    console.log(log);
+    throw new Error(`pod ${name} ended ${phase}`);
+  }
+  return log;
 }
 
 // a step: its minutes, the schedules set before it, the tail and the
@@ -355,12 +345,16 @@ const stopChildren = () => {
   for (const c of children) c.kill();
   children.clear();
 };
+// a first signal stops the children and cancels the waits, so the mint
+// step scales the server back; a second exits at once
 function stopOnExit() {
   process.on("exit", stopChildren);
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
+      if (cancelRequested) process.exit(130);
+      cancelRequested = true;
+      console.error("stopping: cleaning up first, again to exit now");
       stopChildren();
-      process.exit(130);
     });
   }
 }
@@ -370,6 +364,8 @@ async function step(mult: string, minutes: string, caps?: CapsMode) {
   const results = join(OUT_DIR, "results", label);
   mkdirSync(results, { recursive: true });
   await scripts();
+  // before the log followers, since it replaces the server's pod
+  await mint();
   await Bun.write(
     join(results, "meta.json"),
     `${JSON.stringify({ target: "cluster", label, context, namespace: ns, mult: Number(mult), minutes: Number(minutes), at: new Date().toISOString() }, null, 2)}\n`,
@@ -474,6 +470,7 @@ async function main() {
   if (command === "install") await install();
   else if (command === "setup") {
     await scripts();
+    await mint();
     console.log(
       await driver(
         "driver-setup",
@@ -484,6 +481,7 @@ async function main() {
   } else if (command === "step" && a && b) await step(a, b, caps);
   else if (command === "smoke") {
     await install();
+    await mint();
     console.log(
       await driver(
         "driver-setup",
@@ -500,4 +498,11 @@ async function main() {
   }
 }
 
-if (import.meta.main) await main();
+if (import.meta.main) {
+  try {
+    await main();
+  } catch (e) {
+    if (cancelRequested && !(e instanceof RecoveryFailed)) process.exit(130);
+    throw e;
+  }
+}

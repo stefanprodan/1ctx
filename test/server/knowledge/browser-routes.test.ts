@@ -6,7 +6,7 @@ import type {
   KnowledgeFileResponse,
   KnowledgeSearchResponse,
 } from "../../../src/shared/api/knowledge.ts";
-import { hashPassword, testApp } from "../../helpers/app.ts";
+import { testApp } from "../../helpers/app.ts";
 
 const base = (id: string) => `/api/projects/${id}/knowledge`;
 
@@ -17,8 +17,6 @@ async function setup() {
     fullName: "Writer",
     email: "writer@example.com",
     role: "member",
-    passwordHash: await hashPassword("password-test"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const other = app.createUser({
@@ -26,14 +24,12 @@ async function setup() {
     fullName: "Reader",
     email: "reader@example.com",
     role: "member",
-    passwordHash: await hashPassword("password-test"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const client = app.client();
-  expect((await client.login("writer", "password-test")).status).toBe(200);
+  expect((await client.signIn("writer")).status).toBe(200);
   const stranger = app.client();
-  expect((await stranger.login("reader", "password-test")).status).toBe(200);
+  expect((await stranger.signIn("reader")).status).toBe(200);
   const projectId = app.projects.personal(owner.id)!.id;
   const foreignId = app.projects.personal(other.id)!.id;
   const close = async () => {

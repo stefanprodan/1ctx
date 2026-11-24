@@ -60,17 +60,35 @@ data kept on your server.
 
 You need Docker and an [OpenRouter](https://openrouter.ai) API key.
 
-From a clone of this repository, write the secrets:
+From a clone of this repository, build the image and write the secrets:
 
 ```sh
-cd deploy/docker
-mkdir -p secrets provision
-openssl rand -hex 16 > secrets/user-admin.key
-printf '%s' '<your OpenRouter key>' > secrets/provider-openrouter.key
-chmod 644 secrets/*.key
+cd deploy/docker && (
+  set -e
+  mkdir -p secrets provision
+  ONECTX_VERSION=dev docker compose -f compose.yaml -f compose.dev.yaml build
+  key=$(mktemp)
+  trap 'rm -f "$key"' EXIT
+  docker run --rm ghcr.io/stefanprodan/1ctx:dev admin-key admin --stdout > "$key"
+  grep -q '^1ctx-admin-' "$key" || { echo "no admin key was made" >&2; exit 1; }
+  chmod 644 "$key"
+  mv -n "$key" secrets/user-admin.key
+  printf '%s' '<your OpenRouter key>' > secrets/provider-openrouter.key
+  chmod 644 secrets/*.key
+)
 ```
 
-`user-admin.key` holds the password of the `admin` user.
+The key goes into place only when it was made and no `user-admin.key`
+is there already, with the mode the container's user can read; a key
+is never written over. Any failed step stops the whole block before
+the next.
+
+`user-admin.key` holds the admin key of the first admin, `admin`. There
+are no passwords: an admin signs in with their own key file,
+`user-<username>.key`, made the same way with `admin-key <username>`, and
+members sign in by email once SMTP is set up. The files must be
+readable by the container's user, 65532; on a shared machine make them
+mode 600 and owned by 65532 instead.
 
 Add a provider and an agent in `provision/instance.yaml`:
 
@@ -94,18 +112,14 @@ spec:
   prompt: You are a helpful teammate. Answer directly.
 ```
 
-Build the image and start it:
+Start it:
 
 ```sh
-ONECTX_VERSION=dev docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+ONECTX_VERSION=dev docker compose -f compose.yaml -f compose.dev.yaml up -d
 ```
 
-Open <http://localhost:11236> and sign in as `admin`. Read the generated
-password with:
-
-```sh
-cat secrets/user-admin.key
-```
+Open <http://localhost:11236> and sign in with the admin key, the
+content of `secrets/user-admin.key`.
 
 The YAML in `provision/` is applied at every start. After editing it,
 restart the container:
@@ -115,7 +129,9 @@ ONECTX_VERSION=dev docker compose restart
 ```
 
 To run a release, omit `compose.dev.yaml` and replace `<release-tag>`
-with a tag from [Releases](https://github.com/stefanprodan/1ctx/releases):
+with a tag from [Releases](https://github.com/stefanprodan/1ctx/releases),
+making the admin key as above with that image
+(`ghcr.io/stefanprodan/1ctx:<release-tag>`):
 
 ```sh
 ONECTX_VERSION='<release-tag>' docker compose up -d

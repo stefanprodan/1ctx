@@ -53,7 +53,6 @@ function signIn(): void {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
 }
 

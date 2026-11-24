@@ -176,7 +176,7 @@ describe("a drain's scheduler", () => {
     await next.automationScheduler.pass();
     expect(chat.scripted.scripts).toHaveLength(1);
     const member = next.client();
-    await member.login("casey", "pw");
+    await member.signIn("casey");
     const resumed = await member.call(
       "POST",
       `/api/automations/${automation.id}/resume`,

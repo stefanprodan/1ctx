@@ -10,7 +10,6 @@ import type {
   SessionsResponse,
 } from "../../../src/shared/api/sessions.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
-import { hashPassword } from "../../helpers/app.ts";
 import { chatApp, idle } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { files, stage } from "../runner/uploads-helpers.ts";
@@ -207,13 +206,11 @@ describe("the project channel", () => {
       fullName: "Out Sider",
       email: "outsider@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     expect(outsider.id).not.toBe("");
     const client = chat.app.client();
-    await client.login("outsider", "pw");
+    await client.signIn("outsider");
     expect(
       (await client.call("GET", `/api/sessions/${channelId}`)).status,
     ).toBe(404);
@@ -230,8 +227,6 @@ describe("the project channel", () => {
       fullName: "Ops Admin",
       email: "opsadmin@example.com",
       role: "admin",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     expect(chat.app.projects.isMember(project.id, admin.id)).toBe(false);

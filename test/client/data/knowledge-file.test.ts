@@ -60,7 +60,6 @@ const reader: Me = {
   username: "reader",
   fullName: "Reader",
   role: "member",
-  mustChangePassword: false,
 };
 
 const agent: KnowledgeAuthor = {

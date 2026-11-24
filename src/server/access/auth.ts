@@ -16,7 +16,9 @@ import { newToken, sha256 } from "../lib/ids.ts";
 import { type ProjectRow, visible } from "../projects/index.ts";
 import { daysWindow } from "../usage/index.ts";
 import type { UserRow } from "../users/index.ts";
+import { type AdminKeys, loginHolds } from "./admin-keys.ts";
 import { type AccessKeyStore, keyAvailable, keysEnabled } from "./key-store.ts";
+import type { PasskeyStore } from "./passkeys/store.ts";
 import type { Login, LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
 
@@ -26,6 +28,7 @@ export const TOUCH_AFTER_MS = HOUR_MS;
 
 export type UsersPort = {
   byId(id: string): UserRow | null;
+  setSignedIn(id: string, at: number): void;
 };
 
 export type ProjectsPort = {
@@ -43,6 +46,8 @@ export type AuthDeps = {
   visits: VisitStore;
   users: UsersPort;
   projects: ProjectsPort;
+  adminKeys: AdminKeys;
+  passkeys: Pick<PasskeyStore, "keyPasskeys" | "delete">;
   clock: Clock;
   // the Secure attribute: on when the app is served over TLS
   secureCookie: boolean;
@@ -56,19 +61,31 @@ export type Resolution = {
 };
 
 export type Auth = {
+  // whether the login's row is still there, so a renewal resolved
+  // before a write that ended it is not sent
+  held(loginId: string): boolean;
   // the route's policy picks the credential: the bearer under key, the
   // cookie under every other. A null principal when there is none, it
   // is unknown, or it expired
   resolve(req: Request, policy: Policy): Resolution;
-  // the principal again from the current user row, for a long-lived socket
+  // the principal again from the current user row, for a long-lived
+  // socket; null once its login is gone or expired, and a key login
+  // ended once its key no longer holds
   refresh(principal: Principal): Principal | null;
-  // a new login for a user: the row and the Set-Cookie header value
-  open(user: UserRow): { login: Login; setCookie: string };
+  // a new login for a user, by an admin key's hash or by email (null):
+  // the row and the Set-Cookie header value
+  open(
+    user: UserRow,
+    keyDigest: string | null,
+  ): { login: Login; setCookie: string };
   // revoke one login; the cleared cookie header value
   close(loginId: string): string;
   // drop the rows whose expiry passed, telling the socket layer about
   // each; how many went
   sweep(): number;
+  // end every key login, and delete every passkey added from one, whose
+  // key no longer holds; how many went
+  checkKeyLogins(): { logins: number; passkeys: number };
   // the project, when the principal may see it; the same 404 whether it
   // is not there or is not theirs to see, so neither leaks
   project(principal: Principal, id: string): ProjectRow;
@@ -110,7 +127,6 @@ export function auth(deps: AuthDeps): Auth {
           username: user.username,
           fullName: user.fullName,
           role: user.role,
-          mustChangePassword: user.mustChangePassword,
           via,
         };
   const current = (userId: string, via: Via): Principal | null =>
@@ -126,6 +142,21 @@ export function auth(deps: AuthDeps): Auth {
     deps.visits.record(user.id, day.days[0]!, now);
     visited.set(user.id, { tz: user.tz, until: day.until });
   };
+  // a key login whose key no longer holds is deleted, and its socket
+  // told; false then
+  const holds = (login: Login, user: UserRow | null): boolean => {
+    if (user !== null && loginHolds(deps.adminKeys, login, user)) return true;
+    endLogin(login);
+    return false;
+  };
+  const endLogin = (login: Login) =>
+    transact(deps.db, () => {
+      deps.logins.delete(login.id);
+      return {
+        result: undefined,
+        events: [loginRevoked(login.userId, login.id)],
+      };
+    });
   const visibleProjectIds = (userId: string): string[] | null => {
     const user = deps.users.byId(userId);
     if (user === null || user.disabled) return null;
@@ -172,10 +203,7 @@ export function auth(deps: AuthDeps): Auth {
           projectIds: key.projectIds,
         });
         if (principal === null) return nobody;
-        if (
-          !principal.mustChangePassword &&
-          (key.lastUsedAt === null || now - key.lastUsedAt >= MINUTE_MS)
-        ) {
+        if (key.lastUsedAt === null || now - key.lastUsedAt >= MINUTE_MS) {
           deps.keys.touch(key.id, now);
         }
         return { principal, setCookie: null };
@@ -186,16 +214,11 @@ export function auth(deps: AuthDeps): Auth {
       if (login === null) return nobody;
       const now = deps.clock();
       if (login.expiresAt <= now) {
-        transact(deps.db, () => {
-          deps.logins.delete(login.id);
-          return {
-            result: undefined,
-            events: [loginRevoked(login.userId, login.id)],
-          };
-        });
+        endLogin(login);
         return nobody;
       }
       const user = deps.users.byId(login.userId);
+      if (login.keyDigest !== null && !holds(login, user)) return nobody;
       const principal = principalOf(user, { kind: "login", id: login.id });
       if (principal === null) return nobody;
       visit(user!, now);
@@ -207,9 +230,24 @@ export function auth(deps: AuthDeps): Auth {
       return { principal, setCookie };
     },
     refresh(principal) {
+      const via = principal.via;
+      if (via.kind === "login") {
+        // the socket may outlive its row, so the row decides, not the bus
+        const login = deps.logins.byId(via.id);
+        if (login === null || login.userId !== principal.userId) return null;
+        if (login.expiresAt <= deps.clock()) {
+          endLogin(login);
+          return null;
+        }
+        if (login.keyDigest !== null) {
+          const user = deps.users.byId(login.userId);
+          if (!holds(login, user)) return null;
+        }
+      }
       return current(principal.userId, principal.via);
     },
-    open(user) {
+    held: (loginId) => deps.logins.byId(loginId) !== null,
+    open(user, keyDigest) {
       const now = deps.clock();
       const token = newToken();
       const login = deps.logins.create({
@@ -217,7 +255,9 @@ export function auth(deps: AuthDeps): Auth {
         tokenHash: sha256(token),
         now,
         expiresAt: now + LOGIN_TTL_MS,
+        keyDigest,
       });
+      deps.users.setSignedIn(user.id, now);
       return { login, setCookie: withToken(token) };
     },
     close(loginId) {
@@ -230,6 +270,36 @@ export function auth(deps: AuthDeps): Auth {
         return {
           result: gone.length,
           events: gone.map((login) => loginRevoked(login.userId, login.id)),
+        };
+      });
+    },
+    checkKeyLogins() {
+      // one file read per user, however many logins and passkeys they hold
+      const digests = new Map<string, string | null>();
+      const keys = {
+        digestOf: (username: string) => {
+          if (!digests.has(username)) {
+            digests.set(username, deps.adminKeys.digestOf(username));
+          }
+          return digests.get(username)!;
+        },
+      };
+      const dead = (held: { userId: string; keyDigest: string | null }) => {
+        const user = deps.users.byId(held.userId);
+        return user === null || !loginHolds(keys, held, user);
+      };
+      const ended = deps.logins.keyLogins().filter(dead);
+      // a passkey added from a key login ends with that key, as the login
+      const passkeys = deps.passkeys.keyPasskeys().filter(dead);
+      if (ended.length === 0 && passkeys.length === 0) {
+        return { logins: 0, passkeys: 0 };
+      }
+      return transact(deps.db, () => {
+        for (const login of ended) deps.logins.delete(login.id);
+        deps.passkeys.delete(passkeys.map((p) => p.id));
+        return {
+          result: { logins: ended.length, passkeys: passkeys.length },
+          events: ended.map((login) => loginRevoked(login.userId, login.id)),
         };
       });
     },
@@ -255,9 +325,6 @@ export function auth(deps: AuthDeps): Auth {
       }
       const user = deps.users.byId(key.userId);
       if (user === null || user.disabled) throw new Forbidden();
-      if (user.mustChangePassword) {
-        throw new Forbidden("change your password first");
-      }
       projectOf(principal, projectId);
     },
     visibleProjectIds,

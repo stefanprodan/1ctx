@@ -6,20 +6,22 @@
 // at its one model, every MCP server at the fake MCP, no key is named,
 // web access is off (the `web` row's mode, which gates webfetch and
 // websearch) and search has no provider, and the automations are
-// suspended so a run's load never depends on the hour. A database
-// holding repositories or credentials is refused, since a turn could
-// reach their hosts.
+// suspended so a run's load never depends on the hour. Each user named
+// in the run's logins gets one login row, whose token the driver sends.
+// A database holding repositories or credentials is refused, since a
+// turn could reach their hosts.
 
 import type { Database } from "bun:sqlite";
+import { type Logins, mintLogins, unminted } from "./logins.ts";
 import { FAKE } from "./shapes.ts";
 
 export type FenceOptions = {
   modelUrl: string;
   mcpUrl: (server: string) => string;
-  // every user's password hash, so the run can sign them in
-  passwordHash?: string;
-  // the time written as the automations' suspension
+  // the time written as the automations' suspension and the logins
   now?: number;
+  // token hashes by username, one login each
+  logins?: Logins;
 };
 
 export type FenceReport = {
@@ -57,6 +59,7 @@ export function fence(db: Database, o: FenceOptions): FenceReport {
     automations: 0,
     users: 0,
   };
+  const now = o.now ?? Date.now();
   db.transaction(() => {
     report.providers = db
       .query("update providers set base_url = ?, key_name = null")
@@ -85,18 +88,14 @@ export function fence(db: Database, o: FenceOptions): FenceReport {
       .query(
         "update automations set suspended_at = ?, next_at = null where suspended_at is null",
       )
-      .run(o.now ?? Date.now()).changes;
-    if (o.passwordHash !== undefined) {
-      report.users = db
-        .query("update users set password_hash = ?, must_change_password = 0")
-        .run(o.passwordHash).changes;
-    }
+      .run(now).changes;
+    report.users = mintLogins(db, o.logins ?? {}, now);
   })();
   return report;
 }
 
 // what the fence promised, read back: every provider and server on the
-// fakes, every automation suspended, the web tools off
+// fakes, every automation suspended, the web tools off, the logins open
 export function fenced(db: Database, o: FenceOptions): string[] {
   const wrong: string[] = [];
   for (const p of db
@@ -125,5 +124,30 @@ export function fenced(db: Database, o: FenceOptions): string[] {
     )
     .get()!.n;
   if (web > 0) wrong.push(`web access or search on (${web} rows)`);
+  const missing = unminted(db, o.logins ?? {}, o.now ?? Date.now());
+  if (missing.length > 0) wrong.push(`${missing.length} logins not minted`);
   return wrong;
+}
+
+// the checkout that serves the run migrates its clone before the fence
+// mints, so a migration that deletes logins cannot void the run's
+export function migrateWith(checkout: string, path: string): string[] {
+  const p = Bun.spawnSync(
+    [
+      "bun",
+      "--eval",
+      `const { open } = await import("./src/server/db/index.ts");
+       const o = open(process.env.LOAD_MIGRATE_DB);
+       o.db.close();
+       console.log(JSON.stringify(o.migrations));`,
+    ],
+    { cwd: checkout, env: { ...process.env, LOAD_MIGRATE_DB: path } },
+  );
+  if (p.exitCode !== 0) {
+    throw new Error(
+      `migrating with ${checkout}: ${p.stderr.toString().trim()}`,
+    );
+  }
+  const lines = p.stdout.toString().trim().split("\n");
+  return JSON.parse(lines.at(-1) ?? "[]") as string[];
 }

@@ -3,15 +3,14 @@
 //
 // An app with email on and its sender stopped, so a test says when an
 // email goes out: the admin signed in, and a member with a real address
-// whose links a test asks for, sends and uses.
+// whose links and codes a test asks for, sends and uses.
 
 import { expect } from "bun:test";
 import type { UserRow } from "../../src/server/users/index.ts";
-import type { LinkResponse } from "../../src/shared/api/access.ts";
 import type { PutSmtpRequest } from "../../src/shared/api/smtp.ts";
 import {
   collectLogs,
-  hashPassword,
+  ORIGIN,
   type TestApp,
   type TestClient,
   testApp,
@@ -28,8 +27,6 @@ export const SMTP: PutSmtpRequest = {
   publicAddress: "https://1ctx.example.test",
 };
 
-export const MARIA_PASSWORD = "maria-first-pw";
-
 export type EmailApp = {
   app: TestApp;
   admin: TestClient;
@@ -39,8 +36,18 @@ export type EmailApp = {
   send(): Promise<number>;
   // the token in the newest email that carried one
   token(): string;
-  // what GET /api/links/:token says of a token, always a 200
-  read(token: string): Promise<LinkResponse["link"]>;
+  // the code in the newest email that carried one
+  code(): string;
+  // the link page's answer to GET, or HEAD, of a token
+  page(token: string, method?: "GET" | "HEAD"): Response;
+  // whether the link page offers the token's Sign in button
+  live(token: string): boolean;
+  // asks as a browser: the client's jar keeps its challenge
+  ask(client: TestClient, email?: string): Promise<Response>;
+  // a code from the browser, for maria's address unless named
+  sendCode(client: TestClient, code: string, email?: string): Promise<Response>;
+  // the link page's form posted as a browser posts it from that page
+  use(client: TestClient, token: string): Promise<Response>;
   // the outbox rows of a user, queued or not
   outbox(userId: string): { kind: string; status: string }[];
   // the user's links: whether a token was minted, and used
@@ -48,16 +55,24 @@ export type EmailApp = {
 };
 
 export async function emailApp(
-  options: { email?: boolean; mustChange?: boolean } = {},
+  options: {
+    email?: boolean;
+    unlistable?: (kind: string) => boolean;
+    // more secrets, kept by reference so a test may change one
+    secrets?: Record<string, string>;
+  } = {},
 ): Promise<EmailApp> {
   const logs = collectLogs();
+  const secrets = options.secrets ?? {};
+  secrets["email-relay"] = "secret-pass";
   const app = await testApp({
-    secrets: { "email-relay": "secret-pass" },
+    secrets,
     logFactory: logs.logFactory,
+    unlistable: options.unlistable,
   });
   await app.email.stop();
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await admin.signIn("admin")).status).toBe(200);
   if (options.email !== false) {
     const put = await admin.call("PUT", "/api/admin/smtp", { body: SMTP });
     expect(put.status).toBe(200);
@@ -68,8 +83,6 @@ export async function emailApp(
     email: "maria@example.test",
     role: "member",
     tz: "Europe/Bucharest",
-    passwordHash: await hashPassword(MARIA_PASSWORD),
-    mustChangePassword: options.mustChange ?? false,
     now: app.now.value,
   });
   return {
@@ -85,11 +98,27 @@ export async function emailApp(
       }
       throw new Error("no email carried a link");
     },
-    async read(token) {
-      const res = await app.client().call("GET", `/api/links/${token}`);
-      expect(res.status).toBe(200);
-      return ((await res.json()) as LinkResponse).link;
+    code() {
+      for (const { message } of [...app.emailSender.sent].reverse()) {
+        const found = /code: (\d{6})$/.exec(message.subject);
+        if (found !== null) return found[1]!;
+      }
+      throw new Error("no email carried a code");
     },
+    page: (token, method = "GET") =>
+      app.linkPage(new Request(`${ORIGIN}/link/${token}`, { method })),
+    live: (token) =>
+      app.linkPage(new Request(`${ORIGIN}/link/${token}`)).status === 200,
+    ask: (client, email = "maria@example.test") =>
+      client.call("POST", "/api/login/link", { body: { email } }),
+    sendCode: (client, code, email = "maria@example.test") =>
+      client.call("POST", "/api/login/code", { body: { email, code } }),
+    use: (client, token) =>
+      client.call("POST", `/api/links/${token}`, {
+        form: {},
+        origin: "null",
+        headers: { "sec-fetch-site": "same-origin" },
+      }),
     outbox: (userId) =>
       app.db
         .query<{ kind: string; status: string }, [string]>(

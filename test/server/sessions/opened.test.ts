@@ -223,14 +223,12 @@ describe("opened file storage and routes", () => {
           fullName: "Outsider",
           email: "outsider@example.com",
           role: "member",
-          passwordHash: chat.app.users.byId(chat.memberId)!.passwordHash,
-          mustChangePassword: false,
           now: chat.app.now.value,
         });
         const outsiderClient = chat.app.client();
-        expect(
-          (await outsiderClient.login(outsider.username, "pw")).status,
-        ).toBe(200);
+        expect((await outsiderClient.signIn(outsider.username)).status).toBe(
+          200,
+        );
         expect(
           (
             await outsiderClient.call(

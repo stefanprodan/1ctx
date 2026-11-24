@@ -159,6 +159,29 @@ export async function readBody(req: Request, max = MAX_BODY): Promise<string> {
   return new TextDecoder().decode(await readBytes(req, max));
 }
 
+// a plain HTML form's body, as a page that runs no script posts it
+export function isForm(req: Request): boolean {
+  return /^application\/x-www-form-urlencoded(\s*;.*)?$/i.test(
+    req.headers.get("content-type") ?? "",
+  );
+}
+
+// a form's fields, each at most once, read with the same cap as JSON
+export async function formBody(
+  req: Request,
+  max = MAX_BODY,
+): Promise<Record<string, string>> {
+  if (!isForm(req)) throw new BadRequest("body must be a form");
+  const text = await readBody(req, max);
+  // a map, so a field named __proto__ is a field like any other
+  const out = new Map<string, string>();
+  for (const [name, value] of new URLSearchParams(text)) {
+    if (out.has(name)) throw new BadRequest(`${name} must appear once`);
+    out.set(name, value);
+  }
+  return Object.fromEntries(out);
+}
+
 export async function jsonBody(req: Request, max = MAX_BODY): Promise<unknown> {
   const text = await readBody(req, max);
   try {

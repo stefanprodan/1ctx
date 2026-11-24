@@ -12,7 +12,7 @@ export function statements(db: Database) {
   const q = (sql: string) => db.prepare(sql);
   return {
     user: q(
-      `insert into users (id, username, full_name, email, about, role, password_hash, disabled, must_change_password, created_at, tz, agent_id) values (?, ?, ?, ?, '', ?, ?, 0, 0, ?, ?, ?)`,
+      `insert into users (id, username, full_name, email, about, role, disabled, created_at, tz, agent_id) values (?, ?, ?, ?, '', ?, 0, ?, ?, ?)`,
     ),
     provider: q(
       `insert into providers (id, name, wire, base_url, key_name, created_at) values (?, ?, ?, ?, ?, ?)`,

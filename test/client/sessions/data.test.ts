@@ -257,7 +257,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
   pushed = [];
   Object.defineProperty(globalThis, "location", {
@@ -1703,7 +1702,6 @@ describe("the sessions entity", () => {
       username: "ana",
       fullName: "Ana",
       role: "member",
-      mustChangePassword: false,
     };
 
     expect(session.value).toBeNull();
@@ -2310,7 +2308,6 @@ describe("answers held for the way back", () => {
       username: "ana",
       fullName: "Ana",
       role: "member",
-      mustChangePassword: false,
     };
     let seen: unknown = "unset";
     answer = () => {

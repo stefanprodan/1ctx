@@ -24,7 +24,7 @@ async function setup() {
       : fake.fetcher(input, init)) as typeof fetch;
   const app = await testApp({ fetcher });
   const client = app.client();
-  await client.login("admin", "hunter2-test");
+  await client.signIn("admin");
   const provider = async (name: string, wire: string, baseUrl: string) =>
     (
       await (

@@ -104,6 +104,9 @@ const EXPECTED_IDS = [
   "0089-project-backend",
   "0090-sandbox-variant",
   "0091-project-variant",
+  "0092-admin-keys",
+  "0093-email-codes",
+  "0094-passkeys",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -137,6 +140,16 @@ const LATER_COLUMNS = [
   "cleared_at",
   "backend",
   "variant",
+  "signed_in_at",
+  "key_digest",
+  "code_hash",
+  "code_tries",
+  "ask_hash",
+  "link_id",
+  // dropped by 0092 and 0093, so held only by rows from before them
+  "password_hash",
+  "must_change_password",
+  "asked",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -215,6 +228,13 @@ describe("migrations", () => {
   });
 });
 
+// users held a password hash until 0092
+const hashed = (db: Database) =>
+  db
+    .query<{ name: string }, []>("select name from pragma_table_info('users')")
+    .all()
+    .some((column) => column.name === "password_hash");
+
 describe("the schema", () => {
   // a fresh schema with a user, a project, an agent, a session and two
   // sends, each with its user message and its answer
@@ -232,9 +252,12 @@ describe("the schema", () => {
     const [nameColumn, nameValue] = named
       ? [", provider_name", ", 'prov'"]
       : ["", ""];
+    const [hashColumn, hashValue] = hashed(db)
+      ? [", password_hash", ", 'x'"]
+      : ["", ""];
     db.exec(`
-      insert into users (id, username, full_name, email, role, password_hash, created_at)
-        values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
+      insert into users (id, username, full_name, email, role${hashColumn}, created_at)
+        values ('u', 'user', 'User', 'user@example.com', 'member'${hashValue}, 0);
       insert into projects (id, kind, name, owner_id, created_at)
         values ('p', 'personal', 'personal', 'u', 0);
       insert into providers (id, name, wire, base_url, created_at)
@@ -1137,28 +1160,25 @@ describe("the schema", () => {
     db.close();
   });
 
-  test("a user starts enabled with an unforced password and a unique email", () => {
+  test("a user starts enabled, never signed in, with a unique email", () => {
     const db = seed();
     expect(
-      db
-        .query(
-          "select disabled, must_change_password from users where id = 'u'",
-        )
-        .get(),
-    ).toEqual({ disabled: 0, must_change_password: 0 });
+      db.query("select disabled, signed_in_at from users where id = 'u'").get(),
+    ).toEqual({ disabled: 0, signed_in_at: null });
+    expect(hashed(db)).toBe(false);
     expect(() =>
       db
         .query(
-          `insert into users (id, username, full_name, email, role, password_hash, created_at)
-           values ('v', 'other', 'Other', 'user@example.com', 'member', 'x', 0)`,
+          `insert into users (id, username, full_name, email, role, created_at)
+           values ('v', 'other', 'Other', 'user@example.com', 'member', 0)`,
         )
         .run(),
     ).toThrow();
     expect(() =>
       db
         .query(
-          `insert into users (id, username, full_name, role, password_hash, created_at)
-           values ('w', 'noemail', 'No Email', 'member', 'x', 0)`,
+          `insert into users (id, username, full_name, role, created_at)
+           values ('w', 'noemail', 'No Email', 'member', 0)`,
         )
         .run(),
     ).toThrow();
@@ -1753,21 +1773,12 @@ describe("the schema", () => {
       ).toEqual([
         "SEARCH email_outbox USING INDEX email_outbox_due (status=? AND next_attempt_at<?)",
       ]);
-      for (const sql of [
-        `delete from email_outbox where user_id = ? and status = 'queued'
-         and kind in (?, ?) and asked = 0`,
-        `update email_outbox set status = 'dropped' where user_id = ?
-         and status = 'queued' and kind in (?, ?) and asked = 1`,
-      ]) {
-        expect(plans(sql, "u", "reset", "signin")).toEqual([
-          "SEARCH email_outbox USING INDEX email_outbox_queued (user_id=? AND kind=?)",
-        ]);
-      }
       expect(
         plans(
-          `select count(*) as n from email_outbox
-           where user_id = ? and kind = ? and status = 'queued'`,
+          `delete from email_outbox where user_id = ? and status = 'queued'
+           and kind in (?, ?)`,
           "u",
+          "reset",
           "signin",
         ),
       ).toEqual([
@@ -1782,25 +1793,6 @@ describe("the schema", () => {
         ),
       ).toEqual([
         "SEARCH email_outbox USING COVERING INDEX email_outbox_automation (automation_id=? AND created_at>?)",
-      ]);
-      expect(
-        plans(
-          `select count(*) from email_outbox
-           where asked = 1 and user_id = ? and created_at >= ?`,
-          "u",
-          0,
-        ),
-      ).toEqual([
-        "SEARCH email_outbox USING COVERING INDEX email_outbox_asked (user_id=? AND created_at>?)",
-      ]);
-      expect(
-        plans(
-          `select count(*) from email_outbox
-           where asked = 1 and created_at >= ?`,
-          0,
-        ),
-      ).toEqual([
-        "SEARCH email_outbox USING COVERING INDEX email_outbox_asked_at (created_at>?)",
       ]);
       // an alert row goes with its automation, whose cap is gone with it
       db.exec(`
@@ -2231,6 +2223,289 @@ describe("the schema", () => {
       expect(() =>
         db.query("update projects set variant = 'node'").run(),
       ).toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0092 drops the passwords and every login, link and queued link email", () => {
+    const db = seed(MIGRATIONS.slice(0, 91));
+    try {
+      db.exec(`
+        insert into users (id, username, full_name, email, role,
+            password_hash, must_change_password, created_at)
+          values ('m', 'forced', 'Forced', 'forced@example.com', 'member',
+            'x', 1, 0),
+            ('v', 'visitor', 'Visitor', 'visitor@example.com', 'member',
+            'x', 0, 0),
+            ('n', 'never', 'Never', 'never@example.com', 'member', 'x', 0, 0);
+        insert into logins (id, user_id, token_hash, created_at,
+            last_seen_at, expires_at)
+          values ('lu', 'u', 'hu', 1, 50, 900), ('lm', 'm', 'hm', 1, 60, 900);
+        insert into visits (user_id, day, at)
+          values ('u', '2026-11-01', 40), ('v', '2026-11-02', 70);
+        insert into access_keys (id, user_id, name, token_hash, scope,
+            created_at, expires_at)
+          values ('ku', 'u', 'laptop', 'tu', 'write', 1, 900),
+            ('km', 'm', 'laptop', 'tm', 'write', 1, 900);
+        insert into user_links (id, purpose, user_id, created_at, expires_at)
+          values ('reset', 'reset', 'u', 1, 900),
+            ('signin', 'signin', 'u', 1, 900),
+            ('invite', 'invite', 'n', 1, 900);
+        insert into email_outbox (id, kind, user_id, message_id, asked,
+            status, next_attempt_at, created_at, updated_at)
+          values ('queued-reset', 'reset', 'u', 'a', 1, 'queued', 0, 1, 1),
+            ('sent-reset', 'reset', 'u', 'b', 1, 'sent', 0, 1, 1),
+            ('queued-signin', 'signin', 'u', 'c', 1, 'queued', 0, 1, 1),
+            ('sent-signin', 'signin', 'u', 'f', 1, 'sent', 0, 1, 1),
+            ('queued-invite', 'invite', 'n', 'd', 0, 'queued', 0, 1, 1),
+            ('queued-notice', 'notice', 'u', 'g', 0, 'queued', 0, 1, 1);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0092-admin-keys"));
+      expect(hashed(db)).toBe(false);
+      // from the logins and visits before they went; null with neither
+      expect(
+        db.query("select id, signed_in_at from users order by id").all(),
+      ).toEqual([
+        { id: "m", signed_in_at: 60 },
+        { id: "n", signed_in_at: null },
+        { id: "u", signed_in_at: 50 },
+        { id: "v", signed_in_at: 70 },
+      ]);
+      expect(db.query("select id from logins").all()).toEqual([]);
+      expect(db.query("select id from user_links").all()).toEqual([]);
+      expect(db.query("select id from access_keys order by id").all()).toEqual([
+        { id: "km" },
+        { id: "ku" },
+      ]);
+      expect(db.query("select id from email_outbox order by id").all()).toEqual(
+        [{ id: "queued-notice" }, { id: "sent-reset" }, { id: "sent-signin" }],
+      );
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      // the kind stays for the sent history
+      db.exec(`insert into email_outbox (id, kind, user_id, message_id,
+          status, next_attempt_at, created_at, updated_at)
+        values ('later', 'reset', 'u', 'e', 'sent', 0, 2, 2)`);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0092's key login check reads only key logins by its index", () => {
+    const db = seed();
+    try {
+      const plan = db
+        .query<{ detail: string }, []>(
+          "explain query plan select id from logins where key_digest is not null",
+        )
+        .all()
+        .map((row) => row.detail);
+      expect(plan.join(" ")).toContain("logins_key");
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0093 gives links their codes, counts asks apart and drops the asked mark", () => {
+    const db = seed(MIGRATIONS.slice(0, 92));
+    try {
+      db.exec(`
+        insert into user_links (id, purpose, user_id, created_at, expires_at,
+            used_at)
+          values ('invite', 'invite', 'u', 1, 900, null),
+            ('used', 'signin', 'u', 1, 900, 5);
+        insert into email_outbox (id, kind, user_id, message_id, asked,
+            status, next_attempt_at, created_at, updated_at)
+          values ('asked', 'signin', 'u', 'a', 1, 'sent', 0, 1, 1),
+            ('alert', 'notice', 'u', 'b', 0, 'queued', 0, 1, 1);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0093-email-codes"));
+      expect(
+        db
+          .query(
+            "select id, code_hash, code_tries, ask_hash from user_links order by id",
+          )
+          .all(),
+      ).toEqual([
+        { id: "invite", code_hash: null, code_tries: 0, ask_hash: null },
+        { id: "used", code_hash: null, code_tries: 0, ask_hash: null },
+      ]);
+      expect(
+        db.query("select id, link_id from email_outbox order by id").all(),
+      ).toEqual([
+        { id: "alert", link_id: null },
+        { id: "asked", link_id: null },
+      ]);
+      expect(
+        db
+          .query<{ name: string }, []>(
+            "select name from pragma_table_info('email_outbox')",
+          )
+          .all()
+          .map((column) => column.name),
+      ).not.toContain("asked");
+      // sign-in links stack up; one unused invite per user
+      db.exec(`
+        insert into user_links (id, purpose, user_id, created_at, expires_at)
+          values ('s1', 'signin', 'u', 2, 900), ('s2', 'signin', 'u', 2, 900);
+        insert into link_asks (user_id, challenge_hash, asked_at)
+          values ('u', 'c', 2);
+      `);
+      expect(() =>
+        db.exec(`insert into user_links (id, purpose, user_id, created_at,
+          expires_at) values ('i2', 'invite', 'u', 2, 900)`),
+      ).toThrow();
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      const plans = (sql: string, ...args: (string | number)[]) =>
+        db
+          .query<{ detail: string }, (string | number)[]>(
+            `explain query plan ${sql}`,
+          )
+          .all(...args)
+          .map((row) => row.detail)
+          .join(" | ");
+      // every read and write of the codes and the caps searches an index
+      const searched: [string, (string | number)[], string][] = [
+        [
+          `select id, code_hash, ask_hash is not null as asked from user_links
+           where user_id = ?1 and used_at is null and expires_at > ?2
+             and code_hash is not null
+             and (ask_hash = ?3 or (ask_hash is null and code_tries < ?4))`,
+          ["u", 0, "c", 5],
+          "user_links_user",
+        ],
+        [
+          `select count(*) as n from user_links
+           where user_id = ? and ask_hash = ? and used_at is not null
+             and code_tries < ?`,
+          ["u", "c", 5],
+          "user_links_user (user_id=? AND ask_hash=?)",
+        ],
+        [
+          `update user_links set token_hash = ?, code_hash = ?, expires_at = ?
+           where id = ? and user_id = ? and used_at is null`,
+          ["t", "h", 1, "s1", "u"],
+          "sqlite_autoindex_user_links_1 (id=?)",
+        ],
+        [
+          `update user_links set used_at = ?1 where id = ?2 and used_at is null
+             and expires_at > ?1
+             and user_id in (select id from users where disabled = 0)`,
+          [1, "s1"],
+          "sqlite_autoindex_user_links_1 (id=?)",
+        ],
+        [
+          "delete from user_links where user_id = ? and purpose = ? and used_at is null",
+          ["u", "invite"],
+          "user_links_invite",
+        ],
+        [
+          `select count(*) as n from link_asks
+           where user_id = ? and challenge_hash = ? and asked_at > ?`,
+          ["u", "c", 0],
+          "link_asks_user (user_id=? AND challenge_hash=? AND asked_at>?)",
+        ],
+        [
+          "select count(*) as n from link_asks where user_id = ? and asked_at > ?",
+          ["u", 0],
+          "link_asks_user (user_id=?)",
+        ],
+        [
+          `select count(*) as n from link_asks
+           where challenge_hash = ? and asked_at > ?`,
+          ["c", 0],
+          "link_asks_challenge (challenge_hash=? AND asked_at>?)",
+        ],
+        [
+          "select count(*) as n from link_asks where asked_at > ?",
+          [0],
+          "link_asks_time (asked_at>?)",
+        ],
+        [
+          "delete from link_asks where asked_at <= ?",
+          [0],
+          "link_asks_time (asked_at<?)",
+        ],
+        [
+          "delete from user_links where expires_at <= ?",
+          [0],
+          "user_links_expiry (expires_at<?)",
+        ],
+      ];
+      for (const [sql, args, index] of searched) {
+        expect(plans(sql, ...args)).toContain(index);
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0094 adds passkeys and their challenges, gone with their user and login", () => {
+    const db = seed(MIGRATIONS.slice(0, 93));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0094-passkeys"));
+      db.exec(`
+        insert into logins (id, user_id, token_hash, created_at,
+            last_seen_at, expires_at)
+          values ('l', 'u', 'h', 1, 1, 900);
+        insert into passkeys (id, user_id, rp_id, origin, credential_id,
+            public_key, alg, sign_count, transports, device, created_at)
+          values ('pk', 'u', '1ctx.test', 'https://1ctx.test', 'c',
+            x'00', -7, 0, '[]', 'Passkey', 1);
+        insert into passkey_challenges (id, challenge_hash, purpose,
+            login_id, rp_id, origin, expires_at)
+          values ('a', 'ha', 'add', 'l', '1ctx.test', 'https://1ctx.test', 9),
+            ('s', 'hs', 'sign_in', null, '1ctx.test', 'https://1ctx.test', 9);
+      `);
+      // ES256 and RS256 only; an add names its login and a sign-in none
+      const refused = [
+        `insert into passkeys (id, user_id, rp_id, origin, credential_id,
+           public_key, alg, sign_count, transports, device, created_at)
+         values ('p2', 'u', 'r', 'o', 'c2', x'00', -8, 0, '[]', 'P', 1)`,
+        `insert into passkeys (id, user_id, rp_id, origin, credential_id,
+           public_key, alg, sign_count, transports, device, created_at)
+         values ('p3', 'u', 'r', 'o', 'c', x'00', -7, 0, '[]', 'P', 1)`,
+        `insert into passkey_challenges (id, challenge_hash, purpose,
+           login_id, rp_id, origin, expires_at)
+         values ('x', 'hx', 'add', null, 'r', 'o', 9)`,
+        `insert into passkey_challenges (id, challenge_hash, purpose,
+           login_id, rp_id, origin, expires_at)
+         values ('y', 'hy', 'sign_in', 'l', 'r', 'o', 9)`,
+      ];
+      for (const sql of refused) expect(() => db.exec(sql)).toThrow();
+      db.exec("delete from logins where id = 'l'");
+      expect(
+        db.query("select id from passkey_challenges order by id").all(),
+      ).toEqual([{ id: "s" }]);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      const plans = (sql: string, ...args: (string | number)[]) =>
+        db
+          .query<{ detail: string }, (string | number)[]>(
+            `explain query plan ${sql}`,
+          )
+          .all(...args)
+          .map((row) => row.detail)
+          .join(" | ");
+      const searched: [string, (string | number)[], string][] = [
+        [
+          "select * from passkeys where user_id = ? order by created_at, id",
+          ["u"],
+          "passkeys_user (user_id=?)",
+        ],
+        [
+          "select * from passkeys where key_digest is not null",
+          [],
+          "passkeys_key",
+        ],
+        [
+          "delete from passkey_challenges where expires_at <= ?",
+          [0],
+          "passkey_challenges_expiry (expires_at<?)",
+        ],
+      ];
+      for (const [sql, args, index] of searched) {
+        expect(plans(sql, ...args)).toContain(index);
+      }
     } finally {
       db.close();
     }
@@ -3666,6 +3941,10 @@ describe("the schema", () => {
               images: _________________,
               mcp_on: __________________,
               cleared_at: ___________________,
+              signed_in_at: ____________________,
+              // dropped by 0092
+              password_hash: _____________________,
+              must_change_password: ______________________,
               ...rest
             }) => rest,
           ),
@@ -4800,6 +5079,9 @@ describe("project channel migrations", () => {
       "0089-project-backend",
       "0090-sandbox-variant",
       "0091-project-variant",
+      "0092-admin-keys",
+      "0093-email-codes",
+      "0094-passkeys",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -5028,6 +5310,9 @@ describe("project channel migrations", () => {
           "0089-project-backend",
           "0090-sandbox-variant",
           "0091-project-variant",
+          "0092-admin-keys",
+          "0093-email-codes",
+          "0094-passkeys",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5205,6 +5490,9 @@ describe("project channel migrations", () => {
         "0089-project-backend",
         "0090-sandbox-variant",
         "0091-project-variant",
+        "0092-admin-keys",
+        "0093-email-codes",
+        "0094-passkeys",
       ]);
       expect(
         db

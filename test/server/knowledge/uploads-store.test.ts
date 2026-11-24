@@ -113,8 +113,6 @@ function anotherUser(ctx: Fixture) {
       fullName: "Other",
       email: `${newId()}@example.com`,
       role: "member",
-      passwordHash: "unused",
-      mustChangePassword: false,
       now: 0,
     },
   );

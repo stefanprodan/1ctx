@@ -20,7 +20,6 @@ import type { FeedRow } from "../../src/shared/api/sessions.ts";
 import { PROTOCOL, type SocketEvent } from "../../src/shared/socket.ts";
 import {
   collectLogs,
-  hashPassword,
   ORIGIN,
   type TestClient,
   VERSION,
@@ -178,36 +177,32 @@ describe("the socket", () => {
       fullName: "Drew Doe",
       email: "drew@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
-    const locked = chat.app.createUser({
+    const teammate = chat.app.createUser({
       username: "erin",
       fullName: "Erin Doe",
       email: "erin@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: true,
       now: chat.app.now.value,
     });
     chat.app.db
       .query(
         "insert into memberships (project_id, user_id, created_at) values (?, ?, ?)",
       )
-      .run(rowTeam, locked.id, chat.app.now.value);
+      .run(rowTeam, teammate.id, chat.app.now.value);
     const drew = chat.app.client();
-    await drew.login("drew", "pw");
+    await drew.signIn("drew");
     const erin = chat.app.client();
-    await erin.login("erin", "pw");
+    await erin.signIn("erin");
     const conns = {
       member: await connection(chat, chat.member),
       admin: await connection(chat, chat.admin),
       outsider: await connection(chat, drew),
-      locked: await connection(chat, erin),
+      teammate: await connection(chat, erin),
     };
     for (const conn of Object.values(conns)) chat.app.socket.open(conn);
-    expect(conns.locked.data.projects.has(rowTeam)).toBe(true);
+    expect(conns.teammate.data.projects.has(rowTeam)).toBe(true);
     const team = await startChat(chat, "team chat", chat.member, rowTeam);
     await finish(team.script);
     const personal = await startChat(chat, "own chat");
@@ -229,7 +224,9 @@ describe("the socket", () => {
       new Set([team.sessionId, personal.sessionId]),
     );
     expect(seen(conns.outsider)).toEqual([]);
-    expect(seen(conns.locked)).toEqual([]);
+    expect(new Set(seen(conns.teammate).map(([id]) => id))).toEqual(
+      new Set([team.sessionId]),
+    );
     close(chat, ...Object.values(conns));
   });
 
@@ -313,7 +310,7 @@ describe("the socket", () => {
         expect(frames(admin, "knowledgeEmptied")).toEqual([]);
 
         const activeClient = chat.app.client();
-        await activeClient.login("casey", "pw");
+        await activeClient.signIn("casey");
         const active = await connection(chat, activeClient);
         chat.app.socket.open(active);
         const logout = await chat.member.call("POST", "/api/logout");
@@ -396,56 +393,6 @@ describe("the socket", () => {
     expect(frames(idle, "session")).toHaveLength(2);
     close(chat, watching, idle);
   });
-
-  test.serial(
-    "a locked connection cannot watch a session or hear project changes",
-    async () => {
-      const chat = await chatApp();
-      const { script, sessionId } = await startChat(chat);
-      chat.app.users.setMustChangePassword(chat.memberId, true);
-      const conn = await connection(chat, chat.member);
-      chat.app.socket.open(conn);
-
-      chat.app.socket.message(
-        conn,
-        JSON.stringify({ type: "watch", sessionId }),
-      );
-
-      expect(conn.data.watching).toBeNull();
-      expect(frames(conn, "watched")).toEqual([]);
-      transact(chat.app.db, () => ({
-        result: undefined,
-        events: [
-          {
-            type: "memory.changed" as const,
-            data: {
-              projectId: chat.projectId,
-              automationId: null,
-              revision: 1,
-            },
-          },
-        ],
-      }));
-      expect(frames(conn, "memory")).toEqual([]);
-      chat.app.knowledge.create(
-        chat.projectId,
-        {
-          kind: "user",
-          id: chat.memberId,
-          name: "casey",
-          sessionId: null,
-          origin: null,
-          keyName: null,
-        },
-        "locked.md",
-        "not sent to the locked tab",
-      );
-      expect(frames(conn, "knowledge")).toEqual([]);
-      await finish(script);
-      expect(frames(conn, "session")).toEqual([]);
-      close(chat, conn);
-    },
-  );
 
   test("content is rendered after the HTML clock interval", async () => {
     const chat = await chatApp();
@@ -866,35 +813,6 @@ describe("the envelope row read", () => {
     expect(conns.map((conn) => frames(conn, "session").length)).toEqual([
       1, 1, 0,
     ]);
-    socket.dispose();
-  });
-
-  test.serial("no read when every viewer must change their password", () => {
-    const reads: string[] = [];
-    const socket = socketArea({
-      version: "test",
-      log: silent,
-      refresh: (principal) => principal,
-      visibleProjectIds: () => [],
-      sessionProject: () => null,
-      live: () => [],
-      queue: () => ({ revision: 0, rows: [] }),
-      children: () => [],
-      drafts: () => [],
-      channelMeter: () => null,
-      envelopeRow(sessionId) {
-        reads.push(sessionId);
-        return null;
-      },
-    });
-    const conns = [memberConn("a", ["p"]), memberConn("b", ["p"])];
-    for (const conn of conns) {
-      conn.data.principal.mustChangePassword = true;
-      socket.open(conn);
-    }
-    changed("p");
-    expect(reads).toEqual([]);
-    expect(conns.map((conn) => frames(conn, "session"))).toEqual([[], []]);
     socket.dispose();
   });
 

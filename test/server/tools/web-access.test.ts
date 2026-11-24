@@ -217,10 +217,10 @@ test("bash names at most ten hosts and forwards the send's network caps", async 
 });
 
 test("tools routes expose access, None and the independent visual settings", async () => {
-  const app = await testApp({ adminPassword: "initial-password" });
+  const app = await testApp();
   const client = app.client();
   try {
-    expect((await client.login("admin", "initial-password")).status).toBe(200);
+    expect((await client.signIn("admin")).status).toBe(200);
     const first = (await (
       await client.call("GET", "/api/tools")
     ).json()) as ToolsResponse;
@@ -273,10 +273,10 @@ test("tools routes expose access, None and the independent visual settings", asy
 });
 
 test("tools PATCH refuses invalid names, fields, modes and domain lists", async () => {
-  const app = await testApp({ adminPassword: "initial-password" });
+  const app = await testApp();
   const client = app.client();
   try {
-    await client.login("admin", "initial-password");
+    await client.signIn("admin");
     const refusals: [string, Record<string, unknown>, string?][] = [
       ["datetime", { enabled: false }, "no such tool"],
       ["webfetch", { enabled: true }],

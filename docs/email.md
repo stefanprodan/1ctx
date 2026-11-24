@@ -4,7 +4,7 @@ Governs `src/server/email/`, `render/email.ts`: the instance's SMTP
 server, the outbox and the sender, an agent's email and an alert's, the
 admin's SMTP page under Config, and what the sign-in, link, users and
 profile pages show of email. The links themselves are in
-`docs/access.md`, the `email_user` tool in `docs/tools.md`.
+`docs/logins.md`, the `email_user` tool in `docs/tools.md`.
 
 ## The server
 
@@ -37,18 +37,24 @@ profile pages show of email. The links themselves are in
   `email.queued` event, so the sender wakes after the commit. Send test
   email is the one exception: it goes to the signed-in admin at once and
   answers `sent` or a failure word.
-- **A link email's row holds no text.** Its kind's `prepare` (from
-  `register()`) builds the email when the row is sent, so a retry never
-  carries an expired or stored link. The `reset`, `signin` and `invite`
-  kinds are access's links (`docs/access.md`); their `prepare` mints a
-  fresh token at every try and drops the row as `revoked` when the link
-  went since. `dropQueued()` drops a user's queued rows of a kind, as
-  when their links end.
+- **A link email's row holds no text, only its link's id** (`link_id`,
+  no foreign key). Its kind's `prepare` (from `register()`) builds the
+  email when the row is sent, so a retry never carries an expired or
+  stored link or code. The `signin` and `invite` kinds are access's
+  links (`docs/logins.md`); `reset` stays in the outbox's check for the
+  sent history and is no longer sent; their `prepare` mints a fresh
+  token and code for that link at every try and drops the row as
+  `revoked` when the link went or was used since. `dropQueued()`
+  deletes a user's queued rows of a kind, as when their links end.
 - **A `notice` row holds its text,** written when it is queued, since
-  it carries no link; its `prepare` adds the HTML.
-- **An account email is short plain text with the same paragraphs as
-  simple HTML.** Its subject is fixed words, never what a user typed,
-  and the names in it are escaped in HTML.
+  it carries no link: a sign-in by link or code, or a passkey added;
+  its `prepare` adds the HTML.
+- **A link email is one line of plain text,** markets' words with
+  1ctx's name: the subject "Your 1ctx sign-in code: 482913", the code's
+  digits whole in it and the body so the system offers them. A notice
+  is short plain text with the same paragraphs as simple HTML. A
+  subject is fixed words, never what a user typed, and the names in an
+  email are escaped in HTML.
 - **The sender is the scheduler's shape.** It starts only when the app
   is activated, wakes on `email.queued` and on a timer from the clock,
   and on shutdown takes no new row and waits for the one in flight. A
@@ -65,18 +71,15 @@ profile pages show of email. The links themselves are in
 - **Backoff is 1, 5 and 30 minutes, then failed.** A sent row becomes
   `sent` and is kept a day (`SENT_KEEP_MS`), so a daily cap counts it; a
   failed row keeps its word for 7 days. Neither keeps the text, and the
-  hourly sweep removes them. A dropped row is deleted, but an `asked`
-  one becomes `dropped`, with no text, and is kept a day like a sent
-  one, so the caps on asks count it. A chat's delete leaves its rows
-  with no session, so the project's cap keeps counting them.
+  hourly sweep removes them. A dropped row is deleted; the caps on asks
+  count `link_asks`, not rows. A chat's delete leaves its rows with no
+  session, so the project's cap keeps counting them.
 - **A kind's email may carry its own From name** (`fromName`, as
   "<agent> via 1ctx"); the address is always the server's.
-- **Link emails asked for at the sign-in page are capped,** 3 per user a
-  day and 50 per instance an hour, on rows marked `asked`; an admin's
-  links are not. A link whose email is still queued is live, though it
-  expired between tries, so an ask waits it out. The Monitor's Attention
-  shows "Link emails", "capped for this hour", while the instance's cap
-  holds and email is on.
+- **Asks at the sign-in page are capped** on access's `link_asks`
+  (`docs/logins.md`); an admin's invites are not. The Monitor's
+  Attention shows "Link emails", "capped for this hour", while the
+  instance's 50 asks an hour (`countAsks()`) hold and email is on.
 - **Delivery re-checks the recipient.** Just before SMTP the sender
   reads the user again and drops the row with a fixed word when they
   are gone, disabled or hold a placeholder address. A kind's `prepare`
@@ -115,9 +118,8 @@ profile pages show of email. The links themselves are in
   profile (`PUT /api/profile/email`). Each kind's `prepare` checks
   again at the send: `deleted` once the session is gone (its id set
   null; a check's alert has none and goes with its automation),
-  `no-access` when the user can no longer open the project or
-
-  must change their password, `opted-out` once they turned it off. The
+  `no-access` when the user can no longer open the project,
+  `opted-out` once they turned it off. The
   one check is `sessionPrepare()` in `frame.ts`.
 - **The email frames what the agent wrote** (`email/frame.ts`). The
   subject starts `[1ctx] `; an agent's From name is "<agent> via 1ctx",
@@ -155,11 +157,10 @@ profile pages show of email. The links themselves are in
   placeholder; a save clears its last result. The Users pages say "No
   real email" for a placeholder only while email is on (`emailOn` in
   `GET /api/users`).
-- **With email on an admin sends links, not passwords.** New user
-  offers Send an invite or Set a password; a user's page sends the
-  invite again while they must change their password, else a reset
-  link (`linkCardWords()`). The typed reset shows only when no email
-  reaches the user.
+- **With email on an admin sends invites.** New user offers Send an
+  invite or No invite; a user's page sends the invite again until the
+  user's first sign-in, only where email reaches them
+  (`inviteCardWords()`). Provisioning never invites.
 - **What agents email shows only with email on.** The profile's Email
   from agents switch shows while `emailOn` (in every profile answer);
   the Config board lists `email_user` only then. The SMTP page holds the
@@ -167,11 +168,9 @@ profile pages show of email. The links themselves are in
   Email switch only while the agents route lists `email` as switchable.
   The automation editor's Access step shows it then or while `emailOn`,
   live whatever the agent takes, since it also stops alert emails.
-- **The sign-in page offers its email links only with email on,**
-  and says the same after an ask whoever was named. The link page
-  (`/link/<token>`) is a `bare` route: drawn outside the shell whoever
-  is signed in, it names an account already signed in before its one
-  button replaces it.
+- **The sign-in page offers its email code only with email on,** and
+  says the same after an ask whoever was named. The link page
+  (`/link/<token>`) is the server's, never the app's (`docs/logins.md`).
 
 ## Words and logs
 

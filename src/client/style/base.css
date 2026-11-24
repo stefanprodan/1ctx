@@ -17,8 +17,9 @@
     display: none !important;
   }
 
+  /* the sign-in's code boxes keep their own large digits */
   @media (pointer: coarse) {
-    input,
+    input:not(.signin-box),
     textarea,
     select,
     [contenteditable] {

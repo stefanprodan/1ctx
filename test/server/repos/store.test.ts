@@ -12,9 +12,9 @@ import { memoryDb } from "../../helpers/db.ts";
 function seeded() {
   const db = memoryDb();
   db.exec(`
-    insert into users (id, username, full_name, email, role, password_hash,
+    insert into users (id, username, full_name, email, role,
         created_at)
-      values ('u', 'casey', 'Casey Doe', 'casey@example.test', 'admin', 'x', 0);
+      values ('u', 'casey', 'Casey Doe', 'casey@example.test', 'admin', 0);
     insert into projects (id, kind, name, owner_id, created_at)
       values ('p1', 'team', 'platform', 'u', 0), ('p2', 'team', 'finops', 'u', 0);
   `);

@@ -18,7 +18,7 @@ import type {
 } from "../../../src/shared/api/projects.ts";
 import type { SandboxResponse } from "../../../src/shared/api/sandbox.ts";
 import type { ProjectDetail } from "../../../src/shared/contracts/project.ts";
-import { hashPassword, type TestApp, testApp } from "../../helpers/app.ts";
+import { type TestApp, testApp } from "../../helpers/app.ts";
 import { memoryDb } from "../../helpers/db.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { fakeGateway, until } from "../../helpers/sandbox.ts";
@@ -42,7 +42,7 @@ async function run(
   const app = await testApp({ secrets, sandboxGateway: fake.connect });
   try {
     const admin = app.client();
-    await admin.login("admin", "hunter2-test");
+    await admin.signIn("admin");
     await body(app, admin);
   } finally {
     await app.shutdown();
@@ -321,12 +321,10 @@ describe("who sets a project's shell", () => {
         fullName: "Casey",
         email: "casey@example.com",
         role: "member",
-        passwordHash: await hashPassword("pw"),
-        mustChangePassword: false,
         now: app.now.value,
       });
       const member = app.client();
-      await member.login("casey", "pw");
+      await member.signIn("casey");
       const ops = await createTeam(admin, "ops", [user.id]);
       await setBackend(admin, ops, "openshell");
       let res = await member.call("PATCH", `/api/projects/${ops.id}`, {
@@ -493,7 +491,7 @@ describe("the one manager, as projects come and go", () => {
     const app = await testApp({ secrets: KEYS, sandboxGateway: fake.connect });
     try {
       const admin = app.client();
-      await admin.login("admin", "hunter2-test");
+      await admin.signIn("admin");
       const box = await createTeam(admin, "box");
       await instance(admin, { endpoint: ENDPOINT });
       await setBackend(admin, box, "openshell");
@@ -525,7 +523,7 @@ describe("the one manager, as projects come and go", () => {
     const app = await testApp({ secrets: KEYS, sandboxGateway: fake.connect });
     try {
       const admin = app.client();
-      await admin.login("admin", "hunter2-test");
+      await admin.signIn("admin");
       const box = await createTeam(admin, "box");
       await instance(admin, { endpoint: ENDPOINT });
       await setBackend(admin, box, "openshell");
@@ -549,7 +547,7 @@ describe("the one manager, as projects come and go", () => {
         expect(again.sandbox.leases()).toBe(kept);
         // nor does an admin's save of the Sandbox page drain it
         const later = again.client();
-        await later.login("admin", "hunter2-test");
+        await later.signIn("admin");
         await instance(later, { backend: "builtin" });
         expect(again.sandbox.leases()).toBe(kept);
         expect(fake.sandboxes.has(sandbox)).toBe(true);

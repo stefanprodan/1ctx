@@ -139,7 +139,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
   urls = [];
   answers = [];

@@ -247,12 +247,10 @@ describe("visual call delivery", () => {
         fullName: "",
         email: "outsider@example.com",
         role: "member",
-        passwordHash: chat.app.users.byId(chat.memberId)!.passwordHash,
-        mustChangePassword: false,
         now: chat.app.now.value,
       });
       const client = chat.app.client();
-      expect((await client.login(outsider.username, "pw")).status).toBe(200);
+      expect((await client.signIn(outsider.username)).status).toBe(200);
       for (const reader of [chat.admin, client]) {
         expect(
           (

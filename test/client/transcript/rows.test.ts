@@ -43,7 +43,6 @@ beforeEach(() => {
     username: "fixture-user",
     fullName: "Fixture User",
     role: "member",
-    mustChangePassword: false,
   };
   initial = null;
   globalThis.fetch = (async () => {

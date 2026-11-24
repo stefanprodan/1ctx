@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The bench target: a clone of a built database (an APFS clone, so it
-// costs nothing until written), fenced onto the fakes with a password
-// of this run's own, the fake model and the fake MCP, the server from a
-// checkout, N turns with watchers and the probe for a while, then all
+// costs nothing until written), fenced onto the fakes with a login per
+// user minted for this run, the fake model and the fake MCP, the server
+// from a checkout, N turns with watchers and the probe for a while, then all
 // stopped. The logs land in out/results/<label>/ and the results row is
 // printed.
 //
@@ -14,11 +14,19 @@
 //   bun scripts/load/bench.ts --smoke    (a tiny build, N=2 for 30 s)
 
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, statSync, unlinkSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { build, defaultDb, OUT_DIR } from "./db/build.ts";
 import { SHAPES, type Shape } from "./fake-model.ts";
-import { fence, fenced } from "./fence.ts";
+import { fence, fenced, migrateWith } from "./fence.ts";
+import { enabledUsers, newLogins } from "./logins.ts";
 import { FAKE, fakeMcpUrl, fakeModelUrl } from "./shapes.ts";
 import { printTable, summarize } from "./summarize.ts";
 
@@ -97,20 +105,21 @@ async function main() {
   clone(db, runDb);
   db = runDb;
 
-  // the fence, and one throwaway password for every user of this run
-  const password = Buffer.from(
-    crypto.getRandomValues(new Uint8Array(16)),
-  ).toString("hex");
-  const hash = await Bun.password.hash(password, {
-    algorithm: "argon2id",
-    memoryCost: 65_536,
-    timeCost: 2,
-  });
+  // the fence, and a login for every user of this run, minted now since
+  // the build's clock is in the past, after the serving checkout's
+  // migrations; the driver alone reads the tokens
+  const migrated = migrateWith(checkout, db);
+  if (migrated.length > 0) console.log(`migrated: ${migrated.join(", ")}`);
   const handle = new Database(db);
+  const { tokens, hashes } = newLogins(enabledUsers(handle));
+  const loginsFile = join(run, "logins.json");
+  writeFileSync(loginsFile, JSON.stringify(tokens), { mode: 0o600 });
+  chmodSync(loginsFile, 0o600);
   const fenceOptions = {
     modelUrl,
     mcpUrl: (s: string) => fakeMcpUrl(s),
-    passwordHash: hash,
+    logins: hashes,
+    now: Date.now(),
   };
   const report = fence(handle, fenceOptions);
   const wrong = fenced(handle, fenceOptions);
@@ -141,6 +150,7 @@ async function main() {
   );
 
   const procs: Bun.Subprocess[] = [];
+  let driverCode: number | null = null;
   const spawn = (
     cmd: string[],
     name: string,
@@ -174,7 +184,6 @@ async function main() {
         db,
         "--secrets",
         join(run, "secrets"),
-        "--trust-proxy",
         "--drain",
         "0",
       ],
@@ -221,7 +230,7 @@ async function main() {
       {
         BASE: base,
         ADMIN: admin,
-        PASSWORD: password,
+        LOGINS: loginsFile,
         FAKE_MODEL_URL: modelUrl,
         FAKE_MCP_URL: `http://127.0.0.1:${FAKE.mcpPort}/`,
       },
@@ -229,15 +238,18 @@ async function main() {
     const code = await driver.exited;
     clearInterval(sampler);
     await Bun.write(join(results, "top.log"), `${top.join("\n")}\n`);
-    if (code !== 0)
-      console.error(
-        `the driver exited ${code}: see ${join(results, "driver.log")}`,
-      );
+    driverCode = code;
   } finally {
     for (const p of procs.reverse()) p.kill("SIGTERM");
     await Promise.all(procs.map((p) => p.exited));
   }
   printTable([await summarize(results)]);
+  // a driver that failed, a sign-in included, fails the run
+  if (driverCode !== 0) {
+    throw new Error(
+      `the driver exited ${driverCode}: see ${join(results, "driver.log")}`,
+    );
+  }
 }
 
 await main();

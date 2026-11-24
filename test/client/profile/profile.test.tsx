@@ -9,7 +9,6 @@ import {
   aboutProblem,
   emailSectionText,
   fullNameProblem,
-  passwordProblem,
 } from "../../../src/client/views/profile/Profile.model.ts";
 import { Profile } from "../../../src/client/views/profile/Profile.tsx";
 
@@ -52,18 +51,6 @@ describe("Profile.model", () => {
     expect(aboutProblem("")).toBeNull();
     expect(aboutProblem("a".repeat(2001))).toContain("under 2000");
   });
-
-  test("the password rule", () => {
-    expect(passwordProblem("old", "longenough", "longenough")).toBeNull();
-    expect(passwordProblem("", "longenough", "longenough")).toContain(
-      "current",
-    );
-    expect(passwordProblem("old", "short", "short")).toContain("at least 8");
-    expect(passwordProblem("longenough", "longenough", "longenough")).toContain(
-      "same",
-    );
-    expect(passwordProblem("old", "longenough", "other")).toContain("differ");
-  });
 });
 
 describe("Profile", () => {
@@ -75,7 +62,7 @@ describe("Profile", () => {
       email: "casey@example.com",
       tz: "Europe/Bucharest",
       disabled: false,
-      mustChangePassword: false,
+      signedInAt: null,
       emailPlaceholder: false,
       emailFromAgents: false,
       about: "Actor.",
@@ -96,8 +83,8 @@ describe("Profile", () => {
     expect(html).toContain('name="about"');
     expect(html).toContain(">Actor.</textarea>");
     expect(html).toContain("Europe/Bucharest");
-    expect(html).toContain('autocomplete="new-password"');
-    expect(html).toContain("Change password");
+    // no password anywhere
+    expect(html).not.toContain('type="password"');
     // access keys live on Connect agents
     expect(html).not.toContain("Access keys");
     // email from agents only once email is set up
@@ -111,28 +98,6 @@ describe("Profile", () => {
     } finally {
       profileEmailOn.value = false;
     }
-  });
-
-  test("tells a person with a handed password to change it", () => {
-    profile.value = {
-      id: "u1",
-      username: "casey",
-      fullName: "Casey Doe",
-      email: "casey@example.com",
-      tz: "Europe/Bucharest",
-      disabled: false,
-      mustChangePassword: true,
-      emailPlaceholder: false,
-      emailFromAgents: false,
-      about: "",
-      role: "member",
-      createdAt: 0,
-    };
-    const html = render(<Profile />);
-    expect(html).toContain("profile-notice");
-    expect(html).toContain("before going on");
-    profile.value = { ...profile.value, mustChangePassword: false };
-    expect(render(<Profile />)).not.toContain("profile-notice");
   });
 
   test("shows the loading line before the row arrives", () => {

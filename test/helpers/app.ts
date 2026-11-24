@@ -7,6 +7,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { LOGIN_TTL_MS } from "../../src/server/access/index.ts";
+import { LoginStore } from "../../src/server/access/store.ts";
 import { type App, compose } from "../../src/server/compose.ts";
 import type { Db } from "../../src/server/db/index.ts";
 import type {
@@ -15,6 +17,7 @@ import type {
   SendResult,
   SmtpServer,
 } from "../../src/server/email/index.ts";
+import { newToken, sha256 } from "../../src/server/lib/ids.ts";
 import {
   type LogFactory,
   type LogFields,
@@ -24,11 +27,7 @@ import {
 import type { JobRunner } from "../../src/server/repos/index.ts";
 import type { Connect } from "../../src/server/sandbox/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
-import {
-  ADMIN_SECRET,
-  hashPassword as hashAtCost,
-  type PasswordCost,
-} from "../../src/server/users/index.ts";
+import { ADMIN_SECRET, meOf } from "../../src/server/users/index.ts";
 import { clientAddress } from "../../src/server/web/serve.ts";
 import { isSecretName, SECRET_KINDS } from "../../src/shared/words.ts";
 import { memoryDb } from "./db.ts";
@@ -39,12 +38,8 @@ import {
 } from "./systemone.ts";
 
 export const ORIGIN = "http://1ctx.test";
-// argon2id's least cost: every test app hashes and checks passwords,
-// and at the production cost that was most of the suite's time
-export const TEST_PASSWORD_COST: PasswordCost = { memoryCost: 8, timeCost: 1 };
-// a password's hash for a user a test makes, at the test app's cost
-export const hashPassword = (password: string) =>
-  hashAtCost(password, TEST_PASSWORD_COST);
+// the first admin's key in user-admin.key, unless a test passes another
+export const ADMIN_KEY = `1ctx-admin-${"A".repeat(43)}`;
 // where a test's provider lives: the fake fetch answers it and nothing
 // else, so the suite never reaches a network
 export const PROVIDER_URL = "http://models.test/v1";
@@ -341,6 +336,8 @@ export type FakeEmailSender = {
   emailSender: EmailSender;
   sent: { server: SmtpServer; message: Outgoing }[];
   result: SendResult;
+  // run as each send starts, as a slow server's time on the fake clock
+  onSend?: () => void;
 };
 
 export function fakeEmailSender(): FakeEmailSender {
@@ -349,6 +346,7 @@ export function fakeEmailSender(): FakeEmailSender {
     result: "sent",
     emailSender: async (server, message) => {
       fake.sent.push({ server, message });
+      fake.onSend?.();
       return fake.result;
     },
   };
@@ -406,6 +404,8 @@ export type TestClient = {
       body?: unknown;
       // a raw body, sent as is
       raw?: string;
+      // a plain HTML form's fields, sent urlencoded
+      form?: Record<string, string>;
       // a binary body, sent with the headers' own content-type
       bytes?: Uint8Array<ArrayBuffer>;
       // the request's signal, as a closed tab aborts it
@@ -414,17 +414,23 @@ export type TestClient = {
       origin?: string | null;
     },
   ): Promise<Response>;
-  login(username: string, password: string): Promise<Response>;
+  // a login for the user opened through the access store, its cookie
+  // in the jar: what a sign-in by email or key leaves, with no route.
+  // 200 with the user, 401 for one missing or disabled
+  signIn(username: string): Promise<Response>;
 };
 
 export async function testApp(
   options: {
-    adminPassword?: string | null;
+    // user-admin.key's content; null leaves the file out
+    adminKey?: string | null;
     trustProxy?: boolean;
     fetcher?: typeof fetch;
     logFactory?: LogFactory;
     // the secrets beside user-admin.key
     secrets?: Record<string, string>;
+    // a kind whose folder cannot be listed while this says so
+    unlistable?: (kind: string) => boolean;
     // a fake tools capability for runner state-machine tests
     tools?: Tools;
     // a command worker other than the real one
@@ -491,30 +497,38 @@ export async function testApp(
     phaseWaiters.delete(key);
   };
   const trustProxy = options.trustProxy ?? false;
-  const adminPassword =
-    options.adminPassword === undefined
-      ? "hunter2-test"
-      : options.adminPassword;
+  const adminKey =
+    options.adminKey === undefined ? ADMIN_KEY : options.adminKey;
   const fake = fakeFetch();
   const emailSender = options.emailSender ?? fakeEmailSender();
-  // read at each call, so a test may replace or delete a key it passed
+  // read at each call, so a test may replace or delete a key it passed;
+  // one value at a time, so a getter that throws fails that read alone,
+  // as an unreadable file does
   const given = options.secrets ?? {};
-  const values = (): Record<string, string> => ({
-    ...(adminPassword === null ? {} : { [ADMIN_SECRET]: adminPassword }),
-    ...given,
-  });
+  const secretOf = (name: string): string | undefined =>
+    Object.hasOwn(given, name)
+      ? given[name]
+      : name === ADMIN_SECRET && adminKey !== null
+        ? adminKey
+        : undefined;
+  const names = (): string[] => [
+    ...new Set([
+      ...(adminKey === null ? [] : [ADMIN_SECRET]),
+      ...Object.keys(given),
+    ]),
+  ];
   const app = await compose({
     db,
-    passwordCost: TEST_PASSWORD_COST,
     secret: (kind, name) => {
       if (!isSecretName(kind, name)) throw new Error("bad secret name");
-      return values()[name]?.trim() || null;
+      return secretOf(name)?.trim() || null;
     },
     secretNames: (kind) => {
       if (!SECRET_KINDS.some((known) => known === kind)) {
         throw new Error("bad secret kind");
       }
-      return Object.keys(values())
+      if (options.unlistable?.(kind)) throw new Error("EACCES: scandir");
+      return names()
         .filter((name) => isSecretName(kind, name))
         .sort();
     },
@@ -551,21 +565,56 @@ export async function testApp(
     fetched: fake.calls,
     emailSender,
     client(address = "127.0.0.1") {
+      // by name and path, as a browser keeps them
+      // a cookie with Max-Age goes once the fake clock passes it
+      const jar = new Map<
+        string,
+        { path: string; pair: string; expires?: number }
+      >();
+      const LOGIN = "login /";
       const client: TestClient = {
-        cookie: null,
+        get cookie() {
+          return jar.get(LOGIN)?.pair ?? null;
+        },
+        set cookie(pair: string | null) {
+          if (pair === null) jar.delete(LOGIN);
+          else jar.set(LOGIN, { path: "/", pair });
+        },
         async call(method, path, opts = {}) {
           const headers = new Headers(opts.headers);
           headers.set("host", "1ctx.test");
           if (opts.origin !== null && method !== "GET") {
             headers.set("origin", opts.origin ?? ORIGIN);
           }
-          if (client.cookie) headers.set("cookie", client.cookie);
+          const pathname = path.split("?")[0]!;
+          for (const [key, c] of jar) {
+            if (c.expires !== undefined && c.expires <= current) {
+              jar.delete(key);
+            }
+          }
+          const sent = [...jar.values()]
+            .filter(
+              (c) =>
+                c.path === "/" ||
+                pathname === c.path ||
+                pathname.startsWith(`${c.path}/`),
+            )
+            .map((c) => c.pair);
+          if (sent.length > 0) {
+            headers.set("cookie", sent.join("; "));
+          }
           if (opts.body !== undefined || opts.raw !== undefined) {
             headers.set("content-type", "application/json");
+          }
+          if (opts.form !== undefined) {
+            headers.set("content-type", "application/x-www-form-urlencoded");
           }
           const body =
             opts.bytes ??
             opts.raw ??
+            (opts.form === undefined
+              ? undefined
+              : new URLSearchParams(opts.form).toString()) ??
             (opts.body === undefined ? undefined : JSON.stringify(opts.body));
           const req = new Request(`${ORIGIN}${path}`, {
             method,
@@ -579,18 +628,50 @@ export async function testApp(
             req,
             clientAddress(req, address, trustProxy),
           ))!;
-          const set = res.headers.get("set-cookie");
-          if (set) {
-            const [pair] = set.split(";");
-            const [, value] = pair.split("=");
-            client.cookie = value ? pair : null;
+          for (const set of res.headers.getSetCookie()) {
+            const [pair, ...attrs] = set.split(";").map((part) => part.trim());
+            const eq = pair!.indexOf("=");
+            const name = pair!.slice(0, eq);
+            const value = pair!.slice(eq + 1);
+            const at =
+              attrs
+                .find((attr) => attr.toLowerCase().startsWith("path="))
+                ?.slice(5) ?? "/";
+            const gone = attrs.some((attr) => /^max-age=0$/i.test(attr));
+            const maxAge = attrs
+              .find((attr) => /^max-age=\d+$/i.test(attr))
+              ?.slice(8);
+            const key = `${name} ${at}`;
+            if (value === "" || gone) jar.delete(key);
+            else {
+              jar.set(key, {
+                path: at,
+                pair: `${name}=${value}`,
+                ...(maxAge === undefined
+                  ? {}
+                  : { expires: current + Number(maxAge) * 1000 }),
+              });
+            }
           }
           return res;
         },
-        login(username, password) {
-          return client.call("POST", "/api/login", {
-            body: { username, password },
+        async signIn(username) {
+          const user = app.users.byUsername(username);
+          if (user === null || user.disabled) {
+            return Response.json({ error: "sign in" }, { status: 401 });
+          }
+          const token = newToken();
+          const at = current;
+          new LoginStore(db).create({
+            userId: user.id,
+            tokenHash: sha256(token),
+            now: at,
+            expiresAt: at + LOGIN_TTL_MS,
+            keyDigest: null,
           });
+          app.users.setSignedIn(user.id, at);
+          client.cookie = `login=${token}`;
+          return Response.json({ user: meOf(user) });
         },
       };
       return client;

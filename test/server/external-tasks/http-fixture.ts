@@ -12,7 +12,6 @@ import type {
 import { createKey } from "../../helpers/access-keys.ts";
 import {
   collectLogs,
-  hashPassword,
   ORIGIN,
   type TestApp,
   type TestClient,
@@ -48,20 +47,17 @@ export async function httpFixture() {
   const logs = collectLogs();
   const app = await testApp({ logFactory: logs.logFactory });
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
-  const passwordHash = await hashPassword("pw");
+  expect((await admin.signIn("admin")).status).toBe(200);
   const person = async (username: string) => {
     const user = app.createUser({
       username,
       fullName: username,
       email: `${username}@example.com`,
       role: "member",
-      passwordHash,
-      mustChangePassword: false,
       now: app.now.value,
     });
     const client = app.client();
-    expect((await client.login(username, "pw")).status).toBe(200);
+    expect((await client.signIn(username)).status).toBe(200);
     return { user, client };
   };
   const creator = await person("creator");

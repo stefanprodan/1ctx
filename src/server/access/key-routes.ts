@@ -13,7 +13,8 @@ import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
-import { actingUser } from "./acting.ts";
+import { actingWrite } from "./acting.ts";
+import type { AdminKeys } from "./admin-keys.ts";
 import type { Auth } from "./auth.ts";
 import {
   type AccessKeyStore,
@@ -30,6 +31,7 @@ export type KeyRoutesDeps = {
   taskClaims: Pick<TaskClaimsPort, "endForKeys">;
   logins: LoginStore;
   users: { byId(id: string): UserRow | null };
+  adminKeys: Pick<AdminKeys, "digestOf">;
   auth: Pick<Auth, "project">;
   accessKeysPerUser(): number;
   clock: Clock;
@@ -75,9 +77,9 @@ export function keyRoutes(deps: KeyRoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const parsed = parseAccessKey(await jsonBody(req));
         const principal = ctx.principal!;
-        const made = transact(deps.db, () => {
-          // A reset while the body arrived must not mint a new credential.
-          const owner = actingUser(deps, principal);
+        // a sign out everywhere or a changed admin key while the body
+        // arrived must not mint a new credential
+        const made = actingWrite(deps, principal, null, (owner) => {
           const keys = deps.keys.list(owner.id);
           if (keys.some((key) => key.name === parsed.name)) {
             throw new Conflict("access key name is taken");
@@ -87,9 +89,9 @@ export function keyRoutes(deps: KeyRoutesDeps): RouteDescriptor[] {
           if (keys.length >= cap) {
             throw new Conflict("access key limit reached");
           }
-          for (const id of parsed.projectIds ?? []) {
-            deps.auth.project(principal, id);
-          }
+          // by the role it holds now, not the one the router read
+          const now = { ...principal, role: owner.role };
+          for (const id of parsed.projectIds ?? []) deps.auth.project(now, id);
           return {
             result: {
               ...deps.keys.create(owner.id, parsed, deps.clock()),

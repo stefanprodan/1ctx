@@ -35,7 +35,7 @@ describe("the scan worker", () => {
       try {
         app = await testApp({ db: file.db });
         const admin = app.client();
-        await admin.login("admin", "hunter2-test");
+        await admin.signIn("admin");
         const month = new Date(app.now.value).toISOString().slice(0, 7);
         const query = page === "usage" ? `&month=${month}` : "";
         const res = await admin.call(

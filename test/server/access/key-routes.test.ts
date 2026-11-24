@@ -7,31 +7,24 @@ import { DAY_MS } from "../../../src/server/lib/clock.ts";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import type { AccessKeysResponse } from "../../../src/shared/api/profile.ts";
 import { createKey, KEY_REQUEST } from "../../helpers/access-keys.ts";
-import {
-  collectLogs,
-  hashPassword,
-  ORIGIN,
-  testApp,
-} from "../../helpers/app.ts";
-import { emailApp, MARIA_PASSWORD } from "../../helpers/links.ts";
+import { collectLogs, ORIGIN, testApp } from "../../helpers/app.ts";
+import { emailApp } from "../../helpers/links.ts";
 import { META } from "../mcp-server/helper.ts";
 
 async function setup() {
   const logs = collectLogs();
   const app = await testApp({ logFactory: logs.logFactory });
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await admin.signIn("admin")).status).toBe(200);
   const user = app.createUser({
     username: "casey",
     fullName: "Casey",
     email: "casey@example.test",
     role: "member",
-    passwordHash: await hashPassword("longenough"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const client = app.client();
-  expect((await client.login("casey", "longenough")).status).toBe(200);
+  expect((await client.signIn("casey")).status).toBe(200);
   const list = async (): Promise<AccessKeysResponse> => {
     const res = await client.call("GET", "/api/profile/keys");
     expect(res.status).toBe(200);
@@ -417,31 +410,7 @@ describe("access key routes", () => {
     }
   });
 
-  test("a must-change login cannot list, create or revoke keys", async () => {
-    const b = await setup();
-    try {
-      const { key } = await createKey(b.client);
-      b.app.users.setMustChangePassword(b.user.id, true);
-      for (const [method, path] of [
-        ["GET", "/api/profile/keys"],
-        ["POST", "/api/profile/keys"],
-        ["DELETE", `/api/profile/keys/${key.id}`],
-      ]) {
-        expect(
-          (
-            await b.client.call(method!, path!, {
-              body: method === "POST" ? KEY_REQUEST : undefined,
-            })
-          ).status,
-        ).toBe(403);
-      }
-      expect(b.stored()).toHaveLength(1);
-    } finally {
-      await b.app.shutdown();
-    }
-  });
-
-  test("a reset while the create body arrives cannot leave a new key", async () => {
+  test("a sign out everywhere while the create body arrives cannot leave a new key", async () => {
     const b = await setup();
     try {
       let controller!: ReadableStreamDefaultController<Uint8Array>;
@@ -459,10 +428,7 @@ describe("access key routes", () => {
       );
       const reset = await b.admin.call(
         "POST",
-        `/api/users/${b.user.id}/password`,
-        {
-          body: { password: "reset-password" },
-        },
+        `/api/users/${b.user.id}/sign-out`,
       );
       expect(reset.status).toBe(204);
       controller.enqueue(new TextEncoder().encode(JSON.stringify(KEY_REQUEST)));
@@ -476,30 +442,22 @@ describe("access key routes", () => {
 });
 
 describe("the ends of access keys", () => {
-  for (const ending of ["disable", "admin reset", "own password"] as const) {
+  for (const ending of ["disable", "sign out everywhere"] as const) {
     test(`${ending} removes only the credentials it should`, async () => {
       const b = await setup();
       try {
-        const { key, token } = await createKey(b.client);
+        const { token } = await createKey(b.client);
         const adminKey = await createKey(b.admin);
         const oldLogin = b.app.client();
-        expect((await oldLogin.login("casey", "longenough")).status).toBe(200);
+        expect((await oldLogin.signIn("casey")).status).toBe(200);
         const response =
           ending === "disable"
             ? await b.admin.call("PATCH", `/api/users/${b.user.id}`, {
                 body: { disabled: true },
               })
-            : ending === "admin reset"
-              ? await b.admin.call("POST", `/api/users/${b.user.id}/password`, {
-                  body: { password: "reset-password" },
-                })
-              : await b.client.call("POST", "/api/profile/password", {
-                  body: { current: "longenough", next: "changed-password" },
-                });
-        expect(response.status).toBe(ending === "admin reset" ? 204 : 200);
-        expect(b.stored()).toEqual(
-          ending === "own password" ? [{ id: key.id }] : [],
-        );
+            : await b.admin.call("POST", `/api/users/${b.user.id}/sign-out`);
+        expect(response.status).toBe(ending === "disable" ? 200 : 204);
+        expect(b.stored()).toEqual([]);
         expect(
           (await (await oldLogin.call("GET", "/api/me")).json()).user,
         ).toBeNull();
@@ -510,7 +468,7 @@ describe("the ends of access keys", () => {
         ).not.toBeNull();
         expect(
           b.logs.events.filter((e) => e.msg === "access key revoked"),
-        ).toHaveLength(ending === "own password" ? 0 : 1);
+        ).toHaveLength(1);
         expect(JSON.stringify(b.logs.events)).not.toContain(token);
         if (ending === "disable") {
           expect(
@@ -528,43 +486,36 @@ describe("the ends of access keys", () => {
     });
   }
 
-  for (const purpose of ["reset", "invite", "signin"] as const) {
-    test(`${purpose} link use ends keys only when it sets a password`, async () => {
+  for (const purpose of ["invite", "signin"] as const) {
+    test(`${purpose} link use keeps keys`, async () => {
       const e = await emailApp();
       try {
         const tab = e.app.client();
-        expect((await tab.login("maria", MARIA_PASSWORD)).status).toBe(200);
+        expect((await tab.signIn("maria")).status).toBe(200);
         const { key, token } = await createKey(tab);
-        if (purpose === "invite")
-          e.app.users.setMustChangePassword(e.maria.id, true);
+        if (purpose === "invite") {
+          e.app.db
+            .query("update users set signed_in_at = null where id = ?")
+            .run(e.maria.id);
+        }
         const requested =
           purpose === "signin"
-            ? await e.app.client().call("POST", "/api/login/link", {
-                body: { username: "maria" },
-              })
-            : await e.admin.call(
-                "POST",
-                `/api/users/${e.maria.id}/${purpose === "reset" ? "reset-link" : "invite"}`,
-              );
+            ? await e.ask(e.app.client())
+            : await e.admin.call("POST", `/api/users/${e.maria.id}/invite`);
         expect(requested.status).toBe(purpose === "signin" ? 202 : 204);
         await e.app.linkAsks();
         await e.send();
         const link = e.token();
-        const row = () =>
-          e.app.db.query("select id from access_keys where id = ?").get(key.id);
-        expect(row()).not.toBeNull();
-        const used = await e.app.client().call("POST", `/api/links/${link}`, {
-          body: purpose === "signin" ? {} : { password: "new-password" },
-        });
-        expect(used.status).toBe(200);
-        expect(row()).toEqual(purpose === "signin" ? { id: key.id } : null);
+        const used = await e.use(e.app.client(), link);
+        expect(used.status).toBe(303);
+        expect(
+          e.app.db.query("select id from access_keys where id = ?").get(key.id),
+        ).toEqual({ id: key.id });
         const old = (await (await tab.call("GET", "/api/me")).json()).user;
-        expect(old?.username ?? null).toBe(
-          purpose === "signin" ? "maria" : null,
-        );
+        expect(old?.username ?? null).toBe("maria");
         expect(
           e.logs.events.filter((event) => event.msg === "access key revoked"),
-        ).toHaveLength(purpose === "signin" ? 0 : 1);
+        ).toHaveLength(0);
         expect(JSON.stringify(e.logs.events)).not.toContain(token);
       } finally {
         await e.app.shutdown();
@@ -572,7 +523,7 @@ describe("the ends of access keys", () => {
     });
   }
 
-  test("a failed reset rolls keys and logins back and emits no revocation log", async () => {
+  test("a failed sign out everywhere rolls keys and logins back and emits no revocation log", async () => {
     const b = await setup();
     try {
       const { key } = await createKey(b.client);
@@ -580,17 +531,13 @@ describe("the ends of access keys", () => {
         begin select raise(abort, 'test refusal'); end`);
       const reset = await b.admin.call(
         "POST",
-        `/api/users/${b.user.id}/password`,
-        {
-          body: { password: "reset-password" },
-        },
+        `/api/users/${b.user.id}/sign-out`,
       );
       expect(reset.status).toBe(500);
       expect(b.stored()).toEqual([{ id: key.id }]);
       expect(
         (await (await b.client.call("GET", "/api/me")).json()).user.username,
       ).toBe("casey");
-      expect(b.app.users.byId(b.user.id)!.mustChangePassword).toBe(false);
       expect(
         b.logs.events.filter((e) => e.msg === "access key revoked"),
       ).toEqual([]);

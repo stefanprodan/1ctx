@@ -26,8 +26,6 @@ export function fixture() {
         fullName: username,
         email: `${username}@example.com`,
         role: "member",
-        passwordHash: "unused",
-        mustChangePassword: false,
         now: 0,
       },
     );

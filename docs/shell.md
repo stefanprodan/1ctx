@@ -36,7 +36,8 @@ layer, the primitives and the styles are in `docs/ui.md`.
   `render/markdown.ts`), without a target, so the router takes them in
   place; in an installed app (`display-mode: standalone`) the router's
   `inApp()` still opens a page of the app in place, so it never leaves
-  the app.
+  the app. A `/link/` path is never the app's: the server draws that
+  page, so `inApp()` leaves it to a full navigation.
 - **A `/knowledge/<name>` path links only with a `project`.** The
   runner's replies and an external task's entries pass one; every other
   render keeps paths as text. A plain path in prose or a link's target

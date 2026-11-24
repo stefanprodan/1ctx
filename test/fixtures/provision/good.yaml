@@ -9,8 +9,6 @@ spec:
   tz: UTC
   about: A test teammate.
   disabled: false
-  passwordFrom: user-zed
-  mustChangePassword: false
 ---
 apiVersion: config.1ctx.dev/v1
 kind: SmtpServer

@@ -37,7 +37,7 @@ async function run(
   const app = await testApp({ secrets, sandboxGateway: fake.connect });
   try {
     const admin = app.client();
-    await admin.login("admin", "hunter2-test");
+    await admin.signIn("admin");
     await body(app, admin);
   } finally {
     await app.shutdown();
@@ -353,7 +353,7 @@ describe("sandbox settings", () => {
     const app = await testApp({ secrets: KEYS, sandboxGateway: connect });
     try {
       const admin = app.client();
-      await admin.login("admin", "hunter2-test");
+      await admin.signIn("admin");
       await admin.call("PUT", "/api/admin/sandbox", {
         body: {
           backend: "openshell",

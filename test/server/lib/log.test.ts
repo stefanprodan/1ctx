@@ -9,6 +9,7 @@ import {
   type LogFields,
   scrubErrors,
 } from "../../../src/server/lib/log.ts";
+import { scrubKey } from "../../../src/server/providers/provider.ts";
 
 const at = new Date("2026-09-21T22:39:12.345Z");
 
@@ -125,6 +126,92 @@ describe("error fields", () => {
     log.error("b", errorFields(new Error(`failed with ${token}`), false));
     expect(lines[0]?.error).toBe("failed with [key]");
   });
+
+  test("scrubs an admin key by its prefix, a cut one too", () => {
+    const key = `1ctx-admin-${"a".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const log = scrubErrors(
+      {
+        info() {},
+        warn() {},
+        error: (_msg, fields) => {
+          lines.push(fields ?? {});
+        },
+      },
+      () => [],
+    );
+    log.error("b", errorFields(new Error(`bad ${key}`), false));
+    log.error("b", errorFields(new Error(`bad ${key.slice(0, 27)}`), false));
+    // under 16 characters after the prefix is no key's shape
+    log.error("b", errorFields(new Error("bad 1ctx-admin-short"), false));
+    expect(lines.map((line) => line.error)).toEqual([
+      "bad [key]",
+      "bad [key]",
+      "bad 1ctx-admin-short",
+    ]);
+  });
+
+  test("masks both key shapes in every string field, before the cut", () => {
+    const admin = `1ctx-admin-${"a".repeat(43)}`;
+    const access = `1ctx_${"b".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const keep = (_msg: string, fields?: LogFields) => {
+      lines.push(fields ?? {});
+    };
+    const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => []);
+    log.info("a", { name: admin, other: `x ${admin.slice(0, 27)} y` });
+    log.warn("a", { name: access, count: 2 });
+    // past the cut whole, under it once masked
+    log.error("a", { error: `${"x".repeat(190)}${admin}`, field: admin });
+    expect(lines).toEqual([
+      { name: "[key]", other: "x [key] y" },
+      { name: "[key]", count: 2 },
+      { error: `${"x".repeat(190)}[key]`, field: "[key]" },
+    ]);
+  });
+
+  test("a value holding a whole access key is scrubbed whole", () => {
+    const token = `1ctx_${"t".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const keep = (_msg: string, fields?: LogFields) => {
+      lines.push(fields ?? {});
+    };
+    const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => [
+      `${token}-private`,
+    ]);
+    log.error("a", { error: `bad ${token}-private end` });
+    expect(lines).toEqual([{ error: "bad [key] end" }]);
+  });
+
+  test("a provider's scrubbed message keeps an admin key's shape for the log", () => {
+    const admin = `1ctx-admin-${"a".repeat(43)}`;
+    const message = scrubKey(`prov did not answer: ${admin}`, "admin");
+    expect(message).toBe("prov did not answer: [key]");
+    const lines: LogFields[] = [];
+    const keep = (_msg: string, fields?: LogFields) => {
+      lines.push(fields ?? {});
+    };
+    const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => [
+      "admin",
+    ]);
+    log.error("a", errorFields(new Error(message), false));
+    expect(format(at, "a", "error", "a", lines[0])).not.toContain("aaaa");
+  });
+
+  test("masks a key's shape before a scrubbed value can break it", () => {
+    const admin = `1ctx-admin-${"a".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const keep = (_msg: string, fields?: LogFields) => {
+      lines.push(fields ?? {});
+    };
+    // a configured secret that is part of the prefix
+    const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => [
+      "admin",
+    ]);
+    log.error("a", { error: `bad ${admin} admin` });
+    expect(lines).toEqual([{ error: "bad [key] [key]" }]);
+  });
+
   test("keeps only source frame locations", () => {
     const error = new Error("boom");
     error.stack = [

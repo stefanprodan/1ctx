@@ -47,7 +47,6 @@ const casey = {
   username: "casey",
   fullName: "Casey Doe",
   role: "member" as const,
-  mustChangePassword: false,
 };
 
 const listed = (username: string) => ({
@@ -76,7 +75,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey Doe",
     role: "member",
-    mustChangePassword: false,
   };
   directoryUsers.value = [
     {

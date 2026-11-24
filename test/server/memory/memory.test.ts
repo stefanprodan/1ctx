@@ -7,7 +7,6 @@ import {
   memoryWork,
   replay,
 } from "../../../src/server/memory/index.ts";
-import { hashPassword } from "../../helpers/app.ts";
 import { createAutomation } from "../../helpers/automations.ts";
 import { chatApp } from "../../helpers/chat.ts";
 
@@ -367,12 +366,10 @@ describe("memory routes", () => {
       fullName: "Outside User",
       email: "outside@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     const client = chat.app.client();
-    await client.login(outsider.username, "pw");
+    await client.signIn(outsider.username);
     expect(
       (await client.call("GET", `/api/projects/${chat.projectId}/memory`))
         .status,

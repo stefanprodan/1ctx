@@ -10,6 +10,12 @@ import { chatApp, startChat, tick } from "../helpers/chat.ts";
 
 function conn(chat: Awaited<ReturnType<typeof chatApp>>, admin: boolean) {
   const frames: { type: string }[] = [];
+  // the user's own login, since the socket's refresh reads its row
+  const login = chat.app.db
+    .query<{ id: string }, [string]>(
+      "select id from logins where user_id = ? limit 1",
+    )
+    .get(admin ? chat.adminId : chat.memberId)!;
   const c: Conn & { frames: typeof frames } = {
     frames,
     data: {
@@ -18,8 +24,7 @@ function conn(chat: Awaited<ReturnType<typeof chatApp>>, admin: boolean) {
         username: admin ? "admin" : "casey",
         fullName: admin ? "Stefan Prodan" : "Casey Doe",
         role: admin ? "admin" : "member",
-        mustChangePassword: false,
-        via: { kind: "login", id: admin ? "la" : "lm" },
+        via: { kind: "login", id: login.id },
       },
       projects: new Set(
         chat.app.projects

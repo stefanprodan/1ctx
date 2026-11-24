@@ -30,7 +30,6 @@ export type Principal = {
   username: string;
   fullName: string;
   role: Role;
-  mustChangePassword: boolean;
   via: Via;
 };
 
@@ -75,12 +74,13 @@ export type RouteDescriptor = {
   // "/api/projects/:id"; a segment starting with ":" captures one segment
   path: string;
   policy: Policy;
-  // reachable while the principal must change their password; the router
-  // refuses every other authenticated route with 403
-  passwordChange?: true;
   // a websocket upgrade: same-origin is checked as for a write, and
   // the handler gets ctx.upgrade
   upgrade?: true;
+  // a plain form from a server-drawn page that sends no referrer, which
+  // the browser posts with Origin: null; taken only beside
+  // Sec-Fetch-Site: same-origin
+  formPost?: true;
   // the seconds the connection may sit idle once access passed, for a
   // route that waits on an upstream past Bun's 10 s default; at most
   // MAX_IDLE_SECONDS, Bun's own ceiling

@@ -11,7 +11,7 @@ import { int, pick, rng, weighted } from "../random.ts";
 import { FAKE, fakeMcpUrl } from "../shapes.ts";
 import type { Build, User } from "./context.ts";
 import { hash } from "./ids.ts";
-import { DAY, HOUR, MIN, NO_PASSWORD, NOW } from "./presets.ts";
+import { DAY, HOUR, MIN, NOW } from "./presets.ts";
 import { APPS, AREAS, hex, markdown, prose } from "./text.ts";
 import { INSTRUCTIONS } from "./tools.ts";
 
@@ -128,17 +128,7 @@ export function people(b: Build) {
     const role = u.admin ? "admin" : "member";
     const email = `${u.name}@load.example`;
     const tz = pick(PR, TZ);
-    b.q.user.run(
-      u.id,
-      u.name,
-      full,
-      email,
-      role,
-      NO_PASSWORD,
-      clock.start,
-      tz,
-      agent,
-    );
+    b.q.user.run(u.id, u.name, full, email, role, clock.start, tz, agent);
   }
   b.bump("users", b.users.length);
 

@@ -88,6 +88,8 @@
     --text-touch: 16px;
     /* a stat tile's figure, the one size above the title */
     --text-figure: 28px;
+    /* a digit in the sign-in's code boxes */
+    --text-digit: 22px;
 
     --radius: 6px;
     --radius-cell: 2px;
@@ -99,6 +101,10 @@
     --space-4: 16px;
     --space-5: 24px;
     --space-6: 32px;
+
+    /* a finger's height (pointer: coarse) */
+    --target-touch: 44px;
+    --icon-small: 14px;
   }
 
   :root[data-theme="light"] {

@@ -34,7 +34,6 @@ const user = {
   username: "casey",
   fullName: "Casey",
   role: "member" as const,
-  mustChangePassword: false,
 };
 
 // the shell's main: its classes and its --waited, if any

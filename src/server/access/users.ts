@@ -3,11 +3,10 @@
 //
 // Admin user management. Identity conflicts are checked in the same
 // transaction as each write so the response names the field instead of
-// exposing a unique-index error. With email on, an admin is offered an
-// invite and a reset by link in place of typing a password. A write
-// that awaits a body reads the acting admin again in its transaction.
+// exposing a unique-index error. With email on, an admin sends an
+// invite that opens the user's first login. A write that awaits a body
+// reads the acting admin again in its transaction.
 
-import type { LinkPurpose } from "../../shared/api/access.ts";
 import type { SendTotals } from "../../shared/api/admin.ts";
 import type {
   AdminUser,
@@ -21,7 +20,6 @@ import { accessChanged, loginRevoked } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
 import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
-import { newToken } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import { lastDays } from "../usage/index.ts";
 import {
@@ -30,14 +28,16 @@ import {
   type UserFields,
   type UserRow,
 } from "../users/index.ts";
-import { actingUser } from "./acting.ts";
+import { actingWrite } from "./acting.ts";
+import type { AdminKeys } from "./admin-keys.ts";
 import {
   type AccessKeyRow,
   type AccessKeyStore,
   logRevokedKeys,
 } from "./key-store.ts";
 import type { Links } from "./links.ts";
-import { parseNewUser, parseUserPassword, parseUserPatch } from "./parse.ts";
+import { parseNewUser, parseUserPatch } from "./parse.ts";
+import type { PasskeyStore } from "./passkeys/store.ts";
 import type { LoginStore } from "./store.ts";
 import type { TaskClaimsPort } from "./task-claims.ts";
 import type { VisitStore } from "./visits.ts";
@@ -53,9 +53,6 @@ export type UsersPort = {
   setRole(id: string, role: Role): void;
   setTz(id: string, tz: string): void;
   setDisabled(id: string, disabled: boolean): void;
-  setMustChangePassword(id: string, required: boolean): void;
-  setPasswordHash(id: string, hash: string): void;
-  hashPassword(password: string): Promise<string>;
   countAdmins(): number;
   createUser(fields: UserFields): UserRow;
 };
@@ -80,10 +77,12 @@ export type UsersRoutesDeps = {
   users: UsersPort;
   projects: UsersProjectsPort;
   usage: UsersUsagePort;
+  adminKeys: Pick<AdminKeys, "digestOf">;
   clock: Clock;
   // a placeholder address is shown only while email is on
   email: { enabled(): boolean };
-  links: Pick<Links, "issue" | "revoke" | "notice">;
+  links: Pick<Links, "invite" | "revoke">;
+  passkeys: Pick<PasskeyStore, "deleteForUser" | "deleteKeyPasskeys">;
 };
 
 const NO_EMAIL = "email is not set up";
@@ -121,32 +120,20 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       throw new Conflict("email is taken");
     }
   };
-  // a link emailed to another user who can take one
-  const sendLink = (
-    purpose: LinkPurpose,
-    id: string,
-    adminId: string,
-  ): void => {
+  // an invite again, to another user who has never signed in
+  const sendInvite = (id: string, adminId: string): void => {
     if (!deps.email.enabled()) throw new Conflict(NO_EMAIL);
-    if (id === adminId) {
-      throw new Conflict(
-        purpose === "invite"
-          ? "cannot invite yourself"
-          : "cannot reset your own password",
-      );
-    }
+    if (id === adminId) throw new Conflict("cannot invite yourself");
     transact(deps.db, () => {
       const user = find(id);
       if (user.disabled) throw new Conflict("the user is disabled");
       if (user.emailPlaceholder) throw new Conflict(PLACEHOLDER);
-      // a user with a password of their own gets a reset, never a
-      // 7-day link that sets one
-      if (purpose === "invite" && !user.mustChangePassword) {
-        throw new Conflict("the user has a password. Send a reset link");
+      if (user.signedInAt !== null) {
+        throw new Conflict("the user has signed in already");
       }
       return {
         result: undefined,
-        events: deps.links.issue(purpose, user.id, adminId),
+        events: deps.links.invite(user.id, adminId),
       };
     });
   };
@@ -180,13 +167,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         if (invite && isPlaceholderEmail(parsed.email)) {
           throw new Conflict(PLACEHOLDER);
         }
-        // an invited user's first password is one nobody knows, hashed
-        // like any other, until the invite sets theirs
-        const passwordHash = await deps.users.hashPassword(
-          invite ? newToken() : parsed.password!,
-        );
-        const user = transact(deps.db, () => {
-          actingUser(deps, ctx.principal!, "admin");
+        const user = actingWrite(deps, ctx.principal!, "admin", () => {
           usernameAvailable(parsed.username, null);
           emailAvailable(parsed.email, null);
           const created = deps.users.createUser({
@@ -195,8 +176,6 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             email: parsed.email,
             role: parsed.role,
             tz: parsed.tz,
-            passwordHash,
-            mustChangePassword: parsed.mustChangePassword ?? true,
             about: parsed.about,
             disabled: parsed.disabled,
             now: deps.clock(),
@@ -204,7 +183,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           return {
             result: find(created.id),
             events: invite
-              ? deps.links.issue("invite", created.id, ctx.principal!.userId)
+              ? deps.links.invite(created.id, ctx.principal!.userId)
               : [],
           };
         });
@@ -219,16 +198,21 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const patch = parseUserPatch(await jsonBody(req));
         const id = ctx.params.id;
-        const changed = transact(deps.db, () => {
-          actingUser(deps, ctx.principal!, "admin");
+        const changed = actingWrite(deps, ctx.principal!, "admin", () => {
           const user = find(id);
           let revokedKeys: AccessKeyRow[] = [];
+          // a key login's file follows the username, and only an admin
+          // signs in by key, so a rename or a demote ends them at once,
+          // and the passkeys added from them, which carry their trust
+          let endedLogins: string[] = [];
           if (
             patch.username !== undefined &&
             patch.username !== user.username
           ) {
             usernameAvailable(patch.username, user.id);
             deps.users.setUsername(user.id, patch.username);
+            endedLogins = deps.logins.deleteKeyLogins(user.id);
+            deps.passkeys.deleteKeyPasskeys(user.id);
           }
           if (patch.email !== undefined && patch.email !== user.email) {
             emailAvailable(patch.email, user.id);
@@ -266,12 +250,20 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             throw new Conflict("the last admin must remain enabled");
           }
           if (roleChanged) deps.users.setRole(user.id, patch.role!);
+          if (roleChanged && patch.role === "member") {
+            endedLogins = [
+              ...endedLogins,
+              ...deps.logins.deleteKeyLogins(user.id),
+            ];
+            deps.passkeys.deleteKeyPasskeys(user.id);
+          }
           if (disabledChanged) {
             deps.users.setDisabled(user.id, patch.disabled!);
             if (patch.disabled === true) {
               deps.logins.deleteForUser(user.id);
               revokedKeys = deps.keys.deleteForUser(user.id);
               deps.links.revoke(user.id);
+              deps.passkeys.deleteForUser(user.id);
             }
           }
           let lostProjects: string[] = [];
@@ -285,6 +277,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             result: { user: find(user.id), revokedKeys },
             events: [
               ...(roleChanged ? [accessChanged([user.id])] : []),
+              ...endedLogins.map((loginId) => loginRevoked(user.id, loginId)),
               ...(disabledChanged && patch.disabled === true
                 ? [loginRevoked(user.id, null)]
                 : []),
@@ -314,43 +307,33 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       },
     },
     {
+      // every way in the user holds ends: logins, live links, passkeys
+      // and access keys, the passkeys and keys since a stolen login can
+      // add one
       method: "POST",
-      path: "/api/users/:id/password",
+      path: "/api/users/:id/sign-out",
       policy: "admin",
-      async handle(req, ctx) {
-        const { password } = parseUserPassword(await jsonBody(req));
+      handle(_req, ctx) {
         const id = ctx.params.id;
         if (id === ctx.principal!.userId) {
-          throw new Conflict("cannot reset your own password");
+          throw new Conflict("cannot sign yourself out everywhere");
         }
-        const passwordHash = await deps.users.hashPassword(password);
-        const changed = transact(deps.db, () => {
-          actingUser(deps, ctx.principal!, "admin");
+        const ended = actingWrite(deps, ctx.principal!, "admin", () => {
           const user = find(id);
-          deps.users.setPasswordHash(user.id, passwordHash);
-          deps.users.setMustChangePassword(user.id, true);
           deps.logins.deleteForUser(user.id);
           const revokedKeys = deps.keys.deleteForUser(user.id);
           deps.links.revoke(user.id);
+          deps.passkeys.deleteForUser(user.id);
           return {
             result: { user, revokedKeys },
             events: [
               loginRevoked(user.id, null),
               ...deps.taskClaims.endForKeys(revokedKeys.map((key) => key.id)),
-              ...deps.links.notice(user, "admin-reset", ctx.address),
             ],
           };
         });
-        logRevokedKeys(deps.log, changed.user.username, changed.revokedKeys);
-        return new Response(null, { status: 204 });
-      },
-    },
-    {
-      method: "POST",
-      path: "/api/users/:id/reset-link",
-      policy: "admin",
-      handle(_req, ctx) {
-        sendLink("reset", ctx.params.id, ctx.principal!.userId);
+        logRevokedKeys(deps.log, ended.user.username, ended.revokedKeys);
+        deps.log.info("signed out everywhere", { user: ended.user.username });
         return new Response(null, { status: 204 });
       },
     },
@@ -360,7 +343,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       path: "/api/users/:id/invite",
       policy: "admin",
       handle(_req, ctx) {
-        sendLink("invite", ctx.params.id, ctx.principal!.userId);
+        sendInvite(ctx.params.id, ctx.principal!.userId);
         return new Response(null, { status: 204 });
       },
     },

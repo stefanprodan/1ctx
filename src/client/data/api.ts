@@ -39,8 +39,8 @@ export function onUnauthorized(fn: () => void): void {
   unauthorized = fn;
 }
 
-function responseFailure(status: number, body: unknown): ApiError {
-  if (status === 401) unauthorized();
+function responseFailure(status: number, body: unknown, hook = true): ApiError {
+  if (status === 401 && hook) unauthorized();
   const words =
     typeof body === "object" &&
     body !== null &&
@@ -52,11 +52,27 @@ function responseFailure(status: number, body: unknown): ApiError {
   return new ApiError(status, words, body);
 }
 
-export async function api<T>(
+export function api<T>(
   path: string,
   method = "GET",
   body?: unknown,
   signal?: AbortSignal,
+): Promise<T> {
+  return call<T>(path, method, body, signal, true);
+}
+
+// a read whose 401 the caller weighs itself: who is signed in, read by
+// a load a newer one may have superseded, signs nobody out on its own
+export function quietGet<T>(path: string): Promise<T> {
+  return call<T>(path, "GET", undefined, undefined, false);
+}
+
+async function call<T>(
+  path: string,
+  method: string,
+  body: unknown,
+  signal: AbortSignal | undefined,
+  hook: boolean,
 ): Promise<T> {
   let res: Response;
   try {
@@ -68,10 +84,10 @@ export async function api<T>(
     });
   } catch {
     signal?.throwIfAborted();
-    throw responseFailure(0, null);
+    throw responseFailure(0, null, hook);
   }
   const data: unknown = await res.json().catch(() => ({}));
-  if (!res.ok) throw responseFailure(res.status, data);
+  if (!res.ok) throw responseFailure(res.status, data, hook);
   return data as T;
 }
 

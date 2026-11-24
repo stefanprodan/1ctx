@@ -104,6 +104,21 @@ describe("sameOrigin", () => {
   test("a garbage origin is refused", () => {
     expect(sameOrigin(req({ origin: "not a url" }), url, false)).toBe(false);
   });
+
+  test("Origin: null passes only a form route the browser says is same-origin", () => {
+    const form = (site?: string) =>
+      req(
+        site === undefined
+          ? { origin: "null" }
+          : { origin: "null", "sec-fetch-site": site },
+      );
+    expect(sameOrigin(form("same-origin"), url, false, false, true)).toBe(true);
+    expect(sameOrigin(form("same-origin"), url, false)).toBe(false);
+    expect(sameOrigin(form("same-origin"), url, false, true)).toBe(false);
+    for (const site of ["cross-site", "same-site", "none", undefined]) {
+      expect(sameOrigin(form(site), url, false, false, true)).toBe(false);
+    }
+  });
 });
 
 describe("clientAddress", () => {
@@ -236,6 +251,29 @@ describe("router", () => {
     expect(b.headers.get("set-cookie")).toBe("login=; Max-Age=0");
   });
 
+  test("a handler's other cookie never drops the login's renewal", async () => {
+    const renew = answered(
+      router({
+        routes: [
+          {
+            ...echo,
+            path: "/api/other",
+            handle: () =>
+              json({}, 200, { "set-cookie": "login_ask=c; Path=/api/login" }),
+          },
+        ],
+        resolve: () => ({ principal: null, setCookie: "login=t; Max-Age=9" }),
+        trustProxy: false,
+        log: silent,
+      }),
+    );
+    const res = await renew(new Request("http://x/api/other"), "a");
+    expect(res.headers.getSetCookie()).toEqual([
+      "login_ask=c; Path=/api/login",
+      "login=t; Max-Age=9",
+    ]);
+  });
+
   test("a renewed cookie rides back on a denial and on an error too", async () => {
     const renew = answered(
       router({
@@ -262,7 +300,6 @@ describe("router", () => {
             username: "u",
             fullName: "U",
             role: "member",
-            mustChangePassword: false,
             via: { kind: "login" as const, id: "l" },
           },
           setCookie: "login=t; Max-Age=9",
@@ -299,7 +336,6 @@ describe("a handler that throws", () => {
     fullName: "Maria",
     role: "member" as const,
     via: { kind: "login" as const, id: "l1" },
-    mustChangePassword: false,
   };
 
   test("is one error request and a JSON 500", async () => {
@@ -474,7 +510,6 @@ describe("idleSeconds", () => {
     username: "member",
     fullName: "Member",
     role: "member",
-    mustChangePassword: false,
     via: { kind: "login", id: "l" },
   };
   const slow: RouteDescriptor = {

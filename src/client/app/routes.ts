@@ -6,7 +6,7 @@
 // entry or hidden. The rail and the tests read this; the server
 // enforces access, never this table.
 // A view is loaded on first use, so the table stays one small module
-// however many views there are; only Login is in the first bundle,
+// however many views there are; only SignIn is in the first bundle,
 // since App needs it before any route.
 
 import { isDecisionId } from "../../shared/contracts/decision.ts";
@@ -49,7 +49,6 @@ import {
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadKnowledgePath } from "../data/knowledge-path.ts";
-import { loadLink } from "../data/links.ts";
 import {
   loadAllUsage,
   loadMcp,
@@ -66,7 +65,7 @@ import {
   loadUsage,
   overviewRange,
 } from "../data/overview.ts";
-import { loadProfile } from "../data/profile.ts";
+import { profilePage } from "../data/profile.ts";
 import { loadProjectMcp } from "../data/project-mcp.ts";
 import {
   loadProject,
@@ -108,7 +107,7 @@ import {
   listPick,
   pickOf,
 } from "../views/home/Home.model.ts";
-import { Login } from "../views/home/Login.tsx";
+import { SignInPage } from "../views/home/SignIn.tsx";
 import { tasksAddressOf } from "../views/projects/ExternalTasks.model.ts";
 import {
   ChatPageWaiting,
@@ -124,9 +123,6 @@ export type Route = {
   view: Lazy<{ params: Params }>;
   title: (params: Params) => string;
   role: "public" | "authenticated" | "admin";
-  // drawn on its own, never in the shell, whoever is signed in: a page
-  // an email links to, which may sign this browser in as someone else
-  bare?: true;
   // what the view reads, started by app/loading.ts when the route
   // matches, with the query for a view filtered by it; a view never
   // fetches
@@ -272,19 +268,11 @@ export const ROUTES: Route[] = [
     // in the first bundle, so its code is there in a microtask and the
     // form draws with no page's bones before it
     view: lazy(
-      async () => Login,
+      async () => SignInPage,
       () => null,
     ),
     title: () => "Sign in",
     role: "public",
-  },
-  {
-    path: "/link/:token",
-    view: lazy(() => import("../views/home/Link.tsx").then((m) => m.Link)),
-    title: () => "Email link",
-    role: "public",
-    bare: true,
-    load: (params) => loadLink(params.token),
   },
   {
     path: "/",
@@ -1010,7 +998,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Profile",
     role: "authenticated",
-    load: loadProfile,
+    load: profilePage,
   },
   // the projects name a key's picks
   ...tabRoutes(

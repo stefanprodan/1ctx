@@ -83,6 +83,7 @@ class FakeNode {
   focus(): void {
     fakeDocument.activeElement = this;
   }
+  select(): void {}
   scrollTo(): void {}
   setSelectionRange(start: number, end: number): void {
     this.selectionStart = start;
@@ -150,10 +151,26 @@ export type Mounted = {
   type(className: string, text: string): Promise<void>;
   // whether the first input of the class holds the focus
   focused(className: string): boolean;
+  // calls the handler (onClick, onInput, onSubmit) of the nth element
+  // carrying the class, with an event over it; value is set on the
+  // element first, as a typed or filled field holds it
+  fire(
+    className: string,
+    handler: string,
+    event?: Record<string, unknown> & { value?: string },
+    nth?: number,
+  ): Promise<void>;
   unmount(): Promise<void>;
 };
 
 type Handlers = Record<string, (event: unknown) => void>;
+
+function allOf(node: FakeNode, className: string, out: FakeNode[] = []) {
+  const classes = node.attributes.get("class")?.split(" ") ?? [];
+  if (classes.includes(className)) out.push(node);
+  for (const child of node.childNodes) allOf(child, className, out);
+  return out;
+}
 
 function inputOf(node: FakeNode, className: string): FakeNode | null {
   const classes = node.attributes.get("class")?.split(" ") ?? [];
@@ -205,6 +222,23 @@ export async function mount(node: VNode): Promise<Mounted> {
           key: "Enter",
           currentTarget: target,
           preventDefault() {},
+        }),
+      );
+    },
+    async fire(className, handler, event = {}, nth = 0) {
+      const node = allOf(root, className)[nth];
+      if (node === undefined) throw new Error(`no .${className} #${nth}`);
+      if (event.value !== undefined)
+        Object.assign(node, { value: event.value });
+      const on = (node as unknown as { __e?: Handlers }).__e ?? {};
+      const fn = on[handler];
+      if (fn === undefined) throw new Error(`.${className} has no ${handler}`);
+      await act(() =>
+        fn({
+          currentTarget: node,
+          target: node,
+          preventDefault() {},
+          ...event,
         }),
       );
     },

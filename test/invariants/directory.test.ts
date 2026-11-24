@@ -18,7 +18,6 @@ import type {
 } from "../../src/shared/api/directory.ts";
 import type { ToolsResponse } from "../../src/shared/api/tools.ts";
 import { firstSentence, MAX_CATALOG_LINE } from "../../src/shared/text.ts";
-import { hashPassword } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
@@ -59,8 +58,6 @@ describe("the directory", () => {
       email: "bogdan@example.com",
       role: "member",
       tz: "Europe/Bucharest",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     chat.app.users.setDisabled(other.id, true);
@@ -110,8 +107,6 @@ describe("the directory", () => {
       email: "bogdan@example.com",
       role: "member",
       tz: "Europe/Bucharest",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     chat.app.users.setDetails(other.id, {
@@ -145,8 +140,6 @@ describe("the directory", () => {
       fullName: "Bogdan P",
       email: "bogdan@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     await createTeam(chat.admin, "shared", [chat.memberId, other.id]);

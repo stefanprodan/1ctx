@@ -84,12 +84,6 @@ describe("the page", () => {
     );
   });
 
-  test("never sends its address to another site", () => {
-    expect(read("index.html")).toContain(
-      '<meta name="referrer" content="no-referrer" />',
-    );
-  });
-
   test("starts the browser's bar in the theme's page colour", () => {
     const html = read("index.html");
     expect(html).toContain(

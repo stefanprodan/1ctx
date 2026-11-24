@@ -21,11 +21,7 @@ import {
   switchDictation,
   transcribe,
 } from "../../../src/client/data/dictation.ts";
-import {
-  dictationOn,
-  loadDictationOn,
-  me,
-} from "../../../src/client/data/me.ts";
+import { dictationOn, loadMe, me } from "../../../src/client/data/me.ts";
 import { overview } from "../../../src/client/data/overview.ts";
 import { providers } from "../../../src/client/data/providers.ts";
 import type { Save } from "../../../src/client/lib/save.ts";
@@ -380,8 +376,8 @@ describe("the Dictation card's calls", () => {
     async () => {
       me.value = admin();
       dictationOn.value = false;
-      // a sign-in's ask whether Dictation is on, still out
-      const asking = loadDictationOn();
+      // a sign-in's read of who it is, Dictation with it, still out
+      const asking = loadMe();
       expect(sent(0)).toMatchObject({ method: "GET", url: "/api/me" });
       const saving = switchDictation({ enabled: true });
       expect(sent(1)).toEqual({
@@ -398,7 +394,7 @@ describe("the Dictation card's calls", () => {
       await asking;
       expect(dictationOn.value).toBe(true);
       // and an ask made after the save lands as usual
-      const later = loadDictationOn();
+      const later = loadMe();
       calls[2]!.answer(
         Response.json({ user: admin(), emailOn: false, dictationOn: false }),
       );

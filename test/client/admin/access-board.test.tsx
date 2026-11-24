@@ -40,7 +40,7 @@ const person = (
   tz: "UTC",
   createdAt: 0,
   disabled: false,
-  mustChangePassword: false,
+  signedInAt: null,
   emailPlaceholder: false,
   lastVisitDay: "2026-09-28",
   projectIds: [],
@@ -96,10 +96,9 @@ describe("the groups", () => {
         person("u3", "gone", { lastVisitDay: "2026-08-29" }),
         person("u4", "recent", { lastVisitDay: "2026-08-30" }),
         person("u5", "handed", {
-          mustChangePassword: true,
           lastVisitDay: null,
         }),
-        person("u6", "off", { disabled: true, mustChangePassword: true }),
+        person("u6", "off", { disabled: true }),
       ],
       NOW,
     );

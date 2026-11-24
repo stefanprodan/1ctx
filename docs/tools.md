@@ -214,9 +214,8 @@ words.
   one line of at most `MAX_EMAIL_SUBJECT` characters that `badSubject()`
   passes (no control or bidi character) and holding no `://`, `body`
   Markdown of at most `MAX_EMAIL_BODY` bytes. A recipient can open the
-  session (its project, `access.visibleProjectIds()`), is enabled and
-  past the forced password change, has a real address and turned email
-  from agents on.
+  session (its project, `access.visibleProjectIds()`), is enabled, has
+  a real address and turned email from agents on.
 - **One refusal refuses the call.** Every user is checked before any
   row is written; the `ToolError` names each refused user and why, and
   nothing is queued, so the model calls again with the users it may

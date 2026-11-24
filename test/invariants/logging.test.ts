@@ -83,10 +83,9 @@ test("events omit private request and chat values", async () => {
       )
     ).status,
   ).toBe(404);
-  expect(
-    (await chat.app.client().login(privateValues.login, "not-the-password"))
-      .status,
-  ).toBe(401);
+  expect((await chat.app.client().signIn(privateValues.login)).status).toBe(
+    401,
+  );
   expect(
     (
       await chat.member.call(

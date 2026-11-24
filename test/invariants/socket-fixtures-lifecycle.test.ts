@@ -5,7 +5,7 @@ import { describe, expect, test } from "bun:test";
 import { compose } from "../../src/server/compose.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import type { ConnData } from "../../src/server/web/socket.ts";
-import { ORIGIN, VERSION } from "../helpers/app.ts";
+import { ADMIN_KEY, ORIGIN, VERSION } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
@@ -40,7 +40,7 @@ async function restart(
   const fresh = await compose({
     db: chat.app.db,
     secret: (kind, name) =>
-      kind === "user-" && name === "user-admin" ? "hunter2-test" : null,
+      kind === "user-" && name === "user-admin" ? ADMIN_KEY : null,
     clock: () => chat.app.now.value,
     fetcher: chat.scripted.fetcher,
     log: () => silent,

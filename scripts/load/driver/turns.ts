@@ -46,7 +46,7 @@ export async function turns(
     0,
     Math.max(0, HOUR.watchers - admins.length - authors.length),
   );
-  const who = await signInAll(api, d, [...authors, ...admins, ...others]);
+  const who = await signInAll(api, [...authors, ...admins, ...others]);
   const monitor = new Monitor(api, admin);
   await monitor.open();
   const home = new Map<string, Watcher>();

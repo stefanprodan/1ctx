@@ -22,8 +22,9 @@ trustProxy: null
 secureCookie: true
 
 secrets:
-  # the Secret mounted at /secrets, never made by the chart: user-admin.key
-  # and the <kind>-<name>.key files
+  # the Secret mounted at /secrets, never made by the chart: user-admin.key,
+  # the first admin's admin key (1ctx admin-key admin --stdout), never a
+  # password; other admins' user-<username>.key; the <kind>-<name>.key files
   existingSecret: onectx
 
 persistence:

@@ -10,7 +10,7 @@
 //   sweep <tls-dir> <endpoint> <instance id>  every sandbox and provider under
 //                                             the instance label deleted
 //
-// Signs in as admin with the preview's user-admin.key; the password is
+// Signs in as admin with the preview's user-admin.key; the admin key is
 // never printed.
 
 import { join } from "node:path";
@@ -32,13 +32,11 @@ function fail(message: string): never {
 }
 
 async function signIn(url: string, secrets: string): Promise<string> {
-  const password = (
-    await Bun.file(join(secrets, "user-admin.key")).text()
-  ).trim();
+  const key = (await Bun.file(join(secrets, "user-admin.key")).text()).trim();
   const res = await fetch(`${url}/api/login`, {
     method: "POST",
     headers: { origin: url, "content-type": "application/json" },
-    body: JSON.stringify({ username: "admin", password }),
+    body: JSON.stringify({ key }),
   });
   if (!res.ok) fail(`admin sign-in answered ${res.status}`);
   const cookie = res.headers.getSetCookie()[0]?.split(";")[0];

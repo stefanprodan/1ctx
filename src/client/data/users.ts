@@ -6,7 +6,6 @@ import type { SendTotalsResponse } from "../../shared/api/admin.ts";
 import type {
   AdminUser,
   CreateUserRequest,
-  ResetPasswordRequest,
   UpdateUserRequest,
   UserResponse,
   UsersResponse,
@@ -107,22 +106,16 @@ export async function updateUser(
   return user;
 }
 
-// a reset answers no row but sets mustChangePassword on one
-export async function resetPassword(
-  id: string,
-  body: ResetPasswordRequest,
-): Promise<void> {
-  await api(`/api/users/${encodeURIComponent(id)}/password`, "POST", body);
-  await reread();
+// ends every login, live link and access key of the user; the row
+// stays as it was
+export async function signOutEverywhere(id: string): Promise<void> {
+  await api(`/api/users/${encodeURIComponent(id)}/sign-out`, "POST");
 }
 
-// an email with a link to choose a password; nothing changes on the row
-// until it is used
-export async function sendUserLink(
-  id: string,
-  kind: "reset-link" | "invite",
-): Promise<void> {
-  await api(`/api/users/${encodeURIComponent(id)}/${kind}`, "POST");
+// an invite again, until the user's first sign-in; nothing changes on
+// the row until it is used
+export async function sendInvite(id: string): Promise<void> {
+  await api(`/api/users/${encodeURIComponent(id)}/invite`, "POST");
 }
 
 // a failure is the saving card's, since the page keeps the list it has

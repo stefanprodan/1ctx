@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Admin user writes keep identity, the personal project, access and logins
-// coherent, while every response stays a projection without the hash.
+// coherent, while every response stays a projection.
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../src/server/lib/bus.ts";
@@ -32,12 +32,11 @@ const userBody = (username: string) => ({
   email: `${username}@example.com`,
   role: "member" as const,
   tz: "Europe/Bucharest",
-  password: "longenough",
 });
 
 async function admin(app: TestApp): Promise<TestClient> {
   const client = app.client();
-  expect((await client.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await client.signIn("admin")).status).toBe(200);
   return client;
 }
 
@@ -115,17 +114,16 @@ describe("admin users", () => {
     const { user } = await response.json();
     expect(user.email).toBe("casey@example.com");
     expect(user.disabled).toBe(false);
-    expect(user.mustChangePassword).toBe(true);
+    expect(user.signedInAt).toBeNull();
     expect(app.users.byId(user.id)).toMatchObject({
       email: "casey@example.com",
       about: "",
       disabled: false,
-      mustChangePassword: true,
     });
     expect(app.projects.personal(user.id)?.name).toBe("personal");
   });
 
-  test("create accepts about and can leave the initial password usable", async () => {
+  test("create accepts about, and the user signs in", async () => {
     const app = await testApp();
     const client = await admin(app);
     const about = "First line.\nSecond line.";
@@ -134,35 +132,25 @@ describe("admin users", () => {
         ...userBody("robin"),
         about,
         disabled: false,
-        mustChangePassword: false,
       },
     });
     expect(response.status).toBe(201);
     const { user } = await response.json();
     expect(user).toMatchObject({
       disabled: false,
-      mustChangePassword: false,
     });
     expect(app.users.byId(user.id)).toMatchObject({
       about,
       disabled: false,
-      mustChangePassword: false,
     });
     expect(app.projects.personal(user.id)?.name).toBe("personal");
 
     const member = app.client();
-    const login = await member.login("robin", "longenough");
+    const login = await member.signIn("robin");
     expect(login.status).toBe(200);
-    expect((await login.json()).user.mustChangePassword).toBe(false);
     expect((await member.call("GET", "/api/projects")).status).toBe(200);
     const profile = await member.call("GET", "/api/profile");
     expect((await profile.json()).user.about).toBe(about);
-
-    const reset = await client.call("POST", `/api/users/${user.id}/password`, {
-      body: { password: "new-password" },
-    });
-    expect(reset.status).toBe(204);
-    expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
   });
 
   test("create can disable an account before any login", async () => {
@@ -173,7 +161,6 @@ describe("admin users", () => {
         ...userBody("robin"),
         about: "Unavailable.",
         disabled: true,
-        mustChangePassword: false,
       },
     });
     expect(response.status).toBe(201);
@@ -182,11 +169,10 @@ describe("admin users", () => {
     expect(app.users.byId(user.id)).toMatchObject({
       about: "Unavailable.",
       disabled: true,
-      mustChangePassword: false,
     });
     expect(app.projects.personal(user.id)?.name).toBe("personal");
     const member = app.client();
-    expect((await member.login("robin", "longenough")).status).toBe(401);
+    expect((await member.signIn("robin")).status).toBe(401);
     expect(member.cookie).toBeNull();
     expect((await member.call("GET", "/api/profile")).status).toBe(401);
   });
@@ -205,7 +191,6 @@ describe("admin users", () => {
           ...userBody("robin"),
           about: "Unavailable.",
           disabled: true,
-          mustChangePassword: false,
         },
       });
       expect(response.status).toBe(500);
@@ -237,8 +222,8 @@ describe("admin users", () => {
       { about: 1 },
       { disabled: null },
       { disabled: "false" },
-      { mustChangePassword: null },
-      { mustChangePassword: "false" },
+      { password: "longenough" },
+      { mustChangePassword: false },
     ]) {
       const response = await client.call("POST", "/api/users", {
         body: { ...userBody("robin"), ...fields },
@@ -361,8 +346,8 @@ describe("admin users", () => {
     const user = await create(client, "casey");
     const first = app.client();
     const second = app.client();
-    await first.login("casey", "longenough");
-    await second.login("casey", "longenough");
+    await first.signIn("casey");
+    await second.signIn("casey");
     const before = app.db
       .query<{ n: number }, [string]>(
         "select count(*) as n from logins where user_id = ?",
@@ -440,7 +425,7 @@ describe("admin users", () => {
     });
   });
 
-  test("patch cannot set a password or change its initial requirement", async () => {
+  test("patch takes no password", async () => {
     const app = await testApp();
     const client = await admin(app);
     const user = await create(client, "robin");
@@ -494,7 +479,6 @@ describe("admin users", () => {
           username: caller.username,
           fullName: "Casey",
           role: "admin",
-          mustChangePassword: false,
           via: { kind: "login", id: "stale" },
         },
         params: { id: adminUser.id },
@@ -512,9 +496,8 @@ describe("admin users", () => {
       const app = await testApp();
       const client = await admin(app);
       const user = await create(client, "casey");
-      app.users.setMustChangePassword(user.id, false);
       const member = app.client();
-      await member.login("casey", "longenough");
+      await member.signIn("casey");
       const owner = app.users.byUsername("admin")!;
       app.db
         .query(
@@ -588,21 +571,20 @@ describe("admin users", () => {
     },
   );
 
-  test("reset revokes every login and closes the user's socket", async () => {
+  test("sign out everywhere ends every login and closes the user's socket", async () => {
     const app = await testApp();
     const client = await admin(app);
     const user = await create(client, "casey");
     const first = app.client();
     const second = app.client();
-    await first.login("casey", "longenough");
-    await second.login("casey", "longenough");
+    await first.signIn("casey");
+    await second.signIn("casey");
     const conn = await connection(app, first);
     app.socket.open(conn);
 
     const response = await client.call(
       "POST",
-      `/api/users/${user.id}/password`,
-      { body: { password: "new-password" } },
+      `/api/users/${user.id}/sign-out`,
     );
     expect(response.status).toBe(204);
     expect(
@@ -615,20 +597,17 @@ describe("admin users", () => {
     expect(conn.closed).toEqual([{ code: 4001, reason: "signed out" }]);
     expect((await first.call("GET", "/api/profile")).status).toBe(401);
     expect((await second.call("GET", "/api/profile")).status).toBe(401);
-    expect((await app.client().login("casey", "new-password")).status).toBe(
-      200,
-    );
+    // the admin's own login stays
+    expect((await client.call("GET", "/api/profile")).status).toBe(200);
   });
 
-  test("an admin resets their own password only from the profile", async () => {
+  test("an admin cannot sign themself out everywhere", async () => {
     const app = await testApp();
     const client = await admin(app);
     const id = app.users.byUsername("admin")!.id;
     await expectConflict(
-      await client.call("POST", `/api/users/${id}/password`, {
-        body: { password: "new-password" },
-      }),
-      "own password",
+      await client.call("POST", `/api/users/${id}/sign-out`),
+      "sign yourself out",
     );
   });
 
@@ -679,7 +658,7 @@ describe("user email projections", () => {
   test("login and me keep the email private", async () => {
     const app = await testApp();
     const client = app.client();
-    const login = await client.login("admin", "hunter2-test");
+    const login = await client.signIn("admin");
     expect((await login.json()).user).not.toHaveProperty("email");
     const me = await client.call("GET", "/api/me");
     expect((await me.json()).user).not.toHaveProperty("email");
@@ -689,9 +668,8 @@ describe("user email projections", () => {
     const app = await testApp();
     const client = await admin(app);
     const user = await create(client, "casey");
-    app.users.setMustChangePassword(user.id, false);
     const member = app.client();
-    await member.login("casey", "longenough");
+    await member.signIn("casey");
     const project = app.projects.personal(user.id)!;
     const response = await member.call("GET", `/api/projects/${project.id}`);
     expect(response.status).toBe(200);
@@ -713,8 +691,8 @@ describe("disabled accounts", () => {
     const user = await create(client, "casey");
     const first = app.client();
     const second = app.client();
-    expect((await first.login("casey", "longenough")).status).toBe(200);
-    expect((await second.login("casey", "longenough")).status).toBe(200);
+    expect((await first.signIn("casey")).status).toBe(200);
+    expect((await second.signIn("casey")).status).toBe(200);
     const conn = await connection(app, first);
     app.socket.open(conn);
 
@@ -733,10 +711,10 @@ describe("disabled accounts", () => {
     ).toEqual({ n: 0 });
     expect(conn.closed).toEqual([{ code: 4001, reason: "signed out" }]);
     expect((await first.call("GET", "/api/profile")).status).toBe(401);
-    const refused = await app.client().login("casey", "longenough");
+    const refused = await app.client().signIn("casey");
     expect(refused.status).toBe(401);
     expect(await refused.json()).toEqual({
-      error: "wrong username or password",
+      error: "sign in",
     });
 
     const again = await client.call("PATCH", `/api/users/${user.id}`, {
@@ -749,7 +727,7 @@ describe("disabled accounts", () => {
     });
     expect(enabled.status).toBe(200);
     expect((await enabled.json()).user.disabled).toBe(false);
-    expect((await app.client().login("casey", "longenough")).status).toBe(200);
+    expect((await app.client().signIn("casey")).status).toBe(200);
   });
 
   test("the caller and last enabled admin guards preserve an administrator", async () => {
@@ -779,7 +757,6 @@ describe("disabled accounts", () => {
           username: caller.username,
           fullName: caller.username,
           role: "admin",
-          mustChangePassword: false,
           via: { kind: "login", id: login },
         },
         params: { id: bootstrap.id },
@@ -805,8 +782,7 @@ describe("disabled accounts", () => {
       ).status,
     ).toBe(200);
     expect(app.users.countAdmins()).toBe(2);
-    app.users.setMustChangePassword(second.id, false);
-    expect((await app.client().login("casey", "longenough")).status).toBe(200);
+    expect((await app.client().signIn("casey")).status).toBe(200);
     const login = app.db
       .query<{ id: string }, [string]>(
         "select id from logins where user_id = ?",
@@ -819,55 +795,5 @@ describe("disabled accounts", () => {
     expect((await as({ disabled: false }))?.status).toBe(200);
     expect((await as({ role: "member" }))?.status).toBe(200);
     expect(app.users.countAdmins()).toBe(1);
-  });
-});
-
-describe("required password changes", () => {
-  test("admin-set passwords restrict the account until profile change", async () => {
-    const app = await testApp();
-    const client = await admin(app);
-    const user = await create(client, "casey");
-    expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
-
-    const member = app.client();
-    const login = await member.login("casey", "longenough");
-    expect(login.status).toBe(200);
-    expect((await login.json()).user.mustChangePassword).toBe(true);
-    const forbidden = await member.call("GET", "/api/projects");
-    expect(forbidden.status).toBe(403);
-    expect(await forbidden.json()).toEqual({
-      error: "change your password first",
-    });
-    const profile = await member.call("GET", "/api/profile");
-    expect(profile.status).toBe(200);
-    expect((await profile.json()).user.mustChangePassword).toBe(true);
-    expect((await member.call("POST", "/api/logout")).status).toBe(200);
-
-    expect((await member.login("casey", "longenough")).status).toBe(200);
-    const changed = await member.call("POST", "/api/profile/password", {
-      body: { current: "longenough", next: "changed-password" },
-    });
-    expect(changed.status).toBe(200);
-    expect((await changed.json()).user.mustChangePassword).toBe(false);
-    expect((await member.call("GET", "/api/projects")).status).toBe(200);
-    const me = await member.call("GET", "/api/me");
-    expect((await me.json()).user.mustChangePassword).toBe(false);
-
-    const reset = await client.call("POST", `/api/users/${user.id}/password`, {
-      body: { password: "reset-password" },
-    });
-    expect(reset.status).toBe(204);
-    expect(app.users.byId(user.id)?.mustChangePassword).toBe(true);
-    const afterReset = await app.client().login("casey", "reset-password");
-    expect(afterReset.status).toBe(200);
-    expect((await afterReset.json()).user.mustChangePassword).toBe(true);
-  });
-
-  test("the bootstrap admin starts without a required change", async () => {
-    const app = await testApp();
-    expect(app.users.byUsername("admin")?.mustChangePassword).toBe(false);
-    const client = app.client();
-    const login = await client.login("admin", "hunter2-test");
-    expect((await login.json()).user.mustChangePassword).toBe(false);
   });
 });

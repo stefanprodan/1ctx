@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { expect, test } from "bun:test";
-import { hashPassword } from "../../helpers/app.ts";
 import {
   createProposal,
   draftApp,
@@ -26,12 +25,10 @@ test("team members and instance admins confirm as themselves; no-op edits keep t
       fullName: "Drew",
       email: "drew@example.test",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     const member = chat.app.client();
-    await member.login("drew", "pw");
+    await member.signIn("drew");
     for (const userId of [chat.memberId, drew.id]) {
       expect(
         (

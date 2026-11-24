@@ -107,7 +107,6 @@ function signIn(): void {
     username: "admin",
     fullName: "Administrator",
     role: "admin",
-    mustChangePassword: false,
   });
 }
 

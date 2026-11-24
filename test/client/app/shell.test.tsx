@@ -48,7 +48,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
   path.value = "/";
   lastWork.value = "/";
@@ -170,8 +169,25 @@ describe("the shell before the user is known", () => {
   test.serial("a failed first load says so with a retry, no bones", () => {
     meError.value = { words: "server busy", status: 503 };
     const html = render(<App />);
+    // the words as a sentence, then the status
+    expect(html).toMatch(/Server busy\.\s*<span class="code-tag">HTTP 503/);
     expect(html).toContain("Try again");
     expect(html).not.toContain("bones-bone");
+  });
+
+  test.serial("the sign-in draws at once, and a failed load retries", () => {
+    const was = path.value;
+    try {
+      path.value = "/login";
+      expect(withClass(render(<App />), "signin")).toBe(1);
+      meError.value = { words: "the server did not answer", status: null };
+      const html = render(<App />);
+      expect(withClass(html, "signin")).toBe(0);
+      expect(html).toContain("The server did not answer.");
+      expect(html).toContain("Try again");
+    } finally {
+      path.value = was;
+    }
   });
 });
 

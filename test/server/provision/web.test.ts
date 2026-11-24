@@ -110,11 +110,8 @@ test.each([
       return Response.json({});
     });
     const reports: string[] = [];
-    await apply(
-      api,
-      documents(object("Tool", name, spec)),
-      () => null,
-      (action) => reports.push(action),
+    await apply(api, documents(object("Tool", name, spec)), (action) =>
+      reports.push(action),
     );
     expect(writes).toEqual([{ path: `/api/tools/${name}`, body: spec }]);
     expect(reports).toEqual(["updated"]);
@@ -161,7 +158,7 @@ describe("provision web through the composed app", () => {
         ignore,
       );
       const client = app.client();
-      await client.login("admin", "hunter2-test");
+      await client.signIn("admin");
       const tools = async (): Promise<ToolsResponse> =>
         (await client.call("GET", "/api/tools")).json();
       const before = await tools();

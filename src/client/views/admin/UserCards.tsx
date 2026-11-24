@@ -7,86 +7,59 @@ import type { AdminUser } from "../../../shared/api/users.ts";
 import { loadUserKeys } from "../../data/access-keys.ts";
 import { me } from "../../data/me.ts";
 import {
-  resetPassword,
-  sendUserLink,
+  sendInvite,
+  signOutEverywhere,
   updateUser,
   users,
 } from "../../data/users.ts";
-import { at, useAction, useSave } from "../../lib/save.ts";
-import { Foot } from "../../ui/Foot.tsx";
-import { Setting, SettingForm } from "../../ui/Setting.tsx";
+import { useAction, useSave } from "../../lib/save.ts";
+import { AskDelete, Foot } from "../../ui/Foot.tsx";
+import { Setting } from "../../ui/Setting.tsx";
 import { holding } from "./drafts.ts";
-import { PasswordField } from "./PasswordField.tsx";
-import {
-  adminCount,
-  disableLock,
-  linkCardWords,
-  passwordProblem,
-} from "./Users.model.ts";
+import { adminCount, disableLock, inviteCardWords } from "./Users.model.ts";
 
 export type CardProps = { user: AdminUser; saving: Signal<boolean> };
 
-export function PasswordCard({ user, saving }: CardProps) {
-  const next = useSignal("");
-  const save = useSave(
-    async () => {
-      const password = next.value;
-      await holding(saving, () => resetPassword(user.id, { password }));
-      next.value = "";
-      // a reset deletes the user's access keys
-      void loadUserKeys(user.id);
-    },
-    (message) => (message.startsWith("password") ? "next" : undefined),
-  );
+// asked once: it ends every login, live link, passkey and access key of
+// the user
+export function SignOutCard({ user, saving }: CardProps) {
+  const save = useSave(async () => {});
+  const asking = useSignal(false);
   return (
-    <SettingForm
-      save={save}
-      check={() => at("next", passwordProblem(next.value))}
-    >
-      <Setting
-        title="Reset password"
-        line={`Signs ${user.fullName} out everywhere and deletes their access keys. Hand them the new one.`}
-        foot={
-          <Foot
+    <Setting
+      title="Sign out everywhere"
+      line={`Ends every sign-in of ${user.fullName}, their unused email links, their passkeys and their access keys.`}
+      foot={
+        <Foot save={save} inline>
+          <AskDelete
             save={save}
-            dirty={next.value !== "" && !saving.value}
-            label="Reset password"
-            inline
+            asking={asking}
+            busy={save.busy || saving.value}
+            ask="Sign out everywhere"
+            label="Sign out"
+            action="sign-out"
+            going="Signing out"
+            onDelete={() =>
+              void save.act("sign-out", async () => {
+                await holding(saving, () => signOutEverywhere(user.id));
+                asking.value = false;
+                // it deletes the user's access keys
+                void loadUserKeys(user.id);
+              })
+            }
           />
-        }
-      >
-        {/* whose password it is, for the browser's password manager */}
-        <input
-          type="text"
-          name="username"
-          autocomplete="username"
-          value={user.username}
-          readOnly
-          hidden
-        />
-        <div class="pair">
-          <PasswordField
-            id="users-reset-password"
-            name="next"
-            label="New password"
-            value={next.value}
-            save={save}
-            onChange={(value) => {
-              next.value = value;
-            }}
-          />
-        </div>
-      </Setting>
-    </SettingForm>
+        </Foot>
+      }
+    />
   );
 }
 
-// with email on the admin sends a link and never holds the password;
-// nothing changes on the row until the link is used
-export function LinkCard({ user, saving }: CardProps) {
+// an invite again, until the user's first sign-in; nothing changes on
+// the row until the link is used
+export function InviteCard({ user, saving }: CardProps) {
   const send = useAction();
   const sent = useSignal<string | null>(null);
-  const words = linkCardWords(user);
+  const words = inviteCardWords(user);
   const failed = send.failure.value;
   return (
     <Setting
@@ -100,7 +73,7 @@ export function LinkCard({ user, saving }: CardProps) {
           onClick={() =>
             void send.run(async () => {
               sent.value = null;
-              await sendUserLink(user.id, words.kind);
+              await sendInvite(user.id);
               sent.value = words.sent;
             })
           }
@@ -143,7 +116,7 @@ export function SwitchCard({ user, saving }: CardProps) {
         lock ??
         (user.disabled
           ? "They cannot sign in."
-          : "Signs them out, blocks sign-in and deletes their access keys.")
+          : "Signs them out, blocks sign-in and deletes their passkeys and access keys.")
       }
       foot={
         <Foot save={save} inline>

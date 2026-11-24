@@ -29,14 +29,15 @@ two targets, one results table. Governs `scripts/load/`,
 | `knowledge.ts` | the team docs, 150 runbooks and incident write-ups, ~3.6 MB a team |
 | `db/` | the database builder (`build.ts` is the entry) |
 | `fence.ts` | what a local run does to its clone before the server opens it |
-| `provision.ts` | the cluster target's provision YAML, keys and chart values |
+| `logins.ts`, `mint.ts` | a run's logins, minted into a stopped database; `mint.ts` is the cluster's mint pod |
+| `provision.ts` | the cluster target's provision YAML, admin key and chart values |
 | `driver/` | the load itself, the same code on both targets (`main.ts` is the entry) |
 | `bench.ts`, `cluster.ts` | the two targets |
 | `summarize.ts` | the results table |
 
 Everything generated lands in the gitignored `scripts/load/out/`:
 `db/` (databases and their `.json` summaries), `run/` (the clone a
-bench run opens), `cluster/` (provision, keys, values, bundles) and
+bench run opens), `cluster/` (provision, the admin key, values, bundles) and
 `results/<label>/` (one folder of logs per run).
 
 ## The shapes
@@ -79,7 +80,7 @@ fails on a broken page.
 
 Full-size figures are extrapolated from `small` and the MVP's counts;
 no preset builds the whole MVP. Users are `adm01`.. and `u001`.. at
-`load.example`; a built database holds a password hash nobody knows.
+`load.example`; a built database holds no login.
 
 ## The fence
 
@@ -92,9 +93,39 @@ No run ever reaches a real engine.
   MCP server at the fake MCP, clears every key name, sets the `web`
   tools row's mode to `off` (the mode, not `enabled`, gates
   `webfetch` and `websearch`) and search's provider to none,
-  suspends every automation, and sets one throwaway password for this
-  run. A database with repositories or credentials
-  is refused. The fence is read back before the server starts.
+  suspends every automation, and opens one login per enabled user. A
+  database with repositories or credentials is refused. The fence is
+  read back before the server starts.
+
+## Logins
+
+No password is hashed or posted, no key is read by the driver, and no
+route skips sign-in. A run mints a login row per user (`logins.ts`)
+with a fresh token, the row holding only its hash, as a sign-in would;
+the driver sends each token as the `login` cookie and checks it with
+`GET /api/me`. Logins are minted at run time, never by the builder,
+whose clock is in the past. A user's earlier logins go when a new one
+is minted.
+
+- **Locally** the checkout that serves the run migrates the clone
+  first, so a migration that deletes logins never voids them, then the
+  fence mints them; the tokens go to `out/run/logins.json` (mode 600),
+  named to the driver by `LOGINS`. A driver that exits non-zero, a
+  failed sign-in included, fails the run.
+- **On the cluster** each driver pod is preceded by a mint step: the
+  server's deployment is scaled to 0, a pod on its volume (`mint.ts`)
+  opens the logins from a ConfigMap of hashes, and the server is scaled
+  back up and waited on. Whatever ends it, a scale-down cut short
+  included, the mint pod is deleted (tried twice) and gone before the
+  server scales back to one replica and its rollout is waited on; a pod
+  that will not go leaves the server down and fails the run with that
+  error, never hidden behind a cancel's exit code. The hashes and tokens reach
+  kubectl on stdin, never a file; the tokens go only into the
+  `load-logins` Secret, which only the driver pod mounts. A driver pod
+  that does not succeed fails the run with its log. A first SIGINT or
+  SIGTERM cancels the waits so this cleanup runs; a second exits. The chart's Secret holds
+  only `user-admin.key`, an admin key for `--provision`, made once in
+  `out/cluster/secrets/` and remade when it holds anything else.
 - The driver, on both targets, sets web access off and search to none
   through `PATCH /api/tools/web` and `/api/tools/websearch`, then
   reads the fence back through the API and refuses to load an instance
@@ -148,9 +179,9 @@ The runner's 4 CPUs carry kind, the fakes, the driver and the server
 together, so its times are several times a workstation's: compare a CI
 run only with another CI run.
 
-Install, setup and steps are idempotent. Install takes the keys from
-the namespace's Secret before it writes any, since the database there
-was made with them; setup keeps what exists by name; a step sets every
+Install, setup and steps are idempotent. No database keeps the admin
+key, so a fresh one works on an existing namespace; setup keeps what
+exists by name; a step sets every
 automation's time and starts on the next minute after. The tail waits
 at most 3 minutes for sends in flight, then stops them; tool failures
 of a send from 5 seconds before its stop on are its aborts and not
@@ -168,7 +199,7 @@ When the branch adds a migration, build the database from main's
 checkout (`bun scripts/load/db/build.ts` run in it, `--out` into this
 one's `out/db/`): `migrate()` accepts migration ids it does not know
 without a word, so main would otherwise run on the branch's schema.
-The branch then migrates its clone at start, as a deploy would.
+The branch then migrates its clone before the fence, as a deploy would.
 
 ## Reading the table
 
@@ -199,7 +230,7 @@ same turns is a cost even when the times hold.
   `migrate()` and stores; the driver's feed client is the client's
   own `Flight`.
 - Outputs stay deterministic for their seed: plans, provision YAML,
-  databases. Only keys and passwords are random.
+  databases. Only keys and login tokens are random.
 - Nothing names a real host, user or instance; the shapes are numbers.
 - The tests (`test/scripts/load/`) run in seconds and are part of
   `make test`; a run against a server is never a test.

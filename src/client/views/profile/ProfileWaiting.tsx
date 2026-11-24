@@ -6,13 +6,15 @@
 // the account's lines, so the form lands where it waited.
 
 import { emailOn } from "../../data/me.ts";
+import { passkeys } from "../../data/passkeys.ts";
 import { Bone } from "../../ui/Bones.tsx";
 import { RowsList, RowsWaiting } from "../../ui/Rows.tsx";
 import { SectionsWaiting } from "../../ui/Section.tsx";
 import { FieldBone } from "../../ui/SettingWaiting.tsx";
 import { AsideBones, Split } from "../../ui/Split.tsx";
 import { WhoWaiting } from "../../ui/Who.tsx";
-import { ABOUT_TEXT, EMAIL_HINT, PASSWORD_TEXT } from "./Profile.model.ts";
+import { PASSKEYS_TEXT } from "./Passkeys.model.ts";
+import { ABOUT_TEXT, EMAIL_HINT } from "./Profile.model.ts";
 import "./profile.css";
 
 export function ProfileWaiting() {
@@ -59,20 +61,23 @@ export function ProfileWaiting() {
                 },
               ]
             : []),
-          {
-            title: "Password",
-            text: PASSWORD_TEXT,
-            body: (
-              <div class="profile-fields">
-                <FieldBone kind="wide" at={12} />
-                <div class="pair">
-                  <FieldBone kind="input" at={14} />
-                  <FieldBone kind="input" at={16} />
-                </div>
-              </div>
-            ),
-            foot: true,
-          },
+          // the passkeys show where the browser has WebAuthn
+          ...(passkeys.support.value
+            ? [
+                {
+                  title: "Passkeys",
+                  text: PASSKEYS_TEXT,
+                  body: (
+                    <div class="field">
+                      <RowsList>
+                        <RowsWaiting count={1} />
+                      </RowsList>
+                    </div>
+                  ),
+                  foot: true,
+                },
+              ]
+            : []),
         ]}
       />
     </Split>

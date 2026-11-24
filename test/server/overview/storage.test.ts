@@ -61,8 +61,8 @@ async function settledChat(chat: ChatApp, projectId = chat.projectId) {
 
 // a clock moved past the logins' life needs them again
 async function relogin(chat: ChatApp) {
-  await chat.admin.login("admin", "hunter2-test");
-  await chat.member.login("casey", "pw");
+  await chat.admin.signIn("admin");
+  await chat.member.signIn("casey");
 }
 
 describe("the storage area map", () => {

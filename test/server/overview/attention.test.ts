@@ -116,7 +116,7 @@ describe("the attention route", () => {
     };
     const app = await testApp({ secrets });
     const admin = app.client();
-    await admin.login("admin", "hunter2-test");
+    await admin.signIn("admin");
     const made = await admin.call("POST", "/api/providers", {
       body: {
         name: "router",

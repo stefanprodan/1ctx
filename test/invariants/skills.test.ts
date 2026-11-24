@@ -37,7 +37,7 @@ function sources(entries: Record<string, Answer>): typeof fetch {
 async function admin(fetcher: typeof fetch, logFactory?: LogFactory) {
   const app = await testApp({ fetcher, logFactory });
   const client = app.client();
-  await client.login("admin", "hunter2-test");
+  await client.signIn("admin");
   return { app, client };
 }
 

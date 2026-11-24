@@ -426,7 +426,7 @@ describe("limits area", () => {
     const app = await testApp({ cores: 4 });
     try {
       const admin = app.client();
-      expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+      expect((await admin.signIn("admin")).status).toBe(200);
       const res = await admin.call("GET", "/api/limits");
       const body = (await res.json()) as LimitsResponse;
       expect(
@@ -540,7 +540,7 @@ describe("limits area", () => {
     const app = await testApp();
     try {
       const admin = app.client();
-      expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+      expect((await admin.signIn("admin")).status).toBe(200);
       const saved = await admin.call("PUT", "/api/limits", {
         body: {
           values: {
@@ -695,7 +695,7 @@ describe("limits area", () => {
       });
       area.store.set("knowledgeProjectBytes", 256 * 1024 * 1024, 50);
       const admin = app.client();
-      expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+      expect((await admin.signIn("admin")).status).toBe(200);
       const response = await admin.call("GET", "/api/limits");
       expect(response.status).toBe(200);
       const { limits }: LimitsResponse = await response.json();

@@ -34,9 +34,9 @@ type Kind = "user" | "reply" | "work" | "memory" | "tool" | "summary";
 function seeded() {
   const db = memoryDb();
   db.exec(`
-    insert into users (id, username, full_name, email, role, password_hash,
+    insert into users (id, username, full_name, email, role,
       created_at)
-    values ('u', 'ana', 'Ana', 'ana@example.com', 'member', 'x', 0);
+    values ('u', 'ana', 'Ana', 'ana@example.com', 'member', 0);
     insert into projects (id, kind, name, owner_id, created_at)
     values ('p', 'team', 'team-one', 'u', 0),
       ('q', 'team', 'team-two', 'u', 0);

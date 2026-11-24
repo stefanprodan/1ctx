@@ -7,7 +7,7 @@ import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { createKey } from "../../helpers/access-keys.ts";
 import type { TestApp, TestClient } from "../../helpers/app.ts";
-import { emailApp, MARIA_PASSWORD } from "../../helpers/links.ts";
+import { emailApp } from "../../helpers/links.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { briefFile, httpFixture } from "./http-fixture.ts";
 
@@ -268,7 +268,7 @@ test.serial(
 );
 
 test.serial(
-  "an admin's password reset ends claims with the deleted keys and logins",
+  "sign out everywhere ends claims with the deleted keys and logins",
   async () => {
     await using f = await httpFixture();
     const key = await f.key();
@@ -277,15 +277,11 @@ test.serial(
     const kept = [hold(f.app, other, f.projectId)];
     await atomicEnding(
       f.app,
-      () =>
-        f.admin.call("POST", `/api/users/${key.userId}/password`, {
-          body: { password: "reset-password" },
-        }),
+      () => f.admin.call("POST", `/api/users/${key.userId}/sign-out`),
       204,
       ended,
       kept,
     );
-    expect(f.app.users.byId(key.userId)!.mustChangePassword).toBe(true);
     expect(
       f.app.db
         .query("select id from access_keys where user_id = ?")
@@ -294,59 +290,36 @@ test.serial(
   },
 );
 
-for (const purpose of ["reset", "invite"] as const) {
-  test.serial(
-    `${purpose} link use ends claims in the password transaction`,
-    async () => {
-      const e = await emailApp();
-      const { app } = e;
-      try {
-        const client = app.client();
-        expect((await client.login("maria", MARIA_PASSWORD)).status).toBe(200);
-        const key = await keyFor(client, e.maria.id);
-        const other = await keyFor(e.admin, app.users.byUsername("admin")!.id);
-        const ended = [
-          hold(app, key, app.projects.personal(key.userId)!.id, true),
-        ];
-        const kept = [
-          hold(app, other, app.projects.personal(other.userId)!.id),
-        ];
-        if (purpose === "invite")
-          app.users.setMustChangePassword(key.userId, true);
-        expect(
-          (
-            await e.admin.call(
-              "POST",
-              `/api/users/${key.userId}/${purpose === "reset" ? "reset-link" : "invite"}`,
-            )
-          ).status,
-        ).toBe(204);
-        await e.send();
-        const token = e.token();
-        await atomicEnding(
-          app,
-          () =>
-            app.client().call("POST", `/api/links/${token}`, {
-              body: { password: "new-password" },
-            }),
-          200,
-          ended,
-          kept,
-        );
-        expect(e.links(key.userId)).toEqual([
-          { purpose, minted: true, used: true },
-        ]);
-        expect(
-          app.db
-            .query("select id from access_keys where user_id = ?")
-            .all(key.userId),
-        ).toEqual([]);
-      } finally {
-        await app.shutdown();
-        app.db.close();
+for (const purpose of ["signin", "invite"] as const) {
+  test.serial(`${purpose} link use keeps keys and claims`, async () => {
+    const e = await emailApp();
+    const { app } = e;
+    try {
+      const client = app.client();
+      expect((await client.signIn("maria")).status).toBe(200);
+      const key = await keyFor(client, e.maria.id);
+      const held = hold(app, key, app.projects.personal(key.userId)!.id);
+      const before = app.externalTasks.show(held.id, null);
+      if (purpose === "invite") {
+        app.db
+          .query("update users set signed_in_at = null where id = ?")
+          .run(key.userId);
       }
-    },
-  );
+      const asked =
+        purpose === "invite"
+          ? await e.admin.call("POST", `/api/users/${key.userId}/invite`)
+          : await e.ask(app.client());
+      expect(asked.status).toBe(purpose === "invite" ? 204 : 202);
+      await app.linkAsks();
+      await e.send();
+      const used = await e.use(app.client(), e.token());
+      expect(used.status).toBe(303);
+      expect(app.externalTasks.show(held.id, null)).toEqual(before);
+    } finally {
+      await app.shutdown();
+      app.db.close();
+    }
+  });
 }
 
 test("removing an admin's membership keeps claims because the project is still visible", async () => {
@@ -367,20 +340,6 @@ test("removing an admin's membership keeps claims because the project is still v
         "DELETE",
         `/api/projects/${f.projectId}/members/${userId}`,
       )
-    ).status,
-  ).toBe(200);
-  expect(f.app.externalTasks.show(held.id, null)).toEqual(before);
-});
-
-test("an owner's password change keeps their keys and task claims", async () => {
-  await using f = await httpFixture();
-  const held = hold(f.app, await f.key(), f.projectId);
-  const before = f.app.externalTasks.show(held.id, null);
-  expect(
-    (
-      await f.creator.client.call("POST", "/api/profile/password", {
-        body: { current: "pw", next: "new-password" },
-      })
     ).status,
   ).toBe(200);
   expect(f.app.externalTasks.show(held.id, null)).toEqual(before);

@@ -4,18 +4,16 @@
 // The server's API as the driver calls it: one signed-in user per
 // cookie, every write with the origin header, every answer timed.
 
-import type { LoginResponse } from "../../../src/shared/api/access.ts";
+import type { MeResponse } from "../../../src/shared/api/access.ts";
 import type { SocketEvent } from "../../../src/shared/socket.ts";
-import { info, sleep } from "./log.ts";
 
 export type Who = { user: string; cookie: string; id: string; role: string };
 export type Res<T> = { status: number; body: T; ms: number; error: string };
 
 export type ApiOptions = {
   base: string;
-  // one password for every user (a local run), else <secrets>user-<name>.key
-  password?: string;
-  secrets?: string;
+  // a JSON file of login tokens by username, minted for this run
+  logins: string;
 };
 
 export class Api {
@@ -75,43 +73,27 @@ export class Api {
     return r.body;
   }
 
-  private async password(user: string): Promise<string> {
-    if (this.options.password !== undefined) return this.options.password;
-    const dir = this.options.secrets ?? "/secrets/";
-    return (await Bun.file(`${dir}user-${user}.key`).text()).trim();
-  }
+  private tokens: Promise<Record<string, string>> | null = null;
 
-  // Sign-in is limited per client address. The server runs with
-  // --trust-proxy, so each user signs in from its own forwarded
-  // address; a 429 waits the window out and tries again.
-  async signIn(user: string, index: number): Promise<Who> {
-    const password = await this.password(user);
-    const addr = `10.${200 + ((index >> 16) & 0x3f)}.${(index >> 8) & 0xff}.${index & 0xff}`;
-    for (let attempt = 0; ; attempt++) {
-      const t = performance.now();
-      const r = await fetch(`${this.base}/api/login`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          origin: this.base,
-          "x-forwarded-for": addr,
-        },
-        body: JSON.stringify({ username: user, password }),
-      });
-      if (r.status === 429 && attempt < 10) {
-        await r.text();
-        info("login limited, waiting", { user });
-        await sleep(61_000);
-        continue;
-      }
-      if (r.status !== 200) {
-        throw new Error(`${user} sign in: ${r.status} ${await r.text()}`);
-      }
-      const body = (await r.json()) as LoginResponse;
-      const cookie = (r.headers.get("set-cookie") ?? "").split(";")[0]!;
-      this.loginMs.push(performance.now() - t);
-      return { user, cookie, id: body.user.id, role: body.user.role };
+  // A user's minted login as the cookie, checked by reading who it is.
+  // Nothing signs in: the tokens were opened in the database before the
+  // server started.
+  async signIn(user: string): Promise<Who> {
+    this.tokens ??= Bun.file(this.options.logins).json();
+    const token = (await this.tokens)[user];
+    if (token === undefined) throw new Error(`no login minted for ${user}`);
+    const cookie = `login=${token}`;
+    const t = performance.now();
+    const r = await this.call<MeResponse>(
+      { user, cookie, id: "", role: "" },
+      "GET",
+      "/api/me",
+    );
+    if (r.status !== 200 || r.body?.user?.username !== user) {
+      throw new Error(`${user} login: ${r.status} ${r.error || "nobody"}`);
     }
+    this.loginMs.push(performance.now() - t);
+    return { user, cookie, id: r.body.user.id, role: r.body.user.role };
   }
 
   socket(

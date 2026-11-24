@@ -8,7 +8,7 @@
 import { describe, expect, test } from "bun:test";
 import { compose } from "../../../src/server/compose.ts";
 import { silent } from "../../../src/server/lib/log.ts";
-import { VERSION } from "../../helpers/app.ts";
+import { ADMIN_KEY, VERSION } from "../../helpers/app.ts";
 import {
   createAutomation,
   settleRun as settle,
@@ -120,7 +120,7 @@ describe("the memory phase boundary", () => {
     const fresh = await compose({
       db: chat.app.db,
       secret: (kind, name) =>
-        kind === "user-" && name === "user-admin" ? "hunter2-test" : null,
+        kind === "user-" && name === "user-admin" ? ADMIN_KEY : null,
       clock: () => chat.app.now.value,
       fetcher: chat.scripted.fetcher,
       log: () => silent,
@@ -162,7 +162,7 @@ describe("the memory phase boundary", () => {
       return compose({
         db: chat.app.db,
         secret: (kind, name) =>
-          kind === "user-" && name === "user-admin" ? "hunter2-test" : null,
+          kind === "user-" && name === "user-admin" ? ADMIN_KEY : null,
         clock: () => chat.app.now.value,
         fetcher: chat.scripted.fetcher,
         log: () => silent,

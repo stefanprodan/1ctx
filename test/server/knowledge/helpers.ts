@@ -36,8 +36,6 @@ export function setup(overrides: Partial<KnowledgeCaps> = {}) {
     fullName: "Writer",
     email: "writer@example.com",
     role: "member",
-    passwordHash: "unused",
-    mustChangePassword: false,
     now: 0,
   });
   const projectId = projects.personal(user.id)!.id;

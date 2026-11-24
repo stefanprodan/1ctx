@@ -4,19 +4,24 @@
 // The root: a public route renders at once; anything else waits for
 // the first load of me in the shell's shape, with a retry when that
 // load fails; the login
-// view when nobody is signed in and the route needs someone; otherwise
-// the shell, the rail beside the view.
+// view when nobody is signed in and the route needs someone; the passkey
+// step after an emailed sign-in; otherwise the shell, the rail beside
+// the view.
 
 import { effect } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { loadMe, me, meError } from "../data/me.ts";
+import { passkeys } from "../data/passkeys.ts";
+import { sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { type HandedWait, HandOver, useHandOver } from "../lib/wait.ts";
 import { Bone } from "../ui/Bones.tsx";
+import { CodeTag } from "../ui/CodeTag.tsx";
 import { PageWaiting } from "../ui/PageWaiting.tsx";
-import { Login } from "../views/home/Login.tsx";
+import { PasskeyStep } from "../views/home/PasskeyStep.tsx";
+import { SignIn } from "../views/home/SignIn.tsx";
 import { Rail, RailWaiting } from "./Rail.tsx";
 import { navigate, path, query } from "./router.ts";
 import { ALIASES, match } from "./routes.ts";
@@ -144,9 +149,8 @@ export function App() {
   }, []);
   // the shell waits for me, then for the view's code, as one wait
   const shellWaits =
-    m?.route.bare !== true &&
-    ((user === undefined && needsUser && meError.value === null) ||
-      (user != null && m !== null && !m.route.view.settled()));
+    (user === undefined && needsUser && meError.value === null) ||
+    (user != null && m !== null && !m.route.view.settled());
   // the view's code loads beside me, not once me lands, and loads even
   // where the shell draws no view, so the wait always ends
   if (shellWaits && m !== null && !m.route.view.settled()) {
@@ -154,32 +158,28 @@ export function App() {
   }
   const waited = useHandOver(shellWaits, path.value);
 
-  // one who must change the password they were handed lands on the
-  // profile, where the server lets them go
   useEffect(() => {
-    if (!user || m?.route.bare) return;
-    if (user.mustChangePassword) {
-      if (m?.route.path !== "/profile") navigate("/profile", true);
-      return;
-    }
+    if (!user) return;
     const alias = ALIASES[path.value];
     if (alias !== undefined) navigate(alias + query.value, true);
     else if (m === null || m.route.path === "/login") navigate("/", true);
   }, [user, m, path.value]);
 
-  // a page an email links to reads the same signed in or not
-  if (m?.route.bare) {
-    const View = m.route.view;
-    return <View params={m.params} />;
-  }
+  // the sign-in at /login is the one App draws for every address that
+  // needs a user, so the card keeps its state when a sign-in moves it
+  const signIn = m !== null && m.route.path === "/login";
+  const failed = meError.value;
   if (user === undefined) {
+    // the sign-in draws at once, but a failed first load offers its
+    // retry rather than a card that cannot know whether email is on
+    if (signIn && failed === null) return <SignIn />;
     // a public page needs nobody, so a slow or hanging first load does
-    // not hold the sign-in form back
-    if (!needsUser) {
+    // not hold it back
+    if (!needsUser && !signIn) {
       const View = m.route.view;
       return <View params={m.params} />;
     }
-    if (meError.value === null) {
+    if (failed === null) {
       // a route with a shape of its own (a chat) waits in it already,
       // so the shape does not change when the user lands
       const Shape =
@@ -198,7 +198,10 @@ export function App() {
     }
     return (
       <main class="shell-fail">
-        <p class="error">{meError.value}</p>
+        <p class="error">
+          {sentence(failed.words)}
+          <CodeTag status={failed.status} spaced />
+        </p>
         <button type="button" class="btn" onClick={() => void loadMe()}>
           Try again
         </button>
@@ -206,12 +209,13 @@ export function App() {
     );
   }
   if (user === null) {
-    if (needsUser) return <Login />;
+    if (needsUser || signIn) return <SignIn />;
     const View = m.route.view;
     return <View params={m.params} />;
   }
+  // signed in already: the app waits behind it until added or skipped
+  if (passkeys.step.value) return <PasskeyStep />;
   if (m === null || m.route.path === "/login") return null;
-  if (user.mustChangePassword && m.route.path !== "/profile") return null;
   if (m.route.role === "admin" && user.role !== "admin") {
     return (
       <Shell user={user} waited={waited}>

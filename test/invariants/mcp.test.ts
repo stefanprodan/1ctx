@@ -75,7 +75,7 @@ async function setup(
     secrets: options.secrets,
   });
   const client = app.client();
-  await client.login("admin", "hunter2-test");
+  await client.signIn("admin");
   return { app, client, flux };
 }
 

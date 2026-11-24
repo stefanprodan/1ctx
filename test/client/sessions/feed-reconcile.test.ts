@@ -144,7 +144,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
   urls = [];
   gates = [];
@@ -534,7 +533,6 @@ describe("a list that goes stops its loads", () => {
         username: "ana",
         fullName: "Ana",
         role: "member",
-        mustChangePassword: false,
       };
       await release(base());
       jest.advanceTimersByTime(TRAIL_MS * 4);

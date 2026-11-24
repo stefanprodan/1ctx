@@ -19,9 +19,9 @@ import {
   emailOn,
   loadUsers,
   loadUserUsage,
-  resetPassword,
-  sendUserLink,
+  sendInvite,
   setUserProjects,
+  signOutEverywhere,
   updateUser,
   users,
   usersError,
@@ -33,13 +33,11 @@ import {
   adminCount,
   disableLock,
   emailProblem,
-  firstPasswordOf,
-  generatePassword,
-  linkCardWords,
+  inviteCardWords,
   metaLine,
-  passwordProblem,
   patchOf,
   roleLock,
+  signInLine,
   stateLine,
   userCounts,
   userFieldOf,
@@ -63,7 +61,7 @@ const casey: AdminUser = {
   tz: "Europe/Bucharest",
   createdAt: new Date(2026, 8, 13).getTime(),
   disabled: false,
-  mustChangePassword: true,
+  signedInAt: null,
   emailPlaceholder: false,
   lastVisitDay: null,
   projectIds: ["p1"],
@@ -100,11 +98,11 @@ describe("the words", () => {
         "@casey · casey@example.com",
       );
       expect(stateLine(root, NOW)).toBe("admin · active today");
-      expect(stateLine(casey, NOW)).toBe("member · password to change");
+      expect(stateLine(casey, NOW)).toBe("member · never signed in");
       expect(stateLine({ ...casey, disabled: true }, NOW)).toBe(
         "member · disabled",
       );
-      expect(stateLine({ ...casey, mustChangePassword: false }, NOW)).toBe(
+      expect(stateLine({ ...casey, signedInAt: 1 }, NOW)).toBe(
         "member · never active",
       );
     },
@@ -112,7 +110,7 @@ describe("the words", () => {
 
   test.serial("last active counts the user's own days, never hours", () => {
     const line = (lastVisitDay: string | null, tz = "UTC") =>
-      stateLine({ ...root, lastVisitDay, tz }, NOW);
+      stateLine({ ...root, signedInAt: 1, lastVisitDay, tz }, NOW);
     expect(line("2026-09-28")).toBe("admin · active today");
     expect(line("2026-09-27")).toBe("admin · active yesterday");
     expect(line("2026-09-25")).toBe("admin · active 3d ago");
@@ -127,21 +125,6 @@ describe("the words", () => {
     expect(line("2026-08-02")).toBe("admin · active 2 Aug");
     expect(line("2025-12-31")).toBe("admin · active 31 Dec 2025");
   });
-
-  test.serial(
-    "a generated password passes the rule and skips look-alikes",
-    () => {
-      const seen = new Set<string>();
-      for (let i = 0; i < 50; i++) {
-        const p = generatePassword();
-        expect(p).toHaveLength(20);
-        expect(p).toMatch(/^[a-km-zA-HJ-NP-Z2-9]+$/);
-        expect(passwordProblem(p)).toBeNull();
-        seen.add(p);
-      }
-      expect(seen.size).toBe(50);
-    },
-  );
 
   test.serial("the list's aside counts by role, the disabled apart", () => {
     expect(
@@ -167,42 +150,64 @@ describe("the words", () => {
   }
 });
 
-describe("the email links", () => {
-  test("a new user is invited only with email on and the invite picked", () => {
-    expect(firstPasswordOf(true, "invite", "typed")).toEqual({ invite: true });
-    expect(firstPasswordOf(true, "password", "typed")).toEqual({
-      password: "typed",
-    });
-    expect(firstPasswordOf(false, "invite", "typed")).toEqual({
-      password: "typed",
-    });
+describe("what keeps a user from signing in", () => {
+  // serial: the file's hooks reset signals and the fetch between tests
+  test.serial("a member email cannot reach, and an admin without a way", () => {
+    expect(signInLine(casey, false)).toBe("No new links while email is off");
+    expect(signInLine({ ...casey, emailPlaceholder: true }, true)).toBe(
+      "Not without a real email",
+    );
+    expect(signInLine(casey, true)).toBeNull();
+    expect(signInLine({ ...casey, disabled: true }, false)).toBeNull();
+    const ops = { ...casey, role: "admin" as const, username: "ops-lead" };
+    expect(signInLine(ops, true)).toBeNull();
+    expect(signInLine(ops, false)).toBe("Use an existing link or an admin key");
+    expect(signInLine({ ...ops, emailPlaceholder: true }, false)).toBe(
+      "Admin key needed",
+    );
+    expect(signInLine({ ...ops, emailPlaceholder: true }, true)).toBe(
+      "Admin key needed",
+    );
+    const underscore = { ...ops, username: "ops_lead" };
+    expect(signInLine(underscore, true)).toBe(
+      "No admin key, as the name has _",
+    );
+    expect(signInLine(underscore, false)).toBe(
+      "No admin key, as the name has _",
+    );
   });
 
-  test("the card invites again until a password is chosen, then resets", () => {
-    expect(linkCardWords(casey)).toMatchObject({
-      kind: "invite",
+  test.serial("the user's page says it in its aside", () => {
+    users.value = [root, casey];
+    projects.value = [];
+    const html = render(<UserPage params={{ username: "casey" }} />);
+    expect(html).toContain(">Sign in<");
+    expect(html).toContain("No new links while email is off");
+  });
+});
+
+describe("the email links", () => {
+  test("the card invites again", () => {
+    expect(inviteCardWords(casey)).toMatchObject({
       button: "Send invite",
       sent: "Sent to casey@example.com.",
     });
-    expect(
-      linkCardWords({ ...casey, mustChangePassword: false }),
-    ).toMatchObject({ kind: "reset-link", button: "Send reset link" });
-    expect(linkCardWords({ ...casey, disabled: true }).line).toBe(
+    expect(inviteCardWords({ ...casey, disabled: true }).line).toBe(
       "Enable them first.",
     );
   });
 
-  test.serial("sends the link the card names", async () => {
+  test.serial("sends the invite and signs out everywhere", async () => {
     const calls: string[] = [];
     answer = (url, init) => {
       calls.push(`${init?.method} ${url}`);
       return new Response(null, { status: 204 });
     };
-    await sendUserLink("u2", "invite");
-    await sendUserLink("u2", "reset-link");
+    await sendInvite("u2");
+    await signOutEverywhere("u2");
     expect(calls).toEqual([
       "POST /api/users/u2/invite",
-      "POST /api/users/u2/reset-link",
+      "POST /api/users/u2/sign-out",
     ]);
   });
 });
@@ -228,12 +233,6 @@ describe("the checks", () => {
     expect(emailProblem("casey@.com")).toBe("Not an email address");
     expect(emailProblem("o ana@example.com")).toBe("Not an email address");
     expect(emailProblem(`${"a".repeat(250)}@b.co`)).toContain("under 254");
-  });
-
-  test.serial("the password rule", () => {
-    expect(passwordProblem("longenough")).toBeNull();
-    expect(passwordProblem("short")).toContain("at least 8");
-    expect(passwordProblem("é".repeat(513))).toContain("at most 1024 bytes");
   });
 
   test.serial("the patch carries only what changed, lowercased", () => {
@@ -274,9 +273,6 @@ describe("the refusals", () => {
     expect(userFieldOf("email is taken")).toBe("email");
     expect(userFieldOf("time zone must be an IANA zone name")).toBe("tz");
     expect(userFieldOf("cannot change your own role")).toBe("role");
-    expect(userFieldOf("password must be a string of 8 to 1024 bytes")).toBe(
-      "password",
-    );
     expect(userFieldOf("the last admin must remain enabled")).toBeUndefined();
   });
 });
@@ -301,36 +297,12 @@ describe("the entity", () => {
         email: "casey@example.com",
         role: "member",
         tz: "Europe/Bucharest",
-        password: "longenough",
       });
       expect(users.value).toEqual([root, casey]);
       const renamed = { ...casey, username: "a-casey" };
       answer = () => Response.json({ user: renamed });
       await updateUser("u2", { username: "a-casey" });
       expect(users.value).toEqual([renamed, root]);
-    },
-  );
-
-  test.serial(
-    "a reset sends the password and reads the list again",
-    async () => {
-      users.value = [root, { ...casey, mustChangePassword: false }];
-      let sent: { url: string; body: unknown } | null = null as {
-        url: string;
-        body: unknown;
-      } | null;
-      answer = (url, init) => {
-        if (init?.method !== "POST")
-          return Response.json({ users: [root, casey] });
-        sent = { url, body: JSON.parse(String(init?.body)) };
-        return new Response(null, { status: 204 });
-      };
-      await resetPassword("u2", { password: "longenough" });
-      expect(sent).toEqual({
-        url: "/api/users/u2/password",
-        body: { password: "longenough" },
-      });
-      expect(users.value).toEqual([root, casey]);
     },
   );
 
@@ -381,9 +353,6 @@ describe("the entity", () => {
           ? new Response(null, { status: 204 })
           : Response.json({ error: "down" }, { status: 503 });
       users.value = [root, casey];
-      await expect(
-        resetPassword("u2", { password: "longenough" }),
-      ).rejects.toThrow("down");
       await expect(setUserProjects(casey, ["p1"])).rejects.toThrow("down");
       // the page keeps the list it had
       expect(users.value).toEqual([root, casey]);
@@ -422,7 +391,7 @@ describe("the pages", () => {
       expect(html).toContain("@admin · admin@example.test");
       expect(html).toContain("@casey · casey@example.com");
       expect(html).toContain('href="/admin/access/users/casey"');
-      expect(html).toContain("member · password to change");
+      expect(html).toContain("member · never signed in");
       expect(html).toContain(">you<");
       expect(html).toContain('href="/admin/access/users?new"');
       expect(html).toContain(">Admins<");
@@ -437,15 +406,14 @@ describe("the pages", () => {
     expect(html).toContain("Forbidden.");
   });
 
-  test.serial("New user asks who, the role and the password once", () => {
+  test.serial("New user asks who and the role, never a password", () => {
     users.value = [root];
     const html = render(<NewUser />);
     expect(html).toContain("Create user");
     expect(html).toContain('name="username"');
-    expect(html).not.toContain('name="again"');
-    expect(html).toContain('aria-label="Generate"');
-    expect(html).toContain('aria-label="Show"');
-    expect(html).toContain('aria-label="Copy"');
+    expect(html).not.toContain('type="password"');
+    // the invite only with email on
+    expect(html).not.toContain("Send an invite");
   });
 
   test.serial(
@@ -468,7 +436,8 @@ describe("the pages", () => {
       expect(html).not.toContain("Works in");
       expect(html).toContain(">platform<");
       expect(html).not.toContain(">ops<");
-      expect(html).toContain("Reset password");
+      expect(html).toContain("Sign out everywhere");
+      expect(html).not.toContain("Reset password");
       expect(html).toContain("Disable @casey");
       expect(html).toContain("Personal, last 30 days");
       expect(html).toContain("1.2K");
@@ -477,13 +446,13 @@ describe("the pages", () => {
   );
 
   test.serial(
-    "the admin's own page fixes the role and has no reset or disable",
+    "the admin's own page fixes the role and has no sign out or disable",
     () => {
       users.value = [root, casey];
       projects.value = [];
       const html = render(<UserPage params={{ username: "admin" }} />);
       expect(html).toContain("You cannot change your own role.");
-      expect(html).not.toContain("Reset password");
+      expect(html).not.toContain("Sign out everywhere");
       expect(html).not.toContain("Disable @admin");
     },
   );
@@ -496,45 +465,41 @@ describe("the pages", () => {
     expect(html).toContain("They cannot sign in.");
   });
 
-  test.serial(
-    "with email on, New user sends an invite in place of the password",
-    () => {
-      users.value = [root];
-      emailOn.value = true;
-      try {
-        const html = render(<NewUser />);
-        expect(html).toContain("Send an invite");
-        expect(html).toContain("It works for 7 days.");
-        expect(html).not.toContain('aria-label="Generate"');
-      } finally {
-        emailOn.value = false;
-      }
-    },
-  );
+  test.serial("with email on, New user sends an invite", () => {
+    users.value = [root];
+    emailOn.value = true;
+    try {
+      const html = render(<NewUser />);
+      expect(html).toContain("Send an invite");
+      expect(html).toContain("No invite");
+      expect(html).toContain("It works for 7 days.");
+    } finally {
+      emailOn.value = false;
+    }
+  });
 
   test.serial(
-    "with email on, a user's page emails a link in place of the typed reset",
+    "with email on, a user's page sends the invite again until a sign-in",
     () => {
       users.value = [
         root,
         casey,
-        { ...casey, id: "u3", username: "dana", mustChangePassword: false },
+        { ...casey, id: "u3", username: "dana", signedInAt: 1 },
       ];
       projects.value = [];
       emailOn.value = true;
       try {
         const invited = render(<UserPage params={{ username: "casey" }} />);
         expect(invited).toContain("Send invite");
-        expect(invited).not.toContain('aria-label="Generate"');
         const active = render(<UserPage params={{ username: "dana" }} />);
-        expect(active).toContain("Send reset link");
-        // no email reaches a placeholder, so the typed reset stays
+        expect(active).not.toContain("Send invite");
+        expect(active).toContain("Sign out everywhere");
+        // no email reaches a placeholder
         users.value = [root, { ...casey, emailPlaceholder: true }];
         const seeded = render(<UserPage params={{ username: "casey" }} />);
         expect(seeded).not.toContain("Send invite");
-        expect(seeded).toContain('aria-label="Generate"');
         const own = render(<UserPage params={{ username: "admin" }} />);
-        expect(own).not.toContain("Send reset link");
+        expect(own).not.toContain("Send invite");
       } finally {
         emailOn.value = false;
       }
@@ -574,12 +539,12 @@ describe("the pages", () => {
       expect(html).toContain("expires ");
       expect(html).toContain('aria-label="More for laptop-claude"');
       expect(html).not.toContain("New access key");
-      // the reset and the disable say they take the keys too
+      // sign out everywhere and the disable say they take the keys too
       expect(html).toContain(
-        "Signs Casey Doe out everywhere and deletes their access keys.",
+        "Ends every sign-in of Casey Doe, their unused email links, their passkeys and their access keys.",
       );
       expect(html).toContain(
-        "Signs them out, blocks sign-in and deletes their access keys.",
+        "Signs them out, blocks sign-in and deletes their passkeys and access keys.",
       );
       // revoking reads the list again
       const calls: string[] = [];

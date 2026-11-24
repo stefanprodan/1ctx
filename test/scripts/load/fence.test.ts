@@ -51,7 +51,7 @@ describe("the driver's fence", () => {
     const app = await testApp();
     try {
       const client = app.client();
-      await client.login("admin", "hunter2-test");
+      await client.signIn("admin");
       const api = caller(client);
       await api.must(admin, "PATCH", "/api/tools/web", { mode: "all" });
       await expect(assertFenced(api, admin, MODEL, MCP)).rejects.toThrow(

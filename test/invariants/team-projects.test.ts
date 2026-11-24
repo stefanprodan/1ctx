@@ -8,7 +8,7 @@ import type { Conn, ConnData } from "../../src/server/web/socket.ts";
 import type { ProjectDetail } from "../../src/shared/contracts/project.ts";
 import type { SessionDetail } from "../../src/shared/contracts/session.ts";
 import type { SocketEvent } from "../../src/shared/socket.ts";
-import { hashPassword, ORIGIN, type TestClient } from "../helpers/app.ts";
+import { ORIGIN, type TestClient } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
@@ -66,12 +66,10 @@ async function makeUser(
     fullName: username.toUpperCase(),
     email: `${username}@example.com`,
     role,
-    passwordHash: await hashPassword("pw"),
-    mustChangePassword: false,
     now: chat.app.now.value,
   });
   const client = chat.app.client();
-  await client.login(username, "pw");
+  await client.signIn(username);
   return { user, client };
 }
 async function addMember(chat: ChatApp, projectId: string, userId: string) {
@@ -496,7 +494,6 @@ describe("team project chat lifecycle", () => {
         username: "casey",
         fullName: "Casey Doe",
         role: "member",
-        mustChangePassword: false,
         via: { kind: "login", id: "test" },
       },
       { projectId: project.id, agentId: chat.agentId, message: "hello" },

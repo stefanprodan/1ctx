@@ -2,8 +2,9 @@
 
 How the binary runs outside the preview: as an OS service, on the
 staging instance, in a container, and how releases are built. Governs
-`src/server/service/`, `scripts/staging.sh`, `scripts/openshell.sh`
-and the `make staging-*` targets, the `Dockerfile`, `.dockerignore`,
+`src/server/service/`, `scripts/staging.sh`, `scripts/openshell.sh`,
+the preview's mail catcher (`scripts/mail/`) and the `make staging-*`
+targets, the `Dockerfile`, `.dockerignore`,
 `deploy/` and `.github/workflows/`.
 
 ## The OS service (`1ctx service`)
@@ -96,7 +97,7 @@ gateway add`.
   sandbox shell on with no custom image. A
   restart keeps an unchanged gateway. The server counts as up only when
   the preview port's one listener is the pid it started, so a stranger
-  on the port is refused before the admin password is sent.
+  on the port is refused before the admin key is sent.
   `preview-stop` stops the gateway; `preview-clean` and `preview-reset`,
   with or without the variable, stop the server, delete every sandbox
   and provider under the instance label through the gateway (started for
@@ -122,6 +123,33 @@ gateway add`.
 - **Kubernetes:** OpenShell's own Helm chart as a prerequisite, not
   built yet.
 
+## The preview's mail catcher
+
+- **The preview's email goes to a catcher on loopback,** the preview
+  port + 2 (`PREVIEW_MAIL_PORT`), each message a mode 600 file in
+  `.preview/mail/` (mode 700) named `<key>--<time>-<count>.eml`.
+  `make preview-mail TO=<username or email>` prints the newest.
+- **Its certificate is made at a start when missing or within two days
+  of its end,** for 127.0.0.1 alone and not a CA, its key never leaving
+  the folder; never the test fixture, which is a CA whose key is
+  public. The server gets it through `NODE_EXTRA_CA_CERTS`, which Bun
+  honours for nodemailer's TLS, so certificates stay verified and
+  nothing else is added.
+- **Its `SmtpServer` object is applied with `--provision` at each
+  start,** after any provisioning, so a provisioned real server never
+  wins. `PREVIEW_MAIL=real` starts no catcher and refuses to start while
+  the SMTP server is still the endpoint the last setup saved in
+  `.preview/mail/endpoint`, or when it cannot be read; provision the
+  real one with it set.
+- **A start refuses a preview port something already listens on.**
+  One that fails before health and the optional sandbox step pass stops
+  only the server and the catcher it launched, by pid, never by a scan
+  of the port, so an older preview that lost its pid file is left alone.
+- **Each recipient's copy is keyed by a hash of its address,** which
+  heads the file as `X-Catcher-To`, so no address matches another's
+  prefix. The catcher answers 250 only once every copy is written, 451
+  otherwise.
+
 ## The container image
 
 - **The build cross-compiles on `$BUILDPLATFORM`.** `bun build
@@ -139,6 +167,14 @@ gateway add`.
 - **Every file in `/secrets` must be readable by 65532.** It is
   mounted read-only. An unreadable key throws where it is read, and an
   unreadable `user-admin.key` fails the first start.
+- **The first admin key is made before the first start.** The image's
+  entry is the binary, so `docker run --rm <image> admin-key admin
+  --stdout` prints one. For Docker Compose, write it to
+  `secrets/user-admin.key` (readable by 65532); for the Helm chart,
+  pipe it into the Secret the chart mounts at `/secrets`, under
+  `user-admin.key`. With the binary at hand, `1ctx admin-key admin
+  --secrets <dir>` writes the file itself, never over one, so a file
+  that held a password is moved aside first.
 - **The cache is `/data/repos` unless `--cache` names another
   mount,** which must be writable by 65532. The Helm chart mounts an
   `emptyDir` at `/cache` (`cache.sizeLimit`), off the claim.

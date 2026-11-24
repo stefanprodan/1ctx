@@ -36,7 +36,7 @@ async function run(
   const app = await testApp({ secrets: KEYS, sandboxGateway: fake.connect });
   try {
     const admin = app.client();
-    await admin.login("admin", "hunter2-test");
+    await admin.signIn("admin");
     await body(app, admin);
   } finally {
     await app.shutdown();
@@ -162,8 +162,6 @@ describe("a project's variant", () => {
         fullName: "Casey",
         email: "casey@example.com",
         role: "member",
-        passwordHash: "x",
-        mustChangePassword: false,
         now: app.now.value,
       });
       const own = app.projects.personal(user.id)!;

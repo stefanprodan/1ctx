@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The words of the account emails: a link email, built when it is
-// sent, and the security notice, built when it is queued. Plain text
-// with the same paragraphs as simple HTML. Nothing a user typed reaches
-// a subject; the names in the text are the admin's, escaped in HTML.
+// sent, plain text with its code whole in the subject and the body, so
+// iOS and macOS offer it; and the security notice, built when it is
+// queued, plain text with the same paragraphs as simple HTML. Nothing a
+// user typed reaches a subject; the names in the text are the admin's,
+// escaped in HTML.
 
 import { isIP } from "node:net";
 import type { LinkPurpose } from "../../shared/api/access.ts";
@@ -12,7 +14,6 @@ import { DAY_MS, MINUTE_MS, zoneOrUtc } from "../lib/clock.ts";
 import { escapeHtml } from "../render/index.ts";
 
 export const LINK_TTL_MS: Record<LinkPurpose, number> = {
-  reset: 30 * MINUTE_MS,
   signin: 15 * MINUTE_MS,
   invite: 7 * DAY_MS,
 };
@@ -49,54 +50,35 @@ export function htmlOf(text: string): string {
 
 export function linkEmail(
   purpose: LinkPurpose,
-  user: Who,
   link: string,
-): Content {
-  const hi = `Hi ${user.fullName},`;
+  code: string,
+): { subject: string; text: string } {
+  const subject = `Your 1ctx sign-in code: ${code}`;
   switch (purpose) {
-    case "reset":
-      return content("Reset your 1ctx password", [
-        hi,
-        `Open this link within 30 minutes to choose a new password for @${user.username}.`,
-        { link },
-        "If you did not ask for it, ignore this email. Your password stays as it is.",
-      ]);
     case "signin":
-      return content("Sign in to 1ctx", [
-        hi,
-        `Open this link within 15 minutes to sign in as @${user.username}.`,
-        { link },
-        "If you did not ask for it, ignore this email.",
-      ]);
+      return {
+        subject,
+        text: `Sign in to 1ctx: ${link}, or enter ${code}. Both work once, for 15 minutes.\n`,
+      };
     case "invite":
-      return content("You are invited to 1ctx", [
-        hi,
-        `An admin made you an account, @${user.username}. Open this link within 7 days to choose your password.`,
-        { link },
-      ]);
+      return {
+        subject,
+        text: `You were added to 1ctx. Sign in: ${link}, or enter ${code}. Both work once, for 7 days.\n`,
+      };
   }
 }
 
-// what happened to the account: the user's own change, a reset by
-// link, an admin's reset, a sign in by link
-export type NoticeEvent = "changed" | "reset" | "admin-reset" | "signin";
+// what happened to the account: a sign in by an emailed link or code
+export type NoticeEvent = "link" | "code";
 
 const NOTICE: Record<NoticeEvent, { subject: string; what: string }> = {
-  changed: {
-    subject: "Your 1ctx password was changed",
-    what: "Your password was changed",
-  },
-  reset: {
-    subject: "Your 1ctx password was reset",
-    what: "Your password was reset by email link",
-  },
-  "admin-reset": {
-    subject: "Your 1ctx password was reset",
-    what: "An admin reset your password",
-  },
-  signin: {
+  link: {
     subject: "New sign in to 1ctx",
     what: "You signed in by email link",
+  },
+  code: {
+    subject: "New sign in to 1ctx",
+    what: "You signed in by email code",
   },
 };
 
@@ -127,10 +109,6 @@ export function noticeEmail(
 ): Content {
   const { subject, what } = NOTICE[event];
   const when = noticeTime(at, user.tz);
-  // the address is the admin's own, and the admin did it
-  if (event === "admin-reset") {
-    return content(subject, [`Hi ${user.fullName},`, `${what} on ${when}.`]);
-  }
   // a proxy's header is not ours to repeat unless it is an address
   const from = isIP(address) === 0 ? "an unknown address" : address;
   return content(subject, [
@@ -138,4 +116,21 @@ export function noticeEmail(
     `${what} on ${when} from ${from}.`,
     "If this was not you, tell your admin.",
   ]);
+}
+
+// a passkey added, sent to the user's own address so a stolen login
+// that adds one is not silent. The server's address, never a sign-in
+// link, so the email is no way in; a provider not known reads as "A
+// passkey"
+export function passkeyEmail(
+  provider: string | null,
+  at: number,
+  tz: string,
+  home: string,
+): { subject: string; text: string } {
+  const what = provider === null ? "A passkey" : `A passkey in ${provider}`;
+  return {
+    subject: "A passkey was added to your 1ctx sign-in",
+    text: `${what} was added to your 1ctx sign-in, ${noticeTime(at, tz)}. Not you? Sign in at ${home}, remove it under Passkeys on your profile, and have an admin sign you out everywhere.\n`,
+  };
 }

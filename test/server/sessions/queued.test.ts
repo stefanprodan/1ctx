@@ -14,11 +14,7 @@ import {
   parseDiscardNotSent,
 } from "../../../src/server/sessions/parse.ts";
 import type { QueuedMessage } from "../../../src/shared/contracts/session.ts";
-import {
-  collectLogs,
-  hashPassword,
-  type TestClient,
-} from "../../helpers/app.ts";
+import { collectLogs, type TestClient } from "../../helpers/app.ts";
 import { settleRun } from "../../helpers/automations.ts";
 import { type ChatApp, chatApp, startChat } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
@@ -29,12 +25,10 @@ async function user(chat: ChatApp, username: string) {
     fullName: username,
     email: `${username}@example.com`,
     role: "member",
-    passwordHash: await hashPassword("pw"),
-    mustChangePassword: false,
     now: chat.app.now.value,
   });
   const client = chat.app.client();
-  await client.login(username, "pw");
+  await client.signIn(username);
   return { id: row.id, client };
 }
 

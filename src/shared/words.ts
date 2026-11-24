@@ -97,21 +97,6 @@ export function isAbout(value: unknown): value is string {
   return typeof value === "string" && value.length <= MAX_ABOUT;
 }
 
-export const MIN_PASSWORD = 8;
-export const MAX_PASSWORD_BYTES = 1024;
-// a password under the floor or over the byte cap, else null; a login
-// passes a floor of 1 so an old password stays usable
-export function passwordProblem(
-  value: string,
-  min = MIN_PASSWORD,
-): "short" | "long" | null {
-  if (value.length < min) return "short";
-  if (new TextEncoder().encode(value).length > MAX_PASSWORD_BYTES) {
-    return "long";
-  }
-  return null;
-}
-
 // how an opened file is drawn: HTML and SVG in the visual frame while
 // the admin's Visuals row is on, Markdown rendered, anything else as code
 export const OPENED_KINDS = ["visual", "markdown", "code"] as const;

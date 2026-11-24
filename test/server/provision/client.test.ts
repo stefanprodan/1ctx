@@ -19,10 +19,7 @@ test("the in-process client keeps the login cookie without origin headers", asyn
     }
     return Response.json({ ok: true });
   });
-  await api.call("POST", "/api/login", {
-    username: "admin",
-    password: "fake-password",
-  });
+  await api.call("POST", "/api/login", { key: "fake-key" });
   await api.call("GET", "/api/users");
   expect(requests[0].headers.get("cookie")).toBeNull();
   expect(requests[1].headers.get("cookie")).toBe("login=fake-token");

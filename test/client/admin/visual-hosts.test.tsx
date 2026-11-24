@@ -154,7 +154,6 @@ describe("the visual hosts entity", () => {
       username: "admin",
       fullName: "Admin",
       role: "admin",
-      mustChangePassword: false,
     };
     tools.value = response(visual.hosts);
   });

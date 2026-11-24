@@ -15,13 +15,13 @@ them on schedules (automations), with shared knowledge and memory.
   `client/ui/Plot.tsx` imports `uplot`, and only `server/sandbox/`
   imports `openshell-sdk` and its packages (`PACKAGE_OWNERS` in
   `test/structure.ts`). `patches/` holds modern-tar's
-  patch: it keeps the raw header `typeflag`, so GNU sparse and unknown
-  types are not read as regular files, and cancelling an entry's body
-  never drops the next entry's, which hung the stream.
+  patch: it keeps the raw `typeflag`, so GNU sparse and unknown types
+  are never read as regular files, and a cancelled entry's body never
+  drops the next one's.
 - **just-bash is ours.** Its source lives in `vendor/just-bash/` and we
   change it; `vendor/README.md` says how.
 - **Status:** alpha. The API and the socket change freely, with no
-  shims. Stored data is kept (see migrations below).
+  shims. Stored data is kept.
 
 ## The dev loop
 
@@ -32,9 +32,10 @@ Everything goes through the Makefile; each target runs the
 make preview        # (re)start the local preview on 127.0.0.1:1236, hot reload
 make preview-stop   # stop it
 make preview-log    # tail its log
-make preview-clean  # stop it and wipe its db, secrets, log and pid
+make preview-clean  # stop it and remove .preview/
 make preview-provision FILE=x.yaml  # stop it, apply the objects, start it
 make preview-reset FILE=x.yaml SECRETS=dir  # wipe it, copy the secrets in, provision
+make preview-mail TO=name  # the newest email to a user, its code and link
 make start ARGS="..."  # run the source in the foreground with the server's flags
 make dev ARGS="..."    # the same with ONECTX_DEV=1 and a restart on server changes
 make clean          # preview-clean, then remove bin/ and Bun's build leftovers
@@ -62,7 +63,9 @@ OpenShell gateway and the sandbox shell (`docs/deploy.md`); a second
 checkout sets `PREVIEW_PORT` and `PREVIEW_GATEWAY_PORT`. A CSS edit
 hot-reloads, a client edit reloads the page, a server edit restarts
 the process. The first start
-writes `user-admin.key` with the password `admin-preview`. Check a UI
+makes `user-admin.key` with `1ctx admin-key admin`. Email lands in a
+catcher, `.preview/mail/`; `PREVIEW_MAIL=real` keeps the provisioned
+SMTP server. Check a UI
 change in Chrome through the DevTools MCP at 1440 and 390 wide; the
 console must stay empty. Report what was verified and how. Do not commit
 unless asked.
@@ -89,9 +92,9 @@ test/         invariants/ (cross-cutting suites), server/, client/,
               shared/, vendor/just-bash/, structure.ts (the layout
               rules), helpers/, fixtures/.
 scripts/      preview, staging, smoke, image, release, vendor-test and
-              cloud-setup (a Claude Code cloud environment) scripts;
-              brand.py; record/, the fixture recorders, run by
-              hand; load/, the load harness (docs/load-testing.md).
+              cloud-setup scripts; brand.py; mail/, the preview's mail
+              catcher; record/, the fixture recorders, run by hand;
+              load/, the load harness (docs/load-testing.md).
 skills/       installable agent skills, added by URL, never seeded;
               the binary embeds and serves external-tasks/.
 site/         1ctx.dev and the brand files, its own project.
@@ -122,12 +125,12 @@ in `package.json`'s build script. Its URL is built in `compose.ts`,
 since a relative URL inside the binary resolves against `src/server`.
 
 **Test helpers.** `test/helpers/app.ts` wires the server over a test db
-with a fake clock, the least argon2id cost, a cookie jar and a fake
-fetch that answers only the recorded hosts (`PROVIDER_URL`,
+with a fake clock, `ADMIN_KEY` in `user-admin.key`, a cookie jar,
+`signIn()` (a login from the store, no route) and a
+fake fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `MLX_URL`,
 `AZURE_URL`, `ANTHROPIC_URL`) and fails every other, a scripted
 `CHECK_URL` host (`checkHost()`), and a fake email sender that
-
 keeps every message; `sleeping`, `slept` and `commandPhase` await the
 fake clock and a command's phase. In `chat.ts`, `until`, `idle`,
 `freed`, `sessionSettled` and `ringing` await bus events, sends
@@ -152,7 +155,8 @@ change it in the same commit as the code that changes a rule.
 | `docs/composer.md` | `composer/`: the draft, its files and switches, the slash commands |
 | `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
-| `docs/access.md` | requests and the router, logins, users, names, project visibility, the socket, links by email |
+| `docs/access.md` | requests and the router, access keys, users, names, project visibility, the socket |
+| `docs/logins.md` | signing in: the login cookie, admin keys and `1ctx admin-key`, links and codes by email, the link page, passkeys |
 | `docs/secrets.md` | `secrets/`: the secret files, their kinds, reads and the log scrub |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
@@ -171,7 +175,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/mcp-server.md` | `mcp-server/`, the inbound `/mcp` endpoint and its tools |
 | `docs/knowledge.md` | `knowledge/`, uploads |
-| `docs/images.md` | `images/`: the image store, ingest, its limits, serving, access, the lease, the agent's image flag, the claim at send, the budget, queued and forked images, image lines, the wires' image parts, the token estimate, the check, images in history, a message's images on the page |
+| `docs/images.md` | `images/`: the image store from ingest to the wires and the page: limits, serving, access, the lease, the agent's flag, the claim at send, the budget, history |
 | `docs/search.md` | `shared/search.ts`, knowledge search, session search and list |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials, a turn's day note |
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
@@ -234,8 +238,8 @@ fixture under `test/fixtures/structure/`.
   carries a policy: `public`, `authenticated`, `admin` or `webhook`. A
   handler gets a typed `Principal` and never reads a header. Every new
   route gets a row in `test/helpers/auth-cases.ts`, or the access suite
-  fails. The rest of the rule (same origin, parsers, body caps, login
-  limits) is in `docs/access.md`.
+  fails. The rest of the rule (same origin, parsers, body caps) is in
+  `docs/access.md`, the login limit in `docs/logins.md`.
 - **Routes never overlap.** Two patterns of one method that could match
   one path fail the router at start (`conflicts()` in `web/router.ts`).
 - **Writes that belong together go through `transact()`.** The body

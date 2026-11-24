@@ -30,7 +30,7 @@ async function admin(secrets: Record<string, string> = {}) {
     },
   });
   const client = app.client();
-  await client.login("admin", "hunter2-test");
+  await client.signIn("admin");
   return { app, client };
 }
 

@@ -56,11 +56,10 @@ export type AlertEmails = {
   opened(automation: AutomationSummary, sessionId: string | null): BusEvent[];
 };
 
-// what made the owner a recipient: enabled, able to open the project,
-// past the forced password change and opted in
+// what made the owner a recipient: enabled, able to open the project
+// and opted in
 const reaches = (deps: AlertEmailDeps, user: UserRow, projectId: string) =>
   !user.disabled &&
-  !user.mustChangePassword &&
   !user.emailPlaceholder &&
   user.emailFromAgents &&
   deps.canOpen(user.id, projectId);

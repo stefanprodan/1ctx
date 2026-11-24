@@ -1,21 +1,17 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Users: identity, the password hash, the one way a user is created,
-// and the bootstrap of the first admin from the admin secret. A user
+// Users: identity, the one way a user is created, and the bootstrap of
+// the first admin from the admin key file. A user
 // is made with what belongs to it, the personal project first of all,
 // in one transaction: the port below runs inside it, so a user never
 // exists without its project.
 
-import {
-  MAX_PASSWORD_BYTES,
-  MIN_PASSWORD,
-  passwordProblem,
-  type Role,
-} from "../../shared/words.ts";
+import type { Role } from "../../shared/words.ts";
 import { type Db, transact } from "../db/index.ts";
 import type { Clock } from "../lib/clock.ts";
 import type { Log } from "../lib/log.ts";
+import { isAdminKey } from "./rules.ts";
 import {
   account,
   isPlaceholderEmail,
@@ -27,6 +23,14 @@ import {
   UserStore,
 } from "./store.ts";
 
+export {
+  ADMIN_KEY_KIND,
+  ADMIN_KEY_PREFIX,
+  adminKeyName,
+  isAdminKey,
+  newAdminKey,
+  usernameOfKey,
+} from "./rules.ts";
 export {
   account,
   isPlaceholderEmail,
@@ -60,7 +64,6 @@ export type BootstrapDeps = UserDeps & {
   secret: (name: string) => string | null;
   clock: Clock;
   log: Log;
-  passwordCost?: PasswordCost;
 };
 
 export function createUser(deps: UserDeps, fields: UserFields): UserRow {
@@ -71,58 +74,43 @@ export function createUser(deps: UserDeps, fields: UserFields): UserRow {
   });
 }
 
-// argon2id's cost, Bun's defaults written out; a test composes with the
-// least, since every test app hashes and checks the admin's password
-// and the cost is the whole run's time otherwise. A check reads the
-// cost from the hash, so it follows whatever made the hash
-export type PasswordCost = { memoryCost: number; timeCost: number };
-export const PASSWORD_COST: PasswordCost = { memoryCost: 65_536, timeCost: 2 };
-
-export async function hashPassword(
-  password: string,
-  cost: PasswordCost = PASSWORD_COST,
-): Promise<string> {
-  return Bun.password.hash(password, { algorithm: "argon2id", ...cost });
-}
-
-export function verifyPassword(
-  password: string,
-  hash: string,
-): Promise<boolean> {
-  return Bun.password.verify(password, hash);
-}
-
 // nobody can sign in until this file is right, so every line names it
 const ADMIN_FILE = `${ADMIN_SECRET}.key`;
 
-// When the users table is empty and user-admin.key holds a password, create
-// the admin with its hash and drop the plain value. A non-empty table
-// ignores the file, so it bootstraps and never resets.
-export async function bootstrap(deps: BootstrapDeps): Promise<UserRow | null> {
+const REASONS = {
+  missing: "is missing",
+  unreadable: "cannot be read",
+  "no admin key": "holds no admin key",
+} as const;
+
+// the first start cannot go on without its admin
+export class BootstrapError extends Error {
+  constructor(
+    readonly file: string,
+    readonly reason: "missing" | "unreadable" | "no admin key",
+  ) {
+    super(`${file} ${REASONS[reason]}`);
+  }
+}
+
+// When the users table is empty, the first admin comes from
+// user-admin.key, which must hold an admin key: the admin signs in with
+// that file, so nothing is stored. A non-empty table ignores the file.
+export function bootstrap(deps: BootstrapDeps): UserRow | null {
   if (deps.store.count() > 0) return null;
-  const password = deps.secret(ADMIN_SECRET);
-  if (password === null) {
-    deps.log.warn("admin not created", { file: ADMIN_FILE, reason: "missing" });
-    return null;
+  let key: string | null;
+  try {
+    key = deps.secret(ADMIN_SECRET);
+  } catch {
+    throw new BootstrapError(ADMIN_FILE, "unreadable");
   }
-  // the rule a new password has, or the first admin would be the one
-  // account allowed what the profile page refuses
-  const problem = passwordProblem(password);
-  if (problem !== null) {
-    deps.log.warn("admin not created", {
-      file: ADMIN_FILE,
-      reason: `too ${problem}`,
-      limit: problem === "long" ? MAX_PASSWORD_BYTES : MIN_PASSWORD,
-    });
-    return null;
-  }
+  if (key === null) throw new BootstrapError(ADMIN_FILE, "missing");
+  if (!isAdminKey(key)) throw new BootstrapError(ADMIN_FILE, "no admin key");
   const user = createUser(deps, {
     username: ADMIN_USERNAME,
     fullName: ADMIN_FULL_NAME,
     email: ADMIN_EMAIL,
     role: "admin",
-    passwordHash: await hashPassword(password, deps.passwordCost),
-    mustChangePassword: false,
     now: deps.clock(),
   });
   deps.log.info("admin created", { user: ADMIN_USERNAME, file: ADMIN_FILE });
@@ -135,7 +123,6 @@ export type UsersDeps = {
   clock: Clock;
   log: Log;
   projects: ProjectsPort;
-  passwordCost?: PasswordCost;
 };
 
 export type Users = {
@@ -153,24 +140,17 @@ export type Users = {
   // every user's pick of a deleted agent goes, so their start moves on
   clearAgent(agentId: string): void;
   setDisabled(id: string, disabled: boolean): void;
-  setMustChangePassword(id: string, required: boolean): void;
   setEmailFromAgents(id: string, on: boolean): void;
-  setPasswordHash(id: string, hash: string): void;
+  setSignedIn(id: string, at: number): void;
   countAdmins(): number;
   createUser(fields: UserFields): UserRow;
-  // a password's hash at the composed cost
-  hashPassword(password: string): Promise<string>;
-  // a hash no password was set for, at the same cost, so a login for a
-  // missing user costs what a wrong password does
-  nobodyHash(): Promise<string>;
-  // the first admin from user-admin.key, once the areas it is made with exist
-  bootstrap(): Promise<UserRow | null>;
+  // the first admin from user-admin.key, once the areas it is made with
+  // exist; throws a BootstrapError when the file cannot make one
+  bootstrap(): UserRow | null;
 };
 
 export function usersArea(deps: UsersDeps): Users {
   const store = new UserStore(deps.db);
-  const cost = deps.passwordCost ?? PASSWORD_COST;
-  let nobody: Promise<string> | null = null;
   const userDeps: UserDeps = { db: deps.db, store, projects: deps.projects };
   return {
     store,
@@ -186,17 +166,10 @@ export function usersArea(deps: UsersDeps): Users {
     setAgent: (id, agentId) => store.setAgent(id, agentId),
     clearAgent: (agentId) => store.clearAgent(agentId),
     setDisabled: (id, disabled) => store.setDisabled(id, disabled),
-    setMustChangePassword: (id, required) =>
-      store.setMustChangePassword(id, required),
     setEmailFromAgents: (id, on) => store.setEmailFromAgents(id, on),
-    setPasswordHash: (id, hash) => store.setPasswordHash(id, hash),
+    setSignedIn: (id, at) => store.setSignedIn(id, at),
     countAdmins: () => store.countAdmins(),
     createUser: (fields) => createUser(userDeps, fields),
-    hashPassword: (password) => hashPassword(password, cost),
-    nobodyHash: () => {
-      nobody ??= hashPassword("nobody", cost);
-      return nobody;
-    },
-    bootstrap: () => bootstrap({ ...userDeps, ...deps, passwordCost: cost }),
+    bootstrap: () => bootstrap({ ...userDeps, ...deps }),
   };
 }

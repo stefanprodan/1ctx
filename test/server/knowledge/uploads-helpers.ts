@@ -12,7 +12,7 @@ import type {
   StagedUploads,
 } from "../../../src/shared/contracts/knowledge.ts";
 import page from "../../fixtures/body.html";
-import { hashPassword, ORIGIN, testApp } from "../../helpers/app.ts";
+import { ORIGIN, testApp } from "../../helpers/app.ts";
 
 export type UploadOptions = {
   body?: BodyInit;
@@ -31,18 +31,16 @@ export async function setupUploads(
 ) {
   const app = await testApp();
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await admin.signIn("admin")).status).toBe(200);
   const owner = app.createUser({
     username: "writer",
     fullName: "Writer",
     email: "writer@example.com",
     role: "member",
-    passwordHash: await hashPassword("password-test"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const client = app.client();
-  expect((await client.login("writer", "password-test")).status).toBe(200);
+  expect((await client.signIn("writer")).status).toBe(200);
   const projectId = app.projects.personal(owner.id)!.id;
   const adminProjectId = app.projects.personal(
     app.users.byUsername("admin")!.id,
@@ -58,6 +56,7 @@ export async function setupUploads(
           trustProxy: false,
           socket: app.socket,
           handle: app.handle,
+          linkPage: app.linkPage,
         })
       : null;
   const origin = listener?.server.url.origin ?? ORIGIN;

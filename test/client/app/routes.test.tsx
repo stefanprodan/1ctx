@@ -18,7 +18,7 @@ import {
 } from "../../../src/client/app/routes.ts";
 import { ZONES } from "../../../src/client/app/zones.ts";
 import { me } from "../../../src/client/data/me.ts";
-import { loadProfile } from "../../../src/client/data/profile.ts";
+import { profilePage } from "../../../src/client/data/profile.ts";
 import { session } from "../../../src/client/data/sessions.ts";
 import type { SessionDetail } from "../../../src/shared/contracts/session.ts";
 import { withClass } from "../../helpers/classes.ts";
@@ -46,7 +46,6 @@ describe("the route table", () => {
       username: "casey",
       fullName: "Casey",
       role: "member",
-      mustChangePassword: false,
     };
     for (const route of ROUTES) {
       const View = route.view;
@@ -139,7 +138,7 @@ describe("the route table's shape", () => {
     expect(match("/connect/codex")?.route.view).toBe(connect);
     expect(match("/connect/opencode")?.route.view).toBe(connect);
     // the keys and their projects load on Connect agents, not the profile
-    expect(match("/profile")?.route.load).toBe(loadProfile);
+    expect(match("/profile")?.route.load).toBe(profilePage);
   });
 
   test("a malformed segment matches nothing", () => {

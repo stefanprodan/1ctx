@@ -22,9 +22,10 @@ they name.
   MCP refresh runs.
 - **Provisioning needs the database to itself.** It refuses a file
   another process holds, so stop the server first.
-- **Apply signs in as `admin` with `user-admin.key`.** It bootstraps
-  that admin first when the database has none, and reports it apart
-  from the counted objects.
+- **Apply signs in with `user-admin.key` as an admin key,** always as
+  the user `admin`, so renaming the user `admin` breaks `--provision`;
+  nothing refuses the rename. It bootstraps that admin first when the database has none, and
+  reports it apart from the counted objects.
 - **`--provision` runs at every server start, before the database
   opens.** Docker Compose and Kubernetes restart the server to apply a
   change. A one-shot or init container would fail on `up -d` and on an
@@ -42,8 +43,10 @@ they name.
   adds and removes users to match. `labels` is the exception below.
 - **Objects not named are never deleted.** Nor are knowledge docs a
   folder does not name.
-- **A password and its change flag are creation-only.** Apply never
-  resets an existing user's password.
+- **A `User` has no password.** A document still holding
+  `passwordFrom` or `mustChangePassword` is refused, naming the field.
+  A provisioned user is never invited, since apply runs at every start;
+  an admin invites from the Users page.
 - **Kinds apply in the order of `KINDS` in `parse.ts`.** A kind is
   applied after every kind it references. A reference names an object
   in the input or a live one.

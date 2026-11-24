@@ -140,7 +140,7 @@ export async function step(api: Api, admin: Who, d: Directory, o: StepOptions) {
     ...incidentUsers,
     ...[...pressers.values()].flat(),
   ]);
-  const who = await signInAll(api, d, [...needed]);
+  const who = await signInAll(api, [...needed]);
 
   const monitor = new Monitor(api, admin);
   await monitor.open();

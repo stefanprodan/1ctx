@@ -15,7 +15,6 @@ import type {
 } from "../../../src/shared/api/directory.ts";
 import { DECISION_OPTIONS } from "../../../src/shared/contracts/decision.ts";
 import {
-  hashPassword,
   KEV_URL,
   PROVIDER_URL,
   type TestApp,
@@ -29,7 +28,7 @@ async function setup() {
   const app = await testApp({ secrets: { "provider-router": "sk-router" } });
   app.now.value = Date.parse("2026-09-16T10:00:00Z");
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await admin.signIn("admin")).status).toBe(200);
   const provider = async (name: string, wire: string, baseUrl: string) => {
     const res = await admin.call("POST", "/api/providers", {
       body: {
@@ -63,12 +62,10 @@ async function setup() {
     fullName: "Casey",
     email: "casey@example.com",
     role: "member",
-    passwordHash: await hashPassword("password-test"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const member = app.client();
-  expect((await member.login("casey", "password-test")).status).toBe(200);
+  expect((await member.signIn("casey")).status).toBe(200);
   const decide = (body: { enabled: boolean; deciderId: string | null }) =>
     admin.call("PUT", "/api/decisions/run-attention", {
       body: {

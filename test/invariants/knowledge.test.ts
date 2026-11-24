@@ -11,7 +11,7 @@ import type {
   KnowledgeVersionsResponse,
 } from "../../src/shared/api/knowledge.ts";
 import type { KnowledgeFile } from "../../src/shared/contracts/knowledge.ts";
-import { hashPassword, type TestClient, testApp } from "../helpers/app.ts";
+import { type TestClient, testApp } from "../helpers/app.ts";
 
 const base = (id: string) => `/api/projects/${id}/knowledge`;
 const filePath = (project: string, file: string) =>
@@ -22,18 +22,16 @@ const versionPath = (project: string, version: string) =>
 async function setup() {
   const app = await testApp();
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await admin.signIn("admin")).status).toBe(200);
   const owner = app.createUser({
     username: "writer",
     fullName: "Writer",
     email: "writer@example.com",
     role: "member",
-    passwordHash: await hashPassword("password-test"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const client = app.client();
-  expect((await client.login("writer", "password-test")).status).toBe(200);
+  expect((await client.signIn("writer")).status).toBe(200);
   const projectId = app.projects.personal(owner.id)!.id;
   const close = async () => {
     await app.shutdown();
@@ -188,12 +186,10 @@ describe("knowledge routes", () => {
         fullName: "Other",
         email: "other@example.com",
         role: "member",
-        passwordHash: await hashPassword("password-test"),
-        mustChangePassword: false,
         now: s.app.now.value,
       });
       const other = s.app.client();
-      await other.login("other", "password-test");
+      await other.signIn("other");
       const team = s.app.projects.createTeam({
         ownerId: s.owner.id,
         name: "team",
