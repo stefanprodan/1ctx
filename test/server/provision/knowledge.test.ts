@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { DEFAULT_LIMITS } from "../../../src/server/limits/index.ts";
 import {
@@ -15,12 +14,15 @@ import {
 import { preflight } from "../../../src/server/provision/parse.ts";
 import type { KnowledgeVersionsResponse } from "../../../src/shared/api/knowledge.ts";
 import { testApp } from "../../helpers/app.ts";
+import { tempDirs } from "../../helpers/temp.ts";
 import { mutations, object } from "./helpers.ts";
 
 type Tree = Record<string, string | Uint8Array>;
 
+const temp = tempDirs();
+
 async function folder(files: Tree): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "1ctx-provision-"));
+  const root = temp("1ctx-provision-");
   for (const [name, body] of Object.entries(files)) {
     const path = join(root, name);
     await mkdir(dirname(path), { recursive: true });

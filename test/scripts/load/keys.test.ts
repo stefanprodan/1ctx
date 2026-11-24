@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { restoreKeys } from "../../../scripts/load/cluster.ts";
+import { tempDirs } from "../../helpers/temp.ts";
+
+const temp = tempDirs();
 
 // a kubectl that answers \`get secret\` with a canned result
 const kubectl =
@@ -20,7 +22,7 @@ const kubectl =
 
 describe("the namespace's keys", () => {
   test("replace the local ones, so the server keeps its users", () => {
-    const dir = mkdtempSync(join(tmpdir(), "load-keys-"));
+    const dir = temp("load-keys-");
     writeFileSync(join(dir, "user-admin.key"), "fresh-local");
     const secret = JSON.stringify({
       data: {
@@ -36,7 +38,7 @@ describe("the namespace's keys", () => {
   });
 
   test("a fresh namespace has none", () => {
-    const dir = mkdtempSync(join(tmpdir(), "load-keys-"));
+    const dir = temp("load-keys-");
     const k = kubectl(
       "",
       1,
@@ -46,7 +48,7 @@ describe("the namespace's keys", () => {
   });
 
   test("any other failure stops the install", () => {
-    const dir = mkdtempSync(join(tmpdir(), "load-keys-"));
+    const dir = temp("load-keys-");
     const k = kubectl("", 1, "Unable to connect to the server");
     expect(() => restoreKeys(k, dir)).toThrow("Unable to connect");
   });
