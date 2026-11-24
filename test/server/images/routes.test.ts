@@ -15,7 +15,6 @@ import {
 } from "../../../src/server/images/stage.ts";
 import { DAY_MS, HOUR_MS } from "../../../src/server/lib/clock.ts";
 import type { StagedImage } from "../../../src/shared/api/images.ts";
-import { hashPassword } from "../../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
@@ -37,12 +36,10 @@ async function setup() {
     fullName: "Robin Roe",
     email: "robin@example.com",
     role: "member",
-    passwordHash: await hashPassword("pw2"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const other = app.client();
-  await other.login("robin", "pw2");
+  await other.signIn("robin");
   const team = app.projects.createTeam({
     ownerId: chat.memberId,
     name: "shared",
@@ -218,12 +215,10 @@ test("a sent image follows its chat, and freed bytes answer 410", async () => {
     fullName: "Sam",
     email: "sam@example.com",
     role: "member",
-    passwordHash: await hashPassword("pw3"),
-    mustChangePassword: false,
     now: s.app.now.value,
   });
   const sam = s.app.client();
-  await sam.login("sam", "pw3");
+  await sam.signIn("sam");
   expect((await s.get(sam, s.team.id, image.id)).status).toBe(404);
   // a sent image is no longer staged, so its uploader cannot remove it
   const removed = await s.chat.member.call(

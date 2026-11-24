@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Access: logins, the principal, the login, logout and me routes, the
-// links an email carries, the signed-in profile routes, and admin user
-// management.
+// admin keys, the links an email carries, the signed-in profile routes,
+// and admin user management.
 
 import type { Db } from "../db/index.ts";
-import type { Clock } from "../lib/clock.ts";
+import { after, type Clock, MINUTE_MS } from "../lib/clock.ts";
 import type { RouteDescriptor } from "../lib/http.ts";
-import type { Log } from "../lib/log.ts";
+import { errorFields, type Log } from "../lib/log.ts";
+import { adminKeys, type KeyFilesPort } from "./admin-keys.ts";
 import {
   type Auth,
   type ProjectsPort as AuthProjectsPort,
@@ -58,7 +59,12 @@ import {
 } from "./users.ts";
 import { VISIT_RETENTION_MS, VisitStore } from "./visits.ts";
 
-export { cookieValue, LOGIN_TTL_MS, TOUCH_AFTER_MS } from "./auth.ts";
+export {
+  COOKIE as LOGIN_COOKIE,
+  cookieValue,
+  LOGIN_TTL_MS,
+  TOUCH_AFTER_MS,
+} from "./auth.ts";
 export {
   parseAbout,
   parseEmail,
@@ -90,6 +96,8 @@ export type AccessDeps = {
   email: EmailPort;
   dictation: DictationPort;
   taskClaims: TaskClaimsPort;
+  // the user- key files: the admin keys
+  keyFiles: KeyFilesPort;
 };
 
 export type Access = Auth & {
@@ -103,6 +111,10 @@ export type Access = Auth & {
   // at shutdown: a link ask from here answers and does nothing; resolves
   // once every one before ran
   closeLinks(): Promise<void>;
+  // the minute's check of every key login, from now until stopped; logs
+  // the files that hold one key, which sign in neither
+  startKeyChecks(): void;
+  stopKeyChecks(): void;
   routes: RouteDescriptor[];
 };
 
@@ -111,6 +123,7 @@ export function accessArea(deps: AccessDeps): Access {
   const keys = new AccessKeyStore(deps.db);
   const visits = new VisitStore(deps.db);
   const linkStore = new LinkStore(deps.db);
+  const keyFiles = adminKeys(deps.keyFiles);
   const built = auth({
     db: deps.db,
     logins,
@@ -119,9 +132,22 @@ export function accessArea(deps: AccessDeps): Access {
     visits,
     users: deps.users,
     projects: deps.projects,
+    adminKeys: keyFiles,
     clock: deps.clock,
     secureCookie: deps.secureCookie,
   });
+  let stopChecks: (() => void) | null = null;
+  const checkLoop = () => {
+    stopChecks = after(deps.clock, MINUTE_MS, () => {
+      try {
+        const ended = built.checkKeyLogins();
+        if (ended > 0) deps.log.info("key logins ended", { logins: ended });
+      } catch (err) {
+        deps.log.warn("key check failed", errorFields(err));
+      }
+      if (stopChecks !== null) checkLoop();
+    });
+  };
   const links = linksOf({
     db: deps.db,
     clock: deps.clock,
@@ -139,11 +165,25 @@ export function accessArea(deps: AccessDeps): Access {
     sweepLinks: () => linkStore.sweep(deps.clock()),
     settled: () => links.settled(),
     closeLinks: () => links.close(),
+    startKeyChecks() {
+      for (const files of keyFiles.duplicates()) {
+        deps.log.warn("admin keys shared", {
+          files: files.map((name) => `${name}.key`).join(","),
+        });
+      }
+      if (stopChecks === null) checkLoop();
+    },
+    stopKeyChecks() {
+      const stop = stopChecks;
+      stopChecks = null;
+      stop?.();
+    },
     routes: [
       ...routes({
         db: deps.db,
         auth: built,
         users: deps.users,
+        adminKeys: keyFiles,
         clock: deps.clock,
         log: deps.log,
         guard,
@@ -153,9 +193,6 @@ export function accessArea(deps: AccessDeps): Access {
       ...linkRoutes({
         db: deps.db,
         auth: built,
-        logins,
-        keys,
-        taskClaims: deps.taskClaims,
         store: linkStore,
         links,
         users: deps.users,
@@ -166,12 +203,8 @@ export function accessArea(deps: AccessDeps): Access {
       }),
       ...profileRoutes({
         db: deps.db,
-        logins,
         users: deps.users,
-        links,
         email: deps.email,
-        clock: deps.clock,
-        log: deps.log,
       }),
       ...usersRoutes({
         db: deps.db,
@@ -183,6 +216,7 @@ export function accessArea(deps: AccessDeps): Access {
         users: deps.users,
         projects: deps.projects,
         usage: deps.usage,
+        adminKeys: keyFiles,
         clock: deps.clock,
         email: deps.email,
         links,
@@ -193,6 +227,7 @@ export function accessArea(deps: AccessDeps): Access {
         taskClaims: deps.taskClaims,
         logins,
         users: deps.users,
+        adminKeys: keyFiles,
         auth: built,
         accessKeysPerUser: deps.accessKeysPerUser,
         clock: deps.clock,

@@ -10,10 +10,11 @@ import { compose } from "../../src/server/compose.ts";
 import { silent } from "../../src/server/lib/log.ts";
 import type { ChatEvent } from "../../src/server/providers/index.ts";
 import { isSecretName } from "../../src/shared/words.ts";
-import { fakeFetch, PROVIDER_URL, VERSION } from "../helpers/app.ts";
+import { ADMIN_KEY, fakeFetch, PROVIDER_URL, VERSION } from "../helpers/app.ts";
 import { memoryDb } from "../helpers/db.ts";
 
-async function build(secrets: Record<string, string>) {
+async function build(given: Record<string, string>) {
+  const secrets: Record<string, string> = { "user-admin": ADMIN_KEY, ...given };
   const db = memoryDb();
   const fake = fakeFetch();
   const app = await compose({

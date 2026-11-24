@@ -32,7 +32,7 @@ ours() {
 }
 running() { [ -f "$PID" ] && ours "$(cat "$PID")"; }
 # the port's only listener is the given pid, so a stranger answering
-# health is never taken for ours nor sent the admin password
+# health is never taken for ours nor sent the admin key
 listens() {
   [ "$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null || true)" = "$1" ]
 }
@@ -137,9 +137,9 @@ keys() {
   mkdir -p "$DIR/secrets"
   chmod 700 "$DIR/secrets"
   if [ ! -f "$DIR/secrets/user-admin.key" ]; then
-    # the bootstrap password for the preview's admin; read once, when the
-    # users table is empty, and hashed into the db
-    (umask 077 && printf 'admin-preview' >"$DIR/secrets/user-admin.key")
+    # the preview admin's key: it makes the admin while the users table
+    # is empty, and signs them in
+    bun "$ENTRY" admin-key admin --secrets "$DIR/secrets" >/dev/null
   fi
   chmod 600 "$DIR/secrets"/*.key
 }

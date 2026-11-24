@@ -51,7 +51,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
   globalThis.fetch = ((url: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";

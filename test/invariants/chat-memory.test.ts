@@ -364,7 +364,7 @@ describe("a chat saves to the project's memory", () => {
         fetcher: scripted.fetcher,
       });
       const member = app.client();
-      await member.login("casey", "pw");
+      await member.signIn("casey");
       const again = { ...chat, app, scripted, member };
       try {
         // the chat still reads its own snapshot, and a save over the

@@ -9,7 +9,6 @@
 
 import { signal } from "@preact/signals";
 import type {
-  ChangePasswordRequest,
   EmailSettingsRequest,
   ProfileResponse,
   UpdateProfileRequest,
@@ -39,7 +38,6 @@ function settle({ user, emailOn }: ProfileResponse): void {
     username: user.username,
     fullName: user.fullName,
     role: user.role,
-    mustChangePassword: user.mustChangePassword,
   });
 }
 
@@ -67,10 +65,4 @@ export async function saveEmailSettings(
   body: EmailSettingsRequest,
 ): Promise<void> {
   settle(await api<ProfileResponse>("/api/profile/email", "PUT", body));
-}
-
-export async function changePassword(
-  body: ChangePasswordRequest,
-): Promise<void> {
-  settle(await api<ProfileResponse>("/api/profile/password", "POST", body));
 }

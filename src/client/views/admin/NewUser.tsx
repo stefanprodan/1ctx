@@ -13,14 +13,11 @@ import { Page } from "../../ui/Page.tsx";
 import { Seg } from "../../ui/Seg.tsx";
 import { fullNameProblem } from "../profile/Profile.model.ts";
 import { NewCard, NewCardWaiting } from "./NewCard.tsx";
-import { PasswordField } from "./PasswordField.tsx";
 import { UserFields, type Who } from "./UserFields.tsx";
 import {
   emailProblem,
-  FIRST_PASSWORD_CHOICES,
-  type FirstPassword,
-  firstPasswordOf,
-  passwordProblem,
+  INVITE_CHOICES,
+  type InviteChoice,
   ROLE_CHOICES,
   tzProblem,
   userFieldOf,
@@ -52,8 +49,7 @@ export function NewUser() {
 function Form() {
   const who = useSignal<Who>({ username: "", fullName: "", email: "", tz: "" });
   const role = useSignal<Role>("member");
-  const password = useSignal("");
-  const first = useSignal<FirstPassword>("invite");
+  const first = useSignal<InviteChoice>("invite");
   const inviting = emailOn.value && first.value === "invite";
   const save = useSave(async () => {
     const from = address();
@@ -63,7 +59,7 @@ function Form() {
       email: who.value.email.trim().toLowerCase(),
       role: role.value,
       tz: who.value.tz,
-      ...firstPasswordOf(emailOn.value, first.value, password.value),
+      ...(inviting ? { invite: true as const } : {}),
     });
     if (address() === from) navigate(adminUserHref(created.username));
   }, userFieldOf);
@@ -84,8 +80,7 @@ function Form() {
           at("username", usernameProblem(w.username)) ??
             at("fullName", fullNameProblem(w.fullName)) ??
             at("email", emailProblem(w.email)) ??
-            at("tz", tzProblem(w.tz)) ??
-            (inviting ? null : at("password", passwordProblem(password.value))),
+            at("tz", tzProblem(w.tz)),
         )
       }
     >
@@ -99,11 +94,11 @@ function Form() {
       >
         {emailOn.value && (
           <div class="field">
-            <span class="label">First password</span>
+            <span class="label">Invite</span>
             <Seg
-              label="First password"
+              label="Invite"
               name="first"
-              options={FIRST_PASSWORD_CHOICES.map((c) => ({
+              options={INVITE_CHOICES.map((c) => ({
                 ...c,
                 disabled: save.busy,
               }))}
@@ -115,22 +110,10 @@ function Form() {
             />
             {inviting && (
               <span class="hint">
-                Emails a link to choose a password. It works for 7 days.
+                Emails a link to sign in. It works for 7 days.
               </span>
             )}
           </div>
-        )}
-        {!inviting && (
-          <PasswordField
-            id="users-new-password"
-            name="password"
-            label="Password"
-            value={password.value}
-            save={save}
-            onChange={(next) => {
-              password.value = next;
-            }}
-          />
         )}
         <div class="field">
           <span class="label">Role</span>

@@ -62,7 +62,7 @@ OpenShell gateway and the sandbox shell (`docs/deploy.md`); a second
 checkout sets `PREVIEW_PORT` and `PREVIEW_GATEWAY_PORT`. A CSS edit
 hot-reloads, a client edit reloads the page, a server edit restarts
 the process. The first start
-writes `user-admin.key` with the password `admin-preview`. Check a UI
+makes `user-admin.key` with `1ctx admin-key admin`. Check a UI
 change in Chrome through the DevTools MCP at 1440 and 390 wide; the
 console must stay empty. Report what was verified and how. Do not commit
 unless asked.
@@ -122,8 +122,9 @@ in `package.json`'s build script. Its URL is built in `compose.ts`,
 since a relative URL inside the binary resolves against `src/server`.
 
 **Test helpers.** `test/helpers/app.ts` wires the server over a test db
-with a fake clock, the least argon2id cost, a cookie jar and a fake
-fetch that answers only the recorded hosts (`PROVIDER_URL`,
+with a fake clock, `ADMIN_KEY` in `user-admin.key`, a cookie jar by
+name and path, `signIn()` (a login from the store, no route) and a
+fake fetch that answers only the recorded hosts (`PROVIDER_URL`,
 `GEMINI_URL`, `NIM_URL`, `GROQ_URL`, `KEV_URL`, `MLX_URL`,
 `AZURE_URL`, `ANTHROPIC_URL`) and fails every other, a scripted
 `CHECK_URL` host (`checkHost()`), and a fake email sender that
@@ -152,7 +153,8 @@ change it in the same commit as the code that changes a rule.
 | `docs/composer.md` | `composer/`: the draft, its files and switches, the slash commands |
 | `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
-| `docs/access.md` | requests and the router, logins, users, names, project visibility, the socket, links by email |
+| `docs/access.md` | requests and the router, access keys, users, names, project visibility, the socket |
+| `docs/logins.md` | signing in: the login cookie, admin keys and `1ctx admin-key`, links by email |
 | `docs/secrets.md` | `secrets/`: the secret files, their kinds, reads and the log scrub |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
@@ -234,8 +236,8 @@ fixture under `test/fixtures/structure/`.
   carries a policy: `public`, `authenticated`, `admin` or `webhook`. A
   handler gets a typed `Principal` and never reads a header. Every new
   route gets a row in `test/helpers/auth-cases.ts`, or the access suite
-  fails. The rest of the rule (same origin, parsers, body caps, login
-  limits) is in `docs/access.md`.
+  fails. The rest of the rule (same origin, parsers, body caps) is in
+  `docs/access.md`, the login limit in `docs/logins.md`.
 - **Routes never overlap.** Two patterns of one method that could match
   one path fail the router at start (`conflicts()` in `web/router.ts`).
 - **Writes that belong together go through `transact()`.** The body

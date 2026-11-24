@@ -79,8 +79,6 @@ function setup(options: { key?: boolean; emailSender?: EmailSender } = {}) {
     fullName: "Ann Lee",
     email: "ann@example.test",
     role: "member",
-    passwordHash: "x",
-    mustChangePassword: false,
     now,
   });
   const fake = fakeEmailSender();

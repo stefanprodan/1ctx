@@ -97,6 +97,7 @@ import { m0088 } from "./0088-sandbox-home.ts";
 import { m0089 } from "./0089-project-backend.ts";
 import { m0090 } from "./0090-sandbox-variant.ts";
 import { m0091 } from "./0091-project-variant.ts";
+import { m0092 } from "./0092-admin-keys.ts";
 
 export const MIGRATIONS: Migration[] = [
   m0001,
@@ -190,4 +191,5 @@ export const MIGRATIONS: Migration[] = [
   m0089,
   m0090,
   m0091,
+  m0092,
 ];

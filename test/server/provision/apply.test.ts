@@ -4,7 +4,12 @@
 import { describe, expect, test } from "bun:test";
 import { CredentialStore } from "../../../src/server/credentials/index.ts";
 import { parse } from "../../../src/server/provision/index.ts";
-import { ANTHROPIC_URL, AZURE_URL, testApp } from "../../helpers/app.ts";
+import {
+  ADMIN_KEY,
+  ANTHROPIC_URL,
+  AZURE_URL,
+  testApp,
+} from "../../helpers/app.ts";
 import {
   agent,
   BARE_URL,
@@ -31,7 +36,6 @@ async function instance() {
     activate: false,
     fetcher: fake.fetcher,
     secrets: {
-      "user-zed": "test-password",
       "provider-alternate": "other-key",
       "http-quotes": "quotes-test-key-0123456789",
     },
@@ -222,11 +226,10 @@ describe("provision through the composed app", () => {
       expect(fake.calls).toContain(SKILL_URL);
       expect(fake.calls).toContain(MCP_URL);
       expect(loginCount(app.db)).toBe(0);
-      expect(lines.join("\n")).not.toContain("test-password");
       expect(lines.join("\n")).not.toContain("quotes-test-key");
-      expect(lines.join("\n")).not.toContain("hunter2-test");
+      expect(lines.join("\n")).not.toContain(ADMIN_KEY);
       const client = app.client();
-      expect((await client.login("admin", "hunter2-test")).status).toBe(200);
+      expect((await client.signIn("admin")).status).toBe(200);
       const tools = await client.call("GET", "/api/tools");
       expect(await tools.json()).toMatchObject({
         access: {
@@ -783,41 +786,38 @@ describe("provision through the composed app", () => {
     }
   });
 
-  test.each([true, false])(
-    "never resets an existing password or its initial mustChangePassword=%s",
-    async (mustChangePassword) => {
-      const { app, fake } = await instance();
-      try {
-        await app.provision.apply(
-          documents(user({ mustChangePassword })),
-          ignore,
-        );
-        const before = app.users.byUsername("zed-user")!;
-        const next = await recompose(app, fake.fetcher, {
-          "user-zed": "changed-password",
-        });
-        try {
-          expect(
-            await next.provision.apply(
-              documents(user({ mustChangePassword: !mustChangePassword })),
-              ignore,
-            ),
-          ).toEqual({ created: 0, updated: 0, unchanged: 1 });
-          expect(app.users.byUsername("zed-user")).toEqual(before);
-          expect(
-            await Bun.password.verify("test-password", before.passwordHash),
-          ).toBeTrue();
-          expect(
-            await Bun.password.verify("changed-password", before.passwordHash),
-          ).toBeFalse();
-        } finally {
-          await next.shutdown();
-        }
-      } finally {
-        await app.shutdown();
+  test("a document still naming a password is refused, naming the field", async () => {
+    const { app } = await instance();
+    try {
+      for (const field of ["passwordFrom", "mustChangePassword"]) {
+        const docs = () =>
+          documents(
+            user({
+              [field]: field === "passwordFrom" ? "user-zed" : false,
+            }),
+          );
+        expect(docs).toThrow(`spec.${field} is gone`);
       }
-    },
-  );
+      expect(app.users.byUsername("zed-user")).toBeNull();
+    } finally {
+      await app.shutdown();
+    }
+  });
+
+  test("a provisioned user is never invited", async () => {
+    const { app } = await instance();
+    try {
+      await app.provision.apply(documents(user()), ignore);
+      const zed = app.users.byUsername("zed-user")!;
+      expect(
+        app.db
+          .query("select count(*) as n from email_outbox where user_id = ?")
+          .get(zed.id),
+      ).toEqual({ n: 0 });
+    } finally {
+      await app.shutdown();
+    }
+  });
 
   test("new agents get defaults and explicit null restores provider defaults", async () => {
     const { app } = await instance();
@@ -1254,7 +1254,7 @@ describe("provision through the composed app", () => {
       expect(app.providers.list()).toHaveLength(1);
       expect(app.agents.list()).toEqual([]);
       const client = app.client();
-      expect((await client.login("admin", "hunter2-test")).status).toBe(200);
+      expect((await client.signIn("admin")).status).toBe(200);
       const response = await client.call("GET", "/api/tools");
       expect((await response.json()).access.mode).toBe("all");
     } finally {
@@ -1328,7 +1328,7 @@ describe("provision through the composed app", () => {
         status: "running",
       });
       const client = app.client();
-      expect((await client.login("admin", "hunter2-test")).status).toBe(200);
+      expect((await client.signIn("admin")).status).toBe(200);
       const response = await client.call(
         "POST",
         `/api/projects/${project.id}/automations`,

@@ -11,6 +11,7 @@ import { DAY_MS, MINUTE_MS } from "../lib/clock.ts";
 // every email the instance sends: the link emails, a security notice, an
 // agent's email and an automation's alert
 export const EMAIL_KINDS = [
+  // no longer sent; the outbox's sent history may still hold one
   "reset",
   "signin",
   "invite",

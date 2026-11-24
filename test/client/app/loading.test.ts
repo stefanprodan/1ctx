@@ -16,7 +16,6 @@ const casey = {
   username: "casey",
   fullName: "Casey",
   role: "member" as const,
-  mustChangePassword: false,
 };
 
 function table() {
@@ -131,35 +130,6 @@ describe("startLoading", () => {
     expect(calls).toEqual(["thing a"]);
     me.value = { ...casey, id: "u2" };
     expect(calls).toEqual(["thing a", "thing a"]);
-  });
-
-  test("a user who must change their password loads only the profile", () => {
-    const { routes, calls } = table();
-    routes.push({
-      view: (() => null) as unknown as Route["view"],
-      title: () => "x",
-      path: "/profile",
-      role: "authenticated",
-      load: async () => {
-        calls.push("profile");
-      },
-    });
-    let projects = 0;
-    globalThis.fetch = (async () => {
-      projects++;
-      return Response.json({ projects: [] });
-    }) as unknown as typeof fetch;
-    me.value = { ...casey, mustChangePassword: true };
-    path.value = "/things/a";
-    stop = startLoading(routes);
-    expect(calls).toEqual([]);
-    expect(projects).toBe(0);
-    path.value = "/profile";
-    expect(calls).toEqual(["profile"]);
-    // the change opens everything: the rail loads and the route again
-    me.value = casey;
-    expect(projects).toBe(1);
-    expect(calls).toEqual(["profile", "profile"]);
   });
 
   test("the same user promoted to admin loads the admin route", () => {

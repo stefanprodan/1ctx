@@ -200,7 +200,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
   Object.defineProperty(globalThis, "location", {
     configurable: true,

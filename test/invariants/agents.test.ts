@@ -20,7 +20,7 @@ import { refuses } from "../helpers/refuses.ts";
 const setup = async (fetcher?: typeof fetch) => {
   const app = await testApp(fetcher === undefined ? {} : { fetcher });
   const client = app.client();
-  await client.login("admin", "hunter2-test");
+  await client.signIn("admin");
   const { provider } = await (
     await client.call("POST", "/api/providers", {
       body: {

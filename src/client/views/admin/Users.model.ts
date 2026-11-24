@@ -6,13 +6,7 @@ import type {
   UpdateUserRequest,
 } from "../../../shared/api/users.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
-import {
-  isEmail,
-  MAX_EMAIL,
-  MAX_PASSWORD_BYTES,
-  MIN_PASSWORD,
-  type Role,
-} from "../../../shared/words.ts";
+import { isEmail, MAX_EMAIL, type Role } from "../../../shared/words.ts";
 import { ago } from "../../lib/format.ts";
 
 export const ROLE_CHOICES: { value: Role; label: string }[] = [
@@ -20,58 +14,29 @@ export const ROLE_CHOICES: { value: Role; label: string }[] = [
   { value: "admin", label: "Admin" },
 ];
 
-// how a new user gets a first password: with email on, an invite by
-// default, so the admin never holds it
-export type FirstPassword = "invite" | "password";
-export const FIRST_PASSWORD_CHOICES: { value: FirstPassword; label: string }[] =
-  [
-    { value: "invite", label: "Send an invite" },
-    { value: "password", label: "Set a password" },
-  ];
+// with email on, a new user is invited by default; a member left
+// without one cannot sign in until an admin sends it
+export type InviteChoice = "invite" | "none";
+export const INVITE_CHOICES: { value: InviteChoice; label: string }[] = [
+  { value: "invite", label: "Send an invite" },
+  { value: "none", label: "No invite" },
+];
 
-// what the new user form sends for the first password
-export function firstPasswordOf(
-  emailOn: boolean,
-  pick: FirstPassword,
-  password: string,
-): { invite: true } | { password: string } {
-  return emailOn && pick === "invite" ? { invite: true } : { password };
-}
-
-// the card that emails a user a link: an invite again while they have
-// not chosen a password, else a reset
-export function linkCardWords(user: UserAccount): {
-  kind: "invite" | "reset-link";
+// the card that emails a user an invite again, until they sign in
+export function inviteCardWords(user: UserAccount): {
   title: string;
   line: string;
   button: string;
   sent: string;
 } {
-  const sent = `Sent to ${user.email}.`;
-  if (user.disabled) {
-    return {
-      kind: "reset-link",
-      title: "Reset password",
-      line: "Enable them first.",
-      button: "Send reset link",
-      sent,
-    };
-  }
-  return user.mustChangePassword
-    ? {
-        kind: "invite",
-        title: "Invite",
-        line: "Emails a new link to choose a password. The last one stops working.",
-        button: "Send invite",
-        sent,
-      }
-    : {
-        kind: "reset-link",
-        title: "Reset password",
-        line: `Emails ${user.fullName} a link to choose a new password. It works for 30 minutes. Using it deletes their access keys.`,
-        button: "Send reset link",
-        sent,
-      };
+  return {
+    title: "Invite",
+    line: user.disabled
+      ? "Enable them first."
+      : "Emails a new link to sign in. The last one stops working.",
+    button: "Send invite",
+    sent: `Sent to ${user.email}.`,
+  };
 }
 
 // the server holds the username rule
@@ -93,16 +58,7 @@ export function tzProblem(value: string): string | null {
   return value === "" ? "Pick a time zone" : null;
 }
 
-// typed once, no confirm box: the admin sees it and hands it over
-export function passwordProblem(password: string): string | null {
-  if (password.length < MIN_PASSWORD)
-    return `The password needs at least ${MIN_PASSWORD} characters`;
-  if (new TextEncoder().encode(password).length > MAX_PASSWORD_BYTES)
-    return `The password needs at most ${MAX_PASSWORD_BYTES} bytes`;
-  return null;
-}
-
-type UserField = "username" | "fullName" | "email" | "tz" | "role" | "password";
+type UserField = "username" | "fullName" | "email" | "tz" | "role";
 
 // the words are the parsers' and the conflicts' in access/
 export function userFieldOf(message: string): UserField | undefined {
@@ -112,7 +68,6 @@ export function userFieldOf(message: string): UserField | undefined {
   if (m.startsWith("email")) return "email";
   if (m.startsWith("time zone")) return "tz";
   if (m.startsWith("role") || m.includes("own role")) return "role";
-  if (m.startsWith("password")) return "password";
   return undefined;
 }
 
@@ -189,8 +144,8 @@ function activeLine(
 export function stateLine(user: AdminUser, now: number): string {
   const state = user.disabled
     ? "disabled"
-    : user.mustChangePassword
-      ? "password to change"
+    : user.signedInAt === null
+      ? "never signed in"
       : activeLine(user, now);
   return `${user.role} · ${state}`;
 }
@@ -249,21 +204,4 @@ export function patchOf(
   if (email !== user.email) body.email = email;
   if (fields.tz !== user.tz) body.tz = fields.tz;
   return Object.keys(body).length === 0 ? null : body;
-}
-
-// without the lookalikes (0 O o, 1 l I), so it survives dictation or paper
-const PASSWORD_CHARS =
-  "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-export function generatePassword(length = 20): string {
-  const n = PASSWORD_CHARS.length;
-  // bytes past the largest multiple of n are drawn again: no modulo bias
-  const limit = 256 - (256 % n);
-  let out = "";
-  while (out.length < length) {
-    for (const byte of crypto.getRandomValues(new Uint8Array(length * 2))) {
-      if (byte < limit && out.length < length) out += PASSWORD_CHARS[byte % n];
-    }
-  }
-  return out;
 }

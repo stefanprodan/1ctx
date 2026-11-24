@@ -7,12 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 import type { ProjectDetail } from "../../src/shared/contracts/project.ts";
-import {
-  collectLogs,
-  hashPassword,
-  type TestClient,
-  testApp,
-} from "../helpers/app.ts";
+import { collectLogs, type TestClient, testApp } from "../helpers/app.ts";
 import { createTeam } from "../helpers/projects.ts";
 
 type App = Awaited<ReturnType<typeof testApp>>;
@@ -29,19 +24,17 @@ async function signedIn(
     fullName: username.toUpperCase(),
     email: `${username}@example.com`,
     role,
-    passwordHash: await hashPassword("pw"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const client = app.client();
-  expect((await client.login(username, "pw")).status).toBe(200);
+  expect((await client.signIn(username)).status).toBe(200);
   return { user, client };
 }
 
 async function setup(options: Parameters<typeof testApp>[0] = {}) {
   const app = await testApp(options);
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await admin.signIn("admin")).status).toBe(200);
   const casey = await signedIn(app, "casey");
   const robin = await signedIn(app, "robin");
   const team = await createTeam(admin, "platform", [casey.user.id]);

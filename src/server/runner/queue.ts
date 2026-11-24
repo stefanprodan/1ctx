@@ -228,7 +228,6 @@ export function dispatcher(deps: DispatcherDeps): Dispatcher {
             ? "expired"
             : user === null ||
                 user.disabled ||
-                user.mustChangePassword ||
                 uploadsFail(row, user, session.projectId)
               ? "failed"
               : null);

@@ -650,7 +650,6 @@ beforeEach(() => {
     username: "stefan",
     fullName: "Stefan",
     role: "member",
-    mustChangePassword: false,
   };
   calls = [];
   hold = false;

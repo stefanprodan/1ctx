@@ -1315,7 +1315,6 @@ describe("the entity over the socket", () => {
       username: "casey",
       fullName: "Casey",
       role: "member",
-      mustChangePassword: false,
     };
     let release: (response: Response) => void = () => {};
     globalThis.fetch = (async (url: string) => {
@@ -1349,7 +1348,6 @@ describe("the entity over the socket", () => {
       username: "casey",
       fullName: "Casey",
       role: "member",
-      mustChangePassword: false,
     };
     let release: (response: Response) => void = () => {};
     globalThis.fetch = (async (url: string) => {
@@ -1415,7 +1413,6 @@ describe("the entity over the socket", () => {
       username: "casey",
       fullName: "Casey",
       role: "member",
-      mustChangePassword: false,
     };
     globalThis.fetch = (async () =>
       Response.json({
@@ -1678,7 +1675,6 @@ describe("the runs' pages", () => {
       username: "casey",
       fullName: "Casey",
       role: "member",
-      mustChangePassword: false,
     };
     globalThis.fetch = (async (url: string) => {
       urls.push(url);

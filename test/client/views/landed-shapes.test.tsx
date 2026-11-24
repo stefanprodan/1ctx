@@ -61,7 +61,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey Doe",
     role: "admin",
-    mustChangePassword: false,
   };
 });
 
@@ -184,15 +183,15 @@ describe("the profile waits as its sections", () => {
     emailOn.value = false;
   });
 
-  test.serial("who it is, About you and Password, Save in bones", () => {
+  test.serial("who it is and About you, Save in bones", () => {
     emailOn.value = false;
     const html = render(<Profile />);
     expect(html).toContain('aria-label="Loading your profile"');
     expect(html).toContain("who-waiting-avatar");
     expect(html).toContain(">About you<");
-    expect(html).toContain(">Password<");
+    expect(html).not.toContain(">Password<");
     expect(html).not.toContain(">Email<");
-    expect(withClass(html, "foot")).toBe(2);
+    expect(withClass(html, "foot")).toBe(1);
     expect(html).not.toContain(GENERIC);
   });
 
@@ -201,7 +200,7 @@ describe("the profile waits as its sections", () => {
     const html = render(<Profile />);
     expect(html).toContain(">Email<");
     expect(html).toContain(EMAIL_HINT);
-    expect(withClass(html, "foot")).toBe(3);
+    expect(withClass(html, "foot")).toBe(2);
   });
 });
 

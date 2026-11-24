@@ -109,11 +109,14 @@ reporting.
   seconds while seen, a stuck one in bad words with its next step
   (`stuckLine()`). The aside counts them, names the gateway label and
   says whether each `openshell-` key file is found, never its value.
-- **The admin's own user page has no Reset password nor Disable.**
-  `roleLock()` fixes their role and the last admin's.
+- **A user page has Sign out everywhere, asked once (`AskDelete`),**
+  and Send invite again until the first sign-in where email reaches
+  them. New user has no password field. The admin's own page has
+  neither, nor Disable; `roleLock()` fixes their role and the last
+  admin's.
 - **A user page lists the user's access keys from `userKeys`,** read
-  again after a revoke (whatever its answer), a reset and a disable,
-  which delete them. No admin page makes a key. The row is
+  again after a revoke (whatever its answer), a sign out everywhere and
+  a disable, which delete them. No admin page makes a key. The row is
   `views/keys/` (`docs/views.md`).
 - **The MCP tab's prompt preview is `promptPreview()`** over
   `offeredServers()` and `promptSnapshot()` from `shared/mcp.ts`, every

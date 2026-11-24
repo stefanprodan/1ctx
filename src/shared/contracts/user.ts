@@ -1,8 +1,7 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The user projections exposed on the wire. The password hash never
-// leaves the server.
+// The user projections exposed on the wire.
 
 import type { Role } from "../words.ts";
 
@@ -14,7 +13,7 @@ export type UserSummary = {
 };
 
 // the signed-in user as the shell sees them
-export type Me = UserSummary & { mustChangePassword: boolean };
+export type Me = UserSummary;
 
 export type UserAccount = UserSummary & {
   email: string;
@@ -22,7 +21,9 @@ export type UserAccount = UserSummary & {
   tz: string;
   createdAt: number;
   disabled: boolean;
-  mustChangePassword: boolean;
+  // the last sign-in, null before the first: an invite is sent again
+  // until then
+  signedInAt: number | null;
   // made up, not the user's: never emailed until an admin saves one
   emailPlaceholder: boolean;
 };

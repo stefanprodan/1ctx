@@ -29,7 +29,6 @@ test("the admin's list says each user's last visit and team projects", async () 
       email: "newcomer@example.com",
       role: "member",
       tz: "UTC",
-      password: "longenough",
     },
   });
   const created = (await never.json()).user;

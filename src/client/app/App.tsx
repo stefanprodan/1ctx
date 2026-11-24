@@ -154,14 +154,8 @@ export function App() {
   }
   const waited = useHandOver(shellWaits, path.value);
 
-  // one who must change the password they were handed lands on the
-  // profile, where the server lets them go
   useEffect(() => {
     if (!user || m?.route.bare) return;
-    if (user.mustChangePassword) {
-      if (m?.route.path !== "/profile") navigate("/profile", true);
-      return;
-    }
     const alias = ALIASES[path.value];
     if (alias !== undefined) navigate(alias + query.value, true);
     else if (m === null || m.route.path === "/login") navigate("/", true);
@@ -211,7 +205,6 @@ export function App() {
     return <View params={m.params} />;
   }
   if (m === null || m.route.path === "/login") return null;
-  if (user.mustChangePassword && m.route.path !== "/profile") return null;
   if (m.route.role === "admin" && user.role !== "admin") {
     return (
       <Shell user={user} waited={waited}>

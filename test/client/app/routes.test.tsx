@@ -46,7 +46,6 @@ describe("the route table", () => {
       username: "casey",
       fullName: "Casey",
       role: "member",
-      mustChangePassword: false,
     };
     for (const route of ROUTES) {
       const View = route.view;

@@ -25,10 +25,6 @@ export type UpdateProfileRequest = {
 // PUT /api/profile/email: whether agents and alerts may email the user
 export type EmailSettingsRequest = { fromAgents: boolean };
 
-// POST /api/profile/password: the current password proves it is the
-// user, the next one replaces it and every other login is revoked
-export type ChangePasswordRequest = { current: string; next: string };
-
 // GET /api/profile/keys: the user's access keys, newest first, and the
 // admin's cap on them; at 0 keys are off and /mcp answers 404
 export type AccessKeysResponse = { keys: AccessKey[]; limit: number };

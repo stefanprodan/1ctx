@@ -48,7 +48,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
   path.value = "/";
   lastWork.value = "/";

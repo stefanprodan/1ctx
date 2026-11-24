@@ -12,7 +12,6 @@ import { DAY_MS, MINUTE_MS, zoneOrUtc } from "../lib/clock.ts";
 import { escapeHtml } from "../render/index.ts";
 
 export const LINK_TTL_MS: Record<LinkPurpose, number> = {
-  reset: 30 * MINUTE_MS,
   signin: 15 * MINUTE_MS,
   invite: 7 * DAY_MS,
 };
@@ -54,13 +53,6 @@ export function linkEmail(
 ): Content {
   const hi = `Hi ${user.fullName},`;
   switch (purpose) {
-    case "reset":
-      return content("Reset your 1ctx password", [
-        hi,
-        `Open this link within 30 minutes to choose a new password for @${user.username}.`,
-        { link },
-        "If you did not ask for it, ignore this email. Your password stays as it is.",
-      ]);
     case "signin":
       return content("Sign in to 1ctx", [
         hi,
@@ -71,29 +63,16 @@ export function linkEmail(
     case "invite":
       return content("You are invited to 1ctx", [
         hi,
-        `An admin made you an account, @${user.username}. Open this link within 7 days to choose your password.`,
+        `An admin made you an account, @${user.username}. Open this link within 7 days to sign in.`,
         { link },
       ]);
   }
 }
 
-// what happened to the account: the user's own change, a reset by
-// link, an admin's reset, a sign in by link
-export type NoticeEvent = "changed" | "reset" | "admin-reset" | "signin";
+// what happened to the account: a sign in by link
+export type NoticeEvent = "signin";
 
 const NOTICE: Record<NoticeEvent, { subject: string; what: string }> = {
-  changed: {
-    subject: "Your 1ctx password was changed",
-    what: "Your password was changed",
-  },
-  reset: {
-    subject: "Your 1ctx password was reset",
-    what: "Your password was reset by email link",
-  },
-  "admin-reset": {
-    subject: "Your 1ctx password was reset",
-    what: "An admin reset your password",
-  },
   signin: {
     subject: "New sign in to 1ctx",
     what: "You signed in by email link",
@@ -127,10 +106,6 @@ export function noticeEmail(
 ): Content {
   const { subject, what } = NOTICE[event];
   const when = noticeTime(at, user.tz);
-  // the address is the admin's own, and the admin did it
-  if (event === "admin-reset") {
-    return content(subject, [`Hi ${user.fullName},`, `${what} on ${when}.`]);
-  }
   // a proxy's header is not ours to repeat unless it is an address
   const from = isIP(address) === 0 ? "an unknown address" : address;
   return content(subject, [

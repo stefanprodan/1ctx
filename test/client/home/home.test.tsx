@@ -82,7 +82,6 @@ describe("Home", () => {
       username: "casey",
       fullName: "Casey",
       role: "member",
-      mustChangePassword: false,
     };
     query.value = "";
     projects.value = [
@@ -350,8 +349,7 @@ describe("Login", () => {
     const html = render(<Login />);
     expect(html).toContain('class="login"');
     expect(html).toContain('class="login-form card"');
-    expect(html).toContain('autocomplete="username"');
-    expect(html).toContain('type="password"');
+    expect(html).toContain('name="key"');
     expect(html).toContain("Sign in");
   });
 });

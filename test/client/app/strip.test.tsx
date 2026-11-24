@@ -23,7 +23,6 @@ const casey: Me = {
   username: "casey",
   fullName: "Casey",
   role: "member",
-  mustChangePassword: false,
 };
 const admin: Me = { ...casey, role: "admin" };
 

@@ -28,7 +28,6 @@ const casey: Me = {
   username: "casey",
   fullName: "Casey",
   role: "admin",
-  mustChangePassword: false,
 };
 
 const chat = (id: string, title: string, revision = 1) => ({

@@ -65,7 +65,6 @@ const member = {
   username: "casey",
   fullName: "Casey Doe",
   role: "member" as const,
-  mustChangePassword: false,
 };
 
 const realFetch = globalThis.fetch;

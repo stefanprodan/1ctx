@@ -126,8 +126,7 @@ arrives.
   `messages` row with its own author. Each is held to a single
   message's bounds. The routes send a list of one.
 - **Every author is read by id at the start.** A missing or disabled
-  user is a 400, one who must change their password a 403, and every
-  author must see the chat and write in its project. The send counts
+  user is a 400, and every author must see the chat and write in its project. The send counts
   against the first author, or the one the dispatcher names, and runs
   under their policy.
 - **On the wire each message is its own user message** with its

@@ -88,7 +88,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey Doe",
     role: "member",
-    mustChangePassword: false,
   };
   projects.value = [team("p1", "platform"), team("p2", "research")];
 });

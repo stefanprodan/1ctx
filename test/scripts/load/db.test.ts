@@ -22,7 +22,6 @@ const sha = async (path: string) =>
 const options = {
   modelUrl: fakeModelUrl(),
   mcpUrl: (s: string) => fakeMcpUrl(s),
-  passwordHash: "a-hash",
 };
 
 describe("the database builder", () => {
@@ -83,12 +82,6 @@ describe("the database builder", () => {
         )
         .get()!;
       expect(keys.n).toBe(0);
-      const hashes = db
-        .query<{ h: string }, []>(
-          "select distinct password_hash as h from users",
-        )
-        .all();
-      expect(hashes).toEqual([{ h: "a-hash" }]);
       db.close();
     },
   );

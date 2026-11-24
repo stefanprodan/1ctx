@@ -13,7 +13,7 @@ import { WAITING_PAGE } from "../../../src/server/runner/queue.ts";
 import { MAX_QUEUED_PER_CHAT } from "../../../src/server/sessions/index.ts";
 import type { QueuedMessage } from "../../../src/shared/contracts/session.ts";
 import { MAX_MESSAGE_BYTES } from "../../../src/shared/words.ts";
-import { hashPassword, testApp } from "../../helpers/app.ts";
+import { testApp } from "../../helpers/app.ts";
 import { createAutomation, settleRun } from "../../helpers/automations.ts";
 import {
   authored,
@@ -1029,12 +1029,10 @@ describe("the queue behind a busy chat", () => {
         fullName: "Dana Roe",
         email: "dana@example.com",
         role: "member",
-        passwordHash: await hashPassword("pw"),
-        mustChangePassword: false,
         now: chat.app.now.value,
       });
       const danaClient = chat.app.client();
-      await danaClient.login("dana", "pw");
+      await danaClient.signIn("dana");
       const team = await createTeam(chat.admin, "ops", [
         chat.memberId,
         dana.id,

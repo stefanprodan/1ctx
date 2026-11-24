@@ -148,7 +148,7 @@ describe("the socket fan-out", () => {
     const m = mark();
     const socket = area();
     const conns = opened(socket, 3);
-    conns[0]!.data.principal.mustChangePassword = true;
+    conns[0]!.data.projects = new Set(["r"]);
     conns[1]!.data.projects = new Set(["q"]);
     conns[2]!.data.projects = new Set();
     for (const event of events(m)) publish(event);

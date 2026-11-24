@@ -110,7 +110,6 @@ export function memberConn(userId: string, projects: string[]): RecordingConn {
       username: userId,
       fullName: userId,
       role: "member",
-      mustChangePassword: false,
       via: { kind: "login", id: `login-${userId}` },
     },
     projects: new Set(projects),

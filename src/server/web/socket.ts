@@ -134,9 +134,7 @@ export function socketArea(deps: SocketDeps): Socket {
   const revoke = (conn: Conn): void =>
     serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
 
-  // a locked tab hears no project's events
   const sees = (conn: Conn, projectId: string): boolean =>
-    !conn.data.principal.mustChangePassword &&
     conn.data.projects.has(projectId);
 
   const join = (map: Map<string, Set<Conn>>, key: string, conn: Conn) => {
@@ -367,7 +365,6 @@ export function socketArea(deps: SocketDeps): Socket {
       method: "GET",
       path: "/api/socket",
       policy: "authenticated",
-      passwordChange: true,
       upgrade: true,
       handle(_req, ctx) {
         const principal = ctx.principal!;
@@ -422,9 +419,6 @@ export function socketArea(deps: SocketDeps): Socket {
         if (conn.data.watching === parsed.sessionId) unwatch(conn);
         return;
       }
-      // The socket stays open so revocation reaches a locked tab, but it must
-      // not become a route around the password-change gate.
-      if (principal.mustChangePassword) return;
       const project = deps.sessionProject(principal, parsed.sessionId);
       if (project === null || !conn.data.projects.has(project)) return;
       unwatch(conn);

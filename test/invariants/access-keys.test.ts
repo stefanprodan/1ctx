@@ -3,7 +3,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { createKey } from "../helpers/access-keys.ts";
-import { hashPassword, testApp } from "../helpers/app.ts";
+import { testApp } from "../helpers/app.ts";
 import { AUTH_CASES } from "../helpers/auth-cases.ts";
 
 describe("a bearer has no authority on cookie routes", () => {
@@ -17,20 +17,16 @@ describe("a bearer has no authority on cookie routes", () => {
             fullName: "Casey",
             email: "casey@example.test",
             role: "member",
-            passwordHash: await hashPassword("pw"),
-            mustChangePassword: false,
             now: app.now.value,
           });
           const admin = app.client();
-          expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+          expect((await admin.signIn("admin")).status).toBe(200);
           const { token } = await createKey(admin);
           const client = app.client();
           if (caller === "member")
-            expect((await client.login("casey", "pw")).status).toBe(200);
+            expect((await client.signIn("casey")).status).toBe(200);
           if (caller === "admin")
-            expect((await client.login("admin", "hunter2-test")).status).toBe(
-              200,
-            );
+            expect((await client.signIn("admin")).status).toBe(200);
           const route = app.routes.find(
             (r) => r.method === c.method && r.path === c.path,
           )!;

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Smoke test of the compiled binary: it starts, serves the page, answers
-# health, bootstraps the admin from user-admin.key and signs it in with a
-# cookie. It runs outside the source directory and removes its files on exit.
+# health, makes an admin key with admin-key, bootstraps the admin from
+# user-admin.key and signs it in with a cookie. It runs outside the source directory and removes its files on exit.
 set -euo pipefail
 source "$(dirname "$0")/smoke-http.sh"
 
@@ -14,8 +14,12 @@ mkdir -p bin
 mkdir "$RUN"
 trap 'kill "${PID:-}" 2>/dev/null || true; rm -rf "$RUN"' EXIT
 
-mkdir -p "$RUN/secrets"
-printf 'smoke-pass' >"$RUN/secrets/user-admin.key"
+made=$("$BIN" admin-key admin --secrets "$RUN/secrets")
+[[ "$made" == "$RUN/secrets/user-admin.key" ]] || {
+  echo "smoke: admin-key printed $made" >&2
+  exit 1
+}
+ADMIN_KEY=$(cat "$RUN/secrets/user-admin.key")
 (cd "$RUN" && exec "$BIN" --listen "127.0.0.1:$PORT" --db 1ctx.sqlite \
   --secrets secrets) >"$RUN/log" 2>&1 &
 PID=$!

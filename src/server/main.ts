@@ -25,6 +25,8 @@ import { shutdownOnSignal } from "./lib/shutdown.ts";
 import { type ProvisionResult, provisionPaths } from "./provision/index.ts";
 import { defaultDir, type Secrets, secrets } from "./secrets/index.ts";
 import { runService, ServiceError } from "./service/index.ts";
+import { BootstrapError } from "./users/index.ts";
+import { makeAdminKey } from "./users/key-file.ts";
 import { serve } from "./web/serve.ts";
 
 const buildVersion = process.env.ONECTX_BUILD_VERSION;
@@ -44,11 +46,16 @@ function fail(message: string): never {
 const cli = parseCli(process.argv.slice(2));
 
 // an http- file is sized before it is read, and one past a key's room
-// is never read
+// is never read; an admin key is far under 100 bytes
+const ADMIN_KEY_FILE_BYTES = 100;
+const MAX_BYTES: Partial<Record<SecretKind, number>> = {
+  "http-": MAX_KEY_FILE_BYTES,
+  "user-": ADMIN_KEY_FILE_BYTES,
+};
 function portsOf(store: Secrets) {
   return {
     secret: (kind: SecretKind, name: string) =>
-      store.read(kind, name, kind === "http-" ? MAX_KEY_FILE_BYTES : undefined),
+      store.read(kind, name, MAX_BYTES[kind]),
     secretNames: (kind: SecretKind) => store.list(kind),
   };
 }
@@ -86,6 +93,21 @@ function provisioner(store: Secrets, log: LogFactory = () => silent) {
       trustProxy: false,
       activate: false,
     });
+}
+
+if (cli.kind === "admin-key") {
+  const { username, stdout, secretsDir } = cli.options;
+  const made = makeAdminKey(
+    username,
+    stdout ? null : (secretsDir ?? defaultDir(Bun.main, process.execPath)),
+  );
+  if (!made.ok) {
+    console.error(`error: ${made.error}`);
+    process.exit(1);
+  }
+  // the one place a key is shown
+  console.log(made.path ?? made.key);
+  process.exit(0);
 }
 
 if (cli.kind === "provision") {
@@ -154,6 +176,10 @@ const app = await compose({
   // an in-memory database keeps no cache either
   cacheDir:
     cacheDir ?? (dbPath === ":memory:" ? null : join(dirname(dbPath), "repos")),
+}).catch((error: unknown) => {
+  if (!(error instanceof BootstrapError)) throw error;
+  log.error("admin not created", { file: error.file, reason: error.reason });
+  process.exit(1);
 });
 app.sweep();
 app.mcpStart();

@@ -19,7 +19,6 @@ const casey = {
   username: "casey",
   fullName: "Casey",
   role: "member" as const,
-  mustChangePassword: false,
 };
 
 type Timer = { fn: () => void; ms: number };

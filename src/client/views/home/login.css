@@ -48,10 +48,6 @@
     margin: 0;
   }
 
-  .login-forgot {
-    align-self: flex-end;
-  }
-
   .login-note {
     margin: 0;
     font-size: var(--text-ui);

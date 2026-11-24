@@ -24,7 +24,6 @@ import {
   AZURE_URL,
   fakeFetch,
   GEMINI_URL,
-  hashPassword,
   PROVIDER_URL,
   type TestApp,
   testApp,
@@ -621,7 +620,7 @@ export async function chatApp(
     repoJobs: options.repoJobs,
   });
   const admin = app.client();
-  await admin.login("admin", "hunter2-test");
+  await admin.signIn("admin");
   const { provider } = await (
     await admin.call("POST", "/api/providers", {
       body: {
@@ -684,12 +683,10 @@ export async function chatApp(
     fullName: "Casey Doe",
     email: "casey@example.com",
     role: "member",
-    passwordHash: await hashPassword("pw"),
-    mustChangePassword: false,
     now: app.now.value,
   });
   const member = app.client();
-  await member.login("casey", "pw");
+  await member.signIn("casey");
   return {
     app,
     scripted,

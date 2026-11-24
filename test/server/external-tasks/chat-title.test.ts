@@ -7,7 +7,6 @@
 
 import { expect, test } from "bun:test";
 import type { ExternalTaskResponse } from "../../../src/shared/api/external-tasks.ts";
-import { hashPassword } from "../../helpers/app.ts";
 import { chatApp, startChat } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { settle } from "../../helpers/tool-loop.ts";
@@ -22,12 +21,10 @@ test("a task's chat title reaches only a reader who may open the chat", async ()
       fullName: "Dana",
       email: "dana@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     const other = chat.app.client();
-    expect((await other.login("dana", "pw")).status).toBe(200);
+    expect((await other.signIn("dana")).status).toBe(200);
     const team = await createTeam(chat.admin, "team", [chat.memberId, dana.id]);
 
     const started = async (message: string, projectId: string) => {

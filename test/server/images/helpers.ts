@@ -6,7 +6,6 @@
 
 import { expect } from "bun:test";
 import type { StagedImage } from "../../../src/shared/api/images.ts";
-import { hashPassword } from "../../helpers/app.ts";
 import {
   authored,
   type ChatApp,
@@ -41,12 +40,10 @@ export async function imageApp() {
     fullName: "Robin Roe",
     email: "robin@example.com",
     role: "member",
-    passwordHash: await hashPassword("pw2"),
-    mustChangePassword: false,
     now: app.now.value,
   }).id;
   const robin = app.client();
-  await robin.login("robin", "pw2");
+  await robin.signIn("robin");
   const team = await createTeam(chat.admin, "ops", [chat.memberId, robinId]);
   // the agent's image flag, as a save from a catalog that lists them
   const reads = (agentId: string, on = true) =>

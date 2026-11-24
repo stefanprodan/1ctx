@@ -28,7 +28,6 @@ const reader: Me = {
   username: "reader",
   fullName: "Reader",
   role: "member",
-  mustChangePassword: false,
 };
 
 function file(changes: Partial<KnowledgeFile> = {}): KnowledgeFile {

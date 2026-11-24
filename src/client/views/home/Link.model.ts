@@ -6,38 +6,22 @@
 // another, since going on replaces it.
 
 import type { LinkPurpose } from "../../../shared/api/access.ts";
-import {
-  MAX_PASSWORD_BYTES,
-  MIN_PASSWORD,
-  passwordProblem,
-} from "../../../shared/words.ts";
 
 export type LinkWords = {
   title: string;
   line: string;
   button: string;
   busy: string;
-  // reset and invite set a password; a sign in link takes none
-  password: boolean;
 };
 
 export function linkWords(purpose: LinkPurpose, username: string): LinkWords {
   switch (purpose) {
-    case "reset":
-      return {
-        title: "Choose a new password",
-        line: `For @${username}. It signs @${username} out everywhere else.`,
-        button: "Set password",
-        busy: "Setting",
-        password: true,
-      };
     case "invite":
       return {
         title: "Welcome to 1ctx",
-        line: `Choose a password for @${username}.`,
-        button: "Set password",
-        busy: "Setting",
-        password: true,
+        line: `Sign in as @${username}. The link works once.`,
+        button: "Sign in",
+        busy: "Signing in",
       };
     case "signin":
       return {
@@ -45,7 +29,6 @@ export function linkWords(purpose: LinkPurpose, username: string): LinkWords {
         line: "The link works once.",
         button: "Sign in",
         busy: "Signing in",
-        password: false,
       };
   }
 }
@@ -57,15 +40,6 @@ export function otherAccount(
 ): string | null {
   if (signedIn === null || signedIn === username) return null;
   return `You are signed in as @${signedIn}. Going on signs you in as @${username} instead.`;
-}
-
-export function newPasswordProblem(value: string): string | null {
-  const problem = passwordProblem(value);
-  if (problem === "short")
-    return `The password needs at least ${MIN_PASSWORD} characters`;
-  if (problem === "long")
-    return `The password needs at most ${MAX_PASSWORD_BYTES} bytes`;
-  return null;
 }
 
 // a link the server no longer knows, said plainly

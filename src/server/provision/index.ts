@@ -2,14 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { WebAccess } from "../../shared/web.ts";
-import {
-  MAX_PASSWORD_BYTES,
-  MIN_PASSWORD,
-  passwordProblem,
-} from "../../shared/words.ts";
 import { messageOf } from "../lib/errors.ts";
 import { scrubValues } from "../lib/log.ts";
-import { ADMIN_SECRET } from "../users/index.ts";
+import { ADMIN_SECRET, isAdminKey } from "../users/index.ts";
 import { apply, type Secret } from "./apply.ts";
 import { type Action, type Counts, client, type Handle } from "./client.ts";
 import {
@@ -54,13 +49,11 @@ export function provisionArea(deps: ProvisionDeps) {
       deps.smtp(),
       deps.providerWire,
     );
-    const password = secret("user-", ADMIN_SECRET);
-    if (password === null || passwordProblem(password) !== null) {
-      throw new Error(
-        `user/admin: user-admin.key must hold ${MIN_PASSWORD} to ${MAX_PASSWORD_BYTES} bytes`,
-      );
+    const key = secret("user-", ADMIN_SECRET);
+    if (!isAdminKey(key)) {
+      throw new Error("user/admin: user-admin.key must hold an admin key");
     }
-    return password;
+    return key;
   };
   return {
     validate,
@@ -83,7 +76,7 @@ export function provisionArea(deps: ProvisionDeps) {
       };
       try {
         // Validation precedes even the login row and the first admin.
-        const password = validate(documents, secret);
+        const key = validate(documents, secret);
         // not an object in the file, so it is said plainly and counted
         // nowhere; its own document, if there is one, reports itself
         if (await deps.bootstrap()) {
@@ -91,12 +84,12 @@ export function provisionArea(deps: ProvisionDeps) {
         }
         const api = client(deps.handle);
         try {
-          await api.call("POST", "/api/login", { username: "admin", password });
+          await api.call("POST", "/api/login", { key });
         } catch (error) {
           throw new Error(`user/admin: ${messageOf(error)}`);
         }
         try {
-          await apply(api, documents, secret, report);
+          await apply(api, documents, report);
         } finally {
           await api.call("POST", "/api/logout");
         }

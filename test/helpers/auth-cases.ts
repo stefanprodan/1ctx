@@ -14,6 +14,8 @@ export type AuthCase = {
   path: string;
   // a body that passes the parser, so a denial is about access alone
   body?: unknown;
+  // sent as the bearer beside the caller's cookie: never a credential
+  bearer?: "admin key";
   expect: Record<Caller, number>;
 };
 
@@ -107,6 +109,20 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 401, admin: 401 },
   },
   {
+    // an admin key opens the web app only, never a bearer route
+    method: "POST",
+    path: "/mcp",
+    bearer: "admin key",
+    body: { jsonrpc: "2.0", id: 1, method: "tools/list" },
+    expect: { anonymous: 401, member: 401, admin: 401 },
+  },
+  {
+    method: "GET",
+    path: "/mcp",
+    bearer: "admin key",
+    expect: { anonymous: 401, member: 401, admin: 401 },
+  },
+  {
     method: "DELETE",
     path: "/mcp",
     expect: { anonymous: 401, member: 401, admin: 401 },
@@ -149,22 +165,16 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/login",
-    body: { username: "nobody", password: "wrong" },
-    // public: everyone reaches the handler; the wrong password is a 401
-    // from it, not from the router
+    body: { key: `1ctx-admin-${"B".repeat(43)}` },
+    // public: everyone reaches the handler; the wrong key is a 401 from
+    // it, not from the router
     expect: { anonymous: 401, member: 401, admin: 401 },
-  },
-  {
-    method: "POST",
-    path: "/api/login/forgot",
-    body: { username: "nobody" },
-    // public; email is off in the matrix, so there is no such feature
-    expect: { anonymous: 404, member: 404, admin: 404 },
   },
   {
     method: "POST",
     path: "/api/login/link",
     body: { username: "nobody" },
+    // public; email is off in the matrix, so there is no such feature
     expect: { anonymous: 404, member: 404, admin: 404 },
   },
   {
@@ -196,6 +206,13 @@ export const AUTH_CASES: AuthCase[] = [
     expect: { anonymous: 401, member: 200, admin: 200 },
   },
   {
+    // a cookie route never reads the bearer
+    method: "GET",
+    path: "/api/profile",
+    bearer: "admin key",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
     method: "PATCH",
     path: "/api/profile",
     body: { fullName: "Casey", about: "", tz: "UTC" },
@@ -214,15 +231,6 @@ export const AUTH_CASES: AuthCase[] = [
     // does not exist
     body: { agentId: "nope" },
     expect: { anonymous: 401, member: 400, admin: 400 },
-  },
-  {
-    method: "POST",
-    path: "/api/profile/password",
-    // authenticated: the handler then checks the current password,
-    // which this body gets wrong on purpose, and that is a 403 so the
-    // client does not take it for a lost login
-    body: { current: "nope", next: "longenough" },
-    expect: { anonymous: 401, member: 403, admin: 403 },
   },
   {
     method: "GET",
@@ -264,7 +272,6 @@ export const AUTH_CASES: AuthCase[] = [
       email: "maria@example.com",
       role: "member",
       tz: "UTC",
-      password: "longenough",
     },
     expect: { anonymous: 401, member: 403, admin: 201 },
   },
@@ -281,19 +288,13 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "POST",
-    path: "/api/users/:id/password",
-    body: { password: "longenough" },
+    path: "/api/users/:id/sign-out",
     expect: { anonymous: 401, member: 403, admin: 404 },
   },
   {
     method: "POST",
-    path: "/api/users/:id/reset-link",
-    // admin: email is off in the matrix
-    expect: { anonymous: 401, member: 403, admin: 409 },
-  },
-  {
-    method: "POST",
     path: "/api/users/:id/invite",
+    // admin: email is off in the matrix
     expect: { anonymous: 401, member: 403, admin: 409 },
   },
   {

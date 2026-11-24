@@ -65,10 +65,10 @@ export type Links = {
   // in the caller's transaction: the security notice, nothing while
   // email is off
   notice(user: UserRow, event: NoticeEvent, address: string): BusEvent[];
-  // a reset or sign in link asked for at the sign-in page, looked up
-  // and issued after the answer, so neither the answer nor its time
-  // says whether the account exists
-  ask(purpose: "reset" | "signin", name: string): void;
+  // a sign in link asked for at the sign-in page, looked up and issued
+  // after the answer, so neither the answer nor its time says whether
+  // the account exists
+  ask(name: string): void;
   // resolves once every ask so far has run
   settled(): Promise<void>;
   // no ask starts work from here; resolves once every one so far ran
@@ -148,14 +148,11 @@ export function links(deps: LinksDeps): Links {
     return { subject: row.subject, text: row.body, html: htmlOf(row.body) };
   });
 
-  const asked = (wanted: "reset" | "signin", name: string) => {
+  const asked = (name: string) => {
     if (!deps.email.enabled()) return;
     const user = byLoginName(deps.users, name);
     if (user === null || user.disabled || user.emailPlaceholder) return;
-    // signed in by link, a must-change user would be asked for a current
-    // password they never knew; a reset sets one instead
-    const purpose =
-      wanted === "signin" && user.mustChangePassword ? "reset" : wanted;
+    const purpose = "signin";
     const outcome = transact<"live" | "user" | "instance" | "issued">(
       deps.db,
       () => {
@@ -201,14 +198,14 @@ export function links(deps: LinksDeps): Links {
         body: text,
       });
     },
-    ask(purpose, name) {
+    ask(name) {
       // past the shutdown's last wait the db may be closed
       if (closed) return;
       // a macrotask, so the answer is written before the lookup starts
       const work = new Promise<void>((resolve) => {
         setTimeout(() => {
           try {
-            asked(purpose, name);
+            asked(name);
           } catch (err) {
             deps.log.error("link ask failed", errorFields(err));
           }

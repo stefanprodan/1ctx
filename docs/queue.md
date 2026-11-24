@@ -86,7 +86,7 @@ table, not an editable queued text row.
   and ends only at a full process.
 - **Rows that can never start turn not sent.** An archived chat, a
   retired (deleted) agent, summons included, a row past `queuedMinutes`,
-  a gone, disabled or must-change-password author, or an upload that no
+  a gone or disabled author, or an upload that no
   longer checks. An author who lost the chat loses the row outright.
 - **The rest start in order up to the first summon,** which starts
   alone once they end. The turn counts against the oldest author with

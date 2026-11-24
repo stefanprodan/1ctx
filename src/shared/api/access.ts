@@ -3,8 +3,8 @@
 
 import type { Me } from "../contracts/user.ts";
 
-// POST /api/login: username is a username or an email
-export type LoginRequest = { username: string; password: string };
+// POST /api/login: an admin key, the content of a user-<username>.key
+export type LoginRequest = { key: string };
 export type LoginResponse = { user: Me };
 
 // GET /api/me: null when nobody is signed in; emailOn offers the email
@@ -16,11 +16,11 @@ export type MeResponse = {
   dictationOn: boolean;
 };
 
-// POST /api/login/forgot and /api/login/link: a username or an email,
-// answered 202 with no body whoever it names
+// POST /api/login/link: a username or an email, answered 202 with no
+// body whoever it names
 export type LinkAskRequest = { username: string };
 
-export const LINK_PURPOSES = ["reset", "signin", "invite"] as const;
+export const LINK_PURPOSES = ["signin", "invite"] as const;
 export type LinkPurpose = (typeof LINK_PURPOSES)[number];
 
 // GET /api/links/:token: null for a link unknown, used, expired or whose
@@ -29,9 +29,8 @@ export type LinkResponse = {
   link: { purpose: LinkPurpose; username: string } | null;
 };
 
-// POST /api/links/:token answers LoginResponse: reset and invite take
-// the new password, signin none
-export type UseLinkRequest = { password?: string };
+// POST /api/links/:token answers LoginResponse; it takes nothing
+export type UseLinkRequest = Record<string, never>;
 
 export type AccessDay = { day: string; start: number; signedIn: number };
 

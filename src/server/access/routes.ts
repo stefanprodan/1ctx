@@ -1,19 +1,18 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Login, logout and me. Login is rate limited per address and answers a
-// wrong username and a wrong password the same way, after the same hash
-// work, so neither leaks which one was wrong. The sign-in field takes a
-// username or an email.
+// Login, logout and me. A login by admin key is rate limited per
+// address and answers every failure, a bad body included, with one 401,
+// since the page faces the internet.
 
 import { isIP } from "node:net";
 import type { LoginResponse, MeResponse } from "../../shared/api/access.ts";
 import type { Me } from "../../shared/contracts/user.ts";
 import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
-import { loginRevoked } from "../lib/bus.ts";
+import { type BusEvent, loginRevoked } from "../lib/bus.ts";
 import { type Clock, MINUTE_MS } from "../lib/clock.ts";
-import { TooManyRequests, Unauthorized } from "../lib/errors.ts";
+import { BadRequest, TooManyRequests, Unauthorized } from "../lib/errors.ts";
 import {
   json,
   loginOf,
@@ -21,10 +20,11 @@ import {
   type RouteContext,
   type RouteDescriptor,
 } from "../lib/http.ts";
+import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
-import { meOf, type UserRow, verifyPassword } from "../users/index.ts";
+import { meOf, type UserRow } from "../users/index.ts";
+import type { AdminKeys } from "./admin-keys.ts";
 import type { Auth } from "./auth.ts";
-import { byLoginName } from "./links.ts";
 import { parseLogin } from "./parse.ts";
 import { RateLimit } from "./ratelimit.ts";
 
@@ -36,19 +36,17 @@ const meOfPrincipal = (p: Principal): Me => ({
   username: p.username,
   fullName: p.fullName,
   role: p.role,
-  mustChangePassword: p.mustChangePassword,
 });
 
 export type UsersPort = {
   byUsername(username: string): UserRow | null;
-  byEmail(email: string): UserRow | null;
-  nobodyHash(): Promise<string>;
 };
 
 export type RoutesDeps = {
   db: Db;
   auth: Auth;
   users: UsersPort;
+  adminKeys: Pick<AdminKeys, "match">;
   clock: Clock;
   log: Log;
   guard(ctx: RouteContext): void;
@@ -87,35 +85,41 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const addr = isIP(ctx.address) === 0 ? "invalid" : ctx.address;
         deps.guard(ctx);
-        const { username, password } = parseLogin(await jsonBody(req));
-        const user = byLoginName(deps.users, username);
-        const ok = await verifyPassword(
-          password,
-          user?.passwordHash ?? (await deps.users.nobodyHash()),
-        );
-        const wrong = new Unauthorized("wrong username or password");
-        const logFailure = () => deps.log.warn("login failed", { addr });
-        if (!ok || user === null || user.disabled) {
-          logFailure();
-          throw wrong;
+        const wrong = () => {
+          deps.log.warn("login failed", { addr });
+          return new Unauthorized("wrong admin key");
+        };
+        // a body past the cap keeps its 413, which says nothing of a key
+        let key: string;
+        try {
+          ({ key } = parseLogin(await jsonBody(req)));
+        } catch (error) {
+          if (error instanceof BadRequest) throw wrong();
+          throw error;
         }
+        const username = deps.adminKeys.match(key);
+        if (username === null) throw wrong();
+        const digest = sha256(key);
+        const principal = ctx.principal;
         const opened = transact(deps.db, () => {
-          // Password verification yields. Re-read under the write transaction so
-          // a disable, reset or rename that won meanwhile cannot open a login.
-          const current = byLoginName(deps.users, username);
-          if (
-            current === null ||
-            current.id !== user.id ||
-            current.passwordHash !== user.passwordHash ||
-            current.disabled
-          ) {
-            logFailure();
-            throw wrong;
+          const user = deps.users.byUsername(username);
+          if (user === null || user.disabled || user.role !== "admin") {
+            throw wrong();
           }
-          const { setCookie } = deps.auth.open(current);
-          return { result: { user: current, setCookie } };
+          // the tab's login is replaced, never kept beside the new one
+          const events: BusEvent[] = [];
+          const loginId = principal === null ? null : loginOf(principal);
+          if (principal !== null && loginId !== null) {
+            deps.auth.close(loginId);
+            events.push(loginRevoked(principal.userId, loginId));
+          }
+          const { setCookie } = deps.auth.open(user, digest);
+          return { result: { user, setCookie }, events };
         });
-        deps.log.info("login opened", { user: opened.user.username });
+        deps.log.info("login opened", {
+          user: opened.user.username,
+          by: "key",
+        });
         const body: LoginResponse = { user: meOf(opened.user) };
         return json(body, 200, { "set-cookie": opened.setCookie });
       },
@@ -124,7 +128,6 @@ export function routes(deps: RoutesDeps): RouteDescriptor[] {
       method: "POST",
       path: "/api/logout",
       policy: "authenticated",
-      passwordChange: true,
       handle(_req, ctx) {
         const principal = ctx.principal!;
         const loginId = loginOf(principal)!;

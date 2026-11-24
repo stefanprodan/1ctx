@@ -54,7 +54,6 @@ describe("drain", () => {
           username: "casey",
           fullName: "Casey Doe",
           role: "member" as const,
-          mustChangePassword: false,
           via: { kind: "login" as const, id: "l" },
         },
         projects: new Set([chat.projectId]),

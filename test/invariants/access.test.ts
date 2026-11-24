@@ -5,7 +5,7 @@
 // every route present in the matrix.
 
 import { describe, expect, test } from "bun:test";
-import { hashPassword, testApp } from "../helpers/app.ts";
+import { ADMIN_KEY, testApp } from "../helpers/app.ts";
 import { AUTH_CASES, type Caller } from "../helpers/auth-cases.ts";
 
 describe("the authorization matrix", () => {
@@ -29,46 +29,29 @@ describe("the authorization matrix", () => {
 
   for (const c of AUTH_CASES) {
     for (const caller of Object.keys(c.expect) as Caller[]) {
-      test(`${c.method} ${c.path} as ${caller} is ${c.expect[caller]}`, async () => {
+      const by = c.bearer === undefined ? "" : ` with an ${c.bearer}`;
+      test(`${c.method} ${c.path}${by} as ${caller} is ${c.expect[caller]}`, async () => {
         const app = await testApp();
         app.createUser({
           username: "casey",
           fullName: "Casey",
           email: "casey@example.com",
           role: "member",
-          passwordHash: await hashPassword("pw"),
-          mustChangePassword: false,
           now: app.now.value,
         });
         const client = app.client();
         if (caller === "admin")
-          expect((await client.login("admin", "hunter2-test")).status).toBe(
-            200,
-          );
+          expect((await client.signIn("admin")).status).toBe(200);
         if (caller === "member")
-          expect((await client.login("casey", "pw")).status).toBe(200);
-        const res = await client.call(c.method, c.path, { body: c.body });
+          expect((await client.signIn("casey")).status).toBe(200);
+        const res = await client.call(c.method, c.path, {
+          body: c.body,
+          ...(c.bearer === undefined
+            ? {}
+            : { headers: { authorization: `Bearer ${ADMIN_KEY}` } }),
+        });
         expect(res.status).toBe(c.expect[caller]);
       });
     }
   }
-});
-
-describe("required password route reachability", () => {
-  test("marks exactly the routes needed to change or leave", async () => {
-    const app = await testApp();
-    const marked = app.routes
-      .filter((route) => route.passwordChange === true)
-      .map((route) => `${route.method} ${route.path}`)
-      .sort();
-    expect(marked).toEqual(
-      [
-        "POST /api/logout",
-        "GET /api/profile",
-        "PATCH /api/profile",
-        "POST /api/profile/password",
-        "GET /api/socket",
-      ].sort(),
-    );
-  });
 });

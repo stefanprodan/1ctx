@@ -88,10 +88,7 @@ test("the listener admits upload bytes while JSON routes keep their own caps", a
         connection: "close",
         "content-type": "application/json",
       },
-      body: JSON.stringify({
-        username: "admin",
-        password: "x".repeat(MAX_BODY),
-      }),
+      body: JSON.stringify({ key: "x".repeat(MAX_BODY) }),
     });
     expect(json.status).toBe(413);
     expect(await json.json()).toEqual({ error: "body too large" });

@@ -90,8 +90,8 @@ async function load(chat: ChatApp): Promise<LoadResponse> {
 async function fixture(): Promise<ChatApp> {
   const chat = await chatApp();
   chat.app.now.value = NOW;
-  await chat.admin.login("admin", "hunter2-test");
-  await chat.member.login("casey", "pw");
+  await chat.admin.signIn("admin");
+  await chat.member.signIn("casey");
   return chat;
 }
 
@@ -258,8 +258,8 @@ describe("the overview days", () => {
   test("fall on the zone's days across a DST change", async () => {
     const chat = await fixture();
     chat.app.now.value = Date.parse("2026-03-31T12:00:00Z");
-    await chat.admin.login("admin", "hunter2-test");
-    await chat.member.login("casey", "pw");
+    await chat.admin.signIn("admin");
+    await chat.member.signIn("casey");
     const sessionId = await settledChat(chat);
     hide(chat);
     // Berlin's 29th starts at 23:00Z the day before and, the clocks
@@ -571,7 +571,7 @@ describe("the overview ranges", () => {
   test("all is today alone with no send", async () => {
     const app = await testApp();
     const admin = app.client();
-    await admin.login("admin", "hunter2-test");
+    await admin.signIn("admin");
     const res = await admin.call("GET", "/api/admin/overview?tz=UTC&range=all");
     expect(res.status).toBe(200);
     const body: OverviewResponse = await res.json();

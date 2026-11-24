@@ -58,7 +58,6 @@ const casey: Me = {
   username: "casey",
   fullName: "Casey",
   role: "member",
-  mustChangePassword: false,
 };
 const robin: Me = { ...casey, id: "u2", username: "robin" };
 

@@ -81,8 +81,6 @@ spec:
   fullName: Load ${name}
   email: ${name}@load.example
   tz: UTC
-  passwordFrom: user-${name}
-  mustChangePassword: false
 `;
   const project = (t: string) => `${API}
 kind: Project

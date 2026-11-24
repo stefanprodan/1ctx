@@ -1,6 +1,7 @@
 # shellcheck shell=bash
 # Sourced by smoke.sh and image-smoke.sh: the HTTP checks of a running
-# server at $URL, its files in $RUN. The caller defines fail().
+# server at $URL, its files in $RUN, its admin key in $ADMIN_KEY. The
+# caller defines fail().
 
 # a body is read into a variable and grepped there: grep -q piped from
 # curl stops at the first match, curl then dies of the broken pipe, and
@@ -21,7 +22,7 @@ smoke_http() {
   login=$(curl -s -c "$RUN/cookies" -o /dev/null \
     -w '%{http_code} %{header_json}' \
     -H 'content-type: application/json' -H "origin: $URL" \
-    -d '{"username":"admin","password":"smoke-pass"}' "$URL/api/login")
+    -d "{\"key\":\"$ADMIN_KEY\"}" "$URL/api/login")
   [[ "$login" == 200* ]] || fail "login answered ${login%% *}"
   echo "$login" | grep -q 'login=' || fail "login set no cookie"
 
@@ -37,11 +38,11 @@ smoke_http() {
 
   wrong=$(curl -s -o /dev/null -w '%{http_code}' \
     -H 'content-type: application/json' -H "origin: $URL" \
-    -d '{"username":"admin","password":"nope"}' "$URL/api/login")
-  [[ "$wrong" == 401 ]] || fail "a wrong password answered $wrong"
+    -d "{\"key\":\"1ctx-admin-$(printf 'A%.0s' {1..43})\"}" "$URL/api/login")
+  [[ "$wrong" == 401 ]] || fail "a wrong admin key answered $wrong"
 
   cross=$(curl -s -o /dev/null -w '%{http_code}' \
     -H 'content-type: application/json' -H 'origin: http://evil.test' \
-    -d '{"username":"admin","password":"smoke-pass"}' "$URL/api/login")
+    -d "{\"key\":\"$ADMIN_KEY\"}" "$URL/api/login")
   [[ "$cross" == 403 ]] || fail "a cross-origin write answered $cross"
 }

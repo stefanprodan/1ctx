@@ -41,7 +41,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   } as typeof me.value;
 });
 

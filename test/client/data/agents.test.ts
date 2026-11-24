@@ -17,7 +17,6 @@ const user = (id: string) => ({
   username: id,
   fullName: id,
   role: "admin" as const,
-  mustChangePassword: false,
 });
 
 const agent = { id: "ag1", name: "coder" } as AgentSummary;

@@ -12,7 +12,7 @@ import { SectionsWaiting } from "../../ui/Section.tsx";
 import { FieldBone } from "../../ui/SettingWaiting.tsx";
 import { AsideBones, Split } from "../../ui/Split.tsx";
 import { WhoWaiting } from "../../ui/Who.tsx";
-import { ABOUT_TEXT, EMAIL_HINT, PASSWORD_TEXT } from "./Profile.model.ts";
+import { ABOUT_TEXT, EMAIL_HINT } from "./Profile.model.ts";
 import "./profile.css";
 
 export function ProfileWaiting() {
@@ -59,20 +59,6 @@ export function ProfileWaiting() {
                 },
               ]
             : []),
-          {
-            title: "Password",
-            text: PASSWORD_TEXT,
-            body: (
-              <div class="profile-fields">
-                <FieldBone kind="wide" at={12} />
-                <div class="pair">
-                  <FieldBone kind="input" at={14} />
-                  <FieldBone kind="input" at={16} />
-                </div>
-              </div>
-            ),
-            foot: true,
-          },
         ]}
       />
     </Split>

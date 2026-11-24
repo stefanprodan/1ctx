@@ -21,7 +21,9 @@ PLATFORMS='' scripts/image.sh
 
 # the server runs as 65532, which owns neither the dirs nor the files
 mkdir "$RUN/secrets" "$RUN/provision"
-printf 'smoke-pass' >"$RUN/secrets/user-admin.key"
+# the admin-key format: the prefix and 32 random bytes as base64url
+ADMIN_KEY="1ctx-admin-$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')"
+printf '%s\n' "$ADMIN_KEY" >"$RUN/secrets/user-admin.key"
 cat >"$RUN/provision/project.yaml" <<'YAML'
 apiVersion: config.1ctx.dev/v1
 kind: Project

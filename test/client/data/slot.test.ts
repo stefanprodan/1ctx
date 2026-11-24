@@ -16,7 +16,6 @@ const user = (id: string) => ({
   username: id,
   fullName: id,
   role: "admin" as const,
-  mustChangePassword: false,
 });
 
 // each read waits for its own release, so a test picks the order

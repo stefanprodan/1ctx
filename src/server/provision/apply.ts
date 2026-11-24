@@ -44,24 +44,14 @@ import { applySmtpServer } from "./smtp.ts";
 
 export type Secret = (kind: SecretKind, name: string) => string | null;
 
-async function user(
-  api: Client,
-  doc: Of<"User">,
-  secret: Secret,
-): Promise<Action> {
+async function user(api: Client, doc: Of<"User">): Promise<Action> {
   const { users } = await api.call<UsersResponse>("GET", "/api/users");
   const before = users.find((row) => row.username === doc.name);
-  const { passwordFrom, mustChangePassword, ...fields } = doc.spec;
+  const fields = doc.spec;
   const desired = { ...fields, disabled: fields.disabled ?? false };
   if (!before) {
-    const password = secret("user-", required(passwordFrom, "passwordFrom"));
-    if (password === null) throw new Error("spec.passwordFrom has no value");
-    await api.call("POST", "/api/users", {
-      username: doc.name,
-      ...desired,
-      password,
-      ...(mustChangePassword === undefined ? {} : { mustChangePassword }),
-    });
+    // never invited: provisioning runs at every start
+    await api.call("POST", "/api/users", { username: doc.name, ...desired });
     return "created";
   }
   const current =
@@ -399,7 +389,6 @@ async function tool(api: Client, doc: Of<"Tool">): Promise<Action> {
 export async function apply(
   api: Client,
   documents: Document[],
-  secret: Secret,
   report: (action: Action, kind: string, name: string) => void,
 ) {
   for (const kind of KINDS) {
@@ -408,7 +397,7 @@ export async function apply(
         let action: Action;
         switch (doc.kind) {
           case "User":
-            action = await user(api, doc, secret);
+            action = await user(api, doc);
             break;
           case "SmtpServer":
             action = await applySmtpServer(api, doc);

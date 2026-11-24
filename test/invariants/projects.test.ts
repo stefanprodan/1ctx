@@ -6,7 +6,7 @@
 // is a 404 to everyone else, an admin included.
 
 import { describe, expect, test } from "bun:test";
-import { hashPassword, testApp } from "../helpers/app.ts";
+import { testApp } from "../helpers/app.ts";
 
 const member = async (app: Awaited<ReturnType<typeof testApp>>) =>
   app.createUser({
@@ -14,8 +14,6 @@ const member = async (app: Awaited<ReturnType<typeof testApp>>) =>
     fullName: "Casey Doe",
     email: "casey@example.com",
     role: "member",
-    passwordHash: await hashPassword("hunter2-test"),
-    mustChangePassword: false,
     now: app.now.value,
   });
 
@@ -58,8 +56,6 @@ describe("the personal project", () => {
           fullName: "Ghost",
           email: "ghost@example.com",
           role: "member",
-          passwordHash: "x",
-          mustChangePassword: false,
           now: 0,
         }),
       ).toThrow("no project");
@@ -102,7 +98,7 @@ describe("GET /api/projects", () => {
         .run(id, admin.id);
     }
     const client = app.client();
-    await client.login("admin", "hunter2-test");
+    await client.signIn("admin");
     const res = await client.call("GET", "/api/projects");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
@@ -131,7 +127,7 @@ describe("GET /api/projects/:id", () => {
   test("lists the three files changed last, newest first", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2-test");
+    await client.signIn("admin");
     const admin = app.users.byUsername("admin")!;
     const project = app.projects.personal(admin.id)!;
     const ids: Record<string, string> = {};
@@ -169,7 +165,7 @@ describe("GET /api/projects/:id", () => {
   test("answers the caller's own project with its members", async () => {
     const app = await testApp();
     const client = app.client();
-    await client.login("admin", "hunter2-test");
+    await client.signIn("admin");
     const admin = app.users.byUsername("admin")!;
     const project = app.projects.personal(admin.id)!;
     const res = await client.call("GET", `/api/projects/${project.id}`);
@@ -215,14 +211,14 @@ describe("GET /api/projects/:id", () => {
     const casey = await member(app);
     const project = app.projects.personal(casey.id)!;
     const admin = app.client();
-    await admin.login("admin", "hunter2-test");
+    await admin.signIn("admin");
     const res = await admin.call("GET", `/api/projects/${project.id}`);
     expect(res.status).toBe(404);
     const missing = await admin.call("GET", "/api/projects/nothing");
     expect(missing.status).toBe(404);
     expect(await res.json()).toEqual(await missing.json());
     const her = app.client();
-    await her.login("casey", "hunter2-test");
+    await her.signIn("casey");
     expect((await her.call("GET", `/api/projects/${project.id}`)).status).toBe(
       200,
     );

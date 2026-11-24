@@ -19,7 +19,6 @@ import {
   isRecord,
   isRole,
   isSearchProvider,
-  isSecretName,
   isSkillName,
   isUsername,
   isWire,
@@ -93,8 +92,6 @@ export type UserSpec = {
   tz?: string;
   about?: string;
   disabled?: boolean;
-  passwordFrom?: string;
-  mustChangePassword?: boolean;
 };
 
 export type ProjectSpec = {
@@ -263,18 +260,20 @@ export type Specs = {
   Tool: ToolSpec;
 };
 
-const USER_FIELDS = [
-  "role",
-  "fullName",
-  "email",
-  "tz",
-  "about",
-  "disabled",
-  "passwordFrom",
-  "mustChangePassword",
-];
+const USER_FIELDS = ["role", "fullName", "email", "tz", "about", "disabled"];
+
+// users have no password: admins sign in with an admin key, everyone by
+// email
+const REMOVED_USER_FIELDS = ["passwordFrom", "mustChangePassword"];
 
 export function user(value: unknown): UserSpec {
+  for (const field of REMOVED_USER_FIELDS) {
+    if (isRecord(value) && Object.hasOwn(value, field)) {
+      throw new Error(
+        `spec.${field} is gone: an admin signs in with an admin key, a user by email`,
+      );
+    }
+  }
   const b = object(value, USER_FIELDS, "spec");
   const role = at("spec.role", () =>
     guarded(isRole, "must be admin or member")(b.role),
@@ -287,11 +286,6 @@ export function user(value: unknown): UserSpec {
       tz: parseTz,
       about: parseAbout,
       disabled: boolean,
-      passwordFrom: guarded(
-        (v): v is string => isSecretName("user-", v),
-        "must name a user- secret without the .key extension",
-      ),
-      mustChangePassword: boolean,
     }),
   };
 }

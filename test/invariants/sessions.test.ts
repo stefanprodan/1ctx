@@ -19,7 +19,7 @@ import {
 } from "../../src/server/sessions/index.ts";
 import type { Tools } from "../../src/server/tools/index.ts";
 import type { FeedRow } from "../../src/shared/api/sessions.ts";
-import { fakeFetch, VERSION } from "../helpers/app.ts";
+import { ADMIN_KEY, fakeFetch, VERSION } from "../helpers/app.ts";
 import {
   type ChatApp,
   chatApp,
@@ -748,7 +748,7 @@ describe("boot repair", () => {
       const repaired = await compose({
         db: chat.app.db,
         secret: (kind, name) =>
-          kind === "user-" && name === "user-admin" ? "hunter2-test" : null,
+          kind === "user-" && name === "user-admin" ? ADMIN_KEY : null,
         clock: () => chat.app.now.value,
         fetcher: fake.fetcher,
         log: () => silent,
@@ -898,7 +898,7 @@ const noUsage: UsagePort = {
 function seededStore() {
   const db = memoryDb();
   db.query(
-    "insert into users (id, username, full_name, email, role, password_hash, created_at) values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0)",
+    "insert into users (id, username, full_name, email, role, created_at) values ('u', 'user', 'User', 'user@example.com', 'member', 0)",
   ).run();
   db.query(
     "insert into projects (id, kind, name, owner_id, created_at) values ('p', 'personal', 'personal', 'u', 0)",

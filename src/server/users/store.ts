@@ -11,9 +11,8 @@ import { DEFAULT_TZ, type Role } from "../../shared/words.ts";
 import type { Db } from "../db/index.ts";
 import { newId } from "../lib/ids.ts";
 
-// the row, server only: the hash never leaves this area
+// the row, server only
 export type UserRow = Profile & {
-  passwordHash: string;
   // the agent a new chat starts on; null follows the default
   agentId: string | null;
 };
@@ -26,8 +25,6 @@ export type UserFields = {
   role: Role;
   // UTC when left out: the first admin, whose zone nobody typed
   tz?: string;
-  passwordHash: string;
-  mustChangePassword: boolean;
   disabled?: boolean;
   now: number;
 };
@@ -46,10 +43,9 @@ type Raw = {
   about: string;
   role: Role;
   tz: string;
-  password_hash: string;
   created_at: number;
   disabled: number;
-  must_change_password: number;
+  signed_in_at: number | null;
   agent_id: string | null;
   email_placeholder: number;
   email_from_agents: number;
@@ -63,10 +59,9 @@ const row = (raw: Raw): UserRow => ({
   about: raw.about,
   role: raw.role,
   tz: raw.tz,
-  passwordHash: raw.password_hash,
   createdAt: raw.created_at,
   disabled: raw.disabled !== 0,
-  mustChangePassword: raw.must_change_password !== 0,
+  signedInAt: raw.signed_in_at,
   emailPlaceholder: raw.email_placeholder !== 0,
   emailFromAgents: raw.email_from_agents !== 0,
   agentId: raw.agent_id,
@@ -79,10 +74,7 @@ export const summary = (user: UserRow): UserSummary => ({
   role: user.role,
 });
 
-export const meOf = (user: UserRow): Me => ({
-  ...summary(user),
-  mustChangePassword: user.mustChangePassword,
-});
+export const meOf = (user: UserRow): Me => summary(user);
 
 export const account = (user: UserRow): UserAccount => ({
   ...summary(user),
@@ -90,7 +82,7 @@ export const account = (user: UserRow): UserAccount => ({
   tz: user.tz,
   createdAt: user.createdAt,
   disabled: user.disabled,
-  mustChangePassword: user.mustChangePassword,
+  signedInAt: user.signedInAt,
   emailPlaceholder: user.emailPlaceholder,
 });
 
@@ -150,9 +142,9 @@ export class UserStore {
     this.db
       .query(
         `insert into users
-          (id, username, full_name, email, about, role, tz, password_hash,
-           must_change_password, disabled, email_placeholder, created_at)
-         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, username, full_name, email, about, role, tz, disabled,
+           email_placeholder, created_at)
+         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -162,8 +154,6 @@ export class UserStore {
         fields.about ?? "",
         fields.role,
         fields.tz ?? DEFAULT_TZ,
-        fields.passwordHash,
-        fields.mustChangePassword ? 1 : 0,
         fields.disabled ? 1 : 0,
         isPlaceholderEmail(fields.email) ? 1 : 0,
         fields.now,
@@ -221,15 +211,8 @@ export class UserStore {
       .run(on ? 1 : 0, id);
   }
 
-  setMustChangePassword(id: string, required: boolean): void {
-    this.db
-      .query("update users set must_change_password = ? where id = ?")
-      .run(required ? 1 : 0, id);
-  }
-
-  setPasswordHash(id: string, passwordHash: string): void {
-    this.db
-      .query("update users set password_hash = ? where id = ?")
-      .run(passwordHash, id);
+  // every login that opens; an invite is sent again until the first
+  setSignedIn(id: string, at: number): void {
+    this.db.query("update users set signed_in_at = ? where id = ?").run(at, id);
   }
 }

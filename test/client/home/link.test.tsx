@@ -18,12 +18,11 @@ import { emailOn, me } from "../../../src/client/data/me.ts";
 import {
   GONE_LINE,
   linkWords,
-  newPasswordProblem,
   otherAccount,
 } from "../../../src/client/views/home/Link.model.ts";
 import { Link } from "../../../src/client/views/home/Link.tsx";
 import {
-  askedLine,
+  ASKED_LINE,
   askProblem,
 } from "../../../src/client/views/home/Login.model.ts";
 import { Login } from "../../../src/client/views/home/Login.tsx";
@@ -35,7 +34,6 @@ const maria = {
   username: "maria",
   fullName: "Maria Pop",
   role: "member" as const,
-  mustChangePassword: false,
 };
 
 let answer: (url: string, init?: RequestInit) => Response;
@@ -50,21 +48,16 @@ beforeEach(() => {
 
 describe("the words", () => {
   test.serial("say what each link does and for whom", () => {
-    expect(linkWords("reset", "maria")).toMatchObject({
-      title: "Choose a new password",
-      button: "Set password",
-      password: true,
-    });
     expect(linkWords("invite", "maria")).toMatchObject({
-      line: "Choose a password for @maria.",
-      password: true,
+      title: "Welcome to 1ctx",
+      line: "Sign in as @maria. The link works once.",
+      button: "Sign in",
     });
     expect(linkWords("signin", "maria")).toMatchObject({
       title: "Sign in as @maria",
       button: "Sign in",
-      password: false,
     });
-    for (const purpose of ["reset", "invite", "signin"] as const) {
+    for (const purpose of ["invite", "signin"] as const) {
       expect(JSON.stringify(linkWords(purpose, "maria"))).not.toMatch(
         /[\u2014;]/,
       );
@@ -79,45 +72,40 @@ describe("the words", () => {
     );
   });
 
-  test.serial("check the new password", () => {
-    expect(newPasswordProblem("short")).toBe(
-      "The password needs at least 8 characters",
-    );
-    expect(newPasswordProblem("longenough")).toBeNull();
-  });
-
   test.serial("an ask needs a name and answers the same for any", () => {
     expect(askProblem("  ")).toBe("Enter your username or email first.");
     expect(askProblem("maria")).toBeNull();
-    expect(askedLine("forgot")).toContain("reset link");
-    expect(askedLine("link")).toContain("sign in link");
+    expect(ASKED_LINE).toContain("sign in link");
   });
 });
 
 describe("the sign-in page", () => {
-  test.serial("offers the email links only with email on", () => {
-    const off = render(<Login />);
-    expect(off).toContain(">Username<");
-    expect(off).not.toContain("Forgot password?");
-    expect(off).not.toContain("Email me a sign in link");
-    emailOn.value = true;
-    const on = render(<Login />);
-    expect(on).toContain(">Username or email<");
-    expect(on).toContain("Forgot password?");
-    expect(on).toContain("Email me a sign in link");
-  });
+  test.serial(
+    "takes an admin key, and offers the email link only with email on",
+    () => {
+      const off = render(<Login />);
+      expect(off).toContain(">Admin key<");
+      expect(off).not.toContain("Username or email");
+      expect(off).not.toContain("Email me a sign in link");
+      emailOn.value = true;
+      const on = render(<Login />);
+      expect(on).toContain(">Admin key<");
+      expect(on).toContain(">Username or email<");
+      expect(on).toContain("Email me a sign in link");
+    },
+  );
 });
 
 describe("the link page", () => {
-  test.serial("names the account and asks a password for a reset", () => {
+  test.serial("names the account of an invite and asks no password", () => {
     link.value = {
       token: TOKEN,
-      value: { purpose: "reset", username: "maria" },
+      value: { purpose: "invite", username: "maria" },
     };
     const html = render(<Link params={{ token: TOKEN }} />);
-    expect(html).toContain("Choose a new password");
-    expect(html).toContain('autocomplete="new-password"');
-    expect(html).toContain("Set password");
+    expect(html).toContain("Welcome to 1ctx");
+    expect(html).toContain("Sign in");
+    expect(html).not.toContain('type="password"');
     expect(html).not.toContain("You are signed in");
   });
 
@@ -198,8 +186,8 @@ describe("the data", () => {
 
   test.serial("asks for a link by name", async () => {
     answer = () => new Response(null, { status: 202 });
-    await askLink("forgot", "maria");
-    expect(calls.at(-1)?.url).toBe("/api/login/forgot");
+    await askLink("maria");
+    expect(calls.at(-1)?.url).toBe("/api/login/link");
     expect(calls.at(-1)?.init?.body).toBe('{"username":"maria"}');
   });
 });

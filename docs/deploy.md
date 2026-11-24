@@ -96,7 +96,7 @@ gateway add`.
   sandbox shell on with no custom image. A
   restart keeps an unchanged gateway. The server counts as up only when
   the preview port's one listener is the pid it started, so a stranger
-  on the port is refused before the admin password is sent.
+  on the port is refused before the admin key is sent.
   `preview-stop` stops the gateway; `preview-clean` and `preview-reset`,
   with or without the variable, stop the server, delete every sandbox
   and provider under the instance label through the gateway (started for
@@ -139,6 +139,14 @@ gateway add`.
 - **Every file in `/secrets` must be readable by 65532.** It is
   mounted read-only. An unreadable key throws where it is read, and an
   unreadable `user-admin.key` fails the first start.
+- **The first admin key is made before the first start.** The image's
+  entry is the binary, so `docker run --rm <image> admin-key admin
+  --stdout` prints one. For Docker Compose, write it to
+  `secrets/user-admin.key` (readable by 65532); for the Helm chart,
+  pipe it into the Secret the chart mounts at `/secrets`, under
+  `user-admin.key`. With the binary at hand, `1ctx admin-key admin
+  --secrets <dir>` writes the file itself, never over one, so a file
+  that held a password is moved aside first.
 - **The cache is `/data/repos` unless `--cache` names another
   mount,** which must be writable by 65532. The Helm chart mounts an
   `emptyDir` at `/cache` (`cache.sizeLimit`), off the claim.

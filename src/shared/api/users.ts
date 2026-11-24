@@ -20,12 +20,10 @@ export type CreateUserRequest = {
   email: string;
   role: Role;
   tz: string;
-  // one of the two: a typed password, or an invite by email that sets it
-  password?: string;
+  // an invite by email, which opens the user's first login
   invite?: true;
   about?: string;
   disabled?: boolean;
-  mustChangePassword?: boolean;
 };
 export type UpdateUserRequest = {
   username?: string;
@@ -36,7 +34,6 @@ export type UpdateUserRequest = {
   tz?: string;
   disabled?: boolean;
 };
-export type ResetPasswordRequest = { password: string };
 
 // GET /api/users/:id/keys: an admin sees a user's access keys and
 // revokes one with DELETE /api/users/:id/keys/:keyId; no route makes

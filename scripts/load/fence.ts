@@ -16,8 +16,6 @@ import { FAKE } from "./shapes.ts";
 export type FenceOptions = {
   modelUrl: string;
   mcpUrl: (server: string) => string;
-  // every user's password hash, so the run can sign them in
-  passwordHash?: string;
   // the time written as the automations' suspension
   now?: number;
 };
@@ -86,11 +84,6 @@ export function fence(db: Database, o: FenceOptions): FenceReport {
         "update automations set suspended_at = ?, next_at = null where suspended_at is null",
       )
       .run(o.now ?? Date.now()).changes;
-    if (o.passwordHash !== undefined) {
-      report.users = db
-        .query("update users set password_hash = ?, must_change_password = 0")
-        .run(o.passwordHash).changes;
-    }
   })();
   return report;
 }

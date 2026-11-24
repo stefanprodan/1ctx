@@ -21,7 +21,7 @@ const casey: Profile = {
   email: "casey@example.com",
   tz: "UTC",
   disabled: false,
-  mustChangePassword: false,
+  signedInAt: null,
   emailPlaceholder: false,
   emailFromAgents: false,
   about: "",
@@ -55,7 +55,6 @@ describe("the profile entity", () => {
       username: "casey",
       fullName: "O",
       role: "member",
-      mustChangePassword: false,
     };
     answer = () => casey;
     await loadProfile();
@@ -65,7 +64,6 @@ describe("the profile entity", () => {
       username: "casey",
       fullName: "Casey",
       role: "member",
-      mustChangePassword: false,
     });
   });
 
@@ -75,7 +73,6 @@ describe("the profile entity", () => {
       username: "admin",
       fullName: "A",
       role: "admin",
-      mustChangePassword: false,
     };
     answer = () => casey;
     await saveProfile({ fullName: "Casey", about: "", tz: "UTC" });
@@ -98,7 +95,6 @@ describe("the profile entity", () => {
       username: "admin",
       fullName: "A",
       role: "admin",
-      mustChangePassword: false,
     };
     let seen: Profile | null | undefined;
     answer = () => {

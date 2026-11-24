@@ -34,9 +34,17 @@ export type ProvisionOptions = {
   secretsDir: string | null;
 };
 
+export type AdminKeyOptions = {
+  username: string;
+  // print the key and write no file
+  stdout: boolean;
+  secretsDir: string | null;
+};
+
 export type Cli =
   | { kind: "run"; options: RunOptions }
   | { kind: "provision"; options: ProvisionOptions }
+  | { kind: "admin-key"; options: AdminKeyOptions }
   | { kind: "service"; argv: string[] }
   | { kind: "help" }
   | { kind: "version" }
@@ -47,6 +55,7 @@ export const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
 \x1b[1mUsage:\x1b[0m
   1ctx [options]
   1ctx provision -f <file|dir|-> [-f ...] [--db <path>] [--secrets <dir>]
+  1ctx admin-key <username> [--stdout] [--secrets <dir>]
   1ctx service install [options] [--restart]
   1ctx service status|start|stop|restart
   1ctx service uninstall [--purge]
@@ -56,6 +65,14 @@ export const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
                          or stdin; repeat to combine inputs
   Apply objects while the server is stopped. No objects are pruned.
   Preflight is offline; applying skills, MCP servers and agents may fetch.
+
+\x1b[1mAdmin key:\x1b[0m
+  admin-key <username>   write a new admin key to user-<username>.key in
+                         the secrets directory, owner-only, never over an
+                         existing file, and print its path; the admin
+                         signs in to the web app with it
+  --stdout               print the key instead, for a Kubernetes or
+                         Docker Compose secret, and write no file
 
 \x1b[1mService:\x1b[0m
   install                run 1ctx with these options as a service of the
@@ -86,8 +103,9 @@ export const HELP = `\x1b[1m1ctx\x1b[0m - one continuous context for agents
   -h, --help             show this help
 
 \x1b[1mSecrets:\x1b[0m
-  user-admin.key         the first admin's password, read once when there
-                         are no users; provision also uses it to sign in
+  user-<username>.key    an admin's key, made by admin-key; user-admin.key
+                         makes the first admin while there are no users,
+                         and provision signs in with it
   <kind>-<name>.key      kinds: user, provider, search, mcp, http; the name is
                          1 to 48 lowercase letters, digits and dashes,
                          starting with a letter or a digit`;
@@ -133,8 +151,39 @@ function parseListen(
   return { hostname: listen.slice(0, colon), port };
 }
 
+function parseAdminKey(args: string[]): Cli {
+  let username: string | null = null;
+  let stdout = false;
+  let secretsDir: string | null = null;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--stdout") stdout = true;
+    else if (arg === "--secrets") {
+      const next = args[++i];
+      if (next === undefined || next === "") {
+        return { kind: "error", message: "--secrets needs a value" };
+      }
+      secretsDir = next;
+    } else if (arg === "-h" || arg === "--help") return { kind: "help" };
+    else if (arg.startsWith("-") || username !== null) {
+      return { kind: "error", message: `unknown admin-key option ${arg}` };
+    } else username = arg;
+  }
+  if (username === null) {
+    return { kind: "error", message: "admin-key needs a username" };
+  }
+  if (stdout && secretsDir !== null) {
+    return {
+      kind: "error",
+      message: "--stdout writes no file, so it takes no --secrets",
+    };
+  }
+  return { kind: "admin-key", options: { username, stdout, secretsDir } };
+}
+
 export function parseCli(argv: string[], home: string = homedir()): Cli {
   if (argv[0] === "service") return { kind: "service", argv: argv.slice(1) };
+  if (argv[0] === "admin-key") return parseAdminKey(argv.slice(1));
   const provisioning = argv[0] === "provision";
   const args = provisioning ? argv.slice(1) : argv;
 

@@ -168,7 +168,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey",
     role: "member",
-    mustChangePassword: false,
   };
   path.value = "/chat/s1";
   query.value = "";

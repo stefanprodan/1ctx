@@ -95,7 +95,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey Doe",
     role: "member",
-    mustChangePassword: false,
   };
   searches.value = new Map();
 });

@@ -6,7 +6,6 @@
 
 import { describe, expect, test } from "bun:test";
 import type { ChildWork } from "../../../src/shared/contracts/session.ts";
-import { hashPassword } from "../../helpers/app.ts";
 import { type ChatApp, startChat, waitScript } from "../../helpers/chat.ts";
 import { createTeam } from "../../helpers/projects.ts";
 import { frames, watch, watcher } from "../../helpers/socket.ts";
@@ -30,12 +29,10 @@ async function outsider(chat: ChatApp) {
     fullName: "Erin Doe",
     email: "erin@example.com",
     role: "member",
-    passwordHash: await hashPassword("pw"),
-    mustChangePassword: false,
     now: chat.app.now.value,
   });
   const client = chat.app.client();
-  await client.login("erin", "pw");
+  await client.signIn("erin");
   return client;
 }
 

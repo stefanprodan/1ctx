@@ -8,8 +8,8 @@ import type { McpServerStore } from "../../../src/server/mcp/index.ts";
 export function seedProject(db: Db, id: string, kind = "team") {
   const owner = `owner-${id}`;
   db.query(
-    `insert into users (id, username, full_name, email, role, password_hash, created_at)
-     values (?, ?, 'Owner', ?, 'member', 'x', 0)`,
+    `insert into users (id, username, full_name, email, role, created_at)
+     values (?, ?, 'Owner', ?, 'member', 0)`,
   ).run(owner, owner, `${owner}@example.com`);
   db.query(
     `insert into projects (id, kind, name, owner_id, created_at)

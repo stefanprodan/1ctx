@@ -56,9 +56,6 @@ export async function applyLink(
 }
 
 // answered the same whoever it names, so there is nothing to read back
-export async function askLink(
-  kind: "forgot" | "link",
-  username: string,
-): Promise<void> {
-  await api(`/api/login/${kind}`, "POST", { username });
+export async function askLink(username: string): Promise<void> {
+  await api("/api/login/link", "POST", { username });
 }

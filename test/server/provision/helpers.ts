@@ -7,9 +7,9 @@ import { silent } from "../../../src/server/lib/log.ts";
 import { parse } from "../../../src/server/provision/index.ts";
 import { anthropicFixture } from "../../helpers/anthropic.ts";
 import {
+  ADMIN_KEY,
   ANTHROPIC_MODELS,
   AZURE_DEPLOYMENTS,
-  TEST_PASSWORD_COST,
   type TestApp,
 } from "../../helpers/app.ts";
 import { azureFixture } from "../../helpers/azure.ts";
@@ -70,7 +70,6 @@ export const user = (spec: Record<string, unknown> = {}) =>
     fullName: "Zed User",
     email: "zed@example.test",
     tz: "UTC",
-    passwordFrom: "user-zed",
     ...spec,
   });
 
@@ -211,12 +210,22 @@ export function snapshot(db: Db) {
 
 export function mutations(db: Db) {
   const watched = tables(db).filter((name) => name !== "logins");
+  // the sign-in's own marks, as its login row: no object write
+  const userColumns = db
+    .query<{ name: string }, []>("pragma table_info(users)")
+    .all()
+    .map((column) => column.name)
+    .filter((column) => column !== "signed_in_at");
   db.exec("create table provision_writes (object_table text, operation text)");
   for (const [index, name] of watched.entries()) {
     for (const operation of ["insert", "update", "delete"]) {
+      const event =
+        name === "users" && operation === "update"
+          ? `update of ${userColumns.join(", ")}`
+          : operation;
       db.exec(
         `create trigger provision_watch_${index}_${operation}
-         after ${operation} on ${quoted(name)}
+         after ${event} on ${quoted(name)}
          begin insert into provision_writes values ('${name}', '${operation}'); end`,
       );
     }
@@ -235,7 +244,7 @@ export async function recompose(
   fetcher: typeof fetch,
   secrets: Record<string, string> = {},
 ): Promise<App> {
-  const values = { "user-admin": "hunter2-test", ...secrets };
+  const values = { "user-admin": ADMIN_KEY, ...secrets };
   return compose({
     db: app.db,
     clock: () => app.now.value,
@@ -248,7 +257,6 @@ export async function recompose(
     secureCookie: false,
     trustProxy: false,
     activate: false,
-    passwordCost: TEST_PASSWORD_COST,
     cores: 1,
   });
 }

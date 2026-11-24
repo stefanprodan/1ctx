@@ -312,7 +312,6 @@ test.serial(
       username: "another",
       role: "member",
       fullName: "",
-      mustChangePassword: false,
     };
     expect(toolVisuals.value.size).toBe(0);
     expect(session.value).toBeNull();

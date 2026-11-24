@@ -6,17 +6,10 @@
 // server's word is still the last.
 
 import type { Profile } from "../../../shared/contracts/user.ts";
-import {
-  isFullName,
-  MAX_ABOUT,
-  MAX_FULL_NAME,
-  MIN_PASSWORD,
-} from "../../../shared/words.ts";
-import type { Problem } from "../../lib/save.ts";
+import { isFullName, MAX_ABOUT, MAX_FULL_NAME } from "../../../shared/words.ts";
 
 // the sections' lines, the same while the profile waits and once it lands
 export const ABOUT_TEXT = "What agents should know about you.";
-export const PASSWORD_TEXT = "Changing it signs out every other device.";
 
 export function fullNameProblem(value: string): string | null {
   const trimmed = value.trim();
@@ -38,40 +31,6 @@ export function detailsFieldOf(message: string): string | undefined {
   if (message.startsWith("about")) return "about";
   if (message.startsWith("time zone")) return "tz";
   return undefined;
-}
-
-// which password box a server refusal names; a rate limit is the form's
-export function passwordFieldOf(message: string): string | undefined {
-  if (message.includes("current password")) return "current";
-  if (message.startsWith("new password")) return "next";
-  return undefined;
-}
-
-// the password checks pinned to the box to fix
-export function passwordFieldProblem(
-  current: string,
-  next: string,
-  again: string,
-): Problem | null {
-  const error = passwordProblem(current, next, again);
-  if (error === null) return null;
-  if (error.includes("current password")) return { error, field: "current" };
-  if (error.includes("differ")) return { error, field: "again" };
-  return { error, field: "next" };
-}
-
-export function passwordProblem(
-  current: string,
-  next: string,
-  again: string,
-): string | null {
-  if (current === "") return "Enter your current password";
-  if (next.length < MIN_PASSWORD)
-    return `The new password needs at least ${MIN_PASSWORD} characters`;
-  if (next === current)
-    return "The new password is the same as the current one";
-  if (again !== next) return "The two new passwords differ";
-  return null;
 }
 
 // where email from agents goes, or why none can

@@ -10,10 +10,8 @@ import {
   parseLinkUse,
   parseLogin,
   parseNewUser,
-  parsePasswordChange,
   parseProfile,
   parseUsername,
-  parseUserPassword,
   parseUserPatch,
 } from "../../src/server/access/parse.ts";
 import { parseRunsQuery } from "../../src/server/automations/parse.ts";
@@ -39,22 +37,10 @@ import { testApp } from "../helpers/app.ts";
 import { refuses } from "../helpers/refuses.ts";
 
 describe("parseLogin", () => {
-  test("accepts a username and a password", () => {
-    expect(parseLogin({ username: "casey", password: "pw" })).toEqual({
-      username: "casey",
-      password: "pw",
-    });
-  });
+  const KEY = `1ctx-admin-${"A".repeat(43)}`;
 
-  test("lowercases an email and only an email", () => {
-    expect(
-      parseLogin({ username: "Casey@Example.COM", password: "pw" }),
-    ).toEqual({ username: "casey@example.com", password: "pw" });
-    expect(parseLogin({ username: "Casey", password: "pw" }).username).toBe(
-      "Casey",
-    );
-    const long = `${"a".repeat(242)}@example.com`;
-    expect(parseLogin({ username: long, password: "pw" }).username).toBe(long);
+  test("accepts an admin key", () => {
+    expect(parseLogin({ key: KEY })).toEqual({ key: KEY });
   });
 
   refuses(
@@ -63,15 +49,13 @@ describe("parseLogin", () => {
       "string",
       [],
       {},
-      { username: "casey" },
-      { password: "pw" },
-      { username: "", password: "pw" },
-      { username: "casey", password: "" },
-      { username: 1, password: "pw" },
-      { username: "casey", password: { $ne: "" } },
-      { username: "casey", password: "pw", role: "admin" },
-      { username: "a".repeat(255), password: "pw" },
-      { username: "casey", password: "p".repeat(1025) },
+      { key: "" },
+      { key: 1 },
+      { key: "A".repeat(43) },
+      { key: `${KEY}A` },
+      { key: KEY.slice(0, -1) },
+      { key: KEY, username: "admin" },
+      { username: "admin", password: "pw" },
     ],
     parseLogin,
   );
@@ -222,28 +206,6 @@ describe("parseProfile", () => {
   );
 });
 
-describe("parsePasswordChange", () => {
-  test("accepts a current and a long enough next", () => {
-    expect(parsePasswordChange({ current: "pw", next: "longenough" })).toEqual({
-      current: "pw",
-      next: "longenough",
-    });
-  });
-
-  refuses(
-    [
-      {},
-      { current: "pw" },
-      { next: "longenough" },
-      { current: "", next: "longenough" },
-      { current: "pw", next: "short" },
-      { current: "pw", next: "x".repeat(1025) },
-      { current: "pw", next: "longenough", again: "longenough" },
-    ],
-    parsePasswordChange,
-  );
-});
-
 describe("parseNewUser", () => {
   const body = {
     username: "casey",
@@ -251,7 +213,6 @@ describe("parseNewUser", () => {
     email: "CASEY@EXAMPLE.COM",
     role: "member" as const,
     tz: "Europe/Bucharest",
-    password: "longenough",
   };
 
   test("accepts every required field and lowercases the email", () => {
@@ -267,14 +228,12 @@ describe("parseNewUser", () => {
         ...body,
         about: "First line.\nSecond line.",
         disabled: flag,
-        mustChangePassword: flag,
       }),
     ).toEqual({
       ...body,
       email: "casey@example.com",
       about: "First line.\nSecond line.",
       disabled: flag,
-      mustChangePassword: flag,
     });
   });
 
@@ -287,7 +246,7 @@ describe("parseNewUser", () => {
       { ...body, role: "owner" },
       { ...body, tz: undefined },
       { ...body, tz: "Mars/Olympus" },
-      { ...body, password: "short" },
+      { ...body, password: "longenough" },
       { ...body, about: null },
       { ...body, about: false },
       { ...body, about: 1 },
@@ -298,25 +257,17 @@ describe("parseNewUser", () => {
         ...body,
         disabled,
       })),
-      ...[null, "false", 0, [], {}].map((mustChangePassword) => ({
-        ...body,
-        mustChangePassword,
-      })),
+      { ...body, mustChangePassword: false },
       { ...body, extra: true },
-      { ...body, password: undefined },
-      { ...body, invite: true },
-      { ...body, password: undefined, invite: false },
-      { ...body, password: undefined, invite: true, mustChangePassword: true },
+      { ...body, invite: false },
+      { ...body, invite: true, disabled: true },
     ],
     parseNewUser,
   );
 
-  test("takes an invite in place of the password", () => {
-    expect(
-      parseNewUser({ ...body, password: undefined, invite: true }),
-    ).toEqual({
+  test("takes an invite", () => {
+    expect(parseNewUser({ ...body, invite: true })).toEqual({
       ...body,
-      password: undefined,
       email: "casey@example.com",
       invite: true,
     });
@@ -344,17 +295,11 @@ describe("parseLinkAsk", () => {
 });
 
 describe("parseLinkUse", () => {
-  test("takes a new password or none", () => {
+  test("takes nothing", () => {
     expect(parseLinkUse({})).toEqual({});
-    expect(parseLinkUse({ password: "longenough" })).toEqual({
-      password: "longenough",
-    });
   });
 
-  refuses(
-    [null, [], { password: "short" }, { password: 1 }, { token: "x" }],
-    parseLinkUse,
-  );
+  refuses([null, [], { password: "longenough" }, { token: "x" }], parseLinkUse);
 });
 
 describe("parseUserPatch", () => {
@@ -412,28 +357,12 @@ describe("parseUserPatch", () => {
   );
 });
 
-describe("parseUserPassword", () => {
-  test("accepts a password at the floor", () => {
-    expect(parseUserPassword({ password: "12345678" })).toEqual({
-      password: "12345678",
-    });
-  });
-
-  refuses(
-    [
-      {},
-      { password: "short" },
-      { password: "x".repeat(1025) },
-      { password: "longenough", current: "old" },
-    ],
-    parseUserPassword,
-  );
-});
-
 describe("over the wire", () => {
   test("a non-JSON body is a 400, not a crash", async () => {
     const app = await testApp();
-    const res = await app.client().call("POST", "/api/login", {
+    const client = app.client();
+    await client.signIn("admin");
+    const res = await client.call("PATCH", "/api/profile", {
       headers: { "content-type": "application/json" },
       body: undefined,
     });
@@ -443,8 +372,10 @@ describe("over the wire", () => {
 
   test("an unknown field is a 400 with its name", async () => {
     const app = await testApp();
-    const res = await app.client().call("POST", "/api/login", {
-      body: { username: "admin", password: "hunter2-test", remember: true },
+    const client = app.client();
+    await client.signIn("admin");
+    const res = await client.call("PATCH", "/api/profile", {
+      body: { fullName: "Admin", about: "", tz: "UTC", remember: true },
     });
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "unknown field remember" });

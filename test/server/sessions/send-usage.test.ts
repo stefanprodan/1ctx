@@ -8,7 +8,7 @@ import type {
   SessionDetail,
 } from "../../../src/shared/contracts/session.ts";
 import type { SocketEvent } from "../../../src/shared/socket.ts";
-import { hashPassword, type TestClient } from "../../helpers/app.ts";
+import type { TestClient } from "../../helpers/app.ts";
 import {
   createAutomation,
   settleRun,
@@ -175,12 +175,10 @@ describe("a send's usage", () => {
       fullName: "Drew Roe",
       email: "drew@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     const outsider = chat.app.client();
-    await outsider.login("drew", "pw");
+    await outsider.signIn("drew");
     const response = await outsider.call("GET", `/api/sessions/${sessionId}`);
     expect(response.status).toBe(404);
   });

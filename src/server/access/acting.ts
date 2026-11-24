@@ -3,18 +3,20 @@
 //
 // The router checks the caller when the headers arrive; a write that
 // first awaits a client-paced body reads the caller again inside its
-// transaction, so a sign-out, reset, disable or demotion meanwhile
-// stops it.
+// transaction, so a sign-out, disable, demotion or a changed admin key
+// meanwhile stops it.
 
 import type { Clock } from "../lib/clock.ts";
 import { Forbidden, Unauthorized } from "../lib/errors.ts";
 import type { Principal } from "../lib/http.ts";
 import type { UserRow } from "../users/index.ts";
+import { type AdminKeys, loginHolds } from "./admin-keys.ts";
 import type { LoginStore } from "./store.ts";
 
 export type ActingDeps = {
   logins: Pick<LoginStore, "byId">;
   users: { byId(id: string): UserRow | null };
+  adminKeys: Pick<AdminKeys, "digestOf">;
   clock: Clock;
 };
 
@@ -36,9 +38,8 @@ export function actingUser(
   const user = deps.users.byId(principal.userId);
   if (user === null) throw new Unauthorized();
   if (user.disabled) throw new Forbidden();
-  if (user.mustChangePassword) {
-    throw new Forbidden("change your password first");
-  }
+  // the login itself ends at the next read or the minute's check
+  if (!loginHolds(deps.adminKeys, login, user)) throw new Unauthorized();
   if (role === "admin" && user.role !== "admin") throw new Forbidden();
   return user;
 }

@@ -7,7 +7,9 @@ log scrub.
 - **A secrets reader is bound to one kind.** One bare value per
   `<kind>-<name>.key`, the kind from `SECRET_KINDS`, the name by
   `isSecretName`; `read()` and `list()` refuse a name of
-  another kind. `openshell-` holds the sandbox gateway's TLS PEMs
+  another kind. `user-` holds the admin keys, one per admin
+  (`docs/logins.md`), read fresh at every use and capped at 100 bytes
+  in `main.ts`. `openshell-` holds the sandbox gateway's TLS PEMs
   (`docs/sandbox.md`). `compose.ts` binds each area's reader; only
   provision, the Monitor's key checks (`overview/`) and the log
   scrubber read by kind.
@@ -17,7 +19,8 @@ log scrub.
 - **A value is never logged, returned by a route or stored.** Routes
   list names alone. Provider, search, MCP, `http-`, `email-` and
   `openshell-` values are scrubbed from logs, the kinds in `SCRUB_KINDS`
-  in `compose.ts`.
+  in `compose.ts`. Access keys and admin keys are masked by their shape
+  (`1ctx_`, `1ctx-admin-`) in `lib/log.ts`.
 - **The gateway's own `tls/` folder holds key material outside the
   secrets folder:** its CA key and the client key the `openshell-` files
   copy, in `.preview/openshell/tls` and on staging

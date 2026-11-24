@@ -7,7 +7,6 @@
 
 import { describe, expect, test } from "bun:test";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
-import { Forbidden } from "../../../src/server/lib/errors.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import {
   MAX_TURN_MESSAGES,
@@ -349,8 +348,6 @@ describe("a turn of several user messages", () => {
         fullName: "Dana Roe",
         email: "dana@example.com",
         role: "admin",
-        passwordHash: "x",
-        mustChangePassword: false,
         now: chat.app.now.value,
       });
       const turn: TurnMessage[] = [
@@ -390,34 +387,6 @@ describe("a turn of several user messages", () => {
           { userId: "gone00000000", message: "one" },
         ]),
       ).toThrow("the user is gone");
-      expect(chat.app.sessions.messages(team.sessionId)).toHaveLength(2);
-      expect(chat.app.runner.registry.size).toBe(0);
-    } finally {
-      await chat.app.shutdown();
-    }
-  });
-
-  test("refuses an author who must change their password, first or later", async () => {
-    const chat = await chatApp();
-    try {
-      const team = await teamChat(chat);
-      chat.app.db
-        .query("update users set must_change_password = 1 where id = ?")
-        .run(team.admin);
-      for (const turn of [
-        [
-          { userId: team.admin, message: "one" },
-          { userId: team.casey, message: "two" },
-        ],
-        [
-          { userId: team.casey, message: "one" },
-          { userId: team.admin, message: "two" },
-        ],
-      ]) {
-        expect(() => chat.app.runner.sendTurn(team.sessionId, turn)).toThrow(
-          new Forbidden("change your password first"),
-        );
-      }
       expect(chat.app.sessions.messages(team.sessionId)).toHaveLength(2);
       expect(chat.app.runner.registry.size).toBe(0);
     } finally {

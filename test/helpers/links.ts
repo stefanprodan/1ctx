@@ -9,13 +9,7 @@ import { expect } from "bun:test";
 import type { UserRow } from "../../src/server/users/index.ts";
 import type { LinkResponse } from "../../src/shared/api/access.ts";
 import type { PutSmtpRequest } from "../../src/shared/api/smtp.ts";
-import {
-  collectLogs,
-  hashPassword,
-  type TestApp,
-  type TestClient,
-  testApp,
-} from "./app.ts";
+import { collectLogs, type TestApp, type TestClient, testApp } from "./app.ts";
 
 export const SMTP: PutSmtpRequest = {
   host: "smtp.example.test",
@@ -27,8 +21,6 @@ export const SMTP: PutSmtpRequest = {
   fromName: "1ctx",
   publicAddress: "https://1ctx.example.test",
 };
-
-export const MARIA_PASSWORD = "maria-first-pw";
 
 export type EmailApp = {
   app: TestApp;
@@ -48,7 +40,7 @@ export type EmailApp = {
 };
 
 export async function emailApp(
-  options: { email?: boolean; mustChange?: boolean } = {},
+  options: { email?: boolean } = {},
 ): Promise<EmailApp> {
   const logs = collectLogs();
   const app = await testApp({
@@ -57,7 +49,7 @@ export async function emailApp(
   });
   await app.email.stop();
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await admin.signIn("admin")).status).toBe(200);
   if (options.email !== false) {
     const put = await admin.call("PUT", "/api/admin/smtp", { body: SMTP });
     expect(put.status).toBe(200);
@@ -68,8 +60,6 @@ export async function emailApp(
     email: "maria@example.test",
     role: "member",
     tz: "Europe/Bucharest",
-    passwordHash: await hashPassword(MARIA_PASSWORD),
-    mustChangePassword: options.mustChange ?? false,
     now: app.now.value,
   });
   return {

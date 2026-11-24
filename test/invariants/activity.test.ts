@@ -45,8 +45,8 @@ describe("GET /api/directory/users/:username/days", () => {
   test("counts posts, chats, manual runs and the signed-in day", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-16T10:00:00Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
-    expect((await chat.admin.login("admin", "hunter2-test")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
+    expect((await chat.admin.signIn("admin")).status).toBe(200);
 
     // a chat and its first post, then a second post
     const started = await startChat(chat, "first");
@@ -114,7 +114,7 @@ describe("GET /api/directory/users/:username/days", () => {
     chat.app.users.setTz(chat.memberId, "Asia/Tokyo");
     // 23:30 in Tokyo on the 15th
     chat.app.now.value = Date.parse("2026-09-15T14:30:00Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
     await chat.member.call("GET", "/api/me");
     chat.app.now.value += 10 * 60_000;
     await chat.member.call("GET", "/api/me");
@@ -139,7 +139,7 @@ describe("GET /api/directory/users/:username/days", () => {
   test("the sweep drops visits past every window", async () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-16T10:00:00Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
     await chat.member.call("GET", "/api/me");
     expect(visits(chat, chat.memberId)).toHaveLength(1);
 
@@ -158,8 +158,8 @@ describe("GET /api/directory/users/:username/days", () => {
     chat.app.users.setTz(chat.memberId, "Asia/Tokyo");
     // 01:00 on the 16th in Tokyo, still the 15th in UTC
     chat.app.now.value = Date.parse("2026-09-15T16:00:00Z");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
-    expect((await chat.admin.login("admin", "hunter2-test")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
+    expect((await chat.admin.signIn("admin")).status).toBe(200);
     const started = await startChat(chat, "late");
     await finish(chat, started.script);
 
@@ -187,7 +187,7 @@ describe("GET /api/directory/users/:username/days", () => {
     const chat = await chatApp();
     chat.app.now.value = Date.parse("2026-09-16T10:00:00Z");
     await chat.member.call("GET", "/api/me");
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
     // the login route opens the login; the visit is the next request's
     expect(visits(chat, chat.memberId)).toHaveLength(0);
     chat.app.users.setDisabled(chat.memberId, true);
@@ -198,7 +198,7 @@ describe("GET /api/directory/users/:username/days", () => {
 
   test("answers 404 to a stranger and 400 to any query", async () => {
     const chat = await chatApp();
-    expect((await chat.member.login("casey", "pw")).status).toBe(200);
+    expect((await chat.member.signIn("casey")).status).toBe(200);
     const cases: [string, number][] = [
       ["/api/directory/users/nobody/days", 404],
       ["/api/directory/users/casey/days?tz=UTC", 400],

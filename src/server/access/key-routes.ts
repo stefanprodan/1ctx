@@ -14,6 +14,7 @@ import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 import { actingUser } from "./acting.ts";
+import type { AdminKeys } from "./admin-keys.ts";
 import type { Auth } from "./auth.ts";
 import {
   type AccessKeyStore,
@@ -30,6 +31,7 @@ export type KeyRoutesDeps = {
   taskClaims: Pick<TaskClaimsPort, "endForKeys">;
   logins: LoginStore;
   users: { byId(id: string): UserRow | null };
+  adminKeys: Pick<AdminKeys, "digestOf">;
   auth: Pick<Auth, "project">;
   accessKeysPerUser(): number;
   clock: Clock;
@@ -76,7 +78,8 @@ export function keyRoutes(deps: KeyRoutesDeps): RouteDescriptor[] {
         const parsed = parseAccessKey(await jsonBody(req));
         const principal = ctx.principal!;
         const made = transact(deps.db, () => {
-          // A reset while the body arrived must not mint a new credential.
+          // a sign out everywhere or a changed admin key while the body
+          // arrived must not mint a new credential
           const owner = actingUser(deps, principal);
           const keys = deps.keys.list(owner.id);
           if (keys.some((key) => key.name === parsed.name)) {

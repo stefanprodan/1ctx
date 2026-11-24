@@ -39,8 +39,8 @@ import { useShownRow } from "./drafts.ts";
 import { AddProject, ProjectRows } from "./ProjectPicks.tsx";
 import {
   type CardProps,
-  LinkCard,
-  PasswordCard,
+  InviteCard,
+  SignOutCard,
   SwitchCard,
 } from "./UserCards.tsx";
 import { UserFields, type Who } from "./UserFields.tsx";
@@ -135,9 +135,10 @@ function UserWaiting() {
 function Body({ user }: { user: AdminUser }) {
   // the profile page is where the admin changes their own
   const self = me.value?.id === user.id;
-  // with email on a link replaces the typed password, unless no email
-  // can reach them
-  const byLink = emailOn.value && !user.emailPlaceholder;
+  // an invite goes again only where email reaches them, until their
+  // first sign-in
+  const invite =
+    emailOn.value && !user.emailPlaceholder && user.signedInAt === null;
   // one card saves at a time, so a slower answer never puts back what a
   // later save changed
   const saving = useSignal(false);
@@ -147,12 +148,8 @@ function Body({ user }: { user: AdminUser }) {
       <RoleCard user={user} saving={saving} />
       <ProjectsCard user={user} saving={saving} />
       <KeysCard user={user} />
-      {!self &&
-        (byLink ? (
-          <LinkCard user={user} saving={saving} />
-        ) : (
-          <PasswordCard user={user} saving={saving} />
-        ))}
+      {!self && invite && <InviteCard user={user} saving={saving} />}
+      {!self && <SignOutCard user={user} saving={saving} />}
       {!self && <SwitchCard user={user} saving={saving} />}
     </SettingStack>
   );

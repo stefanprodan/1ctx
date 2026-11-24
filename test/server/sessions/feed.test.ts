@@ -105,7 +105,7 @@ function fixture(seed: number, projects: number, runs = 0) {
   const db = memoryDb();
   const rnd = random(seed);
   db.query(
-    "insert into users (id, username, full_name, email, role, password_hash, created_at) values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0)",
+    "insert into users (id, username, full_name, email, role, created_at) values ('u', 'user', 'User', 'user@example.com', 'member', 0)",
   ).run();
   db.query(
     "insert into providers (id, name, wire, base_url, created_at) values ('pr', 'prov', 'openai-compatible', 'http://x', 0)",

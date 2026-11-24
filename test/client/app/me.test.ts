@@ -20,7 +20,6 @@ const casey = {
   username: "casey",
   fullName: "Casey",
   role: "member" as const,
-  mustChangePassword: false,
 };
 
 const realFetch = globalThis.fetch;
@@ -50,7 +49,7 @@ afterEach(() => {
 describe("me", () => {
   test.serial("a late first load does not undo a sign-in", async () => {
     const first = loadMe();
-    await login({ username: "casey", password: "pw" });
+    await login({ key: `1ctx-admin-${"A".repeat(43)}` });
     expect(me.value).toEqual(casey);
     gates.shift()?.();
     await first;
@@ -58,7 +57,7 @@ describe("me", () => {
   });
 
   test.serial("a late load does not undo a sign-out either", async () => {
-    await login({ username: "casey", password: "pw" });
+    await login({ key: `1ctx-admin-${"A".repeat(43)}` });
     // the sign-in's own ask whether Dictation is on
     gates.shift()?.();
     globalThis.fetch = (async (url: string) => {
@@ -91,7 +90,7 @@ describe("me", () => {
         if (url === "/api/login") return Response.json({ user: casey });
         return Response.json({ ok: true });
       }) as unknown as typeof fetch;
-      await login({ username: "casey", password: "pw" });
+      await login({ key: `1ctx-admin-${"A".repeat(43)}` });
       expect(dictationOn.value).toBe(false);
       gates.shift()?.();
       await settle();

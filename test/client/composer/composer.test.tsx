@@ -38,7 +38,6 @@ beforeEach(() => {
     username: "admin",
     fullName: "Admin",
     role: "admin",
-    mustChangePassword: false,
   };
 });
 

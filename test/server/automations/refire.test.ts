@@ -326,7 +326,7 @@ describe("the re-fire at start", () => {
     const next = await restart(chat, false);
     // the owner's one place is taken by a chat of their own
     const member = next.client();
-    await member.login("casey", "pw");
+    await member.signIn("casey");
     const pending = chat.scripted.next();
     const started = await member.call("POST", "/api/sessions", {
       body: { projectId: chat.projectId, agentId: chat.agentId, message: "a" },

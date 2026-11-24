@@ -53,7 +53,6 @@ async function visit(page: string, searches: string[]) {
     username: "stefan",
     fullName: "Stefan",
     role: "member",
-    mustChangePassword: false,
   };
   const stop = startLoading();
   try {

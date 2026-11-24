@@ -125,6 +125,30 @@ describe("error fields", () => {
     log.error("b", errorFields(new Error(`failed with ${token}`), false));
     expect(lines[0]?.error).toBe("failed with [key]");
   });
+
+  test("scrubs an admin key by its prefix, a cut one too", () => {
+    const key = `1ctx-admin-${"a".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const log = scrubErrors(
+      {
+        info() {},
+        warn() {},
+        error: (_msg, fields) => {
+          lines.push(fields ?? {});
+        },
+      },
+      () => [],
+    );
+    log.error("b", errorFields(new Error(`bad ${key}`), false));
+    log.error("b", errorFields(new Error(`bad ${key.slice(0, 27)}`), false));
+    // under 16 characters after the prefix is no key's shape
+    log.error("b", errorFields(new Error("bad 1ctx-admin-short"), false));
+    expect(lines.map((line) => line.error)).toEqual([
+      "bad [key]",
+      "bad [key]",
+      "bad 1ctx-admin-short",
+    ]);
+  });
   test("keeps only source frame locations", () => {
     const error = new Error("boom");
     error.stack = [

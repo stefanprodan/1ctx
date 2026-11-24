@@ -10,7 +10,7 @@ import { type Db, transact } from "../db/index.ts";
 import { jsonBody } from "../lib/body.ts";
 import { type BusEvent, loginRevoked } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
-import { BadRequest, NotFound } from "../lib/errors.ts";
+import { NotFound } from "../lib/errors.ts";
 import {
   json,
   loginOf,
@@ -21,30 +21,17 @@ import { sha256 } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import { meOf, type UserRow } from "../users/index.ts";
 import type { Auth } from "./auth.ts";
-import {
-  type AccessKeyRow,
-  type AccessKeyStore,
-  logRevokedKeys,
-} from "./key-store.ts";
 import type { LinkStore } from "./link-store.ts";
 import type { Links } from "./links.ts";
 import { isLinkToken, parseLinkAsk, parseLinkUse } from "./parse.ts";
-import type { LoginStore } from "./store.ts";
-import type { TaskClaimsPort } from "./task-claims.ts";
 
 export type UsersPort = {
   byId(id: string): UserRow | null;
-  setPasswordHash(id: string, hash: string): void;
-  setMustChangePassword(id: string, required: boolean): void;
-  hashPassword(password: string): Promise<string>;
 };
 
 export type LinkRoutesDeps = {
   db: Db;
   auth: Auth;
-  logins: LoginStore;
-  keys: AccessKeyStore;
-  taskClaims: Pick<TaskClaimsPort, "endForKeys">;
   store: LinkStore;
   links: Links;
   users: UsersPort;
@@ -59,18 +46,18 @@ export type LinkRoutesDeps = {
 const GONE = "this link is no longer valid";
 
 export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
-  const ask = (purpose: "reset" | "signin"): RouteDescriptor => ({
+  const ask: RouteDescriptor = {
     method: "POST",
-    path: purpose === "reset" ? "/api/login/forgot" : "/api/login/link",
+    path: "/api/login/link",
     policy: "public",
     async handle(req, ctx) {
       if (!deps.email.enabled()) throw new NotFound("email is not set up");
       deps.guard(ctx);
       const { username } = parseLinkAsk(await jsonBody(req));
-      deps.links.ask(purpose, username);
+      deps.links.ask(username);
       return new Response(null, { status: 202 });
     },
-  });
+  };
   const gone = () => json({ error: GONE }, 404);
   // the link a token opens while it is live: unused, unexpired and its
   // user enabled; its user beside it
@@ -85,8 +72,7 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
     return { link, user };
   };
   return [
-    ask("reset"),
-    ask("signin"),
+    ask,
     {
       method: "GET",
       path: "/api/links/:token",
@@ -111,70 +97,34 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         deps.guard(ctx);
         const token = ctx.params.token;
-        // a dead link answers as an unknown one, before the body is read
-        // or a password hashed; the write below still decides
+        // a dead link answers as an unknown one, before the body is
+        // read; the write below still decides
         const found = live(token);
         if (found === null) return gone();
         const tokenHash = sha256(token);
-        const { password } = parseLinkUse(await jsonBody(req));
-        const sets = found.link.purpose !== "signin";
-        if (sets && password === undefined) {
-          throw new BadRequest("password must be set");
-        }
-        if (!sets && password !== undefined) {
-          throw new BadRequest("password must be left out to sign in");
-        }
-        const hash =
-          password === undefined
-            ? null
-            : await deps.users.hashPassword(password);
+        parseLinkUse(await jsonBody(req));
         const principal = ctx.principal;
         const opened = transact(deps.db, () => {
           const used = deps.store.use(tokenHash, deps.clock());
           if (used === null) return { result: null };
           const user = deps.users.byId(used.userId)!;
           const events: BusEvent[] = [];
-          let revokedKeys: AccessKeyRow[] = [];
           // the tab's login is replaced, never kept beside the new one
           const loginId = principal === null ? null : loginOf(principal);
           if (principal !== null && loginId !== null) {
             deps.auth.close(loginId);
             events.push(loginRevoked(principal.userId, loginId));
           }
-          if (hash !== null) {
-            deps.users.setPasswordHash(user.id, hash);
-            deps.users.setMustChangePassword(user.id, false);
-            deps.logins.deleteForUser(user.id);
-            revokedKeys = deps.keys.deleteForUser(user.id);
-            deps.links.revoke(user.id);
-            events.push(
-              loginRevoked(user.id, null),
-              ...deps.taskClaims.endForKeys(revokedKeys.map((key) => key.id)),
-            );
-          }
-          const current = deps.users.byId(user.id)!;
-          const { setCookie } = deps.auth.open(current);
-          if (used.purpose !== "invite") {
-            events.push(
-              ...deps.links.notice(
-                current,
-                used.purpose === "reset" ? "reset" : "signin",
-                ctx.address,
-              ),
-            );
+          const { setCookie } = deps.auth.open(user, null);
+          if (used.purpose === "signin") {
+            events.push(...deps.links.notice(user, "signin", ctx.address));
           }
           return {
-            result: {
-              user: current,
-              purpose: used.purpose,
-              setCookie,
-              revokedKeys,
-            },
+            result: { user, purpose: used.purpose, setCookie },
             events,
           };
         });
         if (opened === null) return gone();
-        logRevokedKeys(deps.log, opened.user.username, opened.revokedKeys);
         deps.log.info("link used", {
           user: opened.user.username,
           purpose: opened.purpose,

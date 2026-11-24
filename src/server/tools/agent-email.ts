@@ -67,9 +67,6 @@ function refusal(
   if (!deps.canOpen(user.id, actor.projectId)) {
     return { why: `@${username} cannot open this ${where}` };
   }
-  if (user.mustChangePassword) {
-    return { why: `@${username} has not finished setting up their account` };
-  }
   if (user.emailPlaceholder) {
     return { why: `@${username} has no email address` };
   }

@@ -16,7 +16,6 @@ export const admin = (over: Partial<Me> = {}): Me => ({
   username: "admin",
   fullName: "Stefan Prodan",
   role: "admin",
-  mustChangePassword: false,
   ...over,
 });
 
@@ -26,6 +25,7 @@ export const user = (over: Partial<AdminUser> = {}): AdminUser => ({
   tz: "UTC",
   createdAt: new Date(2026, 8, 12).getTime(),
   disabled: false,
+  signedInAt: new Date(2026, 8, 12).getTime(),
   emailPlaceholder: false,
   lastVisitDay: null,
   projectIds: [],

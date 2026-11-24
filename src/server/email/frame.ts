@@ -161,7 +161,6 @@ export function sessionPrepare(
     if (row.projectId === null || !canOpen(user.id, row.projectId)) {
       return "no-access";
     }
-    if (user.mustChangePassword) return "no-access";
     if (!user.emailFromAgents) return "opted-out";
     if (framed === null) throw new Error(`an ${row.kind} row has no text`);
     return withLink(framed, link(framed.path));

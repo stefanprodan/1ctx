@@ -32,7 +32,7 @@ async function signedIn(secrets: Record<string, string> = {}) {
     logFactory: logs.logFactory,
   });
   const admin = app.client();
-  expect((await admin.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await admin.signIn("admin")).status).toBe(200);
   const read = async () => {
     const res = await admin.call("GET", "/api/admin/smtp");
     expect(res.status).toBe(200);
@@ -139,7 +139,6 @@ describe("the email routes", () => {
         email: "maria@1ctx.dev",
         role: "member",
         tz: "UTC",
-        password: "maria-password",
       },
     });
     expect(made.status).toBe(201);
@@ -182,8 +181,6 @@ describe("the email routes", () => {
       fullName: "Ann",
       email: "ann@example.test",
       role: "member",
-      passwordHash: "x",
-      mustChangePassword: false,
       now: app.now.value,
     });
     transact(app.db, () => ({

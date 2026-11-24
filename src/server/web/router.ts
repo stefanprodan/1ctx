@@ -5,6 +5,7 @@
 // a browser sends Origin on the handshake.
 
 import { isIP } from "node:net";
+import { LOGIN_COOKIE } from "../access/index.ts";
 import { BadRequest, HttpError, TooManyRequests } from "../lib/errors.ts";
 import {
   json,
@@ -140,16 +141,10 @@ async function dispatch(
   if (route.policy === "key" && principal?.via.kind !== "key") {
     return json({ error: "sign in" }, 401);
   }
-  if (route.policy === "key" && principal!.mustChangePassword) {
-    return json({ error: "change your password first" }, 403);
-  }
   if (route.policy === "authenticated" || route.policy === "admin") {
     if (principal === null) return json({ error: "sign in" }, 401);
     if (route.policy === "admin" && principal.role !== "admin") {
       return json({ error: "forbidden" }, 403);
-    }
-    if (principal.mustChangePassword && route.passwordChange !== true) {
-      return json({ error: "change your password first" }, 403);
     }
   }
   // only a caller access let in may hold the connection longer
@@ -301,9 +296,15 @@ export function router(deps: RouterDeps): Router {
       }
       if (res === undefined) return undefined;
       // the row already moved, so the browser's copy must move with it
-      // whatever the answer was, unless the handler replaced the cookie
-      if (resolution.setCookie !== null && !res.headers.has("set-cookie")) {
-        res.headers.set("set-cookie", resolution.setCookie);
+      // whatever the answer was, unless the handler replaced the login
+      // cookie; a handler's other cookie rides beside it
+      if (
+        resolution.setCookie !== null &&
+        !res.headers
+          .getSetCookie()
+          .some((cookie) => cookie.startsWith(`${LOGIN_COOKIE}=`))
+      ) {
+        res.headers.append("set-cookie", resolution.setCookie);
       }
       record(
         route.path,

@@ -5,35 +5,32 @@
 // transaction: what happened to the admin meanwhile stops the write.
 
 import { expect, test } from "bun:test";
-import { hashPassword, ORIGIN, testApp } from "../../helpers/app.ts";
+import { ORIGIN, testApp } from "../../helpers/app.ts";
 
-const PASSWORD = "longenough";
+const ADA_KEY = `1ctx-admin-${"a".repeat(43)}`;
 
 async function setup() {
-  const app = await testApp();
+  const secrets: Record<string, string> = { "user-ada": ADA_KEY };
+  const app = await testApp({ secrets });
   const other = app.client();
-  expect((await other.login("admin", "hunter2-test")).status).toBe(200);
+  expect((await other.signIn("admin")).status).toBe(200);
   const make = async (username: string, role: "admin" | "member") =>
     app.createUser({
       username,
       fullName: username,
       email: `${username}@example.test`,
       role,
-      passwordHash: await hashPassword(PASSWORD),
-      mustChangePassword: false,
       now: app.now.value,
     });
   const acting = await make("ada", "admin");
   const casey = await make("casey", "member");
+  // by her key, so a rotation is one of the endings
   const client = app.client();
-  expect((await client.login("ada", PASSWORD)).status).toBe(200);
-  const hashOf = (id: string) =>
-    app.db
-      .query<{ password_hash: string }, [string]>(
-        "select password_hash from users where id = ?",
-      )
-      .get(id)!.password_hash;
-  return { app, other, acting, casey, client, hashOf };
+  const login = await client.call("POST", "/api/login", {
+    body: { key: ADA_KEY },
+  });
+  expect(login.status).toBe(200);
+  return { app, secrets, other, acting, casey, client };
 }
 
 type Setup = Awaited<ReturnType<typeof setup>>;
@@ -79,8 +76,9 @@ const ENDINGS = {
         ).status,
       ).toBe(200),
   },
+  // a key login holds only while its user is an admin
   demotion: {
-    status: 403,
+    status: 401,
     run: async (b: Setup) =>
       expect(
         (
@@ -90,16 +88,25 @@ const ENDINGS = {
         ).status,
       ).toBe(200),
   },
-  reset: {
+  "sign out everywhere": {
     status: 401,
     run: async (b: Setup) =>
       expect(
-        (
-          await b.other.call("POST", `/api/users/${b.acting.id}/password`, {
-            body: { password: "reset-password" },
-          })
-        ).status,
+        (await b.other.call("POST", `/api/users/${b.acting.id}/sign-out`))
+          .status,
       ).toBe(204),
+  },
+  "key rotated": {
+    status: 401,
+    run: async (b: Setup) => {
+      b.secrets["user-ada"] = `1ctx-admin-${"b".repeat(43)}`;
+    },
+  },
+  "key file removed": {
+    status: 401,
+    run: async (b: Setup) => {
+      delete b.secrets["user-ada"];
+    },
   },
 };
 
@@ -113,7 +120,6 @@ const WRITES = {
       email: "mallory@example.test",
       role: "admin",
       tz: "UTC",
-      password: PASSWORD,
     },
     unchanged: (b: Setup) =>
       expect(b.app.users.byUsername("mallory")).toBeNull(),
@@ -128,11 +134,14 @@ const WRITES = {
       expect(casey.email).toBe("casey@example.test");
     },
   },
-  password: {
+  "access key": {
     method: "POST",
-    path: (b: Setup) => `/api/users/${b.casey.id}/password`,
-    body: { password: "mallory-knows" },
-    unchanged: () => {},
+    path: () => "/api/profile/keys",
+    body: { name: "laptop", scope: "write", projectIds: null, days: 30 },
+    unchanged: (b: Setup) =>
+      expect(
+        b.app.db.query("select count(*) as n from access_keys").get(),
+      ).toEqual({ n: 0 }),
   },
 };
 
@@ -141,15 +150,10 @@ for (const [ending, end] of Object.entries(ENDINGS)) {
     test(`a ${ending} while the ${name} body arrives writes nothing`, async () => {
       const b = await setup();
       try {
-        const hash = b.hashOf(b.casey.id);
         const send = slowCall(b, write.method, write.path(b));
         await end.run(b);
         expect(await send(write.body)).toBe(end.status);
         write.unchanged(b);
-        expect(b.hashOf(b.casey.id)).toBe(hash);
-        expect((await b.app.client().login("casey", PASSWORD)).status).toBe(
-          200,
-        );
       } finally {
         await b.app.shutdown();
       }

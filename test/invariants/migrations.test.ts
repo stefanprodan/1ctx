@@ -104,6 +104,7 @@ const EXPECTED_IDS = [
   "0089-project-backend",
   "0090-sandbox-variant",
   "0091-project-variant",
+  "0092-admin-keys",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -137,6 +138,11 @@ const LATER_COLUMNS = [
   "cleared_at",
   "backend",
   "variant",
+  "signed_in_at",
+  "key_digest",
+  // dropped by 0092, so held only by rows from before it
+  "password_hash",
+  "must_change_password",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -215,6 +221,13 @@ describe("migrations", () => {
   });
 });
 
+// users held a password hash until 0092
+const hashed = (db: Database) =>
+  db
+    .query<{ name: string }, []>("select name from pragma_table_info('users')")
+    .all()
+    .some((column) => column.name === "password_hash");
+
 describe("the schema", () => {
   // a fresh schema with a user, a project, an agent, a session and two
   // sends, each with its user message and its answer
@@ -232,9 +245,12 @@ describe("the schema", () => {
     const [nameColumn, nameValue] = named
       ? [", provider_name", ", 'prov'"]
       : ["", ""];
+    const [hashColumn, hashValue] = hashed(db)
+      ? [", password_hash", ", 'x'"]
+      : ["", ""];
     db.exec(`
-      insert into users (id, username, full_name, email, role, password_hash, created_at)
-        values ('u', 'user', 'User', 'user@example.com', 'member', 'x', 0);
+      insert into users (id, username, full_name, email, role${hashColumn}, created_at)
+        values ('u', 'user', 'User', 'user@example.com', 'member'${hashValue}, 0);
       insert into projects (id, kind, name, owner_id, created_at)
         values ('p', 'personal', 'personal', 'u', 0);
       insert into providers (id, name, wire, base_url, created_at)
@@ -1137,28 +1153,25 @@ describe("the schema", () => {
     db.close();
   });
 
-  test("a user starts enabled with an unforced password and a unique email", () => {
+  test("a user starts enabled, never signed in, with a unique email", () => {
     const db = seed();
     expect(
-      db
-        .query(
-          "select disabled, must_change_password from users where id = 'u'",
-        )
-        .get(),
-    ).toEqual({ disabled: 0, must_change_password: 0 });
+      db.query("select disabled, signed_in_at from users where id = 'u'").get(),
+    ).toEqual({ disabled: 0, signed_in_at: null });
+    expect(hashed(db)).toBe(false);
     expect(() =>
       db
         .query(
-          `insert into users (id, username, full_name, email, role, password_hash, created_at)
-           values ('v', 'other', 'Other', 'user@example.com', 'member', 'x', 0)`,
+          `insert into users (id, username, full_name, email, role, created_at)
+           values ('v', 'other', 'Other', 'user@example.com', 'member', 0)`,
         )
         .run(),
     ).toThrow();
     expect(() =>
       db
         .query(
-          `insert into users (id, username, full_name, role, password_hash, created_at)
-           values ('w', 'noemail', 'No Email', 'member', 'x', 0)`,
+          `insert into users (id, username, full_name, role, created_at)
+           values ('w', 'noemail', 'No Email', 'member', 0)`,
         )
         .run(),
     ).toThrow();
@@ -2231,6 +2244,89 @@ describe("the schema", () => {
       expect(() =>
         db.query("update projects set variant = 'node'").run(),
       ).toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0092 drops the passwords and keeps every login and live link but reset and must-change ones", () => {
+    const db = seed(MIGRATIONS.slice(0, 91));
+    try {
+      db.exec(`
+        insert into users (id, username, full_name, email, role,
+            password_hash, must_change_password, created_at)
+          values ('m', 'forced', 'Forced', 'forced@example.com', 'member',
+            'x', 1, 0),
+            ('v', 'visitor', 'Visitor', 'visitor@example.com', 'member',
+            'x', 0, 0),
+            ('n', 'never', 'Never', 'never@example.com', 'member', 'x', 0, 0);
+        insert into logins (id, user_id, token_hash, created_at,
+            last_seen_at, expires_at)
+          values ('lu', 'u', 'hu', 1, 50, 900), ('lm', 'm', 'hm', 1, 60, 900);
+        insert into visits (user_id, day, at)
+          values ('u', '2026-11-01', 40), ('v', '2026-11-02', 70);
+        insert into access_keys (id, user_id, name, token_hash, scope,
+            created_at, expires_at)
+          values ('ku', 'u', 'laptop', 'tu', 'write', 1, 900),
+            ('km', 'm', 'laptop', 'tm', 'write', 1, 900);
+        insert into user_links (id, purpose, user_id, created_at, expires_at)
+          values ('reset', 'reset', 'u', 1, 900),
+            ('signin', 'signin', 'u', 1, 900),
+            ('invite', 'invite', 'n', 1, 900);
+        insert into email_outbox (id, kind, user_id, message_id, asked,
+            status, next_attempt_at, created_at, updated_at)
+          values ('queued-reset', 'reset', 'u', 'a', 1, 'queued', 0, 1, 1),
+            ('sent-reset', 'reset', 'u', 'b', 1, 'sent', 0, 1, 1),
+            ('queued-signin', 'signin', 'u', 'c', 1, 'queued', 0, 1, 1),
+            ('queued-invite', 'invite', 'n', 'd', 0, 'queued', 0, 1, 1);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0092-admin-keys"));
+      expect(hashed(db)).toBe(false);
+      expect(
+        db.query("select id, signed_in_at from users order by id").all(),
+      ).toEqual([
+        { id: "m", signed_in_at: null },
+        { id: "n", signed_in_at: null },
+        { id: "u", signed_in_at: 50 },
+        { id: "v", signed_in_at: 70 },
+      ]);
+      expect(db.query("select id, key_digest from logins").all()).toEqual([
+        { id: "lu", key_digest: null },
+      ]);
+      expect(db.query("select id from access_keys").all()).toEqual([
+        { id: "ku" },
+      ]);
+      expect(db.query("select id from user_links order by id").all()).toEqual([
+        { id: "invite" },
+        { id: "signin" },
+      ]);
+      expect(db.query("select id from email_outbox order by id").all()).toEqual(
+        [
+          { id: "queued-invite" },
+          { id: "queued-signin" },
+          { id: "sent-reset" },
+        ],
+      );
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      // the kind stays for the sent history
+      db.exec(`insert into email_outbox (id, kind, user_id, message_id,
+          status, next_attempt_at, created_at, updated_at)
+        values ('later', 'reset', 'u', 'e', 'sent', 0, 2, 2)`);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0092's key login check reads only key logins by its index", () => {
+    const db = seed();
+    try {
+      const plan = db
+        .query<{ detail: string }, []>(
+          "explain query plan select id from logins where key_digest is not null",
+        )
+        .all()
+        .map((row) => row.detail);
+      expect(plan.join(" ")).toContain("logins_key");
     } finally {
       db.close();
     }
@@ -3666,6 +3762,10 @@ describe("the schema", () => {
               images: _________________,
               mcp_on: __________________,
               cleared_at: ___________________,
+              signed_in_at: ____________________,
+              // dropped by 0092
+              password_hash: _____________________,
+              must_change_password: ______________________,
               ...rest
             }) => rest,
           ),
@@ -4800,6 +4900,7 @@ describe("project channel migrations", () => {
       "0089-project-backend",
       "0090-sandbox-variant",
       "0091-project-variant",
+      "0092-admin-keys",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -5028,6 +5129,7 @@ describe("project channel migrations", () => {
           "0089-project-backend",
           "0090-sandbox-variant",
           "0091-project-variant",
+          "0092-admin-keys",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5205,6 +5307,7 @@ describe("project channel migrations", () => {
         "0089-project-backend",
         "0090-sandbox-variant",
         "0091-project-variant",
+        "0092-admin-keys",
       ]);
       expect(
         db

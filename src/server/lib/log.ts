@@ -231,12 +231,12 @@ export function scrubErrors(log: Log, values: () => string[]): Log {
     if (typeof fields?.error !== "string") return fields;
     return {
       ...fields,
-      // an access key is a row, never a key file, so its shape is masked
+      // an access key is a row, never a key file, so its shape is
+      // masked; an admin key by its prefix, so a cut one is masked too
       error: cut(
-        scrubValues(fields.error, values(), "[key]").replace(
-          /1ctx_[A-Za-z0-9_-]{43}/g,
-          "[key]",
-        ),
+        scrubValues(fields.error, values(), "[key]")
+          .replace(/1ctx_[A-Za-z0-9_-]{43}/g, "[key]")
+          .replace(/1ctx-admin-[A-Za-z0-9_-]{16,}/g, "[key]"),
       ),
     };
   };

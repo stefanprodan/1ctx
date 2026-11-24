@@ -63,7 +63,6 @@ beforeEach(() => {
     username: "casey",
     fullName: "Casey Doe",
     role: "member",
-    mustChangePassword: false,
   };
   userPage.value = null;
   userDays.value = null;

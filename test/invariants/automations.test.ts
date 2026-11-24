@@ -10,7 +10,6 @@ import {
   type AutomationSummary,
   STALE_EDIT,
 } from "../../src/shared/contracts/automation.ts";
-import { hashPassword } from "../helpers/app.ts";
 import { createAutomation } from "../helpers/automations.ts";
 import { chatApp, sessionSettled, tick } from "../helpers/chat.ts";
 
@@ -118,7 +117,7 @@ describe("automations", () => {
     chat.app.automationScheduler.stop();
     await tick();
     chat.app.now.value = Date.parse("2026-03-08T06:30:00.000Z");
-    await chat.member.login("casey", "pw");
+    await chat.member.signIn("casey");
     const changedSchedule = await chat.member.call(
       "PATCH",
       `/api/automations/${automation.id}`,
@@ -414,8 +413,6 @@ describe("automation rights", () => {
       fullName: "Other User",
       email: "other@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     chat.app.db
@@ -450,7 +447,7 @@ describe("automation rights", () => {
     );
     const automation: AutomationSummary = (await created.json()).automation;
     const otherClient = chat.app.client();
-    await otherClient.login("other", "pw");
+    await otherClient.signIn("other");
     const row = () => chat.app.automations.byId(automation.id)!;
     const patch = (
       client: typeof otherClient,
@@ -568,8 +565,6 @@ describe("automation rights", () => {
       fullName: "Third User",
       email: "third@example.com",
       role: "member",
-      passwordHash: await hashPassword("pw"),
-      mustChangePassword: false,
       now: chat.app.now.value,
     });
     chat.app.db
@@ -578,7 +573,7 @@ describe("automation rights", () => {
       )
       .run(third.id, chat.app.now.value);
     const thirdClient = chat.app.client();
-    await thirdClient.login("third", "pw");
+    await thirdClient.signIn("third");
     expect(
       (await thirdClient.call("DELETE", `/api/automations/${automation.id}`))
         .status,

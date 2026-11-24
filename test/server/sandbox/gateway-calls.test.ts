@@ -243,7 +243,7 @@ async function onGateways(
   });
   try {
     const admin = app.client();
-    await admin.login("admin", "hunter2-test");
+    await admin.signIn("admin");
     await body(
       async (endpoint) => {
         const res = await admin.call("PUT", "/api/admin/sandbox", {

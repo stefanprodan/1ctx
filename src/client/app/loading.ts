@@ -47,14 +47,11 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
     void (queryOnly && loadQuery !== undefined ? runOf(loadQuery) : run)();
   };
   const dispose = effect(() => {
-    // the user's id, role and password state, not the row: a profile
-    // save replaces the row and must not reload the page's entities,
-    // while a role change may open an admin page that has not loaded,
-    // and a password change opens everything
+    // the user's id and role, not the row: a profile save replaces the
+    // row and must not reload the page's entities, while a role change
+    // may open an admin page that has not loaded
     const row = me.value;
-    const user = row
-      ? `${row.id} ${row.role} ${row.mustChangePassword ? "locked" : ""}`
-      : "";
+    const user = row ? `${row.id} ${row.role}` : "";
     const pathname = path.value;
     const search = query.value;
     if (
@@ -72,9 +69,8 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
       !newUser && pathname === last.pathname && search !== last.search;
     last = { user, pathname, search };
     const m = match(pathname, routes);
-    // the rail's projects, whichever page the sign in happened on; the
-    // server refuses them until the password changes
-    if (newUser && row && !row.mustChangePassword) void loadProjects();
+    // the rail's projects, whichever page the sign in happened on
+    if (newUser && row) void loadProjects();
     // a public page reads the same for anyone, signed in or not, so it
     // loads once per address and a sign in on it does not read it again
     if (m?.route.role === "public") {
@@ -84,8 +80,6 @@ export function startLoading(routes: Route[] = ROUTES): () => void {
     }
     current = null;
     if (row === null || row === undefined) return;
-    // the server refuses every other route until the password changes
-    if (row.mustChangePassword && m?.route.path !== "/profile") return;
     if (m === null || m.route.load === undefined) return;
     if (m.route.role === "admin" && row.role !== "admin") return;
     start(m, search, queryOnly);

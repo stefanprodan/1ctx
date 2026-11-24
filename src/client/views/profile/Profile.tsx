@@ -3,8 +3,8 @@
 //
 // The profile: who the user is on one line, then sections down one
 // column, a heading on the left and the form on the right: the name,
-// the time zone and the about text, email from agents while email is
-// set up, and the password. The aside holds
+// the time zone and the about text, and email from agents while email
+// is set up. The aside holds
 // the account: the email, the role and when the user joined. The
 // username is shown, not edited; an admin changes it. A Save wakes when
 // something changed, says Saved for a moment, and a refusal stays beside
@@ -14,7 +14,6 @@ import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
 import {
-  changePassword,
   profile,
   profileEmailOn,
   profileError,
@@ -46,9 +45,6 @@ import {
   EMAIL_HINT,
   emailSectionText,
   fullNameProblem,
-  PASSWORD_TEXT,
-  passwordFieldOf,
-  passwordFieldProblem,
 } from "./Profile.model.ts";
 import { ProfileWaiting } from "./ProfileWaiting.tsx";
 import "./profile.css";
@@ -173,74 +169,6 @@ function EmailForm({ user }: { user: ProfileRow }) {
   );
 }
 
-function PasswordForm() {
-  const current = useSignal("");
-  const next = useSignal("");
-  const again = useSignal("");
-  const form = useRef<HTMLDivElement>(null);
-  const save = useSave(async () => {
-    await changePassword({ current: current.value, next: next.value });
-    current.value = "";
-    next.value = "";
-    again.value = "";
-  }, passwordFieldOf);
-  useFocusField(save, form);
-  const invalid = (field: string) => save.fieldError(field) !== null;
-  const submit = (event: Event) => {
-    event.preventDefault();
-    void save.run(passwordFieldProblem(current.value, next.value, again.value));
-  };
-  return (
-    <SectionForm onSubmit={submit}>
-      <div class="profile-fields" ref={form}>
-        <label class="field">
-          <span class="label">Current password</span>
-          <input
-            name="current"
-            type="password"
-            autocomplete="current-password"
-            aria-invalid={invalid("current") || undefined}
-            value={current.value}
-            onInput={save.bind(current)}
-          />
-          <FieldError save={save} field="current" />
-        </label>
-        <div class="pair">
-          <label class="field">
-            <span class="label">New password</span>
-            <input
-              name="next"
-              type="password"
-              autocomplete="new-password"
-              aria-invalid={invalid("next") || undefined}
-              value={next.value}
-              onInput={save.bind(next)}
-            />
-            <FieldError save={save} field="next" />
-          </label>
-          <label class="field">
-            <span class="label">New password again</span>
-            <input
-              name="again"
-              type="password"
-              autocomplete="new-password"
-              aria-invalid={invalid("again") || undefined}
-              value={again.value}
-              onInput={save.bind(again)}
-            />
-            <FieldError save={save} field="again" />
-          </label>
-        </div>
-      </div>
-      <Foot
-        save={save}
-        dirty={current.value !== "" && next.value !== "" && again.value !== ""}
-        label="Change password"
-      />
-    </SectionForm>
-  );
-}
-
 export function Profile() {
   const user = profile.value;
   return (
@@ -264,11 +192,6 @@ export function Profile() {
           }
         >
           <div class="profile">
-            {user.mustChangePassword && (
-              <p class="profile-notice">
-                Change the password you were handed before going on.
-              </p>
-            )}
             <Who
               class="profile-head"
               avatar={initials(user.fullName)}
@@ -286,9 +209,6 @@ export function Profile() {
                 <EmailForm user={user} />
               </Section>
             )}
-            <Section title="Password" text={PASSWORD_TEXT}>
-              <PasswordForm />
-            </Section>
           </div>
         </Split>
       )}

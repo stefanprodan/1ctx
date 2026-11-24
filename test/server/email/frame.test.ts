@@ -237,7 +237,7 @@ describe("a row's body", () => {
       subject: framed.subject,
       body: packBody(framed),
     } as OutboxRow;
-    const user = { id: "u1", mustChangePassword: false, emailFromAgents: true };
+    const user = { id: "u1", emailFromAgents: true };
     const prepare = (link: (path: string) => string) =>
       sessionPrepare(() => true, link)(row, user as UserRow);
     // the sender tries the row again as other
@@ -267,7 +267,7 @@ describe("a row's body", () => {
       subject: framed.subject,
       body: packBody(framed),
     } as OutboxRow;
-    const user = { id: "u1", mustChangePassword: false, emailFromAgents: true };
+    const user = { id: "u1", emailFromAgents: true };
     expect(
       sessionPrepare(
         () => true,
