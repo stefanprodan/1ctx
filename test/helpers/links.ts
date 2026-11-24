@@ -55,11 +55,18 @@ export type EmailApp = {
 };
 
 export async function emailApp(
-  options: { email?: boolean; unlistable?: (kind: string) => boolean } = {},
+  options: {
+    email?: boolean;
+    unlistable?: (kind: string) => boolean;
+    // more secrets, kept by reference so a test may change one
+    secrets?: Record<string, string>;
+  } = {},
 ): Promise<EmailApp> {
   const logs = collectLogs();
+  const secrets = options.secrets ?? {};
+  secrets["email-relay"] = "secret-pass";
   const app = await testApp({
-    secrets: { "email-relay": "secret-pass" },
+    secrets,
     logFactory: logs.logFactory,
     unlistable: options.unlistable,
   });
