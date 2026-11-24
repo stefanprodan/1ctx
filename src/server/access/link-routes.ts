@@ -36,8 +36,9 @@ export const ASK_COOKIE = "login_ask";
 // after a queue backlog still finds it, and a code lives only its own
 // 15 minutes and 5 tries however long the challenge does
 export const ASK_TTL_MS = DAY_MS;
-// where a sign-in by link or code lands
-export const LANDING = "/";
+// where a sign-in by link or code lands; the flag asks the page for its
+// passkey step, and the page strips it
+export const LANDING = "/?signed_in=1";
 
 export type UsersPort = {
   byId(id: string): UserRow | null;

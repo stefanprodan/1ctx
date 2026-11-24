@@ -348,7 +348,7 @@ describe("asking for a code", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       user: { username: "maria" },
-      landing: "/",
+      landing: "/?signed_in=1",
     });
     expect(admin.cookie).not.toBe(before);
     expect(
@@ -841,7 +841,7 @@ describe("the link page", () => {
     const before = admin.cookie;
     const res = await e.use(admin, e.sent);
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toBe("/");
+    expect(res.headers.get("location")).toBe("/?signed_in=1");
     expect(res.headers.get("cache-control")).toBe("no-store");
     expect(admin.cookie).not.toBe(before);
     expect(

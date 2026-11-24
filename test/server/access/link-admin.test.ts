@@ -147,7 +147,7 @@ describe("invites", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       user: { username: "maria" },
-      landing: "/",
+      landing: "/?signed_in=1",
     });
     expect(app.users.byId(maria.id)!.signedInAt).toBe(app.now.value);
     // no notice for an invite, and using the code used the link
