@@ -9,7 +9,7 @@ export PLATFORMS
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset smoke image image-smoke sandbox-image sandbox-check sandbox-net-check kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke models
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset preview-mail smoke image image-smoke sandbox-image sandbox-check sandbox-net-check kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke models
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -72,7 +72,7 @@ preview-stop: ## Stop the local preview
 preview-log: ## Tail the local preview's log
 	@bun run preview-log
 
-preview-clean: ## Stop the local preview and remove its db, log and pid
+preview-clean: ## Stop the local preview and remove its db, secrets, mail, log and pid
 	@bun run preview-clean
 
 preview-provision: ## Apply a provision file to the preview (FILE=path.yaml)
@@ -80,6 +80,9 @@ preview-provision: ## Apply a provision file to the preview (FILE=path.yaml)
 
 preview-reset: ## Wipe the preview and provision it again (FILE=path.yaml SECRETS=dir)
 	@bun run preview-reset $(FILE) $(SECRETS)
+
+preview-mail: ## Print the newest preview email to a user, with its code and link (TO=username)
+	@bun run preview-mail $(TO)
 
 staging-deploy: ## Build main, back the staging db up, swap the binary and restart its service
 	@bun run staging-deploy

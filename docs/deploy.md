@@ -2,8 +2,9 @@
 
 How the binary runs outside the preview: as an OS service, on the
 staging instance, in a container, and how releases are built. Governs
-`src/server/service/`, `scripts/staging.sh`, `scripts/openshell.sh`
-and the `make staging-*` targets, the `Dockerfile`, `.dockerignore`,
+`src/server/service/`, `scripts/staging.sh`, `scripts/openshell.sh`,
+the preview's mail catcher (`scripts/mail/`) and the `make staging-*`
+targets, the `Dockerfile`, `.dockerignore`,
 `deploy/` and `.github/workflows/`.
 
 ## The OS service (`1ctx service`)
@@ -121,6 +122,23 @@ gateway add`.
   yet.
 - **Kubernetes:** OpenShell's own Helm chart as a prerequisite, not
   built yet.
+
+## The preview's mail catcher
+
+- **The preview's email goes to a catcher on loopback,** the preview
+  port + 2 (`PREVIEW_MAIL_PORT`), each message a mode 600 file in
+  `.preview/mail/` (mode 700) named `<address>--<time>-<count>.eml`.
+  `make preview-mail TO=<username or email>` prints the newest.
+- **Its certificate is made at a start when missing or within two days
+  of its end,** for 127.0.0.1 alone and not a CA, its key never leaving
+  the folder; never the test fixture, which is a CA whose key is
+  public. The server gets it through `NODE_EXTRA_CA_CERTS`, which Bun
+  honours for nodemailer's TLS, so certificates stay verified and
+  nothing else is added.
+- **Its `SmtpServer` object is applied with `--provision` at each
+  start,** after any provisioning, so a provisioned real server never
+  wins. `PREVIEW_MAIL=real` starts no catcher and leaves the SMTP server
+  last applied; provision the real one with it set.
 
 ## The container image
 
