@@ -5,13 +5,21 @@
 // count and a namespace: admins adm01.., members u001.. in 2 to 5 team
 // projects each (every team at least 5), the fake provider, the three
 // fake MCP servers, written in every team and read in personal projects,
-// the agents on MCP. The users' keys are throwaway and made once, so the
-// chart's Secret keeps them across installs. The team docs are not
+// the agents on MCP. The chart's Secret holds only the first admin's key,
+// which provisioning signs in with; the driver's logins are minted per
+// run (logins.ts). The team docs are not
 // here: a ConfigMap is flat and capped at 1 MiB, so the driver's setup
 // writes them through the API.
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
+import { isAdminKey, newAdminKey } from "../../src/server/users/rules.ts";
 import { SERVER_NAMES } from "./catalog.ts";
 import { rng } from "./random.ts";
 import { FAKE, MVP } from "./shapes.ts";
@@ -154,8 +162,6 @@ export function valuesYaml(files: Record<string, string>): string {
     .join("\n");
   return `# the load harness's release, written by scripts/load/provision.ts
 secureCookie: false
-# the driver signs each user in from its own forwarded address
-trustProxy: true
 secrets:
   existingSecret: onectx
 persistence:
@@ -174,19 +180,25 @@ ${inline}
 `;
 }
 
-// a throwaway password per user, made once; the server trims a key
-// file, so none ends in a newline
-export function writeSecrets(dir: string, users: string[]): number {
-  mkdirSync(dir, { recursive: true });
-  let made = 0;
-  for (const name of users) {
-    const path = join(dir, `user-${name}.key`);
-    if (existsSync(path)) continue;
-    const bytes = crypto.getRandomValues(new Uint8Array(12));
-    writeFileSync(path, Buffer.from(bytes).toString("hex"), { mode: 0o600 });
-    made++;
+export const ADMIN_KEY_FILE = "user-admin.key";
+
+// the first admin's key, made once; a file holding anything else (an
+// older harness's password) is made again, since no database keeps a key
+export function writeAdminKey(dir: string): boolean {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const path = join(dir, ADMIN_KEY_FILE);
+  if (existsSync(path) && isAdminKey(readFileSync(path, "utf8").trim())) {
+    return false;
   }
-  return made;
+  writeFileSync(path, newAdminKey(), { mode: 0o600 });
+  chmodSync(path, 0o600);
+  return true;
+}
+
+// everyone the provision makes, for the logins a run mints
+export function usernames(c: Counts = MVP_COUNTS): string[] {
+  const n = names(c);
+  return ["admin", ...n.admins, ...n.members];
 }
 
 export function writeCluster(dir: string, ns: string, c: Counts = MVP_COUNTS) {
@@ -196,11 +208,6 @@ export function writeCluster(dir: string, ns: string, c: Counts = MVP_COUNTS) {
     writeFileSync(join(dir, "provision", name), text);
   }
   writeFileSync(join(dir, "values.yaml"), valuesYaml(files));
-  const n = names(c);
-  const made = writeSecrets(join(dir, "secrets"), [
-    "admin",
-    ...n.admins,
-    ...n.members,
-  ]);
+  const made = writeAdminKey(join(dir, "secrets"));
   return { files, made };
 }

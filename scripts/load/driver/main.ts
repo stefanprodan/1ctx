@@ -9,9 +9,9 @@
 //   bun scripts/load/driver/main.ts step MULT MINUTES [--seed S] [--incident] [--caps default|max]
 //   bun scripts/load/driver/main.ts turns N SECONDS [--seed S] [--tool-share X]
 //
-// env: BASE (the server), ADMIN (admin), PASSWORD (one for every user)
-// or SECRETS (a folder of user-<name>.key, /secrets/), FAKE_MODEL_URL
-// and FAKE_MCP_URL (what every provider and MCP server must point at)
+// env: BASE (the server), ADMIN (admin), LOGINS (a JSON file of the
+// login tokens minted for this run, by username), FAKE_MODEL_URL and
+// FAKE_MCP_URL (what every provider and MCP server must point at)
 
 import type { ProjectsResponse } from "../../../src/shared/api/projects.ts";
 import { KNOWLEDGE_FILES } from "../shapes.ts";
@@ -47,12 +47,8 @@ async function main() {
     process.exit(2);
   }
   const caps = parseCaps(argv);
-  const api = new Api({
-    base: env("BASE"),
-    password: process.env.PASSWORD,
-    secrets: process.env.SECRETS,
-  });
-  const admin = await api.signIn(process.env.ADMIN ?? "admin", 0);
+  const api = new Api({ base: env("BASE"), logins: env("LOGINS") });
+  const admin = await api.signIn(process.env.ADMIN ?? "admin");
   // the fence, read back before any load
   await fenceWeb(api, admin);
   await assertFenced(api, admin, env("FAKE_MODEL_URL"), env("FAKE_MCP_URL"));

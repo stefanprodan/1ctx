@@ -6,18 +6,22 @@
 // at its one model, every MCP server at the fake MCP, no key is named,
 // web access is off (the `web` row's mode, which gates webfetch and
 // websearch) and search has no provider, and the automations are
-// suspended so a run's load never depends on the hour. A database
-// holding repositories or credentials is refused, since a turn could
-// reach their hosts.
+// suspended so a run's load never depends on the hour. Each user named
+// in the run's logins gets one login row, whose token the driver sends.
+// A database holding repositories or credentials is refused, since a
+// turn could reach their hosts.
 
 import type { Database } from "bun:sqlite";
+import { type Logins, mintLogins, unminted } from "./logins.ts";
 import { FAKE } from "./shapes.ts";
 
 export type FenceOptions = {
   modelUrl: string;
   mcpUrl: (server: string) => string;
-  // the time written as the automations' suspension
+  // the time written as the automations' suspension and the logins
   now?: number;
+  // token hashes by username, one login each
+  logins?: Logins;
 };
 
 export type FenceReport = {
@@ -55,6 +59,7 @@ export function fence(db: Database, o: FenceOptions): FenceReport {
     automations: 0,
     users: 0,
   };
+  const now = o.now ?? Date.now();
   db.transaction(() => {
     report.providers = db
       .query("update providers set base_url = ?, key_name = null")
@@ -83,13 +88,14 @@ export function fence(db: Database, o: FenceOptions): FenceReport {
       .query(
         "update automations set suspended_at = ?, next_at = null where suspended_at is null",
       )
-      .run(o.now ?? Date.now()).changes;
+      .run(now).changes;
+    report.users = mintLogins(db, o.logins ?? {}, now);
   })();
   return report;
 }
 
 // what the fence promised, read back: every provider and server on the
-// fakes, every automation suspended, the web tools off
+// fakes, every automation suspended, the web tools off, the logins open
 export function fenced(db: Database, o: FenceOptions): string[] {
   const wrong: string[] = [];
   for (const p of db
@@ -118,5 +124,7 @@ export function fenced(db: Database, o: FenceOptions): string[] {
     )
     .get()!.n;
   if (web > 0) wrong.push(`web access or search on (${web} rows)`);
+  const missing = unminted(db, o.logins ?? {}, o.now ?? Date.now());
+  if (missing.length > 0) wrong.push(`${missing.length} logins not minted`);
   return wrong;
 }

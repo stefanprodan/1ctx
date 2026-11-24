@@ -4,6 +4,9 @@
 // The cluster target: the Helm chart's pod on a local kind cluster, the
 // fakes beside it, the driver in a pod, nothing through a port-forward.
 // Only a context named kind-* is used, and only a namespace named 1ctx-*.
+// Before each driver pod the server stops, a pod mints a login per user
+// into its database from hashes, and the tokens go into a Secret that
+// only the driver mounts.
 //
 //   bun scripts/load/cluster.ts install [--tag dev] [--cpu 4]
 //   bun scripts/load/cluster.ts setup [--max-mult 16]
@@ -13,11 +16,18 @@
 // every command: [--context kind-1ctx-test] [--namespace 1ctx-load]
 // `make kind-up` makes that cluster, `make kind-image` loads the image
 
-import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { OUT_DIR } from "./db/build.ts";
 import { type CapsMode, parseCaps } from "./driver/automations.ts";
-import { mcpBase, modelUrl, writeCluster } from "./provision.ts";
+import { newLogins } from "./logins.ts";
+import {
+  ADMIN_KEY_FILE,
+  mcpBase,
+  modelUrl,
+  usernames,
+  writeCluster,
+} from "./provision.ts";
 import { failIfStuck, rolledOut } from "./rollout.ts";
 import { FAKE } from "./shapes.ts";
 import { printTable, summarize } from "./summarize.ts";
@@ -131,7 +141,7 @@ spec:
       command: ${JSON.stringify(["bun", "/load/driver.js", ...args])}
       env:
         - { name: BASE, value: "http://onectx.${ns}.svc" }
-        - { name: SECRETS, value: /secrets/ }
+        - { name: LOGINS, value: /logins/logins.json }
         - { name: FAKE_MODEL_URL, value: "${modelUrl(ns)}" }
         - { name: FAKE_MCP_URL, value: "${mcpBase(ns)}" }
       resources:
@@ -139,10 +149,43 @@ spec:
         limits: { cpu: "2", memory: 2Gi }
       volumeMounts:
         - { name: scripts, mountPath: /load }
-        - { name: secrets, mountPath: /secrets, readOnly: true }
+        - { name: logins, mountPath: /logins, readOnly: true }
   volumes:
     - { name: scripts, configMap: { name: load-scripts } }
-    - { name: secrets, secret: { secretName: onectx } }
+    - { name: logins, secret: { secretName: ${LOGINS_SECRET} } }
+`;
+}
+
+const LOGINS_SECRET = "load-logins";
+const MINT_POD = "mint-logins";
+// the chart's selector for release onectx
+const SERVER_PODS =
+  "app.kubernetes.io/name=onectx,app.kubernetes.io/instance=onectx";
+
+// as the chart's server runs, on its volume, with the hashes alone
+export function mintPod(): string {
+  return `apiVersion: v1
+kind: Pod
+metadata: { name: ${MINT_POD}, namespace: ${ns} }
+spec:
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+  containers:
+    - name: mint
+      image: ${BUN_IMAGE}
+      command: ["bun", "/load/mint.js", "/data/1ctx.sqlite", "/mint/hashes.json"]
+      volumeMounts:
+        - { name: scripts, mountPath: /load }
+        - { name: hashes, mountPath: /mint, readOnly: true }
+        - { name: data, mountPath: /data }
+  volumes:
+    - { name: scripts, configMap: { name: load-scripts } }
+    - { name: hashes, configMap: { name: ${MINT_POD} } }
+    - { name: data, persistentVolumeClaim: { claimName: onectx } }
 `;
 }
 
@@ -153,6 +196,7 @@ async function scripts() {
     ["scripts/load/fake-model.ts", "fake-model.js"],
     ["scripts/load/fake-mcp.ts", "fake-mcp.js"],
     ["scripts/load/driver/main.ts", "driver.js"],
+    ["scripts/load/mint.ts", "mint.js"],
   ];
   for (const [entry, file] of entries) {
     const built = await Bun.build({
@@ -184,37 +228,13 @@ async function scripts() {
   );
 }
 
-// the namespace's database was provisioned with its Secret's keys, so
-// those win over the local folder: fresh local keys would lock the
-// server out of its own users and crash it on every start
-export function restoreKeys(
-  kubectl: (...args: string[]) => string[],
-  dir: string,
-): number {
-  const p = Bun.spawnSync(kubectl("get", "secret", "onectx", "-o", "json"));
-  if (p.exitCode !== 0) {
-    const err = p.stderr.toString();
-    // a fresh namespace has no Secret yet and gets fresh keys
-    if (err.includes("NotFound") || err.includes("not found")) return 0;
-    throw new Error(`reading the namespace's keys: ${err.trim()}`);
-  }
-  const data =
-    (JSON.parse(p.stdout.toString()) as { data?: Record<string, string> })
-      .data ?? {};
-  mkdirSync(dir, { recursive: true });
-  for (const [name, value] of Object.entries(data)) {
-    const path = join(dir, name);
-    writeFileSync(path, Buffer.from(value, "base64"));
-    chmodSync(path, 0o600);
-  }
-  return Object.keys(data).length;
-}
-
+// the database keeps no admin key, so a fresh one works on an existing
+// namespace; the Secret holds that file alone, never older ones beside it
 async function install() {
-  const restored = restoreKeys(k, join(CLUSTER, "secrets"));
-  if (restored > 0) console.log(`${restored} keys taken from the namespace`);
   const { made } = writeCluster(CLUSTER, ns);
-  console.log(`provision written to ${CLUSTER}, ${made} new keys`);
+  console.log(
+    `provision written to ${CLUSTER}${made ? ", a new admin key" : ""}`,
+  );
   apply(
     run(
       [
@@ -239,7 +259,7 @@ async function install() {
         "secret",
         "generic",
         "onectx",
-        `--from-file=${join(CLUSTER, "secrets")}`,
+        `--from-file=${ADMIN_KEY_FILE}=${join(CLUSTER, "secrets", ADMIN_KEY_FILE)}`,
         "--dry-run=client",
         "-o",
         "yaml",
@@ -305,16 +325,10 @@ function checkMetrics() {
   }
 }
 
-// runs the driver in a fresh pod and returns its log; the pod must
-// start within READY_MS and end within doneMs, or the run fails
+// waits for a pod to end; it must start within READY_MS and end within
+// doneMs, or the run fails
 const READY_MS = 3 * 60_000;
-async function driver(
-  name: string,
-  args: string[],
-  doneMs: number,
-): Promise<string> {
-  run(k("delete", "pod", name, "--ignore-not-found"), undefined, true);
-  apply(driverPod(name, args));
+async function ended(name: string, doneMs: number): Promise<string> {
   const start = Date.now();
   const phaseOf = () =>
     run(
@@ -326,7 +340,7 @@ async function driver(
     await Bun.sleep(5000);
     const phase = phaseOf();
     if (phase === "Pending") failIfStuck(k, (pod) => pod === name);
-    if (phase === "Succeeded" || phase === "Failed") break;
+    if (phase === "Succeeded" || phase === "Failed") return phase;
     const waited = Date.now() - start;
     if (phase === "Pending" && waited > READY_MS) {
       throw new Error(
@@ -341,6 +355,70 @@ async function driver(
       );
     }
   }
+}
+
+// a login per user, opened in the stopped server's database: the mint
+// pod gets the hashes, the driver's Secret the tokens, and the server
+// starts again whatever happens
+async function mint() {
+  const { tokens, hashes } = newLogins(usernames());
+  const file = (name: string, text: string) => {
+    const path = join(CLUSTER, name);
+    writeFileSync(path, text, { mode: 0o600 });
+    chmodSync(path, 0o600);
+    return path;
+  };
+  mkdirSync(CLUSTER, { recursive: true });
+  const hashesFile = file("hashes.json", JSON.stringify(hashes));
+  const tokensFile = file("logins.json", JSON.stringify(tokens));
+  const create = (...args: string[]) =>
+    apply(
+      run(
+        k("create", ...args, "--dry-run=client", "-o", "yaml"),
+        undefined,
+        true,
+      ),
+    );
+  create("configmap", MINT_POD, `--from-file=hashes.json=${hashesFile}`);
+  create(
+    "secret",
+    "generic",
+    LOGINS_SECRET,
+    `--from-file=logins.json=${tokensFile}`,
+  );
+  unlinkSync(tokensFile);
+  run(k("delete", "pod", MINT_POD, "--ignore-not-found"), undefined, true);
+  run(k("scale", "deploy/onectx", "--replicas=0"), undefined, true);
+  try {
+    const gone = Bun.spawnSync(
+      k("wait", "--for=delete", "pod", "-l", SERVER_PODS, "--timeout=5m"),
+    );
+    const err = gone.stderr.toString();
+    // older kubectl calls a selector that matches nothing an error
+    if (gone.exitCode !== 0 && !err.includes("no matching resources")) {
+      throw new Error(`waiting for the server to stop: ${err.trim()}`);
+    }
+    apply(mintPod());
+    const phase = await ended(MINT_POD, READY_MS + 60_000);
+    const log = run(k("logs", MINT_POD), undefined, true).trim();
+    if (phase !== "Succeeded") throw new Error(`minting logins: ${log}`);
+    console.log(log);
+    run(k("delete", "pod", MINT_POD), undefined, true);
+  } finally {
+    run(k("scale", "deploy/onectx", "--replicas=1"), undefined, true);
+  }
+  await rolledOut(k, "onectx");
+}
+
+// runs the driver in a fresh pod and returns its log; mint() goes first
+async function driver(
+  name: string,
+  args: string[],
+  doneMs: number,
+): Promise<string> {
+  run(k("delete", "pod", name, "--ignore-not-found"), undefined, true);
+  apply(driverPod(name, args));
+  await ended(name, doneMs);
   return run(k("logs", name), undefined, true);
 }
 
@@ -370,6 +448,8 @@ async function step(mult: string, minutes: string, caps?: CapsMode) {
   const results = join(OUT_DIR, "results", label);
   mkdirSync(results, { recursive: true });
   await scripts();
+  // before the log followers, since it replaces the server's pod
+  await mint();
   await Bun.write(
     join(results, "meta.json"),
     `${JSON.stringify({ target: "cluster", label, context, namespace: ns, mult: Number(mult), minutes: Number(minutes), at: new Date().toISOString() }, null, 2)}\n`,
@@ -474,6 +554,7 @@ async function main() {
   if (command === "install") await install();
   else if (command === "setup") {
     await scripts();
+    await mint();
     console.log(
       await driver(
         "driver-setup",
@@ -484,6 +565,7 @@ async function main() {
   } else if (command === "step" && a && b) await step(a, b, caps);
   else if (command === "smoke") {
     await install();
+    await mint();
     console.log(
       await driver(
         "driver-setup",
