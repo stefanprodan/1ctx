@@ -226,19 +226,29 @@ export function scrubValues(
   return out;
 }
 
+// an access key is a row, never a key file, so its shape is masked; an
+// admin key by its prefix, so a cut one is masked too
+const maskKeys = (text: string): string =>
+  text
+    .replace(/1ctx_[A-Za-z0-9_-]{43}/g, "[key]")
+    .replace(/1ctx-admin-[A-Za-z0-9_-]{16,}/g, "[key]");
+
+// key files' values are scrubbed from the error, the one field that
+// carries outside text; both key shapes from every string field
 export function scrubErrors(log: Log, values: () => string[]): Log {
   const scrub = (fields?: LogFields): LogFields | undefined => {
-    if (typeof fields?.error !== "string") return fields;
-    return {
-      ...fields,
-      // an access key is a row, never a key file, so its shape is
-      // masked; an admin key by its prefix, so a cut one is masked too
-      error: cut(
-        scrubValues(fields.error, values(), "[key]")
-          .replace(/1ctx_[A-Za-z0-9_-]{43}/g, "[key]")
-          .replace(/1ctx-admin-[A-Za-z0-9_-]{16,}/g, "[key]"),
-      ),
-    };
+    if (fields === undefined) return fields;
+    const out: LogFields = {};
+    for (const [key, value] of Object.entries(fields)) {
+      if (typeof value !== "string") {
+        out[key] = value;
+      } else if (key === "error") {
+        out[key] = cut(maskKeys(scrubValues(value, values(), "[key]")));
+      } else {
+        out[key] = maskKeys(value);
+      }
+    }
+    return out;
   };
   const write = (level: LogLevel) => (msg: string, fields?: LogFields) =>
     log[level](msg, scrub(fields));

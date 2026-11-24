@@ -2,15 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // An admin write that awaits its body reads the admin again in its
-// transaction: what happened to the admin meanwhile stops the write.
+// transaction: what happened to the admin meanwhile stops the write, and
+// a key login that no longer holds ends with it.
 
 import { expect, test } from "bun:test";
 import { ORIGIN, testApp } from "../../helpers/app.ts";
+import { SMTP } from "../../helpers/links.ts";
 
 const ADA_KEY = `1ctx-admin-${"a".repeat(43)}`;
 
 async function setup() {
-  const secrets: Record<string, string> = { "user-ada": ADA_KEY };
+  const secrets: Record<string, string> = {
+    "user-ada": ADA_KEY,
+    "email-relay": "secret-pass",
+  };
   const app = await testApp({ secrets });
   const other = app.client();
   expect((await other.signIn("admin")).status).toBe(200);
@@ -134,6 +139,12 @@ const WRITES = {
       expect(casey.email).toBe("casey@example.test");
     },
   },
+  "SMTP settings": {
+    method: "PUT",
+    path: () => "/api/admin/smtp",
+    body: SMTP,
+    unchanged: (b: Setup) => expect(b.app.email.settings()).toBeNull(),
+  },
   "access key": {
     method: "POST",
     path: () => "/api/profile/keys",
@@ -159,6 +170,35 @@ for (const [ending, end] of Object.entries(ENDINGS)) {
       }
     });
   }
+}
+
+const KEY_ENDINGS = ["key rotated", "key file removed"] as const;
+
+for (const ending of KEY_ENDINGS) {
+  test(`a ${ending} while a body arrives ends the login for good`, async () => {
+    const b = await setup();
+    try {
+      const login = b.app.db
+        .query<{ id: string }, []>(
+          "select id from logins where key_digest is not null",
+        )
+        .get()!;
+      const send = slowCall(b, "PATCH", `/api/users/${b.casey.id}`);
+      await ENDINGS[ending].run(b);
+      expect(await send({ role: "admin" })).toBe(401);
+      expect(b.app.users.byId(b.casey.id)!.role).toBe("member");
+      expect(
+        b.app.db
+          .query("select count(*) as n from logins where id = ?")
+          .get(login.id),
+      ).toEqual({ n: 0 });
+      b.secrets["user-ada"] = ADA_KEY;
+      const me = await b.client.call("GET", "/api/me");
+      expect((await me.json()).user).toBeNull();
+    } finally {
+      await b.app.shutdown();
+    }
+  });
 }
 
 test("an admin still signed in finishes a slow write", async () => {

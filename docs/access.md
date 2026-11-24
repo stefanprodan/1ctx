@@ -83,7 +83,10 @@ router and the socket). Logins, admin keys and links by email are
 - **A write after a body re-reads its caller** (`actingUser()`) in
   its transaction: a key create, an admin's user create, patch or sign
   out everywhere. A gone login, or a key login whose key no longer
-  holds, is 401; disabled or demoted 403.
+  holds, is 401, and that key login ends; a login by email that is
+  disabled or lost admin rights is 403. A demoted admin's key login
+  ends at the demote, so their next request is 401. The SMTP settings
+  save reads its admin again the same way, through a port.
 - **An admin cannot demote, disable, sign out everywhere or invite
   their own row,** a 409 in the route. Demoting or disabling the last
   enabled admin is a 409 too.
@@ -92,9 +95,11 @@ router and the socket). Logins, admin keys and links by email are
   with `disabled: true` too it is a 400. `POST /api/users/:id/invite`
   sends it again, replacing the unused one, until the first sign-in
   (`signed_in_at` null). Each is a 409 while email is off and for a
-  disabled user or a placeholder. A member with no invite, no email on
-  or a placeholder cannot sign in until an admin sets a real address
-  and invites them; an admin without one signs in only by key.
+  disabled user or a placeholder. A member not invited but with a real
+  address, while email is on, asks for a sign-in link themselves. A
+  member whom email cannot reach (email off, or a placeholder) cannot
+  sign in until an admin sets a real address and email is on; an
+  admin without one signs in only by key. The user page says which.
 - **Sign out everywhere** (`POST /api/users/:id/sign-out`) ends the
   user's logins, live links with their queued email and access keys in
   one transaction, the keys since a stolen login can mint one, and

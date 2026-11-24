@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, test } from "bun:test";
-import { accessArea, cookieValue } from "../../../src/server/access/index.ts";
+import {
+  accessArea,
+  cookieValue,
+  LOGIN_TTL_MS,
+} from "../../../src/server/access/index.ts";
 import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
 import { silent } from "../../../src/server/lib/log.ts";
 import { usersArea } from "../../../src/server/users/index.ts";
@@ -16,6 +20,7 @@ const OPS_KEY = `1ctx-admin-${"o".repeat(43)}`;
 function build(secureCookie: boolean) {
   const db = memoryDb();
   const files: Record<string, string> = { "user-ops": OPS_KEY };
+  const now = { value: 0 };
   const users = usersArea({
     db,
     secret: () => null,
@@ -48,7 +53,7 @@ function build(secureCookie: boolean) {
       hasQueued: () => false,
       countAsked: () => 0,
     },
-    clock: () => 0,
+    clock: () => now.value,
     log: silent,
     secureCookie,
     accessKeysPerUser: () => 5,
@@ -69,7 +74,7 @@ function build(secureCookie: boolean) {
     presence: { onlineUserIds: () => [] },
     activity: { personDays: (_userId, starts) => starts.map(() => 0) },
   });
-  return { db, user, users, access, files };
+  return { db, user, users, access, files, now };
 }
 
 describe("cookieValue", () => {
@@ -118,6 +123,31 @@ describe("access", () => {
     users.setDisabled(user.id, true);
     expect(access.resolve(req, "authenticated").principal).toBeNull();
     expect(access.refresh(principal)).toBeNull();
+  });
+
+  test("a refresh needs the login's row, unexpired, whatever the socket heard", () => {
+    const { db, user, access, now } = build(false);
+    const principalOf = (setCookie: string) =>
+      access.resolve(
+        new Request("http://x", {
+          headers: { cookie: setCookie.split(";")[0] },
+        }),
+        "authenticated",
+      ).principal!;
+    const gone = access.open(user, null);
+    const deleted = principalOf(gone.setCookie);
+    expect(access.refresh(deleted)?.username).toBe("u");
+    db.query("delete from logins where id = ?").run(gone.login.id);
+    expect(access.refresh(deleted)).toBeNull();
+    const old = access.open(user, null);
+    const expired = principalOf(old.setCookie);
+    now.value = LOGIN_TTL_MS;
+    expect(access.refresh(expired)).toBeNull();
+    expect(
+      db
+        .query("select count(*) as n from logins where id = ?")
+        .get(old.login.id),
+    ).toEqual({ n: 0 });
   });
 
   test.serial(

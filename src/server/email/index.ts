@@ -14,7 +14,7 @@ import type { Db } from "../db/index.ts";
 import type { BusEvent } from "../lib/bus.ts";
 import { type Clock, HOUR_MS } from "../lib/clock.ts";
 import { Conflict } from "../lib/errors.ts";
-import type { RouteDescriptor } from "../lib/http.ts";
+import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import { newId } from "../lib/ids.ts";
 import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
@@ -116,6 +116,9 @@ export type EmailDeps = {
   keys: () => string[];
   users: { byId(id: string): UserRow | null };
   emailSender: EmailSender;
+  // the write inside a transaction that reads its admin again first, a
+  // closure since access is built after email
+  acting<T>(principal: Principal, write: () => T): T;
 };
 
 export type Email = {
@@ -227,8 +230,9 @@ export function emailArea(deps: EmailDeps): Email {
     store,
     routes: routes({
       response: (principal) => response(principal.userId),
-      save: (fields) => {
-        store.saveSettings(fields, deps.clock());
+      save: (principal, fields) => {
+        // a key rotated while the body arrived writes nothing
+        deps.acting(principal, () => store.saveSettings(fields, deps.clock()));
         // a saved server may send what waited for one
         loop.wake();
       },

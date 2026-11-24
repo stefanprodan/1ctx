@@ -8,6 +8,9 @@
 # pipefail turns a good answer into a failure whenever curl loses the race
 get() { curl -sf "$1" || fail "GET $1 did not answer"; }
 
+# the key goes on stdin, never on curl's argument list, which ps shows
+key_body() { printf '{"key":"%s"}' "$1"; }
+
 smoke_http() {
   local health page script chunk login wrong cross
   health=$(get "$URL/api/health")
@@ -19,10 +22,10 @@ smoke_http() {
   chunk=$(get "$URL$script")
   grep -q 'preact\|render' <<<"$chunk" || fail "the script did not serve"
 
-  login=$(curl -s -c "$RUN/cookies" -o /dev/null \
+  login=$(key_body "$ADMIN_KEY" | curl -s -c "$RUN/cookies" -o /dev/null \
     -w '%{http_code} %{header_json}' \
     -H 'content-type: application/json' -H "origin: $URL" \
-    -d "{\"key\":\"$ADMIN_KEY\"}" "$URL/api/login")
+    --data-binary @- "$URL/api/login")
   [[ "$login" == 200* ]] || fail "login answered ${login%% *}"
   echo "$login" | grep -q 'login=' || fail "login set no cookie"
 
@@ -36,13 +39,14 @@ smoke_http() {
   grep -qi 'connect-src.*none' "$RUN/visual-headers" \
     || fail "the visual shell allows connections"
 
-  wrong=$(curl -s -o /dev/null -w '%{http_code}' \
-    -H 'content-type: application/json' -H "origin: $URL" \
-    -d "{\"key\":\"1ctx-admin-$(printf 'A%.0s' {1..43})\"}" "$URL/api/login")
+  wrong=$(key_body "1ctx-admin-$(printf 'A%.0s' {1..43})" \
+    | curl -s -o /dev/null -w '%{http_code}' \
+      -H 'content-type: application/json' -H "origin: $URL" \
+      --data-binary @- "$URL/api/login")
   [[ "$wrong" == 401 ]] || fail "a wrong admin key answered $wrong"
 
-  cross=$(curl -s -o /dev/null -w '%{http_code}' \
+  cross=$(key_body "$ADMIN_KEY" | curl -s -o /dev/null -w '%{http_code}' \
     -H 'content-type: application/json' -H 'origin: http://evil.test' \
-    -d "{\"key\":\"$ADMIN_KEY\"}" "$URL/api/login")
+    --data-binary @- "$URL/api/login")
   [[ "$cross" == 403 ]] || fail "a cross-origin write answered $cross"
 }

@@ -40,12 +40,13 @@ export type EmailApp = {
 };
 
 export async function emailApp(
-  options: { email?: boolean } = {},
+  options: { email?: boolean; unlistable?: (kind: string) => boolean } = {},
 ): Promise<EmailApp> {
   const logs = collectLogs();
   const app = await testApp({
     secrets: { "email-relay": "secret-pass" },
     logFactory: logs.logFactory,
+    unlistable: options.unlistable,
   });
   await app.email.stop();
   const admin = app.client();

@@ -13,7 +13,7 @@ import { Conflict, NotFound } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
-import { actingUser } from "./acting.ts";
+import { actingWrite } from "./acting.ts";
 import type { AdminKeys } from "./admin-keys.ts";
 import type { Auth } from "./auth.ts";
 import {
@@ -77,10 +77,9 @@ export function keyRoutes(deps: KeyRoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const parsed = parseAccessKey(await jsonBody(req));
         const principal = ctx.principal!;
-        const made = transact(deps.db, () => {
-          // a sign out everywhere or a changed admin key while the body
-          // arrived must not mint a new credential
-          const owner = actingUser(deps, principal);
+        // a sign out everywhere or a changed admin key while the body
+        // arrived must not mint a new credential
+        const made = actingWrite(deps, principal, null, (owner) => {
           const keys = deps.keys.list(owner.id);
           if (keys.some((key) => key.name === parsed.name)) {
             throw new Conflict("access key name is taken");

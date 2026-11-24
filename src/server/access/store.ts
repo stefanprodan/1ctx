@@ -109,6 +109,16 @@ export class LoginStore {
       .map(row);
   }
 
+  // the user's key logins, their ids back for the sockets behind them
+  deleteKeyLogins(userId: string): string[] {
+    return this.db
+      .query<{ id: string }, [string]>(
+        "delete from logins where user_id = ? and key_digest is not null returning id",
+      )
+      .all(userId)
+      .map((r) => r.id);
+  }
+
   deleteForUser(userId: string): number {
     return this.db.query("delete from logins where user_id = ?").run(userId)
       .changes;

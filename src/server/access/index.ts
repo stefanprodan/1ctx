@@ -5,10 +5,12 @@
 // admin keys, the links an email carries, the signed-in profile routes,
 // and admin user management.
 
-import type { Db } from "../db/index.ts";
+import type { Db, Transaction } from "../db/index.ts";
 import { after, type Clock, MINUTE_MS } from "../lib/clock.ts";
-import type { RouteDescriptor } from "../lib/http.ts";
+import type { Principal, RouteDescriptor } from "../lib/http.ts";
 import { errorFields, type Log } from "../lib/log.ts";
+import type { UserRow } from "../users/index.ts";
+import { actingWrite } from "./acting.ts";
 import { adminKeys, type KeyFilesPort } from "./admin-keys.ts";
 import {
   type Auth,
@@ -115,6 +117,13 @@ export type Access = Auth & {
   // the files that hold one key, which sign in neither
   startKeyChecks(): void;
   stopKeyChecks(): void;
+  // a write after a body, for an area built before access: its caller
+  // read again in the transaction (actingUser())
+  actingWrite<T>(
+    principal: Principal,
+    role: "admin" | null,
+    body: (user: UserRow) => Transaction<T>,
+  ): T;
   routes: RouteDescriptor[];
 };
 
@@ -123,7 +132,7 @@ export function accessArea(deps: AccessDeps): Access {
   const keys = new AccessKeyStore(deps.db);
   const visits = new VisitStore(deps.db);
   const linkStore = new LinkStore(deps.db);
-  const keyFiles = adminKeys(deps.keyFiles);
+  const keyFiles = adminKeys(deps.keyFiles, deps.log);
   const built = auth({
     db: deps.db,
     logins,
@@ -173,6 +182,19 @@ export function accessArea(deps: AccessDeps): Access {
       }
       if (stopChecks === null) checkLoop();
     },
+    actingWrite: (principal, role, body) =>
+      actingWrite(
+        {
+          db: deps.db,
+          logins,
+          users: deps.users,
+          adminKeys: keyFiles,
+          clock: deps.clock,
+        },
+        principal,
+        role,
+        body,
+      ),
     stopKeyChecks() {
       const stop = stopChecks;
       stopChecks = null;

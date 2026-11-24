@@ -28,7 +28,7 @@ import {
   type UserFields,
   type UserRow,
 } from "../users/index.ts";
-import { actingUser } from "./acting.ts";
+import { actingWrite } from "./acting.ts";
 import type { AdminKeys } from "./admin-keys.ts";
 import {
   type AccessKeyRow,
@@ -165,8 +165,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         if (invite && isPlaceholderEmail(parsed.email)) {
           throw new Conflict(PLACEHOLDER);
         }
-        const user = transact(deps.db, () => {
-          actingUser(deps, ctx.principal!, "admin");
+        const user = actingWrite(deps, ctx.principal!, "admin", () => {
           usernameAvailable(parsed.username, null);
           emailAvailable(parsed.email, null);
           const created = deps.users.createUser({
@@ -197,16 +196,19 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       async handle(req, ctx) {
         const patch = parseUserPatch(await jsonBody(req));
         const id = ctx.params.id;
-        const changed = transact(deps.db, () => {
-          actingUser(deps, ctx.principal!, "admin");
+        const changed = actingWrite(deps, ctx.principal!, "admin", () => {
           const user = find(id);
           let revokedKeys: AccessKeyRow[] = [];
+          // a key login's file follows the username, and only an admin
+          // signs in by key, so a rename or a demote ends them at once
+          let endedLogins: string[] = [];
           if (
             patch.username !== undefined &&
             patch.username !== user.username
           ) {
             usernameAvailable(patch.username, user.id);
             deps.users.setUsername(user.id, patch.username);
+            endedLogins = deps.logins.deleteKeyLogins(user.id);
           }
           if (patch.email !== undefined && patch.email !== user.email) {
             emailAvailable(patch.email, user.id);
@@ -244,6 +246,12 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             throw new Conflict("the last admin must remain enabled");
           }
           if (roleChanged) deps.users.setRole(user.id, patch.role!);
+          if (roleChanged && patch.role === "member") {
+            endedLogins = [
+              ...endedLogins,
+              ...deps.logins.deleteKeyLogins(user.id),
+            ];
+          }
           if (disabledChanged) {
             deps.users.setDisabled(user.id, patch.disabled!);
             if (patch.disabled === true) {
@@ -263,6 +271,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             result: { user: find(user.id), revokedKeys },
             events: [
               ...(roleChanged ? [accessChanged([user.id])] : []),
+              ...endedLogins.map((loginId) => loginRevoked(user.id, loginId)),
               ...(disabledChanged && patch.disabled === true
                 ? [loginRevoked(user.id, null)]
                 : []),
@@ -302,8 +311,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
         if (id === ctx.principal!.userId) {
           throw new Conflict("cannot sign yourself out everywhere");
         }
-        const ended = transact(deps.db, () => {
-          actingUser(deps, ctx.principal!, "admin");
+        const ended = actingWrite(deps, ctx.principal!, "admin", () => {
           const user = find(id);
           deps.logins.deleteForUser(user.id);
           const revokedKeys = deps.keys.deleteForUser(user.id);

@@ -6,7 +6,12 @@ import type {
   UpdateUserRequest,
 } from "../../../shared/api/users.ts";
 import type { UserAccount } from "../../../shared/contracts/user.ts";
-import { isEmail, MAX_EMAIL, type Role } from "../../../shared/words.ts";
+import {
+  isEmail,
+  isSecretName,
+  MAX_EMAIL,
+  type Role,
+} from "../../../shared/words.ts";
 import { ago } from "../../lib/format.ts";
 
 export const ROLE_CHOICES: { value: Role; label: string }[] = [
@@ -37,6 +42,21 @@ export function inviteCardWords(user: UserAccount): {
     button: "Send invite",
     sent: `Sent to ${user.email}.`,
   };
+}
+
+// why the user has no way in, or none of the admin key; null when
+// nothing stands in the way. A disabled user's card says so already
+export function signInLine(user: UserAccount, emailOn: boolean): string | null {
+  if (user.disabled) return null;
+  if (user.role === "admin") {
+    // a key file's name takes no underscore
+    return isSecretName("user-", `user-${user.username}`)
+      ? null
+      : "No admin key, as the name has _";
+  }
+  if (!emailOn) return "Not while email is off";
+  if (user.emailPlaceholder) return "Not without a real email";
+  return null;
 }
 
 // the server holds the username rule

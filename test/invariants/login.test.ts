@@ -35,6 +35,19 @@ describe("bootstrap", () => {
     },
   );
 
+  test("the first start fails naming the file when it cannot be read", async () => {
+    const secrets = Object.defineProperty({}, "user-admin", {
+      enumerable: true,
+      get() {
+        throw new Error("EACCES: permission denied");
+      },
+    });
+    const failed = await testApp({ secrets }).catch((error) => error);
+    expect(failed).toBeInstanceOf(BootstrapError);
+    expect(failed.file).toBe("user-admin.key");
+    expect(failed.reason).toBe("unreadable");
+  });
+
   test("a later start ignores the file", async () => {
     const first = await testApp();
     const again = await testApp({ db: first.db, adminKey: null });

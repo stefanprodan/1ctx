@@ -246,6 +246,8 @@ export async function compose(options: ComposeOptions): Promise<App> {
     keys: () => options.secretNames?.(EMAIL_KEY_PREFIX) ?? [],
     users,
     emailSender: options.emailSender ?? smtpSender(),
+    acting: (principal, write) =>
+      access.actingWrite(principal, "admin", () => ({ result: write() })),
   });
   // the instance's start, as the overview reports it
   const startedAt = clock();

@@ -20,7 +20,8 @@ log scrub.
   list names alone. Provider, search, MCP, `http-`, `email-` and
   `openshell-` values are scrubbed from logs, the kinds in `SCRUB_KINDS`
   in `compose.ts`. Access keys and admin keys are masked by their shape
-  (`1ctx_`, `1ctx-admin-`) in `lib/log.ts`.
+  (`1ctx_`, `1ctx-admin-`) in every string field, by `lib/log.ts`,
+  before the error's cut.
 - **The gateway's own `tls/` folder holds key material outside the
   secrets folder:** its CA key and the client key the `openshell-` files
   copy, in `.preview/openshell/tls` and on staging

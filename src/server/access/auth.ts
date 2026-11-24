@@ -64,7 +64,8 @@ export type Auth = {
   // is unknown, or it expired
   resolve(req: Request, policy: Policy): Resolution;
   // the principal again from the current user row, for a long-lived
-  // socket; null, and a key login ended, once its key no longer holds
+  // socket; null once its login is gone or expired, and a key login
+  // ended once its key no longer holds
   refresh(principal: Principal): Principal | null;
   // a new login for a user, by an admin key's hash or by email (null):
   // the row and the Set-Cookie header value
@@ -224,10 +225,18 @@ export function auth(deps: AuthDeps): Auth {
     },
     refresh(principal) {
       const via = principal.via;
-      const login = via.kind === "login" ? deps.logins.byId(via.id) : null;
-      if (login !== null && login.keyDigest !== null) {
-        const user = deps.users.byId(login.userId);
-        if (!holds(login, user)) return null;
+      if (via.kind === "login") {
+        // the socket may outlive its row, so the row decides, not the bus
+        const login = deps.logins.byId(via.id);
+        if (login === null || login.userId !== principal.userId) return null;
+        if (login.expiresAt <= deps.clock()) {
+          endLogin(login);
+          return null;
+        }
+        if (login.keyDigest !== null) {
+          const user = deps.users.byId(login.userId);
+          if (!holds(login, user)) return null;
+        }
       }
       return current(principal.userId, principal.via);
     },

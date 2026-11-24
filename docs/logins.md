@@ -51,21 +51,30 @@ keys (`access/admin-keys.ts`, `users/rules.ts`, `users/key-file.ts`,
 - **Files are read at each use, never cached,** so a key added needs no
   restart and a Kubernetes Secret swapped through its symlinks is seen
   at once. A file that cannot be read is a missing one, for its own
-  keys alone.
+  keys alone. A folder that cannot be listed holds no key: a key
+  sign-in is the one 401, `admin keys unlisted` is logged with no
+  field, and email sign-in still works.
 - **A key login keeps the key's hash** (`logins.key_digest`; a login by
   email holds null). `resolve()` and `refresh()` compare it with the
   file's current hash, and a changed, missing or unreadable file, a
   demote, a disable or a rename deletes the login and publishes
-  `login.revoked`. `actingUser()` checks the same inside the write. A
-  check of every key login runs each minute on the clock, so a socket
-  that sends nothing closes within a minute.
+  `login.revoked`. A rename or a demote deletes the user's key logins
+  in its own write; their email logins stay. `actingUser()` checks the
+  same inside a write, through `actingWrite()`, which deletes a key
+  login that no longer holds in a transaction of its own after the
+  refused write rolled back. `refresh()` needs the login's row, owned
+  by its user and unexpired, whatever the socket heard. A check of
+  every key login runs each minute on the clock, so a socket that sends
+  nothing closes within a minute.
 - **A key's file follows its username.** A secret name allows no `_`,
   so `admin-key` refuses such a username and that admin has no key.
   A rename ends the user's key logins; rename or remove the file too,
   since a later admin taking the old name would be signed in by it.
+  `--provision` always signs in as `admin`, so renaming that user
+  breaks it (`docs/provision.md`).
 - **The first admin comes from `user-admin.key`** while the users
-  table is empty. It must hold an admin key, or the first start logs
-  `admin not created` with the file and exits 1. A non-empty table
+  table is empty. It must be readable and hold an admin key, or the
+  first start logs `admin not created` with the file and exits 1. A non-empty table
   ignores the file.
 
 ## Links by email

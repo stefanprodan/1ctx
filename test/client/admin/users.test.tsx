@@ -37,6 +37,7 @@ import {
   metaLine,
   patchOf,
   roleLock,
+  signInLine,
   stateLine,
   userCounts,
   userFieldOf,
@@ -147,6 +148,28 @@ describe("the words", () => {
       ).toBe(1);
     });
   }
+});
+
+describe("what keeps a user from signing in", () => {
+  test("a member email cannot reach, and an admin with no key file name", () => {
+    expect(signInLine(casey, false)).toBe("Not while email is off");
+    expect(signInLine({ ...casey, emailPlaceholder: true }, true)).toBe(
+      "Not without a real email",
+    );
+    expect(signInLine(casey, true)).toBeNull();
+    expect(signInLine({ ...casey, disabled: true }, false)).toBeNull();
+    const ops = { ...casey, role: "admin" as const, username: "ops_lead" };
+    expect(signInLine(ops, true)).toBe("No admin key, as the name has _");
+    expect(signInLine({ ...ops, username: "ops-lead" }, false)).toBeNull();
+  });
+
+  test.serial("the user's page says it in its aside", () => {
+    users.value = [root, casey];
+    projects.value = [];
+    const html = render(<UserPage params={{ username: "casey" }} />);
+    expect(html).toContain(">Sign in<");
+    expect(html).toContain("Not while email is off");
+  });
 });
 
 describe("the email links", () => {

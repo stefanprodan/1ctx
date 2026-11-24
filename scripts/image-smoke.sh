@@ -19,11 +19,15 @@ trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true
 
 PLATFORMS='' scripts/image.sh
 
-# the server runs as 65532, which owns neither the dirs nor the files
-mkdir "$RUN/secrets" "$RUN/provision"
-# the admin-key format: the prefix and 32 random bytes as base64url
-ADMIN_KEY="1ctx-admin-$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n')"
-printf '%s\n' "$ADMIN_KEY" >"$RUN/secrets/user-admin.key"
+# the image's own admin-key, as docs/deploy.md tells an operator
+ADMIN_KEY=$(docker run --rm --read-only --cap-drop ALL --network none \
+  --security-opt no-new-privileges:true "$IMAGE" admin-key admin --stdout)
+# the server runs as 65532, which owns neither the dirs nor the files: it
+# reads them through the caller's group, added to it, never as others.
+# $RUN stays 700: the mounts never pass through it
+(umask 027 && mkdir "$RUN/secrets" "$RUN/provision" \
+  && printf '%s\n' "$ADMIN_KEY" >"$RUN/secrets/user-admin.key")
+GID=$(id -g)
 cat >"$RUN/provision/project.yaml" <<'YAML'
 apiVersion: config.1ctx.dev/v1
 kind: Project
@@ -32,12 +36,15 @@ metadata:
 spec:
   description: Applied at start.
 YAML
-chmod 755 "$RUN" "$RUN/secrets" "$RUN/provision"
-chmod 644 "$RUN/secrets/user-admin.key" "$RUN/provision/project.yaml"
+chgrp "$GID" "$RUN/secrets" "$RUN/provision" "$RUN/secrets/user-admin.key" \
+  "$RUN/provision/project.yaml"
+chmod 700 "$RUN"
+chmod 750 "$RUN/secrets" "$RUN/provision"
+chmod 640 "$RUN/secrets/user-admin.key" "$RUN/provision/project.yaml"
 
 docker volume create "$NAME" >/dev/null
 docker run -d --name "$NAME" --read-only --cap-drop ALL \
-  --security-opt no-new-privileges:true \
+  --security-opt no-new-privileges:true --group-add "$GID" \
   -v "$NAME:/data" -v "$RUN/secrets:/secrets:ro" \
   -v "$RUN/provision:/provision:ro" \
   -p "127.0.0.1:$PORT:11236" "$IMAGE" >/dev/null

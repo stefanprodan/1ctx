@@ -5,10 +5,12 @@
 // a key added or rotated needs no restart, and a Kubernetes Secret
 // swapped through its symlinks is seen at once. A file is under 100
 // bytes and read only for a key sign-in or a key login, so nothing is
-// cached. A file that cannot be read is a missing one.
+// cached. A file that cannot be read is a missing one, and a folder
+// that cannot be listed holds none.
 
 import { timingSafeEqual } from "node:crypto";
 import { sha256 } from "../lib/ids.ts";
+import type { Log } from "../lib/log.ts";
 import {
   adminKeyName,
   isAdminKey,
@@ -38,7 +40,7 @@ const sameDigest = (a: string, b: string): boolean =>
   a.length === b.length &&
   timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
 
-export function adminKeys(files: KeyFilesPort): AdminKeys {
+export function adminKeys(files: KeyFilesPort, log: Log): AdminKeys {
   const readKey = (name: string): string | null => {
     try {
       const value = files.read(name);
@@ -48,11 +50,20 @@ export function adminKeys(files: KeyFilesPort): AdminKeys {
     }
   };
   // every file's name and its key's hash, the unreadable left out
-  const digests = (): { name: string; digest: string }[] =>
-    files.list().flatMap((name) => {
+  const digests = (): { name: string; digest: string }[] => {
+    let names: string[];
+    try {
+      names = files.list();
+    } catch {
+      // the error names the folder, so only the phrase is logged
+      log.warn("admin keys unlisted");
+      return [];
+    }
+    return names.flatMap((name) => {
       const key = readKey(name);
       return key === null ? [] : [{ name, digest: sha256(key) }];
     });
+  };
   return {
     match(key) {
       if (!isAdminKey(key)) return null;

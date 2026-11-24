@@ -101,6 +101,7 @@ function setup(options: { key?: boolean; emailSender?: EmailSender } = {}) {
     keys: () => Object.keys(keys),
     users,
     emailSender,
+    acting: (_principal, write) => write(),
   });
   email.store.saveSettings(SERVER, now);
   const enqueue = (over: { subject?: string } = {}) =>

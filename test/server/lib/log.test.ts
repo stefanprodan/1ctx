@@ -149,6 +149,27 @@ describe("error fields", () => {
       "bad 1ctx-admin-short",
     ]);
   });
+
+  test("masks both key shapes in every string field, before the cut", () => {
+    const admin = `1ctx-admin-${"a".repeat(43)}`;
+    const access = `1ctx_${"b".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const keep = (_msg: string, fields?: LogFields) => {
+      lines.push(fields ?? {});
+    };
+    const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => []);
+    log.info("a", { name: admin, other: `x ${admin.slice(0, 27)} y` });
+    log.warn("a", { name: access, count: 2 });
+    log.error("a", {
+      error: `${"x".repeat(190)}${admin.slice(0, 30)}`,
+      field: admin,
+    });
+    expect(lines[0]).toEqual({ name: "[key]", other: "x [key] y" });
+    expect(lines[1]).toEqual({ name: "[key]", count: 2 });
+    expect(lines[2]?.field).toBe("[key]");
+    const line = format(at, "a", "error", "a", lines[2]);
+    expect(line).not.toContain("1ctx-admin-");
+  });
   test("keeps only source frame locations", () => {
     const error = new Error("boom");
     error.stack = [

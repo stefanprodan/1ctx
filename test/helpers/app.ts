@@ -424,6 +424,8 @@ export async function testApp(
     logFactory?: LogFactory;
     // the secrets beside user-admin.key
     secrets?: Record<string, string>;
+    // a kind whose folder cannot be listed while this says so
+    unlistable?: (kind: string) => boolean;
     // a fake tools capability for runner state-machine tests
     tools?: Tools;
     // a command worker other than the real one
@@ -520,6 +522,7 @@ export async function testApp(
       if (!SECRET_KINDS.some((known) => known === kind)) {
         throw new Error("bad secret kind");
       }
+      if (options.unlistable?.(kind)) throw new Error("EACCES: scandir");
       return names()
         .filter((name) => isSecretName(kind, name))
         .sort();

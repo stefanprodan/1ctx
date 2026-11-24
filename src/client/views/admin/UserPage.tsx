@@ -51,6 +51,7 @@ import {
   patchOf,
   ROLE_CHOICES,
   roleLock,
+  signInLine,
   tzProblem,
   userFieldOf,
   usernameProblem,
@@ -356,6 +357,7 @@ function KeysCard({ user }: { user: AdminUser }) {
 
 function Aside({ user }: { user: AdminUser }) {
   const now = useNow(60_000);
+  const blocked = signInLine(user, emailOn.value);
   return (
     <>
       {/* a team project's turns are not theirs to answer for */}
@@ -375,6 +377,7 @@ function Aside({ user }: { user: AdminUser }) {
       <AsideSection label="Account">
         <AsideLine label="Last active">{lastActive(user, now)}</AsideLine>
         <AsideLine label="Created">{dayMonthYear(user.createdAt)}</AsideLine>
+        {blocked !== null && <AsideLine label="Sign in">{blocked}</AsideLine>}
       </AsideSection>
     </>
   );

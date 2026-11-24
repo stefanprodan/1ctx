@@ -77,15 +77,19 @@ export function createUser(deps: UserDeps, fields: UserFields): UserRow {
 // nobody can sign in until this file is right, so every line names it
 const ADMIN_FILE = `${ADMIN_SECRET}.key`;
 
+const REASONS = {
+  missing: "is missing",
+  unreadable: "cannot be read",
+  "no admin key": "holds no admin key",
+} as const;
+
 // the first start cannot go on without its admin
 export class BootstrapError extends Error {
   constructor(
     readonly file: string,
-    readonly reason: "missing" | "no admin key",
+    readonly reason: "missing" | "unreadable" | "no admin key",
   ) {
-    super(
-      `${file} ${reason === "missing" ? "is missing" : "holds no admin key"}`,
-    );
+    super(`${file} ${REASONS[reason]}`);
   }
 }
 
@@ -94,7 +98,12 @@ export class BootstrapError extends Error {
 // that file, so nothing is stored. A non-empty table ignores the file.
 export function bootstrap(deps: BootstrapDeps): UserRow | null {
   if (deps.store.count() > 0) return null;
-  const key = deps.secret(ADMIN_SECRET);
+  let key: string | null;
+  try {
+    key = deps.secret(ADMIN_SECRET);
+  } catch {
+    throw new BootstrapError(ADMIN_FILE, "unreadable");
+  }
   if (key === null) throw new BootstrapError(ADMIN_FILE, "missing");
   if (!isAdminKey(key)) throw new BootstrapError(ADMIN_FILE, "no admin key");
   const user = createUser(deps, {

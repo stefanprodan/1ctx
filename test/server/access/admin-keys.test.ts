@@ -15,6 +15,7 @@ import {
   type TestClient,
   testApp,
 } from "../../helpers/app.ts";
+import { emailApp } from "../../helpers/links.ts";
 
 const key = (c: string) => `1ctx-admin-${c.repeat(43)}`;
 const OPS = key("o");
@@ -148,6 +149,34 @@ describe("signing in by key", () => {
     expect((await signIn(app.client(), ADMIN_KEY)).status).toBe(200);
   });
 
+  test("a key folder that cannot be listed is the one 401, and email still signs in", async () => {
+    // from the start, so its duplicate check meets it too
+    const e = await emailApp({ unlistable: (kind) => kind === "user-" });
+    const { app } = e;
+    try {
+      const res = await signIn(app.client(), ADMIN_KEY);
+      expect(res.status).toBe(401);
+      const unlisted = e.logs.events.filter(
+        (event) => event.msg === "admin keys unlisted",
+      );
+      expect(unlisted.length).toBeGreaterThan(0);
+      for (const event of unlisted) expect(event.fields).toEqual({});
+      const tab = app.client();
+      await tab.call("POST", "/api/login/link", {
+        body: { username: "maria" },
+      });
+      await app.linkAsks();
+      await e.send();
+      const used = await tab.call("POST", `/api/links/${e.token()}`, {
+        body: {},
+      });
+      expect(used.status).toBe(200);
+      expect(await me(tab)).toBe("maria");
+    } finally {
+      await app.shutdown();
+    }
+  });
+
   test("a sign-in ends the browser's previous login", async () => {
     const { app, admin } = await setup();
     expect(logins(app)).toBe(1);
@@ -196,6 +225,38 @@ describe("a key login ends", () => {
         .query("select count(*) as n from logins where key_digest is not null")
         .get(),
     ).toEqual({ n: 0 });
+  });
+
+  test("a rename and a demote end key logins in their write, never email ones", async () => {
+    const s = await setup();
+    const rows = (userId: string) =>
+      s.app.db
+        .query<{ key: number }, [string]>(
+          "select key_digest is not null as key from logins where user_id = ? order by key",
+        )
+        .all(userId)
+        .map((row) => row.key);
+    const byEmail = s.app.client();
+    await byEmail.signIn("ops");
+    const byKey = async () => {
+      expect((await signIn(s.app.client(), OPS)).status).toBe(200);
+      expect(rows(s.ops.id)).toEqual([0, 1]);
+    };
+    const patch = async (body: unknown) =>
+      expect(
+        (await s.admin.call("PATCH", `/api/users/${s.ops.id}`, { body }))
+          .status,
+      ).toBe(200);
+    await byKey();
+    await patch({ username: "ops2" });
+    expect(rows(s.ops.id)).toEqual([0]);
+    await patch({ username: "ops" });
+    await byKey();
+    await patch({ role: "member" });
+    expect(rows(s.ops.id)).toEqual([0]);
+    await patch({ role: "admin" });
+    expect(rows(s.ops.id)).toEqual([0]);
+    expect(await me(byEmail)).toBe("ops");
   });
 
   test("a login by email outlives a changed key file", async () => {

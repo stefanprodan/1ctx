@@ -2249,7 +2249,7 @@ describe("the schema", () => {
     }
   });
 
-  test("0092 drops the passwords and keeps every login and live link but reset and must-change ones", () => {
+  test("0092 drops the passwords and every login, link and queued link email", () => {
     const db = seed(MIGRATIONS.slice(0, 91));
     try {
       db.exec(`
@@ -2278,34 +2278,29 @@ describe("the schema", () => {
           values ('queued-reset', 'reset', 'u', 'a', 1, 'queued', 0, 1, 1),
             ('sent-reset', 'reset', 'u', 'b', 1, 'sent', 0, 1, 1),
             ('queued-signin', 'signin', 'u', 'c', 1, 'queued', 0, 1, 1),
-            ('queued-invite', 'invite', 'n', 'd', 0, 'queued', 0, 1, 1);
+            ('sent-signin', 'signin', 'u', 'f', 1, 'sent', 0, 1, 1),
+            ('queued-invite', 'invite', 'n', 'd', 0, 'queued', 0, 1, 1),
+            ('queued-notice', 'notice', 'u', 'g', 0, 'queued', 0, 1, 1);
       `);
       expect(migrate(db)).toEqual(expectedFrom("0092-admin-keys"));
       expect(hashed(db)).toBe(false);
+      // from the logins and visits before they went; null with neither
       expect(
         db.query("select id, signed_in_at from users order by id").all(),
       ).toEqual([
-        { id: "m", signed_in_at: null },
+        { id: "m", signed_in_at: 60 },
         { id: "n", signed_in_at: null },
         { id: "u", signed_in_at: 50 },
         { id: "v", signed_in_at: 70 },
       ]);
-      expect(db.query("select id, key_digest from logins").all()).toEqual([
-        { id: "lu", key_digest: null },
-      ]);
-      expect(db.query("select id from access_keys").all()).toEqual([
+      expect(db.query("select id from logins").all()).toEqual([]);
+      expect(db.query("select id from user_links").all()).toEqual([]);
+      expect(db.query("select id from access_keys order by id").all()).toEqual([
+        { id: "km" },
         { id: "ku" },
       ]);
-      expect(db.query("select id from user_links order by id").all()).toEqual([
-        { id: "invite" },
-        { id: "signin" },
-      ]);
       expect(db.query("select id from email_outbox order by id").all()).toEqual(
-        [
-          { id: "queued-invite" },
-          { id: "queued-signin" },
-          { id: "sent-reset" },
-        ],
+        [{ id: "queued-notice" }, { id: "sent-reset" }, { id: "sent-signin" }],
       );
       expect(db.query("pragma foreign_key_check").all()).toEqual([]);
       // the kind stays for the sent history

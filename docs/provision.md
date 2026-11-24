@@ -22,9 +22,9 @@ they name.
   MCP refresh runs.
 - **Provisioning needs the database to itself.** It refuses a file
   another process holds, so stop the server first.
-- **Apply signs in with `user-admin.key` as an admin key,** as the user
-  that file names, so renaming `admin` needs the file renamed with it.
-  It bootstraps that admin first when the database has none, and
+- **Apply signs in with `user-admin.key` as an admin key,** always as
+  the user `admin`, so renaming the user `admin` breaks `--provision`;
+  nothing refuses the rename. It bootstraps that admin first when the database has none, and
   reports it apart from the counted objects.
 - **`--provision` runs at every server start, before the database
   opens.** Docker Compose and Kubernetes restart the server to apply a
