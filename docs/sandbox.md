@@ -184,8 +184,8 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   so every variant keeps it. `python` is `base`; `bun` adds Bun, with
   `node` linked to `bun` (`node --version` is not answered) and `npx`
   a wrapper running `bun x`; `cc` (never pushed) adds `gcc` and `libc6-dev`, shared by
-  `go` (Go in `/usr/local/go`) and `rust` (a pinned stable toolchain
-  through `rustup-init`, minimal profile, in `/opt/home/.rustup` and
+  `go` (Go in `/usr/local/go`) and `rust` (the official image's pinned
+  stable toolchain, minimal profile, moved to `/opt/home/.rustup` and
   `/opt/home/.cargo`, owned by the sandbox user, since `/usr` is
   read-only under Landlock and HOME is the container's own disk).
   `rustup` adds a toolchain or target beside it from

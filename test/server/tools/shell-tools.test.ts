@@ -107,19 +107,20 @@ describe("bash's tools by image variant", () => {
 
   test("the versions are the Dockerfile's", async () => {
     const text = await Bun.file(DOCKERFILE).text();
-    const arg = (name: string) => {
-      const found = new RegExp(`^ARG ${name}=(\\S+)$`, "m").exec(text);
-      if (found === null) throw new Error(`no ARG ${name}`);
-      return found[1]!;
-    };
     const python = /^FROM ghcr\.io\/astral-sh\/uv:python(\d+\.\d+)-/m.exec(
       text,
     );
     expect(python?.[1]).toBe(SHELL_VERSIONS.python);
-    const minor = (version: string) => version.split(".").slice(0, 2).join(".");
-    expect(minor(arg("BUN_VERSION"))).toBe(SHELL_VERSIONS.bun);
-    expect(minor(arg("GO_VERSION"))).toBe(SHELL_VERSIONS.go);
-    expect(minor(arg("RUST_VERSION"))).toBe(SHELL_VERSIONS.rust);
+    const image = (from: string) => {
+      const found = new RegExp(`^FROM ${from}:(\\d+\\.\\d+)[.-]`, "m").exec(
+        text,
+      );
+      if (found === null) throw new Error(`no FROM ${from}`);
+      return found[1]!;
+    };
+    expect(image("oven/bun")).toBe(SHELL_VERSIONS.bun);
+    expect(image("golang")).toBe(SHELL_VERSIONS.go);
+    expect(image("rust")).toBe(SHELL_VERSIONS.rust);
     // every variant is a target, and the table has one row each
     for (const variant of SANDBOX_VARIANTS) {
       expect(text).toMatch(new RegExp(`^FROM \\S+ AS ${variant}$`, "m"));
