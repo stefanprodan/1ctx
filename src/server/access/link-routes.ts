@@ -10,10 +10,9 @@
 import type { CodeResponse } from "../../shared/api/access.ts";
 import type { Me } from "../../shared/contracts/user.ts";
 import { type Db, transact } from "../db/index.ts";
-import { BACKOFF_MS, SMTP_TIMEOUTS } from "../email/index.ts";
 import { formBody, isForm, jsonBody } from "../lib/body.ts";
 import { type BusEvent, loginRevoked } from "../lib/bus.ts";
-import type { Clock } from "../lib/clock.ts";
+import { type Clock, DAY_MS } from "../lib/clock.ts";
 import { BadRequest, NotFound } from "../lib/errors.ts";
 import {
   json,
@@ -27,22 +26,16 @@ import type { Log } from "../lib/log.ts";
 import { meOf, type UserRow } from "../users/index.ts";
 import type { Auth } from "./auth.ts";
 import { cookieValue } from "./auth.ts";
-import { LINK_TTL_MS } from "./emails.ts";
 import type { LinkStore, Used } from "./link-store.ts";
 import { codeHash, type Links } from "./links.ts";
 import { isLinkToken, parseCode, parseLinkAsk, parseLinkUse } from "./parse.ts";
 
 // the asking browser's challenge, which a code is only tried beside
 export const ASK_COOKIE = "login_ask";
-// past the email's last retry plus a code's life, so a code sent late
-// still finds the challenge it was asked beside: every wait between
-// tries, and every try at the SMTP client's longest (a wait starts once
-// its try returned)
-const TRY_MS = Object.values(SMTP_TIMEOUTS).reduce((sum, ms) => sum + ms, 0);
-export const ASK_TTL_MS =
-  BACKOFF_MS.reduce((sum, wait) => sum + wait, 0) +
-  (BACKOFF_MS.length + 1) * TRY_MS +
-  LINK_TTL_MS.signin;
+// a day, as long as its asks count: a code sent on a late retry or
+// after a queue backlog still finds it, and a code lives only its own
+// 15 minutes and 5 tries however long the challenge does
+export const ASK_TTL_MS = DAY_MS;
 // where a sign-in by link or code lands
 export const LANDING = "/";
 

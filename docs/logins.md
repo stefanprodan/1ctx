@@ -97,10 +97,9 @@ link and a six-digit code, either works once, and using one uses both.
 - **The ask binds the code to its browser.** It sets `login_ask`
   (`Path=/api/login; HttpOnly; SameSite=Lax`, Secure under
   `--secure-cookie`) holding a random challenge, kept when the browser
-  holds one; the link row keeps its hash (`ask_hash`). It lasts the
-  waits between the email's tries (`BACKOFF_MS`), each try at the SMTP
-  client's longest (`SMTP_TIMEOUTS`) and a code's 15 minutes
-  (`ASK_TTL_MS`), so a code delivered on the last retry still finds it.
+  holds one; the link row keeps its hash (`ask_hash`). It lasts a day
+  (`ASK_TTL_MS`), as long as its asks count, so a code sent on a late
+  retry or after a queue backlog still finds it.
 - **Every ask makes a new link** and leaves earlier live ones working,
   so nobody's ask blocks or kills another's. Only an unused invite is
   one per user (`user_links_invite`): a new one replaces it and its
