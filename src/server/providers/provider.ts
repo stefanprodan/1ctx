@@ -71,6 +71,7 @@ export function keyOf(
 export const noKeyFile = (row: Pick<ProviderRow, "name" | "keyName">) =>
   `${row.name} has no key file ${row.keyName}.key`;
 
+// the key and both key shapes together, so neither breaks the other
 export function scrubKey(text: string, key: string | null): string {
   return scrubValues(text, [key], "[key]");
 }

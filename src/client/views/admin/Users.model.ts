@@ -55,7 +55,11 @@ export function signInLine(user: UserAccount, emailOn: boolean): string | null {
     if (!isSecretName("user-", `user-${user.username}`)) {
       return "No admin key, as the name has _";
     }
-    return reached ? null : "Admin key needed";
+    if (reached) return null;
+    // a link already sent still works while email is off
+    return user.emailPlaceholder
+      ? "Admin key needed"
+      : "Use an existing link or an admin key";
   }
   // a link already sent still works
   if (!emailOn) return "No new links while email is off";

@@ -211,27 +211,49 @@ export const silent: Log = {
   error() {},
 };
 
-// each value replaced by mark, the longest first, so a value inside
-// another never leaves the longer one's rest
+// an access key is a row, never a key file, so its shape is masked; an
+// admin key by its prefix, so a cut one is masked too
+const KEY_SHAPES = [
+  /1ctx_[A-Za-z0-9_-]{43}/g,
+  /1ctx-admin-[A-Za-z0-9_-]{16,}/g,
+];
+
+// every key shape and every occurrence of each value, all found on the
+// original text and overlaps merged, each range replaced by mark once:
+// masking one first could break the other's match and leave its rest
 export function scrubValues(
   text: string,
   values: Iterable<string | null>,
   mark: string,
 ): string {
-  const found = [...values].filter((value): value is string => !!value);
-  let out = text;
-  for (const value of found.sort((a, b) => b.length - a.length)) {
-    out = out.replaceAll(value, mark);
+  const ranges: [number, number][] = [];
+  for (const shape of KEY_SHAPES) {
+    for (const found of text.matchAll(shape)) {
+      ranges.push([found.index, found.index + found[0].length]);
+    }
   }
-  return out;
+  for (const value of values) {
+    if (!value) continue;
+    for (let at = text.indexOf(value); at !== -1; ) {
+      ranges.push([at, at + value.length]);
+      at = text.indexOf(value, at + 1);
+    }
+  }
+  if (ranges.length === 0) return text;
+  ranges.sort((x, y) => x[0] - y[0]);
+  let out = "";
+  let from = 0;
+  for (let i = 0; i < ranges.length; ) {
+    const start = ranges[i]![0];
+    let end = ranges[i]![1];
+    for (i++; i < ranges.length && ranges[i]![0] < end; i++) {
+      end = Math.max(end, ranges[i]![1]);
+    }
+    out += text.slice(from, start) + mark;
+    from = end;
+  }
+  return out + text.slice(from);
 }
-
-// an access key is a row, never a key file, so its shape is masked; an
-// admin key by its prefix, so a cut one is masked too
-const maskKeys = (text: string): string =>
-  text
-    .replace(/1ctx_[A-Za-z0-9_-]{43}/g, "[key]")
-    .replace(/1ctx-admin-[A-Za-z0-9_-]{16,}/g, "[key]");
 
 // key files' values are scrubbed from the error, the one field that
 // carries outside text; both key shapes from every string field
@@ -243,10 +265,9 @@ export function scrubErrors(log: Log, values: () => string[]): Log {
       if (typeof value !== "string") {
         out[key] = value;
       } else if (key === "error") {
-        // shapes first: a scrubbed value inside a key would break its shape
-        out[key] = cut(scrubValues(maskKeys(value), values(), "[key]"));
+        out[key] = cut(scrubValues(value, values(), "[key]"));
       } else {
-        out[key] = maskKeys(value);
+        out[key] = scrubValues(value, [], "[key]");
       }
     }
     return out;

@@ -21,7 +21,10 @@ log scrub.
   `openshell-` values are scrubbed from logs, the kinds in `SCRUB_KINDS`
   in `compose.ts`. Access keys and admin keys are masked by their shape
   (`1ctx_`, `1ctx-admin-`) in every string field, by `lib/log.ts`,
-  before the error's cut.
+  before the error's cut. `scrubValues()` finds the shapes and the
+  scrubbed values on the same text and replaces each merged range
+  once, so a value inside a key, or a key inside a value, leaves
+  nothing behind; every scrub before a log line goes through it.
 - **The gateway's own `tls/` folder holds key material outside the
   secrets folder:** its CA key and the client key the `openshell-` files
   copy, in `.preview/openshell/tls` and on staging

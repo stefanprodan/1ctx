@@ -26,7 +26,16 @@ function area() {
   const socket = socketArea({
     version: "test",
     log: silent,
-    refresh: (principal: Principal) => (state.signedIn ? principal : null),
+    // as the real refresh does: the ended login is published before the
+    // null comes back, so the socket hears of it twice
+    refresh: (principal: Principal) => {
+      if (state.signedIn) return principal;
+      publish({
+        type: "login.revoked",
+        data: { userId: principal.userId, loginId: null },
+      });
+      return null;
+    },
     visibleProjectIds: () => (state.signedIn ? ["p"] : null),
     sessionProject: () => "p",
     live: () => [],
@@ -54,6 +63,7 @@ test.serial(
     state.signedIn = false;
     socket.message(conn, JSON.stringify({ type: "unwatch", sessionId: "s" }));
     expect(conn.closed.map((c) => c.code)).toEqual([CLOSE_REVOKED]);
+    expect(socket.size()).toBe(0);
     socket.stream("s", frame);
     publish({
       type: "login.revoked",
@@ -70,10 +80,8 @@ test.serial(
     const { socket, conn, state } = area();
     state.signedIn = false;
     publish({ type: "access.changed", data: { userIds: ["u-revoke"] } });
-    publish({
-      type: "login.revoked",
-      data: { userId: "u-revoke", loginId: null },
-    });
+    expect(conn.closed.map((c) => c.code)).toEqual([CLOSE_REVOKED]);
+    expect(socket.size()).toBe(0);
     socket.stream("s", frame);
     expect(conn.frames).toEqual([]);
     expect(conn.closed.map((c) => c.code)).toEqual([CLOSE_REVOKED]);

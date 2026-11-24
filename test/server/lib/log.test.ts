@@ -9,6 +9,7 @@ import {
   type LogFields,
   scrubErrors,
 } from "../../../src/server/lib/log.ts";
+import { scrubKey } from "../../../src/server/providers/provider.ts";
 
 const at = new Date("2026-09-21T22:39:12.345Z");
 
@@ -167,6 +168,34 @@ describe("error fields", () => {
       { name: "[key]", count: 2 },
       { error: `${"x".repeat(190)}[key]`, field: "[key]" },
     ]);
+  });
+
+  test("a value holding a whole access key is scrubbed whole", () => {
+    const token = `1ctx_${"t".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const keep = (_msg: string, fields?: LogFields) => {
+      lines.push(fields ?? {});
+    };
+    const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => [
+      `${token}-private`,
+    ]);
+    log.error("a", { error: `bad ${token}-private end` });
+    expect(lines).toEqual([{ error: "bad [key] end" }]);
+  });
+
+  test("a provider's scrubbed message keeps an admin key's shape for the log", () => {
+    const admin = `1ctx-admin-${"a".repeat(43)}`;
+    const message = scrubKey(`prov did not answer: ${admin}`, "admin");
+    expect(message).toBe("prov did not answer: [key]");
+    const lines: LogFields[] = [];
+    const keep = (_msg: string, fields?: LogFields) => {
+      lines.push(fields ?? {});
+    };
+    const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => [
+      "admin",
+    ]);
+    log.error("a", errorFields(new Error(message), false));
+    expect(format(at, "a", "error", "a", lines[0])).not.toContain("aaaa");
   });
 
   test("masks a key's shape before a scrubbed value can break it", () => {

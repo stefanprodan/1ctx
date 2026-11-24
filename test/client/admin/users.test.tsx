@@ -161,7 +161,10 @@ describe("what keeps a user from signing in", () => {
     expect(signInLine({ ...casey, disabled: true }, false)).toBeNull();
     const ops = { ...casey, role: "admin" as const, username: "ops-lead" };
     expect(signInLine(ops, true)).toBeNull();
-    expect(signInLine(ops, false)).toBe("Admin key needed");
+    expect(signInLine(ops, false)).toBe("Use an existing link or an admin key");
+    expect(signInLine({ ...ops, emailPlaceholder: true }, false)).toBe(
+      "Admin key needed",
+    );
     expect(signInLine({ ...ops, emailPlaceholder: true }, true)).toBe(
       "Admin key needed",
     );
