@@ -101,8 +101,9 @@ router and the socket). Logins, admin keys and links by email are
 - **A disable deletes every login of the user,** by key or by email,
   their keys, passkeys and live links, keeping their work, so their next request
   gets 401, and so does one of the writes above already admitted.
-- **A demote ends only key logins.** The demoted admin's key login is
-  gone at the demote (401); their login by email survives, so their
+- **A demote ends only key logins** and the passkeys added from one.
+  The demoted admin's key login is gone at the demote (401); their
+  login by email and its passkeys survive, so their
   next admin request gets 403, and so does one of the admin-only
   writes above already admitted.
 - **An admin cannot demote, disable, sign out everywhere or invite
