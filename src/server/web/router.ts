@@ -9,6 +9,7 @@ import { LOGIN_COOKIE } from "../access/index.ts";
 import { BadRequest, HttpError, TooManyRequests } from "../lib/errors.ts";
 import {
   json,
+  loginOf,
   MAX_IDLE_SECONDS,
   type Method,
   type Policy,
@@ -52,6 +53,8 @@ export type RouterDeps = {
   // behind a TLS-terminating proxy the request arrives as http; the
   // proxy's X-Forwarded-Proto says what the browser saw
   trustProxy: boolean;
+  // whether a login's row is still there; none takes every one as held
+  held?: (loginId: string) => boolean;
   log: Log;
 };
 
@@ -303,9 +306,13 @@ export function router(deps: RouterDeps): Router {
       if (res === undefined) return undefined;
       // the row already moved, so the browser's copy must move with it
       // whatever the answer was, unless the handler replaced the login
-      // cookie; a handler's other cookie rides beside it
+      // cookie or a write meanwhile ended the login (a sign-in racing
+      // in the same browser); a handler's other cookie rides beside it
+      const renewed =
+        resolution.principal === null ? null : loginOf(resolution.principal);
       if (
         resolution.setCookie !== null &&
+        (renewed === null || deps.held === undefined || deps.held(renewed)) &&
         !res.headers
           .getSetCookie()
           .some((cookie) => cookie.startsWith(`${LOGIN_COOKIE}=`))

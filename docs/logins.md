@@ -16,8 +16,9 @@ keys (`access/admin-keys.ts`, `users/rules.ts`, `users/key-file.ts`,
 - **A touched login re-sends its cookie on every answer.** Past an hour
   since the last touch the resolver moves the row's expiry, and the
   router sets the cookie with a full Max-Age on any answer, errors
-  included, unless the handler set `login` itself; another cookie the
-  handler sets rides beside it.
+  included, unless the handler set `login` itself or the login's row
+  is gone by then (a sign-in racing in the same browser ended it,
+  `held()`); another cookie the handler sets rides beside it.
 - **Every sign-in ends the browser's previous login** and publishes its
   `login.revoked`. Each opened login sets `users.signed_in_at`.
 - **Login is rate limited per address.** A key sign-in, a link ask, a
@@ -94,9 +95,11 @@ link and a six-digit code, either works once, and using one uses both.
   nothing. A bad address is a 400; only the login limit answers 429.
   Only an enabled user with a real address gets a link.
 - **The ask binds the code to its browser.** It sets `login_ask`
-  (15 minutes, `Path=/api/login; HttpOnly; SameSite=Lax`, Secure under
+  (`Path=/api/login; HttpOnly; SameSite=Lax`, Secure under
   `--secure-cookie`) holding a random challenge, kept when the browser
-  holds one; the link row keeps its hash (`ask_hash`).
+  holds one; the link row keeps its hash (`ask_hash`). It lasts the
+  email's retries (`BACKOFF_MS`) plus a code's 15 minutes
+  (`ASK_TTL_MS`), so a code delivered on the last retry still finds it.
 - **Every ask makes a new link** and leaves earlier live ones working,
   so nobody's ask blocks or kills another's. Only an unused invite is
   one per user (`user_links_invite`): a new one replaces it and its

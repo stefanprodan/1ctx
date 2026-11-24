@@ -8,6 +8,8 @@
 // beside the browser that asked, and a link or its code works once.
 
 import { describe, expect, test } from "bun:test";
+import { TOUCH_AFTER_MS } from "../../../src/server/access/index.ts";
+import { ASK_TTL_MS } from "../../../src/server/access/link-routes.ts";
 import {
   ASKS_PER_CHALLENGE_HOUR,
   ASKS_PER_HOUR,
@@ -15,7 +17,7 @@ import {
   ASKS_PER_USER_DAY,
 } from "../../../src/server/email/index.ts";
 import { DAY_MS, HOUR_MS } from "../../../src/server/lib/clock.ts";
-import { ADMIN_KEY, type TestClient } from "../../helpers/app.ts";
+import { ADMIN_KEY, ORIGIN, type TestClient } from "../../helpers/app.ts";
 import { type EmailApp, emailApp, SMTP } from "../../helpers/links.ts";
 
 const MINUTE = 60_000;
@@ -36,8 +38,7 @@ async function shown(res: Response) {
 const ASKED = {
   status: 202,
   body: "",
-  cookie:
-    "login_ask=<challenge>; Path=/api/login; HttpOnly; SameSite=Lax; Max-Age=900",
+  cookie: `login_ask=<challenge>; Path=/api/login; HttpOnly; SameSite=Lax; Max-Age=${ASK_TTL_MS / 1000}`,
   type: null,
 };
 
@@ -208,6 +209,101 @@ describe("asking for a code", () => {
     expect(e.live(token)).toBe(false);
     expect((await e.sendCode(tab, code)).status).toBe(401);
     await e.app.shutdown();
+  });
+
+  test("a miss counts on every link of its challenge, and the fifth kills them all", async () => {
+    const e = await emailApp();
+    const tab = browser(e);
+    const codes: string[] = [];
+    for (const client of [tab, tab, browser(e)]) {
+      await e.ask(client);
+      await e.app.linkAsks();
+      await e.send();
+      codes.push(e.code());
+    }
+    let wrong = "000000";
+    while (codes.includes(wrong))
+      wrong = String(Number(wrong) + 1).padStart(6, "0");
+    for (let i = 0; i < 4; i++) {
+      expect((await e.sendCode(tab, wrong)).status).toBe(401);
+      expect(rows(e).map((link) => link.code_tries)).toEqual([i + 1, i + 1, 0]);
+    }
+    expect((await e.sendCode(tab, wrong)).status).toBe(401);
+    expect(rows(e)).toEqual([
+      { purpose: "signin", code_tries: 5, used: 1 },
+      { purpose: "signin", code_tries: 5, used: 1 },
+      { purpose: "signin", code_tries: 0, used: 0 },
+    ]);
+    // the other challenge's link is the control: untouched and live
+    expect((await e.sendCode(tab, codes[0]!)).status).toBe(401);
+    expect((await e.sendCode(tab, codes[1]!)).status).toBe(401);
+    expect(e.live(e.token())).toBe(true);
+    await e.app.shutdown();
+  });
+
+  test("a code sent on the email's last retry still finds its challenge", async () => {
+    const e = await emailApp();
+    const { app } = e;
+    const tab = browser(e);
+    await e.ask(tab);
+    await app.linkAsks();
+    // three tries fail; the fourth, 36 minutes on, is delivered
+    app.emailSender.result = "timeout";
+    for (const wait of [0, 1, 5, 30]) {
+      app.now.value += wait * MINUTE;
+      if (wait === 30) app.emailSender.result = "sent";
+      expect(await e.send()).toBe(1);
+    }
+    // late in the code's own 15 minutes, the cookie is still held
+    app.now.value += 14 * MINUTE;
+    expect((await e.sendCode(tab, e.code())).status).toBe(200);
+    await app.shutdown();
+  });
+
+  test("a renewal is not sent for a login a racing sign-in ended", async () => {
+    const e = await emailApp();
+    const { app } = e;
+    const tab = browser(e);
+    expect((await tab.signIn("admin")).status).toBe(200);
+    const old = tab.cookie!;
+    // the login is due its renewal, and maria asks in this browser
+    app.now.value += TOUCH_AFTER_MS + MINUTE;
+    const asker = browser(e);
+    await e.ask(asker);
+    await app.linkAsks();
+    await e.send();
+    asker.cookie = old;
+    // the link's form: resolved (renewal pending) before its body lands
+    let release = () => {};
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        release = () => controller.close();
+      },
+    });
+    const link = app.handle(
+      new Request(`${ORIGIN}/api/links/${e.token()}`, {
+        method: "POST",
+        headers: {
+          host: "1ctx.test",
+          origin: "null",
+          "sec-fetch-site": "same-origin",
+          "content-type": "application/x-www-form-urlencoded",
+          cookie: old,
+        },
+        body,
+      }),
+      "10.250.0.1",
+    );
+    // the code wins, ending the old login
+    const code = await e.sendCode(asker, e.code());
+    expect(code.status).toBe(200);
+    release();
+    const lost = (await link)!;
+    expect(lost.status).toBe(404);
+    expect(
+      lost.headers.getSetCookie().filter((c) => c.startsWith("login=")),
+    ).toEqual([]);
+    await app.shutdown();
   });
 
   test("a wrong code, another address, no challenge and a bad body are one 401", async () => {
@@ -819,7 +915,9 @@ describe("the link page", () => {
     expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
     expect(res.headers.get("referrer-policy")).toBe("no-referrer");
     expect(res.headers.get("set-cookie")).toMatch(
-      /^login_ask=[A-Za-z0-9_-]{43}; Path=\/api\/login; HttpOnly; SameSite=Lax; Max-Age=900$/,
+      new RegExp(
+        `^login_ask=[A-Za-z0-9_-]{43}; Path=/api/login; HttpOnly; SameSite=Lax; Max-Age=${ASK_TTL_MS / 1000}$`,
+      ),
     );
     const html = await res.text();
     expect(html).toContain("Check your email.");

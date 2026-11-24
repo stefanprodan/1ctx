@@ -190,12 +190,18 @@ describe("expiry", () => {
     expect((await client.call("GET", "/api/me")).status).toBe(200);
     app.now.value += LOGIN_TTL_MS - 1000;
     expect((await client.call("GET", "/api/me")).status).toBe(200);
+    const kept = client.cookie;
     app.now.value += LOGIN_TTL_MS;
+    // the browser drops the cookie at its Max-Age
     expect(await (await client.call("GET", "/api/me")).json()).toEqual({
       user: null,
       emailOn: false,
       dictationOn: false,
     });
+    // one sent anyway finds the login expired, and ends it
+    const stale = app.client();
+    stale.cookie = kept;
+    expect((await (await stale.call("GET", "/api/me")).json()).user).toBeNull();
     expect(app.db.query("select count(*) as n from logins").get()).toEqual({
       n: 0,
     });

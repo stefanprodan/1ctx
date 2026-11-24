@@ -59,6 +59,9 @@ export type Resolution = {
 };
 
 export type Auth = {
+  // whether the login's row is still there, so a renewal resolved
+  // before a write that ended it is not sent
+  held(loginId: string): boolean;
   // the route's policy picks the credential: the bearer under key, the
   // cookie under every other. A null principal when there is none, it
   // is unknown, or it expired
@@ -240,6 +243,7 @@ export function auth(deps: AuthDeps): Auth {
       }
       return current(principal.userId, principal.via);
     },
+    held: (loginId) => deps.logins.byId(loginId) !== null,
     open(user, keyDigest) {
       const now = deps.clock();
       const token = newToken();

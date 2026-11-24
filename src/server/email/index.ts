@@ -62,6 +62,7 @@ export {
   ASKS_PER_HOUR,
   ASKS_PER_INBOX_DAY,
   ASKS_PER_USER_DAY,
+  BACKOFF_MS,
   type DropWord,
   EMAIL_KINDS,
   type EmailKind,

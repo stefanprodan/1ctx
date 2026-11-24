@@ -915,6 +915,7 @@ export async function compose(options: ComposeOptions): Promise<App> {
   const handle = router({
     routes,
     resolve: (req, policy) => access.resolve(req, policy),
+    held: (loginId) => access.held(loginId),
     trustProxy: options.trustProxy,
     log: log("router"),
   });

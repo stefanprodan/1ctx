@@ -563,7 +563,11 @@ export async function testApp(
     emailSender,
     client(address = "127.0.0.1") {
       // by name and path, as a browser keeps them
-      const jar = new Map<string, { path: string; pair: string }>();
+      // a cookie with Max-Age goes once the fake clock passes it
+      const jar = new Map<
+        string,
+        { path: string; pair: string; expires?: number }
+      >();
       const LOGIN = "login /";
       const client: TestClient = {
         get cookie() {
@@ -580,6 +584,11 @@ export async function testApp(
             headers.set("origin", opts.origin ?? ORIGIN);
           }
           const pathname = path.split("?")[0]!;
+          for (const [key, c] of jar) {
+            if (c.expires !== undefined && c.expires <= current) {
+              jar.delete(key);
+            }
+          }
           const sent = [...jar.values()]
             .filter(
               (c) =>
@@ -626,9 +635,20 @@ export async function testApp(
                 .find((attr) => attr.toLowerCase().startsWith("path="))
                 ?.slice(5) ?? "/";
             const gone = attrs.some((attr) => /^max-age=0$/i.test(attr));
+            const maxAge = attrs
+              .find((attr) => /^max-age=\d+$/i.test(attr))
+              ?.slice(8);
             const key = `${name} ${at}`;
             if (value === "" || gone) jar.delete(key);
-            else jar.set(key, { path: at, pair: `${name}=${value}` });
+            else {
+              jar.set(key, {
+                path: at,
+                pair: `${name}=${value}`,
+                ...(maxAge === undefined
+                  ? {}
+                  : { expires: current + Number(maxAge) * 1000 }),
+              });
+            }
           }
           return res;
         },
