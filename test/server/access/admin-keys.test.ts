@@ -326,7 +326,7 @@ describe("a key login ends", () => {
     expect(logins(s.app)).toBe(1);
     expect(
       s.logs.events.find((e) => e.msg === "key logins ended")?.fields,
-    ).toEqual({ logins: 1 });
+    ).toEqual({ logins: 1, passkeys: 0 });
     s.app.socket.dispose();
   });
 });

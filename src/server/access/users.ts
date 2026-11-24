@@ -37,6 +37,7 @@ import {
 } from "./key-store.ts";
 import type { Links } from "./links.ts";
 import { parseNewUser, parseUserPatch } from "./parse.ts";
+import type { PasskeyStore } from "./passkeys/store.ts";
 import type { LoginStore } from "./store.ts";
 import type { TaskClaimsPort } from "./task-claims.ts";
 import type { VisitStore } from "./visits.ts";
@@ -81,6 +82,7 @@ export type UsersRoutesDeps = {
   // a placeholder address is shown only while email is on
   email: { enabled(): boolean };
   links: Pick<Links, "invite" | "revoke">;
+  passkeys: Pick<PasskeyStore, "deleteForUser">;
 };
 
 const NO_EMAIL = "email is not set up";
@@ -258,6 +260,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
               deps.logins.deleteForUser(user.id);
               revokedKeys = deps.keys.deleteForUser(user.id);
               deps.links.revoke(user.id);
+              deps.passkeys.deleteForUser(user.id);
             }
           }
           let lostProjects: string[] = [];
@@ -301,8 +304,9 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       },
     },
     {
-      // every way in the user holds ends: logins, live links and access
-      // keys, the keys since a stolen login can mint one
+      // every way in the user holds ends: logins, live links, passkeys
+      // and access keys, the passkeys and keys since a stolen login can
+      // add one
       method: "POST",
       path: "/api/users/:id/sign-out",
       policy: "admin",
@@ -316,6 +320,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           deps.logins.deleteForUser(user.id);
           const revokedKeys = deps.keys.deleteForUser(user.id);
           deps.links.revoke(user.id);
+          deps.passkeys.deleteForUser(user.id);
           return {
             result: { user, revokedKeys },
             events: [

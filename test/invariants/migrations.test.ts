@@ -106,6 +106,7 @@ const EXPECTED_IDS = [
   "0091-project-variant",
   "0092-admin-keys",
   "0093-email-codes",
+  "0094-passkeys",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -2429,6 +2430,77 @@ describe("the schema", () => {
           "delete from user_links where expires_at <= ?",
           [0],
           "user_links_expiry (expires_at<?)",
+        ],
+      ];
+      for (const [sql, args, index] of searched) {
+        expect(plans(sql, ...args)).toContain(index);
+      }
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0094 adds passkeys and their challenges, gone with their user and login", () => {
+    const db = seed(MIGRATIONS.slice(0, 93));
+    try {
+      expect(migrate(db)).toEqual(expectedFrom("0094-passkeys"));
+      db.exec(`
+        insert into logins (id, user_id, token_hash, created_at,
+            last_seen_at, expires_at)
+          values ('l', 'u', 'h', 1, 1, 900);
+        insert into passkeys (id, user_id, rp_id, origin, credential_id,
+            public_key, alg, sign_count, transports, device, created_at)
+          values ('pk', 'u', '1ctx.test', 'https://1ctx.test', 'c',
+            x'00', -7, 0, '[]', 'Passkey', 1);
+        insert into passkey_challenges (id, challenge_hash, purpose,
+            login_id, rp_id, origin, expires_at)
+          values ('a', 'ha', 'add', 'l', '1ctx.test', 'https://1ctx.test', 9),
+            ('s', 'hs', 'sign_in', null, '1ctx.test', 'https://1ctx.test', 9);
+      `);
+      // ES256 and RS256 only; an add names its login and a sign-in none
+      const refused = [
+        `insert into passkeys (id, user_id, rp_id, origin, credential_id,
+           public_key, alg, sign_count, transports, device, created_at)
+         values ('p2', 'u', 'r', 'o', 'c2', x'00', -8, 0, '[]', 'P', 1)`,
+        `insert into passkeys (id, user_id, rp_id, origin, credential_id,
+           public_key, alg, sign_count, transports, device, created_at)
+         values ('p3', 'u', 'r', 'o', 'c', x'00', -7, 0, '[]', 'P', 1)`,
+        `insert into passkey_challenges (id, challenge_hash, purpose,
+           login_id, rp_id, origin, expires_at)
+         values ('x', 'hx', 'add', null, 'r', 'o', 9)`,
+        `insert into passkey_challenges (id, challenge_hash, purpose,
+           login_id, rp_id, origin, expires_at)
+         values ('y', 'hy', 'sign_in', 'l', 'r', 'o', 9)`,
+      ];
+      for (const sql of refused) expect(() => db.exec(sql)).toThrow();
+      db.exec("delete from logins where id = 'l'");
+      expect(
+        db.query("select id from passkey_challenges order by id").all(),
+      ).toEqual([{ id: "s" }]);
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      const plans = (sql: string, ...args: (string | number)[]) =>
+        db
+          .query<{ detail: string }, (string | number)[]>(
+            `explain query plan ${sql}`,
+          )
+          .all(...args)
+          .map((row) => row.detail)
+          .join(" | ");
+      const searched: [string, (string | number)[], string][] = [
+        [
+          "select * from passkeys where user_id = ? order by created_at, id",
+          ["u"],
+          "passkeys_user (user_id=?)",
+        ],
+        [
+          "select * from passkeys where key_digest is not null",
+          [],
+          "passkeys_key",
+        ],
+        [
+          "delete from passkey_challenges where expires_at <= ?",
+          [0],
+          "passkey_challenges_expiry (expires_at<?)",
         ],
       ];
       for (const [sql, args, index] of searched) {
@@ -5009,6 +5081,7 @@ describe("project channel migrations", () => {
       "0091-project-variant",
       "0092-admin-keys",
       "0093-email-codes",
+      "0094-passkeys",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -5239,6 +5312,7 @@ describe("project channel migrations", () => {
           "0091-project-variant",
           "0092-admin-keys",
           "0093-email-codes",
+          "0094-passkeys",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5418,6 +5492,7 @@ describe("project channel migrations", () => {
         "0091-project-variant",
         "0092-admin-keys",
         "0093-email-codes",
+        "0094-passkeys",
       ]);
       expect(
         db

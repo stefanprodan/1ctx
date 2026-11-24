@@ -44,3 +44,31 @@ export type AccessBoardResponse = {
   recent: AccessRecent[];
   activeProjectIds: string[];
 };
+
+// POST /api/login/passkey/options: the browser's get() options as
+// PublicKeyCredentialRequestOptionsJSON; discoverable, so no user is
+// named before the tap
+export type PasskeyRequestOptions = {
+  challenge: string;
+  rpId: string;
+  timeout: number;
+  userVerification: "required";
+  allowCredentials: [];
+};
+
+// POST /api/login/passkey: the credential's toJSON(). Every refusal is
+// one 401, but a passkey this server holds no row for carries this
+// code, so the page can ask the browser to forget it
+export type PasskeyAssertion = {
+  id: string;
+  rawId: string;
+  type: "public-key";
+  response: {
+    clientDataJSON: string;
+    authenticatorData: string;
+    signature: string;
+    userHandle: string | null;
+  };
+};
+export const UNKNOWN_PASSKEY = "unknown_passkey";
+export type PasskeySignInResponse = { user: Me; landing: string };

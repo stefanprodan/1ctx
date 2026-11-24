@@ -18,6 +18,7 @@ import { daysWindow } from "../usage/index.ts";
 import type { UserRow } from "../users/index.ts";
 import { type AdminKeys, loginHolds } from "./admin-keys.ts";
 import { type AccessKeyStore, keyAvailable, keysEnabled } from "./key-store.ts";
+import type { PasskeyStore } from "./passkeys/store.ts";
 import type { Login, LoginStore } from "./store.ts";
 import type { VisitStore } from "./visits.ts";
 
@@ -46,6 +47,7 @@ export type AuthDeps = {
   users: UsersPort;
   projects: ProjectsPort;
   adminKeys: AdminKeys;
+  passkeys: Pick<PasskeyStore, "keyPasskeys" | "delete">;
   clock: Clock;
   // the Secure attribute: on when the app is served over TLS
   secureCookie: boolean;
@@ -81,8 +83,9 @@ export type Auth = {
   // drop the rows whose expiry passed, telling the socket layer about
   // each; how many went
   sweep(): number;
-  // end every key login whose key no longer holds; how many went
-  checkKeyLogins(): number;
+  // end every key login, and delete every passkey added from one, whose
+  // key no longer holds; how many went
+  checkKeyLogins(): { logins: number; passkeys: number };
   // the project, when the principal may see it; the same 404 whether it
   // is not there or is not theirs to see, so neither leaks
   project(principal: Principal, id: string): ProjectRow;
@@ -271,26 +274,31 @@ export function auth(deps: AuthDeps): Auth {
       });
     },
     checkKeyLogins() {
-      // one file read per user, however many logins they hold
+      // one file read per user, however many logins and passkeys they hold
       const digests = new Map<string, string | null>();
-      const ended = deps.logins.keyLogins().filter((login) => {
-        const user = deps.users.byId(login.userId);
-        if (user === null) return true;
-        const keys = {
-          digestOf: (username: string) => {
-            if (!digests.has(username)) {
-              digests.set(username, deps.adminKeys.digestOf(username));
-            }
-            return digests.get(username)!;
-          },
-        };
-        return !loginHolds(keys, login, user);
-      });
-      if (ended.length === 0) return 0;
+      const keys = {
+        digestOf: (username: string) => {
+          if (!digests.has(username)) {
+            digests.set(username, deps.adminKeys.digestOf(username));
+          }
+          return digests.get(username)!;
+        },
+      };
+      const dead = (held: { userId: string; keyDigest: string | null }) => {
+        const user = deps.users.byId(held.userId);
+        return user === null || !loginHolds(keys, held, user);
+      };
+      const ended = deps.logins.keyLogins().filter(dead);
+      // a passkey added from a key login ends with that key, as the login
+      const passkeys = deps.passkeys.keyPasskeys().filter(dead);
+      if (ended.length === 0 && passkeys.length === 0) {
+        return { logins: 0, passkeys: 0 };
+      }
       return transact(deps.db, () => {
         for (const login of ended) deps.logins.delete(login.id);
+        deps.passkeys.delete(passkeys.map((p) => p.id));
         return {
-          result: ended.length,
+          result: { logins: ended.length, passkeys: passkeys.length },
           events: ended.map((login) => loginRevoked(login.userId, login.id)),
         };
       });

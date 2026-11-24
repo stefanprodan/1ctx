@@ -30,6 +30,9 @@ import { RateLimit } from "./ratelimit.ts";
 
 export const LOGIN_LIMIT = 10;
 export const LOGIN_WINDOW_MS = MINUTE_MS;
+// passkey options, per address in the same window: a sign-in page keeps
+// them fresh, so they never spend the sign-in limit
+export const OPTIONS_LIMIT = 60;
 
 const meOfPrincipal = (p: Principal): Me => ({
   id: p.userId,
@@ -59,12 +62,13 @@ export type RoutesDeps = {
 export type DictationPort = { enabled(): boolean };
 
 // the per-address limit of every sign-in route: a login, an ask for a
-// link and a link used share one window
+// link, a code, a link used and a passkey answer share one window
 export function loginGuard(
   clock: Clock,
   log: Log,
+  hits = LOGIN_LIMIT,
 ): (ctx: RouteContext) => void {
-  const limit = new RateLimit(LOGIN_LIMIT, LOGIN_WINDOW_MS);
+  const limit = new RateLimit(hits, LOGIN_WINDOW_MS);
   return (ctx) => {
     if (limit.hit(ctx.address, clock())) return;
     if (limit.closed(ctx.address)) {

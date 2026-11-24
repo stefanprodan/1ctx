@@ -42,3 +42,61 @@ export type CreateAccessKeyRequest = {
 export type CreateAccessKeyResponse = { key: AccessKey; token: string };
 
 // DELETE /api/profile/keys/:id revokes one; 204
+
+// one of the user's passkeys: its provider's name (device), the origin
+// it was added at and signs in at, and its credential id, by which the
+// page asks the browser to forget a removed one
+export type Passkey = {
+  id: string;
+  credentialId: string;
+  origin: string;
+  device: string;
+  createdAt: number;
+  // null until it signs in
+  lastUsedAt: number | null;
+};
+
+// GET /api/profile/passkeys: every passkey of the user, at every origin,
+// oldest first
+export type PasskeysResponse = { passkeys: Passkey[] };
+
+type CredentialDescriptor = {
+  type: "public-key";
+  id: string;
+  transports: string[];
+};
+
+// POST /api/profile/passkeys/options: the browser's create() options as
+// PublicKeyCredentialCreationOptionsJSON; byte fields are base64url.
+// excludeCredentials holds the user's passkeys of this host. A 409 at
+// the cap
+export type PasskeyCreationOptions = {
+  challenge: string;
+  rp: { id: string; name: string };
+  user: { id: string; name: string; displayName: string };
+  pubKeyCredParams: { type: "public-key"; alg: number }[];
+  timeout: number;
+  attestation: "none";
+  authenticatorSelection: {
+    residentKey: "required";
+    requireResidentKey: true;
+    userVerification: "required";
+  };
+  excludeCredentials: CredentialDescriptor[];
+};
+
+// POST /api/profile/passkeys: the new credential's toJSON(), answered
+// 201 with its Passkey; a refused answer is a 400, a credential held
+// already or the cap a 409
+export type PasskeyRegistration = {
+  id: string;
+  rawId: string;
+  type: "public-key";
+  response: {
+    clientDataJSON: string;
+    authenticatorData: string;
+    publicKey: string;
+    publicKeyAlgorithm: number;
+    transports?: string[];
+  };
+};

@@ -156,7 +156,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
 | `docs/access.md` | requests and the router, access keys, users, names, project visibility, the socket |
-| `docs/logins.md` | signing in: the login cookie, admin keys and `1ctx admin-key`, links and codes by email, the link page |
+| `docs/logins.md` | signing in: the login cookie, admin keys and `1ctx admin-key`, links and codes by email, the link page, passkeys |
 | `docs/secrets.md` | `secrets/`: the secret files, their kinds, reads and the log scrub |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |

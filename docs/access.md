@@ -99,7 +99,7 @@ router and the socket). Logins, admin keys and links by email are
   write by an access key checks its bearer again in its transaction
   (`checkKey()`).
 - **A disable deletes every login of the user,** by key or by email,
-  their keys and live links, keeping their work, so their next request
+  their keys, passkeys and live links, keeping their work, so their next request
   gets 401, and so does one of the writes above already admitted.
 - **A demote ends only key logins.** The demoted admin's key login is
   gone at the demote (401); their login by email survives, so their
@@ -124,8 +124,9 @@ router and the socket). Logins, admin keys and links by email are
   placeholder "Admin key needed", and with a name that has `_`, which
   no key file can spell, "No admin key, as the name has _".
 - **Sign out everywhere** (`POST /api/users/:id/sign-out`) ends the
-  user's logins, live links with their queued email and access keys in
-  one transaction, the keys since a stolen login can mint one, and
+  user's logins, live links with their queued email, passkeys and
+  access keys in one transaction, the passkeys and keys since a stolen
+  login can add one, and
   those keys' external task claims through the port, events after
   commit.
 - **Email from agents is the user's own switch.** Only `PUT

@@ -1,10 +1,11 @@
-# Logins, admin keys and links by email
+# Logins, admin keys, links by email and passkeys
 
 Governs how a user signs in: the login cookie and its ends, the admin
 keys (`access/admin-keys.ts`, `users/rules.ts`, `users/key-file.ts`,
-`1ctx admin-key`) and the links and codes an email carries
+`1ctx admin-key`), the links and codes an email carries
 (`access/links.ts`, `link-store.ts`, `link-routes.ts`, the link page
-`web/link-page.ts`) and the sign-in page (`views/home/SignIn.tsx`).
+`web/link-page.ts`), passkeys (`access/passkeys/`) and the sign-in
+page (`views/home/SignIn.tsx`).
 Requests, users and the socket are
 `docs/access.md`.
 
@@ -23,12 +24,15 @@ Requests, users and the socket are
 - **Every sign-in ends the browser's previous login** and publishes its
   `login.revoked`. Each opened login sets `users.signed_in_at`.
 - **Login is rate limited per address.** A key sign-in, a link ask, a
-  code and a link used share one window (10 a minute, then 429). The limit is a fixed window per key
+  code, a link used and a passkey's answer (an add or a sign-in) share
+  one window (10 a minute, then 429); passkey options have their own
+  (60 a minute). The limit is a fixed window per key
   with a cap on keys, so memory stays constant. `login limited` is
   logged once when an address's window closes, not per refusal.
 - **Every way a login ends publishes `login.revoked`.** Logout,
-  expiry, disable, sign out everywhere and a key login whose key no
-  longer holds all do, so the socket closes those connections.
+  expiry, disable, sign out everywhere, a sign-in in the same browser
+  and a key login whose key no longer holds all do, so the socket
+  closes those connections.
 - **Sign-in paths log fixed words only:** `login opened`, `login
   failed` with the address, `link issued`, `link ask capped` with the
   cap's word, `link used` with `by` (`link` or `code`). Never a
@@ -181,3 +185,66 @@ link and a six-digit code, either works once, and using one uses both.
 - **The hand-over's fragment is always stripped;** an address that is
   no `isEmail()` is dropped, and so is any hand-over once the browser
   is signed in.
+
+## Passkeys
+
+Markets' design (`access/passkeys/`): added only from a signed-in
+browser, never instead of the first sign-in; a passkey then signs in
+alone. No package and no CBOR: the browser's `getPublicKey()` (SPKI)
+and `getAuthenticatorData()`, `crypto.subtle`, ES256 and RS256 of
+2,048 bits or more, attestation `none`.
+
+- **The relying party is the browser's `Origin`,** `https:` or
+  `http:` to a loopback host, its hostname the id; never `Host` or the
+  email's public address. Any other Origin, none included, is a 403
+  on every ceremony route, so these handlers read that one header.
+  A passkey and its challenge keep the full origin, port included: a
+  passkey signs in only at the origin it was added at.
+- **Challenges are rows** (`passkey_challenges`): 32 random bytes,
+  only their hash kept, purpose `add` or `sign_in`, two minutes; an
+  add's is bound to its login (deleted with it). An answer deletes its
+  row in its write, so each is used once; each insert deletes the
+  expired, and the logins' sweep takes them too.
+- **Every check is markets'** (`checks.ts`): the client data's type,
+  challenge and exact origin, `crossOrigin` not true, the relying
+  party's hash, user present and verified, backup state not without
+  eligibility; an add's attested credential id equal to `rawId` and
+  `id` its base64url, its key imported as the algorithm it names; a
+  sign-in's user handle the passkey's `users.id`, the signature (DER
+  to raw for ES256), and a count that moves forward once either side
+  is above 0, moved in the write only while it still holds the count
+  read.
+- **Routes.** `GET /api/profile/passkeys` lists the user's passkeys at
+  every origin; `POST /api/profile/passkeys/options` gives `create()`
+  options (`excludeCredentials` the user's passkeys of this host);
+  `POST /api/profile/passkeys` adds the answer (201, a refused answer
+  400, a credential held already 409); `DELETE
+  /api/profile/passkeys/:id` removes one of the user's own. `POST
+  /api/login/passkey/options` gives discoverable `get()` options and
+  `POST /api/login/passkey` signs in (`{user, landing}` and the
+  cookie), ending the browser's previous login.
+- **Every failed sign-in is one 401** (`passkey not accepted`), a bad
+  body and a form included, but a credential with no row here, which
+  carries `code: "unknown_passkey"` so the page can ask the browser to
+  forget it; one held for another origin never does. A body past the
+  cap keeps its 413.
+- **At most 10 a user,** counted across hosts, a 409 at the options
+  and at the answer. A passkey is named for its provider from the
+  AAGUID (`provider.ts`), else "Passkey".
+- **An add reads its login again inside its write** (`actingWrite()`),
+  so one landing after a sign out everywhere, a disable or a changed
+  key adds nothing, and so does a removal.
+- **A passkey keeps the trust of the login that added it.** Added from
+  a key login it holds that login's `key_digest`, and so does a login
+  it opens. A sign-in checks the user's key file itself, in its write
+  (`loginHolds()`), so a changed or removed file, a rename, a demote or
+  a disable ends it as it ends key logins; the minute's key check
+  deletes such passkeys. Added by email, it holds null.
+- **Sign out everywhere and a disable delete the user's passkeys,**
+  since a stolen login could have added one.
+- **An add emails the user** while email is on and the address is
+  real: a notice naming the provider, the time in their zone and the
+  server's address, never a sign-in link.
+- **Logs name a passkey's id and its user** (`passkey added`, `passkey
+  used`, `passkey removed`) and a refusal's reason word (`passkey
+  refused`), never a credential id, key or challenge.

@@ -47,7 +47,8 @@ profile pages show of email. The links themselves are in
   `revoked` when the link went or was used since. `dropQueued()`
   deletes a user's queued rows of a kind, as when their links end.
 - **A `notice` row holds its text,** written when it is queued, since
-  it carries no link; its `prepare` adds the HTML.
+  it carries no link: a sign-in by link or code, or a passkey added;
+  its `prepare` adds the HTML.
 - **A link email is one line of plain text,** markets' words with
   1ctx's name: the subject "Your 1ctx sign-in code: 482913", the code's
   digits whole in it and the body so the system offers them. A notice

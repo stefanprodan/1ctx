@@ -193,6 +193,41 @@ export const AUTH_CASES: AuthCase[] = [
   },
   {
     method: "POST",
+    path: "/api/login/passkey/options",
+    // public; the matrix's page is plain http to a host that is no
+    // loopback, so there is no relying party
+    expect: { anonymous: 403, member: 403, admin: 403 },
+  },
+  {
+    method: "POST",
+    path: "/api/login/passkey",
+    body: {},
+    expect: { anonymous: 403, member: 403, admin: 403 },
+  },
+  {
+    method: "GET",
+    path: "/api/profile/passkeys",
+    expect: { anonymous: 401, member: 200, admin: 200 },
+  },
+  {
+    method: "POST",
+    path: "/api/profile/passkeys/options",
+    // authenticated; then no relying party on plain http, as above
+    expect: { anonymous: 401, member: 403, admin: 403 },
+  },
+  {
+    method: "POST",
+    path: "/api/profile/passkeys",
+    body: {},
+    expect: { anonymous: 401, member: 403, admin: 403 },
+  },
+  {
+    method: "DELETE",
+    path: "/api/profile/passkeys/:id",
+    expect: { anonymous: 401, member: 404, admin: 404 },
+  },
+  {
+    method: "POST",
     path: "/api/logout",
     expect: { anonymous: 401, member: 200, admin: 200 },
   },

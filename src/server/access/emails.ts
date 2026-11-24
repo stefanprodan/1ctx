@@ -117,3 +117,20 @@ export function noticeEmail(
     "If this was not you, tell your admin.",
   ]);
 }
+
+// a passkey added, sent to the user's own address so a stolen login
+// that adds one is not silent. The server's address, never a sign-in
+// link, so the email is no way in; a provider not known reads as "A
+// passkey"
+export function passkeyEmail(
+  provider: string | null,
+  at: number,
+  tz: string,
+  home: string,
+): { subject: string; text: string } {
+  const what = provider === null ? "A passkey" : `A passkey in ${provider}`;
+  return {
+    subject: "A passkey was added to your 1ctx sign-in",
+    text: `${what} was added to your 1ctx sign-in, ${noticeTime(at, tz)}. Not you? Sign in at ${home}, remove it under Passkeys on your profile, and have an admin sign you out everywhere.\n`,
+  };
+}
