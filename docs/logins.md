@@ -166,9 +166,13 @@ link and a six-digit code, either works once, and using one uses both.
   in. A line under the field keeps its height whatever it says, so the
   card never moves. The rules are `SignIn.model.ts`'s.
 - **A sign-in leaves the card only once `GET /api/me` names the user**
-  (`opened()` in `data/me.ts`). A read that fails after an accepted
-  code keeps the card with Try again, which reads again and never posts
-  the spent code; a malformed answer is a failure, `user: null` nobody.
+  (`opened()` in `data/me.ts`). A code is spent once its post succeeds,
+  whatever the body: a read that fails after it keeps the card with Try
+  again, which reads again and never posts the code. A malformed answer
+  or a flag that is no boolean is a failure, `user: null` nobody. The
+  card's reads say their failure on the card, never as the page's
+  startup failure, and skip the 401 hook: a superseded read's 401 signs
+  nobody out.
 - **The sign-in's posts skip `api()`'s 401 hook** (`data/sign-in.ts`):
   a wrong key or code ends no login. Their failures say fixed words for
   the status (`signInWords()`), never the body's.

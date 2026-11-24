@@ -3,6 +3,8 @@
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
+import { App } from "../../../src/client/app/App.tsx";
+import { path } from "../../../src/client/app/router.ts";
 import {
   handedOver,
   holdHandOver,
@@ -27,7 +29,7 @@ import {
 } from "../../../src/client/views/home/SignIn.model.ts";
 import { SignIn } from "../../../src/client/views/home/SignIn.tsx";
 import type { Me } from "../../../src/shared/contracts/user.ts";
-import { settle } from "../../helpers/async.ts";
+import { deferred, settle } from "../../helpers/async.ts";
 import { withClass } from "../../helpers/classes.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
 import { type Mounted, mount } from "../../helpers/mount.ts";
@@ -206,6 +208,7 @@ describe("the sign-in's words", () => {
     expect(signInWords(0, wrong)).toBe("the server did not answer");
     expect(signInWords(401, wrong)).toBe(wrong);
     expect(signInWords(400, wrong)).toBe("email is an email address");
+    expect(signInWords(403, wrong)).toBe("not sent from this server's pages");
     expect(signInWords(404, wrong)).toBe("email is off");
     expect(signInWords(429, wrong)).toBe("too many tries; wait a minute");
     expect(signInWords(500, wrong)).toBe("the server failed");
@@ -221,26 +224,26 @@ const user: Me = {
   role: "member",
 };
 
-// the server, by method and path: each call takes the next answer queued
-// for it, and a call nothing was queued for fails the test
-type Answer = () => Response;
-const answers = new Map<string, Answer[]>();
-const queue = (route: string, ...list: Answer[]) => {
-  answers.set(route, [...(answers.get(route) ?? []), ...list]);
-};
-const calls = clientFetch((url, init) => {
-  const route = `${init?.method ?? "GET"} ${url}`;
-  const next = answers.get(route)?.shift();
-  if (next === undefined) throw new Error(`unexpected ${route}`);
-  return next();
-});
-const json =
-  (body: unknown, status = 200) =>
-  () =>
-    Response.json(body, { status });
-const routes = () => calls.map((c) => `${c.init?.method ?? "GET"} ${c.url}`);
-
 describe("signing in on the card", () => {
+  // the server, by method and path: each call takes the next answer queued
+  // for it, and a call nothing was queued for fails the test
+  type Answer = () => Response | Promise<Response>;
+  const answers = new Map<string, Answer[]>();
+  const queue = (route: string, ...list: Answer[]) => {
+    answers.set(route, [...(answers.get(route) ?? []), ...list]);
+  };
+  const calls = clientFetch((url, init) => {
+    const route = `${init?.method ?? "GET"} ${url}`;
+    const next = answers.get(route)?.shift();
+    if (next === undefined) throw new Error(`unexpected ${route}`);
+    return next();
+  });
+  const json =
+    (body: unknown, status = 200) =>
+    () =>
+      Response.json(body, { status });
+  const routes = () => calls.map((c) => `${c.init?.method ?? "GET"} ${c.url}`);
+
   const g = globalThis as Record<string, unknown>;
   const held = {
     location: g.location,
@@ -358,6 +361,76 @@ describe("signing in on the card", () => {
       expect(m.html()).toContain('name="key"');
       expect(m.html()).not.toContain('name="email"');
       expect(kept.get(KEPT_WAY)).toBe("key");
+    },
+  );
+  test.serial(
+    "a taken code with an unreadable answer is spent all the same",
+    async () => {
+      queue("POST /api/login/code", () => new Response("not json"));
+      queue(
+        "GET /api/me",
+        () => new Response("<html>proxy</html>", { status: 502 }),
+        json({ user, emailOn: true, dictationOn: false }),
+      );
+      const m = await codeStep();
+      await fill(m, "123456");
+      await settle();
+      expect(m.html()).toContain(">Try again</button>");
+      await m.fire("splitbutton-go", "onClick");
+      await settle();
+      expect(me.value).toEqual(user);
+      // the retry only reads: the spent code is never posted again
+      expect(routes()).toEqual([
+        "POST /api/login/code",
+        "GET /api/me",
+        "GET /api/me",
+      ]);
+    },
+  );
+
+  test.serial("a post from another site's page says so", async () => {
+    queue("POST /api/login/link", json({ error: "cross-site" }, 403));
+    mounted = await mount(<SignIn />);
+    const m = mounted;
+    await m.fire("signin-input", "onInput", { value: "maria@example.test" });
+    await m.fire("signin-form", "onSubmit");
+    await settle();
+    expect(m.html()).toContain("Not sent from this server's pages.");
+  });
+
+  test.serial(
+    "a failed read after a key keeps the card while the first load is out",
+    async () => {
+      emailOn.value = false;
+      me.value = undefined;
+      const first = deferred<Response>();
+      queue(
+        "GET /api/me",
+        () => first.promise,
+        () => new Response("<html>proxy</html>", { status: 502 }),
+      );
+      queue("POST /api/login", json({ user }));
+      const was = path.value;
+      path.value = "/login";
+      try {
+        mounted = await mount(<App />);
+        const m = mounted;
+        await m.fire("signin-input", "onInput", { value: "1ctx-admin-key" });
+        await m.fire("signin-form", "onSubmit");
+        await settle();
+        expect(withClass(m.html(), "signin-card")).toBe(1);
+        expect(m.html()).toContain("The server failed.");
+        expect(withClass(m.html(), "shell-fail")).toBe(0);
+        // the first load, superseded, lands nothing
+        first.resolve(
+          Response.json({ user: null, emailOn: false, dictationOn: false }),
+        );
+        await settle();
+        expect(withClass(m.html(), "signin-card")).toBe(1);
+        expect(me.value).toBeUndefined();
+      } finally {
+        path.value = was;
+      }
     },
   );
 });

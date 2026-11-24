@@ -12,6 +12,8 @@ export function signInWords(status: number, wrong: string): string {
   if (status === 0) return "the server did not answer";
   if (status === 401) return wrong;
   if (status === 400) return "email is an email address";
+  // the same-origin check: a post from another site's page
+  if (status === 403) return "not sent from this server's pages";
   // only the email routes answer 404, while email is off
   if (status === 404) return "email is off";
   if (status === 429) return "too many tries; wait a minute";

@@ -12,6 +12,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { loadMe, me, meError } from "../data/me.ts";
+import { sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { type HandedWait, HandOver, useHandOver } from "../lib/wait.ts";
 import { Bone } from "../ui/Bones.tsx";
@@ -195,7 +196,7 @@ export function App() {
     return (
       <main class="shell-fail">
         <p class="error">
-          {failed.words}
+          {sentence(failed.words)}
           <CodeTag status={failed.status} spaced />
         </p>
         <button type="button" class="btn" onClick={() => void loadMe()}>

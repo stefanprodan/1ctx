@@ -169,8 +169,8 @@ describe("the shell before the user is known", () => {
   test.serial("a failed first load says so with a retry, no bones", () => {
     meError.value = { words: "server busy", status: 503 };
     const html = render(<App />);
-    expect(html).toContain("server busy");
-    expect(html).toContain("HTTP 503");
+    // the words as a sentence, then the status
+    expect(html).toMatch(/Server busy\.\s*<span class="code-tag">HTTP 503/);
     expect(html).toContain("Try again");
     expect(html).not.toContain("bones-bone");
   });
@@ -183,7 +183,7 @@ describe("the shell before the user is known", () => {
       meError.value = { words: "the server did not answer", status: null };
       const html = render(<App />);
       expect(withClass(html, "signin")).toBe(0);
-      expect(html).toContain("the server did not answer");
+      expect(html).toContain("The server did not answer.");
       expect(html).toContain("Try again");
     } finally {
       path.value = was;

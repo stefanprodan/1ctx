@@ -25,71 +25,89 @@ const casey = {
   fullName: "Casey",
   role: "member" as const,
 };
+const flags = { emailOn: true, dictationOn: false };
 
-const realFetch = globalThis.fetch;
-// each GET /api/me waits for the test to answer it
-let held: ((body: unknown) => void)[] = [];
-let calls: string[] = [];
-let unauthorized = 0;
-
-beforeEach(() => {
-  me.value = undefined;
-  held = [];
-  calls = [];
-  unauthorized = 0;
-  globalThis.fetch = (async (url: string, init?: RequestInit) => {
-    const method = init?.method ?? "GET";
-    calls.push(`${method} ${url}`);
-    if (method === "GET" && url === "/api/me") {
-      const body = await new Promise<unknown>((r) => held.push(r));
-      return Response.json(body);
-    }
-    if (method === "POST" && url === "/api/login") {
-      const key = JSON.parse(String(init?.body)).key;
-      if (key === "wrong") {
-        unauthorized++;
-        return Response.json({ error: "anything" }, { status: 401 });
-      }
-      return Response.json({ user: casey });
-    }
-    if (method === "POST" && url === "/api/logout") {
-      return Response.json({ ok: true });
-    }
-    throw new Error(`unexpected ${method} ${url}`);
-  }) as unknown as typeof fetch;
-});
-
-afterEach(() => {
-  globalThis.fetch = realFetch;
-  me.value = undefined;
-  meError.value = null;
-  dictationOn.value = false;
-  emailOn.value = false;
-});
-
-describe("me", () => {
-  test("an answer is read only when it names a user or nobody", () => {
-    expect(readMeAnswer({ user: null })).toEqual({
+describe("an answer of GET /api/me", () => {
+  test("is read only when it names a user or nobody, flags and all", () => {
+    expect(readMeAnswer({ user: null, ...flags })).toEqual({
       user: null,
-      emailOn: false,
-      dictationOn: false,
+      ...flags,
     });
     expect(
       readMeAnswer({ user: casey, emailOn: true, dictationOn: true }),
     ).toEqual({ user: casey, emailOn: true, dictationOn: true });
     expect(readMeAnswer({})).toBeNull();
     expect(readMeAnswer(null)).toBeNull();
-    expect(readMeAnswer({ user: { id: "u1" } })).toBeNull();
-    expect(readMeAnswer({ user: { ...casey, role: "owner" } })).toBeNull();
+    expect(readMeAnswer({ user: null })).toBeNull();
+    expect(
+      readMeAnswer({ user: null, emailOn: "yes", dictationOn: false }),
+    ).toBeNull();
+    expect(readMeAnswer({ user: { id: "u1" }, ...flags })).toBeNull();
+    expect(
+      readMeAnswer({ user: { ...casey, role: "owner" }, ...flags }),
+    ).toBeNull();
+  });
+});
+
+describe("me", () => {
+  const realFetch = globalThis.fetch;
+  // each GET /api/me waits for the test to answer it, with a body or a
+  // whole response
+  let held: ((answer: unknown) => void)[] = [];
+  let calls: string[] = [];
+
+  beforeEach(() => {
+    me.value = undefined;
+    held = [];
+    calls = [];
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${url}`);
+      if (method === "GET" && url === "/api/me") {
+        const answer = await new Promise<unknown>((r) => held.push(r));
+        return answer instanceof Response ? answer : Response.json(answer);
+      }
+      if (method === "POST" && url === "/api/login") {
+        const key = JSON.parse(String(init?.body)).key;
+        if (key === "wrong") {
+          return Response.json({ error: "anything" }, { status: 401 });
+        }
+        return Response.json({ user: casey });
+      }
+      if (method === "POST" && url === "/api/logout") {
+        return Response.json({ ok: true });
+      }
+      throw new Error(`unexpected ${method} ${url}`);
+    }) as unknown as typeof fetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    me.value = undefined;
+    meError.value = null;
+    dictationOn.value = false;
+    emailOn.value = false;
   });
 
   test.serial("a malformed answer is a failure, never nobody", async () => {
     const load = loadMe();
     await settle();
-    held.shift()?.({ user: "casey" });
+    held.shift()?.({ user: "casey", ...flags });
     expect(await load).toBe("failed");
     expect(me.value).toBeUndefined();
     expect(meError.value?.words).toBe("the server failed");
+  });
+
+  test.serial("a flag that is no boolean keeps the flags held", async () => {
+    emailOn.value = true;
+    dictationOn.value = true;
+    const load = loadMe();
+    await settle();
+    held.shift()?.({ user: casey, emailOn: 1, dictationOn: false });
+    expect(await load).toBe("failed");
+    expect(emailOn.value).toBe(true);
+    expect(dictationOn.value).toBe(true);
+    expect(me.value).toBeUndefined();
   });
 
   test.serial("a key sign-in leaves only once me names the user", async () => {
@@ -104,16 +122,30 @@ describe("me", () => {
     expect(emailOn.value).toBe(true);
   });
 
-  test.serial("a failed read after the key is no sign-in", async () => {
+  test.serial("a read naming nobody after the key is no sign-in", async () => {
     const signing = login({ key: "k" }).then(
       () => "in",
       (err: Error) => err.message,
     );
     await settle();
-    held.shift()?.({ user: null, emailOn: true });
+    held.shift()?.({ user: null, ...flags });
     expect(await signing).toBe("not signed in");
     expect(me.value).toBeNull();
   });
+
+  test.serial(
+    "a failed read after the key is the card's, not the page's",
+    async () => {
+      const signing = login({ key: "k" }).then(
+        () => "in",
+        (err: Error) => err.message,
+      );
+      await settle();
+      held.shift()?.(new Response("<html>", { status: 502 }));
+      expect(await signing).toBe("the server failed");
+      expect(meError.value).toBeNull();
+    },
+  );
 
   test.serial("a wrong key never signs anyone out", async () => {
     me.value = casey;
@@ -122,8 +154,31 @@ describe("me", () => {
       (err: Error) => err.message,
     );
     expect(said).toBe("wrong admin key");
-    expect(unauthorized).toBe(1);
     expect(me.value).toEqual(casey);
+  });
+
+  test.serial(
+    "a superseded read's 401 never signs out a newer sign-in",
+    async () => {
+      const first = loadMe();
+      const signing = login({ key: "k" });
+      await settle();
+      held[1]?.({ user: casey, ...flags });
+      await signing;
+      expect(me.value).toEqual(casey);
+      held[0]?.(Response.json({ error: "signed out" }, { status: 401 }));
+      await first;
+      expect(me.value).toEqual(casey);
+    },
+  );
+
+  test.serial("a current read's 401 signs out", async () => {
+    me.value = casey;
+    const load = loadMe();
+    await settle();
+    held.shift()?.(Response.json({ error: "signed out" }, { status: 401 }));
+    expect(await load).toBe("nobody");
+    expect(me.value).toBeNull();
   });
 
   test.serial("a late first load does not undo a sign-in", async () => {
@@ -131,10 +186,10 @@ describe("me", () => {
     const signing = login({ key: "k" });
     await settle();
     // the sign-in's own read answers first, the page's first one after
-    held[1]?.({ user: casey });
+    held[1]?.({ user: casey, ...flags });
     await signing;
     expect(me.value).toEqual(casey);
-    held[0]?.({ user: null });
+    held[0]?.({ user: null, ...flags });
     await first;
     expect(me.value).toEqual(casey);
   });
@@ -145,7 +200,7 @@ describe("me", () => {
     await logout();
     expect(me.value).toBeNull();
     await settle();
-    held.shift()?.({ user: casey });
+    held.shift()?.({ user: casey, ...flags });
     await late;
     expect(me.value).toBeNull();
   });
@@ -161,10 +216,10 @@ describe("me", () => {
     const first = loadMe();
     const second = loadMe();
     await settle();
-    held[1]?.({ user: null });
+    held[1]?.({ user: null, ...flags });
     await second;
     expect(me.value).toBeNull();
-    held[0]?.({ user: casey });
+    held[0]?.({ user: casey, ...flags });
     expect(await first).toBe("nobody");
     expect(me.value).toBeNull();
   });

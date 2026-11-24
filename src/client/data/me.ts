@@ -11,8 +11,8 @@ import type { LoginRequest, MeResponse } from "../../shared/api/access.ts";
 import type { Me } from "../../shared/contracts/user.ts";
 import { isRole } from "../../shared/words.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { ApiError, api, onUnauthorized } from "./api.ts";
-import { signInPost } from "./sign-in.ts";
+import { ApiError, api, onUnauthorized, quietGet } from "./api.ts";
+import { signInPost, signInWords } from "./sign-in.ts";
 
 export const me = signal<Me | null | undefined>(undefined);
 export const meError = signal<Failure | null>(null);
@@ -73,45 +73,72 @@ export function isMe(u: unknown): u is Me {
 }
 
 // a GET /api/me answer as read: user null names nobody; null when it is
-// no answer at all (a proxy's page, a body cut short)
+// no answer at all (a proxy's page, a body cut short, a flag that is no
+// boolean), so the flags held stay as they were
 export function readMeAnswer(body: unknown): MeResponse | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
   if (b.user !== null && !isMe(b.user)) return null;
-  return {
-    user: b.user,
-    emailOn: b.emailOn === true,
-    dictationOn: b.dictationOn === true,
-  };
+  if (typeof b.emailOn !== "boolean" || typeof b.dictationOn !== "boolean") {
+    return null;
+  }
+  return { user: b.user, emailOn: b.emailOn, dictationOn: b.dictationOn };
 }
 
 export type Who = "in" | "nobody" | "failed";
+// who, and the words of a failure for the caller that shows them
+type Read = { who: Who; words: string | null };
 
 // a later load supersedes one in flight, which then answers as it does
 let loads = 0;
-let current: Promise<Who> = Promise.resolve("nobody");
+let current: Promise<Read> = Promise.resolve({ who: "nobody", words: null });
 
-export function loadMe(): Promise<Who> {
-  current = readMe(++loads, ++turn);
+// the page's load: a failure is meError, which the root draws
+export async function loadMe(): Promise<Who> {
+  current = readMe(++loads, ++turn, true);
+  return (await current).who;
+}
+
+// a sign-in's read of who it opened: its failure is the card's to say,
+// never meError, so the card stays drawn with its own line
+export function confirmMe(): Promise<Read> {
+  current = readMe(++loads, ++turn, false);
   return current;
 }
 
-async function readMe(load: number, mine: number): Promise<Who> {
+async function readMe(
+  load: number,
+  mine: number,
+  page: boolean,
+): Promise<Read> {
   const asked = dictationTicket();
-  meError.value = null;
+  if (page) meError.value = null;
   try {
-    const read = readMeAnswer(await api<unknown>("/api/me"));
+    // without api()'s 401 hook: a superseded read's 401 must not sign
+    // out a newer sign-in, so its effect waits for the checks below
+    const read = readMeAnswer(await quietGet<unknown>("/api/me"));
     if (read === null) throw new ApiError(0, "the server failed");
     if (load !== loads) return current;
     emailOn.value = read.emailOn;
-    if (turn !== mine) return me.value ? "in" : "nobody";
+    if (turn !== mine) return { who: me.value ? "in" : "nobody", words: null };
     me.value = read.user;
     landDictationOn(read.dictationOn, asked);
-    return read.user === null ? "nobody" : "in";
+    return { who: read.user === null ? "nobody" : "in", words: null };
   } catch (err) {
     if (load !== loads) return current;
-    if (turn === mine) meError.value = failure(err);
-    return "failed";
+    if (turn !== mine) return { who: "failed", words: null };
+    if (err instanceof ApiError && err.status === 401) {
+      if (me.value) setMe(null);
+      return { who: "nobody", words: null };
+    }
+    if (!page) {
+      // the card says the sign-in's own words for the status
+      const status = err instanceof ApiError ? err.status : 0;
+      return { who: "failed", words: signInWords(status, "signed out") };
+    }
+    const failed = failure(err);
+    meError.value = failed;
+    return { who: "failed", words: failed.words };
   }
 }
 
@@ -119,9 +146,8 @@ async function readMe(load: number, mine: number): Promise<Who> {
 // leaves the sign-in only once it is; a read that fails or names nobody
 // throws, with the failure's words or "not signed in"
 export async function opened(): Promise<void> {
-  if ((await loadMe()) !== "in") {
-    throw new ApiError(0, meError.peek()?.words ?? "not signed in");
-  }
+  const { who, words } = await confirmMe();
+  if (who !== "in") throw new ApiError(0, words ?? "not signed in");
 }
 
 export async function login(body: LoginRequest): Promise<void> {

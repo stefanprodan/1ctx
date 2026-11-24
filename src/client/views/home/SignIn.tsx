@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
 import { askLink, sendCode, takeHandOver } from "../../data/links.ts";
-import { emailOn, loadMe, login } from "../../data/me.ts";
+import { confirmMe, emailOn, login } from "../../data/me.ts";
 import { says } from "../../lib/format.ts";
 import { type IconName, Mark, Wordmark } from "../../lib/icons.tsx";
 import { SplitButton, type SplitItem } from "../../ui/SplitButton.tsx";
@@ -99,11 +99,8 @@ export function SignIn({
     () =>
       codeFlow({
         post: (typed, landed) =>
-          sendCode(email.peek(), typed, (to) => {
-            landed();
-            navigate(to, true);
-          }),
-        read: loadMe,
+          sendCode(email.peek(), typed, landed, (to) => navigate(to, true)),
+        read: async () => (await confirmMe()).who,
       }),
     [],
   );

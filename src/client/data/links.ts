@@ -18,12 +18,14 @@ export async function askLink(email: string): Promise<void> {
   await signInPost("/api/login/link", body, "signed out");
 }
 
-// signs this browser in, in place of any other. go takes the landing
-// once the server took the code, before who it is is read, so a failure
-// after it is a used code
+// signs this browser in, in place of any other. taken runs as soon as
+// the server took the code, whatever its body says, so a failure after
+// it is a spent code that is never posted again; go takes the landing
+// when the answer names one; then who it is is read
 export async function sendCode(
   email: string,
   code: string,
+  taken: () => void,
   go: (landing: string) => void,
 ): Promise<void> {
   const body: CodeRequest = { email: email.trim(), code };
@@ -32,6 +34,7 @@ export async function sendCode(
     body,
     "wrong or expired code",
   )) as { landing?: unknown } | null;
+  taken();
   if (typeof answer?.landing === "string" && answer.landing.startsWith("/")) {
     go(answer.landing);
   }
