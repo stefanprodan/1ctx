@@ -148,14 +148,16 @@ export function assertionOf(c: Asserted): AssertionJSON {
   };
 }
 
-// options as the server should answer them: a challenge, a usable
-// timeout and the lists the browser reads
+// options as the server should answer them: a challenge, a timeout
+// longer than the leeway (or they are stale at once) and the lists the
+// browser reads
 export function optionsOk(j: unknown, adding: boolean): boolean {
   if (typeof j !== "object" || j === null) return false;
   const o = j as Record<string, unknown>;
   if (typeof o.challenge !== "string" || o.challenge === "") return false;
   const t = o.timeout;
-  if (typeof t !== "number" || !Number.isFinite(t) || t <= 0) return false;
+  if (typeof t !== "number" || !Number.isFinite(t) || t <= LEEWAY_MS)
+    return false;
   if (!adding) return Array.isArray(o.allowCredentials);
   const user = o.user as Record<string, unknown> | null | undefined;
   return (

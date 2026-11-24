@@ -652,6 +652,7 @@ describe("the passkeys store", () => {
     expect(optionsOk(REQUEST, false)).toBe(true);
     expect(optionsOk(REQUEST, true)).toBe(false);
     expect(optionsOk({ ...REQUEST, timeout: 0 }, false)).toBe(false);
+    expect(optionsOk({ ...REQUEST, timeout: 30_000 }, false)).toBe(false);
     expect(optionsOk({ ...REQUEST, timeout: "120000" }, false)).toBe(false);
     expect(optionsOk({ ...REQUEST, timeout: Number.NaN }, false)).toBe(false);
     expect(optionsOk({ ...REQUEST, challenge: "" }, false)).toBe(false);
