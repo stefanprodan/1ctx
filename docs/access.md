@@ -87,7 +87,8 @@ router and the socket). Logins, admin keys and links by email are
   key no longer holds, is 401, and that key login ends. An access key
   create checks its projects by the caller's current role and what
   they see now, so a project they no longer see is a 404. Every other
-  cookie write checks its caller only at admission, in the router; a
+  cookie write checks its login only at admission, in the router,
+  though some read the caller's project access again in their write; a
   write by an access key checks its bearer again in its transaction
   (`checkKey()`).
 - **A disable deletes every login of the user,** by key or by email,
