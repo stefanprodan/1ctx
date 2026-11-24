@@ -77,6 +77,28 @@ describe("renderMarkdown", () => {
     }
   });
 
+  test("strikes only between double tildes", () => {
+    expect(renderMarkdown("costs ~5~, 5~6 and 7~8, ~~gone~~ `a~b`")).toBe(
+      '<p class="md-p">costs ~5~, 5~6 and 7~8, <del class="md-del">gone</del> <code class="md-code">a~b</code></p>',
+    );
+    expect(renderMarkdown("a \\~5~ b\ufdd0")).toBe(
+      '<p class="md-p">a ~5~ b</p>',
+    );
+    expect(renderMarkdown("```js\nconst x = ~y;\n```")).toContain(
+      '<span class="hljs-keyword">const</span> x = ~y;',
+    );
+  });
+
+  test("keeps a tilde in a link and a bare URL", () => {
+    expect(
+      renderMarkdown("https://x.test/~u/a~b [l](https://x.test/~v) ~5~", {
+        autolinks: true,
+      }),
+    ).toBe(
+      '<p class="md-p"><a class="md-link" href="https://x.test/~u/a~b" target="_blank" rel="noopener">https://x.test/~u/a~b</a> <a class="md-link" href="https://x.test/~v" target="_blank" rel="noopener">l</a> ~5~</p>',
+    );
+  });
+
   test("renders images as text without an img element", () => {
     const html = renderMarkdown("![logo](https://example.test/logo.png)");
     expect(html).not.toContain("<img");

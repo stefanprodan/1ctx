@@ -11,7 +11,7 @@
 // loses them, and a link shows the address its parse writes back.
 
 import { stripBidi } from "../../shared/words.ts";
-import { escapeHtml, tableAlign } from "./markdown.ts";
+import { escapeHtml, holdTildes, tableAlign, tildesBack } from "./markdown.ts";
 
 // raw HTML blocks reach the html callback, which drops them; spans stay
 // text, escaped like any other. A bare URL stays text: Bun's autolinks
@@ -25,7 +25,8 @@ const OPTIONS = { noHtmlSpans: true } as const;
 function linkable(href: string): string | null {
   let url: URL;
   try {
-    url = new URL(href);
+    // a held tilde would be percent-encoded as itself
+    url = new URL(tildesBack(href));
   } catch {
     return null;
   }
@@ -135,10 +136,14 @@ export type EmailBody = { html: string; text: string };
 // too
 export function renderEmailMarkdown(md: string): EmailBody {
   if (md.trim() === "") return { html: "", text: "" };
+  // only ~~ strikes, as in a chat
+  const held = holdTildes(md);
+  const render = (callbacks: typeof HTML | typeof TEXT) =>
+    stripBidi(tildesBack(Bun.markdown.render(held, callbacks, OPTIONS)));
   try {
     return {
-      html: stripBidi(Bun.markdown.render(md, HTML, OPTIONS)),
-      text: stripBidi(Bun.markdown.render(md, TEXT, OPTIONS))
+      html: render(HTML),
+      text: render(TEXT)
         .replace(/\n{3,}/g, "\n\n")
         .trim(),
     };
