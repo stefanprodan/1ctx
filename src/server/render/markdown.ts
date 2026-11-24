@@ -28,6 +28,18 @@ function unescapeHtml(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
+// the parser strikes between single tildes too, so "5~6 and 7~8" lost
+// its words; a lone tilde is held aside while parsing and only ~~
+// strikes. A bare URL keeps its tildes, since a held one stops its
+// autolink, and an escaped tilde stays the parser's
+const HELD = "\uFDD0";
+const LONE_TILDE = /(?:https?:\/\/|www\.)\S*|(?<![~\\])~(?!~)/g;
+export const holdTildes = (md: string) =>
+  md
+    .replaceAll(HELD, "")
+    .replace(LONE_TILDE, (match) => (match === "~" ? HELD : match));
+export const tildesBack = (value: string) => value.replaceAll(HELD, "~");
+
 const SAFE_HREF = /^(https?:|mailto:)/i;
 // the app's own pages an agent links to: an automation, its memory, a run, a
 // chat and an external task, with nothing after the id. A fixed list, since the
@@ -50,7 +62,9 @@ function language(info: string | undefined): string {
   return /^[\w+#.-]{1,24}$/.test(word) ? word.toLowerCase() : "";
 }
 
-function codeBlock(text: string, info: string | undefined): string {
+function codeBlock(held: string, info: string | undefined): string {
+  // the highlighter reads the code as written
+  const text = tildesBack(held);
   const lang = language(info);
   const body = (lang && highlight(unescapeHtml(text), lang)) || text;
   const pre = `<pre class="md-pre"><code class="md-block-code">${body}</code></pre>`;
@@ -239,6 +253,11 @@ export function renderMarkdown(
   options: RenderOptions = {},
 ): string {
   if (md === "") return "";
+  if (!md.includes("~")) return render(md, options);
+  return tildesBack(render(holdTildes(md), options));
+}
+
+function render(md: string, options: RenderOptions): string {
   const parse = options.autolinks ? LINKED : OPTIONS;
   try {
     const project = options.project;
