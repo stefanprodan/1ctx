@@ -183,17 +183,16 @@ gateway add`.
   needs, which hangs or corrupts the database. A named volume takes
   the image's `/data` with its owner 65532. On a Linux host a bind
   mount works once it is `chown 65532:65532`.
-- **The sandbox image (`deploy/sandbox/Dockerfile`) pins its base, uv's
-  Python 3.15 trixie-slim image that brings Python and uv, by digest,
-  and every download by version and the sha256 its publisher gives,**
-  checked at build: yq and bun from their releases, Go's tarball from
-  go.dev's list, `rustup-init` from
-  `static.rust-lang.org/rustup/archive/<version>/<target>/rustup-init.sha256`,
-  and the Rust toolchain by its version, which rustup checks against
-  the channel's manifest. Bun is the root Dockerfile's version, so the
-  two move together. Dependabot bumps the base's digest; the rest is
-  bumped by hand, and the bash description's versions with it
-  (`docs/bash.md`). It makes every root the sandbox policy
+- **The sandbox image (`deploy/sandbox/Dockerfile`) pins every image it
+  takes from by digest and downloads nothing of its own:** its base,
+  uv's Python 3.15 trixie-slim image that brings Python and uv, and the
+  official `jqlang/jq`, `mikefarah/yq`, `oven/bun`, `golang` and `rust`
+  slim images that jq, yq, Bun, Go and Rust are copied from, Rust's two homes moved
+  under `/opt/home`. `oven/bun` is the root Dockerfile's, so the two
+  move together. Dependabot bumps every digest. The apt packages are
+  trixie's on the day of the build. A new Bun,
+  Go, Python or Rust minor bumps the bash description's versions in
+  the same change (`docs/bash.md`), which a test checks. It makes every root the sandbox policy
   names and holds no helper: the server passes them with each exec.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
   would kill the shutdown after the drain. Docker Compose sets

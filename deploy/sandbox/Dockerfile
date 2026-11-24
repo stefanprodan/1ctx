@@ -9,29 +9,26 @@
 # bun:     the base and Bun, with node and npx running on Bun
 # go:      the base, gcc and Go with cgo
 # rust:    the base, gcc and Rust stable through rustup
-FROM ghcr.io/astral-sh/uv:python3.15-trixie-slim@sha256:980d6aa868431fd4ef2b32481e934ef5ee3b662c5decade3aa2d7e7ffb8075e4 AS base
 
-ARG YQ_VERSION=v4.54.3
-ARG YQ_SHA256_AMD64=129534601871538efe0ba4c5e62a34fb1d5f469bcb975c4fddeb467d82974973
-ARG YQ_SHA256_ARM64=89f69310b61b68d1245065a1241d1fc843f7a36cd6103ffd77ad987613bd1b67
-ARG TARGETARCH
+# jq, yq, Bun, Go and Rust come from their official images, pinned by
+# digest, so Dependabot bumps them with the base. Bun is the root
+# Dockerfile's. jq and yq are static binaries, so they run on any base.
+FROM ghcr.io/jqlang/jq:1.8.2@sha256:b9c68867e5766576263a222e91db3de422d802069c7af70440e667a95344e486 AS jqdist
+FROM mikefarah/yq:4.54.3@sha256:7834187596ad56fd5a81436114e0b0b9dd54c91bb43946d1f7145b2be5f9c3d2 AS yqdist
+FROM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS bundist
+FROM golang:1.27.4-trixie@sha256:430985542100b871e108ccc00e8dcc5eef08ca14ee5825e98ebf563d8ffec4ee AS godist
+FROM rust:1.100.0-slim-trixie@sha256:3b199fd6db7d709274df56565b8f4003f9e30d7bfcff9d53148c86053b7855e2 AS rustdist
+
+FROM ghcr.io/astral-sh/uv:python3.15-trixie-slim@sha256:980d6aa868431fd4ef2b32481e934ef5ee3b662c5decade3aa2d7e7ffb8075e4 AS base
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      bash ca-certificates coreutils curl findutils git jq make \
+      bash ca-certificates coreutils curl findutils git make \
       poppler-utils procps ripgrep tar \
  && rm -rf /var/lib/apt/lists/*
 
-RUN set -eu; \
-    case "$TARGETARCH" in \
-      amd64) yq_sha=$YQ_SHA256_AMD64 ;; \
-      arm64) yq_sha=$YQ_SHA256_ARM64 ;; \
-      *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac; \
-    curl -fsSLo /usr/local/bin/yq \
-      "https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/yq_linux_$TARGETARCH"; \
-    echo "$yq_sha  /usr/local/bin/yq" | sha256sum -c -; \
-    chmod 0755 /usr/local/bin/yq
+COPY --from=jqdist /jq /usr/local/bin/jq
+COPY --from=yqdist /usr/bin/yq /usr/local/bin/yq
 
 # Landlock skips a path that does not exist, so every root the policy
 # names is made here. OpenShell refuses a mount on the image's home, so
@@ -48,7 +45,7 @@ RUN groupadd -g 1000 sandbox \
 # the same for every variant.
 ENV HOME=/sandbox \
     TMPDIR=/sandbox/tmp \
-    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/opt/home/go/bin:/opt/home/.cargo/bin \
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/opt/home/go/bin:/opt/home/.cargo/bin:/opt/home/.local/bin:/opt/home/.bun/bin \
     UV_CACHE_DIR=/opt/home/.cache/uv \
     UV_LINK_MODE=copy \
     UV_TOOL_BIN_DIR=/opt/home/.local/bin \
@@ -76,73 +73,25 @@ RUN apt-get update \
 USER sandbox
 
 FROM base AS bun
-ARG BUN_VERSION=1.4.4
-ARG BUN_SHA256_AMD64=bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c
-ARG BUN_SHA256_ARM64=baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e
-ARG TARGETARCH
 USER root
+COPY --from=bundist /usr/local/bin/bun /usr/local/bin/bun
 # node and npx run on Bun, so npm CLIs and #!/usr/bin/env node scripts
 # work. Bun is bunx only when called by that name, so npx is a wrapper
-RUN set -eu; \
-    case "$TARGETARCH" in \
-      amd64) bun=bun-linux-x64; bun_sha=$BUN_SHA256_AMD64 ;; \
-      arm64) bun=bun-linux-aarch64; bun_sha=$BUN_SHA256_ARM64 ;; \
-      *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac; \
-    curl -fsSLo /tmp/bun.zip \
-      "https://github.com/oven-sh/bun/releases/download/bun-v$BUN_VERSION/$bun.zip"; \
-    echo "$bun_sha  /tmp/bun.zip" | sha256sum -c -; \
-    python3 -m zipfile -e /tmp/bun.zip /tmp/bun; \
-    mv "/tmp/bun/$bun/bun" /usr/local/bin/bun; \
-    chmod 0755 /usr/local/bin/bun; \
-    ln -s bun /usr/local/bin/bunx; \
-    ln -s bun /usr/local/bin/node; \
-    printf '#!/bin/sh\nexec /usr/local/bin/bun x "$@"\n' > /usr/local/bin/npx; \
-    chmod 0755 /usr/local/bin/npx; \
-    rm -r /tmp/bun.zip /tmp/bun
+RUN ln -s bun /usr/local/bin/bunx \
+ && ln -s bun /usr/local/bin/node \
+ && printf '#!/bin/sh\nexec /usr/local/bin/bun x "$@"\n' > /usr/local/bin/npx \
+ && chmod 0755 /usr/local/bin/npx
 USER sandbox
 
 FROM cc AS go
-ARG GO_VERSION=1.27.4
-ARG GO_SHA256_AMD64=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
-ARG GO_SHA256_ARM64=3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92
-ARG TARGETARCH
-USER root
-RUN set -eu; \
-    case "$TARGETARCH" in \
-      amd64) go_sha=$GO_SHA256_AMD64 ;; \
-      arm64) go_sha=$GO_SHA256_ARM64 ;; \
-      *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac; \
-    curl -fsSLo /tmp/go.tar.gz \
-      "https://dl.google.com/go/go$GO_VERSION.linux-$TARGETARCH.tar.gz"; \
-    echo "$go_sha  /tmp/go.tar.gz" | sha256sum -c -; \
-    tar -C /usr/local -xzf /tmp/go.tar.gz; \
-    rm /tmp/go.tar.gz
-USER sandbox
+COPY --from=godist /usr/local/go /usr/local/go
 
 # The toolchain lives in HOME, the container's own disk, owned by the
-# sandbox user: /usr is read-only in a sandbox, and rustup adds another
-# toolchain or target beside this one.
+# sandbox user: /usr is read-only in a sandbox, and cargo and rustup
+# write their caches and added targets beside it. rustup finds it by
+# RUSTUP_HOME, so the image's /usr/local copy runs from here.
 FROM cc AS rust
-ARG RUSTUP_VERSION=1.29.3
-ARG RUSTUP_SHA256_AMD64=b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55
-ARG RUSTUP_SHA256_ARM64=9f608c142e0e38a78957d0661ba1dfaf0b6fb37184cfaa4b9a0aa57af6184282
-ARG RUST_VERSION=1.100.0
-ARG TARGETARCH
-RUN set -eu; \
-    case "$TARGETARCH" in \
-      amd64) target=x86_64-unknown-linux-gnu; sha=$RUSTUP_SHA256_AMD64 ;; \
-      arm64) target=aarch64-unknown-linux-gnu; sha=$RUSTUP_SHA256_ARM64 ;; \
-      *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac; \
-    curl -fsSLo /sandbox/tmp/rustup-init \
-      "https://static.rust-lang.org/rustup/archive/$RUSTUP_VERSION/$target/rustup-init"; \
-    echo "$sha  /sandbox/tmp/rustup-init" | sha256sum -c -; \
-    chmod 0755 /sandbox/tmp/rustup-init; \
-    /sandbox/tmp/rustup-init -y --no-modify-path --profile minimal \
-      --default-toolchain "$RUST_VERSION"; \
-    rm /sandbox/tmp/rustup-init; \
-    rustc --version
+COPY --from=rustdist --chown=sandbox:sandbox /usr/local/rustup /opt/home/.rustup
+COPY --from=rustdist --chown=sandbox:sandbox /usr/local/cargo /opt/home/.cargo
 
 FROM base AS python
