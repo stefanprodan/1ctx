@@ -2,8 +2,8 @@
 
 How the sandbox shell's image is built. Governs `deploy/sandbox/`
 (the variants Dockerfile, `base/` and `checks/`),
-`scripts/sandbox-image.sh`, `scripts/sandbox-image-check.ts` and
-`.github/workflows/shell-base.yml`.
+`scripts/sandbox-image.sh`, `scripts/sandbox-image-check.ts`,
+`scripts/sandbox-tools.ts` and `.github/workflows/shell-base.yml`.
 What a release pushes is in `docs/deploy.md`; how the server runs the
 image, its environment and its roots in `docs/sandbox.md`.
 
@@ -96,6 +96,25 @@ image, its environment and its roots in `docs/sandbox.md`.
   --release --locked --features pcre2` checks every dependency against
   the crate's lock file, and `PCRE2_SYS_STATIC=1` links PCRE2 in, so
   `rg` needs only libc and libgcc_s.
+- **`make sandbox-tools` moves the pins** to the newest stable
+  releases: git's highest `vX.Y.Z` tag on GitHub, sorted by version,
+  never a release candidate; ripgrep's newest stable crate on
+  crates.io. git's sha256 is computed from the downloaded tarball and
+  must equal its entry in kernel.org's `sha256sums.asc`, else nothing
+  changes; ripgrep's is the one crates.io lists. It rewrites only the
+  four lines, never moves a pin back, and changes nothing when the
+  pins are current. `--diff` prints what moved against `HEAD`, as
+  Markdown, empty when nothing did. The version choice, the list's
+  parse and the rewrite are pure and tested on fixtures.
+- **The `tools` job bumps them through one pull request,** on the
+  schedule and by hand, on `main` only: it runs `make sandbox-tools`
+  and opens or updates a signed pull request on `shell-tools`,
+  labelled `build`, holding only the base Dockerfile, as `models.yml`
+  does for the catalog. A pull request made with `github.token` starts
+  no workflow, so the job dispatches `test.yml` and `shell-base.yml`
+  on the branch; the latter only builds there. Never auto-merged; its
+  merge publishes a base with the new tools.
+
 ## The contract
 
 - **Each variant's promise is a contract, `deploy/sandbox/checks/`**:

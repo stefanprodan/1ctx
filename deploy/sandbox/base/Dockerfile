@@ -7,7 +7,8 @@
 #        git, make, jq, yq, ripgrep, pdftotext (the python variant)
 # cc:    the base and gcc, for cgo and Rust's linker
 
-# git and ripgrep are built from source at these pins
+# git and ripgrep are built from source at these pins; make
+# sandbox-tools moves them
 ARG GIT_VERSION=2.56.1
 ARG GIT_SHA256=f0b0bf89264b9bd2e1c640363e7529643989da76281600473c50745cd34a607f
 ARG RG_VERSION=16.0.0

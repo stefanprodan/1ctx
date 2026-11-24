@@ -47,6 +47,7 @@ make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 make image          # the container image, native and loaded; PLATFORMS=a,b only builds
 make image-smoke    # run the image as production does, sign in, stop it (CI runs it)
 make sandbox-image  # the sandbox image variants, native, as 1ctx-shell:dev-<variant>; VARIANT=go one
+make sandbox-tools  # bump the shell base's git and ripgrep pins
 make kind-up        # the local kind cluster 1ctx-test; kind-image, kind-down
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
 make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
