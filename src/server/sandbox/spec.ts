@@ -41,6 +41,9 @@ export const SANDBOX_ENV: Readonly<Record<string, string>> = {
   TMPDIR: "/sandbox/tmp",
   UV_CACHE_DIR: `${HOME}/.cache/uv`,
   UV_LINK_MODE: "copy",
+  // uv tool install and bun add -g put their commands in these bins,
+  // so both are on PATH
+  UV_TOOL_BIN_DIR: `${HOME}/.local/bin`,
   // bun's cache and global packages stay in HOME, never /knowledge,
   // which is saved after a command
   BUN_INSTALL: `${HOME}/.bun`,
@@ -56,7 +59,7 @@ export const SANDBOX_ENV: Readonly<Record<string, string>> = {
   CARGO_HOME: `${HOME}/.cargo`,
   RUSTUP_HOME: `${HOME}/.rustup`,
   DO_NOT_TRACK: "1",
-  PATH: `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:${HOME}/go/bin:${HOME}/.cargo/bin`,
+  PATH: `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:${HOME}/go/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${HOME}/.bun/bin`,
 };
 
 // the roots the image makes; only these are writable, never /sandbox

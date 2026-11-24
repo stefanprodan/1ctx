@@ -9,7 +9,7 @@ export PLATFORMS
 
 .DEFAULT_GOAL := help
 
-.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset preview-mail smoke image image-smoke sandbox-image sandbox-check sandbox-net-check kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke models
+.PHONY: help start dev test vendor-test build lint clean preview preview-stop preview-log preview-clean preview-provision preview-reset preview-mail smoke image image-smoke sandbox-image sandbox-check sandbox-net-check sandbox-image-check kind-up kind-image kind-down staging-deploy staging-provision staging-status load-db load-bench load-cluster load-summary load-smoke models
 
 help: ## Show available tasks
 	@grep -hE '^[a-z][a-z-]*:.*## .*$$' $(MAKEFILE_LIST) \
@@ -50,6 +50,9 @@ sandbox-check: ## Drive a real sandbox gateway through the sandbox backend by ha
 
 sandbox-net-check: ## Drive a real sandbox gateway's network and credentials by hand (ARGS="--ca .. --cert .. --key ..")
 	@bun run sandbox-net-check $(ARGS)
+
+sandbox-image-check: ## Check the sandbox images against their contracts on a real gateway, the preview's by default (ARGS="--variant go --offline")
+	@bun run sandbox-image-check $(ARGS)
 
 kind-up: ## Create the local kind cluster 1ctx-test with metrics-server
 	@bun run kind-up

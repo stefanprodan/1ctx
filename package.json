@@ -19,6 +19,7 @@
     "sandbox-image": "scripts/sandbox-image.sh",
     "sandbox-check": "bun scripts/sandbox-check.ts",
     "sandbox-net-check": "bun scripts/sandbox-net-check.ts",
+    "sandbox-image-check": "bun scripts/sandbox-image-check.ts",
     "kind-up": "scripts/kind.sh up",
     "kind-image": "scripts/kind.sh image",
     "kind-down": "scripts/kind.sh down",
