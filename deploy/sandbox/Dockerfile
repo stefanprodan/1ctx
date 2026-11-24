@@ -10,18 +10,15 @@
 # go:      the base, gcc and Go with cgo
 # rust:    the base, gcc and Rust stable through rustup
 
-# Bun, Go and Rust come from their official images, pinned by digest,
-# so Dependabot bumps them with the base. Bun is the root Dockerfile's.
+# yq, Bun, Go and Rust come from their official images, pinned by
+# digest, so Dependabot bumps them with the base. Bun is the root
+# Dockerfile's. yq is a static binary, so Alpine's build runs here.
+FROM mikefarah/yq:4.54.3@sha256:7834187596ad56fd5a81436114e0b0b9dd54c91bb43946d1f7145b2be5f9c3d2 AS yqdist
 FROM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS bundist
 FROM golang:1.27.4-trixie@sha256:430985542100b871e108ccc00e8dcc5eef08ca14ee5825e98ebf563d8ffec4ee AS godist
 FROM rust:1.100.0-slim-trixie@sha256:3b199fd6db7d709274df56565b8f4003f9e30d7bfcff9d53148c86053b7855e2 AS rustdist
 
 FROM ghcr.io/astral-sh/uv:python3.15-trixie-slim@sha256:980d6aa868431fd4ef2b32481e934ef5ee3b662c5decade3aa2d7e7ffb8075e4 AS base
-
-ARG YQ_VERSION=v4.54.3
-ARG YQ_SHA256_AMD64=129534601871538efe0ba4c5e62a34fb1d5f469bcb975c4fddeb467d82974973
-ARG YQ_SHA256_ARM64=89f69310b61b68d1245065a1241d1fc843f7a36cd6103ffd77ad987613bd1b67
-ARG TARGETARCH
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -29,16 +26,7 @@ RUN apt-get update \
       poppler-utils procps ripgrep tar \
  && rm -rf /var/lib/apt/lists/*
 
-RUN set -eu; \
-    case "$TARGETARCH" in \
-      amd64) yq_sha=$YQ_SHA256_AMD64 ;; \
-      arm64) yq_sha=$YQ_SHA256_ARM64 ;; \
-      *) echo "unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
-    esac; \
-    curl -fsSLo /usr/local/bin/yq \
-      "https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/yq_linux_$TARGETARCH"; \
-    echo "$yq_sha  /usr/local/bin/yq" | sha256sum -c -; \
-    chmod 0755 /usr/local/bin/yq
+COPY --from=yqdist /usr/bin/yq /usr/local/bin/yq
 
 # Landlock skips a path that does not exist, so every root the policy
 # names is made here. OpenShell refuses a mount on the image's home, so
