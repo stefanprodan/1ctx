@@ -63,8 +63,7 @@ You need Docker and an [OpenRouter](https://openrouter.ai) API key.
 From a clone of this repository, build the image and write the secrets:
 
 ```sh
-cd deploy/docker
-(
+cd deploy/docker && (
   set -e
   mkdir -p secrets provision
   ONECTX_VERSION=dev docker compose -f compose.yaml -f compose.dev.yaml build

@@ -103,10 +103,9 @@ mail_start() {
   mail_stop
   bun "$MAIL_ENTRY" setup "$MAIL" "$MAIL_PORT" "$URL"
   nohup bun "$MAIL_ENTRY" serve "$MAIL" "$MAIL_PORT" >"$MAIL/catcher.log" 2>&1 &
-  echo $! >"$MAIL_PID"
-  local pid
-  pid=$(cat "$MAIL_PID")
+  local pid=$!
   MAIL_STARTED=$pid
+  echo "$pid" >"$MAIL_PID"
   for _ in $(seq 1 50); do
     [ "$(lsof -nP -tiTCP:"$MAIL_PORT" -sTCP:LISTEN 2>/dev/null || true)" = "$pid" ] && return 0
     mail_running || break
@@ -282,10 +281,9 @@ start() {
   ONECTX_DEV=1 nohup bun --watch "$ENTRY" \
     --listen "127.0.0.1:$PORT" --db "$DIR/1ctx.sqlite" \
     --secrets "$DIR/secrets" --drain 0 ${mail[@]+"${mail[@]}"} >"$LOG" 2>&1 &
-  echo $! >"$PID"
-  local pid holders
-  pid=$(cat "$PID")
+  local pid=$! holders
   SERVER_STARTED=$pid
+  echo "$pid" >"$PID"
   for _ in $(seq 1 50); do
     if curl -sf -o /dev/null "$URL/api/health"; then
       if listens "$pid"; then
