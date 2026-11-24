@@ -73,6 +73,7 @@ export {
   type EmailSender,
   type Outgoing,
   type SendResult,
+  SMTP_TIMEOUTS,
   type SmtpServer,
   smtpSender,
 } from "./smtp.ts";

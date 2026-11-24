@@ -15,6 +15,8 @@ import {
   ASKS_PER_HOUR,
   ASKS_PER_INBOX_DAY,
   ASKS_PER_USER_DAY,
+  BACKOFF_MS,
+  SMTP_TIMEOUTS,
 } from "../../../src/server/email/index.ts";
 import { DAY_MS, HOUR_MS } from "../../../src/server/lib/clock.ts";
 import { ADMIN_KEY, ORIGIN, type TestClient } from "../../helpers/app.ts";
@@ -247,15 +249,20 @@ describe("asking for a code", () => {
     const tab = browser(e);
     await e.ask(tab);
     await app.linkAsks();
-    // three tries fail; the fourth, 36 minutes on, is delivered
+    // every try takes the SMTP client's longest; three fail, and the
+    // fourth, after the waits between them, is delivered
+    const tryMs = Object.values(SMTP_TIMEOUTS).reduce((a, b) => a + b, 0);
+    app.emailSender.onSend = () => {
+      app.now.value += tryMs;
+    };
     app.emailSender.result = "timeout";
-    for (const wait of [0, 1, 5, 30]) {
-      app.now.value += wait * MINUTE;
-      if (wait === 30) app.emailSender.result = "sent";
+    for (const [i, wait] of [0, ...BACKOFF_MS].entries()) {
+      app.now.value += wait;
+      if (i === BACKOFF_MS.length) app.emailSender.result = "sent";
       expect(await e.send()).toBe(1);
     }
     // late in the code's own 15 minutes, the cookie is still held
-    app.now.value += 14 * MINUTE;
+    app.now.value += 15 * MINUTE - tryMs - 1;
     expect((await e.sendCode(tab, e.code())).status).toBe(200);
     await app.shutdown();
   });

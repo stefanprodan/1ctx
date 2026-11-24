@@ -10,7 +10,7 @@
 import type { CodeResponse } from "../../shared/api/access.ts";
 import type { Me } from "../../shared/contracts/user.ts";
 import { type Db, transact } from "../db/index.ts";
-import { BACKOFF_MS } from "../email/index.ts";
+import { BACKOFF_MS, SMTP_TIMEOUTS } from "../email/index.ts";
 import { formBody, isForm, jsonBody } from "../lib/body.ts";
 import { type BusEvent, loginRevoked } from "../lib/bus.ts";
 import type { Clock } from "../lib/clock.ts";
@@ -35,9 +35,14 @@ import { isLinkToken, parseCode, parseLinkAsk, parseLinkUse } from "./parse.ts";
 // the asking browser's challenge, which a code is only tried beside
 export const ASK_COOKIE = "login_ask";
 // past the email's last retry plus a code's life, so a code sent late
-// still finds the challenge it was asked beside
+// still finds the challenge it was asked beside: every wait between
+// tries, and every try at the SMTP client's longest (a wait starts once
+// its try returned)
+const TRY_MS = Object.values(SMTP_TIMEOUTS).reduce((sum, ms) => sum + ms, 0);
 export const ASK_TTL_MS =
-  BACKOFF_MS.reduce((sum, wait) => sum + wait, 0) + LINK_TTL_MS.signin;
+  BACKOFF_MS.reduce((sum, wait) => sum + wait, 0) +
+  (BACKOFF_MS.length + 1) * TRY_MS +
+  LINK_TTL_MS.signin;
 // where a sign-in by link or code lands
 export const LANDING = "/";
 

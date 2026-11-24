@@ -98,7 +98,8 @@ link and a six-digit code, either works once, and using one uses both.
   (`Path=/api/login; HttpOnly; SameSite=Lax`, Secure under
   `--secure-cookie`) holding a random challenge, kept when the browser
   holds one; the link row keeps its hash (`ask_hash`). It lasts the
-  email's retries (`BACKOFF_MS`) plus a code's 15 minutes
+  waits between the email's tries (`BACKOFF_MS`), each try at the SMTP
+  client's longest (`SMTP_TIMEOUTS`) and a code's 15 minutes
   (`ASK_TTL_MS`), so a code delivered on the last retry still finds it.
 - **Every ask makes a new link** and leaves earlier live ones working,
   so nobody's ask blocks or kills another's. Only an unused invite is

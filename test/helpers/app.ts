@@ -336,6 +336,8 @@ export type FakeEmailSender = {
   emailSender: EmailSender;
   sent: { server: SmtpServer; message: Outgoing }[];
   result: SendResult;
+  // run as each send starts, as a slow server's time on the fake clock
+  onSend?: () => void;
 };
 
 export function fakeEmailSender(): FakeEmailSender {
@@ -344,6 +346,7 @@ export function fakeEmailSender(): FakeEmailSender {
     result: "sent",
     emailSender: async (server, message) => {
       fake.sent.push({ server, message });
+      fake.onSend?.();
       return fake.result;
     },
   };
