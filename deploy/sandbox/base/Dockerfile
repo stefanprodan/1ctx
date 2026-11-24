@@ -4,8 +4,10 @@
 # The base of the 1ctx shell images, every step that runs a command:
 #
 # base:  Python and uv, bash, coreutils, findutils, procps, tar, curl,
-#        git, make, jq, yq, ripgrep, pdftotext (the python variant)
-# cc:    the base and gcc, for cgo and Rust's linker
+#        wget, rsync, git, make, perl, jq, yq, ripgrep, pdftotext,
+#        sqlite3, archive tools and small utilities (the python variant)
+# cc:    the base, gcc, g++ and pkg-config, for cgo, Rust's linker and
+#        native builds
 
 # git and ripgrep are built from source at these pins; make
 # sandbox-tools moves them
@@ -62,12 +64,13 @@ RUN cd /src \
 
 FROM trixie AS base
 
-# the libraries git links, named so a change to curl's dependencies
-# never drops one
+# The libraries git links are named, so a change to curl's dependencies
+# never drops one, and so is perl, which Debian's git used to pull in.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      bash ca-certificates coreutils curl findutils make \
-      poppler-utils procps tar \
+      bash bc bsdextrautils bzip2 ca-certificates coreutils curl file \
+      findutils gettext-base less lua5.4 make patch perl poppler-utils procps \
+      rsync sqlite3 tar tree unzip wget xz-utils zip zstd \
       libcurl4t64 libpcre2-8-0 libssl3t64 zlib1g \
  && rm -rf /var/lib/apt/lists/*
 
@@ -110,10 +113,12 @@ USER sandbox
 WORKDIR /sandbox
 CMD ["/bin/bash"]
 
-# gcc for cgo and Rust's linker, one layer go and rust share
+# gcc for cgo and Rust's linker, g++ and pkg-config for native
+# builds, one layer go and rust share
 FROM base AS cc
 USER root
 RUN apt-get update \
- && apt-get install -y --no-install-recommends gcc libc6-dev \
+ && apt-get install -y --no-install-recommends \
+      g++ gcc libc6-dev pkg-config \
  && rm -rf /var/lib/apt/lists/*
 USER sandbox

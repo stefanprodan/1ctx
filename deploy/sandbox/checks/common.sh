@@ -68,13 +68,39 @@ common_writes() {
 # each one runs, so a missing library or a wrong architecture fails
 common_tools() {
   local t
-  for t in bash curl git jq make python3 rg tar uv uvx yq; do
-    "$t" --version >/dev/null || {
+  for t in bash bc bzip2 column curl envsubst file git hexdump jq less \
+    make patch perl python3 rg rsync sqlite3 tar tree uv uvx wget xz \
+    yq zip zstd; do
+    "$t" --version </dev/null >/dev/null || {
       echo "$t does not run"
       return 1
     }
   done
+  unzip -v >/dev/null
+  lua -v >/dev/null
   pdftotext -v 2>/dev/null
+}
+
+# tar through each compressor, and zip, each archive unpacked again
+common_archives() {
+  mkdir in
+  printf 'abc\n' >in/f
+  local z
+  for z in xz zstd bzip2; do
+    tar -caf "a.tar.$z" in
+    mkdir "out-$z"
+    tar -xaf "a.tar.$z" -C "out-$z"
+    eq "$(cat "out-$z/in/f")" abc
+  done
+  zip -qr a.zip in
+  unzip -q a.zip -d out-zip
+  eq "$(cat out-zip/in/f)" abc
+}
+
+# JSON::PP is outside perl-base, so a bare perl-base fails
+common_scripts() {
+  eq "$(perl -MJSON::PP -e 'print encode_json([42])')" "[42]"
+  eq "$(lua -e 'print(6*7)')" 42
 }
 
 # a lookbehind, which only PCRE2 reads, so a build without it fails
@@ -122,6 +148,8 @@ offline_common() {
   check "runs as the sandbox user" common_user
   check "HOME and TMPDIR are writable, /usr is not" common_writes
   check "the base tools run" common_tools
+  check "tar and zip pack and unpack" common_archives
+  check "perl modules and lua load" common_scripts
   check "git commits and greps with -P" common_git
   check "git has its https helper" common_git_https
   check "rg searches with --pcre2" common_rg

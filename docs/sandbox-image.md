@@ -42,14 +42,21 @@ image, its environment and its roots in `docs/sandbox.md`.
 ## The base image
 
 - **`deploy/sandbox/base/Dockerfile` holds every step that runs a
-  command:** `base` (what the python variant holds) and `cc` (`base`
-  with `gcc` and `libc6-dev`). uv's image is named once, as the
+  command:** `base` and `cc`. uv's image is named once, as the
   `trixie` stage, and both `base` and git's build start from it, so
   git links the libraries the base ships. `cc` builds its own copy of
   `base`, so the two share no apt layer. Nothing runs this image: the
-  server runs `1ctx-shell`. Measured locally (linux/arm64,
-  2026-11-25): base 415 MB and cc 709 MB, from 489 MB and 783 MB with
-  Debian's git and ripgrep.
+  server runs `1ctx-shell`. Measured locally (`docker images`,
+  linux/arm64, 2026-11-25): base 509 MB and cc 879 MB, from 489 MB and
+  783 MB before the tools below were added and git and ripgrep built.
+- **`base` is what the python variant holds:** Python 3.15 and uv,
+  bash, coreutils, findutils, procps, curl, wget, rsync, make, patch,
+  git, ripgrep, jq, yq, pdftotext, the `sqlite3` shell, Lua 5.4 (as
+  `lua`, Debian's alternative), full Perl, `tar` with xz, zstd and
+  bzip2, zip and unzip, `file`, `tree`, `bc`, `less`, `envsubst`,
+  `column` and `hexdump`. Perl is named in the apt layer, since
+  Debian's git package was what pulled it in beyond perl-base. `cc`
+  adds `gcc`, `g++`, `libc6-dev` and `pkg-config`.
 - **`shell-base.yml` publishes `ghcr.io/stefanprodan/1ctx-shell-base`:**
   `trixie` and `trixie-cc`, each with a dated `-YYYYMMDD` tag that is
   never moved and is deleted by hand. It runs Mondays, by hand, on a
@@ -131,5 +138,8 @@ image, its environment and its roots in `docs/sandbox.md`.
   `SHELL_VERSIONS` as `EXPECT_<TOOL>`, paths from the env the server
   sends. git and ripgrep are checked by what a chat uses (a commit
   read back, `git grep -P`, the https helper reaching libcurl, `rg
-  --pcre2`), never by version, so a base bump never fails a variant
-  still built on an older base.
+  --pcre2`), never by version, so a version bump never fails a variant
+  still built on an older base. A tool the base adds is checked by
+  running it, and archives, `perl -MJSON::PP` (outside perl-base) and
+  `lua` by use; a variant fails those until it is built on a base that
+  has them.

@@ -9,6 +9,18 @@ C
   eq "$(./x)" 42
 }
 
+cc_cxx() {
+  cat >x.cc <<'CC'
+#include <iostream>
+#include <vector>
+int main() { std::vector<int> v{6, 7}; std::cout << v[0] * v[1] << "\n"; }
+CC
+  g++ -o x x.cc
+  eq "$(./x)" 42
+  pkg-config --version >/dev/null
+}
+
 offline_variant() {
   check "gcc compiles and runs a C file" cc_compile
+  check "g++ compiles and runs a C++ file, pkg-config runs" cc_cxx
 }
