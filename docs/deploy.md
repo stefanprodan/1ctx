@@ -313,6 +313,12 @@ deletes the cluster with every release in it.
   as `1ctx-shell:dev-<variant>` and the registry name a source run's
   default names (`VARIANT=go` builds one). The first push creates the
   GHCR package `1ctx-shell` private; make it public once by hand.
+- **`shell-base.yml` publishes `ghcr.io/stefanprodan/1ctx-shell-base`**
+  from `deploy/sandbox/base/Dockerfile`: `trixie` and `trixie-cc` (with
+  gcc), each with a dated `-YYYYMMDD` tag deleted by hand. Mondays, by
+  hand and on a `main` push changing it; a pull request only builds.
+  `docker/github-builder` builds each platform natively, cosign signed;
+  `attest` adds GitHub's attestation, `smoke` the offline contract.
 - **The release pushes the Helm chart beside the image.** Its version is
   the tag without the `v` and its `appVersion` the tag, at
   `oci://ghcr.io/stefanprodan/charts/onectx`, with provenance attested.
