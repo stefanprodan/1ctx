@@ -17,7 +17,7 @@ full feature list.
 - A persistent volume provisioner in the cluster, unless using an existing
   claim
 - A Secret named `onectx` in the release namespace, see
-  [Configure passwords and API keys](#configure-passwords-and-api-keys)
+  [Configure admin keys and API keys](#configure-admin-keys-and-api-keys)
 
 ## Installing the chart
 
@@ -25,17 +25,19 @@ This example bootstraps an OpenRouter provider, an `assistant` agent and
 a `workspace` project. You need an [OpenRouter](https://openrouter.ai)
 API key.
 
-Create the namespace and the Secret with your admin password and API key:
+Create the namespace and the Secret with a fresh admin key, made by the
+image's `admin-key` and piped straight in, and your API key:
 
 ```sh
 kubectl create namespace onectx
-kubectl -n onectx create secret generic onectx \
-  --from-literal=user-admin.key='<password>' \
-  --from-literal=provider-openrouter.key='<OpenRouter API key>'
+docker run --rm ghcr.io/stefanprodan/1ctx:<tag> admin-key admin --stdout |
+  kubectl -n onectx create secret generic onectx \
+    --from-file=user-admin.key=/dev/stdin \
+    --from-literal=provider-openrouter.key='<OpenRouter API key>'
 ```
 
 Save the following as `values.yaml`. The provider references the key in
-the Secret; no passwords or API keys go in this file.
+the Secret; no keys go in this file.
 
 ```yaml
 provision:
@@ -77,7 +79,8 @@ helm install onectx oci://ghcr.io/stefanprodan/charts/onectx \
 
 Expose the service over HTTPS using an
 [Ingress or Gateway API route](#configure-ingress-or-gateway-api), then
-sign in as `admin` with the password you supplied in the Secret.
+sign in as `admin` with the admin key in the Secret
+(`kubectl -n onectx get secret onectx -o jsonpath='{.data.user-admin\.key}' | base64 -d`).
 
 Open the `workspace` project and start a chat with `assistant`. Add
 teammates to the project through the web UI.
@@ -103,15 +106,18 @@ The chart-created database claim is kept by default. See
 
 ## Configuration and installation details
 
-### Configure passwords and API keys
+### Configure admin keys and API keys
 
-Passwords and API keys are read from an existing Secret, named by
+Admin keys and API keys are read from an existing Secret, named by
 `secrets.existingSecret` and mounted at `/secrets`. Each key is one file:
 
-- `user-admin.key`: the `admin` password, 8 characters or more. It
-  creates the admin when the database has no users. With provisioning
-  on, every start signs in with it, so it must match the admin's current
-  password.
+- `user-admin.key`: the first admin's admin key, never a password,
+  made with `1ctx admin-key admin --stdout` (or the image's `admin-key`,
+  as above). It creates `admin` when the database has no users, and
+  with provisioning on every start signs in with it.
+- `user-<username>.key`: another admin's own key, made the same way and
+  read at each sign-in, so adding one needs no restart. Members have no
+  key and sign in by email.
 - `<kind>-<name>.key`: kinds are `user`, `provider`, `search`, `mcp` and
   `http`. The name is 1 to 48 lowercase letters, digits or hyphens, and
   starts with a letter or digit.

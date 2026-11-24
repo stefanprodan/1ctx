@@ -14,13 +14,17 @@ metadata:
   name: onectx
 ```
 
-## Passwords and API keys
+## Admin keys and API keys
 
 Create a Secret named `onectx` in the namespace `onectx`, one key per
 file:
 
-- `user-admin.key`: the `admin` password. With `provision` set, every
-  start signs in with it, so keep it equal to the admin's password.
+- `user-admin.key`: the first admin's admin key, never a password. It
+  creates `admin` on the first start, and with `provision` set every
+  start signs in with it. Make it with the image's `admin-key`:
+  `docker run --rm ghcr.io/stefanprodan/1ctx:<tag> admin-key admin --stdout`.
+- `user-<username>.key`: another admin's own key, made the same way.
+  Members sign in by email.
 - `<kind>-<name>.key`: provider, search, MCP and HTTP keys, such as
   `provider-openrouter.key` or `search-exa.key`.
 

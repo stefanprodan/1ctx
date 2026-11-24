@@ -1,6 +1,9 @@
-# Run with ONECTX_VERSION set to a release; ./secrets holds user-admin.key
-# for the first admin and the <kind>-<name>.key files, and ./provision (or
-# ONECTX_PROVISION) holds the YAML objects applied at every start.
+# Run with ONECTX_VERSION set to a release. ./secrets holds user-admin.key,
+# the first admin's key and never a password (`docker run --rm <image>
+# admin-key admin --stdout > secrets/user-admin.key`), another admin's
+# user-<username>.key and the <kind>-<name>.key files, each readable by
+# 65532 (mode 600 owned by 65532). Members sign in by email. ./provision
+# (or ONECTX_PROVISION) holds the YAML objects applied at every start.
 name: 1ctx
 services:
   1ctx:
