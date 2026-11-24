@@ -15,6 +15,7 @@ import {
   type AssertionJSON,
   type CreationJSON,
   fresh,
+  optionsOk,
   passkeyWords,
   type RequestJSON,
   refreshIn,
@@ -132,9 +133,21 @@ export function passkeysStore(d: PasskeysDeps) {
 
   const shown = () => {
     for (const p of ["add", "sign_in"] as const) {
-      if (wants[p] > 0 && stale(p)) void fetchOptions(p).catch(() => {});
+      if (wants[p] > 0 && stale(p)) fetchRetrying(p);
     }
   };
+
+  // a failed fetch tries again while a button still wants options, or
+  // the autofill would never arm or would end with it
+  function fetchRetrying(p: Purpose): void {
+    void fetchOptions(p).catch(() => {
+      if (wants[p] === 0) return;
+      timers[p]();
+      timers[p] = later(RETRY_MS, () => {
+        if (wants[p] > 0 && !device.hidden()) fetchRetrying(p);
+      });
+    });
+  }
 
   function schedule(p: Purpose) {
     timers[p]();
@@ -142,12 +155,7 @@ export function passkeysStore(d: PasskeysDeps) {
     const o = primed[p];
     if (wants[p] === 0 || o === null) return;
     const refresh = () => {
-      if (wants[p] > 0 && !device.hidden()) {
-        // a failed refresh tries again, or the autofill would end with it
-        void fetchOptions(p).catch(() => {
-          timers[p] = later(RETRY_MS, refresh);
-        });
-      }
+      if (wants[p] > 0 && !device.hidden()) fetchRetrying(p);
     };
     timers[p] = later(refreshIn(o.at, o.json.timeout, now()), refresh);
   }
@@ -160,6 +168,9 @@ export function passkeysStore(d: PasskeysDeps) {
     if (stale(p)) waiting[p].value = true;
     try {
       const json = await call<Options>(OPTIONS[p], "POST");
+      // options without a challenge or a timeout would be kept and
+      // refreshed at once, over and over: a failure, tried again later
+      if (!optionsOk(json, p === "add")) throw new Error("bad options");
       if (mine === asked[p] && at === session()) {
         primed[p] = { json, at: sent, session: at };
         schedule(p);
@@ -185,14 +196,14 @@ export function passkeysStore(d: PasskeysDeps) {
 
   // each challenge is used once, so the next tap needs new options
   const again = (p: Purpose) => {
-    if (wants[p] > 0) void fetchOptions(p).catch(() => {});
+    if (wants[p] > 0) fetchRetrying(p);
   };
 
   // while a passkey button shows; the release lets go
   function prime(p: Purpose): () => void {
     if (wants.add + wants.sign_in === 0) unwatch = device.onVisible(shown);
     wants[p]++;
-    if (stale(p)) void fetchOptions(p).catch(() => {});
+    if (stale(p)) fetchRetrying(p);
     else schedule(p);
     let held = true;
     return () => {
@@ -211,10 +222,14 @@ export function passkeysStore(d: PasskeysDeps) {
     if (!support.peek()) return;
     const mine = ++load;
     const at = session();
-    failed.value = null;
+    // a failure stays until an answer replaces it, so a retry never
+    // leaves the section with neither
     try {
       const a = await call<PasskeysResponse>(PASSKEYS_PATH);
-      if (mine === load && at === session()) list.value = a.passkeys;
+      if (mine === load && at === session()) {
+        list.value = a.passkeys;
+        failed.value = null;
+      }
     } catch (e) {
       if (mine === load && at === session()) failed.value = failure(e);
     }
@@ -343,8 +358,10 @@ export function passkeysStore(d: PasskeysDeps) {
     go: (landing: string) => void,
     answered?: AssertionJSON,
   ): Promise<void> {
+    const at = session();
     const sent = answered ?? (await assert());
-    if (sent === null) return;
+    // none, or the user changed while the browser asked: nothing is sent
+    if (sent === null || at !== session()) return;
     try {
       const a = (await d.post(
         PASSKEY_SIGN_IN_PATH,

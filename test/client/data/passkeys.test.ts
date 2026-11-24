@@ -25,6 +25,7 @@ import {
   fresh,
   fromB64url,
   LEEWAY_MS,
+  optionsOk,
   passkeyWords,
   type RegistrationJSON,
   type RequestJSON,
@@ -344,6 +345,8 @@ function server(list: Passkey[] = []) {
     optionsGate: null as Promise<void> | null,
     listGate: null as Promise<void> | null,
     optionsFail: 0,
+    // answers of a 200 without a timeout
+    malformed: 0,
   };
   const asked: { to: string; method: string; body: unknown }[] = [];
   let challenge = 0;
@@ -360,7 +363,12 @@ function server(list: Passkey[] = []) {
         throw new ApiError(503, "the server failed while answering");
       }
       const base = to === PASSKEY_OPTIONS_PATH ? CREATION : REQUEST;
-      return { ...base, challenge: b64(++challenge) } as T;
+      const json = { ...base, challenge: b64(++challenge) };
+      if (knobs.malformed > 0) {
+        knobs.malformed--;
+        return { ...json, timeout: undefined } as T;
+      }
+      return json as T;
     }
     if (to === PASSKEYS_PATH && method === "GET") {
       const now = [...list];
@@ -605,6 +613,67 @@ describe("the passkeys store", () => {
     release();
   });
 
+  test("a failed first fetch tries again, so the autofill arms", async () => {
+    const m = made([], true, true);
+    m.s.knobs.optionsFail = 1;
+    const release = m.st.listen(() => {});
+    await settle();
+    expect(optionsAsked(m.s, PASSKEY_SIGN_IN_OPTIONS_PATH)).toBe(1);
+    expect(m.d.order).toEqual([]);
+    const retry = m.l.live().at(-1)!;
+    expect(retry.ms).toBe(30_000);
+    retry.fire();
+    await settle();
+    expect(optionsAsked(m.s, PASSKEY_SIGN_IN_OPTIONS_PATH)).toBe(2);
+    // the failed ask minted no challenge
+    expect(m.d.order).toEqual([`autofill ${b64(1)}`]);
+    release();
+    expect(m.l.live()).toHaveLength(0);
+  });
+
+  test("options without a usable timeout are a failure, never kept", async () => {
+    const m = made();
+    m.s.knobs.malformed = 1;
+    const release = m.st.prime("add");
+    await settle();
+    // not kept: the tap only fetches, and no refresh loops at once
+    expect(optionsAsked(m.s)).toBe(1);
+    expect(m.l.live().map((t) => t.ms)).toEqual([30_000]);
+    m.l.live().at(-1)!.fire();
+    await settle();
+    expect(optionsAsked(m.s)).toBe(2);
+    expect(await m.st.add()).toBe(true);
+    expect(m.d.order).toEqual([`create ${b64(2)}`]);
+    release();
+  });
+
+  test("the options' shape is checked", () => {
+    expect(optionsOk(CREATION, true)).toBe(true);
+    expect(optionsOk(REQUEST, false)).toBe(true);
+    expect(optionsOk(REQUEST, true)).toBe(false);
+    expect(optionsOk({ ...REQUEST, timeout: 0 }, false)).toBe(false);
+    expect(optionsOk({ ...REQUEST, timeout: "120000" }, false)).toBe(false);
+    expect(optionsOk({ ...REQUEST, timeout: Number.NaN }, false)).toBe(false);
+    expect(optionsOk({ ...REQUEST, challenge: "" }, false)).toBe(false);
+    expect(optionsOk({}, false)).toBe(false);
+    expect(optionsOk(null, false)).toBe(false);
+  });
+
+  test("an answer from a sheet open while the user changed is never sent", async () => {
+    const m = made();
+    const release = m.st.prime("sign_in");
+    await settle();
+    const sheet = Promise.withResolvers<AssertionJSON>();
+    m.d.device.get = () => sheet.promise;
+    const signing = m.st.signIn(() => {});
+    m.signOut();
+    sheet.resolve(ASSERTION);
+    await signing;
+    expect(m.s.asked.some((a) => a.to === PASSKEY_SIGN_IN_PATH)).toBe(false);
+    expect(m.opens()).toBe(0);
+    release();
+  });
+
   test("options answered late count their freshness from the ask", async () => {
     const m = made();
     const gate = Promise.withResolvers<void>();
@@ -762,7 +831,10 @@ describe("the passkeys store", () => {
     await m.st.read();
     expect(m.st.failed.value).toEqual({ words: "boom", status: 500 });
     m.s.knobs.listGate = null;
-    await m.st.read();
+    const reading = m.st.read();
+    // the failure stays until the answer replaces it
+    expect(m.st.failed.value).not.toBeNull();
+    await reading;
     expect(m.st.failed.value).toBeNull();
     expect(m.st.list.value).toEqual([]);
   });

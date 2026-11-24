@@ -130,20 +130,46 @@ describe("the Passkeys section", () => {
       expect(html).not.toContain("1ctx.example.com");
       expect(withClass(html, "profile-when")).toBe(5);
       expect(html.match(/>Remove<\/button>/g)).toHaveLength(2);
+      expect(html).toContain('aria-label="Remove Apple Passwords"');
+      expect(html).toContain('aria-label="Remove Windows Hello"');
       expect(html).toContain("Add a passkey");
     },
   );
 
-  test.serial("with none, says what a passkey is for", () => {
+  test.serial("with none, says so once, the hint saying what for", () => {
     user();
     passkeys.support.value = true;
     passkeys.list.value = [];
     const html = render(<Profile />);
-    expect(html).toContain(
-      "Sign in with Face ID, Touch ID or your password manager.",
-    );
+    expect(html).toContain("No passkeys yet.");
+    expect(html).not.toContain("Sign in with Face ID");
+    expect(html.match(/Face ID/g)).toHaveLength(1);
     expect(html).toContain("Add a passkey");
   });
+
+  test.serial(
+    "once drawn, a retry of the list never puts the page back to bones",
+    async () => {
+      user();
+      passkeys.support.value = true;
+      passkeys.failed.value = { words: "the server failed", status: 500 };
+      const m = await mount(<Profile />);
+      try {
+        expect(m.html()).toContain("The server failed.");
+        expect(m.html()).toContain('name="about"');
+        // a retry that clears the failure before its answer lands
+        passkeys.failed.value = null;
+        await settle();
+        expect(m.html()).toContain('name="about"');
+        expect(m.html()).not.toMatch(/role="status" aria-label="Loading/);
+        passkeys.list.value = [item()];
+        await settle();
+        expect(m.html()).toContain("Apple Passwords");
+      } finally {
+        await m.unmount();
+      }
+    },
+  );
 
   test.serial("the page waits for the passkeys with the profile", () => {
     user();
@@ -191,9 +217,7 @@ describe("removing a passkey", () => {
       await settle();
       expect(calls.filter((c) => c.init?.method === "DELETE")).toHaveLength(1);
       expect(m.html()).not.toContain("Apple Passwords");
-      expect(m.html()).toContain(
-        "Sign in with Face ID, Touch ID or your password manager.",
-      );
+      expect(m.html()).toContain("No passkeys yet.");
     } finally {
       await m.unmount();
     }

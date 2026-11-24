@@ -134,6 +134,7 @@ function PasskeyRow({
           busy={save.busy}
           small
           ask="Remove"
+          askLabel={`Remove ${passkey.device}`}
           label="Remove"
           action="remove"
           going="Removing"

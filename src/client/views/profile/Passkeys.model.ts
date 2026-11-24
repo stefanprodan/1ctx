@@ -9,8 +9,7 @@ import { dayMonth, dayMonthYear } from "../../lib/format.ts";
 // the card's line beside its title, and its note with none
 export const PASSKEYS_TEXT =
   "Use Face ID, Touch ID or your password manager instead of a code.";
-export const NO_PASSKEYS =
-  "Sign in with Face ID, Touch ID or your password manager.";
+export const NO_PASSKEYS = "No passkeys yet.";
 
 // every origin's is listed, so one added at another address never hides;
 // it signs in only there, port included, so its row names it

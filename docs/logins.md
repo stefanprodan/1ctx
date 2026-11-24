@@ -260,7 +260,8 @@ and `getAuthenticatorData()`, `crypto.subtle`, ES256 and RS256 of
   tap, so the sign-in, the passkey step and the profile's section fetch
   options when they show, again 30 s (`LEEWAY_MS`) before their
   timeout, and after every tap but a sign-in that worked. Freshness
-  counts from the ask; a failed refresh tries again after 30 s; a
+  counts from the ask; a failed fetch or refresh, options without a
+  challenge or a usable timeout included, tries again after 30 s; a
   hidden tab fetches stale options when shown. A tap on stale options
   only fetches, its button disabled until they land, so no tap awaits
   a fetch before the browser is asked. An add still asking when the
@@ -291,6 +292,7 @@ and `getAuthenticatorData()`, `crypto.subtle`, ES256 and RS256 of
   provider, "Added 12 Nov" and "Last used 20 Nov" or "Never used" on
   the reader's calendar, and the host of one added at another origin
   (`elsewhere()`), so none hides. Remove is asked once; "Add a
-  passkey" is its foot. With none it says "Sign in with Face ID, Touch
-  ID or your password manager." The profile route loads the list with
-  the row, so the page waits as one.
+  passkey" is its foot. With none it says "No passkeys yet." The
+  profile route loads the list with the row, so the first draw waits
+  as one; once drawn, a reload or retry of the list touches only the
+  section, a failure staying until an answer replaces it.

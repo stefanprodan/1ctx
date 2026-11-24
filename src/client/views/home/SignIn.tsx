@@ -337,6 +337,8 @@ export function SignIn({
               disabled={
                 busy.value || sending.value || passkeys.waiting("sign_in")
               }
+              // a stalled fetch never keeps the user from another way
+              menuDisabled={busy.value || sending.value}
               onClick={() => void signInByPasskey()}
               working={busy.value || passkeys.waiting("sign_in")}
               items={ways}

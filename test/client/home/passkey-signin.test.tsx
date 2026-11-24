@@ -140,6 +140,10 @@ describe("the sign-in with passkeys", () => {
       release();
       expect(button(html, "Sign in")).toContain("disabled");
       expect(withClass(html, "splitbutton-spin")).toBe(1);
+      // a stalled fetch never keeps the user from another way
+      const pick = /<button[^>]*aria-label="Ways to sign in"[^>]*>/.exec(html);
+      expect(pick?.[0]).toBeDefined();
+      expect(pick![0]).not.toContain("disabled");
       expect(labels(menusOf(<SignIn />)[0]!.items)).toEqual([
         "Email code",
         "Passkey (picked)",

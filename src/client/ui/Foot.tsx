@@ -109,6 +109,7 @@ export function AskDelete({
   action = "delete",
   going = "Deleting",
   small,
+  askLabel,
   onAsk,
   onDelete,
 }: {
@@ -124,6 +125,8 @@ export function AskDelete({
   going?: string;
   // in a row's end, beside its other small buttons
   small?: boolean;
+  // the first button's name for a reader, naming what it removes
+  askLabel?: string;
   // it never throws
   onAsk?: () => Promise<void>;
   onDelete: () => void;
@@ -143,6 +146,7 @@ export function AskDelete({
       <button
         type="button"
         class={btn}
+        aria-label={askLabel}
         disabled={busy}
         onClick={async () => {
           await onAsk?.();

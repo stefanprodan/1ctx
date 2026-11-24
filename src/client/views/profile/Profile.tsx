@@ -173,16 +173,22 @@ function EmailForm({ user }: { user: ProfileRow }) {
 
 export function Profile() {
   const user = profile.value;
-  // the passkeys land with the profile, so the page waits as one
+  // the passkeys land with the profile, so the first draw waits as one;
+  // once drawn, the list's reloads touch only its section, never the
+  // forms and their unsaved edits
+  const drawn = useRef(false);
   const keys =
+    !drawn.current &&
     passkeys.support.value &&
     passkeys.list.value === null &&
     passkeys.failed.value === null;
+  const loading = (user === null || keys) && profileError.value === null;
+  if (!loading && user !== null) drawn.current = true;
   return (
     <Page
       crumb="Account"
       title="Profile"
-      loading={(user === null || keys) && profileError.value === null}
+      loading={loading}
       waiting={<ProfileWaiting />}
       error={profileError.value}
     >
