@@ -195,6 +195,15 @@ gateway add`.
   bumped by hand, and the bash description's versions with it
   (`docs/bash.md`). It makes every root the sandbox policy
   names and holds no helper: the server passes them with each exec.
+- **Each variant's promise is a contract, `deploy/sandbox/checks/`**:
+  `common.sh` (the harness and what every variant holds) and one file
+  per variant, shell checks that must exit 0. `make sandbox-image-check
+  [ARGS="--variant go --image <ref> --offline"]` sends them through the
+  sandbox backend to a real gateway, the preview's by default: the
+  offline checks with the network off, then at most one online check
+  per variant on the default hosts. Versions come from `SHELL_VERSIONS`
+  as `EXPECT_<TOOL>`, paths from the env the server sends; a check
+  names no version or path of its own. Run it on every image change.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
   would kill the shutdown after the drain. Docker Compose sets
   `stop_grace_period: 25s`; a plain run passes `--stop-timeout 25`.

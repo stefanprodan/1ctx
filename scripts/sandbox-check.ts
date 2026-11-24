@@ -469,22 +469,6 @@ except Exception as e: print('mem', type(e).__name__)"`,
     `${brief((ptmx.answer?.stdout ?? "") + (ptmx.answer?.stderr ?? ""))}; fence ${ptmx.steps.find((s) => s.step === "fence")?.ms}ms`,
   );
 
-  // the variant's toolchain builds with no network, under Landlock's
-  // read-only /usr, its caches and the Rust toolchain in HOME
-  const builds: Record<SandboxVariant, string> = {
-    python: `python3 -c 'print("built", 6 * 7)'`,
-    bun: `node -e 'console.log("built", 6 * 7)'`,
-    go: `mkdir -p "$HOME/cgo" && cd "$HOME/cgo" && printf 'package main\\n\\n// static int twice(int x) { return 2 * x; }\\nimport "C"\\nimport "fmt"\\n\\nfunc main() { fmt.Println("built", C.twice(21)) }\\n' > main.go && go run main.go`,
-    rust: `cd "$HOME" && cargo new -q --offline built && cd built && printf 'fn main() { println!("built {}", 6 * 7); }\\n' > src/main.rs && cargo run -q --offline`,
-  };
-  // in a subshell, so the chat's cwd stays for the steps after
-  const built = await command(chat, `(${builds[variant]})`, 120_000);
-  report(
-    `the ${variant} variant builds and runs a program offline`,
-    (built.answer?.stdout ?? "").includes("built 42"),
-    `${built.total}ms; ${brief((built.answer?.stdout ?? "") + (built.answer?.stderr ?? ""))}`,
-  );
-
   const warm = await command(chat, "true");
   report(
     "a warm command with nothing changed pushes nothing",

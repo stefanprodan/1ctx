@@ -14,8 +14,8 @@
 //     --ca ca.crt --cert tls.crt --key tls.key [--variant python] \
 //     [--image 1ctx-shell:dev-<variant>]
 //
-// The variant names the tools checked: Python and uv in each, and its
-// own toolchain fetching from the default hosts.
+// The variant only picks the image; what each image holds is
+// scripts/sandbox-image-check.ts's.
 
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -622,37 +622,25 @@ async function main() {
       .join(", "),
   );
 
-  // the variant's own toolchain, fetching from the default hosts
-  await toolchain();
-
-  // the image's tools, then uv: a package from PyPI and another Python
-  // from uv's download host, both into HOME
+  // the default hosts: uv's package from PyPI and another Python from
+  // its download host, both into HOME, and npm's encoded slash. The image's own tools are
+  // scripts/sandbox-image-check.ts's
   const uv = await command(
     DEFAULTS,
     [],
     [
-      `printf 'python '; python3 --version 2>&1`,
-      `printf 'git '; git --version | cut -d' ' -f3`,
-      `printf 'make '; make --version | head -1 | cut -d' ' -f3`,
-      `printf 'rg '; rg --version | head -1 | cut -d' ' -f2`,
-      `printf 'yq '; yq --version | grep -o 'v[0-9][0-9.]*'`,
-      `printf 'jq '; jq --version`,
-      `printf 'uvx '; uvx --version | cut -d' ' -f2`,
       `printf 'requests '; uv run -q --with requests python -c 'import requests; print(requests.__name__)' 2>&1 | tail -1`,
       `printf 'other '; uv run -q --python 3.14 python --version 2>&1 | tail -1`,
       `printf 'where '; ls "$HOME/.local/share/uv/python" | grep -c 3.14`,
+      // npm's scoped names hold an encoded slash, refused on other hosts
+      `printf 'npm-encoded '; curl -s -m 15 -o /dev/null -w '%{http_code}' 'https://registry.npmjs.org/@types%2fnode'; echo`,
     ].join("\n"),
   );
   const u = uv.raw;
   report(
-    "the image's tools answer: Python 3.15, git, make, rg, yq, jq and uvx",
-    /^python Python 3\.15\.\d+$/.test(lineOf(u, "python")) &&
-      ["git", "make", "rg", "yq", "jq", "uvx"].every(
-        (label) => lineOf(u, label).length > label.length + 1,
-      ),
-    ["python", "git", "make", "rg", "yq", "jq", "uvx"]
-      .map((label) => lineOf(u, label))
-      .join(", "),
+    "an encoded slash passes on the npm registry",
+    lineOf(u, "npm-encoded") === "npm-encoded 200",
+    lineOf(u, "npm-encoded"),
   );
   report(
     "uv installs a package and downloads another Python into HOME",
@@ -679,117 +667,6 @@ async function main() {
       (proxyRefused(off.raw, "off") ||
         (status(off.raw, "off") === "000" && status(w, "listed") === "200")),
     `${uv.sandbox} -> ${off.sandbox} (${off.loaded} load); ${lineOf(off.raw, "off")}`,
-  );
-}
-
-// what the variant adds: its tools answer, and each installs from the
-// default hosts into HOME, never /tmp
-async function toolchain() {
-  if (variant === "python") {
-    const none = await command(
-      DEFAULTS,
-      [],
-      `for t in bun node go cargo gcc; do command -v $t >/dev/null && echo "has $t"; done; echo done`,
-    );
-    report(
-      "python holds no other toolchain",
-      none.raw.trim() === "done",
-      brief(none.raw),
-    );
-    return;
-  }
-  if (variant === "bun") {
-    // a scoped package too: its registry path holds an encoded slash
-    const bun = await command(
-      DEFAULTS,
-      [],
-      [
-        `printf 'bun '; bun --version`,
-        `printf 'node '; node -e 'console.log(process.versions.bun)'`,
-        // a real package, since plain bun also answers --version
-        `printf 'npx '; npx cowsay npx-ok 2>&1 | grep -c 'npx-ok'`,
-        `mkdir -p "$HOME/bun-check" && cd "$HOME/bun-check"`,
-        `printf '{"name":"bun-check","private":true}' > package.json`,
-        `printf 'import { z } from "zod";\\nconsole.log(z.string().parse("zod-ok"));\\n' > x.ts`,
-        `bun add zod @types/node > "$HOME/bun-add.log" 2>&1; echo "add $?"`,
-        `grep -iE 'error|403|denied|refused' "$HOME/bun-add.log" | head -5`,
-        `printf 'types '; cat node_modules/@types/node/package.json | jq -r .name`,
-        `printf 'run '; bun run x.ts 2>&1 | tail -1`,
-        `printf 'cache '; ls "$HOME/.bun/install/cache" | grep -c .`,
-        `printf 'npm-encoded '; curl -s -m 15 -o /dev/null -w '%{http_code}' 'https://registry.npmjs.org/@types%2fnode'; echo`,
-      ].join("\n"),
-    );
-    const n = bun.raw;
-    report(
-      "bun 1.4.4 answers, node runs on it and npx runs a package from npm",
-      lineOf(n, "bun") === "bun 1.4.4" &&
-        lineOf(n, "node") === "node 1.4.4" &&
-        lineOf(n, "npx") === "npx 1",
-      ["bun", "node", "npx"].map((label) => lineOf(n, label)).join(", "),
-    );
-    report(
-      "an encoded slash passes on the npm registry",
-      lineOf(n, "npm-encoded") === "npm-encoded 200",
-      lineOf(n, "npm-encoded"),
-    );
-    report(
-      "bun adds a package and a scoped one from the defaults, and runs TypeScript",
-      lineOf(n, "add") === "add 0" &&
-        lineOf(n, "types") === "types @types/node" &&
-        lineOf(n, "run") === "run zod-ok" &&
-        Number(lineOf(n, "cache").split(" ")[1]) > 0 &&
-        (bun.changes?.written.length ?? 0) === 0,
-      `${bun.ms}ms; ${brief(n)}; /tmp written ${bun.changes?.written.length ?? 0}`,
-    );
-    return;
-  }
-  if (variant === "go") {
-    const go = await command(
-      DEFAULTS,
-      [],
-      [
-        `printf 'go '; go version | cut -d' ' -f3`,
-        `mkdir -p "$HOME/go-check" && cd "$HOME/go-check"`,
-        `go mod init example.test/check > /dev/null 2>&1`,
-        `printf 'package main\\n\\n// static int twice(int x) { return 2 * x; }\\nimport "C"\\nimport "fmt"\\nimport "golang.org/x/example/hello/reverse"\\n\\nfunc main() { fmt.Println(C.twice(21), reverse.String("ko-og")) }\\n' > main.go`,
-        `go get golang.org/x/example/hello@latest > "$HOME/go-get.log" 2>&1; echo "get $?"`,
-        `printf 'run '; go run . 2>&1 | tail -1`,
-        `printf 'mods '; ls "$HOME/go/pkg/mod/golang.org/x" | grep -c example`,
-      ].join("\n"),
-    );
-    const g = go.raw;
-    report(
-      "go 1.27 fetches a module through the proxy and runs it with cgo",
-      /^go go1\.27\.\d+$/.test(lineOf(g, "go")) &&
-        lineOf(g, "get") === "get 0" &&
-        lineOf(g, "run") === "run 42 go-ok" &&
-        Number(lineOf(g, "mods").split(" ")[1]) > 0,
-      `${go.ms}ms; ${brief(g)}`,
-    );
-    return;
-  }
-  const rust = await command(
-    DEFAULTS,
-    [],
-    [
-      `printf 'rustc '; rustc --version | cut -d' ' -f2`,
-      `cd "$HOME" && cargo new -q rust-check && cd rust-check`,
-      `cargo add -q itoa > "$HOME/cargo-add.log" 2>&1; echo "add $?"`,
-      `printf 'fn main() { println!("{}", itoa::Buffer::new().format(42)); }\\n' > src/main.rs`,
-      `printf 'run '; cargo run -q 2>&1 | tail -1`,
-      `rustup target add wasm32-unknown-unknown > "$HOME/rustup.log" 2>&1; echo "target $?"`,
-      `printf 'targets '; rustup target list --installed | grep -c .`,
-    ].join("\n"),
-  );
-  const r = rust.raw;
-  report(
-    "rust 1.100 adds a crate, builds it, and rustup fetches a target into HOME",
-    lineOf(r, "rustc") === "rustc 1.100.0" &&
-      lineOf(r, "add") === "add 0" &&
-      lineOf(r, "run") === "run 42" &&
-      lineOf(r, "target") === "target 0" &&
-      lineOf(r, "targets") === "targets 2",
-    `${rust.ms}ms; ${brief(r)}`,
   );
 }
 
