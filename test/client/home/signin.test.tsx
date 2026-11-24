@@ -1,10 +1,15 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { render } from "preact-render-to-string";
-import { handedOver, sendCode, whoIs } from "../../../src/client/data/links.ts";
-import { emailOn, me } from "../../../src/client/data/me.ts";
+import {
+  handedOver,
+  holdHandOver,
+  takeHandOver,
+} from "../../../src/client/data/links.ts";
+import { emailOn, me, meError } from "../../../src/client/data/me.ts";
+import { signInWords } from "../../../src/client/data/sign-in.ts";
 import { SplitButton } from "../../../src/client/ui/SplitButton.tsx";
 import {
   codeFlow,
@@ -22,8 +27,10 @@ import {
 } from "../../../src/client/views/home/SignIn.model.ts";
 import { SignIn } from "../../../src/client/views/home/SignIn.tsx";
 import type { Me } from "../../../src/shared/contracts/user.ts";
+import { settle } from "../../helpers/async.ts";
 import { withClass } from "../../helpers/classes.ts";
 import { clientFetch } from "../../helpers/client-fetch.ts";
+import { type Mounted, mount } from "../../helpers/mount.ts";
 
 describe("the way", () => {
   test("follows what the server offers", () => {
@@ -160,76 +167,199 @@ describe("the code's flow", () => {
 });
 
 describe("the hand-over", () => {
-  test("reads the address from the fragment, or nothing", () => {
+  test("takes a real address from the fragment, or nothing", () => {
     expect(handedOver("#code=maria%40example.test")).toBe("maria@example.test");
     expect(handedOver("#code=nobody")).toBeNull();
+    expect(handedOver("#code=a%40b")).toBeNull();
     expect(handedOver("#code=%E0%A4%A")).toBeNull();
     expect(handedOver("#section")).toBeNull();
     expect(handedOver("")).toBeNull();
   });
-});
 
-const user = { id: "u1", username: "maria" } as unknown as Me;
+  test.serial("strips the reserved fragment, valid or not", () => {
+    let strips = 0;
+    const strip = () => {
+      strips++;
+    };
+    holdHandOver("#code=not-an-address", strip);
+    expect(strips).toBe(1);
+    expect(takeHandOver()).toBeNull();
+    holdHandOver("#section", strip);
+    expect(strips).toBe(1);
+    holdHandOver("#code=maria%40example.test", strip);
+    expect(strips).toBe(2);
+    expect(takeHandOver()).toBe("maria@example.test");
+    expect(takeHandOver()).toBeNull();
+  });
 
-describe("signing in by code", () => {
-  let answer: () => Response = () => new Response("{}");
-  clientFetch(() => answer());
-  afterEach(() => {
+  test.serial("a browser signed in already drops it", () => {
+    holdHandOver("#code=maria%40example.test", () => {});
+    me.value = user;
+    expect(takeHandOver()).toBeNull();
     me.value = undefined;
   });
+});
 
-  test.serial("lands the user after the landing", async () => {
-    answer = () => Response.json({ user, landing: "/" });
-    const steps: string[] = [];
-    await sendCode(
-      { email: " maria@example.test ", code: "123456" },
-      () => steps.push("landed"),
-      (to) => steps.push(`go ${to}`),
+describe("the sign-in's words", () => {
+  test("say the status, never the body", () => {
+    const wrong = "wrong or expired code";
+    expect(signInWords(0, wrong)).toBe("the server did not answer");
+    expect(signInWords(401, wrong)).toBe(wrong);
+    expect(signInWords(400, wrong)).toBe("email is an email address");
+    expect(signInWords(404, wrong)).toBe("email is off");
+    expect(signInWords(429, wrong)).toBe("too many tries; wait a minute");
+    expect(signInWords(500, wrong)).toBe("the server failed");
+    expect(signInWords(502, wrong)).toBe("the server failed");
+    expect(signInWords(413, wrong)).toBe("refused");
+  });
+});
+
+const user: Me = {
+  id: "u1",
+  username: "maria",
+  fullName: "Maria",
+  role: "member",
+};
+
+// the server, by method and path: each call takes the next answer queued
+// for it, and a call nothing was queued for fails the test
+type Answer = () => Response;
+const answers = new Map<string, Answer[]>();
+const queue = (route: string, ...list: Answer[]) => {
+  answers.set(route, [...(answers.get(route) ?? []), ...list]);
+};
+const calls = clientFetch((url, init) => {
+  const route = `${init?.method ?? "GET"} ${url}`;
+  const next = answers.get(route)?.shift();
+  if (next === undefined) throw new Error(`unexpected ${route}`);
+  return next();
+});
+const json =
+  (body: unknown, status = 200) =>
+  () =>
+    Response.json(body, { status });
+const routes = () => calls.map((c) => `${c.init?.method ?? "GET"} ${c.url}`);
+
+describe("signing in on the card", () => {
+  const g = globalThis as Record<string, unknown>;
+  const held = {
+    location: g.location,
+    history: g.history,
+    localStorage: g.localStorage,
+  };
+  let mounted: Mounted | null = null;
+  let kept: Map<string, string>;
+
+  beforeEach(() => {
+    answers.clear();
+    kept = new Map();
+    g.location = { origin: "http://1ctx.test", pathname: "/", search: "" };
+    g.history = { pushState() {}, replaceState() {} };
+    g.localStorage = {
+      getItem: (k: string) => kept.get(k) ?? null,
+      setItem: (k: string, v: string) => kept.set(k, v),
+    };
+    emailOn.value = true;
+    me.value = null;
+  });
+  afterEach(async () => {
+    await mounted?.unmount();
+    mounted = null;
+    Object.assign(g, held);
+    emailOn.value = false;
+    me.value = undefined;
+    meError.value = null;
+  });
+
+  const codeStep = async () => {
+    mounted = await mount(
+      <SignIn opening="code" address="maria@example.test" />,
     );
-    expect(steps).toEqual(["landed", "go /"]);
-    expect(me.value).toEqual(user);
+    return mounted;
+  };
+  // the system's one-time code fills every box at once
+  const fill = (m: Mounted, code: string) =>
+    m.fire("signin-box", "onInput", { value: code });
+
+  test.serial("a refused code says so, whatever the body says", async () => {
+    queue("POST /api/login/code", json({ error: "anything at all" }, 401));
+    const m = await codeStep();
+    await fill(m, "123456");
+    await settle();
+    expect(m.html()).toContain("Wrong or expired code.");
+    expect(withClass(m.html(), "signin-box", "signin-box-wrong")).toBe(6);
+    expect(me.value).toBeNull();
   });
 
-  test.serial("an unreadable answer is a used code", async () => {
-    answer = () => new Response("not json");
-    let landed = false;
-    await expect(
-      sendCode(
-        { email: "maria@example.test", code: "123456" },
-        () => {
-          landed = true;
-        },
-        () => {},
-      ),
-    ).rejects.toThrow("couldn't load");
-    expect(landed).toBe(true);
+  test.serial(
+    "a failed read after a taken code offers Try again, never a repost",
+    async () => {
+      queue("POST /api/login/code", json({ user, landing: "/" }));
+      queue(
+        "GET /api/me",
+        () => new Response("<html>proxy</html>", { status: 502 }),
+        // a malformed answer is no answer: still Try again
+        json({ user: { id: "u1" }, emailOn: true }),
+        json({ user, emailOn: true, dictationOn: false }),
+      );
+      const m = await codeStep();
+      await fill(m, "123456");
+      await settle();
+      expect(m.html()).toContain("Couldn't load.");
+      expect(m.html()).toContain(">Try again</button>");
+      expect(me.value).toBeNull();
+      await m.fire("splitbutton-go", "onClick");
+      await settle();
+      expect(m.html()).toContain(">Try again</button>");
+      expect(me.value).toBeNull();
+      await m.fire("splitbutton-go", "onClick");
+      await settle();
+      expect(me.value).toEqual(user);
+      expect(routes()).toEqual([
+        "POST /api/login/code",
+        "GET /api/me",
+        "GET /api/me",
+        "GET /api/me",
+      ]);
+    },
+  );
+
+  test.serial("an ask refused says the sign-in's words", async () => {
+    queue("POST /api/login/link", json({ error: "slow down" }, 429));
+    mounted = await mount(<SignIn />);
+    const m = mounted;
+    await m.fire("signin-input", "onInput", { value: "maria@example.test" });
+    await m.fire("signin-form", "onSubmit");
+    await settle();
+    expect(m.html()).toContain("Too many tries; wait a minute.");
+    expect(m.html()).toContain('name="email"');
   });
 
-  test.serial("a refused code never lands", async () => {
-    answer = () => Response.json({ error: "wrong code" }, { status: 401 });
-    let landed = false;
-    await expect(
-      sendCode(
-        { email: "maria@example.test", code: "123456" },
-        () => {
-          landed = true;
-        },
-        () => {},
-      ),
-    ).rejects.toThrow("wrong code");
-    expect(landed).toBe(false);
+  test.serial("an ask sent moves on to the code", async () => {
+    queue("POST /api/login/link", () => new Response(null, { status: 202 }));
+    mounted = await mount(<SignIn />);
+    const m = mounted;
+    await m.fire("signin-input", "onInput", { value: "maria@example.test" });
+    await m.fire("signin-form", "onSubmit");
+    await settle();
+    expect(withClass(m.html(), "signin-box")).toBe(6);
+    expect(m.html()).toContain("Sent to maria@example.test");
   });
 
-  test.serial("who is in: a user, nobody or no answer", async () => {
-    answer = () =>
-      Response.json({ user: null, emailOn: true, dictationOn: false });
-    expect(await whoIs()).toBe("nobody");
-    answer = () => Response.json({ user, emailOn: true, dictationOn: false });
-    expect(await whoIs()).toBe("in");
-    expect(me.value).toEqual(user);
-    answer = () => new Response("", { status: 502 });
-    expect(await whoIs()).toBe("failed");
-  });
+  test.serial(
+    "a way picked in the menu swaps the field and is kept",
+    async () => {
+      mounted = await mount(<SignIn />);
+      const m = mounted;
+      expect(m.html()).toContain('name="email"');
+      await m.fire("splitbutton-pick", "onClick");
+      expect(withClass(m.html(), "menu-item")).toBe(2);
+      await m.fire("menu-item", "onClick", {}, 1);
+      expect(m.html()).toContain('name="key"');
+      expect(m.html()).not.toContain('name="email"');
+      expect(kept.get(KEPT_WAY)).toBe("key");
+    },
+  );
 });
 
 describe("SignIn", () => {

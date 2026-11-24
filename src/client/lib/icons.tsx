@@ -155,7 +155,10 @@ const PATHS = {
   // an HTTP credential: a key bash's curl signs with
   email: "M2 3.5h12v9H2zM2 4l6 5 6-5",
   key: "M5.5 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM7.6 8.4 13.5 2.5M11.5 4.5l1.75 1.75M9.75 6.25l1.25 1.25",
-  // the sign-in's Admin key, and its Send a new code
+  // the sign-in's ways and its code's actions: Email code, Admin key,
+  // Send a new code and Use another email
+  mail: "M2.5 4h11v8.5h-11zM2.5 4.5 8 8.75l5.5-4.25",
+  pen: "M10.5 2.5l3 3-8 8H2.5v-3z",
   shield:
     "M8 1.75 13 3.5v4c0 3.2-2.1 5.6-5 6.75C5.1 13.1 3 10.7 3 7.5v-4zM5.75 8l1.5 1.5 3-3",
   retry:

@@ -6,54 +6,36 @@
 // only tried beside; same-origin fetches carry it. The link an email
 // carries opens a page the server draws.
 
-import type {
-  CodeRequest,
-  CodeResponse,
-  LinkAskRequest,
-  MeResponse,
-} from "../../shared/api/access.ts";
-import { api } from "./api.ts";
-import { loadDictationOn, setDictationOn, setMe } from "./me.ts";
+import { effect } from "@preact/signals";
+import type { CodeRequest, LinkAskRequest } from "../../shared/api/access.ts";
+import { isEmail } from "../../shared/words.ts";
+import { me, opened } from "./me.ts";
+import { signInPost } from "./sign-in.ts";
 
 // answered the same whoever it names, so there is nothing to read back
 export async function askLink(email: string): Promise<void> {
   const body: LinkAskRequest = { email: email.trim() };
-  await api("/api/login/link", "POST", body);
+  await signInPost("/api/login/link", body, "signed out");
 }
 
-// signs this browser in, in place of any other. landed runs once the
-// server took the code, before who it is is read from the answer, so a
-// failure after it is a used code; go takes the landing first, then the
-// user lands
+// signs this browser in, in place of any other. go takes the landing
+// once the server took the code, before who it is is read, so a failure
+// after it is a used code
 export async function sendCode(
-  body: CodeRequest,
-  landed: () => void,
+  email: string,
+  code: string,
   go: (landing: string) => void,
 ): Promise<void> {
-  const answer = await api<Partial<CodeResponse>>("/api/login/code", "POST", {
-    email: body.email.trim(),
-    code: body.code,
-  });
-  landed();
-  if (answer.user == null || typeof answer.landing !== "string") {
-    throw new Error("couldn't load");
+  const body: CodeRequest = { email: email.trim(), code };
+  const answer = (await signInPost(
+    "/api/login/code",
+    body,
+    "wrong or expired code",
+  )) as { landing?: unknown } | null;
+  if (typeof answer?.landing === "string" && answer.landing.startsWith("/")) {
+    go(answer.landing);
   }
-  if (answer.landing.startsWith("/")) go(answer.landing);
-  setMe(answer.user);
-  void loadDictationOn();
-}
-
-// who the cookie signs in, read again after a used code's answer failed
-export async function whoIs(): Promise<"in" | "nobody" | "failed"> {
-  try {
-    const body = await api<MeResponse>("/api/me");
-    if (body.user === null) return "nobody";
-    setMe(body.user);
-    setDictationOn(body.dictationOn);
-    return "in";
-  } catch {
-    return "failed";
-  }
+  await opened();
 }
 
 // the dead link page's ask hands its address over in the fragment,
@@ -65,21 +47,33 @@ export function handedOver(hash: string): string | null {
   if (!hash.startsWith(HAND_OVER)) return null;
   try {
     const email = decodeURIComponent(hash.slice(HAND_OVER.length)).trim();
-    return email.includes("@") ? email : null;
+    return isEmail(email) ? email : null;
   } catch {
     return null;
   }
 }
 
-// read once as the page loads and taken out of the address bar, so it
-// never stays in the history; the first sign-in drawn takes it
-let handed: string | null =
-  typeof location === "undefined" ? null : handedOver(location.hash);
-if (handed !== null) {
-  try {
-    history.replaceState(null, "", location.pathname + location.search);
-  } catch {}
+// read once as the page loads, and the reserved fragment always taken
+// out of the address bar, so it never stays in the history; the first
+// sign-in drawn takes it, and a browser signed in already drops it
+let handed: string | null = null;
+
+export function holdHandOver(hash: string, strip: () => void): void {
+  if (!hash.startsWith(HAND_OVER)) return;
+  handed = handedOver(hash);
+  strip();
 }
+
+if (typeof location !== "undefined") {
+  holdHandOver(location.hash, () => {
+    try {
+      history.replaceState(null, "", location.pathname + location.search);
+    } catch {}
+  });
+}
+effect(() => {
+  if (me.value) handed = null;
+});
 
 export function takeHandOver(): string | null {
   const email = handed;

@@ -165,3 +165,15 @@ link and a six-digit code, either works once, and using one uses both.
   off. The code is six boxes (`CodeBoxes.tsx`); the sixth digit signs
   in. A line under the field keeps its height whatever it says, so the
   card never moves. The rules are `SignIn.model.ts`'s.
+- **A sign-in leaves the card only once `GET /api/me` names the user**
+  (`opened()` in `data/me.ts`). A read that fails after an accepted
+  code keeps the card with Try again, which reads again and never posts
+  the spent code; a malformed answer is a failure, `user: null` nobody.
+- **The sign-in's posts skip `api()`'s 401 hook** (`data/sign-in.ts`):
+  a wrong key or code ends no login. Their failures say fixed words for
+  the status (`signInWords()`), never the body's.
+- **On `/login` a failed first load is its retry,** not a card that
+  cannot know whether email is on.
+- **The hand-over's fragment is always stripped;** an address that is
+  no `isEmail()` is dropped, and so is any hand-over once the browser
+  is signed in.

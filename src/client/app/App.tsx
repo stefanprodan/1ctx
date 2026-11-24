@@ -15,6 +15,7 @@ import { loadMe, me, meError } from "../data/me.ts";
 import { Icon } from "../lib/icons.tsx";
 import { type HandedWait, HandOver, useHandOver } from "../lib/wait.ts";
 import { Bone } from "../ui/Bones.tsx";
+import { CodeTag } from "../ui/CodeTag.tsx";
 import { PageWaiting } from "../ui/PageWaiting.tsx";
 import { SignIn } from "../views/home/SignIn.tsx";
 import { Rail, RailWaiting } from "./Rail.tsx";
@@ -160,14 +161,21 @@ export function App() {
     else if (m === null || m.route.path === "/login") navigate("/", true);
   }, [user, m, path.value]);
 
+  // the sign-in at /login is the one App draws for every address that
+  // needs a user, so the card keeps its state when a sign-in moves it
+  const signIn = m !== null && m.route.path === "/login";
+  const failed = meError.value;
   if (user === undefined) {
+    // the sign-in draws at once, but a failed first load offers its
+    // retry rather than a card that cannot know whether email is on
+    if (signIn && failed === null) return <SignIn />;
     // a public page needs nobody, so a slow or hanging first load does
-    // not hold the sign-in form back
-    if (!needsUser) {
+    // not hold it back
+    if (!needsUser && !signIn) {
       const View = m.route.view;
       return <View params={m.params} />;
     }
-    if (meError.value === null) {
+    if (failed === null) {
       // a route with a shape of its own (a chat) waits in it already,
       // so the shape does not change when the user lands
       const Shape =
@@ -186,7 +194,10 @@ export function App() {
     }
     return (
       <main class="shell-fail">
-        <p class="error">{meError.value}</p>
+        <p class="error">
+          {failed.words}
+          <CodeTag status={failed.status} spaced />
+        </p>
         <button type="button" class="btn" onClick={() => void loadMe()}>
           Try again
         </button>
@@ -194,7 +205,7 @@ export function App() {
     );
   }
   if (user === null) {
-    if (needsUser) return <SignIn />;
+    if (needsUser || signIn) return <SignIn />;
     const View = m.route.view;
     return <View params={m.params} />;
   }

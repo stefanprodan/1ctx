@@ -3,7 +3,7 @@
 //
 // The link page loads no stylesheet, so its look is copied: every value
 // it names must be the one tokens.css gives that name, in each theme,
-// and its logo the client's.
+// and its lockup the client's.
 
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -54,9 +54,9 @@ test("its values are tokens.css's, in the dark and the light theme", () => {
   expect(rules).not.toMatch(/font-size:\d|font:\d/);
 });
 
-test("its logo is the client's", () => {
+test("its lockup is the client's mark and wordmark", () => {
   const icons = readFileSync(join(CLIENT, "lib/icons.tsx"), "utf8");
   const paths = [...html.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]!);
-  expect(paths).toHaveLength(3);
+  expect(paths).toHaveLength(4);
   for (const d of paths) expect(icons).toContain(d);
 });

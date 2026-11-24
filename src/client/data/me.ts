@@ -7,14 +7,12 @@
 // retry instead of a blank page.
 
 import { signal } from "@preact/signals";
-import type {
-  LoginRequest,
-  LoginResponse,
-  MeResponse,
-} from "../../shared/api/access.ts";
+import type { LoginRequest, MeResponse } from "../../shared/api/access.ts";
 import type { Me } from "../../shared/contracts/user.ts";
+import { isRole } from "../../shared/words.ts";
 import { type Failure, failure } from "../lib/format.ts";
-import { api, onUnauthorized } from "./api.ts";
+import { ApiError, api, onUnauthorized } from "./api.ts";
+import { signInPost } from "./sign-in.ts";
 
 export const me = signal<Me | null | undefined>(undefined);
 export const meError = signal<Failure | null>(null);
@@ -63,41 +61,72 @@ onUnauthorized(() => {
   if (me.value) setMe(null);
 });
 
-export async function loadMe(): Promise<void> {
-  const mine = ++turn;
+export function isMe(u: unknown): u is Me {
+  if (typeof u !== "object" || u === null) return false;
+  const m = u as Record<string, unknown>;
+  return (
+    typeof m.id === "string" &&
+    typeof m.username === "string" &&
+    typeof m.fullName === "string" &&
+    isRole(m.role)
+  );
+}
+
+// a GET /api/me answer as read: user null names nobody; null when it is
+// no answer at all (a proxy's page, a body cut short)
+export function readMeAnswer(body: unknown): MeResponse | null {
+  if (typeof body !== "object" || body === null) return null;
+  const b = body as Record<string, unknown>;
+  if (b.user !== null && !isMe(b.user)) return null;
+  return {
+    user: b.user,
+    emailOn: b.emailOn === true,
+    dictationOn: b.dictationOn === true,
+  };
+}
+
+export type Who = "in" | "nobody" | "failed";
+
+// a later load supersedes one in flight, which then answers as it does
+let loads = 0;
+let current: Promise<Who> = Promise.resolve("nobody");
+
+export function loadMe(): Promise<Who> {
+  current = readMe(++loads, ++turn);
+  return current;
+}
+
+async function readMe(load: number, mine: number): Promise<Who> {
   const asked = dictationTicket();
   meError.value = null;
   try {
-    const body = await api<MeResponse>("/api/me");
-    emailOn.value = body.emailOn;
-    if (turn === mine) {
-      me.value = body.user;
-      landDictationOn(body.dictationOn, asked);
-    }
+    const read = readMeAnswer(await api<unknown>("/api/me"));
+    if (read === null) throw new ApiError(0, "the server failed");
+    if (load !== loads) return current;
+    emailOn.value = read.emailOn;
+    if (turn !== mine) return me.value ? "in" : "nobody";
+    me.value = read.user;
+    landDictationOn(read.dictationOn, asked);
+    return read.user === null ? "nobody" : "in";
   } catch (err) {
-    if (turn === mine) {
-      meError.value = failure(err);
-    }
+    if (load !== loads) return current;
+    if (turn === mine) meError.value = failure(err);
+    return "failed";
+  }
+}
+
+// a sign-in's post opened a login: who it is is read, and the page
+// leaves the sign-in only once it is; a read that fails or names nobody
+// throws, with the failure's words or "not signed in"
+export async function opened(): Promise<void> {
+  if ((await loadMe()) !== "in") {
+    throw new ApiError(0, meError.peek()?.words ?? "not signed in");
   }
 }
 
 export async function login(body: LoginRequest): Promise<void> {
-  const { user } = await api<LoginResponse>("/api/login", "POST", body);
-  setMe(user);
-  void loadDictationOn();
-}
-
-// a sign-in answers the user alone, so whether Dictation is on is asked
-// after it; a failure leaves the mic hidden until the next load
-export async function loadDictationOn(): Promise<void> {
-  const mine = turn;
-  const asked = dictationTicket();
-  try {
-    const body = await api<MeResponse>("/api/me");
-    if (turn === mine) landDictationOn(body.dictationOn, asked);
-  } catch {
-    // the mic stays hidden: nothing else depends on it
-  }
+  await signInPost("/api/login", body, "wrong admin key");
+  await opened();
 }
 
 // a 401 here means the login was already gone: signed out either way

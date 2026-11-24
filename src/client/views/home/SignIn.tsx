@@ -11,8 +11,8 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
-import { askLink, sendCode, takeHandOver, whoIs } from "../../data/links.ts";
-import { emailOn, login } from "../../data/me.ts";
+import { askLink, sendCode, takeHandOver } from "../../data/links.ts";
+import { emailOn, loadMe, login } from "../../data/me.ts";
 import { says } from "../../lib/format.ts";
 import { type IconName, Mark, Wordmark } from "../../lib/icons.tsx";
 import { SplitButton, type SplitItem } from "../../ui/SplitButton.tsx";
@@ -35,7 +35,7 @@ import {
 import "./signin.css";
 
 const WAYS: Record<Way, { label: string; icon: IconName }> = {
-  email: { label: "Email code", icon: "email" },
+  email: { label: "Email code", icon: "mail" },
   key: { label: "Admin key", icon: "shield" },
 };
 
@@ -99,10 +99,11 @@ export function SignIn({
     () =>
       codeFlow({
         post: (typed, landed) =>
-          sendCode({ email: email.peek(), code: typed }, landed, (to) =>
-            navigate(to, true),
-          ),
-        read: whoIs,
+          sendCode(email.peek(), typed, (to) => {
+            landed();
+            navigate(to, true);
+          }),
+        read: loadMe,
       }),
     [],
   );
@@ -214,7 +215,7 @@ export function SignIn({
     },
     {
       label: "Use another email",
-      icon: "pencil",
+      icon: "pen",
       run: () => {
         resent.value = false;
         go("email");
