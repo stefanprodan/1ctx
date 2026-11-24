@@ -177,24 +177,14 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   `CGO_ENABLED=1`, `CC=gcc`), `CARGO_HOME` and `RUSTUP_HOME` in HOME,
   and `DO_NOT_TRACK`. One set for every variant. An OpenShell exec
   sees none of the image's `ENV`.
-- **The image (`deploy/sandbox/Dockerfile`) is one target per
-  variant.** `base` is uv's Python 3.15 on Debian trixie with bash,
-  git, make, curl, jq, yq, ripgrep and pdftotext, the sandbox user and every root;
-  the helpers run `/usr/local/bin/python3 -I -S` and `/usr/bin/bash`,
-  so every variant keeps it. `python` is `base`; `bun` adds Bun, with
-  `node` linked to `bun` (`node --version` is not answered) and `npx`
-  a wrapper running `bun x`; `cc` (never pushed) adds `gcc` and `libc6-dev`, shared by
-  `go` (Go in `/usr/local/go`) and `rust` (the official image's pinned
-  stable toolchain, minimal profile, moved to `/opt/home/.rustup` and
-  `/opt/home/.cargo`, owned by the sandbox user, since `/usr` is
-  read-only under Landlock and HOME is the container's own disk).
-  `rustup` adds a toolchain or target beside it from
-  `static.rust-lang.org`, and `uv run --python 3.X` another Python
-  from `releases.astral.sh`, both default hosts, into HOME until the
-  sandbox is recycled. Nothing of ours walks, pushes or pulls HOME; the
-  root check only writes and removes its probe file there. Measured
-  locally (`docker images`, linux/arm64, 2026-11-20): python 439 MB,
-  bun 602 MB, go 1.06 GB, rust 1.44 GB; python 488 MB with pdftotext.
+- **The helpers run `/usr/local/bin/python3 -I -S` and
+  `/usr/bin/bash`,** so every variant of the image keeps both; what
+  each variant holds is in `docs/sandbox-image.md`. `rustup` adds a
+  toolchain or target from `static.rust-lang.org`, and `uv run
+  --python 3.X` another Python from `releases.astral.sh`, both default
+  hosts, into HOME until the sandbox is recycled. Nothing of ours
+  walks, pushes or pulls HOME; the root check only writes and removes
+  its probe file there.
 - **The policy opens the devices shells and the fence use:**
   `/dev/null`, `/dev/zero`, `/dev/random`, `/dev/tty`, `/dev/ptmx` and
   `/dev/pts` read-write, `/dev/urandom` and `/sys/fs/cgroup` read-only.

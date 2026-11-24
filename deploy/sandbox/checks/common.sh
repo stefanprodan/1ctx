@@ -77,6 +77,42 @@ common_tools() {
   pdftotext -v 2>/dev/null
 }
 
+# a lookbehind, which only PCRE2 reads, so a build without it fails
+common_git() {
+  git init -q repo
+  cd repo
+  git config user.name check
+  git config user.email check@example.invalid
+  printf 'abc123\n' >f
+  git add f
+  git commit -q -m one
+  eq "$(git log --format=%s)" one
+  eq "$(git show HEAD:f)" abc123
+  eq "$(git grep -P -h -o '(?<=abc)\d+')" 123
+}
+
+# offline, so a refused connection is the pass: libcurl ran in the
+# helper; a missing helper says it is not found
+common_git_https() {
+  local out
+  if out=$(git ls-remote https://127.0.0.1:9/x.git 2>&1); then
+    echo "ls-remote reached 127.0.0.1:9"
+    return 1
+  fi
+  case $out in
+  *"unable to access"*) ;;
+  *)
+    printf '%s\n' "$out"
+    return 1
+    ;;
+  esac
+}
+
+common_rg() {
+  printf 'abc123\n' >f
+  eq "$(rg --pcre2 -o '(?<=abc)\d+' f)" 123
+}
+
 common_python() {
   eq "$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')" \
     "$EXPECT_PYTHON"
@@ -86,6 +122,9 @@ offline_common() {
   check "runs as the sandbox user" common_user
   check "HOME and TMPDIR are writable, /usr is not" common_writes
   check "the base tools run" common_tools
+  check "git commits and greps with -P" common_git
+  check "git has its https helper" common_git_https
+  check "rg searches with --pcre2" common_rg
   check "python is $EXPECT_PYTHON" common_python
 }
 

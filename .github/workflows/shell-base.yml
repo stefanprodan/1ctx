@@ -8,7 +8,7 @@ on:
     branches:
       - main
       # a workflow off main cannot be dispatched, so this branch
-      # publishes the first base
+      # publishes the first base; it is named in every publish rule below
       - build/shell-base-image
     paths:
       - deploy/sandbox/base/**
@@ -21,14 +21,16 @@ on:
 permissions:
   contents: read
 
-# one publish at a time moves the tags; a pull request only builds
+# Only main publishes: push, attest and smoke. Any other ref, a pull
+# request or a dispatch included, builds both targets and stops. One
+# publish at a time moves the tags.
 concurrency:
-  group: shell-base-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
+  group: shell-base-${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image') && 'publish' || github.ref }}
   cancel-in-progress: false
 
 jobs:
   # each platform builds on its own native runner, joined into one index
-  # under the moving and the dated tag; a pull request pushes nothing
+  # under the moving and the dated tag
   base:
     uses: docker/github-builder/.github/workflows/build.yml@bb1eb9fb69408ac52395fb21f49c6b52d564529a # v1.20.0
     permissions:
@@ -37,7 +39,7 @@ jobs:
       id-token: write # mint the OIDC token cosign signs the provenance with
     with:
       output: image
-      push: ${{ github.event_name != 'pull_request' }}
+      push: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image') }}
       context: deploy/sandbox/base
       target: base
       platforms: linux/amd64,linux/arm64
@@ -66,7 +68,7 @@ jobs:
       id-token: write # mint the OIDC token cosign signs the provenance with
     with:
       output: image
-      push: ${{ github.event_name != 'pull_request' }}
+      push: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image') }}
       context: deploy/sandbox/base
       target: cc
       platforms: linux/amd64,linux/arm64
@@ -88,7 +90,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
   attest:
-    if: github.event_name != 'pull_request'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image')
     needs: [base, cc]
     runs-on: ubuntu-latest
     permissions:
@@ -120,7 +122,7 @@ jobs:
   # the builder has no step before its push, so the contract runs on
   # the pushed digests, on the builder's own runners
   smoke:
-    if: github.event_name != 'pull_request'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image')
     needs: [base, cc]
     strategy:
       matrix:
@@ -165,3 +167,4 @@ jobs:
         run: |
           docker pull "$IMAGE@$DIGEST"
           bun scripts/sandbox-image-check.ts --docker --variant cc --image "$IMAGE@$DIGEST"
+
