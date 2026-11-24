@@ -151,16 +151,27 @@ describe("the words", () => {
 });
 
 describe("what keeps a user from signing in", () => {
-  test("a member email cannot reach, and an admin with no key file name", () => {
-    expect(signInLine(casey, false)).toBe("Not while email is off");
+  // serial: the file's hooks reset signals and the fetch between tests
+  test.serial("a member email cannot reach, and an admin without a way", () => {
+    expect(signInLine(casey, false)).toBe("No new links while email is off");
     expect(signInLine({ ...casey, emailPlaceholder: true }, true)).toBe(
       "Not without a real email",
     );
     expect(signInLine(casey, true)).toBeNull();
     expect(signInLine({ ...casey, disabled: true }, false)).toBeNull();
-    const ops = { ...casey, role: "admin" as const, username: "ops_lead" };
-    expect(signInLine(ops, true)).toBe("No admin key, as the name has _");
-    expect(signInLine({ ...ops, username: "ops-lead" }, false)).toBeNull();
+    const ops = { ...casey, role: "admin" as const, username: "ops-lead" };
+    expect(signInLine(ops, true)).toBeNull();
+    expect(signInLine(ops, false)).toBe("Admin key needed");
+    expect(signInLine({ ...ops, emailPlaceholder: true }, true)).toBe(
+      "Admin key needed",
+    );
+    const underscore = { ...ops, username: "ops_lead" };
+    expect(signInLine(underscore, true)).toBe(
+      "No admin key, as the name has _",
+    );
+    expect(signInLine(underscore, false)).toBe(
+      "No admin key, as the name has _",
+    );
   });
 
   test.serial("the user's page says it in its aside", () => {
@@ -168,7 +179,7 @@ describe("what keeps a user from signing in", () => {
     projects.value = [];
     const html = render(<UserPage params={{ username: "casey" }} />);
     expect(html).toContain(">Sign in<");
-    expect(html).toContain("Not while email is off");
+    expect(html).toContain("No new links while email is off");
   });
 });
 

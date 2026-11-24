@@ -131,8 +131,13 @@ export function socketArea(deps: SocketDeps): Socket {
     conn.close(code, reason);
   };
 
-  const revoke = (conn: Conn): void =>
+  // once: a close callback can lag behind the next event or write, so
+  // the connection leaves every set at once and a second revoke is none
+  const revoke = (conn: Conn): void => {
+    if (conn.data.closeCause === "revoked") return;
+    forget(conn);
     serverClose(conn, CLOSE_REVOKED, "signed out", "revoked");
+  };
 
   const sees = (conn: Conn, projectId: string): boolean =>
     conn.data.projects.has(projectId);
@@ -347,11 +352,7 @@ export function socketArea(deps: SocketDeps): Socket {
         break;
       case "login.revoked":
         each((conn) => {
-          if (signedOut(conn.data.principal, event.data)) {
-            // A close callback can lag behind the next committed write.
-            forget(conn);
-            revoke(conn);
-          }
+          if (signedOut(conn.data.principal, event.data)) revoke(conn);
         });
         for (const data of pending) {
           if (signedOut(data.principal, event.data)) data.revoked = true;

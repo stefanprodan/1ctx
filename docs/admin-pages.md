@@ -112,10 +112,9 @@ reporting.
 - **A user page has Sign out everywhere, asked once (`AskDelete`),**
   and Send invite again until the first sign-in where email reaches
   them. Its aside says in one line what keeps them from signing in
-  (`signInLine()`): email off or a placeholder for a member, no admin
-  key for an admin whose name has `_`. New user has no password field. The admin's own page has
-  neither, nor Disable; `roleLock()` fixes their role and the last
-  admin's.
+  (`signInLine()`, words in `docs/access.md`). New user has no password
+  field. The admin's own page has neither, nor Disable; `roleLock()`
+  fixes their role and the last admin's.
 - **A user page lists the user's access keys from `userKeys`,** read
   again after a revoke (whatever its answer), a sign out everywhere and
   a disable, which delete them. No admin page makes a key. The row is

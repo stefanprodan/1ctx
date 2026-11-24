@@ -44,17 +44,21 @@ export function inviteCardWords(user: UserAccount): {
   };
 }
 
-// why the user has no way in, or none of the admin key; null when
-// nothing stands in the way. A disabled user's card says so already
+// what keeps the user from signing in; null when nothing does. A
+// disabled user's card says so already, and the page cannot see key
+// files, so an admin email cannot reach needs one
 export function signInLine(user: UserAccount, emailOn: boolean): string | null {
   if (user.disabled) return null;
+  const reached = emailOn && !user.emailPlaceholder;
   if (user.role === "admin") {
     // a key file's name takes no underscore
-    return isSecretName("user-", `user-${user.username}`)
-      ? null
-      : "No admin key, as the name has _";
+    if (!isSecretName("user-", `user-${user.username}`)) {
+      return "No admin key, as the name has _";
+    }
+    return reached ? null : "Admin key needed";
   }
-  if (!emailOn) return "Not while email is off";
+  // a link already sent still works
+  if (!emailOn) return "No new links while email is off";
   if (user.emailPlaceholder) return "Not without a real email";
   return null;
 }

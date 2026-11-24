@@ -126,7 +126,7 @@ describe("access", () => {
   });
 
   test("a refresh needs the login's row, unexpired, whatever the socket heard", () => {
-    const { db, user, access, now } = build(false);
+    const { db, user, users, access, now } = build(false);
     const principalOf = (setCookie: string) =>
       access.resolve(
         new Request("http://x", {
@@ -139,6 +139,21 @@ describe("access", () => {
     expect(access.refresh(deleted)?.username).toBe("u");
     db.query("delete from logins where id = ?").run(gone.login.id);
     expect(access.refresh(deleted)).toBeNull();
+    // another user's login never refreshes this one
+    const other = users.createUser({
+      username: "w",
+      fullName: "W",
+      email: "w@example.com",
+      role: "member",
+      now: 0,
+    });
+    const theirs = access.open(other, null);
+    expect(
+      access.refresh({
+        ...deleted,
+        via: { kind: "login", id: theirs.login.id },
+      }),
+    ).toBeNull();
     const old = access.open(user, null);
     const expired = principalOf(old.setCookie);
     now.value = LOGIN_TTL_MS;

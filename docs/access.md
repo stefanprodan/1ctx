@@ -82,11 +82,15 @@ router and the socket). Logins, admin keys and links by email are
   too.
 - **A write after a body re-reads its caller** (`actingUser()`) in
   its transaction: a key create, an admin's user create, patch or sign
-  out everywhere. A gone login, or a key login whose key no longer
-  holds, is 401, and that key login ends; a login by email that is
-  disabled or lost admin rights is 403. A demoted admin's key login
-  ends at the demote, so their next request is 401. The SMTP settings
-  save reads its admin again the same way, through a port.
+  out everywhere, and the SMTP settings save through a port. A gone
+  login, or a key login whose key no longer holds, is 401, and that key
+  login ends. A key create checks its projects by the role read there.
+- **A disable deletes every login of the user,** by key or by email,
+  their keys and live links, keeping their work, so their next request
+  and any write already admitted get 401.
+- **A demote ends only key logins.** The demoted admin's key login is
+  gone at the demote (401); their login by email survives, and an
+  admin-only write it sends, admitted or not, gets 403.
 - **An admin cannot demote, disable, sign out everywhere or invite
   their own row,** a 409 in the route. Demoting or disabling the last
   enabled admin is a 409 too.
@@ -96,10 +100,14 @@ router and the socket). Logins, admin keys and links by email are
   sends it again, replacing the unused one, until the first sign-in
   (`signed_in_at` null). Each is a 409 while email is off and for a
   disabled user or a placeholder. A member not invited but with a real
-  address, while email is on, asks for a sign-in link themselves. A
-  member whom email cannot reach (email off, or a placeholder) cannot
-  sign in until an admin sets a real address and email is on; an
-  admin without one signs in only by key. The user page says which.
+  address, while email is on, asks for a sign-in link themselves.
+  While email is off no new link goes, though one already sent still
+  works; a placeholder gets none until an admin sets a real address.
+  An admin email cannot reach signs in only by key. The user page says
+  which (`signInLine()`): "No new links while email is off", "Not
+  without a real email", "Admin key needed", or for an admin whose
+  name has `_`, which no key file can spell, "No admin key, as the name
+  has _".
 - **Sign out everywhere** (`POST /api/users/:id/sign-out`) ends the
   user's logins, live links with their queued email and access keys in
   one transaction, the keys since a stolen login can mint one, and
@@ -108,8 +116,6 @@ router and the socket). Logins, admin keys and links by email are
 - **Email from agents is the user's own switch.** Only `PUT
   /api/profile/email` sets it, off by default; no admin route or
   provisioned field does (`docs/email.md`).
-- **A disable deletes the user's logins, keys and live links,**
-  keeping their work.
 - **The email is unique and lowercased; the zone is required.** An
   admin picks the zone on create, never guessed; the first admin starts
   in `UTC`. `isEmail()` takes only a dot-atom `local@host` (no quotes,

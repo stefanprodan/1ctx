@@ -89,9 +89,9 @@ export function keyRoutes(deps: KeyRoutesDeps): RouteDescriptor[] {
           if (keys.length >= cap) {
             throw new Conflict("access key limit reached");
           }
-          for (const id of parsed.projectIds ?? []) {
-            deps.auth.project(principal, id);
-          }
+          // by the role it holds now, not the one the router read
+          const now = { ...principal, role: owner.role };
+          for (const id of parsed.projectIds ?? []) deps.auth.project(now, id);
           return {
             result: {
               ...deps.keys.create(owner.id, parsed, deps.clock()),

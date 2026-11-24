@@ -160,16 +160,29 @@ describe("error fields", () => {
     const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => []);
     log.info("a", { name: admin, other: `x ${admin.slice(0, 27)} y` });
     log.warn("a", { name: access, count: 2 });
-    log.error("a", {
-      error: `${"x".repeat(190)}${admin.slice(0, 30)}`,
-      field: admin,
-    });
-    expect(lines[0]).toEqual({ name: "[key]", other: "x [key] y" });
-    expect(lines[1]).toEqual({ name: "[key]", count: 2 });
-    expect(lines[2]?.field).toBe("[key]");
-    const line = format(at, "a", "error", "a", lines[2]);
-    expect(line).not.toContain("1ctx-admin-");
+    // past the cut whole, under it once masked
+    log.error("a", { error: `${"x".repeat(190)}${admin}`, field: admin });
+    expect(lines).toEqual([
+      { name: "[key]", other: "x [key] y" },
+      { name: "[key]", count: 2 },
+      { error: `${"x".repeat(190)}[key]`, field: "[key]" },
+    ]);
   });
+
+  test("masks a key's shape before a scrubbed value can break it", () => {
+    const admin = `1ctx-admin-${"a".repeat(43)}`;
+    const lines: LogFields[] = [];
+    const keep = (_msg: string, fields?: LogFields) => {
+      lines.push(fields ?? {});
+    };
+    // a configured secret that is part of the prefix
+    const log = scrubErrors({ info: keep, warn: keep, error: keep }, () => [
+      "admin",
+    ]);
+    log.error("a", { error: `bad ${admin} admin` });
+    expect(lines).toEqual([{ error: "bad [key] [key]" }]);
+  });
+
   test("keeps only source frame locations", () => {
     const error = new Error("boom");
     error.stack = [

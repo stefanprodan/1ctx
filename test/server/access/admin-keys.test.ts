@@ -6,6 +6,8 @@
 // the key it opened with.
 
 import { describe, expect, test } from "bun:test";
+import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
 import type { ConnData } from "../../../src/server/web/socket.ts";
 import {
   ADMIN_KEY,
@@ -227,37 +229,68 @@ describe("a key login ends", () => {
     ).toEqual({ n: 0 });
   });
 
-  test("a rename and a demote end key logins in their write, never email ones", async () => {
-    const s = await setup();
-    const rows = (userId: string) =>
-      s.app.db
-        .query<{ key: number }, [string]>(
-          "select key_digest is not null as key from logins where user_id = ? order by key",
-        )
-        .all(userId)
-        .map((row) => row.key);
-    const byEmail = s.app.client();
-    await byEmail.signIn("ops");
-    const byKey = async () => {
-      expect((await signIn(s.app.client(), OPS)).status).toBe(200);
-      expect(rows(s.ops.id)).toEqual([0, 1]);
-    };
-    const patch = async (body: unknown) =>
-      expect(
+  test.serial(
+    "a rename and a demote end key logins in their write, never email ones",
+    async () => {
+      const s = await setup();
+      const keyLogin = () =>
+        s.app.db
+          .query<{ id: string }, [string]>(
+            "select id from logins where user_id = ? and key_digest is not null",
+          )
+          .get(s.ops.id)?.id ?? null;
+      const emailLogins = () =>
+        s.app.db
+          .query<{ n: number }, [string]>(
+            "select count(*) as n from logins where user_id = ? and key_digest is null",
+          )
+          .get(s.ops.id)!.n;
+      const byEmail = s.app.client();
+      await byEmail.signIn("ops");
+      const byKey = async () => {
+        expect((await signIn(s.app.client(), OPS)).status).toBe(200);
+        return keyLogin()!;
+      };
+      const patch = async (body: unknown) =>
         (await s.admin.call("PATCH", `/api/users/${s.ops.id}`, { body }))
-          .status,
-      ).toBe(200);
-    await byKey();
-    await patch({ username: "ops2" });
-    expect(rows(s.ops.id)).toEqual([0]);
-    await patch({ username: "ops" });
-    await byKey();
-    await patch({ role: "member" });
-    expect(rows(s.ops.id)).toEqual([0]);
-    await patch({ role: "admin" });
-    expect(rows(s.ops.id)).toEqual([0]);
-    expect(await me(byEmail)).toBe("ops");
-  });
+          .status;
+      const events: BusEvent[] = [];
+      const unsubscribe = subscribe((event) => events.push(event), silent);
+      const revoked = () => {
+        const out = events
+          .filter((e) => e.type === "login.revoked")
+          .map((e) => e.data);
+        events.length = 0;
+        return out;
+      };
+      try {
+        const first = await byKey();
+        revoked();
+        // a later field taken rolls the rename back, and nothing ends
+        expect(await patch({ username: "ops2", email: s.casey.email })).toBe(
+          409,
+        );
+        expect(keyLogin()).toBe(first);
+        expect(revoked()).toEqual([]);
+        expect(await patch({ username: "ops2" })).toBe(200);
+        expect(keyLogin()).toBeNull();
+        expect(revoked()).toEqual([{ userId: s.ops.id, loginId: first }]);
+        expect(await patch({ username: "ops" })).toBe(200);
+        const second = await byKey();
+        revoked();
+        expect(await patch({ role: "member" })).toBe(200);
+        expect(keyLogin()).toBeNull();
+        expect(revoked()).toEqual([{ userId: s.ops.id, loginId: second }]);
+        expect(await patch({ role: "admin" })).toBe(200);
+        expect(keyLogin()).toBeNull();
+        expect(revoked()).toEqual([]);
+      } finally {
+        unsubscribe();
+      }
+      expect(emailLogins()).toBe(1);
+      expect(await me(byEmail)).toBe("ops");
+    },
+  );
 
   test("a login by email outlives a changed key file", async () => {
     const s = await setup();

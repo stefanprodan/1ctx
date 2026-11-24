@@ -6,8 +6,11 @@
 // a key login that no longer holds ends with it.
 
 import { expect, test } from "bun:test";
-import { ORIGIN, testApp } from "../../helpers/app.ts";
+import { type BusEvent, subscribe } from "../../../src/server/lib/bus.ts";
+import { silent } from "../../../src/server/lib/log.ts";
+import { ORIGIN, type TestClient, testApp } from "../../helpers/app.ts";
 import { SMTP } from "../../helpers/links.ts";
+import { createTeam } from "../../helpers/projects.ts";
 
 const ADA_KEY = `1ctx-admin-${"a".repeat(43)}`;
 
@@ -41,12 +44,17 @@ async function setup() {
 type Setup = Awaited<ReturnType<typeof setup>>;
 
 // the request goes through the router now, its body only when sent
-function slowCall(b: Setup, method: string, path: string) {
+function slowCall(
+  b: Setup,
+  method: string,
+  path: string,
+  client: TestClient = b.client,
+) {
   let controller!: ReadableStreamDefaultController<Uint8Array>;
   const response = b.app.handle(
     new Request(`${ORIGIN}${path}`, {
       method,
-      headers: { cookie: b.client.cookie!, origin: ORIGIN },
+      headers: { cookie: client.cookie!, origin: ORIGIN },
       body: new ReadableStream<Uint8Array>({
         start(value) {
           controller = value;
@@ -175,31 +183,104 @@ for (const [ending, end] of Object.entries(ENDINGS)) {
 const KEY_ENDINGS = ["key rotated", "key file removed"] as const;
 
 for (const ending of KEY_ENDINGS) {
-  test(`a ${ending} while a body arrives ends the login for good`, async () => {
-    const b = await setup();
-    try {
-      const login = b.app.db
-        .query<{ id: string }, []>(
-          "select id from logins where key_digest is not null",
-        )
-        .get()!;
-      const send = slowCall(b, "PATCH", `/api/users/${b.casey.id}`);
-      await ENDINGS[ending].run(b);
-      expect(await send({ role: "admin" })).toBe(401);
-      expect(b.app.users.byId(b.casey.id)!.role).toBe("member");
-      expect(
-        b.app.db
-          .query("select count(*) as n from logins where id = ?")
-          .get(login.id),
-      ).toEqual({ n: 0 });
-      b.secrets["user-ada"] = ADA_KEY;
-      const me = await b.client.call("GET", "/api/me");
-      expect((await me.json()).user).toBeNull();
-    } finally {
-      await b.app.shutdown();
-    }
-  });
+  test.serial(
+    `a ${ending} while a body arrives ends the login for good`,
+    async () => {
+      const b = await setup();
+      const events: BusEvent[] = [];
+      const unsubscribe = subscribe((event) => events.push(event), silent);
+      try {
+        const login = b.app.db
+          .query<{ id: string }, []>(
+            "select id from logins where key_digest is not null",
+          )
+          .get()!;
+        const send = slowCall(b, "PATCH", `/api/users/${b.casey.id}`);
+        await ENDINGS[ending].run(b);
+        expect(await send({ role: "admin" })).toBe(401);
+        expect(b.app.users.byId(b.casey.id)!.role).toBe("member");
+        expect(
+          b.app.db
+            .query("select count(*) as n from logins where id = ?")
+            .get(login.id),
+        ).toEqual({ n: 0 });
+        expect(events.filter((e) => e.type === "login.revoked")).toEqual([
+          {
+            type: "login.revoked",
+            data: { userId: b.acting.id, loginId: login.id },
+          },
+        ]);
+        b.secrets["user-ada"] = ADA_KEY;
+        const me = await b.client.call("GET", "/api/me");
+        expect((await me.json()).user).toBeNull();
+      } finally {
+        unsubscribe();
+        await b.app.shutdown();
+      }
+    },
+  );
 }
+
+// an admin signed in by email keeps the login at a demote, but not
+// what only an admin may do
+async function demotedByEmail() {
+  const b = await setup();
+  const eve = b.app.createUser({
+    username: "eve",
+    fullName: "Eve",
+    email: "eve@example.test",
+    role: "admin",
+    now: b.app.now.value,
+  });
+  const tab = b.app.client();
+  expect((await tab.signIn("eve")).status).toBe(200);
+  const demote = async () =>
+    expect(
+      (
+        await b.other.call("PATCH", `/api/users/${eve.id}`, {
+          body: { role: "member" },
+        })
+      ).status,
+    ).toBe(200);
+  return { b, eve, tab, demote };
+}
+
+test("an access key made while its admin is demoted reaches no team project", async () => {
+  const { b, tab, demote } = await demotedByEmail();
+  try {
+    const team = await createTeam(b.other, "ops");
+    const send = slowCall(b, "POST", "/api/profile/keys", tab);
+    await demote();
+    expect(
+      await send({
+        name: "laptop",
+        scope: "write",
+        projectIds: [team.id],
+        days: 30,
+      }),
+    ).toBe(404);
+    expect(
+      b.app.db.query("select count(*) as n from access_keys").get(),
+    ).toEqual({ n: 0 });
+  } finally {
+    await b.app.shutdown();
+  }
+});
+
+test("an SMTP save while its admin is demoted is 403 and writes nothing", async () => {
+  const { b, tab, demote } = await demotedByEmail();
+  try {
+    const send = slowCall(b, "PUT", "/api/admin/smtp", tab);
+    await demote();
+    expect(await send(SMTP)).toBe(403);
+    expect(b.app.email.settings()).toBeNull();
+    expect(
+      (await (await tab.call("GET", "/api/me")).json()).user.username,
+    ).toBe("eve");
+  } finally {
+    await b.app.shutdown();
+  }
+});
 
 test("an admin still signed in finishes a slow write", async () => {
   const b = await setup();

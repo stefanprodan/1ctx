@@ -243,7 +243,8 @@ export function scrubErrors(log: Log, values: () => string[]): Log {
       if (typeof value !== "string") {
         out[key] = value;
       } else if (key === "error") {
-        out[key] = cut(maskKeys(scrubValues(value, values(), "[key]")));
+        // shapes first: a scrubbed value inside a key would break its shape
+        out[key] = cut(scrubValues(maskKeys(value), values(), "[key]"));
       } else {
         out[key] = maskKeys(value);
       }
