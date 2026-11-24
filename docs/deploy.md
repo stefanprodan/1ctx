@@ -203,6 +203,8 @@ gateway add`.
   per variant on the default hosts. Versions come from `SHELL_VERSIONS`
   as `EXPECT_<TOOL>`, paths from the env the server sends; a check
   names no version or path of its own. Run it on every image change.
+  `--docker` runs the offline half on `docker run --network none`,
+  `cc` too.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
   would kill the shutdown after the drain. Docker Compose sets
   `stop_grace_period: 25s`; a plain run passes `--stop-timeout 25`.

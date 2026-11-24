@@ -51,7 +51,7 @@ sandbox-check: ## Drive a real sandbox gateway through the sandbox backend by ha
 sandbox-net-check: ## Drive a real sandbox gateway's network and credentials by hand (ARGS="--ca .. --cert .. --key ..")
 	@bun run sandbox-net-check $(ARGS)
 
-sandbox-image-check: ## Check the sandbox images against their contracts on a real gateway, the preview's by default (ARGS="--variant go --offline")
+sandbox-image-check: ## Check the sandbox images against their contracts on a real gateway, the preview's by default (ARGS="--variant go --offline"; --docker the offline half in docker run)
 	@bun run sandbox-image-check $(ARGS)
 
 kind-up: ## Create the local kind cluster 1ctx-test with metrics-server
