@@ -16,7 +16,7 @@ import { Icon } from "../lib/icons.tsx";
 import { type HandedWait, HandOver, useHandOver } from "../lib/wait.ts";
 import { Bone } from "../ui/Bones.tsx";
 import { PageWaiting } from "../ui/PageWaiting.tsx";
-import { Login } from "../views/home/Login.tsx";
+import { SignIn } from "../views/home/SignIn.tsx";
 import { Rail, RailWaiting } from "./Rail.tsx";
 import { navigate, path, query } from "./router.ts";
 import { ALIASES, match } from "./routes.ts";
@@ -194,7 +194,7 @@ export function App() {
     );
   }
   if (user === null) {
-    if (needsUser) return <Login />;
+    if (needsUser) return <SignIn />;
     const View = m.route.view;
     return <View params={m.params} />;
   }

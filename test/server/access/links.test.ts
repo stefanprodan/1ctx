@@ -928,14 +928,17 @@ describe("the link page", () => {
     );
     const html = await res.text();
     expect(html).toContain("Check your email.");
-    expect(html).toContain('<a href="/">Enter the code</a>');
+    // the sign-in opens on the code for the address, from the fragment
+    expect(html).toContain(
+      '<a href="/#code=maria%40example.test">Enter the code</a>',
+    );
     // an unknown address reads the same
     const unknown = await browser(e).call("POST", "/api/login/link", {
       form: { email: "nobody@example.test" },
       origin: "null",
       headers: { "sec-fetch-site": "same-origin" },
     });
-    expect(await unknown.text()).toBe(html);
+    expect(await unknown.text()).toBe(html.replace("maria%40", "nobody%40"));
     await e.app.linkAsks();
     await e.send();
     // the code works beside that browser's cookie

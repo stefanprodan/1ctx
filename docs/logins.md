@@ -4,7 +4,8 @@ Governs how a user signs in: the login cookie and its ends, the admin
 keys (`access/admin-keys.ts`, `users/rules.ts`, `users/key-file.ts`,
 `1ctx admin-key`) and the links and codes an email carries
 (`access/links.ts`, `link-store.ts`, `link-routes.ts`, the link page
-`web/link-page.ts`). Requests, users and the socket are
+`web/link-page.ts`) and the sign-in page (`views/home/SignIn.tsx`).
+Requests, users and the socket are
 `docs/access.md`.
 
 ## Logins
@@ -136,7 +137,11 @@ link and a six-digit code, either works once, and using one uses both.
   'none'`, `form-action 'self'` and `frame-ancestors 'none'`. A live
   link shows one Sign in button; a dead one (unknown, used, expired, a
   disabled user's) is one 404 page, with a form that asks again while
-  email is on. The client router leaves `/link/` to the server.
+  email is on. Its answer links to `/#code=<address>`, the sign-in's
+  code step for that address beside the challenge the ask set; a
+  fragment is never sent, so no log holds the address;
+  `data/links.ts` reads it once at load and takes it out of the address
+  bar. The client router leaves `/link/` to the server.
 - **The button posts a form to `POST /api/links/:token`,** a `formPost`
   route (`Origin: null` with `Sec-Fetch-Site: same-origin`,
   `docs/access.md`) taking an empty form. A dead link answers the dead
@@ -150,3 +155,13 @@ link and a six-digit code, either works once, and using one uses both.
   address, no link. An invite has none.
 - **Sign out everywhere, a disable and an email change end every live
   link** of the user, with its queued email.
+
+## The sign-in page
+
+- **The sign-in is one card, `views/home/SignIn.tsx`,** on every
+  address that needs a user and on `/login`. Its one button's menu
+  picks Email code (while `emailOn`) or Admin key, kept per browser in
+  localStorage `1ctx-sign-in` and dropped to Admin key while email is
+  off. The code is six boxes (`CodeBoxes.tsx`); the sixth digit signs
+  in. A line under the field keeps its height whatever it says, so the
+  card never moves. The rules are `SignIn.model.ts`'s.

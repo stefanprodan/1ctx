@@ -6,7 +6,7 @@
 // entry or hidden. The rail and the tests read this; the server
 // enforces access, never this table.
 // A view is loaded on first use, so the table stays one small module
-// however many views there are; only Login is in the first bundle,
+// however many views there are; only SignIn is in the first bundle,
 // since App needs it before any route.
 
 import { isDecisionId } from "../../shared/contracts/decision.ts";
@@ -107,7 +107,7 @@ import {
   listPick,
   pickOf,
 } from "../views/home/Home.model.ts";
-import { Login } from "../views/home/Login.tsx";
+import { SignInPage } from "../views/home/SignIn.tsx";
 import { tasksAddressOf } from "../views/projects/ExternalTasks.model.ts";
 import {
   ChatPageWaiting,
@@ -268,7 +268,7 @@ export const ROUTES: Route[] = [
     // in the first bundle, so its code is there in a microtask and the
     // form draws with no page's bones before it
     view: lazy(
-      async () => Login,
+      async () => SignInPage,
       () => null,
     ),
     title: () => "Sign in",

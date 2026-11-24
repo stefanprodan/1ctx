@@ -48,8 +48,8 @@ export type UsersPort = {
 export type PagesPort = {
   // a dead link, read as an unknown one
   dead(): Response;
-  // the answer to a form's ask, with these headers
-  sent(headers: Record<string, string>): Response;
+  // the answer to a form's ask for that address, with these headers
+  sent(headers: Record<string, string>, email: string): Response;
 };
 
 export type LinkRoutesDeps = {
@@ -170,7 +170,7 @@ export function linkRoutes(deps: LinkRoutesDeps): RouteDescriptor[] {
           "set-cookie": askCookie(challenge),
         };
         return form
-          ? deps.pages.sent(headers)
+          ? deps.pages.sent(headers, email)
           : new Response(null, { status: 202, headers });
       },
     },

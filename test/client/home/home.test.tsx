@@ -24,7 +24,6 @@ import {
   greeting,
 } from "../../../src/client/views/home/Home.model.ts";
 import { Home } from "../../../src/client/views/home/Home.tsx";
-import { Login } from "../../../src/client/views/home/Login.tsx";
 import type { FeedRow } from "../../../src/shared/api/sessions.ts";
 import { fakeClock, mount } from "../../helpers/mount.ts";
 
@@ -341,15 +340,5 @@ describe("Home", () => {
     } finally {
       projectsError.value = null;
     }
-  });
-});
-
-describe("Login", () => {
-  test("renders the form with the classes login.css depends on", () => {
-    const html = render(<Login />);
-    expect(html).toContain('class="login"');
-    expect(html).toContain('class="login-form card"');
-    expect(html).toContain('name="key"');
-    expect(html).toContain("Sign in");
   });
 });
