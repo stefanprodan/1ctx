@@ -3,8 +3,8 @@
 //
 // The profile: who the user is on one line, then sections down one
 // column, a heading on the left and the form on the right: the name,
-// the time zone and the about text, and email from agents while email
-// is set up. The aside holds
+// the time zone and the about text, email from agents while email is
+// set up, and the passkeys where the browser has them. The aside holds
 // the account: the email, the role and when the user joined. The
 // username is shown, not edited; an admin changes it. A Save wakes when
 // something changed, says Saved for a moment, and a refusal stays beside
@@ -13,6 +13,7 @@
 import { useSignal } from "@preact/signals";
 import { useRef } from "preact/hooks";
 import type { Profile as ProfileRow } from "../../../shared/contracts/user.ts";
+import { passkeys } from "../../data/passkeys.ts";
 import {
   profile,
   profileEmailOn,
@@ -38,6 +39,7 @@ import { AsideLine, AsideSection, Split } from "../../ui/Split.tsx";
 import { Who, WhoLine } from "../../ui/Who.tsx";
 import { ZoneSelect } from "../../ui/ZoneSelect.tsx";
 import { roleWords } from "../directory/Directory.model.ts";
+import { PasskeysSection } from "./Passkeys.tsx";
 import {
   ABOUT_TEXT,
   aboutProblem,
@@ -171,11 +173,16 @@ function EmailForm({ user }: { user: ProfileRow }) {
 
 export function Profile() {
   const user = profile.value;
+  // the passkeys land with the profile, so the page waits as one
+  const keys =
+    passkeys.support.value &&
+    passkeys.list.value === null &&
+    passkeys.failed.value === null;
   return (
     <Page
       crumb="Account"
       title="Profile"
-      loading={user === null && profileError.value === null}
+      loading={(user === null || keys) && profileError.value === null}
       waiting={<ProfileWaiting />}
       error={profileError.value}
     >
@@ -209,6 +216,7 @@ export function Profile() {
                 <EmailForm user={user} />
               </Section>
             )}
+            <PasskeysSection />
           </div>
         </Split>
       )}

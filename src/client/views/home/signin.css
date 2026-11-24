@@ -40,6 +40,30 @@
     flex-direction: column;
     gap: var(--space-4);
   }
+  /* the passkey step's head: an icon beside its title, a line under */
+  .signin-step {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .signin-step-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 600;
+  }
+  .signin-hint {
+    margin: 0;
+    color: var(--faint);
+  }
+  /* as tall as the split button, across the card */
+  .signin-add {
+    width: 100%;
+    height: 36px;
+  }
+  .signin-skip {
+    align-self: center;
+  }
   .signin-boxes {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));

@@ -110,8 +110,9 @@ reporting.
   (`stuckLine()`). The aside counts them, names the gateway label and
   says whether each `openshell-` key file is found, never its value.
 - **A user page has Sign out everywhere, asked once (`AskDelete`),**
-  and Send invite again until the first sign-in where email reaches
-  them. Its aside says in one line what keeps them from signing in
+  whose line, like Disable's, names the passkeys and access keys it
+  deletes, and Send invite again until the first sign-in where email
+  reaches them. Its aside says in one line what keeps them from signing in
   (`signInLine()`, words in `docs/access.md`). New user has no password
   field. The admin's own page has neither, nor Disable; `roleLock()`
   fixes their role and the last admin's.

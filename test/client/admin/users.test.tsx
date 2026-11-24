@@ -541,10 +541,10 @@ describe("the pages", () => {
       expect(html).not.toContain("New access key");
       // sign out everywhere and the disable say they take the keys too
       expect(html).toContain(
-        "Ends every sign-in of Casey Doe, their unused email links and their access keys.",
+        "Ends every sign-in of Casey Doe, their unused email links, their passkeys and their access keys.",
       );
       expect(html).toContain(
-        "Signs them out, blocks sign-in and deletes their access keys.",
+        "Signs them out, blocks sign-in and deletes their passkeys and access keys.",
       );
       // revoking reads the list again
       const calls: string[] = [];

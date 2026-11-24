@@ -17,6 +17,7 @@ import type { Profile } from "../../shared/contracts/user.ts";
 import { type Failure, failure } from "../lib/format.ts";
 import { api } from "./api.ts";
 import { me, setMe } from "./me.ts";
+import { loadPasskeys } from "./passkeys.ts";
 
 export const profile = signal<Profile | null>(null);
 export const profileError = signal<Failure | null>(null);
@@ -55,6 +56,12 @@ export async function loadProfile(): Promise<void> {
       profileError.value = failure(err);
     }
   }
+}
+
+// the profile route's load: the passkeys land with the row, so the page
+// waits as one
+export async function profilePage(): Promise<void> {
+  await Promise.all([loadProfile(), loadPasskeys()]);
 }
 
 export async function saveProfile(body: UpdateProfileRequest): Promise<void> {

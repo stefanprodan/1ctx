@@ -6,8 +6,8 @@
 // code step's boxes, one per digit, and the line under them. The code
 // is held as its digits in order, never with gaps.
 
-export type Step = "email" | "code" | "key";
-export type Way = "email" | "key";
+export type Step = "email" | "code" | "key" | "passkey";
+export type Way = "email" | "passkey" | "key";
 
 export const KEPT_WAY = "1ctx-sign-in";
 
@@ -16,7 +16,7 @@ export const KEPT_WAY = "1ctx-sign-in";
 export function keptWay(): Way | null {
   try {
     const v = localStorage.getItem(KEPT_WAY);
-    return v === "email" || v === "key" ? v : null;
+    return v === "email" || v === "passkey" || v === "key" ? v : null;
   } catch {
     return null;
   }
@@ -28,16 +28,23 @@ export function keepWay(way: Way): void {
   } catch {}
 }
 
-// the way a sign-in goes, from what the server offers
-export function wayOf(picked: Step, emailOn: boolean): Step {
+// the way a sign-in goes, from what the server and browser offer
+export function wayOf(picked: Step, emailOn: boolean, passkeys: boolean): Step {
+  if (picked === "passkey" && !passkeys) return emailOn ? "email" : "key";
   if (!emailOn && (picked === "email" || picked === "code")) return "key";
   return picked;
 }
 
 // the ways the menu offers: the admin key always, an emailed code while
-// email is on; one way alone needs no menu
-export function waysOffered(emailOn: boolean): Way[] {
-  return emailOn ? ["email", "key"] : [];
+// email is on, a passkey where the browser has WebAuthn; one way alone
+// needs no menu
+export function waysOffered(emailOn: boolean, passkeys: boolean): Way[] {
+  const ways: Way[] = [
+    ...(emailOn ? (["email"] as const) : []),
+    ...(passkeys ? (["passkey"] as const) : []),
+    "key",
+  ];
+  return ways.length > 1 ? ways : [];
 }
 
 export const DIGITS = 6;

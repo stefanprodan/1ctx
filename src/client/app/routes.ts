@@ -65,7 +65,7 @@ import {
   loadUsage,
   overviewRange,
 } from "../data/overview.ts";
-import { loadProfile } from "../data/profile.ts";
+import { profilePage } from "../data/profile.ts";
 import { loadProjectMcp } from "../data/project-mcp.ts";
 import {
   loadProject,
@@ -998,7 +998,7 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Profile",
     role: "authenticated",
-    load: loadProfile,
+    load: profilePage,
   },
   // the projects name a key's picks
   ...tabRoutes(

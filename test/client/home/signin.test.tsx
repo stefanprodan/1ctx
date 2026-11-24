@@ -35,19 +35,24 @@ import { clientFetch } from "../../helpers/client-fetch.ts";
 import { type Mounted, mount } from "../../helpers/mount.ts";
 
 describe("the way", () => {
-  test("follows what the server offers", () => {
-    expect(wayOf("email", true)).toBe("email");
-    expect(wayOf("code", true)).toBe("code");
-    expect(wayOf("key", true)).toBe("key");
-    // email off: the admin key is the one way left
-    expect(wayOf("email", false)).toBe("key");
-    expect(wayOf("code", false)).toBe("key");
-    expect(wayOf("key", false)).toBe("key");
+  test("a way the server or browser does not offer falls back to one that is", () => {
+    expect(wayOf("email", true, false)).toBe("email");
+    expect(wayOf("code", true, false)).toBe("code");
+    expect(wayOf("key", true, true)).toBe("key");
+    expect(wayOf("passkey", true, true)).toBe("passkey");
+    expect(wayOf("passkey", true, false)).toBe("email");
+    expect(wayOf("passkey", false, false)).toBe("key");
+    // email off: the admin key, or a passkey
+    expect(wayOf("email", false, true)).toBe("key");
+    expect(wayOf("code", false, true)).toBe("key");
+    expect(wayOf("key", false, false)).toBe("key");
   });
 
   test("one way alone has no menu", () => {
-    expect(waysOffered(true)).toEqual(["email", "key"]);
-    expect(waysOffered(false)).toEqual([]);
+    expect(waysOffered(true, false)).toEqual(["email", "key"]);
+    expect(waysOffered(true, true)).toEqual(["email", "passkey", "key"]);
+    expect(waysOffered(false, true)).toEqual(["passkey", "key"]);
+    expect(waysOffered(false, false)).toEqual([]);
   });
 
   test.serial("is kept per browser, and a throwing storage keeps none", () => {
@@ -64,6 +69,8 @@ describe("the way", () => {
       expect(store.get(KEPT_WAY)).toBe("key");
       expect(keptWay()).toBe("key");
       store.set(KEPT_WAY, "passkey");
+      expect(keptWay()).toBe("passkey");
+      store.set(KEPT_WAY, "password");
       expect(keptWay()).toBeNull();
       g.localStorage = {
         getItem: () => {

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The sign-in page: the lockup and one card. With email on, anyone signs
-// in by a code emailed to them, typed in six boxes; an admin signs in
-// with their admin key. The way picked is kept per browser. The dead
-// link page's ask opens it on the code for the address it handed over.
+// in by a code emailed to them, typed in six boxes; a passkey signs in
+// where one was added; an admin signs in with their admin key. The way
+// picked is kept per browser. The dead link page's ask opens it on the
+// code for the address it handed over.
 
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
@@ -13,8 +14,15 @@ import type { Params } from "../../app/params.ts";
 import { navigate } from "../../app/router.ts";
 import { askLink, sendCode, takeHandOver } from "../../data/links.ts";
 import { confirmMe, emailOn, login } from "../../data/me.ts";
+import { dropSignedIn, passkeys } from "../../data/passkeys.ts";
 import { says } from "../../lib/format.ts";
 import { type IconName, Mark, Wordmark } from "../../lib/icons.tsx";
+import {
+  type AssertionJSON,
+  cancelled,
+  passkeyWords,
+  unknownPasskey,
+} from "../../lib/passkeys.ts";
 import { SplitButton, type SplitItem } from "../../ui/SplitButton.tsx";
 import { CodeBoxes } from "./CodeBoxes.tsx";
 import {
@@ -36,11 +44,12 @@ import "./signin.css";
 
 const WAYS: Record<Way, { label: string; icon: IconName }> = {
   email: { label: "Email code", icon: "mail" },
+  passkey: { label: "Passkey", icon: "key" },
   key: { label: "Admin key", icon: "shield" },
 };
 
 // keeps its height, so nothing moves when it shows
-function Said({ error }: { error: string | null }) {
+export function Said({ error }: { error: string | null }) {
   return (
     <p class="signin-say error" role="alert">
       {error ?? ""}
@@ -48,7 +57,7 @@ function Said({ error }: { error: string | null }) {
   );
 }
 
-function Frame({ children }: { children: ComponentChildren }) {
+export function Frame({ children }: { children: ComponentChildren }) {
   return (
     <main class="signin">
       <div class="signin-brand">
@@ -77,7 +86,8 @@ export function SignIn({
   const chosen = useSignal<Step>(
     opening ?? (handed !== null ? "code" : (keptWay() ?? "email")),
   );
-  const step = wayOf(chosen.value, on);
+  const support = passkeys.support.value;
+  const step = wayOf(chosen.value, on, support);
   const email = useSignal(address ?? handed ?? "");
   const code = useSignal("");
   const key = useSignal("");
@@ -94,6 +104,36 @@ export function SignIn({
   useEffect(() => {
     if (step === "code") codeInput.current?.focus();
   }, [step]);
+  // a refused passkey is not offered again this visit
+  const refused = useSignal(false);
+  // the email and key fields' autofill; not mid-code, where the boxes
+  // hold the user's attention
+  const fill =
+    support &&
+    passkeys.autofill.value &&
+    !refused.value &&
+    (step === "email" || step === "key");
+  useEffect(
+    // options in hand before any tap, the menu's Passkey included; the
+    // autofill primes its own
+    () =>
+      support && step !== "code" && !fill
+        ? passkeys.prime("sign_in")
+        : undefined,
+    [support, step, fill],
+  );
+  useEffect(
+    () =>
+      fill
+        ? passkeys.listen((answer) => {
+            // its challenge is spent: a busy card holds it again on new
+            // options
+            if (busy.peek() || sending.peek()) passkeys.signInFailed();
+            else void signInByPasskey(answer);
+          })
+        : undefined,
+    [fill],
+  );
 
   const flow = useMemo(
     () =>
@@ -172,11 +212,37 @@ export function SignIn({
     chosen.value = to;
   };
 
+  // answer: the autofill's; else the browser is asked before any await,
+  // inside the tap
+  async function signInByPasskey(answer?: AssertionJSON) {
+    if (busy.value || sending.value) return;
+    const signing = passkeys.signIn((to) => navigate(to, true), answer);
+    dropSignedIn();
+    busy.value = true;
+    error.value = null;
+    try {
+      await signing;
+    } catch (err) {
+      const words = passkeyWords(err, false);
+      if (!cancelled(err)) refused.value = true;
+      // gone from the account: the way it was kept on goes with it
+      if (unknownPasskey(err) && chosen.peek() === "passkey") {
+        const back: Way = on ? "email" : "key";
+        keepWay(back);
+        go(back);
+      }
+      error.value = words;
+    } finally {
+      busy.value = false;
+    }
+  }
+
   const submitKey = async (event: Event) => {
     event.preventDefault();
     if (busy.value) return;
     busy.value = true;
     error.value = null;
+    dropSignedIn();
     try {
       // the form renders at the address that needed a user, so staying
       // there lands on it; App sends /login itself home
@@ -189,13 +255,15 @@ export function SignIn({
     }
   };
 
-  const ways: SplitItem[] = waysOffered(on).map((way) => ({
+  const ways: SplitItem[] = waysOffered(on, support).map((way) => ({
     label: WAYS[way].label,
     icon: WAYS[way].icon,
     checked: step === way,
     run: () => {
       keepWay(way);
       go(way);
+      // picking Passkey asks for it in the same tap, as iOS needs
+      if (way === "passkey") void signInByPasskey();
     },
   }));
   const codeActions: SplitItem[] = [
@@ -239,7 +307,7 @@ export function SignIn({
                 class="signin-input"
                 name="email"
                 type="email"
-                autocomplete="email"
+                autocomplete={fill ? "email webauthn" : "email"}
                 inputmode="email"
                 disabled={sending.value}
                 value={email.value}
@@ -258,6 +326,25 @@ export function SignIn({
               {sending.value ? "Sending" : "Sign in"}
             </SplitButton>
           </form>
+        )}
+        {step === "passkey" && (
+          <div class="signin-form">
+            <p class="signin-hint">
+              Use Face ID, Touch ID or your password manager.
+            </p>
+            <Said error={error.value} />
+            <SplitButton
+              disabled={
+                busy.value || sending.value || passkeys.waiting("sign_in")
+              }
+              onClick={() => void signInByPasskey()}
+              working={busy.value || passkeys.waiting("sign_in")}
+              items={ways}
+              label="Ways to sign in"
+            >
+              {busy.value ? "Signing in" : "Sign in"}
+            </SplitButton>
+          </div>
         )}
         {step === "code" && (
           <form
@@ -336,7 +423,9 @@ export function SignIn({
                 class="signin-input"
                 name="key"
                 type="password"
-                autocomplete="current-password"
+                autocomplete={
+                  fill ? "current-password webauthn" : "current-password"
+                }
                 value={key.value}
                 onInput={(e) => {
                   key.value = (e.currentTarget as HTMLInputElement).value;

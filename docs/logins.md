@@ -4,8 +4,9 @@ Governs how a user signs in: the login cookie and its ends, the admin
 keys (`access/admin-keys.ts`, `users/rules.ts`, `users/key-file.ts`,
 `1ctx admin-key`), the links and codes an email carries
 (`access/links.ts`, `link-store.ts`, `link-routes.ts`, the link page
-`web/link-page.ts`), passkeys (`access/passkeys/`) and the sign-in
-page (`views/home/SignIn.tsx`).
+`web/link-page.ts`), passkeys (`access/passkeys/`, `data/passkeys.ts`,
+the profile's Passkeys section) and the sign-in page
+(`views/home/SignIn.tsx`).
 Requests, users and the socket are
 `docs/access.md`.
 
@@ -132,7 +133,9 @@ link and a six-digit code, either works once, and using one uses both.
   kills an asked link; an invite, which no browser asked for, is tried
   beside any challenge and its fifth miss ends its code, never its link.
   A wrong code, another address, no challenge and a bad body are one
-  401. A hit answers `{user, landing}` with the login cookie.
+  401. A hit answers `{user, landing}` with the login cookie. The
+  landing of a link or a code is `/?signed_in=1`, which asks the page
+  for its passkey step (Passkeys).
 - **A link never acts on a GET,** since email scanners open links.
   `GET` and `HEAD /link/<token>` are drawn by the server outside the
   router (`web/link-page.ts`): no script, font or stylesheet, its look
@@ -164,9 +167,9 @@ link and a six-digit code, either works once, and using one uses both.
 
 - **The sign-in is one card, `views/home/SignIn.tsx`,** on every
   address that needs a user and on `/login`. Its one button's menu
-  picks Email code (while `emailOn`) or Admin key, kept per browser in
-  localStorage `1ctx-sign-in` and dropped to Admin key while email is
-  off. The code is six boxes (`CodeBoxes.tsx`); the sixth digit signs
+  picks Email code (while `emailOn`), Passkey (where the browser has
+  WebAuthn) or Admin key, kept per browser in localStorage
+  `1ctx-sign-in`, a way no longer offered falling back (`wayOf()`). The code is six boxes (`CodeBoxes.tsx`); the sixth digit signs
   in. A line under the field keeps its height whatever it says, so the
   card never moves. The rules are `SignIn.model.ts`'s.
 - **A sign-in leaves the card only once `GET /api/me` names the user**
@@ -252,3 +255,42 @@ and `getAuthenticatorData()`, `crypto.subtle`, ES256 and RS256 of
 - **Logs name a passkey's id and its user** (`passkey added`, `passkey
   used`, `passkey removed`) and a refusal's reason word (`passkey
   refused`), never a credential id, key or challenge.
+- **The browser fetches options before the tap** (`prime()` in
+  `data/passkeys.ts`): iOS runs `create()` and `get()` only inside the
+  tap, so the sign-in, the passkey step and the profile's section fetch
+  options when they show, again 30 s (`LEEWAY_MS`) before their
+  timeout, and after every tap but a sign-in that worked. Freshness
+  counts from the ask; a failed refresh tries again after 30 s; a
+  hidden tab fetches stale options when shown. A tap on stale options
+  only fetches, its button disabled until they land, so no tap awaits
+  a fetch before the browser is asked. An add still asking when the
+  user changes sends nothing.
+- **Picking Passkey in the menu asks the browser in that tap,** after
+  aborting the autofill's request (a browser holds one); cancelled, the
+  card stays on the Passkey way, whose Sign in asks again. The email
+  and admin key fields say `webauthn` in their `autocomplete` where the
+  browser has conditional mediation, and `listen()` holds a
+  conditional `get()` open on the primed options, restarted by each
+  refresh; a refused request waits for that refresh. A passkey signs
+  in as a code does: its landing, then `GET /api/me`.
+- **A refused passkey ends the autofill for the visit,** and an
+  unknown one (`unknown_passkey`) moves a kept Passkey way back to
+  Email code (or the admin key). Removing a passkey of this host, and
+  an unknown one on an https address, ask the browser to forget it
+  (`signalUnknownCredential()`); on loopback another install on
+  another port may hold it, so nothing is forgotten there.
+- **A passkey step after every emailed sign-in,** in the sign-in's own
+  card (`views/home/PasskeyStep.tsx`): once signed in, `watchStep()`
+  strips `?signed_in=1` with `replaceState`, and a browser with a
+  platform authenticator (asked once at start) gets "Sign in faster
+  next time", "Add a passkey" and "Skip" in place of the app. Nothing
+  is kept, so every emailed sign-in asks. A key or passkey sign-in
+  drops a leftover flag (`dropSignedIn()`), so it never asks.
+- **The profile's Passkeys section** (`views/profile/Passkeys.tsx`),
+  absent without `PublicKeyCredential`, lists every passkey with its
+  provider, "Added 12 Nov" and "Last used 20 Nov" or "Never used" on
+  the reader's calendar, and the host of one added at another origin
+  (`elsewhere()`), so none hides. Remove is asked once; "Add a
+  passkey" is its foot. With none it says "Sign in with Face ID, Touch
+  ID or your password manager." The profile route loads the list with
+  the row, so the page waits as one.

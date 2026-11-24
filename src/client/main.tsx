@@ -15,6 +15,7 @@ import { match } from "./app/routes.ts";
 import { watchPages, watchScreen, watchViewport } from "./app/shell.ts";
 import { watchTitle } from "./app/Title.state.ts";
 import { watchTheme } from "./app/theme.ts";
+import { watchStep } from "./data/passkeys.ts";
 import { startSocket } from "./data/socket.ts";
 
 watchTheme();
@@ -25,5 +26,6 @@ watchPages((pathname) => match(pathname) !== null);
 watchRecent();
 watchTitle();
 startLoading();
+watchStep();
 startSocket({ reload });
 render(<App />, document.getElementById("app")!);

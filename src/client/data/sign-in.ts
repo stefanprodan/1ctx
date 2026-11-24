@@ -1,9 +1,9 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// The sign-in's posts: a wrong key or code ends no login, so they skip
-// api()'s 401 hook, and their failures say the sign-in's own words for
-// the status, never the body's.
+// The sign-in's posts: a wrong key, code or passkey ends no login, so
+// they skip api()'s 401 hook, and their failures say the sign-in's own
+// words for the status, never the body's.
 
 import { ApiError } from "./api.ts";
 
@@ -37,6 +37,11 @@ export async function signInPost(
   } catch {
     throw new ApiError(0, signInWords(0, wrong));
   }
-  if (!res.ok) throw new ApiError(res.status, signInWords(res.status, wrong));
+  if (!res.ok) {
+    // the words stay the page's own; a code, such as an unknown
+    // passkey's, still reaches the caller
+    const body: unknown = await res.json().catch(() => null);
+    throw new ApiError(res.status, signInWords(res.status, wrong), body);
+  }
   return await res.json().catch(() => null);
 }

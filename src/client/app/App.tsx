@@ -4,20 +4,23 @@
 // The root: a public route renders at once; anything else waits for
 // the first load of me in the shell's shape, with a retry when that
 // load fails; the login
-// view when nobody is signed in and the route needs someone; otherwise
-// the shell, the rail beside the view.
+// view when nobody is signed in and the route needs someone; the passkey
+// step after an emailed sign-in; otherwise the shell, the rail beside
+// the view.
 
 import { effect } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import type { Me } from "../../shared/contracts/user.ts";
 import { loadMe, me, meError } from "../data/me.ts";
+import { passkeys } from "../data/passkeys.ts";
 import { sentence } from "../lib/format.ts";
 import { Icon } from "../lib/icons.tsx";
 import { type HandedWait, HandOver, useHandOver } from "../lib/wait.ts";
 import { Bone } from "../ui/Bones.tsx";
 import { CodeTag } from "../ui/CodeTag.tsx";
 import { PageWaiting } from "../ui/PageWaiting.tsx";
+import { PasskeyStep } from "../views/home/PasskeyStep.tsx";
 import { SignIn } from "../views/home/SignIn.tsx";
 import { Rail, RailWaiting } from "./Rail.tsx";
 import { navigate, path, query } from "./router.ts";
@@ -210,6 +213,8 @@ export function App() {
     const View = m.route.view;
     return <View params={m.params} />;
   }
+  // signed in already: the app waits behind it until added or skipped
+  if (passkeys.step.value) return <PasskeyStep />;
   if (m === null || m.route.path === "/login") return null;
   if (m.route.role === "admin" && user.role !== "admin") {
     return (

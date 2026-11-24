@@ -20,14 +20,15 @@ import { adminCount, disableLock, inviteCardWords } from "./Users.model.ts";
 
 export type CardProps = { user: AdminUser; saving: Signal<boolean> };
 
-// asked once: it ends every login, live link and access key of the user
+// asked once: it ends every login, live link, passkey and access key of
+// the user
 export function SignOutCard({ user, saving }: CardProps) {
   const save = useSave(async () => {});
   const asking = useSignal(false);
   return (
     <Setting
       title="Sign out everywhere"
-      line={`Ends every sign-in of ${user.fullName}, their unused email links and their access keys.`}
+      line={`Ends every sign-in of ${user.fullName}, their unused email links, their passkeys and their access keys.`}
       foot={
         <Foot save={save} inline>
           <AskDelete
@@ -115,7 +116,7 @@ export function SwitchCard({ user, saving }: CardProps) {
         lock ??
         (user.disabled
           ? "They cannot sign in."
-          : "Signs them out, blocks sign-in and deletes their access keys.")
+          : "Signs them out, blocks sign-in and deletes their passkeys and access keys.")
       }
       foot={
         <Foot save={save} inline>
