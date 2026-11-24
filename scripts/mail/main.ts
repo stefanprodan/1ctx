@@ -11,6 +11,8 @@
 //   bun scripts/mail/main.ts show DIR DB TO
 //     the newest message to TO, a username (its email read from DB) or
 //     an email, with its code and link
+//   bun scripts/mail/main.ts points DB PORT
+//     exits 0 when the SMTP server in DB is the catcher on PORT
 
 import { Database } from "bun:sqlite";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -77,6 +79,22 @@ export function addressFor(db: string, to: string): string | null {
   }
 }
 
+// whether the instance's SMTP server is still the catcher on that port
+export function pointsAtCatcher(db: string, port: number): boolean {
+  if (!existsSync(db)) return false;
+  const handle = new Database(db);
+  try {
+    const row = handle
+      .query<{ host: string; port: number }, []>(
+        "select host, port from smtp_settings",
+      )
+      .get();
+    return row?.host === "127.0.0.1" && row.port === port;
+  } finally {
+    handle.close();
+  }
+}
+
 function serve(dir: string, port: number) {
   const box = openBox(dir);
   const server = listenSmtp({
@@ -117,9 +135,11 @@ if (import.meta.main) {
   if (command === "setup" && dir && a && b) setup(dir, Number(a), b);
   else if (command === "serve" && dir && a) serve(dir, Number(a));
   else if (command === "show" && dir && a && b) process.exit(show(dir, a, b));
+  else if (command === "points" && dir && a)
+    process.exit(pointsAtCatcher(dir, Number(a)) ? 0 : 1);
   else {
     console.error(
-      "usage: main.ts setup DIR PORT URL | serve DIR PORT | show DIR DB TO",
+      "usage: main.ts setup DIR PORT URL | serve DIR PORT | show DIR DB TO | points DB PORT",
     );
     process.exit(2);
   }

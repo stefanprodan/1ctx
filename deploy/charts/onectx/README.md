@@ -30,11 +30,15 @@ image's `admin-key` and piped straight in, and your API key:
 
 ```sh
 kubectl create namespace onectx
-docker run --rm ghcr.io/stefanprodan/1ctx:<tag> admin-key admin --stdout |
-  kubectl -n onectx create secret generic onectx \
+key=$(docker run --rm ghcr.io/stefanprodan/1ctx:<tag> admin-key admin --stdout)
+case "$key" in 1ctx-admin-*) ;; *) echo "no admin key made" >&2; false ;; esac &&
+  printf '%s' "$key" | kubectl -n onectx create secret generic onectx \
     --from-file=user-admin.key=/dev/stdin \
     --from-literal=provider-openrouter.key='<OpenRouter API key>'
 ```
+
+The check keeps a failed `docker run` from making a Secret with an
+empty key.
 
 Save the following as `values.yaml`. The provider references the key in
 the Secret; no keys go in this file.

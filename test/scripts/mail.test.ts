@@ -11,13 +11,19 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import {
   addressOf,
+  keyOf,
   newest,
   openBox,
   show,
   showFile,
 } from "../../scripts/mail/box.ts";
 import { CERT_DAYS, makeCert, stillGood } from "../../scripts/mail/cert.ts";
-import { addressFor, setup, smtpYaml } from "../../scripts/mail/main.ts";
+import {
+  addressFor,
+  pointsAtCatcher,
+  setup,
+  smtpYaml,
+} from "../../scripts/mail/main.ts";
 import { listenSmtp, type Received } from "../../scripts/mail/smtp.ts";
 import { smtpSender } from "../../src/server/email/smtp.ts";
 import { parse } from "../../src/server/provision/index.ts";
@@ -86,7 +92,7 @@ describe("the catcher's object", () => {
 });
 
 describe("the catcher's files", () => {
-  test("one per recipient, the owner's alone", () => {
+  test("one per recipient, every address kept, the owner's alone", () => {
     const dir = temp("mail-box-");
     const box = openBox(dir);
     const paths = box.write(
@@ -95,14 +101,34 @@ describe("the catcher's files", () => {
         "Subject: hi\r\n\r\n..dot\r\nend",
       ),
     );
-    expect(paths.map((p) => p.slice(dir.length + 1).split("--")[0])).toEqual([
-      "ann@preview.test",
-      "bob@preview.test",
-    ]);
+    expect(paths).toHaveLength(3);
+    expect(paths.every((p) => p.startsWith(`${dir}/`))).toBe(true);
     expect(statSync(dir).mode & 0o777).toBe(0o700);
     expect(statSync(paths[0]!).mode & 0o777).toBe(0o600);
     expect(readFileSync(paths[0]!, "utf8")).toBe(
-      "Subject: hi\r\n\r\n.dot\r\nend\r\n",
+      "X-Catcher-To: ann@preview.test\r\nSubject: hi\r\n\r\n.dot\r\nend\r\n",
+    );
+    expect(newest(dir, "../etc@x")).toBe(paths[2]!);
+  });
+
+  test("one address never finds another that starts with it", () => {
+    const dir = temp("mail-box-");
+    const box = openBox(dir);
+    const [ann, west] = box.write(
+      received(
+        ["<ann@a.test>", "<ann@a.test--west.test>"],
+        "Subject: both\r\n\r\nx",
+      ),
+      Date.UTC(2026, 10, 24, 10),
+    );
+    box.write(
+      received(["<ann@a.test--west.test>"], "Subject: west\r\n\r\nx"),
+      Date.UTC(2026, 10, 24, 11),
+    );
+    expect(newest(dir, "ann@a.test")).toBe(ann!);
+    expect(newest(dir, "ann@a.test--west.test")).not.toBe(west!);
+    expect(showFile(newest(dir, "ann@a.test--west.test")!).subject).toBe(
+      "west",
     );
   });
 
@@ -125,11 +151,10 @@ describe("the catcher's files", () => {
     expect(newest(join(dir, "missing"), "ann@preview.test")).toBeNull();
   });
 
-  test("an address is a safe file name or none", () => {
-    expect(addressOf("<A.B+c@Example.test>")).toBe("a.b+c@example.test");
-    expect(addressOf("<a/b@x>")).toBeNull();
-    expect(addressOf("<a@x/../y>")).toBeNull();
-    expect(addressOf("<a@..>")).toBeNull();
+  test("an address is its envelope form, lowercased", () => {
+    expect(addressOf(" <A.B+c@Example.test> ")).toBe("a.b+c@example.test");
+    expect(keyOf("<Ann@A.test>")).toBe(keyOf("ann@a.test"));
+    expect(keyOf("ann@a.test")).toMatch(/^[0-9a-f]{16}$/);
   });
 });
 
@@ -180,6 +205,19 @@ describe("a username", () => {
     expect(addressFor(path, "bob")).toBeNull();
     expect(addressFor(path, "Bob@Preview.test")).toBe("bob@preview.test");
     expect(addressFor(join(path, "missing"), "ann")).toBeNull();
+  });
+});
+
+describe("real mail", () => {
+  test("is refused while the SMTP server is the catcher", () => {
+    const path = join(temp("mail-real-"), "1ctx.sqlite");
+    expect(pointsAtCatcher(path, 1238)).toBe(false);
+    const db = new Database(path);
+    db.exec("create table smtp_settings (host text, port integer)");
+    db.query("insert into smtp_settings values ('127.0.0.1', 1238)").run();
+    db.close();
+    expect(pointsAtCatcher(path, 1238)).toBe(true);
+    expect(pointsAtCatcher(path, 1338)).toBe(false);
   });
 });
 
@@ -235,6 +273,37 @@ describe("the catcher", () => {
         },
       );
       expect(other).toBe("tls");
+    } finally {
+      server.stop();
+    }
+  });
+  test("answers 451 when a copy cannot be stored", async () => {
+    const cert = makeCert();
+    const server = listenSmtp({
+      tls: true,
+      certificate: cert,
+      onMessage: () => {
+        throw new Error("disk full");
+      },
+    });
+    try {
+      const sent = await smtpSender({ ca: cert.cert })(
+        {
+          host: "127.0.0.1",
+          port: server.port,
+          security: "tls",
+          username: null,
+          password: null,
+        },
+        {
+          from: { name: "1ctx", address: "1ctx@preview.test" },
+          to: { name: "Ann", address: "ann@preview.test" },
+          subject: "x",
+          text: "x",
+          messageId: "<m3@preview.test>",
+        },
+      );
+      expect(sent).not.toBe("sent");
     } finally {
       server.stop();
     }

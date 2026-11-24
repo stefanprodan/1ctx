@@ -25,7 +25,7 @@ import {
 import { join, resolve } from "node:path";
 import { build, defaultDb, OUT_DIR } from "./db/build.ts";
 import { SHAPES, type Shape } from "./fake-model.ts";
-import { fence, fenced } from "./fence.ts";
+import { fence, fenced, migrateWith } from "./fence.ts";
 import { enabledUsers, newLogins } from "./logins.ts";
 import { FAKE, fakeMcpUrl, fakeModelUrl } from "./shapes.ts";
 import { printTable, summarize } from "./summarize.ts";
@@ -106,7 +106,10 @@ async function main() {
   db = runDb;
 
   // the fence, and a login for every user of this run, minted now since
-  // the build's clock is in the past; the driver alone reads the tokens
+  // the build's clock is in the past, after the serving checkout's
+  // migrations; the driver alone reads the tokens
+  const migrated = migrateWith(checkout, db);
+  if (migrated.length > 0) console.log(`migrated: ${migrated.join(", ")}`);
   const handle = new Database(db);
   const { tokens, hashes } = newLogins(enabledUsers(handle));
   const loginsFile = join(run, "logins.json");
@@ -147,6 +150,7 @@ async function main() {
   );
 
   const procs: Bun.Subprocess[] = [];
+  let driverCode: number | null = null;
   const spawn = (
     cmd: string[],
     name: string,
@@ -234,15 +238,18 @@ async function main() {
     const code = await driver.exited;
     clearInterval(sampler);
     await Bun.write(join(results, "top.log"), `${top.join("\n")}\n`);
-    if (code !== 0)
-      console.error(
-        `the driver exited ${code}: see ${join(results, "driver.log")}`,
-      );
+    driverCode = code;
   } finally {
     for (const p of procs.reverse()) p.kill("SIGTERM");
     await Promise.all(procs.map((p) => p.exited));
   }
   printTable([await summarize(results)]);
+  // a driver that failed, a sign-in included, fails the run
+  if (driverCode !== 0) {
+    throw new Error(
+      `the driver exited ${driverCode}: see ${join(results, "driver.log")}`,
+    );
+  }
 }
 
 await main();

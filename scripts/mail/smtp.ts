@@ -27,6 +27,7 @@ export type SmtpOptions = {
   rejectRecipient?: boolean;
   // never greet, so the client's greeting timeout ends it
   silent?: boolean;
+  // a throw answers 451
   onMessage(message: Received): void;
   // every command line read, AUTH's argument left out
   onCommand?(line: string): void;
@@ -67,13 +68,20 @@ export function listenSmtp(options: SmtpOptions): SmtpListener {
       state.buffer = state.buffer.slice(end + 2);
       if (state.data !== null) {
         if (line === ".") {
-          options.onMessage({
+          const message = {
             auth: state.auth,
             from: state.from,
             to: state.to,
             data: state.data.join("\r\n"),
-          });
+          };
           state.data = null;
+          // 250 only once the message is kept; a throw asks for a retry
+          try {
+            options.onMessage(message);
+          } catch {
+            socket.write("451 not kept\r\n");
+            continue;
+          }
           socket.write("250 queued\r\n");
         } else {
           state.data.push(line);

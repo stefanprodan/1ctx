@@ -127,7 +127,7 @@ gateway add`.
 
 - **The preview's email goes to a catcher on loopback,** the preview
   port + 2 (`PREVIEW_MAIL_PORT`), each message a mode 600 file in
-  `.preview/mail/` (mode 700) named `<address>--<time>-<count>.eml`.
+  `.preview/mail/` (mode 700) named `<key>--<time>-<count>.eml`.
   `make preview-mail TO=<username or email>` prints the newest.
 - **Its certificate is made at a start when missing or within two days
   of its end,** for 127.0.0.1 alone and not a CA, its key never leaving
@@ -137,8 +137,13 @@ gateway add`.
   nothing else is added.
 - **Its `SmtpServer` object is applied with `--provision` at each
   start,** after any provisioning, so a provisioned real server never
-  wins. `PREVIEW_MAIL=real` starts no catcher and leaves the SMTP server
-  last applied; provision the real one with it set.
+  wins. `PREVIEW_MAIL=real` starts no catcher and refuses to start while
+  the SMTP server is still the catcher; provision the real one with it
+  set.
+- **Each recipient's copy is keyed by a hash of its address,** which
+  heads the file as `X-Catcher-To`, so no address matches another's
+  prefix. The catcher answers 250 only once every copy is written, 451
+  otherwise.
 
 ## The container image
 

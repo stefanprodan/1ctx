@@ -15,8 +15,9 @@
 # each message a file in .preview/mail/ (`mail <user>` prints the newest).
 # The server trusts its certificate through NODE_EXTRA_CA_CERTS and its
 # SmtpServer is applied with --provision at each start, after any
-# provisioning. PREVIEW_MAIL=real leaves the SMTP server last applied,
-# so a real one comes back by provisioning it with the variable set.
+# provisioning. PREVIEW_MAIL=real starts no catcher and refuses to start
+# while the SMTP server is still the catcher: provision the real one with
+# the variable set.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -84,10 +85,15 @@ mail_running() {
   [ "$(lsof -a -p "$(cat "$MAIL_PID")" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')" = "$HERE" ]
 }
 
+# the pid file goes only with the process, as the gateway's does
 mail_stop() {
   if mail_running; then
     kill "$(cat "$MAIL_PID")"
     for _ in $(seq 1 50); do mail_running || break; sleep 0.1; done
+    if mail_running; then
+      echo "the mail catcher (pid $(cat "$MAIL_PID")) did not stop within 5 s; stop it, then run this again" >&2
+      exit 1
+    fi
   fi
   rm -f "$MAIL_PID"
 }
@@ -226,6 +232,11 @@ reset() {
 start() {
   keys
   local mail=()
+  if [ "${PREVIEW_MAIL:-}" = real ] && [ -f "$DIR/1ctx.sqlite" ] &&
+    bun "$MAIL_ENTRY" points "$DIR/1ctx.sqlite" "$MAIL_PORT"; then
+    echo "PREVIEW_MAIL=real, but the preview's SMTP server is still the catcher on 127.0.0.1:$MAIL_PORT; provision the real one: PREVIEW_MAIL=real make preview-provision FILE=..." >&2
+    exit 1
+  fi
   if [ "${PREVIEW_MAIL:-}" != real ]; then
     mail_start
     mail=(--provision "$MAIL/smtp.yaml")
@@ -259,6 +270,7 @@ start() {
   done
   echo "preview did not answer at $URL; log tail:" >&2
   tail -20 "$LOG" >&2
+  mail_stop
   exit 1
 }
 

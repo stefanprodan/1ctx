@@ -107,13 +107,20 @@ the driver sends each token as the `login` cookie and checks it with
 whose clock is in the past. A user's earlier logins go when a new one
 is minted.
 
-- **Locally** the fence mints them; the tokens go to
-  `out/run/logins.json` (mode 600), named to the driver by `LOGINS`.
+- **Locally** the checkout that serves the run migrates the clone
+  first, so a migration that deletes logins never voids them, then the
+  fence mints them; the tokens go to `out/run/logins.json` (mode 600),
+  named to the driver by `LOGINS`. A driver that exits non-zero, a
+  failed sign-in included, fails the run.
 - **On the cluster** each driver pod is preceded by a mint step: the
   server's deployment is scaled to 0, a pod on its volume (`mint.ts`)
   opens the logins from a ConfigMap of hashes, and the server is scaled
-  back up and waited on. The tokens go only into the `load-logins`
-  Secret, which only the driver pod mounts. The chart's Secret holds
+  back up and waited on. Whatever ends it, the mint pod is deleted and
+  gone before the server scales back. The hashes and tokens reach
+  kubectl on stdin, never a file; the tokens go only into the
+  `load-logins` Secret, which only the driver pod mounts. A driver pod
+  that does not succeed fails the run with its log. A first SIGINT or
+  SIGTERM cancels the waits so this cleanup runs; a second exits. The chart's Secret holds
   only `user-admin.key`, an admin key for `--provision`, made once in
   `out/cluster/secrets/` and remade when it holds anything else.
 - The driver, on both targets, sets web access off and search to none
@@ -189,7 +196,7 @@ When the branch adds a migration, build the database from main's
 checkout (`bun scripts/load/db/build.ts` run in it, `--out` into this
 one's `out/db/`): `migrate()` accepts migration ids it does not know
 without a word, so main would otherwise run on the branch's schema.
-The branch then migrates its clone at start, as a deploy would.
+The branch then migrates its clone before the fence, as a deploy would.
 
 ## Reading the table
 

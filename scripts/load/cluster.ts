@@ -16,11 +16,17 @@
 // every command: [--context kind-1ctx-test] [--namespace 1ctx-load]
 // `make kind-up` makes that cluster, `make kind-image` loads the image
 
-import { chmodSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { OUT_DIR } from "./db/build.ts";
 import { type CapsMode, parseCaps } from "./driver/automations.ts";
-import { newLogins } from "./logins.ts";
+import {
+  Cancelled,
+  ended,
+  type Kube,
+  LOGINS_SECRET,
+  mint as mint_,
+} from "./pods.ts";
 import {
   ADMIN_KEY_FILE,
   mcpBase,
@@ -28,7 +34,7 @@ import {
   usernames,
   writeCluster,
 } from "./provision.ts";
-import { failIfStuck, rolledOut } from "./rollout.ts";
+import { rolledOut } from "./rollout.ts";
 import { FAKE } from "./shapes.ts";
 import { printTable, summarize } from "./summarize.ts";
 
@@ -153,39 +159,6 @@ spec:
   volumes:
     - { name: scripts, configMap: { name: load-scripts } }
     - { name: logins, secret: { secretName: ${LOGINS_SECRET} } }
-`;
-}
-
-const LOGINS_SECRET = "load-logins";
-const MINT_POD = "mint-logins";
-// the chart's selector for release onectx
-const SERVER_PODS =
-  "app.kubernetes.io/name=onectx,app.kubernetes.io/instance=onectx";
-
-// as the chart's server runs, on its volume, with the hashes alone
-export function mintPod(): string {
-  return `apiVersion: v1
-kind: Pod
-metadata: { name: ${MINT_POD}, namespace: ${ns} }
-spec:
-  restartPolicy: Never
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 65532
-    runAsGroup: 65532
-    fsGroup: 65532
-  containers:
-    - name: mint
-      image: ${BUN_IMAGE}
-      command: ["bun", "/load/mint.js", "/data/1ctx.sqlite", "/mint/hashes.json"]
-      volumeMounts:
-        - { name: scripts, mountPath: /load }
-        - { name: hashes, mountPath: /mint, readOnly: true }
-        - { name: data, mountPath: /data }
-  volumes:
-    - { name: scripts, configMap: { name: load-scripts } }
-    - { name: hashes, configMap: { name: ${MINT_POD} } }
-    - { name: data, persistentVolumeClaim: { claimName: onectx } }
 `;
 }
 
@@ -325,92 +298,17 @@ function checkMetrics() {
   }
 }
 
-// waits for a pod to end; it must start within READY_MS and end within
-// doneMs, or the run fails
-const READY_MS = 3 * 60_000;
-async function ended(name: string, doneMs: number): Promise<string> {
-  const start = Date.now();
-  const phaseOf = () =>
-    run(
-      k("get", "pod", name, "-o", "jsonpath={.status.phase}"),
-      undefined,
-      true,
-    ).trim();
-  for (;;) {
-    await Bun.sleep(5000);
-    const phase = phaseOf();
-    if (phase === "Pending") failIfStuck(k, (pod) => pod === name);
-    if (phase === "Succeeded" || phase === "Failed") return phase;
-    const waited = Date.now() - start;
-    if (phase === "Pending" && waited > READY_MS) {
-      throw new Error(
-        `pod ${name} did not start in ${READY_MS / 60_000} minutes`,
-      );
-    }
-    if (waited > doneMs) {
-      const log = Bun.spawnSync(k("logs", name)).stdout.toString();
-      if (log !== "") console.log(log);
-      throw new Error(
-        `pod ${name} did not end in ${Math.round(doneMs / 60_000)} minutes`,
-      );
-    }
-  }
-}
+// SIGINT or SIGTERM sets it, so the waits throw and every cleanup runs
+let cancelRequested = false;
+const kube: Kube = {
+  k,
+  sleep: (ms) => Bun.sleep(ms),
+  cancelled: () => cancelRequested,
+};
+const mint = () => mint_(kube, usernames(), ns, BUN_IMAGE);
 
-// a login per user, opened in the stopped server's database: the mint
-// pod gets the hashes, the driver's Secret the tokens, and the server
-// starts again whatever happens
-async function mint() {
-  const { tokens, hashes } = newLogins(usernames());
-  const file = (name: string, text: string) => {
-    const path = join(CLUSTER, name);
-    writeFileSync(path, text, { mode: 0o600 });
-    chmodSync(path, 0o600);
-    return path;
-  };
-  mkdirSync(CLUSTER, { recursive: true });
-  const hashesFile = file("hashes.json", JSON.stringify(hashes));
-  const tokensFile = file("logins.json", JSON.stringify(tokens));
-  const create = (...args: string[]) =>
-    apply(
-      run(
-        k("create", ...args, "--dry-run=client", "-o", "yaml"),
-        undefined,
-        true,
-      ),
-    );
-  create("configmap", MINT_POD, `--from-file=hashes.json=${hashesFile}`);
-  create(
-    "secret",
-    "generic",
-    LOGINS_SECRET,
-    `--from-file=logins.json=${tokensFile}`,
-  );
-  unlinkSync(tokensFile);
-  run(k("delete", "pod", MINT_POD, "--ignore-not-found"), undefined, true);
-  run(k("scale", "deploy/onectx", "--replicas=0"), undefined, true);
-  try {
-    const gone = Bun.spawnSync(
-      k("wait", "--for=delete", "pod", "-l", SERVER_PODS, "--timeout=5m"),
-    );
-    const err = gone.stderr.toString();
-    // older kubectl calls a selector that matches nothing an error
-    if (gone.exitCode !== 0 && !err.includes("no matching resources")) {
-      throw new Error(`waiting for the server to stop: ${err.trim()}`);
-    }
-    apply(mintPod());
-    const phase = await ended(MINT_POD, READY_MS + 60_000);
-    const log = run(k("logs", MINT_POD), undefined, true).trim();
-    if (phase !== "Succeeded") throw new Error(`minting logins: ${log}`);
-    console.log(log);
-    run(k("delete", "pod", MINT_POD), undefined, true);
-  } finally {
-    run(k("scale", "deploy/onectx", "--replicas=1"), undefined, true);
-  }
-  await rolledOut(k, "onectx");
-}
-
-// runs the driver in a fresh pod and returns its log; mint() goes first
+// runs the driver in a fresh pod and returns its log, or throws with
+// the log printed unless it succeeded; mint() goes first
 async function driver(
   name: string,
   args: string[],
@@ -418,8 +316,21 @@ async function driver(
 ): Promise<string> {
   run(k("delete", "pod", name, "--ignore-not-found"), undefined, true);
   apply(driverPod(name, args));
-  await ended(name, doneMs);
-  return run(k("logs", name), undefined, true);
+  let phase: string;
+  try {
+    phase = await ended(kube, name, doneMs);
+  } catch (e) {
+    if (e instanceof Cancelled) {
+      Bun.spawnSync(k("delete", "pod", name, "--wait=false"));
+    }
+    throw e;
+  }
+  const log = run(k("logs", name), undefined, true);
+  if (phase !== "Succeeded") {
+    console.log(log);
+    throw new Error(`pod ${name} ended ${phase}`);
+  }
+  return log;
 }
 
 // a step: its minutes, the schedules set before it, the tail and the
@@ -433,12 +344,16 @@ const stopChildren = () => {
   for (const c of children) c.kill();
   children.clear();
 };
+// a first signal stops the children and cancels the waits, so the mint
+// step scales the server back; a second exits at once
 function stopOnExit() {
   process.on("exit", stopChildren);
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
+      if (cancelRequested) process.exit(130);
+      cancelRequested = true;
+      console.error("stopping: cleaning up first, again to exit now");
       stopChildren();
-      process.exit(130);
     });
   }
 }
@@ -582,4 +497,11 @@ async function main() {
   }
 }
 
-if (import.meta.main) await main();
+if (import.meta.main) {
+  try {
+    await main();
+  } catch (e) {
+    if (cancelRequested) process.exit(130);
+    throw e;
+  }
+}

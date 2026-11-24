@@ -21,8 +21,10 @@ file:
 
 - `user-admin.key`: the first admin's admin key, never a password. It
   creates `admin` on the first start, and with `provision` set every
-  start signs in with it. Make it with the image's `admin-key`:
-  `docker run --rm ghcr.io/stefanprodan/1ctx:<tag> admin-key admin --stdout`.
+  start signs in with it. Make it with the image's `admin-key`
+  (`docker run --rm ghcr.io/stefanprodan/1ctx:<tag> admin-key admin --stdout`)
+  into a variable, and check it starts with `1ctx-admin-` before it goes
+  into the Secret, as the chart's README does.
 - `user-<username>.key`: another admin's own key, made the same way.
   Members sign in by email.
 - `<kind>-<name>.key`: provider, search, MCP and HTTP keys, such as

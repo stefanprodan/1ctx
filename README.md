@@ -66,10 +66,16 @@ From a clone of this repository, build the image and write the secrets:
 cd deploy/docker
 mkdir -p secrets provision
 ONECTX_VERSION=dev docker compose -f compose.yaml -f compose.dev.yaml build
-docker run --rm ghcr.io/stefanprodan/1ctx:dev admin-key admin --stdout > secrets/user-admin.key
+key=$(mktemp)
+docker run --rm ghcr.io/stefanprodan/1ctx:dev admin-key admin --stdout > "$key"
+grep -q '^1ctx-admin-' "$key" && chmod 644 "$key" &&
+  mv -n "$key" secrets/user-admin.key
 printf '%s' '<your OpenRouter key>' > secrets/provider-openrouter.key
 chmod 644 secrets/*.key
 ```
+
+The key goes into place only when it was made and no `user-admin.key`
+is there already; a key is never written over.
 
 `user-admin.key` holds the admin key of the first admin, `admin`. There
 are no passwords: an admin signs in with their own key file,
@@ -118,8 +124,8 @@ ONECTX_VERSION=dev docker compose restart
 
 To run a release, omit `compose.dev.yaml` and replace `<release-tag>`
 with a tag from [Releases](https://github.com/stefanprodan/1ctx/releases),
-making the admin key with that image
-(`docker run --rm ghcr.io/stefanprodan/1ctx:<release-tag> admin-key admin --stdout`):
+making the admin key as above with that image
+(`ghcr.io/stefanprodan/1ctx:<release-tag>`):
 
 ```sh
 ONECTX_VERSION='<release-tag>' docker compose up -d

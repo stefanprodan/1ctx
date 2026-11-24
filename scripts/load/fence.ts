@@ -128,3 +128,26 @@ export function fenced(db: Database, o: FenceOptions): string[] {
   if (missing.length > 0) wrong.push(`${missing.length} logins not minted`);
   return wrong;
 }
+
+// the checkout that serves the run migrates its clone before the fence
+// mints, so a migration that deletes logins cannot void the run's
+export function migrateWith(checkout: string, path: string): string[] {
+  const p = Bun.spawnSync(
+    [
+      "bun",
+      "--eval",
+      `const { open } = await import("./src/server/db/index.ts");
+       const o = open(process.env.LOAD_MIGRATE_DB);
+       o.db.close();
+       console.log(JSON.stringify(o.migrations));`,
+    ],
+    { cwd: checkout, env: { ...process.env, LOAD_MIGRATE_DB: path } },
+  );
+  if (p.exitCode !== 0) {
+    throw new Error(
+      `migrating with ${checkout}: ${p.stderr.toString().trim()}`,
+    );
+  }
+  const lines = p.stdout.toString().trim().split("\n");
+  return JSON.parse(lines.at(-1) ?? "[]") as string[];
+}

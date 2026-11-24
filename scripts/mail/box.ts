@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The catcher's mailbox: one file per message and recipient, named
-// `<address>--<UTC time>-<count>.eml`, so a recipient's newest is the
-// last of its names in order. The folder is the owner's alone.
+// `<key>--<UTC time>-<count>.eml`, where the key is a short hash of the
+// lowercased address, so one address never matches another's prefix
+// and every address makes a safe name. The address heads the file as
+// X-Catcher-To. A recipient's newest is the last of its names in order.
+// The folder is the owner's alone.
 
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   mkdirSync,
@@ -15,17 +19,16 @@ import {
 import { join } from "node:path";
 import type { Received } from "./smtp.ts";
 
-const ADDRESS = /^[a-z0-9._%+-]+@[a-z0-9.-]+$/;
-
-// an envelope recipient, `<a@b>` as RCPT gives it, or null when it
-// would not make a safe file name
-export function addressOf(value: string): string | null {
-  const bare = value
+// an envelope recipient, `<a@b>` as RCPT gives it, as it is stored
+export function addressOf(value: string): string {
+  return value
     .trim()
     .replace(/^<(.*)>$/, "$1")
     .toLowerCase();
-  return ADDRESS.test(bare) && !bare.includes("..") ? bare : null;
 }
+
+export const keyOf = (address: string): string =>
+  createHash("sha256").update(addressOf(address)).digest("hex").slice(0, 16);
 
 const stamp = (ms: number) => new Date(ms).toISOString().replace(/[-:.]/g, "");
 
@@ -34,7 +37,8 @@ export function openBox(dir: string) {
   chmodSync(dir, 0o700);
   let count = 0;
   return {
-    // the paths written, one per recipient it could name
+    // the paths written, one per recipient; throws when one cannot be,
+    // so the catcher answers 451 and the sender keeps the message
     write(message: Received, now = Date.now()): string[] {
       // a line the client began with a dot had it doubled
       const data = message.data
@@ -42,24 +46,23 @@ export function openBox(dir: string) {
         .map((line) => (line.startsWith("..") ? line.slice(1) : line))
         .join("\r\n");
       count++;
-      const written: string[] = [];
-      for (const to of message.to) {
+      return message.to.map((to) => {
         const address = addressOf(to);
-        if (address === null) continue;
         const path = join(
           dir,
-          `${address}--${stamp(now)}-${String(count).padStart(6, "0")}.eml`,
+          `${keyOf(address)}--${stamp(now)}-${String(count).padStart(6, "0")}.eml`,
         );
-        writeFileSync(path, `${data}\r\n`, { mode: 0o600 });
-        written.push(path);
-      }
-      return written;
+        writeFileSync(path, `X-Catcher-To: ${address}\r\n${data}\r\n`, {
+          mode: 0o600,
+        });
+        return path;
+      });
     },
   };
 }
 
 export function newest(dir: string, address: string): string | null {
-  const prefix = `${address.toLowerCase()}--`;
+  const prefix = `${keyOf(address)}--`;
   let names: string[];
   try {
     names = readdirSync(dir);
