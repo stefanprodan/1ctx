@@ -55,7 +55,7 @@ RUN groupadd -g 1000 sandbox \
 # the same for every variant.
 ENV HOME=/sandbox \
     TMPDIR=/sandbox/tmp \
-    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/opt/home/go/bin:/opt/home/.cargo/bin \
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/go/bin:/opt/home/go/bin:/opt/home/.cargo/bin:/opt/home/.local/bin:/opt/home/.bun/bin \
     UV_CACHE_DIR=/opt/home/.cache/uv \
     UV_LINK_MODE=copy \
     UV_TOOL_BIN_DIR=/opt/home/.local/bin \
