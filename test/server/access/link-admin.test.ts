@@ -30,19 +30,19 @@ describe("invites", () => {
     expect(e.outbox(user.id)).toEqual([{ kind: "invite", status: "queued" }]);
     await e.send();
     const { message } = app.emailSender.sent.at(-1)!;
-    expect(message.subject).toBe("You are invited to 1ctx");
-    expect(message.text).toContain("within 7 days to sign in");
     const token = e.token();
-    expect(await e.read(token)).toEqual({
-      purpose: "invite",
-      username: "nina",
-    });
+    const code = e.code();
+    expect(message.subject).toBe(`Your 1ctx sign-in code: ${code}`);
+    expect(message.text).toBe(
+      `You were added to 1ctx. Sign in: https://1ctx.example.test/link/${token}, or enter ${code}. Both work once, for 7 days.\n`,
+    );
+    expect(message.html).toBeUndefined();
+    expect(e.live(token)).toBe(true);
     // seven days later it still works
     app.now.value += 7 * 24 * 60 * 60_000 - 1;
     const tab = app.client();
-    const used = await tab.call("POST", `/api/links/${token}`, { body: {} });
-    expect(used.status).toBe(200);
-    expect((await used.json()).user.username).toBe("nina");
+    const used = await e.use(tab, token);
+    expect(used.status).toBe(303);
     expect(
       (await (await tab.call("GET", "/api/me")).json()).user.username,
     ).toBe("nina");
@@ -71,8 +71,8 @@ describe("invites", () => {
       { kind: "invite", status: "queued" },
     ]);
     await e.send();
-    expect(await e.read(first)).toBeNull();
-    expect(await e.read(e.token())).not.toBeNull();
+    expect(e.live(first)).toBe(false);
+    expect(e.live(e.token())).toBe(true);
     await app.shutdown();
   });
 
@@ -131,6 +131,52 @@ describe("invites", () => {
     await on.app.shutdown();
   });
 
+  test("an invite's code works beside any asking browser's cookie", async () => {
+    const e = await emailApp();
+    const { app, admin, maria } = e;
+    await admin.call("POST", `/api/users/${maria.id}/invite`);
+    await e.send();
+    const code = e.code();
+    // no browser asked for it, but a code is tried only beside a cookie
+    const bare = app.client("10.7.0.1");
+    expect((await e.sendCode(bare, code)).status).toBe(401);
+    // a browser that asked for someone else holds a cookie
+    const tab = app.client("10.7.0.2");
+    expect((await e.ask(tab, "nobody@example.test")).status).toBe(202);
+    const res = await e.sendCode(tab, code);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      user: { username: "maria" },
+      landing: "/",
+    });
+    expect(app.users.byId(maria.id)!.signedInAt).toBe(app.now.value);
+    // no notice for an invite, and using the code used the link
+    expect(e.outbox(maria.id).map((row) => row.kind)).toEqual(["invite"]);
+    expect(e.live(e.token())).toBe(false);
+    await app.shutdown();
+  });
+
+  test("an invite's fifth wrong code ends its code, never its link", async () => {
+    const e = await emailApp();
+    const { app, admin, maria } = e;
+    await admin.call("POST", `/api/users/${maria.id}/invite`);
+    await e.send();
+    const code = e.code();
+    const wrong = code === "000000" ? "111111" : "000000";
+    // misses from every browser count on the link
+    for (let i = 0; i < 5; i++) {
+      const tab = app.client(`10.8.0.${i}`);
+      await e.ask(tab, "nobody@example.test");
+      expect((await e.sendCode(tab, wrong)).status).toBe(401);
+    }
+    const tab = app.client("10.8.1.1");
+    await e.ask(tab, "nobody@example.test");
+    expect((await e.sendCode(tab, code)).status).toBe(401);
+    expect(e.live(e.token())).toBe(true);
+    expect((await e.use(tab, e.token())).status).toBe(303);
+    await app.shutdown();
+  });
+
   test("a user made without one gets no email", async () => {
     const e = await emailApp();
     const res = await e.admin.call("POST", "/api/users", { body: NEW_USER });
@@ -145,9 +191,7 @@ describe("what ends a link", () => {
   // a sent sign in link, and a queued invite on top
   async function withLinks() {
     const e = await emailApp();
-    await e.app
-      .client()
-      .call("POST", "/api/login/link", { body: { username: "maria" } });
+    await e.ask(e.app.client());
     await e.app.linkAsks();
     await e.send();
     const signin = e.token();
@@ -159,9 +203,7 @@ describe("what ends a link", () => {
           .outbox(e.maria.id)
           .filter((row) => row.status === "queued" && row.kind !== "notice"),
       ).toEqual([]);
-      const res = await e.app.client().call("POST", `/api/links/${signin}`, {
-        body: {},
-      });
+      const res = await e.use(e.app.client(), signin);
       expect(res.status).toBe(404);
     };
     return { e, dead };
@@ -229,9 +271,7 @@ describe("what ends a link", () => {
   test("a sweep between tries leaves a failing link email failing", async () => {
     const e = await emailApp();
     e.app.emailSender.result = "timeout";
-    await e.app
-      .client()
-      .call("POST", "/api/login/link", { body: { username: "maria" } });
+    await e.ask(e.app.client());
     await e.app.linkAsks();
     for (let minute = 0; minute < 60; minute++) {
       if (minute === 30) e.app.sweep();
@@ -259,13 +299,11 @@ describe("the security notice", () => {
     const { app, maria } = e;
     // 2026-10-06 11:02 UTC, 14:02 in Bucharest
     app.now.value = Date.UTC(2026, 9, 6, 11, 2);
-    await app.client().call("POST", "/api/login/link", {
-      body: { username: "maria" },
-    });
+    await e.ask(app.client());
     await app.linkAsks();
     await e.send();
     const tab = app.client("203.0.113.5");
-    await tab.call("POST", `/api/links/${e.token()}`, { body: {} });
+    expect((await e.use(tab, e.token())).status).toBe(303);
     expect(e.outbox(maria.id).at(-1)).toEqual({
       kind: "notice",
       status: "queued",
@@ -279,6 +317,7 @@ describe("the security notice", () => {
     expect(message.text).toContain("If this was not you, tell your admin.");
     expect(message.html).toContain("<p>Hi Maria Pop,</p>");
     expect(message.text).not.toContain("http");
+    expect(message.text).not.toMatch(/\d{6}/);
     // a sent row keeps no text
     const rows = app.db
       .query<{ body: string | null }, [string]>(

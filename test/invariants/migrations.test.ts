@@ -105,6 +105,7 @@ const EXPECTED_IDS = [
   "0090-sandbox-variant",
   "0091-project-variant",
   "0092-admin-keys",
+  "0093-email-codes",
 ] as const;
 
 // the columns 0020 made, so its inserts hold after later columns
@@ -140,9 +141,14 @@ const LATER_COLUMNS = [
   "variant",
   "signed_in_at",
   "key_digest",
-  // dropped by 0092, so held only by rows from before it
+  "code_hash",
+  "code_tries",
+  "ask_hash",
+  "link_id",
+  // dropped by 0092 and 0093, so held only by rows from before them
   "password_hash",
   "must_change_password",
+  "asked",
 ];
 const earlier = (rows: unknown[]) =>
   rows
@@ -1766,21 +1772,12 @@ describe("the schema", () => {
       ).toEqual([
         "SEARCH email_outbox USING INDEX email_outbox_due (status=? AND next_attempt_at<?)",
       ]);
-      for (const sql of [
-        `delete from email_outbox where user_id = ? and status = 'queued'
-         and kind in (?, ?) and asked = 0`,
-        `update email_outbox set status = 'dropped' where user_id = ?
-         and status = 'queued' and kind in (?, ?) and asked = 1`,
-      ]) {
-        expect(plans(sql, "u", "reset", "signin")).toEqual([
-          "SEARCH email_outbox USING INDEX email_outbox_queued (user_id=? AND kind=?)",
-        ]);
-      }
       expect(
         plans(
-          `select count(*) as n from email_outbox
-           where user_id = ? and kind = ? and status = 'queued'`,
+          `delete from email_outbox where user_id = ? and status = 'queued'
+           and kind in (?, ?)`,
           "u",
+          "reset",
           "signin",
         ),
       ).toEqual([
@@ -1795,25 +1792,6 @@ describe("the schema", () => {
         ),
       ).toEqual([
         "SEARCH email_outbox USING COVERING INDEX email_outbox_automation (automation_id=? AND created_at>?)",
-      ]);
-      expect(
-        plans(
-          `select count(*) from email_outbox
-           where asked = 1 and user_id = ? and created_at >= ?`,
-          "u",
-          0,
-        ),
-      ).toEqual([
-        "SEARCH email_outbox USING COVERING INDEX email_outbox_asked (user_id=? AND created_at>?)",
-      ]);
-      expect(
-        plans(
-          `select count(*) from email_outbox
-           where asked = 1 and created_at >= ?`,
-          0,
-        ),
-      ).toEqual([
-        "SEARCH email_outbox USING COVERING INDEX email_outbox_asked_at (created_at>?)",
       ]);
       // an alert row goes with its automation, whose cap is gone with it
       db.exec(`
@@ -2322,6 +2300,140 @@ describe("the schema", () => {
         .all()
         .map((row) => row.detail);
       expect(plan.join(" ")).toContain("logins_key");
+    } finally {
+      db.close();
+    }
+  });
+
+  test("0093 gives links their codes, counts asks apart and drops the asked mark", () => {
+    const db = seed(MIGRATIONS.slice(0, 92));
+    try {
+      db.exec(`
+        insert into user_links (id, purpose, user_id, created_at, expires_at,
+            used_at)
+          values ('invite', 'invite', 'u', 1, 900, null),
+            ('used', 'signin', 'u', 1, 900, 5);
+        insert into email_outbox (id, kind, user_id, message_id, asked,
+            status, next_attempt_at, created_at, updated_at)
+          values ('asked', 'signin', 'u', 'a', 1, 'sent', 0, 1, 1),
+            ('alert', 'notice', 'u', 'b', 0, 'queued', 0, 1, 1);
+      `);
+      expect(migrate(db)).toEqual(expectedFrom("0093-email-codes"));
+      expect(
+        db
+          .query(
+            "select id, code_hash, code_tries, ask_hash from user_links order by id",
+          )
+          .all(),
+      ).toEqual([
+        { id: "invite", code_hash: null, code_tries: 0, ask_hash: null },
+        { id: "used", code_hash: null, code_tries: 0, ask_hash: null },
+      ]);
+      expect(
+        db.query("select id, link_id from email_outbox order by id").all(),
+      ).toEqual([
+        { id: "alert", link_id: null },
+        { id: "asked", link_id: null },
+      ]);
+      expect(
+        db
+          .query<{ name: string }, []>(
+            "select name from pragma_table_info('email_outbox')",
+          )
+          .all()
+          .map((column) => column.name),
+      ).not.toContain("asked");
+      // sign-in links stack up; one unused invite per user
+      db.exec(`
+        insert into user_links (id, purpose, user_id, created_at, expires_at)
+          values ('s1', 'signin', 'u', 2, 900), ('s2', 'signin', 'u', 2, 900);
+        insert into link_asks (user_id, challenge_hash, asked_at)
+          values ('u', 'c', 2);
+      `);
+      expect(() =>
+        db.exec(`insert into user_links (id, purpose, user_id, created_at,
+          expires_at) values ('i2', 'invite', 'u', 2, 900)`),
+      ).toThrow();
+      expect(db.query("pragma foreign_key_check").all()).toEqual([]);
+      const plans = (sql: string, ...args: (string | number)[]) =>
+        db
+          .query<{ detail: string }, (string | number)[]>(
+            `explain query plan ${sql}`,
+          )
+          .all(...args)
+          .map((row) => row.detail)
+          .join(" | ");
+      // every read and write of the codes and the caps searches an index
+      const searched: [string, (string | number)[], string][] = [
+        [
+          `select id, code_hash, ask_hash is not null as asked from user_links
+           where user_id = ?1 and used_at is null and expires_at > ?2
+             and code_hash is not null
+             and (ask_hash = ?3 or (ask_hash is null and code_tries < ?4))`,
+          ["u", 0, "c", 5],
+          "user_links_user",
+        ],
+        [
+          `select count(*) as n from user_links
+           where user_id = ? and ask_hash = ? and used_at is not null
+             and code_tries < ?`,
+          ["u", "c", 5],
+          "user_links_user (user_id=? AND ask_hash=?)",
+        ],
+        [
+          `update user_links set token_hash = ?, code_hash = ?, expires_at = ?
+           where id = ? and user_id = ? and used_at is null`,
+          ["t", "h", 1, "s1", "u"],
+          "sqlite_autoindex_user_links_1 (id=?)",
+        ],
+        [
+          `update user_links set used_at = ?1 where id = ?2 and used_at is null
+             and expires_at > ?1
+             and user_id in (select id from users where disabled = 0)`,
+          [1, "s1"],
+          "sqlite_autoindex_user_links_1 (id=?)",
+        ],
+        [
+          "delete from user_links where user_id = ? and purpose = ? and used_at is null",
+          ["u", "invite"],
+          "user_links_invite",
+        ],
+        [
+          `select count(*) as n from link_asks
+           where user_id = ? and challenge_hash = ? and asked_at > ?`,
+          ["u", "c", 0],
+          "link_asks_user (user_id=? AND challenge_hash=? AND asked_at>?)",
+        ],
+        [
+          "select count(*) as n from link_asks where user_id = ? and asked_at > ?",
+          ["u", 0],
+          "link_asks_user (user_id=?)",
+        ],
+        [
+          `select count(*) as n from link_asks
+           where challenge_hash = ? and asked_at > ?`,
+          ["c", 0],
+          "link_asks_challenge (challenge_hash=? AND asked_at>?)",
+        ],
+        [
+          "select count(*) as n from link_asks where asked_at > ?",
+          [0],
+          "link_asks_time (asked_at>?)",
+        ],
+        [
+          "delete from link_asks where asked_at <= ?",
+          [0],
+          "link_asks_time (asked_at<?)",
+        ],
+        [
+          "delete from user_links where expires_at <= ?",
+          [0],
+          "user_links_expiry (expires_at<?)",
+        ],
+      ];
+      for (const [sql, args, index] of searched) {
+        expect(plans(sql, ...args)).toContain(index);
+      }
     } finally {
       db.close();
     }
@@ -4896,6 +5008,7 @@ describe("project channel migrations", () => {
       "0090-sandbox-variant",
       "0091-project-variant",
       "0092-admin-keys",
+      "0093-email-codes",
     ]);
     expect(
       db.query("select id, title from sessions where id = 'session70'").get(),
@@ -5125,6 +5238,7 @@ describe("project channel migrations", () => {
           "0090-sandbox-variant",
           "0091-project-variant",
           "0092-admin-keys",
+          "0093-email-codes",
         ]);
         expect(db.query("select * from session_scratch").get()).toEqual({
           workspace_id: "sess",
@@ -5303,6 +5417,7 @@ describe("project channel migrations", () => {
         "0090-sandbox-variant",
         "0091-project-variant",
         "0092-admin-keys",
+        "0093-email-codes",
       ]);
       expect(
         db

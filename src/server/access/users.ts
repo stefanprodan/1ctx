@@ -80,7 +80,7 @@ export type UsersRoutesDeps = {
   clock: Clock;
   // a placeholder address is shown only while email is on
   email: { enabled(): boolean };
-  links: Pick<Links, "issue" | "revoke">;
+  links: Pick<Links, "invite" | "revoke">;
 };
 
 const NO_EMAIL = "email is not set up";
@@ -131,7 +131,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
       }
       return {
         result: undefined,
-        events: deps.links.issue("invite", user.id, adminId),
+        events: deps.links.invite(user.id, adminId),
       };
     });
   };
@@ -181,7 +181,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           return {
             result: find(created.id),
             events: invite
-              ? deps.links.issue("invite", created.id, ctx.principal!.userId)
+              ? deps.links.invite(created.id, ctx.principal!.userId)
               : [],
           };
         });

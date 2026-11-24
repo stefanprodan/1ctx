@@ -164,15 +164,11 @@ describe("signing in by key", () => {
       expect(unlisted.length).toBeGreaterThan(0);
       for (const event of unlisted) expect(event.fields).toEqual({});
       const tab = app.client();
-      await tab.call("POST", "/api/login/link", {
-        body: { username: "maria" },
-      });
+      await e.ask(tab);
       await app.linkAsks();
       await e.send();
-      const used = await tab.call("POST", `/api/links/${e.token()}`, {
-        body: {},
-      });
-      expect(used.status).toBe(200);
+      const used = await e.use(tab, e.token());
+      expect(used.status).toBe(303);
       expect(await me(tab)).toBe("maria");
     } finally {
       await app.shutdown();

@@ -16,6 +16,8 @@ export type OutboxRow = {
   userId: string;
   projectId: string | null;
   sessionId: string | null;
+  // the link a link email carries, minted at each try
+  linkId: string | null;
   subject: string | null;
   body: string | null;
   messageId: string;
@@ -23,12 +25,10 @@ export type OutboxRow = {
   createdAt: number;
 };
 
-// automationId names an alert's automation, for its cap; asked marks a
-// link email asked for at the sign-in page, for the caps on asks
+// automationId names an alert's automation, for its cap
 export type OutboxFields = Omit<OutboxRow, "attempts"> & {
   sendId?: string | null;
   automationId: string | null;
-  asked: boolean;
   now: number;
 };
 
@@ -58,6 +58,7 @@ type RawOutbox = {
   user_id: string;
   project_id: string | null;
   session_id: string | null;
+  link_id: string | null;
   subject: string | null;
   body: string | null;
   message_id: string;
@@ -71,6 +72,7 @@ const outbox = (raw: RawOutbox): OutboxRow => ({
   userId: raw.user_id,
   projectId: raw.project_id,
   sessionId: raw.session_id,
+  linkId: raw.link_id,
   subject: raw.subject,
   body: raw.body,
   messageId: raw.message_id,
@@ -133,7 +135,7 @@ export class EmailStore {
     this.db
       .query(
         `insert into email_outbox (id, kind, user_id, project_id, session_id,
-           automation_id, subject, body, message_id, asked, next_attempt_at,
+           automation_id, link_id, subject, body, message_id, next_attempt_at,
            created_at, updated_at, send_id)
          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
@@ -144,10 +146,10 @@ export class EmailStore {
         fields.projectId,
         fields.sessionId,
         fields.automationId,
+        fields.linkId,
         fields.subject,
         fields.body,
         fields.messageId,
-        fields.asked ? 1 : 0,
         fields.now,
         fields.createdAt,
         fields.now,
@@ -182,54 +184,21 @@ export class EmailStore {
     });
   }
 
-  // dropped: nothing of it is kept, but an asked row stays a day as
-  // dropped, with no text, so the caps on asks keep counting it
-  drop(id: string, now: number): void {
-    transact(this.db, () => {
-      this.db
-        .query(
-          `update email_outbox set status = 'dropped', subject = null,
-             body = null, claimed_at = null, updated_at = ?
-           where id = ? and asked = 1`,
-        )
-        .run(now, id);
-      this.db
-        .query("delete from email_outbox where id = ? and asked = 0")
-        .run(id);
-      return { result: undefined };
-    });
+  // dropped: nothing of it is kept; the caps on asks count link_asks
+  drop(id: string): void {
+    this.db.query("delete from email_outbox where id = ?").run(id);
   }
 
   // a user's queued rows of these kinds, as when the links they would
-  // carry are revoked, dropped as drop() does; the count dropped
-  dropQueued(userId: string, kinds: readonly EmailKind[], now: number): number {
+  // carry are revoked; the count dropped
+  dropQueued(userId: string, kinds: readonly EmailKind[]): number {
     if (kinds.length === 0) return 0;
-    const where = `user_id = ? and status = 'queued'
-      and kind in (${kinds.map(() => "?").join(", ")})`;
-    const kept = this.db
+    return this.db
       .query(
-        `update email_outbox set status = 'dropped', subject = null,
-           body = null, claimed_at = null, updated_at = ?
-         where ${where} and asked = 1`,
+        `delete from email_outbox where user_id = ? and status = 'queued'
+         and kind in (${kinds.map(() => "?").join(", ")})`,
       )
-      .run(now, userId, ...kinds).changes;
-    const removed = this.db
-      .query(`delete from email_outbox where ${where} and asked = 0`)
       .run(userId, ...kinds).changes;
-    return kept + removed;
-  }
-
-  // whether the user has a queued row of the kind, as a link email
-  // still being tried
-  hasQueued(userId: string, kind: EmailKind): boolean {
-    return (
-      this.db
-        .query<{ n: number }, [string, string]>(
-          `select count(*) as n from email_outbox
-           where user_id = ? and kind = ? and status = 'queued'`,
-        )
-        .get(userId, kind)!.n > 0
-    );
   }
 
   // the text goes; the row stays a day for the caps counted on rows
@@ -293,22 +262,14 @@ export class EmailStore {
       .get(automationId, since)!.n;
   }
 
-  // the link emails asked for at the sign-in page at or after since, a
-  // user's or, with null, the instance's
-  countAsked(userId: string | null, since: number): number {
-    return userId === null
-      ? this.db
-          .query<{ n: number }, [number]>(
-            `select count(*) as n from email_outbox
-             where asked = 1 and created_at >= ?`,
-          )
-          .get(since)!.n
-      : this.db
-          .query<{ n: number }, [string, number]>(
-            `select count(*) as n from email_outbox
-             where asked = 1 and user_id = ? and created_at >= ?`,
-          )
-          .get(userId, since)!.n;
+  // the instance's asks at the sign-in page after since, for the
+  // Monitor; access writes and counts them
+  countAsks(since: number): number {
+    return this.db
+      .query<{ n: number }, [number]>(
+        "select count(*) as n from link_asks where asked_at > ?",
+      )
+      .get(since)!.n;
   }
 
   // the next time a row is due, a claimed one aside

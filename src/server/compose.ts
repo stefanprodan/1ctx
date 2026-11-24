@@ -99,6 +99,7 @@ import { type Tools, toolsArea } from "./tools/index.ts";
 import { type UsageStore, usageArea } from "./usage/index.ts";
 import { type UserStore, type Users, usersArea } from "./users/index.ts";
 import { healthRoutes } from "./web/health.ts";
+import { deadPage, linkPage, sentPage } from "./web/link-page.ts";
 import { type Router, router } from "./web/router.ts";
 import { type Socket, socketArea } from "./web/socket.ts";
 
@@ -176,6 +177,8 @@ export type App = {
   socket: Socket;
   routes: RouteDescriptor[];
   handle: Router;
+  // GET and HEAD of /link/<token>, drawn outside the router
+  linkPage: (req: Request) => Response;
   provision: Provision;
   repaired: number;
   reconciled: number;
@@ -435,6 +438,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     keyFiles: {
       read: (name) => secret("user-", name),
       list: () => options.secretNames?.("user-") ?? [],
+    },
+    pages: {
+      dead: () => deadPage(email.enabled()),
+      sent: sentPage,
     },
   });
   agents = agentsArea({
@@ -973,6 +980,10 @@ export async function compose(options: ComposeOptions): Promise<App> {
     socket,
     routes,
     handle,
+    linkPage: linkPage({
+      live: (token) => access.linkLive(token),
+      emailOn: () => email.enabled(),
+    }),
     provision,
     repaired,
     reconciled,

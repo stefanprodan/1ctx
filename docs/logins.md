@@ -2,8 +2,9 @@
 
 Governs how a user signs in: the login cookie and its ends, the admin
 keys (`access/admin-keys.ts`, `users/rules.ts`, `users/key-file.ts`,
-`1ctx admin-key`) and the links an email carries (`access/links.ts`,
-`link-store.ts`, `link-routes.ts`). Requests, users and the socket are
+`1ctx admin-key`) and the links and codes an email carries
+(`access/links.ts`, `link-store.ts`, `link-routes.ts`, the link page
+`web/link-page.ts`). Requests, users and the socket are
 `docs/access.md`.
 
 ## Logins
@@ -19,16 +20,18 @@ keys (`access/admin-keys.ts`, `users/rules.ts`, `users/key-file.ts`,
   handler sets rides beside it.
 - **Every sign-in ends the browser's previous login** and publishes its
   `login.revoked`. Each opened login sets `users.signed_in_at`.
-- **Login is rate limited per address.** A key sign-in, a link ask and
-  a link used share one window. The limit is a fixed window per key
+- **Login is rate limited per address.** A key sign-in, a link ask, a
+  code and a link used share one window (10 a minute, then 429). The limit is a fixed window per key
   with a cap on keys, so memory stays constant. `login limited` is
   logged once when an address's window closes, not per refusal.
 - **Every way a login ends publishes `login.revoked`.** Logout,
   expiry, disable, sign out everywhere and a key login whose key no
   longer holds all do, so the socket closes those connections.
 - **Sign-in paths log fixed words only:** `login opened`, `login
-  failed` with the address, `link used`. Never a submitted field, key,
-  token, cookie or subject.
+  failed` with the address, `link issued`, `link ask capped` with the
+  cap's word, `link used` with `by` (`link` or `code`). Never a
+  submitted field, key, code, token, cookie or subject; the router
+  logs `/api/links/:token` by its pattern.
 
 ## Admin keys
 
@@ -80,39 +83,67 @@ keys (`access/admin-keys.ts`, `users/rules.ts`, `users/key-file.ts`,
 ## Links by email
 
 Only while email is on (`docs/email.md`); the sign-in page learns it
-from `emailOn` in `GET /api/me`.
+from `emailOn` in `GET /api/me`. Markets' design: one email holds a
+link and a six-digit code, either works once, and using one uses both.
 
-- **An ask never tells.** `POST /api/login/link` answers 202 with no
-  body before any lookup. The
-  lookup and the outbox write run after the answer (`links.ask()`),
-  which the shutdown awaits; an ask after that point answers the same
-  and does nothing. A missing, disabled or placeholder account, or one
-  with a live link of that purpose or its email still queued, gets
-  nothing. Only the login limit answers 429.
-- **Asks are capped** at 3 link emails per user a day and 50 per
-  instance an hour, counted on outbox rows; over either the ask does
-  nothing and logs `link ask capped`. An admin's links are not counted.
-- **A token is minted when its email is sent.** A `user_links` row is
-  written unminted with its outbox row, which holds no text; the kind's
-  `prepare` stores the token's hash and starts the expiry at each try:
-  sign in 15 minutes, invite 7 days. One unused link per user
-  and purpose: a new one replaces the old and its queued email.
-  Expired links go with the logins' sweep an hour after expiry, so an
-  email's last retry still mints its link. Using a link and every read
-  check expiry themselves.
+- **An ask never tells.** `POST /api/login/link` takes `{email}` (or a
+  form's `email=`) and answers 202 with no body before any lookup, a
+  form with the link page's "Check your email." The lookup, the caps
+  and the outbox write run after the answer (`links.ask()`), which the
+  shutdown awaits; an ask after that point answers the same and does
+  nothing. A bad address is a 400; only the login limit answers 429.
+  Only an enabled user with a real address gets a link.
+- **The ask binds the code to its browser.** It sets `login_ask`
+  (15 minutes, `Path=/api/login; HttpOnly; SameSite=Lax`, Secure under
+  `--secure-cookie`) holding a random challenge, kept when the browser
+  holds one; the link row keeps its hash (`ask_hash`).
+- **Every ask makes a new link** and leaves earlier live ones working,
+  so nobody's ask blocks or kills another's. Only an unused invite is
+  one per user (`user_links_invite`): a new one replaces it and its
+  queued email.
+- **Asks are capped** on `link_asks` (`user_id`, `challenge_hash`,
+  `asked_at`), kept a day whatever became of their links (the logins'
+  sweep): 3 a day per user from one challenge, 10 a day per user across
+  challenges unless this one already signed the user in (a link it asked
+  for, used, never one killed by wrong codes), 5 an hour per challenge
+  whoever it names, 50 an hour per instance (`ASKS_*` in
+  `email/rules.ts`). Over any, nothing is sent and `link ask capped` is
+  logged. Only an admitted ask is recorded, so unknown and capped asks
+  spend nothing. Invites are not counted.
+- **A token and a code are minted when the email is sent.** The link is
+  written unminted with its outbox row, which names it (`link_id`); the
+  kind's `prepare` stores both hashes and starts the expiry at each try:
+  sign in 15 minutes, invite 7 days. The code is six random digits, its
+  hash salted with the link id (`codeHash()`). Expired links go with the
+  logins' sweep an hour after expiry, so an email's last retry still
+  mints its link.
+- **`POST /api/login/code` takes `{email, code}`** and tries the code
+  only beside `login_ask`, against every live link of that address
+  asked by that challenge and every invite with tries left: a hit uses
+  that link, a miss counts on all of them (`code_tries`). The fifth miss
+  kills an asked link; an invite, which no browser asked for, is tried
+  beside any challenge and its fifth miss ends its code, never its link.
+  A wrong code, another address, no challenge and a bad body are one
+  401. A hit answers `{user, landing}` with the login cookie.
 - **A link never acts on a GET,** since email scanners open links.
-  `GET /api/links/:token` names the purpose and the username with no
-  side effect and `no-store`; unknown, used, expired and a disabled
-  user's are one 200 with `link: null`, as `/api/me` answers nobody, so
-  the browser logs no failed request. Only `POST` acts: a dead link is
-  the same 404 as an unknown one, before the body is read; a link issued keeps working if email goes off. The page holds
-  `<meta name="referrer" content="no-referrer">`, since Bun sets no
-  header on it, so the token in its address never leaves.
-- **Using a link is one conditional update** (unused, unexpired, user
-  enabled) in the transaction that opens one login; it takes no body
-  but `{}`. A sign-in link and an invite do the same. The tab's old
-  login ends too.
+  `GET` and `HEAD /link/<token>` are drawn by the server outside the
+  router (`web/link-page.ts`): no script, font or stylesheet, its look
+  copied from `tokens.css` (a test holds them equal), `no-store`,
+  `no-referrer` as a header and a meta, and a CSP of `default-src
+  'none'`, `form-action 'self'` and `frame-ancestors 'none'`. A live
+  link shows one Sign in button; a dead one (unknown, used, expired, a
+  disabled user's) is one 404 page, with a form that asks again while
+  email is on. The client router leaves `/link/` to the server.
+- **The button posts a form to `POST /api/links/:token`,** a `formPost`
+  route (`Origin: null` with `Sec-Fetch-Site: same-origin`,
+  `docs/access.md`) taking an empty form. A dead link answers the dead
+  page before the body is read. Using it is one conditional update
+  (unused, unexpired, user enabled) in the transaction that opens the
+  login, answered 303 to the landing. A link issued keeps working if
+  email goes off.
+- **Every sign-in by link or code ends the browser's previous login.**
+  A sign-in link and its code queue a security notice ("by email link"
+  or "by email code"): the time in the user's zone and the client
+  address, no link. An invite has none.
 - **Sign out everywhere, a disable and an email change end every live
   link** of the user, with its queued email.
-- **A security notice follows a sign-in link used:** the time in the
-  user's zone and the client address, no link. An invite has none.

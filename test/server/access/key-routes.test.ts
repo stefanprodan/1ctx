@@ -500,18 +500,14 @@ describe("the ends of access keys", () => {
         }
         const requested =
           purpose === "signin"
-            ? await e.app.client().call("POST", "/api/login/link", {
-                body: { username: "maria" },
-              })
+            ? await e.ask(e.app.client())
             : await e.admin.call("POST", `/api/users/${e.maria.id}/invite`);
         expect(requested.status).toBe(purpose === "signin" ? 202 : 204);
         await e.app.linkAsks();
         await e.send();
         const link = e.token();
-        const used = await e.app.client().call("POST", `/api/links/${link}`, {
-          body: {},
-        });
-        expect(used.status).toBe(200);
+        const used = await e.use(e.app.client(), link);
+        expect(used.status).toBe(303);
         expect(
           e.app.db.query("select id from access_keys where id = ?").get(key.id),
         ).toEqual({ id: key.id });

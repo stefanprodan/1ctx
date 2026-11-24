@@ -20,7 +20,7 @@ import type { Log } from "../lib/log.ts";
 import type { UserRow } from "../users/index.ts";
 import { routes } from "./routes.ts";
 import {
-  ASKED_LINKS_PER_HOUR,
+  ASKS_PER_HOUR,
   badSubject,
   type EmailKind,
   FAILED_KEEP_MS,
@@ -58,8 +58,10 @@ export {
   parseSmtpUsername,
 } from "./parse.ts";
 export {
-  ASKED_LINKS_PER_HOUR,
-  ASKED_LINKS_PER_USER_DAY,
+  ASKS_PER_CHALLENGE_HOUR,
+  ASKS_PER_HOUR,
+  ASKS_PER_INBOX_DAY,
+  ASKS_PER_USER_DAY,
   type DropWord,
   EMAIL_KINDS,
   type EmailKind,
@@ -88,9 +90,8 @@ export type Enqueue = {
   sendId?: string | null;
   // an alert's automation, which its cap counts
   automationId?: string | null;
-  // a link email asked for at the sign-in page, which the asks' caps
-  // count
-  asked?: boolean;
+  // a link email's link, whose token and code its prepare mints
+  linkId?: string | null;
   subject?: string | null;
   body?: string | null;
 };
@@ -103,7 +104,7 @@ export type EmailAttention = {
   failed: number;
   lastFailure: SmtpFailure | null;
   lastFailedAt: number | null;
-  // email is on and the instance's hourly cap on asked links is reached
+  // email is on and the instance's hourly cap on asks is reached
   linksPaused: boolean;
 };
 
@@ -133,13 +134,8 @@ export type Email = {
   // a kind's last word before SMTP; one per kind
   register(kind: EmailKind, prepare: Prepare): void;
   // the user's queued rows of these kinds, in the caller's transaction;
-  // an asked row stays as dropped for the caps; the count dropped
+  // the count dropped
   dropQueued(userId: string, kinds: readonly EmailKind[]): number;
-  // whether the user has a queued row of the kind
-  hasQueued(userId: string, kind: EmailKind): boolean;
-  // the link emails asked for at the sign-in page at or after since, a
-  // user's or, with null, the instance's
-  countAsked(userId: string | null, since: number): number;
   start(): void;
   stop(): Promise<void>;
   // after a cut shutdown, so the send in flight writes nothing
@@ -263,7 +259,7 @@ export function emailArea(deps: EmailDeps): Email {
         sessionId: fields.sessionId ?? null,
         sendId: fields.sendId ?? null,
         automationId: fields.automationId ?? null,
-        asked: fields.asked ?? false,
+        linkId: fields.linkId ?? null,
         subject: fields.subject ?? null,
         body: fields.body ?? null,
         messageId: messageIdOf(id, settings.fromAddress),
@@ -276,10 +272,7 @@ export function emailArea(deps: EmailDeps): Email {
       if (prepares.has(kind)) throw new Error(`${kind} is registered`);
       prepares.set(kind, prepare);
     },
-    dropQueued: (userId, kinds) =>
-      store.dropQueued(userId, kinds, deps.clock()),
-    hasQueued: (userId, kind) => store.hasQueued(userId, kind),
-    countAsked: (userId, since) => store.countAsked(userId, since),
+    dropQueued: (userId, kinds) => store.dropQueued(userId, kinds),
     start: () => loop.start(),
     stop: () => loop.stop(),
     halt: () => loop.halt(),
@@ -295,9 +288,7 @@ export function emailArea(deps: EmailDeps): Email {
         hasKey: hasKey(settings),
         ...store.counts(),
         linksPaused:
-          enabled() &&
-          store.countAsked(null, deps.clock() - HOUR_MS) >=
-            ASKED_LINKS_PER_HOUR,
+          enabled() && store.countAsks(deps.clock() - HOUR_MS) >= ASKS_PER_HOUR,
       };
     },
   };

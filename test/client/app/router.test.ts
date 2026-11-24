@@ -24,6 +24,16 @@ describe("inApp", () => {
     }
   });
 
+  test("an emailed link's page is the server's, a full navigation", () => {
+    for (const standalone of [false, true]) {
+      for (const blank of [false, true]) {
+        expect(
+          inApp(link(`/link/${"A".repeat(43)}`, blank), HERE, standalone),
+        ).toBe(false);
+      }
+    }
+  });
+
   test("a new-tab link to a page keeps its tab in a browser", () => {
     expect(inApp(link(`${HERE}/projects`, true), HERE, false)).toBe(false);
   });

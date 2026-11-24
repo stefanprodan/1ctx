@@ -16,21 +16,19 @@ export type MeResponse = {
   dictationOn: boolean;
 };
 
-// POST /api/login/link: a username or an email, answered 202 with no
-// body whoever it names
-export type LinkAskRequest = { username: string };
+// POST /api/login/link: an email, answered 202 with no body whoever it
+// names; it sets the login_ask cookie, the browser's challenge. A plain
+// form may post it too (email=), answered with a page
+export type LinkAskRequest = { email: string };
+
+// POST /api/login/code: the code an email carried, tried only beside the
+// login_ask cookie; every refusal is one 401. The landing is where the
+// page goes next
+export type CodeRequest = { email: string; code: string };
+export type CodeResponse = { user: Me; landing: string };
 
 export const LINK_PURPOSES = ["signin", "invite"] as const;
 export type LinkPurpose = (typeof LINK_PURPOSES)[number];
-
-// GET /api/links/:token: null for a link unknown, used, expired or whose
-// user is disabled
-export type LinkResponse = {
-  link: { purpose: LinkPurpose; username: string } | null;
-};
-
-// POST /api/links/:token answers LoginResponse; it takes nothing
-export type UseLinkRequest = Record<string, never>;
 
 export type AccessDay = { day: string; start: number; signedIn: number };
 

@@ -401,6 +401,8 @@ export type TestClient = {
       body?: unknown;
       // a raw body, sent as is
       raw?: string;
+      // a plain HTML form's fields, sent urlencoded
+      form?: Record<string, string>;
       // a binary body, sent with the headers' own content-type
       bytes?: Uint8Array<ArrayBuffer>;
       // the request's signal, as a closed tab aborts it
@@ -592,9 +594,15 @@ export async function testApp(
           if (opts.body !== undefined || opts.raw !== undefined) {
             headers.set("content-type", "application/json");
           }
+          if (opts.form !== undefined) {
+            headers.set("content-type", "application/x-www-form-urlencoded");
+          }
           const body =
             opts.bytes ??
             opts.raw ??
+            (opts.form === undefined
+              ? undefined
+              : new URLSearchParams(opts.form).toString()) ??
             (opts.body === undefined ? undefined : JSON.stringify(opts.body));
           const req = new Request(`${ORIGIN}${path}`, {
             method,

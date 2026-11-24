@@ -49,6 +49,7 @@ test("the listener admits upload bytes while JSON routes keep their own caps", a
     development: false,
     trustProxy: false,
     socket: app.socket,
+    linkPage: app.linkPage,
     handle: (req, address, upgrade) =>
       new URL(req.url).pathname === "/api/test-bytes"
         ? bytesRoute(req, address, upgrade)

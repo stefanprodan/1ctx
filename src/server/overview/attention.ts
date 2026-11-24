@@ -60,7 +60,7 @@ export function attention(input: AttentionInput): AttentionItem[] {
   if (email !== null && email.keyName !== null && !email.hasKey) {
     key("smtp-key", email.keyName);
   }
-  // the instance's hourly cap on link emails asked for at sign in
+  // the instance's hourly cap on asks at sign in, counted on link_asks
   if (email?.linksPaused) key("links-paused", "Link emails");
   keys.sort(
     (a, b) =>

@@ -33,7 +33,9 @@ import { keyRoutes } from "./key-routes.ts";
 import { AccessKeyStore } from "./key-store.ts";
 import {
   type UsersPort as LinkRoutesUsersPort,
+  linkLive,
   linkRoutes,
+  type PagesPort,
 } from "./link-routes.ts";
 import { LinkStore } from "./link-store.ts";
 import {
@@ -67,6 +69,7 @@ export {
   LOGIN_TTL_MS,
   TOUCH_AFTER_MS,
 } from "./auth.ts";
+export { ASK_COOKIE } from "./link-routes.ts";
 export {
   parseAbout,
   parseEmail,
@@ -100,14 +103,19 @@ export type AccessDeps = {
   taskClaims: TaskClaimsPort;
   // the user- key files: the admin keys
   keyFiles: KeyFilesPort;
+  // the server-drawn pages a link's form post answers with
+  pages: PagesPort;
 };
 
 export type Access = Auth & {
   unavailableKeys(ids: readonly string[]): string[];
   // drop the visits past every window; how many went
   sweepVisits(): number;
-  // drop the links past their expiry, used or not; how many went
+  // drop the links past their expiry, used or not, and the asks past
+  // their day; how many went
   sweepLinks(): number;
+  // whether a token opens a live link, for the link page
+  linkLive(token: string): boolean;
   // the work a link ask left after its answer, for the shutdown and tests
   settled(): Promise<void>;
   // at shutdown: a link ask from here answers and does nothing; resolves
@@ -172,6 +180,7 @@ export function accessArea(deps: AccessDeps): Access {
       keys.unavailable(ids, deps.clock(), deps.accessKeysPerUser()),
     sweepVisits: () => visits.deleteBefore(deps.clock() - VISIT_RETENTION_MS),
     sweepLinks: () => linkStore.sweep(deps.clock()),
+    linkLive: (token) => linkLive(linkStore, deps.users, deps.clock(), token),
     settled: () => links.settled(),
     closeLinks: () => links.close(),
     startKeyChecks() {
@@ -219,8 +228,10 @@ export function accessArea(deps: AccessDeps): Access {
         links,
         users: deps.users,
         email: deps.email,
+        pages: deps.pages,
         clock: deps.clock,
         log: deps.log,
+        secureCookie: deps.secureCookie,
         guard,
       }),
       ...profileRoutes({

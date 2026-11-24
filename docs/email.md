@@ -37,19 +37,23 @@ profile pages show of email. The links themselves are in
   `email.queued` event, so the sender wakes after the commit. Send test
   email is the one exception: it goes to the signed-in admin at once and
   answers `sent` or a failure word.
-- **A link email's row holds no text.** Its kind's `prepare` (from
-  `register()`) builds the email when the row is sent, so a retry never
-  carries an expired or stored link. The `signin` and `invite` kinds
-  are access's links (`docs/logins.md`); `reset` stays in the outbox's
-  check for the sent history and is no longer sent; their `prepare` mints a
-  fresh token at every try and drops the row as `revoked` when the link
-  went since. `dropQueued()` drops a user's queued rows of a kind, as
-  when their links end.
+- **A link email's row holds no text, only its link's id** (`link_id`,
+  no foreign key). Its kind's `prepare` (from `register()`) builds the
+  email when the row is sent, so a retry never carries an expired or
+  stored link or code. The `signin` and `invite` kinds are access's
+  links (`docs/logins.md`); `reset` stays in the outbox's check for the
+  sent history and is no longer sent; their `prepare` mints a fresh
+  token and code for that link at every try and drops the row as
+  `revoked` when the link went or was used since. `dropQueued()`
+  deletes a user's queued rows of a kind, as when their links end.
 - **A `notice` row holds its text,** written when it is queued, since
   it carries no link; its `prepare` adds the HTML.
-- **An account email is short plain text with the same paragraphs as
-  simple HTML.** Its subject is fixed words, never what a user typed,
-  and the names in it are escaped in HTML.
+- **A link email is one line of plain text,** markets' words with
+  1ctx's name: the subject "Your 1ctx sign-in code: 482913", the code's
+  digits whole in it and the body so the system offers them. A notice
+  is short plain text with the same paragraphs as simple HTML. A
+  subject is fixed words, never what a user typed, and the names in an
+  email are escaped in HTML.
 - **The sender is the scheduler's shape.** It starts only when the app
   is activated, wakes on `email.queued` and on a timer from the clock,
   and on shutdown takes no new row and waits for the one in flight. A
@@ -66,18 +70,15 @@ profile pages show of email. The links themselves are in
 - **Backoff is 1, 5 and 30 minutes, then failed.** A sent row becomes
   `sent` and is kept a day (`SENT_KEEP_MS`), so a daily cap counts it; a
   failed row keeps its word for 7 days. Neither keeps the text, and the
-  hourly sweep removes them. A dropped row is deleted, but an `asked`
-  one becomes `dropped`, with no text, and is kept a day like a sent
-  one, so the caps on asks count it. A chat's delete leaves its rows
-  with no session, so the project's cap keeps counting them.
+  hourly sweep removes them. A dropped row is deleted; the caps on asks
+  count `link_asks`, not rows. A chat's delete leaves its rows with no
+  session, so the project's cap keeps counting them.
 - **A kind's email may carry its own From name** (`fromName`, as
   "<agent> via 1ctx"); the address is always the server's.
-- **Link emails asked for at the sign-in page are capped,** 3 per user a
-  day and 50 per instance an hour, on rows marked `asked`; an admin's
-  links are not. A link whose email is still queued is live, though it
-  expired between tries, so an ask waits it out. The Monitor's Attention
-  shows "Link emails", "capped for this hour", while the instance's cap
-  holds and email is on.
+- **Asks at the sign-in page are capped** on access's `link_asks`
+  (`docs/logins.md`); an admin's invites are not. The Monitor's
+  Attention shows "Link emails", "capped for this hour", while the
+  instance's 50 asks an hour (`countAsks()`) hold and email is on.
 - **Delivery re-checks the recipient.** Just before SMTP the sender
   reads the user again and drops the row with a fixed word when they
   are gone, disabled or hold a placeholder address. A kind's `prepare`
@@ -166,11 +167,9 @@ profile pages show of email. The links themselves are in
   Email switch only while the agents route lists `email` as switchable.
   The automation editor's Access step shows it then or while `emailOn`,
   live whatever the agent takes, since it also stops alert emails.
-- **The sign-in page offers its email links only with email on,**
-  and says the same after an ask whoever was named. The link page
-  (`/link/<token>`) is a `bare` route: drawn outside the shell whoever
-  is signed in, it names an account already signed in before its one
-  button replaces it.
+- **The sign-in page offers its email code only with email on,** and
+  says the same after an ask whoever was named. The link page
+  (`/link/<token>`) is the server's, never the app's (`docs/logins.md`).
 
 ## Words and logs
 

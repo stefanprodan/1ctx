@@ -173,20 +173,22 @@ export const AUTH_CASES: AuthCase[] = [
   {
     method: "POST",
     path: "/api/login/link",
-    body: { username: "nobody" },
+    body: { email: "nobody@example.test" },
     // public; email is off in the matrix, so there is no such feature
     expect: { anonymous: 404, member: 404, admin: 404 },
   },
   {
-    method: "GET",
-    path: "/api/links/:token",
-    // public: no such link, a null link for everyone
-    expect: { anonymous: 200, member: 200, admin: 200 },
+    method: "POST",
+    path: "/api/login/code",
+    body: { email: "nobody@example.test", code: "123456" },
+    // public: no asking browser's cookie, the one 401 for everyone
+    expect: { anonymous: 401, member: 401, admin: 401 },
   },
   {
     method: "POST",
     path: "/api/links/:token",
     body: {},
+    // public: no such link, the dead link's page for everyone
     expect: { anonymous: 404, member: 404, admin: 404 },
   },
   {

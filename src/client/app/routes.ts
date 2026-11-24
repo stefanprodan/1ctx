@@ -49,7 +49,6 @@ import {
 import { loadKnowledge } from "../data/knowledge.ts";
 import { loadDocPage, onlyLineMoved } from "../data/knowledge-file.ts";
 import { loadKnowledgePath } from "../data/knowledge-path.ts";
-import { loadLink } from "../data/links.ts";
 import {
   loadAllUsage,
   loadMcp,
@@ -124,9 +123,6 @@ export type Route = {
   view: Lazy<{ params: Params }>;
   title: (params: Params) => string;
   role: "public" | "authenticated" | "admin";
-  // drawn on its own, never in the shell, whoever is signed in: a page
-  // an email links to, which may sign this browser in as someone else
-  bare?: true;
   // what the view reads, started by app/loading.ts when the route
   // matches, with the query for a view filtered by it; a view never
   // fetches
@@ -277,14 +273,6 @@ export const ROUTES: Route[] = [
     ),
     title: () => "Sign in",
     role: "public",
-  },
-  {
-    path: "/link/:token",
-    view: lazy(() => import("../views/home/Link.tsx").then((m) => m.Link)),
-    title: () => "Email link",
-    role: "public",
-    bare: true,
-    load: (params) => loadLink(params.token),
   },
   {
     path: "/",

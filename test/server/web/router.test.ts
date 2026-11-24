@@ -104,6 +104,21 @@ describe("sameOrigin", () => {
   test("a garbage origin is refused", () => {
     expect(sameOrigin(req({ origin: "not a url" }), url, false)).toBe(false);
   });
+
+  test("Origin: null passes only a form route the browser says is same-origin", () => {
+    const form = (site?: string) =>
+      req(
+        site === undefined
+          ? { origin: "null" }
+          : { origin: "null", "sec-fetch-site": site },
+      );
+    expect(sameOrigin(form("same-origin"), url, false, false, true)).toBe(true);
+    expect(sameOrigin(form("same-origin"), url, false)).toBe(false);
+    expect(sameOrigin(form("same-origin"), url, false, true)).toBe(false);
+    for (const site of ["cross-site", "same-site", "none", undefined]) {
+      expect(sameOrigin(form(site), url, false, false, true)).toBe(false);
+    }
+  });
 });
 
 describe("clientAddress", () => {

@@ -5,6 +5,7 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  parseCode,
   parseEmail,
   parseLinkAsk,
   parseLinkUse,
@@ -275,9 +276,9 @@ describe("parseNewUser", () => {
 });
 
 describe("parseLinkAsk", () => {
-  test("takes a username or an email", () => {
-    expect(parseLinkAsk({ username: "Casey@Example.com" })).toEqual({
-      username: "casey@example.com",
+  test("takes an email, lowercased", () => {
+    expect(parseLinkAsk({ email: "Casey@Example.com" })).toEqual({
+      email: "casey@example.com",
     });
   });
 
@@ -285,18 +286,44 @@ describe("parseLinkAsk", () => {
     [
       null,
       {},
-      { username: "" },
-      { username: 1 },
-      { username: "a".repeat(255) },
-      { username: "casey", password: "x" },
+      { email: "" },
+      { email: 1 },
+      { email: "casey" },
+      { username: "casey@example.com" },
+      { email: `${"a".repeat(255)}@example.com` },
+      { email: "casey@example.com", password: "x" },
     ],
     parseLinkAsk,
   );
 });
 
+describe("parseCode", () => {
+  test("takes an email and six digits", () => {
+    expect(parseCode({ email: "Casey@Example.com", code: "012345" })).toEqual({
+      email: "casey@example.com",
+      code: "012345",
+    });
+  });
+
+  refuses(
+    [
+      null,
+      {},
+      { email: "casey@example.com" },
+      { email: "casey@example.com", code: "12345" },
+      { email: "casey@example.com", code: "1234567" },
+      { email: "casey@example.com", code: 123456 },
+      { email: "casey@example.com", code: "12 456" },
+      { email: "casey", code: "123456" },
+      { email: "casey@example.com", code: "123456", key: "x" },
+    ],
+    parseCode,
+  );
+});
+
 describe("parseLinkUse", () => {
   test("takes nothing", () => {
-    expect(parseLinkUse({})).toEqual({});
+    expect(() => parseLinkUse({})).not.toThrow();
   });
 
   refuses([null, [], { password: "longenough" }, { token: "x" }], parseLinkUse);

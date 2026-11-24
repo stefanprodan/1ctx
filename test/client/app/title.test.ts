@@ -193,9 +193,6 @@ describe("a page's title", () => {
     expect(pageTitle()).toBe("Sign in · 1ctx");
     path.value = "/nothing";
     expect(pageTitle()).toBe("Sign in · 1ctx");
-    // a page an email links to needs nobody
-    path.value = "/link/abc";
-    expect(pageTitle()).toBe("Email link · 1ctx");
   });
 
   test.serial("an unknown address while signed in is the brand", () => {

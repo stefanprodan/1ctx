@@ -18,6 +18,11 @@ router and the socket). Logins, admin keys and links by email are
   server's scheme and host, using the trusted proxy's last scheme.
   Cookie writes without Origin pass only without `sec-fetch-site`;
   their existing no-downgrade rule is unchanged.
+- **`Origin: null` passes only a `formPost` route** with
+  `Sec-Fetch-Site: same-origin`: the plain forms of the server-drawn
+  link page, which sends no referrer, so the browser posts them with a
+  null Origin (`POST /api/links/:token`, `POST /api/login/link`).
+  Everywhere else a null Origin is refused.
 - **Every body and parameter goes through a hand-written parser** that
   throws a 400 on anything unexpected. A body is read through
   `readBody()` or `readBytes()` with the route's own cap, never
@@ -33,7 +38,9 @@ router and the socket). Logins, admin keys and links by email are
   external tasks skill; any other path, the OAuth metadata an MCP client
   probes for included, is a JSON 404, never the page. The page, its bundle and
   the files `serve()` takes by a fixed path (the manifest's icons) are
-  public static files outside it, with no row in the matrix.
+  public static files outside it, with no row in the matrix, and so is
+  the link page `/link/<token>` (`web/link-page.ts`, `docs/logins.md`),
+  whose GET and HEAD write nothing.
 
 ## Access keys
 

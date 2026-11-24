@@ -133,7 +133,7 @@ export function sender(deps: SenderDeps): Sender {
   };
 
   const dropped = (row: OutboxRow, reason: DropWord) => {
-    deps.store.drop(row.id, deps.clock());
+    deps.store.drop(row.id);
     deps.log.info("email dropped", { ...fields(row), reason });
   };
 

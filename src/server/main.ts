@@ -203,6 +203,7 @@ const { server, stop } = serve({
     "/icon-maskable-512.png": maskable,
   },
   handle: app.handle,
+  linkPage: app.linkPage,
   socket: app.socket,
   trustProxy,
   development: process.env.ONECTX_DEV === "1",

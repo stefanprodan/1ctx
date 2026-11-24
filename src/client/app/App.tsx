@@ -144,9 +144,8 @@ export function App() {
   }, []);
   // the shell waits for me, then for the view's code, as one wait
   const shellWaits =
-    m?.route.bare !== true &&
-    ((user === undefined && needsUser && meError.value === null) ||
-      (user != null && m !== null && !m.route.view.settled()));
+    (user === undefined && needsUser && meError.value === null) ||
+    (user != null && m !== null && !m.route.view.settled());
   // the view's code loads beside me, not once me lands, and loads even
   // where the shell draws no view, so the wait always ends
   if (shellWaits && m !== null && !m.route.view.settled()) {
@@ -155,17 +154,12 @@ export function App() {
   const waited = useHandOver(shellWaits, path.value);
 
   useEffect(() => {
-    if (!user || m?.route.bare) return;
+    if (!user) return;
     const alias = ALIASES[path.value];
     if (alias !== undefined) navigate(alias + query.value, true);
     else if (m === null || m.route.path === "/login") navigate("/", true);
   }, [user, m, path.value]);
 
-  // a page an email links to reads the same signed in or not
-  if (m?.route.bare) {
-    const View = m.route.view;
-    return <View params={m.params} />;
-  }
   if (user === undefined) {
     // a public page needs nobody, so a slow or hanging first load does
     // not hold the sign-in form back

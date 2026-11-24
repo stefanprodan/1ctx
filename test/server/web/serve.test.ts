@@ -28,6 +28,7 @@ test("the manifest's icons are served beside the page", async () => {
     trustProxy: false,
     socket: app.socket,
     handle: app.handle,
+    linkPage: app.linkPage,
   });
   try {
     const origin = listener.server.url.origin;
@@ -44,6 +45,16 @@ test("the manifest's icons are served beside the page", async () => {
       expect(head.headers.get("etag")).toBeTruthy();
       await head.arrayBuffer();
     }
+    // an emailed link's page is the server's, GET and HEAD alike
+    const link = `${origin}/link/${"A".repeat(43)}`;
+    const drawn = await fetch(link);
+    expect(drawn.status).toBe(404);
+    expect(drawn.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(await drawn.text()).toContain("This link no longer works.");
+    const headed = await fetch(link, { method: "HEAD" });
+    expect(headed.status).toBe(404);
+    expect(headed.headers.get("cache-control")).toBe("no-store");
+    await headed.arrayBuffer();
     const other = await fetch(`${origin}/icon-1024.png`);
     expect(other.headers.get("content-type")).toStartWith("text/html");
     await other.text();

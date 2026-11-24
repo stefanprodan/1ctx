@@ -56,6 +56,7 @@ export async function setupUploads(
           trustProxy: false,
           socket: app.socket,
           handle: app.handle,
+          linkPage: app.linkPage,
         })
       : null;
   const origin = listener?.server.url.origin ?? ORIGIN;

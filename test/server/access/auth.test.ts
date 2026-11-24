@@ -50,8 +50,10 @@ function build(secureCookie: boolean) {
       enqueue: () => [],
       register: () => {},
       dropQueued: () => 0,
-      hasQueued: () => false,
-      countAsked: () => 0,
+    },
+    pages: {
+      dead: () => new Response(null, { status: 404 }),
+      sent: () => new Response(null, { status: 202 }),
     },
     clock: () => now.value,
     log: silent,

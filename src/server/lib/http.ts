@@ -77,6 +77,10 @@ export type RouteDescriptor = {
   // a websocket upgrade: same-origin is checked as for a write, and
   // the handler gets ctx.upgrade
   upgrade?: true;
+  // a plain form from a server-drawn page that sends no referrer, which
+  // the browser posts with Origin: null; taken only beside
+  // Sec-Fetch-Site: same-origin
+  formPost?: true;
   // the seconds the connection may sit idle once access passed, for a
   // route that waits on an upstream past Bun's 10 s default; at most
   // MAX_IDLE_SECONDS, Bun's own ceiling

@@ -6,9 +6,9 @@
 // client sends, and refuse anything unexpected with a 400.
 
 import type {
+  CodeRequest,
   LinkAskRequest,
   LoginRequest,
-  UseLinkRequest,
 } from "../../shared/api/access.ts";
 import type {
   CreateAccessKeyRequest,
@@ -41,19 +41,6 @@ import { fields, parseName } from "../lib/body.ts";
 import { BadRequest } from "../lib/errors.ts";
 import { isAdminKey } from "../users/index.ts";
 
-// a username or an email as typed at sign in: the rule is checked, not
-// enforced, so the answer is the same as for an unknown user. Capped at
-// an email's length; only an email is lowercased, as it is stored
-function loginName(value: unknown): string {
-  if (typeof value !== "string" || value === "") {
-    throw new BadRequest("username must be a string");
-  }
-  if (value.length > MAX_EMAIL) {
-    throw new BadRequest(`username must be at most ${MAX_EMAIL} characters`);
-  }
-  return value.includes("@") ? value.toLowerCase() : value;
-}
-
 // the route answers any refusal here with its one 401
 export function parseLogin(body: unknown): LoginRequest {
   const b = fields(body, ["key"]);
@@ -61,14 +48,24 @@ export function parseLogin(body: unknown): LoginRequest {
   return { key: b.key };
 }
 
+// an address, lowercased as it is stored; whose it is stays unknown
 export function parseLinkAsk(body: unknown): LinkAskRequest {
-  const b = fields(body, ["username"]);
-  return { username: loginName(b.username) };
+  const b = fields(body, ["email"]);
+  return { email: parseEmail(b.email) };
 }
 
-export function parseLinkUse(body: unknown): UseLinkRequest {
+// the route answers any refusal here with its one 401
+export function parseCode(body: unknown): CodeRequest {
+  const b = fields(body, ["email", "code"]);
+  if (typeof b.code !== "string" || !/^\d{6}$/.test(b.code)) {
+    throw new BadRequest("code must be six digits");
+  }
+  return { email: parseEmail(b.email), code: b.code };
+}
+
+// the link page's form, which holds no field
+export function parseLinkUse(body: unknown): void {
   fields(body, []);
-  return {};
 }
 
 // newToken()'s shape: 32 bytes as base64url

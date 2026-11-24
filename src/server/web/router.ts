@@ -102,15 +102,21 @@ export function lastForwarded(req: Request, name: string): string | null {
 
 // a browser sends Origin on every non-GET; a request without one is not
 // from a page, and one from another host or a plaintext page of the
-// same host is refused
+// same host is refused. A form route takes Origin: null, which a
+// no-referrer page's post carries, only when the browser says the page
+// was this origin's
 export function sameOrigin(
   req: Request,
   url: URL,
   trustProxy: boolean,
   key = false,
+  formPost = false,
 ) {
   const origin = req.headers.get("origin");
   if (origin === null) return key || req.headers.get("sec-fetch-site") === null;
+  if (origin === "null") {
+    return formPost && req.headers.get("sec-fetch-site") === "same-origin";
+  }
   let parsed: URL;
   try {
     parsed = new URL(origin);
@@ -241,7 +247,7 @@ export function router(deps: RouterDeps): Router {
       if (
         route.policy !== "key" &&
         (method !== "GET" || route.upgrade) &&
-        !sameOrigin(req, url, deps.trustProxy)
+        !sameOrigin(req, url, deps.trustProxy, false, route.formPost === true)
       ) {
         const res = json({ error: "cross-origin request" }, 403);
         record(route.path, res.status, undefined, route.policy);

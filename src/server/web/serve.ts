@@ -1,8 +1,8 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 //
-// Bun.serve: /api/* through the router, the manifest's fixed files,
-// everything else the page.
+// Bun.serve: /api/* through the router, the manifest's fixed files, the
+// emailed link's page, everything else the page.
 
 import { readFileSync } from "node:fs";
 import type { HTMLBundle, ServerWebSocket } from "bun";
@@ -29,6 +29,8 @@ export type ServeOptions = {
   // a fixed path to the file served there
   files: Readonly<Record<string, string>>;
   handle: Router;
+  // GET and HEAD of /link/<token>, drawn by the server
+  linkPage: (req: Request) => Response;
   socket: SocketHandlers;
   // the client address is the socket's, or with a trusted proxy the
   // last address that proxy appended to X-Forwarded-For
@@ -110,6 +112,7 @@ export function serve(options: ServeOptions) {
             }),
           (seconds) => server.timeout(req, seconds),
         ),
+      "/link/:token": (req) => options.linkPage(req),
       "/*": options.page,
     },
     websocket: {

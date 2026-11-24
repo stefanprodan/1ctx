@@ -308,16 +308,12 @@ for (const purpose of ["signin", "invite"] as const) {
       const asked =
         purpose === "invite"
           ? await e.admin.call("POST", `/api/users/${key.userId}/invite`)
-          : await app.client().call("POST", "/api/login/link", {
-              body: { username: "maria" },
-            });
+          : await e.ask(app.client());
       expect(asked.status).toBe(purpose === "invite" ? 204 : 202);
       await app.linkAsks();
       await e.send();
-      const used = await app
-        .client()
-        .call("POST", `/api/links/${e.token()}`, { body: {} });
-      expect(used.status).toBe(200);
+      const used = await e.use(app.client(), e.token());
+      expect(used.status).toBe(303);
       expect(app.externalTasks.show(held.id, null)).toEqual(before);
     } finally {
       await app.shutdown();

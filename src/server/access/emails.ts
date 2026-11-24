@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // The words of the account emails: a link email, built when it is
-// sent, and the security notice, built when it is queued. Plain text
-// with the same paragraphs as simple HTML. Nothing a user typed reaches
-// a subject; the names in the text are the admin's, escaped in HTML.
+// sent, plain text with its code whole in the subject and the body, so
+// iOS and macOS offer it; and the security notice, built when it is
+// queued, plain text with the same paragraphs as simple HTML. Nothing a
+// user typed reaches a subject; the names in the text are the admin's,
+// escaped in HTML.
 
 import { isIP } from "node:net";
 import type { LinkPurpose } from "../../shared/api/access.ts";
@@ -48,34 +50,35 @@ export function htmlOf(text: string): string {
 
 export function linkEmail(
   purpose: LinkPurpose,
-  user: Who,
   link: string,
-): Content {
-  const hi = `Hi ${user.fullName},`;
+  code: string,
+): { subject: string; text: string } {
+  const subject = `Your 1ctx sign-in code: ${code}`;
   switch (purpose) {
     case "signin":
-      return content("Sign in to 1ctx", [
-        hi,
-        `Open this link within 15 minutes to sign in as @${user.username}.`,
-        { link },
-        "If you did not ask for it, ignore this email.",
-      ]);
+      return {
+        subject,
+        text: `Sign in to 1ctx: ${link}, or enter ${code}. Both work once, for 15 minutes.\n`,
+      };
     case "invite":
-      return content("You are invited to 1ctx", [
-        hi,
-        `An admin made you an account, @${user.username}. Open this link within 7 days to sign in.`,
-        { link },
-      ]);
+      return {
+        subject,
+        text: `You were added to 1ctx. Sign in: ${link}, or enter ${code}. Both work once, for 7 days.\n`,
+      };
   }
 }
 
-// what happened to the account: a sign in by link
-export type NoticeEvent = "signin";
+// what happened to the account: a sign in by an emailed link or code
+export type NoticeEvent = "link" | "code";
 
 const NOTICE: Record<NoticeEvent, { subject: string; what: string }> = {
-  signin: {
+  link: {
     subject: "New sign in to 1ctx",
     what: "You signed in by email link",
+  },
+  code: {
+    subject: "New sign in to 1ctx",
+    what: "You signed in by email code",
   },
 };
 
