@@ -81,19 +81,22 @@ router and the socket). Logins, admin keys and links by email are
   creates the personal project in the same transaction. Tests use it
   too.
 - **A write after a body re-reads its caller** (`actingWrite()`, which
-  calls `actingUser()` in its transaction): an access key create, an
-  admin's user create, patch or sign out everywhere, and the SMTP
-  settings save through a port. A gone login, or a key login whose key
-  no longer holds, is 401, and that key login ends. A key create checks
-  its projects by the role read there. Every other write checks its
-  caller only at admission, in the router.
+  calls `actingUser()` in its transaction): an access key create, and
+  the admin-only user create, patch, sign out everywhere and SMTP
+  settings save (through a port). A gone login, or a key login whose
+  key no longer holds, is 401, and that key login ends. An access key
+  create checks its projects by the caller's current role and what
+  they see now, so a project they no longer see is a 404. Every other
+  cookie write checks its caller only at admission, in the router; a
+  write by an access key checks its bearer again in its transaction
+  (`checkKey()`).
 - **A disable deletes every login of the user,** by key or by email,
   their keys and live links, keeping their work, so their next request
   gets 401, and so does one of the writes above already admitted.
 - **A demote ends only key logins.** The demoted admin's key login is
   gone at the demote (401); their login by email survives, so their
-  next admin request gets 403, and so does one of the writes above
-  already admitted.
+  next admin request gets 403, and so does one of the admin-only
+  writes above already admitted.
 - **An admin cannot demote, disable, sign out everywhere or invite
   their own row,** a 409 in the route. Demoting or disabling the last
   enabled admin is a 409 too.

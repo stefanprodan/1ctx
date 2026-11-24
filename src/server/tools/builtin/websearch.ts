@@ -116,7 +116,8 @@ async function readBody(
   return new TextDecoder().decode(bytes);
 }
 
-function serverText(text: string): string {
+// scrubbed before the cut, so a key echoed across it leaves no prefix
+function serverText(text: string, key: string | null): string {
   let clean = "";
   for (let index = 0; index < text.length; index++) {
     const code = text.charCodeAt(index);
@@ -125,24 +126,27 @@ function serverText(text: string): string {
       clean += text[index];
     }
   }
-  return clean.replace(/\s+/gu, " ").trim().slice(0, 300);
+  return scrubValues(clean.replace(/\s+/gu, " ").trim(), [key], "[key]").slice(
+    0,
+    300,
+  );
 }
 
-function errorFromBody(body: string): string | null {
+function errorFromBody(body: string, key: string | null): string | null {
   try {
     const value = JSON.parse(body);
     if (!isRecord(value)) return null;
     // Tavily nests its words under detail
     const error = isRecord(value.detail) ? value.detail.error : value.error;
-    return typeof error === "string" ? serverText(error) : null;
+    return typeof error === "string" ? serverText(error, key) : null;
   } catch {
     return null;
   }
 }
 
 // the provider's words are the model's; the log keeps a fixed phrase
-function providerError(error: ProviderError): Error {
-  const text = serverText(error.message);
+function providerError(error: ProviderError, key: string | null): Error {
+  const text = serverText(error.message, key);
   return error.keyRejected
     ? new ToolError(`websearch key rejected: ${text}`, "websearch key rejected")
     : new ToolError(text, "websearch answer refused");
@@ -150,13 +154,14 @@ function providerError(error: ProviderError): Error {
 
 async function post(
   request: ProviderRequest,
-  keySent: boolean,
+  key: string | null,
   parse: (body: string, contentType: string | null, key: boolean) => string,
   signal: AbortSignal,
   deadlineAt: number,
   maxBytes: number,
   dependencies: SearchDependencies,
 ): Promise<string> {
+  const keySent = key !== null;
   for (let attempt = 0; attempt < 2; attempt++) {
     signal.throwIfAborted();
     const response = await raceSignal(
@@ -184,7 +189,7 @@ async function post(
     if (response.status < 200 || response.status >= 300) {
       // the status and whether a key went out decide what failed; the
       // provider's words, when it sent readable ones, only follow
-      const text = errorFromBody(body);
+      const text = errorFromBody(body, key);
       const words = (head: string) =>
         new ToolError(text === null ? head : `${head}: ${text}`, head);
       if (keySent && response.status === 401) {
@@ -198,7 +203,7 @@ async function post(
     try {
       return parse(body, response.headers.get("content-type"), keySent);
     } catch (error) {
-      if (error instanceof ProviderError) throw providerError(error);
+      if (error instanceof ProviderError) throw providerError(error, key);
       throw error;
     }
   }
@@ -230,7 +235,7 @@ export async function searchWeb(
   try {
     return await post(
       request,
-      key !== null,
+      key,
       parse,
       signal,
       deadlineAt,
