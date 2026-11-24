@@ -31,11 +31,20 @@ bun_workspace() {
   eq "$(bunx lib-bin)" bin
 }
 
+# a global from disk runs by name: bun add -g's bin is on PATH
+bun_global() {
+  echo '{"name":"glob-check","version":"1.0.0","bin":{"glob-check":"b.js"}}' >package.json
+  printf '#!/usr/bin/env node\nconsole.log("global");\n' >b.js
+  bun add -g --silent "file:$PWD"
+  eq "$(glob-check)" global
+}
+
 offline_variant() {
   check "bun is $EXPECT_BUN" bun_version
   check "node and a node shebang run on bun" bun_node
   check "bun runs TypeScript" bun_typescript
   check "bun links a workspace dependency, npx and bunx run its bin" bun_workspace
+  check "bun add -g puts a command on PATH" bun_global
 }
 
 # a scoped name: its registry path holds an encoded slash

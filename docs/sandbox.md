@@ -170,8 +170,10 @@ sizes of when it was made. No limit of ours bounds its disk (below).
   the image is never refused, and a sandbox without repositories is
   never asked.
 - **Every exec runs with `SANDBOX_ENV`** (`spec.ts`): HOME, `TMPDIR`,
-  `PATH` (with `/usr/local/go/bin`, `$HOME/go/bin` and
-  `$HOME/.cargo/bin`), uv's settings, bun's (its cache and global
+  `PATH` (with `/usr/local/go/bin` and the bins installs write to:
+  `$HOME/go/bin`, `$HOME/.cargo/bin`, uv's tools in
+  `$HOME/.local/bin` and bun's globals in `$HOME/.bun/bin`), uv's
+  settings, bun's (its cache and global
   packages under HOME, never `/knowledge`), Go's (`GOPATH`, `GOCACHE`
   and `GOMODCACHE` under `$HOME/go`, `CGO_ENABLED=1`, `CC=gcc`),
   `CARGO_HOME` and `RUSTUP_HOME` under HOME, and `DO_NOT_TRACK`. One

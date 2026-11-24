@@ -17,8 +17,20 @@ python_alone() {
   done
 }
 
+# uv tool install's bin is on PATH, so an installed tool runs by name
+python_tool_bin() {
+  case ":$PATH:" in
+  *":$(uv tool dir --bin):"*) ;;
+  *)
+    echo "$(uv tool dir --bin) is not on PATH"
+    return 1
+    ;;
+  esac
+}
+
 offline_variant() {
   check "uv makes a venv that imports a local module" python_venv
+  check "uv's tool bin is on PATH" python_tool_bin
   check "no other toolchain" python_alone
 }
 
