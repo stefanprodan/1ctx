@@ -209,15 +209,41 @@ describe("a username", () => {
 });
 
 describe("real mail", () => {
-  test("is refused while the SMTP server is the catcher", () => {
-    const path = join(temp("mail-real-"), "1ctx.sqlite");
-    expect(pointsAtCatcher(path, 1238)).toBe(false);
+  test("is refused while the SMTP server is the catcher last set up", () => {
+    const root = temp("mail-real-");
+    const dir = join(root, "mail");
+    const path = join(root, "1ctx.sqlite");
+    expect(pointsAtCatcher(path, dir)).toBe(false);
     const db = new Database(path);
     db.exec("create table smtp_settings (host text, port integer)");
     db.query("insert into smtp_settings values ('127.0.0.1', 1238)").run();
     db.close();
-    expect(pointsAtCatcher(path, 1238)).toBe(true);
-    expect(pointsAtCatcher(path, 1338)).toBe(false);
+    // no setup yet: nothing to be the catcher
+    expect(pointsAtCatcher(path, dir)).toBe(false);
+    setup(dir, 1238, "http://127.0.0.1:1236");
+    expect(pointsAtCatcher(path, dir)).toBe(true);
+  });
+
+  test("follows the saved endpoint, not this start's port", () => {
+    const root = temp("mail-real-");
+    const dir = join(root, "mail");
+    const path = join(root, "1ctx.sqlite");
+    setup(dir, 1238, "http://127.0.0.1:1236");
+    const db = new Database(path);
+    db.exec("create table smtp_settings (host text, port integer)");
+    db.query("insert into smtp_settings values ('127.0.0.1', 1238)").run();
+    db.close();
+    // a later start with PREVIEW_PORT changed would compute 1338
+    expect(pointsAtCatcher(path, dir)).toBe(true);
+  });
+
+  test("a database it cannot read is an error, not a no", () => {
+    const root = temp("mail-real-");
+    const dir = join(root, "mail");
+    setup(dir, 1238, "http://127.0.0.1:1236");
+    const path = join(root, "1ctx.sqlite");
+    new Database(path).close();
+    expect(() => pointsAtCatcher(path, dir)).toThrow("no such table");
   });
 });
 

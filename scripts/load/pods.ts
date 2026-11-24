@@ -136,9 +136,10 @@ export async function mint(
   );
   const deleteMint = () =>
     kubectl(k("delete", "pod", MINT_POD, "--ignore-not-found", "--wait=true"));
-  deleteMint();
-  kubectl(k("scale", "deploy/onectx", "--replicas=0"));
+  let failure: unknown = null;
   try {
+    deleteMint();
+    kubectl(k("scale", "deploy/onectx", "--replicas=0"));
     const gone = Bun.spawnSync(
       k("wait", "--for=delete", "pod", "-l", SERVER_PODS, "--timeout=5m"),
     );
@@ -152,9 +153,35 @@ export async function mint(
     const log = kubectl(k("logs", MINT_POD)).trim();
     if (phase !== "Succeeded") throw new Error(`minting logins: ${log}`);
     console.log(log);
-  } finally {
-    deleteMint();
-    kubectl(k("scale", "deploy/onectx", "--replicas=1"));
+  } catch (e) {
+    failure = e;
   }
-  await rolledOut(k, "onectx");
+  await restore(kube, deleteMint, failure);
+  if (failure !== null) throw failure;
 }
+
+// The server back on every ending: the mint pod gone (one retry), one
+// replica, the rollout waited on. A pod that will not go leaves the
+// server down rather than two pods on one volume.
+async function restore(kube: Kube, deleteMint: () => void, failure: unknown) {
+  const { k } = kube;
+  try {
+    try {
+      deleteMint();
+    } catch {
+      deleteMint();
+    }
+    kubectl(k("scale", "deploy/onectx", "--replicas=1"));
+    await rolledOut(k, "onectx");
+  } catch (e) {
+    const why = e instanceof Error ? e.message : String(e);
+    const after =
+      failure === null
+        ? ""
+        : ` (after: ${failure instanceof Error ? failure.message : String(failure)})`;
+    throw new RecoveryFailed(`the server was not restored: ${why}${after}`);
+  }
+}
+
+// cleanup that failed: never hidden behind a cancel's exit code
+export class RecoveryFailed extends Error {}

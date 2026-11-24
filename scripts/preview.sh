@@ -231,12 +231,20 @@ reset() {
 
 start() {
   keys
-  local mail=()
-  if [ "${PREVIEW_MAIL:-}" = real ] && [ -f "$DIR/1ctx.sqlite" ] &&
-    bun "$MAIL_ENTRY" points "$DIR/1ctx.sqlite" "$MAIL_PORT"; then
-    echo "PREVIEW_MAIL=real, but the preview's SMTP server is still the catcher on 127.0.0.1:$MAIL_PORT; provision the real one: PREVIEW_MAIL=real make preview-provision FILE=..." >&2
-    exit 1
+  local mail=() probe=0
+  if [ "${PREVIEW_MAIL:-}" = real ]; then
+    bun "$MAIL_ENTRY" points "$DIR/1ctx.sqlite" "$MAIL" || probe=$?
+    if [ "$probe" = 0 ]; then
+      echo "PREVIEW_MAIL=real, but the preview's SMTP server is still the catcher ($(cat "$MAIL/endpoint")); provision the real one: PREVIEW_MAIL=real make preview-provision FILE=..." >&2
+      exit 1
+    elif [ "$probe" != 1 ]; then
+      echo "PREVIEW_MAIL=real, but the preview's SMTP server could not be read, so it may still be the catcher; fix the error above or provision the real one" >&2
+      exit 1
+    fi
   fi
+  # from here until health and the sandbox step pass, any exit, set -e's
+  # included, stops the server and the catcher this start began
+  trap stop EXIT
   if [ "${PREVIEW_MAIL:-}" != real ]; then
     mail_start
     mail=(--provision "$MAIL/smtp.yaml")
@@ -256,6 +264,7 @@ start() {
         echo "preview up at $URL (pid $pid, log $LOG)"
         if mail_running; then echo "mail caught on 127.0.0.1:$MAIL_PORT into $MAIL/"; fi
         if [ "${PREVIEW_SHELL:-}" = sandbox ]; then sandbox; fi
+        trap - EXIT
         return 0
       fi
       holders=$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | grep -vx "$pid" | tr "\n" " " || true)
@@ -270,7 +279,6 @@ start() {
   done
   echo "preview did not answer at $URL; log tail:" >&2
   tail -20 "$LOG" >&2
-  mail_stop
   exit 1
 }
 

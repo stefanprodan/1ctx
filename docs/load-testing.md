@@ -115,8 +115,11 @@ is minted.
 - **On the cluster** each driver pod is preceded by a mint step: the
   server's deployment is scaled to 0, a pod on its volume (`mint.ts`)
   opens the logins from a ConfigMap of hashes, and the server is scaled
-  back up and waited on. Whatever ends it, the mint pod is deleted and
-  gone before the server scales back. The hashes and tokens reach
+  back up and waited on. Whatever ends it, a scale-down cut short
+  included, the mint pod is deleted (tried twice) and gone before the
+  server scales back to one replica and its rollout is waited on; a pod
+  that will not go leaves the server down and fails the run with that
+  error, never hidden behind a cancel's exit code. The hashes and tokens reach
   kubectl on stdin, never a file; the tokens go only into the
   `load-logins` Secret, which only the driver pod mounts. A driver pod
   that does not succeed fails the run with its log. A first SIGINT or

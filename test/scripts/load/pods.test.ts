@@ -7,7 +7,12 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { Cancelled, type Kube, mint } from "../../../scripts/load/pods.ts";
+import {
+  Cancelled,
+  type Kube,
+  mint,
+  RecoveryFailed,
+} from "../../../scripts/load/pods.ts";
 import { tempDirs } from "../../helpers/temp.ts";
 
 const temp = tempDirs();
@@ -20,6 +25,11 @@ echo "$*" >> "$dir/calls"
 case "$*" in
   *"/dev/stdin"*) n=$(wc -l < "$dir/calls" | tr -d " "); cat > "$dir/stdin-$n"; echo "kind: x" ;;
   *"apply -f -"*) cat > /dev/null ;;
+  *"scale deploy/onectx --replicas=0"*) if [ -f "$dir/fail-scale" ]; then exit 130; fi ;;
+  *"delete pod mint-logins"*)
+    n=$(grep -c "delete pod mint-logins" "$dir/calls")
+    f=$(cat "$dir/delete-fails" 2>/dev/null || echo 0)
+    if [ "$n" -gt 1 ] && [ "$n" -le $((1 + f)) ]; then echo "delete refused" >&2; exit 1; fi ;;
   *"get pod mint-logins"*) cat "$dir/phase" ;;
   *"logs mint-logins"*) echo "minted 3 logins" ;;
   *"get deploy onectx"*) printf '2 2 1 1 1 ' ;;
@@ -27,10 +37,15 @@ case "$*" in
 esac
 `;
 
-function fake(phase: string) {
+function fake(
+  phase: string,
+  o: { failScale?: boolean; deleteFails?: number } = {},
+) {
   const dir = temp("load-pods-");
   writeFileSync(join(dir, "kubectl"), FAKE);
   writeFileSync(join(dir, "phase"), phase);
+  if (o.failScale) writeFileSync(join(dir, "fail-scale"), "");
+  writeFileSync(join(dir, "delete-fails"), String(o.deleteFails ?? 0));
   const calls = () =>
     readFileSync(join(dir, "calls"), "utf8").trim().split("\n");
   return {
@@ -63,28 +78,48 @@ describe("the mint step", () => {
     ).toBeGreaterThan(-1);
     expect(
       readdirSync(f.dir).filter(
-        (n) => !/^(kubectl|phase|calls|stdin-\d+)$/.test(n),
+        (n) => !/^(kubectl|phase|calls|delete-fails|stdin-\d+)$/.test(n),
       ),
     ).toEqual([]);
   });
 
-  test("a failed mint deletes its pod before the server scales back", async () => {
+  // the mint pod deleted after the last scale-down, then one replica,
+  // then the rollout read
+  const restored = (calls: string[]) => {
+    const removed = calls.findLastIndex((c) =>
+      c.includes("delete pod mint-logins"),
+    );
+    const up = calls.findLastIndex((c) => c.includes("--replicas=1"));
+    const rollout = calls.findLastIndex((c) => c.includes("get deploy onectx"));
+    expect(removed).toBeGreaterThan(at(calls, "--replicas=0"));
+    expect(up).toBeGreaterThan(removed);
+    expect(rollout).toBeGreaterThan(up);
+  };
+
+  test("a success restores the server", async () => {
+    const f = fake("Succeeded");
+    await mint(kube(f.k), ["admin"], "1ctx-load", "bun:x");
+    restored(f.calls());
+  });
+
+  test("a failed mint restores the server", async () => {
     const f = fake("Failed");
     await expect(
       mint(kube(f.k), ["admin"], "1ctx-load", "bun:x"),
     ).rejects.toThrow("minting logins: minted 3 logins");
-    const calls = f.calls();
-    const down = at(calls, "scale", "--replicas=0");
-    const removed = calls.findLastIndex((c) =>
-      c.includes("delete pod mint-logins"),
-    );
-    const up = at(calls, "scale", "--replicas=1");
-    expect(down).toBeGreaterThan(-1);
-    expect(removed).toBeGreaterThan(down);
-    expect(up).toBeGreaterThan(removed);
+    restored(f.calls());
   });
 
-  test("a cancel runs the same cleanup", async () => {
+  test("a scale-down cut short restores the server", async () => {
+    const f = fake("Succeeded", { failScale: true });
+    await expect(
+      mint(kube(f.k), ["admin"], "1ctx-load", "bun:x"),
+    ).rejects.toThrow("scale deploy/onectx");
+    restored(f.calls());
+    expect(at(f.calls(), "apply")).toBeLessThan(at(f.calls(), "--replicas=0"));
+  });
+
+  test("a cancel during the mint wait restores the server", async () => {
     const f = fake("Running");
     let polls = 0;
     await expect(
@@ -95,20 +130,22 @@ describe("the mint step", () => {
         "bun:x",
       ),
     ).rejects.toBeInstanceOf(Cancelled);
-    const calls = f.calls();
-    const removed = calls.findLastIndex((c) =>
-      c.includes("delete pod mint-logins"),
-    );
-    expect(at(calls, "apply")).toBeGreaterThan(-1);
-    expect(at(calls, "scale", "--replicas=1")).toBeGreaterThan(removed);
+    restored(f.calls());
   });
 
-  test("a success waits for the server's rollout", async () => {
-    const f = fake("Succeeded");
+  test("a final delete that fails once is tried again", async () => {
+    const f = fake("Succeeded", { deleteFails: 1 });
     await mint(kube(f.k), ["admin"], "1ctx-load", "bun:x");
-    const calls = f.calls();
-    expect(at(calls, "get deploy onectx")).toBeGreaterThan(
-      at(calls, "scale", "--replicas=1"),
+    restored(f.calls());
+  });
+
+  test("a mint pod that will not go leaves the server down and says so", async () => {
+    const f = fake("Failed", { deleteFails: 2 });
+    const done = mint(kube(f.k), ["admin"], "1ctx-load", "bun:x");
+    await expect(done).rejects.toBeInstanceOf(RecoveryFailed);
+    await expect(done).rejects.toThrow(
+      /not restored: .*delete refused.*after: minting logins/,
     );
+    expect(at(f.calls(), "--replicas=1")).toBe(-1);
   });
 });

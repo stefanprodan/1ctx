@@ -1,10 +1,13 @@
 # Run with ONECTX_VERSION set to a release. ./secrets holds user-admin.key,
 # the first admin's key and never a password, another admin's
 # user-<username>.key and the <kind>-<name>.key files, each readable by
-# 65532 (mode 600 owned by 65532). Make a key into a temp file, check it,
-# and move it only where none is (never `>` over a key):
-#   key=$(mktemp); docker run --rm <image> admin-key admin --stdout > "$key"
-#   grep -q '^1ctx-admin-' "$key" && mv -n "$key" secrets/user-admin.key
+# 65532 (mode 600 owned by 65532, or 644 on a machine you alone use).
+# Make a key into a temp file, check it, set its mode and move it only
+# where none is, never `>` over a key:
+#   (set -e; key=$(mktemp); trap 'rm -f "$key"' EXIT
+#    docker run --rm <image> admin-key admin --stdout > "$key"
+#    grep -q '^1ctx-admin-' "$key"; chmod 644 "$key"
+#    mv -n "$key" secrets/user-admin.key)
 # Members sign in by email. ./provision (or ONECTX_PROVISION) holds the
 # YAML objects applied at every start.
 name: 1ctx

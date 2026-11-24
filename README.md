@@ -66,16 +66,23 @@ From a clone of this repository, build the image and write the secrets:
 cd deploy/docker
 mkdir -p secrets provision
 ONECTX_VERSION=dev docker compose -f compose.yaml -f compose.dev.yaml build
-key=$(mktemp)
-docker run --rm ghcr.io/stefanprodan/1ctx:dev admin-key admin --stdout > "$key"
-grep -q '^1ctx-admin-' "$key" && chmod 644 "$key" &&
+(
+  set -e
+  key=$(mktemp)
+  trap 'rm -f "$key"' EXIT
+  docker run --rm ghcr.io/stefanprodan/1ctx:dev admin-key admin --stdout > "$key"
+  grep -q '^1ctx-admin-' "$key" || { echo "no admin key was made" >&2; exit 1; }
+  chmod 644 "$key"
   mv -n "$key" secrets/user-admin.key
+)
 printf '%s' '<your OpenRouter key>' > secrets/provider-openrouter.key
 chmod 644 secrets/*.key
 ```
 
 The key goes into place only when it was made and no `user-admin.key`
-is there already; a key is never written over.
+is there already, with the mode the container's user can read; a key
+is never written over. A failed key ends the subshell non-zero, so the
+block stops there when run as a script.
 
 `user-admin.key` holds the admin key of the first admin, `admin`. There
 are no passwords: an admin signs in with their own key file,

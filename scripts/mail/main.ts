@@ -11,8 +11,9 @@
 //   bun scripts/mail/main.ts show DIR DB TO
 //     the newest message to TO, a username (its email read from DB) or
 //     an email, with its code and link
-//   bun scripts/mail/main.ts points DB PORT
-//     exits 0 when the SMTP server in DB is the catcher on PORT
+//   bun scripts/mail/main.ts points DB DIR
+//     exits 0 when the SMTP server in DB is the catcher DIR's last setup
+//     pointed it at, 1 when not, 2 when either cannot be read
 
 import { Database } from "bun:sqlite";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -24,6 +25,8 @@ import { listenSmtp } from "./smtp.ts";
 export const CERT = "cert.pem";
 const KEY = "key.pem";
 export const SMTP_YAML = "smtp.yaml";
+// the endpoint the last setup pointed the preview at
+const ENDPOINT = "endpoint";
 
 export function smtpYaml(port: number, publicUrl: string): string {
   return `# written by scripts/mail/main.ts at each preview start
@@ -57,6 +60,7 @@ export function setup(dir: string, port: number, publicUrl: string) {
   writeFileSync(join(dir, SMTP_YAML), smtpYaml(port, publicUrl), {
     mode: 0o600,
   });
+  writeFileSync(join(dir, ENDPOINT), `127.0.0.1:${port}\n`, { mode: 0o600 });
 }
 
 // a username's address; an email stays itself
@@ -79,9 +83,13 @@ export function addressFor(db: string, to: string): string | null {
   }
 }
 
-// whether the instance's SMTP server is still the catcher on that port
-export function pointsAtCatcher(db: string, port: number): boolean {
-  if (!existsSync(db)) return false;
+// whether the instance's SMTP server is still the catcher the last
+// setup in dir pointed it at, whatever port this start would pick; a
+// read that fails throws
+export function pointsAtCatcher(db: string, dir: string): boolean {
+  const saved = join(dir, ENDPOINT);
+  if (!existsSync(saved) || !existsSync(db)) return false;
+  const endpoint = readFileSync(saved, "utf8").trim();
   const handle = new Database(db);
   try {
     const row = handle
@@ -89,7 +97,7 @@ export function pointsAtCatcher(db: string, port: number): boolean {
         "select host, port from smtp_settings",
       )
       .get();
-    return row?.host === "127.0.0.1" && row.port === port;
+    return row !== null && `${row.host}:${row.port}` === endpoint;
   } finally {
     handle.close();
   }
@@ -135,11 +143,16 @@ if (import.meta.main) {
   if (command === "setup" && dir && a && b) setup(dir, Number(a), b);
   else if (command === "serve" && dir && a) serve(dir, Number(a));
   else if (command === "show" && dir && a && b) process.exit(show(dir, a, b));
-  else if (command === "points" && dir && a)
-    process.exit(pointsAtCatcher(dir, Number(a)) ? 0 : 1);
-  else {
+  else if (command === "points" && dir && a) {
+    try {
+      process.exit(pointsAtCatcher(dir, a) ? 0 : 1);
+    } catch (e) {
+      console.error(e instanceof Error ? e.message : String(e));
+      process.exit(2);
+    }
+  } else {
     console.error(
-      "usage: main.ts setup DIR PORT URL | serve DIR PORT | show DIR DB TO | points DB PORT",
+      "usage: main.ts setup DIR PORT URL | serve DIR PORT | show DIR DB TO | points DB DIR",
     );
     process.exit(2);
   }

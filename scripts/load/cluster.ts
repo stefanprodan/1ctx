@@ -26,6 +26,7 @@ import {
   type Kube,
   LOGINS_SECRET,
   mint as mint_,
+  RecoveryFailed,
 } from "./pods.ts";
 import {
   ADMIN_KEY_FILE,
@@ -501,7 +502,7 @@ if (import.meta.main) {
   try {
     await main();
   } catch (e) {
-    if (cancelRequested) process.exit(130);
+    if (cancelRequested && !(e instanceof RecoveryFailed)) process.exit(130);
     throw e;
   }
 }

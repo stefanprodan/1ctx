@@ -138,8 +138,11 @@ gateway add`.
 - **Its `SmtpServer` object is applied with `--provision` at each
   start,** after any provisioning, so a provisioned real server never
   wins. `PREVIEW_MAIL=real` starts no catcher and refuses to start while
-  the SMTP server is still the catcher; provision the real one with it
-  set.
+  the SMTP server is still the endpoint the last setup saved in
+  `.preview/mail/endpoint`, or when it cannot be read; provision the
+  real one with it set.
+- **A start that fails stops what it began,** the server and the
+  catcher, until health and the optional sandbox step pass.
 - **Each recipient's copy is keyed by a hash of its address,** which
   heads the file as `X-Catcher-To`, so no address matches another's
   prefix. The catcher answers 250 only once every copy is written, 451
