@@ -135,4 +135,8 @@ what the bash tool's description shares with it.
   loopback, link-local and metadata never. The sandbox's own loopback
   is reachable.
 - A key rotated or a global policy set mid-command applies until the
-  command ends; refusals are OpenShell's status and words.
+  command ends; refusals are OpenShell's status and words. A
+  destination off the policy (host, address or port) fails the connect
+  in the sandbox with `EACCES`; a refused request on an allowed
+  connection, an encoded path, is closed unanswered; a credential's
+  refusal is a 403.

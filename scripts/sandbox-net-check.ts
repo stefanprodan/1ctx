@@ -307,17 +307,28 @@ const brief = (text: string) =>
 // curl's status and body head, for a line each
 const probe = (label: string, args: string) =>
   `: > /tmp/b; printf '%s ' ${label}; curl -s -m 15 -o /tmp/b -w '%{http_code}' ${args}; printf ' '; head -c 160 /tmp/b | tr '\\n' ' '; echo`;
-// curl's status and the proxy's answer to a CONNECT: 000 alone is also
-// an address nobody answers, never proof of a refusal
+// curl's status, then eacces when the sandbox's kernel refused the
+// connect, as OpenShell refuses a destination off the policy: 000
+// alone is also an address nobody answers, never proof of a refusal
 const refusalProbe = (label: string, url: string) =>
-  `printf '%s ' ${label}; curl -s -m 15 -o /dev/null -w '%{http_code} %{http_connect}' ${url}; echo`;
+  `printf '%s ' ${label}; curl -sv -m 15 -o /dev/null -w '%{http_code}' ${url} 2>/tmp/e; grep -q 'Immediate connect fail.*Permission denied' /tmp/e && printf ' eacces'; echo`;
+// curl's status and exit: OpenShell refuses a request it reads on an
+// allowed connection by closing it unanswered, curl's 56
+const requestProbe = (label: string, url: string) =>
+  `printf '%s ' ${label}; curl -s -m 15 -o /dev/null -w '%{http_code}' ${url}; printf ' exit %s\n' $?`;
 const lineOf = (out: string, label: string) =>
   out.split("\n").find((line) => line.startsWith(`${label} `)) ?? "";
 const status = (out: string, label: string) =>
   lineOf(out, label).split(" ")[1] ?? "";
-// the proxy's 403, to the request itself or to its CONNECT
-const proxyRefused = (out: string, label: string) =>
-  lineOf(out, label).split(" ").slice(1).includes("403");
+// OpenShell's refusal of the connect, or a 403 to the request
+const refused = (out: string, label: string) => {
+  const words = lineOf(out, label).split(" ").slice(1);
+  return words.includes("eacces") || words.includes("403");
+};
+// a 4xx, or the connection closed with no answer
+const requestRefused = (out: string, label: string) =>
+  /^4\d\d /.test(`${status(out, label)} `) ||
+  lineOf(out, label) === `${label} 000 exit 56`;
 
 async function main() {
   const A = `$${envName(SIGNED.name)}`;
@@ -412,7 +423,7 @@ async function main() {
         "redirect-unlisted",
         `-L "https://httpbin.org/redirect-to?url=https://example.org/"`,
       ),
-      probe("encoded", "https://httpbin.org/anything/a%2Fb"),
+      requestProbe("encoded", "https://httpbin.org/anything/a%2Fb"),
       refusalProbe("unlisted", "https://www.example.org/"),
       `printf 'raw-socket '; (exec 3<>/dev/tcp/1.1.1.1/443 && echo connected) 2>&1 | head -1`,
       `printf 'python '; python3 -c "import urllib.request as u;print(u.urlopen('https://httpbin.org/get',timeout=10).status)" 2>&1 | tail -1`,
@@ -438,8 +449,8 @@ async function main() {
   );
   report(
     "an encoded path and an unlisted host are refused",
-    // httpbin answers 200 to any path, so a 4xx is the proxy's
-    /^4\d\d$/.test(status(two, "encoded")) && proxyRefused(two, "unlisted"),
+    // httpbin answers 200 to any path, so a refusal is OpenShell's
+    requestRefused(two, "encoded") && refused(two, "unlisted"),
     `${lineOf(two, "encoded").slice(0, 120)} / ${lineOf(two, "unlisted")}`,
   );
   report(
@@ -615,7 +626,7 @@ async function main() {
   report(
     "unlisted names, raw addresses, metadata and other ports are refused",
     ["two-label", "unlisted", "literal", "port-8443", "metadata"].every(
-      (label) => proxyRefused(w, label),
+      (label) => refused(w, label),
     ),
     ["two-label", "unlisted", "literal", "port-8443", "metadata"]
       .map((label) => lineOf(w, label))
@@ -623,8 +634,8 @@ async function main() {
   );
 
   // the default hosts: uv's package from PyPI and another Python from
-  // its download host, both into HOME, and npm's encoded slash. The image's own tools are
-  // scripts/sandbox-image-check.ts's
+  // its download host, both into HOME, and npm's encoded slash. The
+  // image's own tools are scripts/sandbox-image-check.ts's
   const uv = await command(
     DEFAULTS,
     [],
@@ -662,9 +673,9 @@ async function main() {
     "off recycles, attaches nothing and nothing reaches out",
     off.sandbox !== uv.sandbox &&
       off.raw.startsWith("0\n") &&
-      // the proxy's refusal, or no answer from a URL the wildcard
+      // OpenShell's refusal, or no answer from a URL the wildcard
       // sandbox reached in this run
-      (proxyRefused(off.raw, "off") ||
+      (refused(off.raw, "off") ||
         (status(off.raw, "off") === "000" && status(w, "listed") === "200")),
     `${uv.sandbox} -> ${off.sandbox} (${off.loaded} load); ${lineOf(off.raw, "off")}`,
   );
