@@ -141,8 +141,10 @@ gateway add`.
   the SMTP server is still the endpoint the last setup saved in
   `.preview/mail/endpoint`, or when it cannot be read; provision the
   real one with it set.
-- **A start that fails stops what it began,** the server and the
-  catcher, until health and the optional sandbox step pass.
+- **A start refuses a preview port something already listens on.**
+  One that fails before health and the optional sandbox step pass stops
+  only the server and the catcher it launched, by pid, never by a scan
+  of the port, so an older preview that lost its pid file is left alone.
 - **Each recipient's copy is keyed by a hash of its address,** which
   heads the file as `X-Catcher-To`, so no address matches another's
   prefix. The catcher answers 250 only once every copy is written, 451

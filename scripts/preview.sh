@@ -106,6 +106,7 @@ mail_start() {
   echo $! >"$MAIL_PID"
   local pid
   pid=$(cat "$MAIL_PID")
+  MAIL_STARTED=$pid
   for _ in $(seq 1 50); do
     [ "$(lsof -nP -tiTCP:"$MAIL_PORT" -sTCP:LISTEN 2>/dev/null || true)" = "$pid" ] && return 0
     mail_running || break
@@ -115,6 +116,26 @@ mail_start() {
   tail -5 "$MAIL/catcher.log" >&2
   mail_stop
   exit 1
+}
+
+# a failed start undoes only what it launched, by pid, never by a scan of
+# the port, so an older preview that lost its pid file is left alone
+SERVER_STARTED=
+MAIL_STARTED=
+rollback() {
+  local p f
+  for p in "$SERVER_STARTED:$PID" "$MAIL_STARTED:$MAIL_PID"; do
+    f=${p#*:}
+    p=${p%%:*}
+    [ -n "$p" ] || continue
+    if kill -0 "$p" 2>/dev/null; then
+      kill "$p" 2>/dev/null || true
+      for _ in $(seq 1 50); do kill -0 "$p" 2>/dev/null || break; sleep 0.1; done
+    fi
+    if [ "$(cat "$f" 2>/dev/null)" = "$p" ] && ! kill -0 "$p" 2>/dev/null; then
+      rm -f "$f"
+    fi
+  done
 }
 
 mail_show() {
@@ -242,9 +263,15 @@ start() {
       exit 1
     fi
   fi
+  local held
+  held=$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | tr "\n" " " || true)
+  if [ -n "$held" ]; then
+    echo "port $PORT is already held (pid ${held% }); stop it (make preview-stop) or pick another PREVIEW_PORT" >&2
+    exit 1
+  fi
   # from here until health and the sandbox step pass, any exit, set -e's
-  # included, stops the server and the catcher this start began
-  trap stop EXIT
+  # included, stops the server and the catcher this start launched
+  trap rollback EXIT
   if [ "${PREVIEW_MAIL:-}" != real ]; then
     mail_start
     mail=(--provision "$MAIL/smtp.yaml")
@@ -258,6 +285,7 @@ start() {
   echo $! >"$PID"
   local pid holders
   pid=$(cat "$PID")
+  SERVER_STARTED=$pid
   for _ in $(seq 1 50); do
     if curl -sf -o /dev/null "$URL/api/health"; then
       if listens "$pid"; then
@@ -270,7 +298,6 @@ start() {
       holders=$(lsof -nP -tiTCP:"$PORT" -sTCP:LISTEN 2>/dev/null | grep -vx "$pid" | tr "\n" " " || true)
       if [ -n "$holders" ]; then
         echo "port $PORT is held by another process (pid ${holders% }); stop it or pick another PREVIEW_PORT" >&2
-        stop
         exit 1
       fi
     fi
