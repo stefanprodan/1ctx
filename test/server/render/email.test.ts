@@ -22,6 +22,16 @@ describe("the email renderer", () => {
     expect(text).not.toContain("your bank");
   });
 
+  test("strikes only between double tildes, links keep theirs", () => {
+    const { html, text } = renderEmailMarkdown(
+      "range 5~6 and 7~8 km, ~~gone~~ [l](https://x.test/~v)",
+    );
+    expect(html).toBe(
+      '<p>range 5~6 and 7~8 km, <del>gone</del> <a href="https://x.test/~v">https://x.test/~v</a></p>',
+    );
+    expect(text).toBe("range 5~6 and 7~8 km, gone https://x.test/~v");
+  });
+
   test("keeps a bare address as text, its markup whole", () => {
     const { html, text } = renderEmailMarkdown(
       "para\n\nsee https://a.test/x*y* ok\n\n# head",
