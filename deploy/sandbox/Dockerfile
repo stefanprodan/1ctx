@@ -10,9 +10,10 @@
 # go:      the base, gcc and Go with cgo
 # rust:    the base, gcc and Rust stable through rustup
 
-# yq, Bun, Go and Rust come from their official images, pinned by
+# jq, yq, Bun, Go and Rust come from their official images, pinned by
 # digest, so Dependabot bumps them with the base. Bun is the root
-# Dockerfile's. yq is a static binary, so Alpine's build runs here.
+# Dockerfile's. jq and yq are static binaries, so they run on any base.
+FROM ghcr.io/jqlang/jq:1.8.2@sha256:b9c68867e5766576263a222e91db3de422d802069c7af70440e667a95344e486 AS jqdist
 FROM mikefarah/yq:4.54.3@sha256:7834187596ad56fd5a81436114e0b0b9dd54c91bb43946d1f7145b2be5f9c3d2 AS yqdist
 FROM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS bundist
 FROM golang:1.27.4-trixie@sha256:430985542100b871e108ccc00e8dcc5eef08ca14ee5825e98ebf563d8ffec4ee AS godist
@@ -22,10 +23,11 @@ FROM ghcr.io/astral-sh/uv:python3.15-trixie-slim@sha256:980d6aa868431fd4ef2b3248
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      bash ca-certificates coreutils curl findutils git jq make \
+      bash ca-certificates coreutils curl findutils git make \
       poppler-utils procps ripgrep tar \
  && rm -rf /var/lib/apt/lists/*
 
+COPY --from=jqdist /jq /usr/local/bin/jq
 COPY --from=yqdist /usr/bin/yq /usr/local/bin/yq
 
 # Landlock skips a path that does not exist, so every root the policy

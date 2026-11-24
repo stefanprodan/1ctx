@@ -186,8 +186,8 @@ gateway add`.
 - **The sandbox image (`deploy/sandbox/Dockerfile`) pins every image it
   takes from by digest and downloads nothing of its own:** its base,
   uv's Python 3.15 trixie-slim image that brings Python and uv, and the
-  official `mikefarah/yq`, `oven/bun`, `golang` and `rust` slim images
-  that yq, Bun, Go and Rust are copied from, Rust's two homes moved
+  official `jqlang/jq`, `mikefarah/yq`, `oven/bun`, `golang` and `rust`
+  slim images that jq, yq, Bun, Go and Rust are copied from, Rust's two homes moved
   under `/opt/home`. `oven/bun` is the root Dockerfile's, so the two
   move together. Dependabot bumps every digest. The apt packages are
   trixie's on the day of the build. A new Bun,
