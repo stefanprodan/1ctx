@@ -100,17 +100,18 @@ export function passkeyRoutes(deps: PasskeyRoutesDeps): RouteDescriptor[] {
   const notAccepted = () => json({ error: "passkey not accepted" }, 401);
   const badPasskey = () =>
     json({ error: "the passkey did not check out" }, 400);
-  // the answer's object; null for a form, a bad body or none
+  // the answer's object, read by the JSON routes' own reader, so its cap
+  // (413) and its content type behave as everywhere; null for a bad
+  // body, and for a form, which no page's script posts
   const answer = async (req: Request) => {
-    if (isForm(req)) return null;
+    let body: unknown;
     try {
-      const body = await jsonBody(req, PASSKEY_BODY_BYTES);
-      return isRecord(body) ? body : null;
+      body = await jsonBody(req, PASSKEY_BODY_BYTES);
     } catch (error) {
-      // a body past the cap keeps its 413
       if (error instanceof BadRequest) return null;
       throw error;
     }
+    return isRecord(body) && !isForm(req) ? body : null;
   };
   const acting = {
     db: deps.db,
@@ -207,15 +208,19 @@ export function passkeyRoutes(deps: PasskeyRoutesDeps): RouteDescriptor[] {
         const principal = ctx.principal!;
         const loginId = loginOf(principal)!;
         // an answer landing after a sign out everywhere adds nothing
+        // a conflict returns rather than throws, so the challenge it took
+        // stays used and the same answer never adds later
         const added = actingWrite<
-          "challenge" | { user: UserRow; passkey: Passkey }
+          "challenge" | "full" | "held" | { user: UserRow; passkey: Passkey }
         >(acting, principal, null, (user) => {
           const now = deps.clock();
           const scope = { purpose: "add" as const, ...rp, login: loginId };
           if (!deps.store.takeChallenge(checked.challenge, scope, now)) {
             return { result: "challenge" as const };
           }
-          if (deps.store.count(user.id) >= PASSKEYS_PER_USER) throw full();
+          if (deps.store.count(user.id) >= PASSKEYS_PER_USER) {
+            return { result: "full" as const };
+          }
           const passkey = deps.store.insert(
             {
               userId: user.id,
@@ -231,9 +236,7 @@ export function passkeyRoutes(deps: PasskeyRoutesDeps): RouteDescriptor[] {
             },
             now,
           );
-          if (passkey === null) {
-            throw new Conflict("this passkey is already added");
-          }
+          if (passkey === null) return { result: "held" as const };
           const events: BusEvent[] = [];
           if (deps.email.enabled() && !user.emailPlaceholder) {
             const { subject, text } = passkeyEmail(
@@ -256,6 +259,10 @@ export function passkeyRoutes(deps: PasskeyRoutesDeps): RouteDescriptor[] {
         if (added === "challenge") {
           refused("challenge", ctx.address);
           return badPasskey();
+        }
+        if (added === "full") throw full();
+        if (added === "held") {
+          throw new Conflict("this passkey is already added");
         }
         deps.log.info("passkey added", {
           user: added.user.username,
@@ -365,7 +372,10 @@ export function passkeyRoutes(deps: PasskeyRoutesDeps): RouteDescriptor[] {
           const user = deps.users.byId(passkey.userId);
           if (user === null || user.disabled)
             return { result: "user" as const };
+          // a key that changed or went ends the passkey for good, so the
+          // old file put back never revives it; the refusal commits
           if (!loginHolds(deps.adminKeys, passkey, user)) {
+            deps.store.delete([passkey.id]);
             return { result: "admin_key" as const };
           }
           // a removal, a sign out everywhere or another answer of this

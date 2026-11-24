@@ -268,12 +268,17 @@ describe("the routes", () => {
     for (let i = 0; i < OPTIONS_LIMIT; i++) {
       expect((await options()).status).toBe(200);
     }
-    expect((await options()).status).toBe(429);
+    const throttled = await options();
+    expect(throttled.status).toBe(429);
+    expect(throttled.headers.get("retry-after")).toBe("60");
     for (let i = 0; i < LOGIN_LIMIT / 2; i++) {
       expect((await code()).status).toBe(401);
       expect((await answer()).status).toBe(401);
     }
-    expect((await answer()).status).toBe(429);
+    t.app.now.value += 15_000;
+    const over = await answer();
+    expect(over.status).toBe(429);
+    expect(over.headers.get("retry-after")).toBe("45");
     expect((await code()).status).toBe(429);
     t.app.now.value += MINUTE_MS;
     expect((await options()).status).toBe(200);
@@ -351,19 +356,25 @@ describe("the trust of the login that added it", () => {
     secrets["user-admin"] = key("n");
     expect((await t.signIn(adminKey)).status).toBe(401);
     expect(await t.me(loginOf(opened))).toBeNull();
-    // the minute's check takes the passkey; maria's stays
+    // the refused sign-in took the passkey; maria's stays
+    expect(t.count("passkeys")).toBe(1);
+    expect(t.count("passkeys where user_id = ?", t.maria.id)).toBe(1);
+    // one never tried is taken by the minute's check, with the first
+    // key login, never used since its key changed, and the new one
+    const again = await keyLogin(t, key("n"));
+    expect((await t.add(again, await authenticator())).status).toBe(201);
+    secrets["user-admin"] = key("m");
     const start = t.app.now.value;
     const next = t.app.slept((at) => at > start + MINUTE_MS);
     t.app.now.value = start + MINUTE_MS;
     await next;
     expect(t.count("passkeys")).toBe(1);
-    expect(t.count("passkeys where user_id = ?", t.maria.id)).toBe(1);
     expect(
-      t.logs.events.find((e) => e.msg === "key logins ended")?.fields,
-    ).toEqual({ logins: 1, passkeys: 1 });
+      t.logs.events.findLast((e) => e.msg === "key logins ended")?.fields,
+    ).toEqual({ logins: 2, passkeys: 1 });
   });
 
-  test("a removed key file, a rename or a demote ends a key passkey; a disable deletes every passkey", async () => {
+  test("a removed or changed key file, a rename or a demote ends a key passkey for good; a disable deletes every passkey", async () => {
     const secrets: Record<string, string> = {
       "user-admin": ADMIN_KEY,
       "user-ops": key("o"),
@@ -382,28 +393,52 @@ describe("the trust of the login that added it", () => {
       expect((await t.add(login, k)).status).toBe(201);
       return k;
     };
-    // removed
-    let k = await add();
-    delete secrets["user-ops"];
-    expect((await t.signIn(k)).status).toBe(401);
-    secrets["user-ops"] = key("o");
-    expect((await t.signIn(k)).status).toBe(200);
-    // renamed: no file follows the new name
     const patch = (body: unknown) =>
       t.admin.call("PATCH", `/api/users/${ops.id}`, { body });
-    expect((await patch({ username: "ops2" })).status).toBe(200);
+    const held = () => t.count("passkeys where user_id = ?", ops.id);
+    // a removed file: refused, and the passkey goes, so the file put
+    // back never revives it
+    let k = await add();
+    delete secrets["user-ops"];
+    const removed = await t.signIn(k);
+    expect(removed.status).toBe(401);
+    expect(await removed.json()).toEqual({ error: "passkey not accepted" });
+    expect(held()).toBe(0);
+    secrets["user-ops"] = key("o");
     expect((await t.signIn(k)).status).toBe(401);
-    expect((await patch({ username: "ops" })).status).toBe(200);
-    expect((await t.signIn(k)).status).toBe(200);
-    // demoted
-    expect((await patch({ role: "member" })).status).toBe(200);
-    expect((await t.signIn(k)).status).toBe(401);
-    expect((await patch({ role: "admin" })).status).toBe(200);
+    // a changed file, then the old one back
     k = await add();
-    expect((await t.signIn(k)).status).toBe(200);
+    secrets["user-ops"] = key("p");
+    expect((await t.signIn(k)).status).toBe(401);
+    expect(held()).toBe(0);
+    secrets["user-ops"] = key("o");
+    expect((await t.signIn(k)).status).toBe(401);
+    // renamed: the rename's write ends it, so renaming back with the
+    // same file keeps it dead
+    k = await add();
+    expect((await patch({ username: "ops2" })).status).toBe(200);
+    expect(held()).toBe(0);
+    expect((await patch({ username: "ops" })).status).toBe(200);
+    expect((await t.signIn(k)).status).toBe(401);
+    // demoted, then promoted again before any sweep: still dead
+    k = await add();
+    expect((await patch({ role: "member" })).status).toBe(200);
+    expect(held()).toBe(0);
+    expect((await patch({ role: "admin" })).status).toBe(200);
+    expect((await t.signIn(k)).status).toBe(401);
+    // a passkey added by email survives a rename and a demote
+    const byEmail = await authenticator();
+    expect((await t.add(await t.login("ops"), byEmail)).status).toBe(201);
+    expect((await patch({ username: "ops3" })).status).toBe(200);
+    expect((await patch({ role: "member" })).status).toBe(200);
+    expect((await t.signIn(byEmail)).status).toBe(200);
+    expect((await patch({ role: "admin" })).status).toBe(200);
+    expect((await patch({ username: "ops" })).status).toBe(200);
     // disabled: every passkey of the user goes
+    k = await add();
+    expect(held()).toBe(2);
     expect((await patch({ disabled: true })).status).toBe(200);
-    expect(t.count("passkeys where user_id = ?", ops.id)).toBe(0);
+    expect(held()).toBe(0);
     expect((await t.signIn(k)).status).toBe(401);
   });
 

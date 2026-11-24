@@ -144,6 +144,13 @@ describe("adding a passkey", () => {
       headers: { "content-type": "application/x-www-form-urlencoded" },
     });
     expect(form.status).toBe(400);
+    // a body past the cap is a 413 whatever its type
+    const big = await t.call(ORIGIN, "POST", "/api/profile/passkeys", {
+      cookie: maria,
+      body: `a=${"x".repeat(17 * 1024)}`,
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+    });
+    expect(big.status).toBe(413);
     expect(t.count("passkeys")).toBe(0);
   });
 
@@ -209,6 +216,18 @@ describe("adding a passkey", () => {
     });
     expect((await t.addOptions(maria)).res.status).toBe(409);
     expect(t.count("passkeys")).toBe(PASSKEYS_PER_USER);
+    // the refused answer used its challenge: a slot opened later never
+    // lets it add
+    const [oldest] = await t.list(maria);
+    expect(
+      (
+        await t.call(ORIGIN, "DELETE", `/api/profile/passkeys/${oldest!.id}`, {
+          cookie: maria,
+        })
+      ).status,
+    ).toBe(204);
+    expect((await t.postAdd(maria, b)).status).toBe(400);
+    expect(t.count("passkeys")).toBe(PASSKEYS_PER_USER - 1);
   });
 
   test("an answer whose id is not its rawId, or whose attested id is empty or too long, adds nothing", async () => {
@@ -246,9 +265,21 @@ describe("adding a passkey", () => {
     const admin = await t.login("admin");
     const key = await authenticator();
     expect((await t.add(maria, key)).status).toBe(201);
-    expect((await t.add(admin, key)).status).toBe(409);
-    expect(t.count("passkeys where user_id = ?", t.maria.id)).toBe(1);
-    expect(t.count("passkeys")).toBe(1);
+    const { options } = await t.addOptions(admin);
+    const twice = await key.create(options, ORIGIN);
+    expect((await t.postAdd(admin, twice)).status).toBe(409);
+    // the refused answer used its challenge: once maria's row is gone,
+    // the same answer still adds nothing
+    const [held] = await t.list(maria);
+    expect(
+      (
+        await t.call(ORIGIN, "DELETE", `/api/profile/passkeys/${held!.id}`, {
+          cookie: maria,
+        })
+      ).status,
+    ).toBe(204);
+    expect((await t.postAdd(admin, twice)).status).toBe(400);
+    expect(t.count("passkeys")).toBe(0);
   });
 
   test("a sign out everywhere between the options and the answer adds nothing", async () => {

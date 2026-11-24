@@ -240,6 +240,16 @@ export class PasskeyStore {
     for (const id of ids) query.run(id);
   }
 
+  // the user's passkeys added from a key login, as a rename or a demote
+  // ends their key logins
+  deleteKeyPasskeys(userId: string): number {
+    return this.db
+      .query(
+        "delete from passkeys where user_id = ? and key_digest is not null",
+      )
+      .run(userId).changes;
+  }
+
   deleteForUser(userId: string): number {
     return this.db.query("delete from passkeys where user_id = ?").run(userId)
       .changes;

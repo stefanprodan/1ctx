@@ -40,6 +40,13 @@ export class RateLimit {
     return this.windows.get(key)?.count === this.limit + 1;
   }
 
+  // whole seconds until the key's window ends, at least 1
+  retryAfter(key: string, now: number): number {
+    const w = this.windows.get(key);
+    const left = w === undefined ? 0 : w.start + this.windowMs - now;
+    return Math.max(1, Math.ceil(left / 1000));
+  }
+
   get size(): number {
     return this.windows.size;
   }

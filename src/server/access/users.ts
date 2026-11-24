@@ -82,7 +82,7 @@ export type UsersRoutesDeps = {
   // a placeholder address is shown only while email is on
   email: { enabled(): boolean };
   links: Pick<Links, "invite" | "revoke">;
-  passkeys: Pick<PasskeyStore, "deleteForUser">;
+  passkeys: Pick<PasskeyStore, "deleteForUser" | "deleteKeyPasskeys">;
 };
 
 const NO_EMAIL = "email is not set up";
@@ -202,7 +202,8 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
           const user = find(id);
           let revokedKeys: AccessKeyRow[] = [];
           // a key login's file follows the username, and only an admin
-          // signs in by key, so a rename or a demote ends them at once
+          // signs in by key, so a rename or a demote ends them at once,
+          // and the passkeys added from them, which carry their trust
           let endedLogins: string[] = [];
           if (
             patch.username !== undefined &&
@@ -211,6 +212,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
             usernameAvailable(patch.username, user.id);
             deps.users.setUsername(user.id, patch.username);
             endedLogins = deps.logins.deleteKeyLogins(user.id);
+            deps.passkeys.deleteKeyPasskeys(user.id);
           }
           if (patch.email !== undefined && patch.email !== user.email) {
             emailAvailable(patch.email, user.id);
@@ -253,6 +255,7 @@ export function usersRoutes(deps: UsersRoutesDeps): RouteDescriptor[] {
               ...endedLogins,
               ...deps.logins.deleteKeyLogins(user.id),
             ];
+            deps.passkeys.deleteKeyPasskeys(user.id);
           }
           if (disabledChanged) {
             deps.users.setDisabled(user.id, patch.disabled!);

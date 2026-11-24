@@ -25,8 +25,8 @@ Requests, users and the socket are
   `login.revoked`. Each opened login sets `users.signed_in_at`.
 - **Login is rate limited per address.** A key sign-in, a link ask, a
   code, a link used and a passkey's answer (an add or a sign-in) share
-  one window (10 a minute, then 429); passkey options have their own
-  (60 a minute). The limit is a fixed window per key
+  one window (10 a minute, then 429 with `Retry-After`); passkey
+  options have their own (60 a minute). The limit is a fixed window per key
   with a cap on keys, so memory stays constant. `login limited` is
   logged once when an address's window closes, not per refusal.
 - **Every way a login ends publishes `login.revoked`.** Logout,
@@ -230,16 +230,20 @@ and `getAuthenticatorData()`, `crypto.subtle`, ES256 and RS256 of
   cap keeps its 413.
 - **At most 10 a user,** counted across hosts, a 409 at the options
   and at the answer. A passkey is named for its provider from the
-  AAGUID (`provider.ts`), else "Passkey".
+  AAGUID (`provider.ts`), else "Passkey". A refused add (the cap, a
+  credential held already) still uses its challenge, so the same
+  answer never adds later.
 - **An add reads its login again inside its write** (`actingWrite()`),
   so one landing after a sign out everywhere, a disable or a changed
   key adds nothing, and so does a removal.
 - **A passkey keeps the trust of the login that added it.** Added from
   a key login it holds that login's `key_digest`, and so does a login
   it opens. A sign-in checks the user's key file itself, in its write
-  (`loginHolds()`), so a changed or removed file, a rename, a demote or
-  a disable ends it as it ends key logins; the minute's key check
-  deletes such passkeys. Added by email, it holds null.
+  (`loginHolds()`): a passkey it refuses is deleted in that write, so
+  the old file put back never revives it. A rename or a demote deletes
+  the user's key passkeys in its own write, with their key logins; the
+  minute's key check deletes any whose file changed. Added by email, it
+  holds null.
 - **Sign out everywhere and a disable delete the user's passkeys,**
   since a stolen login could have added one.
 - **An add emails the user** while email is on and the address is

@@ -76,7 +76,10 @@ export function loginGuard(
         addr: isIP(ctx.address) === 0 ? "invalid" : ctx.address,
       });
     }
-    throw new TooManyRequests("too many sign-in attempts. Wait a minute");
+    throw new TooManyRequests(
+      "too many sign-in attempts. Wait a minute",
+      limit.retryAfter(ctx.address, clock()),
+    );
   };
 }
 
