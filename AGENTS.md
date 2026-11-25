@@ -41,17 +41,16 @@ make dev ARGS="..."    # the same with ONECTX_DEV=1 and a restart on server chan
 make clean          # preview-clean, then remove bin/ and Bun's build leftovers
 make lint           # biome check --write, then bun check; run after any code change
 make test           # bun test; run after any code change, before finishing
-make vendor-test    # just-bash's own suite, against its expected failures
+make vendor-test    # just-bash's suite, against its expected failures
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 make image          # the container image, native and loaded; PLATFORMS=a,b only builds
 make image-smoke    # run the image as production does, sign in, stop it (CI runs it)
-make sandbox-image  # sandbox variants as 1ctx-shell:dev-<variant>; VARIANT=go one; BASE=local builds the base
-make sandbox-tools  # bump the shell base's git and ripgrep pins
+make sandbox-image  # the sandbox image variants as 1ctx-shell:dev-<variant>; VARIANT=go one
 make kind-up        # the local kind cluster 1ctx-test; kind-image, kind-down
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
 make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
-make staging-status     # what the staging service says
+make staging-status     # the staging service's status
 make load-db PRESET=bench|small  # a load test database in scripts/load/out/
 make load-bench ARGS="..."  # compare builds under load; load-cluster on kind, load-summary
 make models         # refresh src/server/providers/models.json from models.dev
@@ -106,7 +105,7 @@ vendor/       just-bash/ (a git subtree, outside Biome and the structure
 docs/         the rules of each area (see Docs).
 deploy/       docker/ (the Docker Compose files), charts/onectx/ (the Helm
               chart), flux/ (its Flux example) and sandbox/ (the
-              sandbox image, its README); docs/deploy.md.
+              sandbox image, its README).
 ```
 
 **Server areas.** `src/server/<area>/` has `index.ts` (what others may
@@ -157,7 +156,7 @@ change it in the same commit as the code that changes a rule.
 | `docs/external-task-pages.md` | the external task pages: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
 | `docs/access.md` | requests and the router, access keys, users, names, project visibility, the socket |
-| `docs/logins.md` | signing in: the login cookie, admin keys, links and codes by email, the link page, passkeys |
+| `docs/logins.md` | signing in: the login cookie, admin keys and `1ctx admin-key`, links and codes by email, the link page, passkeys |
 | `docs/secrets.md` | `secrets/`: the secret files, their kinds, reads and the log scrub |
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
@@ -166,26 +165,26 @@ change it in the same commit as the code that changes a rule.
 | `docs/queue.md` | messages to a busy chat, the queue's dispatcher |
 | `docs/subagents.md` | the `delegate` tool, child sessions, the child loop and the child rows |
 | `docs/compaction.md` | the summary round, its `max_tokens`, the tail after it, compact on demand |
-| `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files |
+| `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
 | `docs/automations.md` | `automations/`, the scheduler, the check URL, what only runs do |
-| `docs/attention.md` | the attention mark (agent, runner, decider), the open alert and its email |
+| `docs/attention.md` | the attention mark (agent, runner, decider backup), the open alert and its email |
 | `docs/external-tasks.md` | `external-tasks/`: member routes, task delivery and maintenance |
 | `docs/tools.md` | `tools/`, `credentials/`, `skills/`, `limits/`, the tool loop, visuals, `email_user` |
 | `docs/project-tools.md` | the `automation` and `external_task` tools |
-| `docs/mcp.md` | `mcp/`, MCP tools in a send, results kept as files |
+| `docs/mcp.md` | `mcp/`, MCP tools in a send, MCP results kept as files |
 | `docs/mcp-server.md` | `mcp-server/`, the inbound `/mcp` endpoint and its tools |
 | `docs/knowledge.md` | `knowledge/`, uploads |
-| `docs/images.md` | `images/`: the image store from ingest to the wires and the page: limits, serving, access, the lease, the claim at send, the budget |
+| `docs/images.md` | `images/`: the image store from ingest to the wires and the page: limits, serving, access, the lease, the agent's flag, the claim at send, the budget, history |
 | `docs/search.md` | `shared/search.ts`, knowledge and session search, session list |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials, a turn's day note |
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, email link pages |
-| `docs/dictation.md` | `dictation/`: the setting, `POST /api/transcribe`, its checks, cap and usage row |
+| `docs/dictation.md` | `dictation/`: the Dictation setting, `POST /api/transcribe`, its WAV check, cap, call and usage row |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/sandbox.md` | `sandbox/`: the shell's settings, the gateway port, leases, the pool, the sweeps |
 | `docs/sandbox-commands.md` | a command in the sandbox: its base, push, fence, walk, read back and settle; subagents sharing it |
 | `docs/sandbox-image.md` | `deploy/sandbox/`: the sandbox image's build, base, pins, contract |
-| `docs/sandbox-network.md` | the sandbox's network: its hosts, OpenShell's policy, credentials as providers, the scrub |
+| `docs/sandbox-network.md` | the sandbox's network: its hosts, OpenShell's policy, credentials as providers, the scrub, differences from the built-in curl |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |

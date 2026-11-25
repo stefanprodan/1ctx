@@ -33,8 +33,8 @@ rules.
   base Dockerfile. Bun's links and `npx` are made in `bunlinks`, `FROM
   --platform=$BUILDPLATFORM` on the pinned `oven/bun`, and copied in,
   the links staying links. So one runner builds both platforms with no
-  emulation, and an added `RUN` fails the arm64 build in CI, which has
-  no QEMU. A test checks it.
+  emulation. A test is the guard: an added `RUN` fails it. Never rely
+  on the build failing, since BuildKit may emulate the command itself.
 - **The variants Dockerfile pins every image it takes from by digest
   and downloads nothing:** the base, and the official `oven/bun`,
   `golang` and `rust` slim images. `oven/bun` is the root Dockerfile's
@@ -58,8 +58,10 @@ rules.
   locally: two `--no-cache` builds of bun and go, both platforms, give
   the same layers; without the two, the copied layers differ.
 - **CI's `shell` job (`test.yml`) builds the variants on a change** to
-  `deploy/sandbox/`, `scripts/sandbox-image.sh` or
-  `scripts/sandbox-image-check.ts`: a pull request against its merge
+  the variants Dockerfile, `deploy/sandbox/checks/`,
+  `scripts/sandbox-image.sh` or `scripts/sandbox-image-check.ts`,
+  never to the base's folder, which changes no variant until its
+  digest is bumped: a pull request against its merge
   commit's base parent, a dispatched branch against its merge base
   with `main`. It builds every variant for both platforms into the
   build cache with no QEMU, then the native ones, and runs each one's
@@ -73,7 +75,8 @@ rules.
   and `cc`, loaded as `1ctx-shell-base:dev` and `:dev-cc`, and passes
   each as a named build context keyed by the `FROM`'s whole reference,
   tag and digest (`--build-context <ref>=docker-image://<tag>`), to try
-  a base change before its pull request.
+  a base change before its pull request. It builds for the native
+  platform only and refuses `PLATFORMS`.
 
 ## The base image
 
@@ -82,7 +85,8 @@ rules.
   `trixie` stage, and both `base` and git's build start from it, so
   git links the libraries the base ships. `cc` builds its own copy of
   `base`, so the two share no apt layer. Nothing runs this image: the
-  server runs `1ctx-shell`. Measured locally (`docker images`,
+  server runs `1ctx-shell`. It makes every root the sandbox policy
+  names and holds no helper: the server passes them with each exec. Measured locally (`docker images`,
   linux/arm64, 2026-11-25): base 491 MB and cc 862 MB, from 489 MB and
   783 MB before the archive and common tools were added and git and
   ripgrep built.
@@ -93,8 +97,9 @@ rules.
   is missing there. Perl is named in the apt layer, since Debian's git
   package was what pulled it in beyond perl-base.
 - **`shell-base.yml` publishes `ghcr.io/stefanprodan/1ctx-shell-base`:**
-  `trixie` and `trixie-cc`, each with a dated `-YYYYMMDD` tag that is
-  never moved and is deleted by hand. It runs Mondays, by hand, on a
+  `trixie` and `trixie-cc`, each with a dated tag ending in the run's
+  number (`trixie-20261125.3`), so no publish moves another's, deleted
+  by hand. It runs Mondays, by hand, on a
   push to `main` changing `deploy/sandbox/base/` or the workflow, and
   on a pull request changing them. `docker/github-builder` builds each
   platform on its own native runner with no QEMU, joins them into one
@@ -105,9 +110,10 @@ rules.
   failed smoke leaves a moved tag and a red run.
 - **Only `main` publishes.** The push, `attest` and `smoke` run only
   on `refs/heads/main`. Any other ref, a pull request or a dispatch
-  included, builds both targets and stops, so a bump's branch is built
-  before it merges. Only publishing runs share the `publish`
-  concurrency group.
+  included, builds both targets and pushes nothing; its `check` job
+  builds `base` and `cc` on the runner and runs their offline
+  contract, so a bump's branch is built and checked before it merges.
+  Only publishing runs share the `publish` concurrency group.
 
 ## git and ripgrep
 
@@ -168,8 +174,9 @@ rules.
   the sandbox backend to a real gateway, the preview's by default: the
   offline checks with the network off, then at most one online check
   per variant on the default hosts. `--docker` runs the offline half
-  on `docker run --network none` as the image's own user, which is
-  what CI runs. Run it on every image change.
+  on `docker run --network none` as the image's own user with the
+  environment the server sends (`SANDBOX_ENV`), which is what CI runs.
+  Run it on every image change.
 - **A check names no version or path of its own.** Versions come from
   `SHELL_VERSIONS` as `EXPECT_<TOOL>`, paths from the env the server
   sends. git and ripgrep are checked by what a chat uses (a commit

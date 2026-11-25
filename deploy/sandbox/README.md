@@ -15,13 +15,14 @@ architecture, the variants by copying files onto it.
 
 | Image | Tags | Built by | When |
 |---|---|---|---|
-| `ghcr.io/stefanprodan/1ctx-shell-base` | `trixie`, `trixie-YYYYMMDD` | `.github/workflows/shell-base.yml`, from `base/Dockerfile`, target `base` | every Monday, by hand, and on a merge that changes `base/` |
-| `ghcr.io/stefanprodan/1ctx-shell-base` | `trixie-cc`, `trixie-cc-YYYYMMDD` | the same workflow, target `cc` | the same |
+| `ghcr.io/stefanprodan/1ctx-shell-base` | `trixie`, `trixie-YYYYMMDD.N` | `.github/workflows/shell-base.yml`, from `base/Dockerfile`, target `base` | every Monday, by hand, and on a merge that changes `base/` |
+| `ghcr.io/stefanprodan/1ctx-shell-base` | `trixie-cc`, `trixie-cc-YYYYMMDD.N` | the same workflow, target `cc` | the same |
 | `ghcr.io/stefanprodan/1ctx-shell` | `<version>-<variant>`, `<variant>` | `.github/workflows/release.yml`, from `Dockerfile`, one target per variant | at each release tag |
 
 - The base is what every variant starts from. `trixie` and `trixie-cc`
-  move at each build; the dated tags never move, so a past release can
-  be rebuilt from the base it used. Nothing runs the base directly.
+  move at each build; a dated tag ends in the number of the run that
+  built it (`trixie-20261125.3`) and never moves, so a past release
+  can be rebuilt from the base it used. Nothing runs the base directly.
 - The variants, `python`, `bun`, `go` and `rust`, build on the base by
   digest. `<version>-<variant>` (for example `v0.0.8-go`) is the only
   tag the server runs, so its environment and the image's layout always
@@ -54,6 +55,7 @@ docker buildx imagetools inspect --raw ghcr.io/stefanprodan/1ctx-shell-base:trix
 cosign verify \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   --certificate-identity-regexp '^https://github.com/docker/github-builder/.github/workflows/build.yml.*$' \
+  --certificate-github-workflow-repository stefanprodan/1ctx \
   ghcr.io/stefanprodan/1ctx-shell-base@<digest>
 ```
 
@@ -211,5 +213,6 @@ Without `--docker` the contract runs through a real OpenShell gateway,
 the local preview's by default, offline and then online.
 
 `make sandbox-tools` moves the git and ripgrep pins in
-`base/Dockerfile` to their newest stable releases, checking each
-checksum against the project's own list.
+`base/Dockerfile` to their newest stable releases. git's checksum is
+its tarball's, compared with kernel.org's list; ripgrep's is the one
+crates.io lists. The build then refuses a download that differs.

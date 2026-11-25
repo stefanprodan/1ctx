@@ -16,8 +16,8 @@
 // With no gateway flags it uses the preview's (PREVIEW_SHELL=sandbox
 // make preview): its port and the openshell- keys in .preview/secrets.
 // --docker runs only the offline checks, with no gateway, in
-// docker run --network none as the image's user, whose ENV is what the
-// server sends; CI has no gateway. There cc, the base image's gcc
+// docker run --network none as the image's user, with the environment
+// the server sends; CI has no gateway. There cc, the base image's gcc
 // target, is a variant too and needs --image.
 
 import { readFileSync } from "node:fs";
@@ -32,6 +32,7 @@ import {
   INSTANCE_LABEL,
   Leases,
   openshellGateway,
+  SANDBOX_ENV,
 } from "../src/server/sandbox/index.ts";
 import { SHELL_VERSIONS } from "../src/server/tools/builtin/shell-tools.ts";
 import {
@@ -254,7 +255,21 @@ async function checkDocker(variant: Contract): Promise<boolean> {
   console.log(`== ${variant} (${image})`);
   const started = performance.now();
   const proc = Bun.spawn(
-    ["docker", "run", "--rm", "-i", "--network", "none", image, "bash"],
+    [
+      "docker",
+      "run",
+      "--rm",
+      "-i",
+      "--network",
+      "none",
+      // an exec in a sandbox sees none of the image's ENV, only this
+      ...Object.entries(SANDBOX_ENV).flatMap(([name, value]) => [
+        "--env",
+        `${name}=${value}`,
+      ]),
+      image,
+      "bash",
+    ],
     {
       stdin: new TextEncoder().encode(script(variant, "offline")),
       stdout: "inherit",

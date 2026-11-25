@@ -23,12 +23,16 @@ contexts=()
 case "${BASE:-}" in
 "") ;;
 local)
+  # a loaded base is one platform's, so it cannot stand in for two
+  if [[ -n "${PLATFORMS:-}" ]]; then
+    echo "BASE=local builds the native platform only, without PLATFORMS" >&2
+    exit 2
+  fi
   for target in base cc; do
     tag=1ctx-shell-base:dev
     [[ "$target" == cc ]] && tag+=-cc
-    base_args=(--file base/Dockerfile --target "$target" --load --tag "$tag")
-    [[ -n "${PLATFORMS:-}" ]] && base_args+=(--platform "$PLATFORMS")
-    docker buildx build "${base_args[@]}" base
+    docker buildx build --file base/Dockerfile --target "$target" --load \
+      --tag "$tag" base
     # a named context keyed by the FROM's reference, tag and digest whole
     ref=$(sed -nE "s/^FROM (ghcr\.io\/[^ ]+\/1ctx-shell-base:[^ ]+) AS $target\$/\1/p" Dockerfile)
     if [[ -z "$ref" ]]; then
