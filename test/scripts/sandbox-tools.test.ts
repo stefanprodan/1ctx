@@ -8,7 +8,7 @@ import {
   cratePin,
   gitPin,
   listedSum,
-  newestTag,
+  newestListed,
   next,
   type Pins,
   readPins,
@@ -38,24 +38,32 @@ const LIST = [
   "-----END PGP SIGNATURE-----",
 ].join("\n");
 
-describe("newestTag", () => {
+describe("newestListed", () => {
+  const list = (files: string[]) =>
+    files.map((file) => `${sum("a")}  ${file}`).join("\n");
+
   test("sorts by version and skips release candidates", () => {
-    const refs = [
-      "refs/tags/v2.10.0",
-      "refs/tags/v2.100.0-rc0",
-      "refs/tags/v2.9.5",
-      "refs/tags/v2.57.0-rc1",
-      "refs/tags/v2.56.1",
-      "refs/tags/v2.56.0",
-      "refs/tags/v1.99.9",
-      "refs/tags/gitgui-0.99",
-      "refs/tags/v0.99.9n",
+    const files = [
+      "git-2.10.0.tar.xz",
+      "git-2.100.0.rc0.tar.xz",
+      "git-2.9.5.tar.xz",
+      "git-2.57.0.rc1.tar.xz",
+      "git-2.56.1.tar.xz",
+      "git-2.56.0.tar.xz",
+      "git-2.99.0.tar.gz",
+      "git-1.8.3.4.tar.xz",
+      "git-manpages-3.0.0.tar.xz",
+      "git-htmldocs-3.0.0.tar.xz",
     ];
-    expect(newestTag(refs)).toBe("2.56.1");
+    expect(newestListed(list(files))).toBe("2.56.1");
   });
 
-  test("answers null with no stable tag", () => {
-    expect(newestTag(["refs/tags/v3.0.0-rc0"])).toBeNull();
+  test("reads a clearsigned list", () => {
+    expect(newestListed(LIST)).toBe("2.10.0");
+  });
+
+  test("answers null with no stable tarball", () => {
+    expect(newestListed(list(["git-3.0.0.rc0.tar.xz"]))).toBeNull();
   });
 });
 

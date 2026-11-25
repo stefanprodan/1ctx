@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Moves the git and ripgrep pins of deploy/sandbox/base/Dockerfile, its
-// four ARG lines, to the newest stable releases: git's highest vX.Y.Z
-// tag on GitHub, its tarball's sha256 computed and checked against
-// kernel.org's sha256sums.asc, and ripgrep's newest stable crate with
+// four ARG lines, to the newest stable releases: git's highest X.Y.Z
+// tarball in kernel.org's sha256sums.asc, its sha256 computed and
+// checked against that list, and ripgrep's newest stable crate with
 // the checksum crates.io lists. Nothing else in the file changes, and
 // nothing when the pins are current. Run by hand (make sandbox-tools)
 // or by the shell-base workflow's tools job. With --diff it prints the
@@ -14,8 +14,6 @@
 import { join } from "node:path";
 
 const DOCKERFILE = join(import.meta.dir, "../deploy/sandbox/base/Dockerfile");
-const GIT_TAGS =
-  "https://api.github.com/repos/git/git/git/matching-refs/tags/v";
 const GIT_DIR = "https://www.kernel.org/pub/software/scm/git";
 const CRATE = "https://crates.io/api/v1/crates/ripgrep";
 // crates.io refuses a client without one
@@ -81,27 +79,32 @@ export function compare(a: string, b: string): number {
   return 0;
 }
 
-// the highest vX.Y.Z among tag names or refs; a release candidate or
-// any other suffix is never stable
-export function newestTag(tags: readonly string[]): string | null {
+// kernel.org's signed list as [sha256, file] rows
+function rows(list: string): [string, string][] {
+  return list.split("\n").flatMap((row) => {
+    const m = /^([0-9a-f]{64}) {2}(\S+)$/.exec(row.trim());
+    return m ? [[m[1], m[2]] as [string, string]] : [];
+  });
+}
+
+// the sha256 the list gives a file, or null
+export function listedSum(list: string, file: string): string | null {
+  return rows(list).find(([, name]) => name === file)?.[0] ?? null;
+}
+
+export const gitTarball = (version: string) => `git-${version}.tar.xz`;
+
+// the highest X.Y.Z with a tarball in the list, so the version chosen
+// is one that can be fetched and checked; a release candidate
+// (git-2.57.0.rc1) or any other shape is never stable
+export function newestListed(list: string): string | null {
   let best: string | null = null;
-  for (const tag of tags) {
-    const m = /^(?:refs\/tags\/)?v(\d+\.\d+\.\d+)$/.exec(tag);
+  for (const [, file] of rows(list)) {
+    const m = /^git-(\d+\.\d+\.\d+)\.tar\.xz$/.exec(file);
     if (m && (best === null || compare(m[1], best) > 0)) best = m[1];
   }
   return best;
 }
-
-// the sha256 kernel.org's signed list gives a file, or null
-export function listedSum(list: string, file: string): string | null {
-  for (const row of list.split("\n")) {
-    const m = /^([0-9a-f]{64}) {2}(\S+)$/.exec(row.trim());
-    if (m && m[2] === file) return m[1];
-  }
-  return null;
-}
-
-export const gitTarball = (version: string) => `git-${version}.tar.xz`;
 
 // git's pin from the tarball's own sha256, only when kernel.org agrees
 export function gitPin(version: string, computed: string, list: string): Pin {
@@ -170,16 +173,13 @@ async function get(url: string): Promise<Response> {
 }
 
 async function newestGit(current: Pin): Promise<Pin | undefined> {
-  const refs = (await (await get(GIT_TAGS)).json()) as { ref?: unknown }[];
-  const version = newestTag(
-    refs.flatMap((r) => (typeof r.ref === "string" ? [r.ref] : [])),
-  );
-  if (version === null) throw new Error("no stable git tag");
+  const list = await (await get(`${GIT_DIR}/sha256sums.asc`)).text();
+  const version = newestListed(list);
+  if (version === null) throw new Error("no stable git in sha256sums.asc");
   if (compare(version, current.version) <= 0) return undefined;
   const file = gitTarball(version);
   const tarball = await (await get(`${GIT_DIR}/${file}`)).arrayBuffer();
   const computed = new Bun.CryptoHasher("sha256").update(tarball).digest("hex");
-  const list = await (await get(`${GIT_DIR}/sha256sums.asc`)).text();
   return gitPin(version, computed, list);
 }
 

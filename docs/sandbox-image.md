@@ -104,13 +104,14 @@ image, its environment and its roots in `docs/sandbox.md`.
   the crate's lock file, and `PCRE2_SYS_STATIC=1` links PCRE2 in, so
   `rg` needs only libc and libgcc_s.
 - **`make sandbox-tools` moves the pins** to the newest stable
-  releases: git's highest `vX.Y.Z` tag on GitHub, sorted by version,
-  never a release candidate; ripgrep's newest stable crate on
-  crates.io. git's sha256 is computed from the downloaded tarball and
-  must equal its entry in kernel.org's `sha256sums.asc`, else nothing
-  changes; ripgrep's is the one crates.io lists. It rewrites only the
-  four lines, never moves a pin back, and changes nothing when the
-  pins are current. `--diff` prints what moved against `HEAD`, as
+  releases: git's highest `X.Y.Z` tarball in kernel.org's
+  `sha256sums.asc`, sorted by version, never a release candidate;
+  ripgrep's newest stable crate on crates.io. git's sha256 is computed
+  from the downloaded tarball and must equal its entry in that list,
+  else nothing changes; ripgrep's is the one crates.io lists. It asks
+  GitHub nothing, so a runner's shared rate limit never fails it. It
+  rewrites only the four lines, never moves a pin back, and changes
+  nothing when the pins are current. `--diff` prints what moved against `HEAD`, as
   Markdown, empty when nothing did. The version choice, the list's
   parse and the rewrite are pure and tested on fixtures.
 - **The `tools` job bumps them through one pull request,** on the
