@@ -31,8 +31,10 @@ export function mcpServerArea(deps: McpServerDeps): McpServerArea {
   };
   return {
     routes: routes(deps, current),
+    // a failed load leaves nothing to close, and shutdown must go on
     close: async () => {
-      await (await handler)?.close();
+      const current = await handler?.catch(() => null);
+      await current?.close();
     },
   };
 }

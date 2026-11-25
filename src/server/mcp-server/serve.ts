@@ -264,7 +264,11 @@ function server(
   const instance = new McpServer(
     { name: "1ctx", version: deps.version },
     {
-      capabilities: { tools: { listChanged: false } },
+      // stateless: no list ever changes within a request
+      capabilities: {
+        tools: { listChanged: false },
+        resources: { listChanged: false },
+      },
       instructions: instructions(canWrite),
     },
   );

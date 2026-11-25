@@ -128,10 +128,11 @@ embeds that file and serves it at
 `/.well-known/skills/external-tasks/SKILL.md`, and Connect agents gives the
 line that installs it. `/mcp` serves the same text through the SDK's skills
 extension (`io.modelcontextprotocol/skills`, `skill.ts`): every key's server
-lists `skill://external-tasks/SKILL.md` in `skills/list` and `resources/list`,
-with its digest. The catalog is loaded once, strict, with the handler. Change
-it in the same commit as the tool; a test checks every action and kind it
-names.
+lists `skill://external-tasks/SKILL.md` in `skills/list` with its digest,
+and in `resources/list`. The catalog is loaded once, strict, with the
+handler; `resources.listChanged` stays false, since nothing is ever sent.
+Change it in the same commit as the tool; a test checks every action and kind
+it names.
 
 ## Results
 

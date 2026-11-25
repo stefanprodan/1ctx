@@ -56,6 +56,12 @@ for (const scope of ["read", "write"] as const) {
       expect(resources.resources.map((entry) => entry.uri)).toEqual([
         "skill://external-tasks/SKILL.md",
       ]);
+      expect((await client.listTools()).tools.map((t) => t.name)).toEqual([
+        "projects",
+        "knowledge",
+        "sessions",
+        "tasks",
+      ]);
       await client.close();
       await area.close();
     });

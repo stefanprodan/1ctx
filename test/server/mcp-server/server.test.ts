@@ -77,7 +77,9 @@ describe("the inbound MCP server and transport", () => {
     const discovered = await json(await send(modern("server/discover")));
     expect(discovered.result.supportedVersions).toEqual(["2026-07-28"]);
     expect(discovered.result.capabilities.tools.listChanged).toBe(false);
-    expect(discovered.result.capabilities.resources).toBeDefined();
+    expect(discovered.result.capabilities.resources).toEqual({
+      listChanged: false,
+    });
     expect(
       discovered.result.capabilities.extensions[
         "io.modelcontextprotocol/skills"
