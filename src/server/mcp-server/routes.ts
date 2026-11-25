@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import type { AuthInfo, McpHttpHandler } from "@modelcontextprotocol/server";
-import skill from "../../../skills/external-tasks/SKILL.md" with {
-  type: "text",
-};
 import { EXTERNAL_TASKS_SKILL_PATH } from "../../shared/skills.ts";
 import { RateLimit } from "../access/index.ts";
 import { MAX_KNOWLEDGE_BODY } from "../knowledge/index.ts";
@@ -13,6 +10,7 @@ import { MINUTE_MS } from "../lib/clock.ts";
 import { TooManyRequests } from "../lib/errors.ts";
 import { json, type RouteDescriptor } from "../lib/http.ts";
 import type { KeyPrincipal, McpServerDeps } from "./ports.ts";
+import { skill } from "./skill.ts";
 
 export const MCP_MESSAGES_PER_MINUTE = 120;
 
@@ -33,7 +31,7 @@ const methodNotAllowed = () => json({ error: "method not allowed" }, 405);
 
 export function routes(
   deps: McpServerDeps,
-  handler: () => McpHttpHandler,
+  handler: () => Promise<McpHttpHandler>,
 ): RouteDescriptor[] {
   const rate = new RateLimit(MCP_MESSAGES_PER_MINUTE, MINUTE_MS);
   return [
@@ -53,7 +51,7 @@ export function routes(
           if (!rate.hit(principal.via.id, now)) admitted = false;
         }
         if (!admitted) throw new TooManyRequests();
-        return handler().fetch(req, {
+        return (await handler()).fetch(req, {
           parsedBody: body,
           authInfo: authInfo(principal, req.signal),
         });

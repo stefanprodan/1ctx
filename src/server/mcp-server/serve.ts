@@ -8,6 +8,7 @@ import {
   type McpHttpHandler,
   McpServer,
 } from "@modelcontextprotocol/server";
+import type { SkillCatalog } from "@modelcontextprotocol/server/ext/skills";
 import {
   MAX_ENTRY_LINKS,
   MAX_KEY_UNFINISHED,
@@ -255,6 +256,7 @@ const instructions = (canWrite: boolean): string =>
 
 function server(
   deps: McpServerDeps,
+  skills: SkillCatalog,
   principal: KeyPrincipal,
   signal: AbortSignal | undefined,
 ): McpServer {
@@ -330,6 +332,8 @@ function server(
     },
     (input) => call(deps, principal, "tasks", input),
   );
+  // the same text as the well-known path, for clients of the skills extension
+  skills.attach(instance);
   return instance;
 }
 
@@ -355,9 +359,13 @@ function sdkErrorFields(error: unknown): LogFields {
   return fields;
 }
 
-export function serve(deps: McpServerDeps): McpHttpHandler {
+export function serve(
+  deps: McpServerDeps,
+  skills: SkillCatalog,
+): McpHttpHandler {
   return createMcpHandler(
-    ({ authInfo }) => server(deps, principalOf(authInfo), signalOf(authInfo)),
+    ({ authInfo }) =>
+      server(deps, skills, principalOf(authInfo), signalOf(authInfo)),
     {
       legacy: "stateless",
       responseMode: "auto",

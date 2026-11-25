@@ -66,7 +66,7 @@ export const WORKER_EXEMPTIONS: Record<string, string> = {
 // imports allowed outside the root, as "importer -> target" relative to
 // it, with the reason
 export const ESCAPE_EXEMPTIONS: Record<string, string> = {
-  "server/mcp-server/routes.ts -> ../skills/external-tasks/SKILL.md":
+  "server/mcp-server/skill.ts -> ../skills/external-tasks/SKILL.md":
     "the binary serves the repo's own skill, so the two never differ",
 };
 

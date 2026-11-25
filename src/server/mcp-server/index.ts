@@ -1,10 +1,12 @@
 // Copyright 2026 Stefan Prodan.
 // SPDX-License-Identifier: Apache-2.0
 
+import type { McpHttpHandler } from "@modelcontextprotocol/server";
 import type { RouteDescriptor } from "../lib/http.ts";
 import type { McpServerDeps } from "./ports.ts";
 import { routes } from "./routes.ts";
 import { serve } from "./serve.ts";
+import { skillCatalog } from "./skill.ts";
 
 export type {
   AccessPort,
@@ -22,13 +24,15 @@ export type McpServerArea = {
 };
 
 export function mcpServerArea(deps: McpServerDeps): McpServerArea {
-  let handler: ReturnType<typeof serve> | null = null;
+  let handler: Promise<McpHttpHandler> | null = null;
   const current = () => {
-    handler ??= serve(deps);
+    handler ??= skillCatalog(deps.log).then((skills) => serve(deps, skills));
     return handler;
   };
   return {
     routes: routes(deps, current),
-    close: () => handler?.close() ?? Promise.resolve(),
+    close: async () => {
+      await (await handler)?.close();
+    },
   };
 }
