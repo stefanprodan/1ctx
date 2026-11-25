@@ -245,14 +245,15 @@ deletes the cluster with every release in it.
 - **The Dockerfile's `oven/bun:<version>@sha256:<digest>` line is the
   one Bun version.** `scripts/bun-version.sh` hands it to `setup-bun`
   in every workflow, and Dependabot's `docker` ecosystem bumps it.
-- **CI (`test.yml`) has three jobs.** `build-test` and `vendor-test`
+- **CI (`test.yml`) has four jobs.** `build-test` and `vendor-test`
   run on Linux for every pull request and push to `main`, side by
   side; they are the required checks. `build-test` runs `make lint`
   and fails on a tree it changed, the test files in parallel, the build
   and the binary's smoke test. `vendor-test` runs
   `make vendor-test ARGS=--parallel`. `macos-smoke` builds and
   smoke-tests the arm64 binary on macOS, on a push to `main` only, with
-  no test suite.
+  no test suite. `shell` builds and checks the sandbox image's variants
+  when a change touches them (`docs/sandbox-image.md`).
 - **`build-test` ends with its checks as parallel steps.** After Helm
   and the Flux CLI are set up, one `parallel:` group runs
   `make image-smoke` for amd64, `docker compose config` on both Compose

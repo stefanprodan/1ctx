@@ -3,12 +3,13 @@
 How the sandbox shell's image is built. Governs `deploy/sandbox/`
 (the variants Dockerfile, `base/`, `checks/` and the README),
 `scripts/sandbox-image.sh`, `scripts/sandbox-image-check.ts`,
-`scripts/sandbox-tools.ts` and `.github/workflows/shell-base.yml`.
-What a release pushes is in `docs/deploy.md`; how the server runs the
-image, its environment and its roots in `docs/sandbox.md`.
-`deploy/sandbox/README.md` is the reference for people: the images,
-their tags, every tool with its version and source, what a custom image
-needs; this doc keeps the rules.
+`scripts/sandbox-tools.ts`, `.github/workflows/shell-base.yml` and the
+`shell` job of `test.yml`. What a release pushes is
+in `docs/deploy.md`; how the server runs the image, its environment
+and its roots in `docs/sandbox.md`. `deploy/sandbox/README.md` is the
+reference for people: the images, their tags, every tool with its
+version and source, what a custom image needs; this doc keeps the
+rules.
 
 ## The variants
 
@@ -47,6 +48,15 @@ needs; this doc keeps the rules.
   bumps the two digests, with whatever follows in the server (the bash
   description, `docs/bash.md`), so the description never names a tool
   the pinned base lacks.
+- **CI's `shell` job (`test.yml`) builds the variants on a change** to
+  `deploy/sandbox/`, `scripts/sandbox-image.sh` or
+  `scripts/sandbox-image-check.ts`: a pull request against its merge
+  commit's base parent, a dispatched branch against its merge base
+  with `main`. It builds every variant for both platforms into the
+  build cache with no QEMU, then the native ones, and runs each one's
+  offline contract (`--docker`). Any other change or event passes
+  without building, so the check always reports and a digest bump is
+  built and run before it merges.
 - **`make sandbox-image` builds every variant locally** as
   `1ctx-shell:dev-<variant>` and the registry name a source run's
   default names, over the pinned base pulled from GHCR (`VARIANT=go`
