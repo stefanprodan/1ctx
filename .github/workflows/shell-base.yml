@@ -46,7 +46,7 @@ jobs:
       meta-images: ghcr.io/${{ github.repository_owner }}/1ctx-shell-base
       meta-tags: |
         type=raw,value=trixie
-        type=raw,value=trixie-{{date 'YYYYMMDD'}}
+        type=raw,value=trixie-{{date 'YYYYMMDD'}}.${{ github.run_number }}
       meta-flavor: latest=false
       set-meta-labels: true
       set-meta-annotations: true
@@ -75,7 +75,7 @@ jobs:
       meta-images: ghcr.io/${{ github.repository_owner }}/1ctx-shell-base
       meta-tags: |
         type=raw,value=trixie-cc
-        type=raw,value=trixie-cc-{{date 'YYYYMMDD'}}
+        type=raw,value=trixie-cc-{{date 'YYYYMMDD'}}.${{ github.run_number }}
       meta-flavor: latest=false
       set-meta-labels: true
       set-meta-annotations: true

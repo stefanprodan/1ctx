@@ -28,7 +28,7 @@ ARG RG_VERSION
 ARG RG_SHA256
 ADD --checksum=sha256:${RG_SHA256} \
     https://static.crates.io/crates/ripgrep/ripgrep-${RG_VERSION}.crate /src/rg.tar.gz
-# PCRE2 linked in statically, so rg needs only libc
+# PCRE2 linked in statically, so rg needs only libc and libgcc_s
 RUN cd /src \
  && tar -xzf rg.tar.gz \
  && cd "ripgrep-${RG_VERSION}" \
@@ -64,8 +64,10 @@ RUN cd /src \
 # programs for serving repositories and sending mail, each its own
 # 2 MB binary a sandbox never runs
 RUN cd /out/usr/local \
- && rm bin/scalar bin/git-shell libexec/git-core/git-daemon \
-      libexec/git-core/git-http-backend libexec/git-core/git-imap-send
+ && rm bin/scalar bin/git-shell \
+      libexec/git-core/scalar libexec/git-core/git-shell \
+      libexec/git-core/git-daemon libexec/git-core/git-http-backend \
+      libexec/git-core/git-imap-send
 
 FROM trixie AS base
 
