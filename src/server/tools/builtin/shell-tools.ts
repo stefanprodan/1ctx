@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // What each sandbox image variant holds, as bash's description names
-// it. The versions are deploy/sandbox/Dockerfile's, and a test fails
-// when the two disagree.
+// it. The versions are the two Dockerfiles' under deploy/sandbox, and
+// a test fails when they disagree.
 
 import type { SandboxVariant } from "../../../shared/contracts/sandbox.ts";
 
