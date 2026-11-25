@@ -72,15 +72,24 @@ describe("the inbound MCP server and transport", () => {
     }
   });
 
-  test("discovers 2026 tools, accepts notifications and rejects resources", async () => {
+  test("discovers 2026 tools and the skill, and accepts notifications", async () => {
     const { area, send } = fixture();
     const discovered = await json(await send(modern("server/discover")));
     expect(discovered.result.supportedVersions).toEqual(["2026-07-28"]);
     expect(discovered.result.capabilities.tools.listChanged).toBe(false);
-    expect(discovered.result.capabilities.resources).toBeUndefined();
+    expect(discovered.result.capabilities.resources).toEqual({
+      listChanged: false,
+    });
+    expect(
+      discovered.result.capabilities.extensions[
+        "io.modelcontextprotocol/skills"
+      ],
+    ).toBeDefined();
 
     const resources = await json(await send(modern("resources/list")));
-    expect(resources.error.code).toBe(-32601);
+    expect(resources.result.resources.map((entry: any) => entry.uri)).toEqual([
+      "skill://external-tasks/SKILL.md",
+    ]);
     for (const method of [
       "notifications/cancelled",
       "notifications/roots/list_changed",
