@@ -59,8 +59,9 @@ rules.
   the same layers; without the two, the copied layers differ.
 - **CI's `shell` job (`test.yml`) builds the variants on a change** to
   the variants Dockerfile, `deploy/sandbox/checks/`,
-  `scripts/sandbox-image.sh` or `scripts/sandbox-image-check.ts`,
-  never to the base's folder, which changes no variant until its
+  `scripts/sandbox-image.sh`, `scripts/sandbox-image-check.ts` or
+  `src/server/sandbox/spec.ts` (the environment the contract runs
+  with), never to the base's folder, which changes no variant until its
   digest is bumped: a pull request against its merge
   commit's base parent, a dispatched branch against its merge base
   with `main`. It builds every variant for both platforms into the
@@ -86,10 +87,10 @@ rules.
   git links the libraries the base ships. `cc` builds its own copy of
   `base`, so the two share no apt layer. Nothing runs this image: the
   server runs `1ctx-shell`. It makes every root the sandbox policy
-  names and holds no helper: the server passes them with each exec. Measured locally (`docker images`,
-  linux/arm64, 2026-11-25): base 491 MB and cc 862 MB, from 489 MB and
-  783 MB before the archive and common tools were added and git and
-  ripgrep built.
+  names and holds no helper: the server passes them with each exec.
+  Measured locally (`docker images`, linux/arm64, 2026-11-25): base
+  491 MB and cc 862 MB, from 489 MB and 783 MB before the archive and
+  common tools were added and git and ripgrep built.
 - **`base` is the python variant; `cc` adds gcc, g++, libc6-dev and
   pkg-config.** Every tool of both is listed once, in
   `deploy/sandbox/README.md`, with its version and source; a test
@@ -98,8 +99,8 @@ rules.
   package was what pulled it in beyond perl-base.
 - **`shell-base.yml` publishes `ghcr.io/stefanprodan/1ctx-shell-base`:**
   `trixie` and `trixie-cc`, each with a dated tag ending in the run's
-  number (`trixie-20261125.3`), so no publish moves another's, deleted
-  by hand. It runs Mondays, by hand, on a
+  number (`trixie-20261125.3`), so no later run moves another's (a
+  re-run of the same run does), deleted by hand. It runs Mondays, by hand, on a
   push to `main` changing `deploy/sandbox/base/` or the workflow, and
   on a pull request changing them. `docker/github-builder` builds each
   platform on its own native runner with no QEMU, joins them into one
@@ -113,6 +114,9 @@ rules.
   included, builds both targets and pushes nothing; its `check` job
   builds `base` and `cc` on the runner and runs their offline
   contract, so a bump's branch is built and checked before it merges.
+  A pull request changing `deploy/sandbox/checks/` or
+  `scripts/sandbox-image-check.ts` starts it too, since no other job
+  runs cc's contract.
   Only publishing runs share the `publish` concurrency group.
 
 ## git and ripgrep
@@ -152,9 +156,10 @@ rules.
   else nothing changes; ripgrep's is the one crates.io lists. It asks
   GitHub nothing, so a runner's shared rate limit never fails it. It
   rewrites only the four lines, never moves a pin back, and changes
-  nothing when the pins are current. `--diff` prints what moved against `HEAD`, as
-  Markdown, empty when nothing did. The version choice, the list's
-  parse and the rewrite are pure and tested on fixtures.
+  nothing when the pins are current. `--diff` prints what moved
+  against `HEAD`, as Markdown, empty when nothing did. The version
+  choice, the list's parse and the rewrite are pure and tested on
+  fixtures.
 - **The `tools` job bumps them through one pull request,** on the
   schedule and by hand, on `main` only: it runs `make sandbox-tools`
   and opens or updates a signed pull request on `shell-tools`,
@@ -174,8 +179,9 @@ rules.
   the sandbox backend to a real gateway, the preview's by default: the
   offline checks with the network off, then at most one online check
   per variant on the default hosts. `--docker` runs the offline half
-  on `docker run --network none` as the image's own user with the
-  environment the server sends (`SANDBOX_ENV`), which is what CI runs.
+  on `docker run --network none` as the image's own user, the
+  server's environment (`SANDBOX_ENV`) set over the image's, which is
+  what CI runs.
   Run it on every image change.
 - **A check names no version or path of its own.** Versions come from
   `SHELL_VERSIONS` as `EXPECT_<TOOL>`, paths from the env the server

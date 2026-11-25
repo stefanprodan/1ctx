@@ -21,8 +21,9 @@ architecture, the variants by copying files onto it.
 
 - The base is what every variant starts from. `trixie` and `trixie-cc`
   move at each build; a dated tag ends in the number of the run that
-  built it (`trixie-20261125.3`) and never moves, so a past release
-  can be rebuilt from the base it used. Nothing runs the base directly.
+  built it (`trixie-20261125.3`) and no later run moves it, so a past
+  release can be rebuilt from the base it used. Nothing runs the base
+  directly.
 - The variants, `python`, `bun`, `go` and `rust`, build on the base by
   digest. `<version>-<variant>` (for example `v0.0.8-go`) is the only
   tag the server runs, so its environment and the image's layout always

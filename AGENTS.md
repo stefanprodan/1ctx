@@ -105,7 +105,7 @@ vendor/       just-bash/ (a git subtree, outside Biome and the structure
 docs/         the rules of each area (see Docs).
 deploy/       docker/ (the Docker Compose files), charts/onectx/ (the Helm
               chart), flux/ (its Flux example) and sandbox/ (the
-              sandbox image, its README).
+              sandbox image).
 ```
 
 **Server areas.** `src/server/<area>/` has `index.ts` (what others may
@@ -148,8 +148,8 @@ change it in the same commit as the code that changes a rule.
 |---|---|
 | `docs/ui.md` | `src/client/`: data layer, primitives, forms, themes, helpers |
 | `docs/waits.md` | a client first load: bones, their reveal and hold, hand-overs, statuses, slow words |
-| `docs/shell.md` | the shell, the rail and its Recent list, the drawer, the installed app, app links, `/knowledge/` paths |
-| `docs/views.md` | what a page draws: `views/`, the feed |
+| `docs/shell.md` | the shell, the rail and its Recent list, the drawer, the installed app, app links and `/knowledge/` paths in replies |
+| `docs/views.md` | what a page draws: `views/`, the session list (feed) |
 | `docs/project-settings.md` | a project's repositories and MCP servers lists, Settings tab and admin page |
 | `docs/channel-page.md` | a channel's page: quotes, pending turns, the context line, its pages and gap |
 | `docs/composer.md` | `composer/`: the draft, its files and switches, the slash commands |
@@ -181,9 +181,9 @@ change it in the same commit as the code that changes a rule.
 | `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, email link pages |
 | `docs/dictation.md` | `dictation/`: the Dictation setting, `POST /api/transcribe`, its WAV check, cap, call and usage row |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
-| `docs/sandbox.md` | `sandbox/`: the shell's settings, the gateway port, leases, the pool, the sweeps |
+| `docs/sandbox.md` | `sandbox/`: the sandbox shell's settings, the gateway port, leases, the pool, the sweeps |
 | `docs/sandbox-commands.md` | a command in the sandbox: its base, push, fence, walk, read back and settle; subagents sharing it |
-| `docs/sandbox-image.md` | `deploy/sandbox/`: the sandbox image's build, base, pins, contract |
+| `docs/sandbox-image.md` | `deploy/sandbox/`: the sandbox image's build and contract |
 | `docs/sandbox-network.md` | the sandbox's network: its hosts, OpenShell's policy, credentials as providers, the scrub, differences from the built-in curl |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |

@@ -10,9 +10,13 @@ on:
     paths:
       - deploy/sandbox/base/**
       - .github/workflows/shell-base.yml
+  # the contract and its runner too: a pull request only builds and
+  # checks, so a change to cc's checks is run somewhere
   pull_request:
     paths:
       - deploy/sandbox/base/**
+      - deploy/sandbox/checks/**
+      - scripts/sandbox-image-check.ts
       - .github/workflows/shell-base.yml
 
 permissions:

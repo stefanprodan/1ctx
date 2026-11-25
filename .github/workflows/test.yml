@@ -139,9 +139,11 @@ jobs:
               ;;
           esac
           build=false
+          # spec.ts holds the environment the contract runs with
           git diff --quiet "$base" HEAD -- deploy/sandbox/Dockerfile \
             deploy/sandbox/checks scripts/sandbox-image.sh \
-            scripts/sandbox-image-check.ts || build=true
+            scripts/sandbox-image-check.ts \
+            src/server/sandbox/spec.ts || build=true
           echo "build=$build" >> "$GITHUB_OUTPUT"
       - name: Read Bun version
         if: steps.changes.outputs.build == 'true'

@@ -16,8 +16,8 @@
 // With no gateway flags it uses the preview's (PREVIEW_SHELL=sandbox
 // make preview): its port and the openshell- keys in .preview/secrets.
 // --docker runs only the offline checks, with no gateway, in
-// docker run --network none as the image's user, with the environment
-// the server sends; CI has no gateway. There cc, the base image's gcc
+// docker run --network none as the image's user, the server's
+// environment set over the image's; CI has no gateway. There cc, the base image's gcc
 // target, is a variant too and needs --image.
 
 import { readFileSync } from "node:fs";
