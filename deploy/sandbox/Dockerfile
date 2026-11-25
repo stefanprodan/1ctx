@@ -15,8 +15,8 @@
 
 # The base by tag and digest, so Dependabot bumps the digest through a
 # pull request and a moved tag changes nothing until it merges
-FROM ghcr.io/stefanprodan/1ctx-shell-base:trixie@sha256:39a586c4b94c29ef0a0cf2c278fd7669bf51ee2abb287b3909498464697c4420 AS base
-FROM ghcr.io/stefanprodan/1ctx-shell-base:trixie-cc@sha256:406054ce5d696606cef8a6e431c72e8673d600b0cc0dcdf69583190fb76f012b AS cc
+FROM ghcr.io/stefanprodan/1ctx-shell-base:trixie@sha256:1d99e64bc764e97133db0ebdaefdac6d09e582d84c9dd64c952ede809c017ca6 AS base
+FROM ghcr.io/stefanprodan/1ctx-shell-base:trixie-cc@sha256:df47392de10a10617c6f8d84f882ffc5bdcaac53b19676a071038c02402cda28 AS cc
 
 # Bun, Go and Rust come from their official images, pinned by digest,
 # so Dependabot bumps them. Bun is the root Dockerfile's, and Rust the
