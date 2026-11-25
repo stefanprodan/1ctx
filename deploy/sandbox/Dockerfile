@@ -21,14 +21,14 @@ FROM ghcr.io/stefanprodan/1ctx-shell-base:trixie-cc@sha256:df47392de10a10617c6f8
 # Bun, Go and Rust come from their official images, pinned by digest,
 # so Dependabot bumps them. Bun is the root Dockerfile's, and Rust the
 # base's ripgrep build's.
-FROM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS bundist
+FROM oven/bun:1.4.5@sha256:3aa040e5445efa09d75bb428a64ba50db13e2b3ac9b6b0c7f145615f62b2ee18 AS bundist
 FROM golang:1.27.4-trixie@sha256:430985542100b871e108ccc00e8dcc5eef08ca14ee5825e98ebf563d8ffec4ee AS godist
 FROM rust:1.100.0-slim-trixie@sha256:3b199fd6db7d709274df56565b8f4003f9e30d7bfcff9d53148c86053b7855e2 AS rustdist
 
 # node and npx run on Bun, so npm CLIs and #!/usr/bin/env node scripts
 # work. Bun is bunx only when called by that name, so npx is a wrapper.
 # Made on the build platform: links and a script are the same on both.
-FROM --platform=$BUILDPLATFORM oven/bun:1.4.4@sha256:1d22548f177f4ff38e0c15baa3c2c46c6c2060ba2d1bc573bb4720b407548f1d AS bunlinks
+FROM --platform=$BUILDPLATFORM oven/bun:1.4.5@sha256:3aa040e5445efa09d75bb428a64ba50db13e2b3ac9b6b0c7f145615f62b2ee18 AS bunlinks
 RUN mkdir /out \
  && ln -s bun /out/bunx \
  && ln -s bun /out/node \
