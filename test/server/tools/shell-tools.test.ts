@@ -25,15 +25,9 @@ const web = { mode: "all" as const, domains: [] };
 const words = (variant: SandboxVariant | null) =>
   makeBashTool({ web, sandbox: hosts, variant }).description;
 
-const DOCKERFILE = join(
-  import.meta.dir,
-  "..",
-  "..",
-  "..",
-  "deploy",
-  "sandbox",
-  "Dockerfile",
-);
+const SANDBOX = join(import.meta.dir, "..", "..", "..", "deploy", "sandbox");
+const DOCKERFILE = join(SANDBOX, "Dockerfile");
+const BASE_DOCKERFILE = join(SANDBOX, "base", "Dockerfile");
 
 describe("bash's tools by image variant", () => {
   test("each variant names its own tools and install hint", () => {
@@ -105,10 +99,11 @@ describe("bash's tools by image variant", () => {
     ).toContain("Go 1.27");
   });
 
-  test("the versions are the Dockerfile's", async () => {
+  test("the versions are the Dockerfiles'", async () => {
     const text = await Bun.file(DOCKERFILE).text();
+    // Python is the base's, the toolchains the variants'
     const python = /^FROM ghcr\.io\/astral-sh\/uv:python(\d+\.\d+)-/m.exec(
-      text,
+      await Bun.file(BASE_DOCKERFILE).text(),
     );
     expect(python?.[1]).toBe(SHELL_VERSIONS.python);
     const image = (from: string) => {

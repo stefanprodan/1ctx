@@ -10,9 +10,15 @@
 //
 //   bun scripts/sandbox-image-check.ts [--variant go] [--image <ref>] \
 //     [--offline] [--endpoint <url> --ca <pem> --cert <pem> --key <pem>]
+//   bun scripts/sandbox-image-check.ts --docker [--variant go|cc] \
+//     [--image <ref>]
 //
 // With no gateway flags it uses the preview's (PREVIEW_SHELL=sandbox
 // make preview): its port and the openshell- keys in .preview/secrets.
+// --docker runs only the offline checks, with no gateway, in
+// docker run --network none as the image's user, the server's
+// environment set over the image's; CI has no gateway. There cc, the base image's gcc
+// target, is a variant too and needs --image.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -26,6 +32,7 @@ import {
   INSTANCE_LABEL,
   Leases,
   openshellGateway,
+  SANDBOX_ENV,
 } from "../src/server/sandbox/index.ts";
 import { SHELL_VERSIONS } from "../src/server/tools/builtin/shell-tools.ts";
 import {
@@ -38,6 +45,10 @@ import {
   type SandboxNet,
 } from "../src/shared/sandbox-net.ts";
 
+// a contract file in deploy/sandbox/checks: a variant, or cc, the base
+// image's gcc target that go and rust build on
+type Contract = SandboxVariant | "cc";
+
 const ROOT = join(import.meta.dir, "..");
 const CHECKS = join(ROOT, "deploy/sandbox/checks");
 const SECRETS = join(ROOT, ".preview/secrets");
@@ -49,6 +60,7 @@ const { values: flags } = parseArgs({
     variant: { type: "string" },
     image: { type: "string" },
     offline: { type: "boolean", default: false },
+    docker: { type: "boolean", default: false },
     endpoint: { type: "string" },
     ca: { type: "string" },
     cert: { type: "string" },
@@ -57,26 +69,19 @@ const { values: flags } = parseArgs({
 });
 function usage(): never {
   console.error(
-    "usage: [--variant python|bun|go|rust] [--image <ref>, with --variant] [--offline] [--endpoint <url> --ca <pem> --cert <pem> --key <pem>]",
+    "usage: [--variant python|bun|go|rust] [--image <ref>, with --variant] [--offline] [--endpoint <url> --ca <pem> --cert <pem> --key <pem>]\n       --docker [--variant python|bun|go|rust|cc] [--image <ref>, with --variant; cc needs it]",
   );
   process.exit(2);
 }
 const one = flags.variant;
-if (one !== undefined && !isSandboxVariant(one)) usage();
+const cc = flags.docker && one === "cc";
+if (one !== undefined && !cc && !isSandboxVariant(one)) usage();
 if (flags.image !== undefined && one === undefined) usage();
-const variants: readonly SandboxVariant[] =
-  one === undefined ? SANDBOX_VARIANTS : [one];
-
-const pem = (flag: string | undefined, name: string) =>
-  readFileSync(flag ?? join(SECRETS, `openshell-gateway-${name}.key`), "utf8");
-const gateway = openshellGateway({
-  endpoint:
-    flags.endpoint ??
-    `https://127.0.0.1:${process.env.PREVIEW_GATEWAY_PORT ?? "17671"}`,
-  ca: pem(flags.ca, "ca"),
-  cert: pem(flags.cert, "cert"),
-  key: pem(flags.key, "key"),
-});
+if (cc && flags.image === undefined) usage();
+const gatewayFlags = [flags.endpoint, flags.ca, flags.cert, flags.key];
+if (flags.docker && gatewayFlags.some((flag) => flag !== undefined)) usage();
+const variants: readonly Contract[] =
+  one === undefined ? SANDBOX_VARIANTS : [one as Contract];
 
 const instanceId = Array.from(
   crypto.getRandomValues(new Uint8Array(12)),
@@ -93,7 +98,7 @@ const DEFAULTS: SandboxNet = {
 
 // the contract as one command: the minors the bash tool names, the
 // harness, the variant's checks, then which half to run
-function script(variant: SandboxVariant, half: "offline" | "online") {
+function script(variant: Contract, half: "offline" | "online") {
   const expect = Object.entries(SHELL_VERSIONS)
     .map(([tool, minor]) => `EXPECT_${tool.toUpperCase()}=${minor}`)
     .join(" ");
@@ -182,7 +187,12 @@ async function command(leases: Leases, net: SandboxNet, text: string) {
   };
 }
 
-async function checkVariant(variant: SandboxVariant): Promise<boolean> {
+type Gateway = ReturnType<typeof openshellGateway>;
+
+async function checkVariant(
+  gateway: Gateway,
+  variant: SandboxVariant,
+): Promise<boolean> {
   const image = flags.image ?? `1ctx-shell:dev-${variant}`;
   console.log(`== ${variant} (${image})`);
   let net = OFF;
@@ -216,7 +226,7 @@ async function checkVariant(variant: SandboxVariant): Promise<boolean> {
   return ok;
 }
 
-async function cleanup() {
+async function cleanup(gateway: Gateway) {
   const labels = { [INSTANCE_LABEL]: instanceId };
   const deadline = Date.now() + 120_000;
   for (;;) {
@@ -239,13 +249,72 @@ async function cleanup() {
   }
 }
 
-const failed: SandboxVariant[] = [];
-try {
-  for (const variant of variants)
-    if (!(await checkVariant(variant))) failed.push(variant);
-} finally {
-  if (!(await cleanup())) process.exitCode = 1;
-  gateway.close();
+// the offline half, on stdin of a container with no network
+async function checkDocker(variant: Contract): Promise<boolean> {
+  const image = flags.image ?? `1ctx-shell:dev-${variant}`;
+  console.log(`== ${variant} (${image})`);
+  const started = performance.now();
+  const proc = Bun.spawn(
+    [
+      "docker",
+      "run",
+      "--rm",
+      "-i",
+      "--network",
+      "none",
+      // an exec in a sandbox sees none of the image's ENV, only this
+      ...Object.entries(SANDBOX_ENV).flatMap(([name, value]) => [
+        "--env",
+        `${name}=${value}`,
+      ]),
+      image,
+      "bash",
+    ],
+    {
+      stdin: new TextEncoder().encode(script(variant, "offline")),
+      stdout: "inherit",
+      stderr: "inherit",
+    },
+  );
+  const ok = (await proc.exited) === 0;
+  const ms = Math.round(performance.now() - started);
+  console.log(`-- offline ${ok ? "ok" : "failed"} in ${ms}ms`);
+  return ok;
 }
+
+async function viaGateway(): Promise<string[]> {
+  const pem = (flag: string | undefined, name: string) =>
+    readFileSync(
+      flag ?? join(SECRETS, `openshell-gateway-${name}.key`),
+      "utf8",
+    );
+  const gateway = openshellGateway({
+    endpoint:
+      flags.endpoint ??
+      `https://127.0.0.1:${process.env.PREVIEW_GATEWAY_PORT ?? "17671"}`,
+    ca: pem(flags.ca, "ca"),
+    cert: pem(flags.cert, "cert"),
+    key: pem(flags.key, "key"),
+  });
+  const failed: string[] = [];
+  try {
+    for (const variant of variants)
+      if (!(await checkVariant(gateway, variant as SandboxVariant)))
+        failed.push(variant);
+  } finally {
+    if (!(await cleanup(gateway))) process.exitCode = 1;
+    gateway.close();
+  }
+  return failed;
+}
+
+async function viaDocker(): Promise<string[]> {
+  const failed: string[] = [];
+  for (const variant of variants)
+    if (!(await checkDocker(variant))) failed.push(variant);
+  return failed;
+}
+
+const failed = flags.docker ? await viaDocker() : await viaGateway();
 console.log(failed.length === 0 ? "all ok" : `failed: ${failed.join(", ")}`);
 if (failed.length > 0) process.exitCode = 1;

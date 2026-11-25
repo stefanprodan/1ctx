@@ -41,16 +41,16 @@ make dev ARGS="..."    # the same with ONECTX_DEV=1 and a restart on server chan
 make clean          # preview-clean, then remove bin/ and Bun's build leftovers
 make lint           # biome check --write, then bun check; run after any code change
 make test           # bun test; run after any code change, before finishing
-make vendor-test    # just-bash's own suite, against its expected failures
+make vendor-test    # just-bash's suite, against its expected failures
 make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 make image          # the container image, native and loaded; PLATFORMS=a,b only builds
 make image-smoke    # run the image as production does, sign in, stop it (CI runs it)
-make sandbox-image  # the sandbox image variants, native, as 1ctx-shell:dev-<variant>; VARIANT=go one
+make sandbox-image  # the sandbox image variants as 1ctx-shell:dev-<variant>; VARIANT=go one
 make kind-up        # the local kind cluster 1ctx-test; kind-image, kind-down
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
 make staging-provision FILE=x.yaml [SECRETS=dir]  # stop staging, apply, start
-make staging-status     # what the staging service says
+make staging-status     # the staging service's status
 make load-db PRESET=bench|small  # a load test database in scripts/load/out/
 make load-bench ARGS="..."  # compare builds under load; load-cluster on kind, load-summary
 make models         # refresh src/server/providers/models.json from models.dev
@@ -105,7 +105,7 @@ vendor/       just-bash/ (a git subtree, outside Biome and the structure
 docs/         the rules of each area (see Docs).
 deploy/       docker/ (the Docker Compose files), charts/onectx/ (the Helm
               chart), flux/ (its Flux example) and sandbox/ (the
-              sandbox image); docs/deploy.md.
+              sandbox image).
 ```
 
 **Server areas.** `src/server/<area>/` has `index.ts` (what others may
@@ -150,10 +150,10 @@ change it in the same commit as the code that changes a rule.
 | `docs/waits.md` | a client first load: bones, their reveal and hold, hand-overs, statuses, slow words |
 | `docs/shell.md` | the shell, the rail and its Recent list, the drawer, the installed app, app links and `/knowledge/` paths in replies |
 | `docs/views.md` | what a page draws: `views/`, the session list (feed) |
-| `docs/project-settings.md` | a project's repositories and MCP servers lists, on its Settings tab and admin page |
-| `docs/channel-page.md` | a project channel's page: quotes, pending turns, the context line, its pages and gap |
+| `docs/project-settings.md` | a project's repositories and MCP servers lists, Settings tab and admin page |
+| `docs/channel-page.md` | a channel's page: quotes, pending turns, the context line, its pages and gap |
 | `docs/composer.md` | `composer/`: the draft, its files and switches, the slash commands |
-| `docs/external-task-pages.md` | what the external task pages draw: the tab, the task's page, its timeline, Home's card |
+| `docs/external-task-pages.md` | the external task pages: the tab, the task's page, its timeline, Home's card |
 | `docs/admin-pages.md` | what the admin pages draw: `views/admin/`, lists, object pages, drafts, saves |
 | `docs/access.md` | requests and the router, access keys, users, names, project visibility, the socket |
 | `docs/logins.md` | signing in: the login cookie, admin keys and `1ctx admin-key`, links and codes by email, the link page, passkeys |
@@ -161,10 +161,10 @@ change it in the same commit as the code that changes a rule.
 | `docs/providers.md` | `providers/`, `deciders/`, an agent's provider, model and thinking |
 | `docs/wires.md` | the azure and anthropic wires: their bodies, streams, catalogs and adapted refusals |
 | `docs/sessions.md` | `sessions/` and the runner's sends (a chat's turns, a run): caps, writer, stream bounds |
-| `docs/channel-context.md` | a channel turn's snapshot, traces, stream budget, admission and meter, run posts, a clear |
-| `docs/queue.md` | messages to a busy chat: the queue, its dispatcher |
+| `docs/channel-context.md` | a channel turn's snapshot, traces, stream budget, admission, meter, run posts, a clear |
+| `docs/queue.md` | messages to a busy chat, the queue's dispatcher |
 | `docs/subagents.md` | the `delegate` tool, child sessions, the child loop and the child rows |
-| `docs/compaction.md` | the summary round, its `max_tokens`, the tail after a summary, compact on demand |
+| `docs/compaction.md` | the summary round, its `max_tokens`, the tail after it, compact on demand |
 | `docs/archive.md` | archive, agent retirement, packing, the sweep, the kept files job |
 | `docs/memory.md` | `memory/`, `memory_edit`, a run's memory phase |
 | `docs/automations.md` | `automations/`, the scheduler, the check URL, what only runs do |
@@ -176,18 +176,19 @@ change it in the same commit as the code that changes a rule.
 | `docs/mcp-server.md` | `mcp-server/`, the inbound `/mcp` endpoint and its tools |
 | `docs/knowledge.md` | `knowledge/`, uploads |
 | `docs/images.md` | `images/`: the image store from ingest to the wires and the page: limits, serving, access, the lease, the agent's flag, the claim at send, the budget, history |
-| `docs/search.md` | `shared/search.ts`, knowledge search, session search and list |
+| `docs/search.md` | `shared/search.ts`, knowledge and session search, session list |
 | `docs/repos.md` | `repos/`: repositories, their hosts, names and credentials, a turn's day note |
-| `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, the pages of email links |
+| `docs/email.md` | `email/`: the SMTP server, the outbox, the sender, agent and alert email, the SMTP page, email link pages |
 | `docs/dictation.md` | `dictation/`: the Dictation setting, `POST /api/transcribe`, its WAV check, cap, call and usage row |
 | `docs/bash.md` | `bash/`, the bash tool, `open`, scratch, kept MCP files, curl signing |
 | `docs/sandbox.md` | `sandbox/`: the sandbox shell's settings, the gateway port, leases, the pool, the sweeps |
-| `docs/sandbox-commands.md` | a command in the sandbox: its base, push, fence, walk, read back and settle; the sandbox a chat shares with its subagents |
+| `docs/sandbox-commands.md` | a command in the sandbox: its base, push, fence, walk, read back and settle; subagents sharing it |
+| `docs/sandbox-image.md` | `deploy/sandbox/`: the sandbox image's build and contract |
 | `docs/sandbox-network.md` | the sandbox's network: its hosts, OpenShell's policy, credentials as providers, the scrub, differences from the built-in curl |
 | `docs/monitor.md` | `overview/`: what the admin Monitor pages read, the usage windows |
 | `docs/provision.md` | `provision/`: applying YAML objects, `--provision` |
 | `docs/deploy.md` | `service/`, staging, the container image, `deploy/`, release and CI |
-| `docs/load-testing.md` | `scripts/load/`: the load harness, its fakes, databases, fence, targets and results |
+| `docs/load-testing.md` | `scripts/load/`: the load harness, its fakes, databases, fence, targets, results |
 | `vendor/README.md` | changing or syncing `vendor/just-bash/` and `vendor/openshell-sdk/` |
 | `vendor/changes.md` | a hunk of `vendor/just-bash/`: its `(1ctx <id>)` entry, same commit |
 | `vendor/differences.md` | where a vendored command still differs from its tool |

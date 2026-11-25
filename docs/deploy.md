@@ -5,7 +5,8 @@ staging instance, in a container, and how releases are built. Governs
 `src/server/service/`, `scripts/staging.sh`, `scripts/openshell.sh`,
 the preview's mail catcher (`scripts/mail/`) and the `make staging-*`
 targets, the `Dockerfile`, `.dockerignore`,
-`deploy/` and `.github/workflows/`.
+`deploy/` and `.github/workflows/`, except the sandbox image's build
+(`docs/sandbox-image.md`).
 
 ## The OS service (`1ctx service`)
 
@@ -183,26 +184,6 @@ gateway add`.
   needs, which hangs or corrupts the database. A named volume takes
   the image's `/data` with its owner 65532. On a Linux host a bind
   mount works once it is `chown 65532:65532`.
-- **The sandbox image (`deploy/sandbox/Dockerfile`) pins every image it
-  takes from by digest and downloads nothing of its own:** its base,
-  uv's Python 3.15 trixie-slim image that brings Python and uv, and the
-  official `jqlang/jq`, `mikefarah/yq`, `oven/bun`, `golang` and `rust`
-  slim images that jq, yq, Bun, Go and Rust are copied from, Rust's two homes moved
-  under `/opt/home`. `oven/bun` is the root Dockerfile's, so the two
-  move together. Dependabot bumps every digest. The apt packages are
-  trixie's on the day of the build. A new Bun,
-  Go, Python or Rust minor bumps the bash description's versions in
-  the same change (`docs/bash.md`), which a test checks. It makes every root the sandbox policy
-  names and holds no helper: the server passes them with each exec.
-- **Each variant's promise is a contract, `deploy/sandbox/checks/`**:
-  `common.sh` (the harness and what every variant holds) and one file
-  per variant, shell checks that must exit 0. `make sandbox-image-check
-  [ARGS="--variant go --image <ref> --offline"]` sends them through the
-  sandbox backend to a real gateway, the preview's by default: the
-  offline checks with the network off, then at most one online check
-  per variant on the default hosts. Versions come from `SHELL_VERSIONS`
-  as `EXPECT_<TOOL>`, paths from the env the server sends; a check
-  names no version or path of its own. Run it on every image change.
 - **Stop grace is the drain plus 15.** Docker's 10 second default
   would kill the shutdown after the drain. Docker Compose sets
   `stop_grace_period: 25s`; a plain run passes `--stop-timeout 25`.
@@ -264,14 +245,15 @@ deletes the cluster with every release in it.
 - **The Dockerfile's `oven/bun:<version>@sha256:<digest>` line is the
   one Bun version.** `scripts/bun-version.sh` hands it to `setup-bun`
   in every workflow, and Dependabot's `docker` ecosystem bumps it.
-- **CI (`test.yml`) has three jobs.** `build-test` and `vendor-test`
+- **CI (`test.yml`) has four jobs.** `build-test` and `vendor-test`
   run on Linux for every pull request and push to `main`, side by
   side; they are the required checks. `build-test` runs `make lint`
   and fails on a tree it changed, the test files in parallel, the build
   and the binary's smoke test. `vendor-test` runs
   `make vendor-test ARGS=--parallel`. `macos-smoke` builds and
   smoke-tests the arm64 binary on macOS, on a push to `main` only, with
-  no test suite.
+  no test suite. `shell` builds and checks the sandbox image's variants
+  when a change touches them (`docs/sandbox-image.md`).
 - **`build-test` ends with its checks as parallel steps.** After Helm
   and the Flux CLI are set up, one `parallel:` group runs
   `make image-smoke` for amd64, `docker compose config` on both Compose
@@ -306,11 +288,12 @@ deletes the cluster with every release in it.
   for each variant first,** python, bun, go and rust, a matrix job
   building that target of `deploy/sandbox/Dockerfile` for the same
   platforms, each attested, plus the moving `:<variant>` for a run by
-  hand, never on a prerelease. No bare `:<tag>`. The server runs only
-  the versioned tag. `make sandbox-image` builds every variant locally
-  as `1ctx-shell:dev-<variant>` and the registry name a source run's
-  default names (`VARIANT=go` builds one). The first push creates the
-  GHCR package `1ctx-shell` private; make it public once by hand.
+  hand, never on a prerelease. It runs no QEMU, since a variant only
+  copies onto the published base, and builds the same layers for one
+  variants Dockerfile (`SOURCE_DATE_EPOCH`, `rewrite-timestamp`). No
+  bare `:<tag>`. The server runs only the versioned tag. The first push creates the GHCR package
+  `1ctx-shell` private; make it public once by hand. How the image is
+  built, its base image and its contract are in `docs/sandbox-image.md`.
 - **The release pushes the Helm chart beside the image.** Its version is
   the tag without the `v` and its `appVersion` the tag, at
   `oci://ghcr.io/stefanprodan/charts/onectx`, with provenance attested.

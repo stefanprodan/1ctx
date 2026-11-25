@@ -29,6 +29,7 @@ updates:
     directories:
       - /
       - /deploy/sandbox
+      - /deploy/sandbox/base
     schedule:
       interval: cron
       cronjob: "0 6 1,15 * *"
