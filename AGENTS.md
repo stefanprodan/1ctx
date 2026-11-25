@@ -46,7 +46,7 @@ make build          # standalone binary in bin/
 make smoke          # start the binary, sign in over HTTP, stop it (CI runs it)
 make image          # the container image, native and loaded; PLATFORMS=a,b only builds
 make image-smoke    # run the image as production does, sign in, stop it (CI runs it)
-make sandbox-image  # the sandbox image variants, native, as 1ctx-shell:dev-<variant>; VARIANT=go one
+make sandbox-image  # sandbox variants as 1ctx-shell:dev-<variant>; VARIANT=go one; BASE=local builds the base
 make sandbox-tools  # bump the shell base's git and ripgrep pins
 make kind-up        # the local kind cluster 1ctx-test; kind-image, kind-down
 make staging-deploy     # build main, back the staging db up, swap the binary, restart
@@ -106,7 +106,7 @@ vendor/       just-bash/ (a git subtree, outside Biome and the structure
 docs/         the rules of each area (see Docs).
 deploy/       docker/ (the Docker Compose files), charts/onectx/ (the Helm
               chart), flux/ (its Flux example) and sandbox/ (the
-              sandbox image, docs/sandbox-image.md); docs/deploy.md.
+              sandbox image, its README); docs/deploy.md.
 ```
 
 **Server areas.** `src/server/<area>/` has `index.ts` (what others may

@@ -49,8 +49,8 @@ only to the gateway, over gRPC with mutual TLS.
   image or network change. `tools/builtin/shell-tools.ts` holds one row per
   variant (its tools line and install hint, at the Dockerfile's
   versions) and the custom image's: Python 3 with uv, and `command -v`
-  for the rest. A test reads the Dockerfile's `FROM` tag and version
-  args and fails when a row disagrees.
+  for the rest. A test reads the Dockerfiles' `FROM` tags (Python's
+  in the base's) and fails when a row disagrees.
 - **A project may pick its own backend and variant**
   (`projects.backend`, `builtin` or `openshell`; `projects.variant`, the
   four words); null follows the instance's. A custom image on the

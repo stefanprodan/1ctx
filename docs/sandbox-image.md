@@ -1,43 +1,60 @@
 # Sandbox image
 
 How the sandbox shell's image is built. Governs `deploy/sandbox/`
-(the variants Dockerfile, `base/` and `checks/`),
+(the variants Dockerfile, `base/`, `checks/` and the README),
 `scripts/sandbox-image.sh`, `scripts/sandbox-image-check.ts`,
 `scripts/sandbox-tools.ts` and `.github/workflows/shell-base.yml`.
 What a release pushes is in `docs/deploy.md`; how the server runs the
 image, its environment and its roots in `docs/sandbox.md`.
+`deploy/sandbox/README.md` is the reference for people: the images,
+their tags, every tool with its version and source, what a custom image
+needs; this doc keeps the rules.
 
 ## The variants
 
-- **`deploy/sandbox/Dockerfile` is one target per variant.** `base`
-  is uv's Python 3.15 on Debian trixie with bash, git, make, curl, jq,
-  yq, ripgrep and pdftotext, the sandbox user and every root. `python`
-  is `base`; `bun` adds Bun, with `node` linked to `bun` (`node
+- **`deploy/sandbox/Dockerfile` is `FROM` and `COPY` only, one target
+  per variant on the published base.** `python` is `trixie` as it is;
+  `bun` copies Bun onto it, with `node` linked to `bun` (`node
   --version` is not answered) and `npx` a wrapper running `bun x`;
-  `cc` (never pushed as a variant) adds `gcc` and `libc6-dev`, shared
-  by `go` (Go in `/usr/local/go`) and `rust` (the official image's
-  pinned stable toolchain, minimal profile, moved to
-  `/opt/home/.rustup` and `/opt/home/.cargo`, owned by the sandbox
-  user, since `/usr` is read-only under Landlock and HOME is the
-  container's own disk). Its `base` and `cc` are still its own copy
-  of the base image's stages, with Debian's git and ripgrep. Measured
-  locally (`docker images`, linux/arm64, 2026-11-20): python 439 MB,
-  bun 602 MB, go 1.06 GB, rust 1.44 GB; python 488 MB with pdftotext.
+  `go` (Go in `/usr/local/go`) and `rust` copy theirs onto
+  `trixie-cc`, Rust's two homes moved to `/opt/home/.rustup` and
+  `/opt/home/.cargo` and owned by the sandbox user, since `/usr` is
+  read-only under Landlock and HOME is the container's own disk.
+  Measured locally (`docker images`, linux/arm64, 2026-11-25): python
+  491 MB, bun 652 MB, go 1.22 GB, rust 1.6 GB.
+- **The base is pinned by tag and digest in two literal `FROM`
+  lines,** `1ctx-shell-base:trixie@sha256:...` and
+  `:trixie-cc@sha256:...`, never an `ARG`, so Dependabot's docker
+  update bumps the digests in its `images` group. A moved tag changes
+  nothing until that pull request merges. An urgent fix: run
+  `shell-base.yml` by hand, bump the two digests by hand, release.
+- **No `RUN` runs on the target platform.** A command belongs in the
+  base Dockerfile. Bun's links and `npx` are made in `bunlinks`, `FROM
+  --platform=$BUILDPLATFORM` on the pinned `oven/bun`, and copied in,
+  the links staying links. So one runner builds both platforms with no
+  emulation, and an added `RUN` fails the arm64 build in CI, which has
+  no QEMU. A test checks it.
 - **The variants Dockerfile pins every image it takes from by digest
-  and downloads nothing of its own:** uv's Python 3.15 trixie-slim
-  image that brings Python and uv, and the official `jqlang/jq`,
-  `mikefarah/yq`, `oven/bun`, `golang` and `rust` slim images that jq,
-  yq, Bun, Go and Rust are copied from, Rust's two homes moved under
-  `/opt/home`. `oven/bun` is the root Dockerfile's, so the two move
-  together. Dependabot bumps every digest. The apt packages are
-  trixie's on the day of the build. A new Bun, Go, Python or Rust
-  minor bumps the bash description's versions in the same change
-  (`docs/bash.md`), which a test checks. The image makes every root
-  the sandbox policy names and holds no helper: the server passes them
-  with each exec.
+  and downloads nothing:** the base, and the official `oven/bun`,
+  `golang` and `rust` slim images. `oven/bun` is the root Dockerfile's
+  and `rust` the base's ripgrep build's, the same tag and digest, so
+  each pair moves together (a test checks Rust's). Dependabot bumps
+  every digest. A new Bun, Go, Python or Rust minor bumps the bash
+  description's versions in the same change (`docs/bash.md`), which a
+  test checks; Python's is the base Dockerfile's.
+- **A change to the base takes two pull requests.** The first changes
+  `deploy/sandbox/base/`; its merge publishes the base. The second
+  bumps the two digests, with whatever follows in the server (the bash
+  description, `docs/bash.md`), so the description never names a tool
+  the pinned base lacks.
 - **`make sandbox-image` builds every variant locally** as
   `1ctx-shell:dev-<variant>` and the registry name a source run's
-  default names (`VARIANT=go` builds one).
+  default names, over the pinned base pulled from GHCR (`VARIANT=go`
+  builds one). `BASE=local` first builds the base Dockerfile's `base`
+  and `cc`, loaded as `1ctx-shell-base:dev` and `:dev-cc`, and passes
+  each as a named build context keyed by the `FROM`'s whole reference,
+  tag and digest (`--build-context <ref>=docker-image://<tag>`), to try
+  a base change before its pull request.
 
 ## The base image
 
@@ -48,15 +65,14 @@ image, its environment and its roots in `docs/sandbox.md`.
   `base`, so the two share no apt layer. Nothing runs this image: the
   server runs `1ctx-shell`. Measured locally (`docker images`,
   linux/arm64, 2026-11-25): base 491 MB and cc 862 MB, from 489 MB and
-  783 MB before the tools below were added and git and ripgrep built.
-- **`base` is what the python variant holds:** Python 3.15 and uv,
-  bash, coreutils, findutils, procps, curl, wget, rsync, make, patch,
-  git, ripgrep, jq, yq, pdftotext, the `sqlite3` shell, Lua 5.4 (as
-  `lua`, Debian's alternative), full Perl, `tar` with xz, zstd and
-  bzip2, zip and unzip, `file`, `tree`, `bc`, `less`, `envsubst`,
-  `column` and `hexdump`. Perl is named in the apt layer, since
-  Debian's git package was what pulled it in beyond perl-base. `cc`
-  adds `gcc`, `g++`, `libc6-dev` and `pkg-config`.
+  783 MB before the archive and common tools were added and git and
+  ripgrep built.
+- **`base` is the python variant; `cc` adds gcc, g++, libc6-dev and
+  pkg-config.** Every tool of both is listed once, in
+  `deploy/sandbox/README.md`, with its version and source; a test
+  fails when a package of their apt layers or a pinned tool's version
+  is missing there. Perl is named in the apt layer, since Debian's git
+  package was what pulled it in beyond perl-base.
 - **`shell-base.yml` publishes `ghcr.io/stefanprodan/1ctx-shell-base`:**
   `trixie` and `trixie-cc`, each with a dated `-YYYYMMDD` tag that is
   never moved and is deleted by hand. It runs Mondays, by hand, on a
@@ -69,9 +85,7 @@ image, its environment and its roots in `docs/sandbox.md`.
   cc's on `trixie-cc`. The builder has no step before its push, so a
   failed smoke leaves a moved tag and a red run.
 - **Only `main` publishes.** The push, `attest` and `smoke` run only
-  on `refs/heads/main` (and the one other branch listed under
-  `on.push.branches`, named in each of those rules, until the first
-  base is published). Any other ref, a pull request or a dispatch
+  on `refs/heads/main`. Any other ref, a pull request or a dispatch
   included, builds both targets and stops, so a bump's branch is built
   before it merges. Only publishing runs share the `publish`
   concurrency group.
@@ -144,5 +158,4 @@ image, its environment and its roots in `docs/sandbox.md`.
   --pcre2`), never by version, so a version bump never fails a variant
   still built on an older base. A tool the base adds is checked by
   running it, and archives, `perl -MJSON::PP` (outside perl-base) and
-  `lua` by use; a variant fails those until it is built on a base that
-  has them.
+  `lua` by use.

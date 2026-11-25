@@ -42,7 +42,7 @@ image: ## Build the container image and load it (PLATFORMS=linux/amd64,linux/arm
 image-smoke: ## Build the image, run it as production does, sign in and stop it
 	@bun run image-smoke
 
-sandbox-image: ## Build the sandbox image variants, loaded as 1ctx-shell:dev-<variant> (VARIANT=go one; PLATFORMS=a,b only builds)
+sandbox-image: ## Build the sandbox image variants, loaded as 1ctx-shell:dev-<variant> on the pinned base (VARIANT=go one; BASE=local on base/Dockerfile built here; PLATFORMS=a,b only builds)
 	@bun run sandbox-image
 
 sandbox-check: ## Drive a real sandbox gateway through the sandbox backend by hand (ARGS="--ca .. --cert .. --key ..")

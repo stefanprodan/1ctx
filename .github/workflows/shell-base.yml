@@ -7,9 +7,6 @@ on:
   push:
     branches:
       - main
-      # a workflow off main cannot be dispatched, so this branch
-      # publishes the first base; it is named in every publish rule below
-      - build/shell-base-image
     paths:
       - deploy/sandbox/base/**
       - .github/workflows/shell-base.yml
@@ -25,7 +22,7 @@ permissions:
 # request or a dispatch included, builds both targets and stops. One
 # publish at a time moves the tags.
 concurrency:
-  group: shell-base-${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image') && 'publish' || github.ref }}
+  group: shell-base-${{ github.ref == 'refs/heads/main' && 'publish' || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -39,7 +36,7 @@ jobs:
       id-token: write # mint the OIDC token cosign signs the provenance with
     with:
       output: image
-      push: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image') }}
+      push: ${{ github.ref == 'refs/heads/main' }}
       context: deploy/sandbox/base
       target: base
       platforms: linux/amd64,linux/arm64
@@ -68,7 +65,7 @@ jobs:
       id-token: write # mint the OIDC token cosign signs the provenance with
     with:
       output: image
-      push: ${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image') }}
+      push: ${{ github.ref == 'refs/heads/main' }}
       context: deploy/sandbox/base
       target: cc
       platforms: linux/amd64,linux/arm64
@@ -90,7 +87,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
   attest:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image')
+    if: github.ref == 'refs/heads/main'
     needs: [base, cc]
     runs-on: ubuntu-latest
     permissions:
@@ -122,7 +119,7 @@ jobs:
   # the builder has no step before its push, so the contract runs on
   # the pushed digests, on the builder's own runners
   smoke:
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/build/shell-base-image')
+    if: github.ref == 'refs/heads/main'
     needs: [base, cc]
     strategy:
       matrix:
