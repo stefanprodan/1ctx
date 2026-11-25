@@ -41,7 +41,7 @@ import { printTable, summarize } from "./summarize.ts";
 
 const ROOT = resolve(import.meta.dir, "../..");
 const CLUSTER = join(OUT_DIR, "cluster");
-const BUN_IMAGE = "oven/bun:1.4.4";
+const BUN_IMAGE = "oven/bun:1.4.5";
 const argv = process.argv.slice(2);
 const flag = (name: string) => {
   const at = argv.indexOf(`--${name}`);

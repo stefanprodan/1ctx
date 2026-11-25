@@ -1382,6 +1382,7 @@
       "kimi-k3": { "window": 1048576, "tools": true, "images": true },
       "kimi-k3.1-pro": { "window": 1048576, "tools": true, "images": true },
       "longcat-2.0": { "window": 1000000, "tools": true, "images": false },
+      "longcat-2.5": { "window": 1000000, "tools": true, "images": true },
       "longcat-2.5-free": {
         "window": 1000000,
         "tools": true,

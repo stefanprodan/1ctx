@@ -59,7 +59,7 @@ jobs:
         with:
           version: v4.3.0
       - name: Setup Flux CLI
-        uses: fluxcd/flux2/action@3fa784edd773d56630bb9f62645e08f70c2cff0a # v2.10.0
+        uses: fluxcd/flux2/action@23dcfe98fe672acdf44ecd9c60cbac41b57f5de8 # v2.10.1
         with:
           version: 2.9.6
           plugins: |
@@ -79,7 +79,7 @@ jobs:
           - name: Lint Helm chart
             run: helm lint --strict deploy/charts/onectx
           - name: Validate Kubernetes manifests
-            uses: fluxcd/flux-schema/actions/validate@4c71b2098ba84b738d811877463f5a2b2bfe443f # v0.17.0
+            uses: fluxcd/flux-schema/actions/validate@f4ef1813dc8e5388c0f56bc16d7fe16ecfc0e023 # v0.18.0
             with:
               path: deploy
               exclude: |

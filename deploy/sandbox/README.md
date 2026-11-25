@@ -132,7 +132,7 @@ The base, plus:
 
 | Tool | Version | From |
 |---|---|---|
-| Bun | 1.4.4 | image, `oven/bun` |
+| Bun | 1.4.5 | image, `oven/bun` |
 | `bunx`, `node` | Bun's | links to `bun`, so npm CLIs and `#!/usr/bin/env node` scripts run on Bun |
 | `npx` | Bun's | a wrapper running `bun x` |
 
