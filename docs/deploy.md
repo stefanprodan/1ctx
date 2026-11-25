@@ -288,8 +288,10 @@ deletes the cluster with every release in it.
   for each variant first,** python, bun, go and rust, a matrix job
   building that target of `deploy/sandbox/Dockerfile` for the same
   platforms, each attested, plus the moving `:<variant>` for a run by
-  hand, never on a prerelease. No bare `:<tag>`. The server runs only
-  the versioned tag. The first push creates the GHCR package
+  hand, never on a prerelease. It runs no QEMU, since a variant only
+  copies onto the published base, and builds the same layers for one
+  variants Dockerfile (`SOURCE_DATE_EPOCH`, `rewrite-timestamp`). No
+  bare `:<tag>`. The server runs only the versioned tag. The first push creates the GHCR package
   `1ctx-shell` private; make it public once by hand. How the image is
   built, its base image and its contract are in `docs/sandbox-image.md`.
 - **The release pushes the Helm chart beside the image.** Its version is

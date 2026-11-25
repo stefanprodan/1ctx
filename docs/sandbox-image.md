@@ -4,7 +4,7 @@ How the sandbox shell's image is built. Governs `deploy/sandbox/`
 (the variants Dockerfile, `base/`, `checks/` and the README),
 `scripts/sandbox-image.sh`, `scripts/sandbox-image-check.ts`,
 `scripts/sandbox-tools.ts`, `.github/workflows/shell-base.yml` and the
-`shell` job of `test.yml`. What a release pushes is
+`shell` jobs of `release.yml` and `test.yml`. What a release pushes is
 in `docs/deploy.md`; how the server runs the image, its environment
 and its roots in `docs/sandbox.md`. `deploy/sandbox/README.md` is the
 reference for people: the images, their tags, every tool with its
@@ -48,6 +48,15 @@ rules.
   bumps the two digests, with whatever follows in the server (the bash
   description, `docs/bash.md`), so the description never names a tool
   the pinned base lacks.
+- **The release builds the same layers each time.** `release.yml`'s
+  `shell` job sets `SOURCE_DATE_EPOCH` to the commit time of the last
+  commit that touched `deploy/sandbox/Dockerfile`, never the tag's, and
+  pushes with `rewrite-timestamp=true` (its `outputs`, in place of
+  `push`). Two releases over one variants Dockerfile push the same
+  layers under their two tags: the registry stores them once, and a
+  host that has one pulls only a manifest for the next. Measured
+  locally: two `--no-cache` builds of bun and go, both platforms, give
+  the same layers; without the two, the copied layers differ.
 - **CI's `shell` job (`test.yml`) builds the variants on a change** to
   `deploy/sandbox/`, `scripts/sandbox-image.sh` or
   `scripts/sandbox-image-check.ts`: a pull request against its merge
