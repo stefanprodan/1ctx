@@ -61,6 +61,11 @@ RUN cd /src \
       NO_EXPAT=1 NO_RUST=1 NO_INSTALL_HARDLINKS=1 INSTALL_SYMLINKS=1 \
       SKIP_DASHED_BUILT_INS=1 \
       all strip install DESTDIR=/out
+# programs for serving repositories and sending mail, each its own
+# 2 MB binary a sandbox never runs
+RUN cd /out/usr/local \
+ && rm bin/scalar bin/git-shell libexec/git-core/git-daemon \
+      libexec/git-core/git-http-backend libexec/git-core/git-imap-send
 
 FROM trixie AS base
 

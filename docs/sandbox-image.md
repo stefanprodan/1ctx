@@ -47,7 +47,7 @@ image, its environment and its roots in `docs/sandbox.md`.
   git links the libraries the base ships. `cc` builds its own copy of
   `base`, so the two share no apt layer. Nothing runs this image: the
   server runs `1ctx-shell`. Measured locally (`docker images`,
-  linux/arm64, 2026-11-25): base 509 MB and cc 879 MB, from 489 MB and
+  linux/arm64, 2026-11-25): base 491 MB and cc 862 MB, from 489 MB and
   783 MB before the tools below were added and git and ripgrep built.
 - **`base` is what the python variant holds:** Python 3.15 and uv,
   bash, coreutils, findutils, procps, curl, wget, rsync, make, patch,
@@ -92,9 +92,11 @@ image, its environment and its roots in `docs/sandbox.md`.
   the proxy variables are libcurl's, as for curl; `git grep -P`
   through PCRE2; zlib; the system config at `/etc/gitconfig`, as
   Debian's git reads it. It leaves out Perl, Python, Tcl/Tk, gettext,
-  expat (push over dumb http), the optional Rust code and the docs.
-  Dashed built-ins are skipped and the rest are symlinks, never
-  hardlinks, and the binaries are stripped: about 20 MB in all. `base`
+  expat (push over dumb http), the optional Rust code, the docs, and
+  the programs that serve repositories or send mail (`git-daemon`,
+  `git-http-backend`, `git-shell`, `git-imap-send`, `scalar`), 2 MB
+  each. Dashed built-ins are skipped and the rest are symlinks, never
+  hardlinks, and the binaries are stripped: about 12 MB in all. `base`
   installs the libraries git links by name (`libcurl4t64`,
   `libpcre2-8-0`, `libssl3t64`, `zlib1g`), never through curl's
   dependencies.
