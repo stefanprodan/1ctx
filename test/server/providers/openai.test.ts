@@ -661,6 +661,31 @@ describe("OpenAI chat stream", () => {
     expect(events).toEqual([{ kind: "alive", thinking: false }]);
     expect(thrown).toBeInstanceOf(Unanswered);
     expect((thrown as Unanswered).timedOut).toBe(false);
+    // the drop's words name ECONNRESET, but only the code makes a reset
+    expect((thrown as Unanswered).reset).toBe(false);
+  });
+
+  test("a connection the peer reset is unanswered and a reset", async () => {
+    const fetcher = (async () => {
+      throw Object.assign(new TypeError("ECONNRESET: the socket closed"), {
+        code: "ECONNRESET",
+      });
+    }) as unknown as typeof fetch;
+    let thrown: unknown;
+    try {
+      for await (const _ of streamChat(
+        fetcher,
+        "http://models.test/v1/chat/completions",
+        buildChatBody(request),
+        new AbortController().signal,
+      )) {
+        // no event comes before the reset
+      }
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(Unanswered);
+    expect((thrown as Unanswered).reset).toBe(true);
   });
 
   test("a stream that drops after only alive events is unanswered", async () => {

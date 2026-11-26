@@ -313,11 +313,15 @@ async function readErrorBody(
 // so asking again is safe; timedOut when the headers wait ran out,
 // which the round asks again only once
 export class Unanswered extends Error {
+  // the connection closed with ECONNRESET, often a pooled one the
+  // server dropped, which a new connection answers at once
+  readonly reset: boolean;
   constructor(
-    message: string,
+    cause: unknown,
     readonly timedOut = false,
   ) {
-    super(message);
+    super(messageOf(cause));
+    this.reset = (cause as { code?: unknown } | null)?.code === "ECONNRESET";
   }
 }
 
@@ -384,7 +388,7 @@ export async function* streamChat(
     });
   } catch (err) {
     if (signal.aborted) throw err;
-    throw new Unanswered(messageOf(err), timedOut);
+    throw new Unanswered(err, timedOut);
   } finally {
     clearTimeout(headersTimer);
   }
@@ -436,7 +440,7 @@ export async function* streamChat(
       }
       if ("error" in result) {
         if (heard || signal.aborted) throw result.error;
-        throw new Unanswered(messageOf(result.error));
+        throw new Unanswered(result.error);
       }
       if (result.value.done) break;
       let parsed: ReturnType<typeof parseSse>;

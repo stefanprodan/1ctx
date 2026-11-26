@@ -151,6 +151,8 @@ export type ChatEvent =
       // timedOut, the headers wait ran out
       unanswered?: boolean;
       timedOut?: boolean;
+      // with unanswered: the peer reset the connection
+      reset?: boolean;
       // the HTTP status, or the code an error frame names
       status?: number;
       // the words are the provider's, from its body or an error frame,

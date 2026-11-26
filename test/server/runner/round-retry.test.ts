@@ -912,6 +912,59 @@ describe("runRound retries", () => {
     expect(r.sleeps).toEqual([1000]);
   });
 
+  test("a reset connection is asked again at once with no retry shown", async () => {
+    const reset: ChatEvent = {
+      kind: "error",
+      message: "azure failed: ECONNRESET",
+      unanswered: true,
+      reset: true,
+    };
+    const r = round([[reset], [reset], answer]);
+    await r.run;
+    expect(r.asked()).toBe(3);
+    expect(r.sleeps).toEqual([]);
+    expect(r.shown).toEqual([]);
+    const retried = r.logs.events.filter((e) => e.msg === "round retried");
+    expect(
+      retried.map((e) => [e.fields.attempt, e.fields.cause, e.fields.wait]),
+    ).toEqual([
+      [1, "reset", 0],
+      [2, "reset", 0],
+    ]);
+  });
+
+  test("a reset between other failures keeps its own count", async () => {
+    const reset: ChatEvent = {
+      kind: "error",
+      message: "azure failed: ECONNRESET",
+      unanswered: true,
+      reset: true,
+    };
+    const r = round([[reset], [busy], [reset], answer]);
+    await r.run;
+    expect(r.asked()).toBe(4);
+    expect(r.sleeps).toEqual([1000]);
+    const retried = r.logs.events.filter((e) => e.msg === "round retried");
+    expect(retried.map((e) => [e.fields.attempt, e.fields.cause])).toEqual([
+      [1, "reset"],
+      [1, undefined],
+      [2, "reset"],
+    ]);
+  });
+
+  test("resets past their five back off as the three", async () => {
+    const reset: ChatEvent = {
+      kind: "error",
+      message: "azure failed: ECONNRESET",
+      unanswered: true,
+      reset: true,
+    };
+    const r = round([...Array.from({ length: 9 }, () => [reset]), answer]);
+    expect((await rejection(r.run)).message).toContain("ECONNRESET");
+    expect(r.asked()).toBe(9);
+    expect(r.sleeps).toEqual([1000, 2000, 4000]);
+  });
+
   test("the first token is timed from the round's start, waits included", async () => {
     const r = round([[busy], answer]);
     await r.run;
