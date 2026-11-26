@@ -163,7 +163,9 @@ the sends of agents on MCP there.
   `[A-Za-z0-9_.$-]` drops the hint, never the line.
 - **`mcp_call` takes `name` as a plain string, `mcp_describe` a `names`
   list.** No enum, since the catalog lists the names; a name outside
-  the snapshot is refused, matched exactly. `mcp_describe` answers the
+  the snapshot is refused. A name matches exactly, or with its `mcp__`
+  left off, which models that skip `mcp_describe` drop; the call then
+  runs under the full name. `mcp_describe` answers the
   description, then the schema as minified JSON, since it stays in
   history.
 - **`mcp_describe` answers one to ten names in order.** The count is

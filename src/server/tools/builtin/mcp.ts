@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { toolArguments } from "../../../shared/contracts/tool.ts";
+import { WIRE_PREFIX } from "../../../shared/mcp.ts";
 import { isRecord } from "../../../shared/words.ts";
 import { ToolError } from "../../lib/errors.ts";
 import {
@@ -35,6 +36,17 @@ function flat(servers: OfferedServer[]): OfferedMcpTool[] {
   return servers.flatMap((server) => server.tools);
 }
 
+// a name as the catalog lists it, or with its mcp__ left off: models that
+// skip mcp_describe drop the prefix, and only one offered tool can match
+function lookup(tools: OfferedMcpTool[], name: string) {
+  return (
+    tools.find((item) => item.wireName === name) ??
+    (name.startsWith(WIRE_PREFIX)
+      ? undefined
+      : tools.find((item) => item.wireName === `${WIRE_PREFIX}${name}`))
+  );
+}
+
 const notAvailable = (name: string) =>
   `MCP tool ${name} is not available; use a name from the available MCP tools`;
 
@@ -42,7 +54,7 @@ function named(servers: OfferedServer[], value: unknown): OfferedMcpTool {
   if (typeof value !== "string" || value === "") {
     throw new Error("name must be an available MCP tool");
   }
-  const tool = flat(servers).find((item) => item.wireName === value);
+  const tool = lookup(flat(servers), value);
   if (tool === undefined) {
     throw new ToolError(notAvailable(value), "MCP tool not available");
   }
@@ -84,10 +96,10 @@ export function describeTools(
   const tools = flat(servers);
   return names
     .map((name) => {
-      const tool = tools.find((item) => item.wireName === name);
+      const tool = lookup(tools, name);
       return tool === undefined
         ? `${name}\nError: ${notAvailable(name)}`
-        : `${name}\n${described(tool)}`;
+        : `${tool.wireName}\n${described(tool)}`;
     })
     .join("\n\n");
 }

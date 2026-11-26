@@ -11,6 +11,8 @@ import {
   describeTools,
   MAX_DESCRIBE_NAMES,
   makeMcpCatalogTools,
+  mcpCallName,
+  resolveMcpCall,
 } from "../../../src/server/tools/builtin/mcp.ts";
 
 const tool = (wireName: string, description: string): OfferedMcpTool =>
@@ -84,6 +86,21 @@ describe("mcp_describe", () => {
     );
   });
 
+  test("a name with its mcp__ left off finds the tool, answered under its full name", () => {
+    expect(describeTools(servers, ["s__a"])).toBe(`Reads a.\n\n${SCHEMA}`);
+    expect(describeTools(servers, ["s__b", "mcp__s__a"])).toBe(
+      [
+        `mcp__s__b\nReads b.\n\n${SCHEMA}`,
+        `mcp__s__a\nReads a.\n\n${SCHEMA}`,
+      ].join("\n\n"),
+    );
+    // a server name, or a prefix already there, never widens the match
+    expect(thrown(["s"]).message).toContain("MCP tool s is not available");
+    expect(thrown(["mcp__a"]).message).toContain(
+      "MCP tool mcp__a is not available",
+    );
+  });
+
   test("the count is checked in code", () => {
     const ten = Array.from({ length: MAX_DESCRIBE_NAMES }, () => "mcp__s__a");
     expect(describeTools(servers, ten).split("mcp__s__a\n")).toHaveLength(
@@ -102,5 +119,32 @@ describe("mcp_describe", () => {
         "names must be a list of available MCP tool names",
       );
     }
+  });
+});
+
+describe("mcp_call", () => {
+  const call = (name: string) =>
+    resolveMcpCall(
+      servers,
+      {
+        id: "c1",
+        name: "mcp_call",
+        arguments: JSON.stringify({ name, arguments: { q: "x" } }),
+      },
+      () => null,
+    );
+
+  test("a name with its mcp__ left off runs under the full name", () => {
+    expect(call("s__a")).toMatchObject({ name: "mcp__s__a" });
+    expect(call("mcp__s__b")).toMatchObject({ name: "mcp__s__b" });
+  });
+
+  test("the stored row names the full tool", () => {
+    const sent = { id: "c1", name: "mcp_call", arguments: '{"name":"s__a"}' };
+    expect(mcpCallName(servers, sent)).toBe("mcp__s__a");
+  });
+
+  test("a name that matches no tool with the prefix added is refused", () => {
+    expect(() => call("s")).toThrow("MCP tool s is not available");
   });
 });
