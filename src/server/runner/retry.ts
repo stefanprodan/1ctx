@@ -5,11 +5,15 @@
 // Only a request that failed before its stream started is: a busy or
 // failing server (429, 5xx, Anthropic's overloaded 529), a connection
 // that failed or dropped before its first event, or a headers wait
-// that ran out, the last only once since each costs two minutes.
+// that ran out, the last only once since each costs two minutes. A
+// connection closed with ECONNRESET before any answer is asked again at
+// once, on its own budget: often a pooled one the server dropped, which
+// a new connection answers, so a wait only delays the round.
 
 import type { ChatEvent } from "../providers/index.ts";
 
 export const MAX_RETRIES = 3;
+export const MAX_RESET_RETRIES = 5;
 const RETRY_BASE_MS = 1000;
 const RETRY_JITTER = 0.25;
 export const MAX_RETRY_AFTER_MS = 30_000;
@@ -19,7 +23,18 @@ export type RetryState = {
   // the retries this round has made, and how many were headers waits
   retries: number;
   timeouts: number;
+  // the resets asked again at once, outside the three
+  resets: number;
 };
+
+// a reset with its immediate budget left: asked again with no wait
+export const immediate = (
+  event: Extract<ChatEvent, { kind: "error" }>,
+  state: RetryState,
+) =>
+  event.unanswered === true &&
+  event.reset === true &&
+  state.resets < MAX_RESET_RETRIES;
 
 // The wait before asking again, or null when the round fails with
 // these words. leftMs is the time to the turn's deadline, null for
@@ -30,6 +45,7 @@ export function retryWait(
   leftMs: number | null,
   random: number,
 ): number | null {
+  if (immediate(event, state)) return 0;
   if (state.retries >= MAX_RETRIES) return null;
   if (event.unanswered) {
     if (event.timedOut && state.timeouts > 0) return null;

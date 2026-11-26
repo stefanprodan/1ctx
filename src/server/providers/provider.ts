@@ -211,7 +211,11 @@ export function providerFor(row: ProviderRow, deps: ProviderDeps): Provider {
           kind: "error",
           message: scrubKey(`${row.name} failed: ${messageOf(err)}`, key),
           ...(err instanceof Unanswered
-            ? { unanswered: true, ...(err.timedOut ? { timedOut: true } : {}) }
+            ? {
+                unanswered: true,
+                ...(err.timedOut ? { timedOut: true } : {}),
+                ...(err.reset ? { reset: true } : {}),
+              }
             : {}),
         };
       }

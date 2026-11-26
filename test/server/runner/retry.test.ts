@@ -12,7 +12,7 @@ type ErrorEvent = Parameters<typeof retryWait>[0];
 
 const refused = (status: number, extra: Partial<ErrorEvent> = {}) =>
   ({ kind: "error", message: `HTTP ${status}`, status, ...extra }) as const;
-const fresh = { retries: 0, timeouts: 0 };
+const fresh = { retries: 0, timeouts: 0, resets: 0 };
 
 describe("which failures are asked again", () => {
   test.each([429, 500, 502, 503, 504, 529])("%i is retried", (status) => {
@@ -25,6 +25,21 @@ describe("which failures are asked again", () => {
       expect(retryWait(refused(status), fresh, null, 0)).toBeNull();
     },
   );
+
+  test("a reset connection is asked again at once, five times", () => {
+    const event = {
+      kind: "error",
+      message: "local failed: ECONNRESET",
+      unanswered: true,
+      reset: true,
+    } as const;
+    expect(retryWait(event, fresh, null, 0)).toBe(0);
+    expect(retryWait(event, { ...fresh, resets: 4 }, null, 0)).toBe(0);
+    // past its own budget it backs off as any failed connection
+    expect(retryWait(event, { ...fresh, resets: 5 }, null, 0)).toBe(1000);
+    // the three spent leave the immediate ones
+    expect(retryWait(event, { ...fresh, retries: 3 }, null, 0)).toBe(0);
+  });
 
   test("a failed connection is retried", () => {
     const event = {
@@ -53,13 +68,17 @@ describe("which failures are asked again", () => {
       timedOut: true,
     } as const;
     expect(retryWait(event, fresh, null, 0)).toBe(1000);
-    expect(retryWait(event, { retries: 1, timeouts: 1 }, null, 0)).toBeNull();
+    expect(
+      retryWait(event, { retries: 1, timeouts: 1, resets: 0 }, null, 0),
+    ).toBeNull();
     // a timeout after a refusal still has its one retry
-    expect(retryWait(event, { retries: 1, timeouts: 0 }, null, 0)).toBe(2000);
+    expect(
+      retryWait(event, { retries: 1, timeouts: 0, resets: 0 }, null, 0),
+    ).toBe(2000);
   });
 
   test("three retries at most", () => {
-    const state = (retries: number) => ({ retries, timeouts: 0 });
+    const state = (retries: number) => ({ retries, timeouts: 0, resets: 0 });
     expect(retryWait(refused(503), state(2), null, 0)).toBe(4000);
     expect(retryWait(refused(503), state(3), null, 0)).toBeNull();
   });
@@ -72,7 +91,7 @@ describe("how long a retry waits", () => {
       [1, 2000],
       [2, 4000],
     ] as const) {
-      const state = { retries, timeouts: 0 };
+      const state = { retries, timeouts: 0, resets: 0 };
       expect(retryWait(refused(503), state, null, 0)).toBe(base);
       expect(retryWait(refused(503), state, null, 0.5)).toBe(base * 1.125);
       const most = retryWait(refused(503), state, null, 0.999_999)!;
@@ -88,9 +107,9 @@ describe("how long a retry waits", () => {
     // no wait asked, or a past date, still backs off with its jitter
     expect(retryWait(after(0), fresh, null, 0)).toBe(1000);
     expect(retryWait(after(0), fresh, null, 0.5)).toBe(1125);
-    expect(retryWait(after(1500), { retries: 2, timeouts: 0 }, null, 0)).toBe(
-      4000,
-    );
+    expect(
+      retryWait(after(1500), { retries: 2, timeouts: 0, resets: 0 }, null, 0),
+    ).toBe(4000);
     expect(retryWait(after(MAX_RETRY_AFTER_MS), fresh, null, 0)).toBe(30_000);
     expect(retryWait(after(MAX_RETRY_AFTER_MS + 1), fresh, null, 0)).toBeNull();
   });

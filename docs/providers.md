@@ -159,8 +159,11 @@ Completions shape, about one token a tool under the azure one.
   529 (Anthropic's overloaded), no response, or a stream that dropped
   before its first event, retried at most three times with backoff from
   1 s, jitter and `Retry-After` (past 30 s fails the round). A headers
-  timeout is retried once, since each costs two minutes. A `served`
-  event does not count as started. No wait passes the turn's deadline
+  timeout is retried once, since each costs two minutes. A connection
+  closed with `ECONNRESET` before any answer is asked again at once, up
+  to five times outside the three and with no retry shown: often a
+  pooled one the server dropped, which a new connection answers. A
+  `served` event does not count as started. No wait passes the turn's deadline
   (the memory phase's own window in that phase). The one exception is
   a round cut for an output loop, asked again once after it streamed
   (`docs/sessions.md`, stream bounds); its new attempt retries as any

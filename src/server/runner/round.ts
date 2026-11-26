@@ -25,7 +25,7 @@ import { unfitImages } from "./image-fit.ts";
 import { offers } from "./policy.ts";
 import { NO_REPO_LINES } from "./prompt.ts";
 import type { ContextLookups } from "./render.ts";
-import { MAX_RETRIES, type RetryState, retryWait } from "./retry.ts";
+import { immediate, MAX_RETRIES, type RetryState, retryWait } from "./retry.ts";
 import { cutLoop, loopFailure, RoundWatches } from "./round-loop.ts";
 import { RoundVisuals } from "./round-visuals.ts";
 import { type ActiveSend, type RoundState, restartRound } from "./send.ts";
@@ -237,7 +237,7 @@ async function streamRound(
   const open = () =>
     deps.chat(send.policy.providerId, req, signal)[Symbol.asyncIterator]();
   let iterator = open();
-  const retry: RetryState = { retries: 0, timeouts: 0 };
+  const retry: RetryState = { retries: 0, timeouts: 0, resets: 0 };
   const paints =
     send.phase === "provider" &&
     send.kind !== "compact" &&
@@ -286,12 +286,16 @@ async function streamRound(
         (deps.random ?? Math.random)(),
       );
       if (wait !== null) {
-        retry.retries++;
+        // a reset asked again at once shows nothing: there is no wait
+        const reset = immediate(event, retry);
+        if (reset) retry.resets++;
+        else retry.retries++;
         if (event.timedOut) retry.timeouts++;
         deps.log.warn("round retried", {
           chat: send.sessionId,
           round: send.roundNo,
-          attempt: retry.retries,
+          attempt: reset ? retry.resets : retry.retries,
+          ...(reset ? { cause: "reset" } : {}),
           ...(event.status === undefined
             ? {}
             : { provider_status: event.status }),
@@ -309,11 +313,13 @@ async function streamRound(
         // round's start, since the waits are what the reader sat through
         round.upstream = null;
         round.servedModel = null;
-        deps.writer.retrying(send, {
-          attempt: retry.retries,
-          max: MAX_RETRIES,
-        });
-        if (!(await sleepUnless(deps.clock, wait, signal))) return;
+        if (!reset) {
+          deps.writer.retrying(send, {
+            attempt: retry.retries,
+            max: MAX_RETRIES,
+          });
+          if (!(await sleepUnless(deps.clock, wait, signal))) return;
+        } else if (signal.aborted) return;
         heard = false;
         thinking = false;
         iterator = open();
