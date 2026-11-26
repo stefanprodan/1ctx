@@ -765,6 +765,108 @@ describe("the catalog and the mode", () => {
     expect(catalogArguments("[]")).toBe("");
   });
 
+  const hinted = (properties: Record<string, unknown>, required = ["a"]) =>
+    args({ type: "object", properties, required });
+
+  test("a hint where a guess goes wrong: lists and short fixed sets", () => {
+    expect(hinted({ a: { type: "array", items: { type: "string" } } })).toBe(
+      "(a: string[])",
+    );
+    for (const type of ["number", "integer", "boolean"]) {
+      expect(hinted({ a: { type: "array", items: { type } } }, [])).toBe(
+        `(a?: ${type}[])`,
+      );
+    }
+    expect(
+      hinted({
+        a: { type: "array", items: { type: "object", properties: {} } },
+      }),
+    ).toBe("(a: object[])");
+    // properties alone say object
+    expect(
+      hinted({ a: { type: "array", items: { properties: { x: {} } } } }),
+    ).toBe("(a: object[])");
+    expect(
+      hinted({
+        a: { type: "array", items: { type: "string", enum: ["x", "y"] } },
+      }),
+    ).toBe("(a: (x|y)[])");
+    // a long or odd set of items is still a set, never free text
+    const seven = ["a", "b", "c", "d", "e", "f", "g"];
+    expect(hinted({ a: { type: "array", items: { enum: seven } } })).toBe(
+      "(a: (…)[])",
+    );
+    expect(hinted({ a: { type: "array", items: { enum: ["a b"] } } })).toBe(
+      "(a: (…)[])",
+    );
+    expect(hinted({ a: { enum: ["open", "closed", "all"] } }, [])).toBe(
+      "(a?: open|closed|all)",
+    );
+    expect(hinted({ a: { enum: seven.slice(0, 6) } })).toBe("(a: a|b|c|d|e|f)");
+    expect(hinted({ a: { type: "integer", enum: [1, 2] } })).toBe("(a: 1|2)");
+    // null beside one type keeps the hint
+    expect(
+      hinted({ a: { type: ["array", "null"], items: { type: "string" } } }),
+    ).toBe("(a: string[])");
+    // only the hinted names change
+    expect(
+      hinted(
+        {
+          owner: { type: "string" },
+          state: { type: "string", enum: ["open", "closed"] },
+          labels: { type: "array", items: { type: "string" } },
+        },
+        ["owner"],
+      ),
+    ).toBe("(owner, state?: open|closed, labels?: string[])");
+  });
+
+  test("a name stays bare when a hint could mislead or costs more than it fixes", () => {
+    for (const property of [
+      { type: "string" },
+      { type: "number" },
+      { type: "integer" },
+      { type: "boolean" },
+      { type: "object", properties: { x: {} }, required: ["x"] },
+      {},
+      // a long enum, or a value outside the name set, drops the hint
+      { enum: ["a", "b", "c", "d", "e", "f", "g"] },
+      { enum: ["a", "b c"] },
+      { enum: ["a", "x|y"] },
+      { enum: [] },
+      // branches at the property
+      { anyOf: [{ type: "string" }, { type: "array" }] },
+      { oneOf: [{ type: "string" }] },
+      // two types left after null
+      { type: ["string", "array"] },
+      { type: ["string", "null"] },
+      // a list whose items say nothing plain
+      { type: "array" },
+      { type: "array", items: { anyOf: [{ type: "string" }] } },
+      { type: "array", items: { type: "array" } },
+      { type: "array", items: { type: ["string", "null"] } },
+    ]) {
+      expect(hinted({ a: property })).toBe("(a)");
+    }
+    // the untyped list never hints
+    expect(
+      catalogArguments(
+        JSON.stringify({
+          properties: { a: { type: "array", items: { type: "string" } } },
+        }),
+        false,
+      ),
+    ).toBe("(a?)");
+    // anyOf at the top still drops the whole list
+    expect(
+      args({
+        type: "object",
+        properties: { a: { type: "array", items: { type: "string" } } },
+        anyOf: [{ required: ["a"] }],
+      }),
+    ).toBe("");
+  });
+
   test("the list is never cut, the sentence is", () => {
     const names = Array.from({ length: 30 }, (_, i) => `argument_${i}`);
     const schema = {
@@ -830,7 +932,13 @@ describe("the catalog and the mode", () => {
     expect(cat.text).toContain(
       "mcp__schema__get_project(project): Fetch one project's TypeMeta lines by name, alias, or member source name (e.g. ack-s3 resolves",
     );
-    expect(tokens(cat.text)).toBe(2577);
+    expect(cat.text).toContain(
+      "\nmcp__flux__get_kubernetes_resources(apiVersion, kind, name?, namespace?, selector?, limit?, fields?: string[]): ",
+    );
+    expect(cat.text).toContain(
+      "\nmcp__github__list_issues(after?, direction?: ASC|DESC, field_filters?: object[], fields?: (…)[], labels?: string[], ",
+    );
+    expect(tokens(cat.text)).toBe(2836);
     expect(mcpCatalog([])).toEqual({ text: "", overCap: false });
     expect(mcpCatalog([{ name: "e", instructions: null, tools: [] }])).toEqual({
       text: "",
@@ -857,7 +965,7 @@ describe("the catalog and the mode", () => {
 
   // the catalog as the format says, built here by hand, so an exact
   // length proves the fit counts the lead, the opening line, every
-  // header and the closing tag
+  // header and the closing tag; the hinted argument tells tier 2 from 3
   const tierFixture = (count: number, last = "Does it.") => [
     {
       name: "s",
@@ -865,18 +973,27 @@ describe("the catalog and the mode", () => {
       tools: Array.from({ length: count }, (_, i) => ({
         wireName: `mcp__s__t${i}`,
         description: i === count - 1 ? last : "Does it.",
-        schemaJson: '{"properties":{"a":{}},"required":["a"]}',
+        schemaJson:
+          '{"properties":{"a":{"type":"array","items":{"type":"string"}}},"required":["a"]}',
       })),
     },
   ];
-  const tierText = (tier: 0 | 1 | 2, servers: PromptServer[]) => {
+  type Tier = 0 | 1 | 2 | 3;
+  const tierText = (tier: Tier, servers: PromptServer[]) => {
     const body = servers
       .map(
         (s) =>
           `${s.name} (${s.tools.length} tools):\n${s.tools
             .map(
               (t) =>
-                `${[`${t.wireName}(a): ${t.description}`, `${t.wireName}(a)`, t.wireName][tier]}\n`,
+                `${
+                  [
+                    `${t.wireName}(a: string[]): ${t.description}`,
+                    `${t.wireName}(a: string[])`,
+                    `${t.wireName}(a)`,
+                    t.wireName,
+                  ][tier]
+                }\n`,
             )
             .join("")}`,
       )
@@ -884,7 +1001,7 @@ describe("the catalog and the mode", () => {
     return `${CATALOG_LEAD}\n${CATALOG_OPENINGS[tier]}\n\n<available_mcp_tools>\n${body}</available_mcp_tools>`;
   };
   // the most tools whose text at the tier fits the cap
-  const most = (tier: 0 | 1 | 2) => {
+  const most = (tier: Tier) => {
     let count = 1;
     while (tierText(tier, tierFixture(count + 1)).length <= MAX_CATALOG) {
       count++;
@@ -907,35 +1024,44 @@ describe("the catalog and the mode", () => {
       text: tierText(1, over),
       overCap: false,
     });
-    // tier 2 to 3 at one tool
-    const two = most(1);
-    expect(mcpCatalog(tierFixture(two)).text).toBe(
-      tierText(1, tierFixture(two)),
-    );
-    expect(mcpCatalog(tierFixture(two + 1)).text).toBe(
-      tierText(2, tierFixture(two + 1)),
-    );
-    expect(tierText(2, tierFixture(two + 1))).not.toContain("(a)");
+    // tier 2 to 3 and 3 to 4 at one tool: types go before arguments
+    for (const tier of [1, 2] as const) {
+      const count = most(tier);
+      expect(mcpCatalog(tierFixture(count)).text).toBe(
+        tierText(tier, tierFixture(count)),
+      );
+      expect(mcpCatalog(tierFixture(count + 1)).text).toBe(
+        tierText((tier + 1) as Tier, tierFixture(count + 1)),
+      );
+    }
+    const three = tierText(2, tierFixture(most(1) + 1));
+    expect(three).toContain("(a)\n");
+    expect(three).not.toContain("string[]");
+    expect(three).not.toContain("after a colon");
+    expect(tierText(3, tierFixture(most(2) + 1))).not.toContain("(a)");
   });
 
-  test("tier 3 is the floor, printed over the cap with nothing dropped", () => {
-    const three = most(2);
-    expect(mcpCatalog(tierFixture(three))).toEqual({
-      text: tierText(2, tierFixture(three)),
+  test("tier 4 is the floor, printed over the cap with nothing dropped", () => {
+    const four = most(3);
+    expect(mcpCatalog(tierFixture(four))).toEqual({
+      text: tierText(3, tierFixture(four)),
       overCap: false,
     });
-    const past = tierFixture(three + 1);
+    const past = tierFixture(four + 1);
     const floor = mcpCatalog(past);
-    expect(floor).toEqual({ text: tierText(2, past), overCap: true });
+    expect(floor).toEqual({ text: tierText(3, past), overCap: true });
     expect(floor.text.length).toBeGreaterThan(MAX_CATALOG);
-    expect(floor.text).toContain(`\nmcp__s__t${three}\n`);
+    expect(floor.text).toContain(`\nmcp__s__t${four}\n`);
     // no argument is shown, so nothing explains the optional mark
     expect(floor.text).not.toContain("A ? after an argument");
     expect(mcpCatalog(tierFixture(3)).text).toContain("A ? after an argument");
   });
 
   test("the catalog is byte-stable for one snapshot", () => {
-    for (const count of [3, most(0) + 1, most(1) + 1, most(2) + 1]) {
+    for (const count of [
+      3,
+      ...([0, 1, 2, 3] as const).map((t) => most(t) + 1),
+    ]) {
       const servers = [
         ...tierFixture(count),
         { ...tierFixture(2)[0]!, name: "z" },

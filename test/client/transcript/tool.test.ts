@@ -78,6 +78,11 @@ describe("tool summaries", () => {
         '{"name":"gitops-knowledge","path":"references/runbook.md"}',
       ),
     ).toBe("references/runbook.md");
+    // a describe row of either shape names its tools
+    expect(
+      shortArg("mcp_describe", '{"names":["mcp__a__x","mcp__b__y"]}'),
+    ).toBe("mcp__a__x, mcp__b__y");
+    expect(shortArg("mcp_describe", '{"name":"mcp__a__x"}')).toBe("mcp__a__x");
   });
 
   test("an MCP wire name shows the server, then the tool, and cuts its argument", () => {

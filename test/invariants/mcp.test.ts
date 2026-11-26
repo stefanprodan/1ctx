@@ -658,7 +658,7 @@ describe("MCP tools in a send", () => {
       {
         id: "describe",
         name: "mcp_describe",
-        arguments: JSON.stringify({ name: "mcp__flux__search_flux_docs" }),
+        arguments: JSON.stringify({ names: ["mcp__flux__search_flux_docs"] }),
       },
     ]);
     started.script.end();
@@ -1432,7 +1432,7 @@ describe("MCP catalog and lifecycle end to end", () => {
       {
         id: "describe",
         name: "mcp_describe",
-        arguments: JSON.stringify({ name: "mcp__wide__read_119" }),
+        arguments: JSON.stringify({ names: ["mcp__wide__read_119"] }),
       },
       {
         id: "call",

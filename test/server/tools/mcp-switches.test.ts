@@ -93,18 +93,27 @@ test.each(["all", "catalog"] as const)(
       if (mode === "catalog") {
         expect(off.mcpCatalog).toContain("mcp__docs__get_item0");
         expect(off.mcpCatalog).not.toContain("mcp__flux__");
-        for (const name of ["mcp_call", "mcp_describe"]) {
-          expect(
-            off.tools.find((tool) => tool.name === name)?.parameters,
-          ).toMatchObject({
-            properties: {
-              name: {
-                type: "string",
-                description: "A tool name from the available MCP tools above.",
-              },
+        expect(
+          off.tools.find((tool) => tool.name === "mcp_call")?.parameters,
+        ).toMatchObject({
+          properties: {
+            name: {
+              type: "string",
+              description: "A tool name from the available MCP tools above.",
             },
-          });
-        }
+          },
+        });
+        expect(
+          off.tools.find((tool) => tool.name === "mcp_describe")?.parameters,
+        ).toMatchObject({
+          properties: {
+            names: {
+              type: "array",
+              items: { type: "string" },
+              description: "Tool names from the available MCP tools above.",
+            },
+          },
+        });
         expect(JSON.stringify(off.tools)).not.toContain("enum");
         // a disabled server's tool, an unprefixed name and an unknown one
         for (const name of [

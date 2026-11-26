@@ -137,25 +137,41 @@ the sends of agents on MCP there.
 - **The catalog shrinks its lines, never its tools.** It takes the
   first tier whose whole text (lead, opening line, every
   `<server> (N tools):` header, every line, closing tag) fits
-  `MAX_CATALOG`: `name(args): sentence`, then `name(args)`, then
-  `name`. The opening line after the lead says which. Arguments are
-  dropped last, since they stop guessed calls. The tier is a pure
-  function of the snapshot, so the prompt stays byte-stable.
-- **Tier 3 is the floor.** Past it the catalog is printed over the cap
+  `MAX_CATALOG`: `name(typed args): sentence`, `name(typed args)`,
+  `name(args)`, then `name`. The opening line after the lead says
+  which. Types go before arguments and arguments last, since both stop
+  guessed calls. The tier is a pure function of the snapshot, so the
+  prompt stays byte-stable.
+- **Tier 4 is the floor.** Past it the catalog is printed over the cap
   and the offer logs `catalog over cap` with `kind` and `count`, never a
   name.
 - **A catalog line is `name(args): sentence`** at tier 1, so a model
   that skips `mcp_describe` does not guess names. The args are the lean
   schema's top-level names, then any `required` name `properties`
-  lacks, an optional one marked `?`; types stay with `mcp_describe`. No
-  list when the top level has `anyOf`, `oneOf`, `allOf` or a kept
-  `$ref`, or a name is outside `[A-Za-z0-9_.$-]`, since it would lie or
-  break the line. Only the sentence is cut, at `MAX_CATALOG_LINE`; it
-  reads past `e.g.` and `i.e.`.
-- **`mcp_describe` and `mcp_call` take `name` as a plain string.** No
-  enum, since the catalog lists the names; a name outside the snapshot
-  is refused, matched exactly. `mcp_describe` answers the description,
-  then the schema as minified JSON, since it stays in history.
+  lacks, an optional one marked `?`. No list when the top level has
+  `anyOf`, `oneOf`, `allOf` or a kept `$ref`, or a name is outside
+  `[A-Za-z0-9_.$-]`, since it would lie or break the line. Only the
+  sentence is cut, at `MAX_CATALOG_LINE`; it reads past `e.g.` and
+  `i.e.`.
+- **A typed arg carries a hint only where a guess goes wrong.** An
+  array is `name: string[]` (its plain item type) or `object[]`; items
+  from a fixed set are `(a|b|c)[]` up to six values, else `(…)[]`, since
+  `string[]` reads as free text. An enum of up to six values is
+  `name: a|b|c`, a longer one bare. A plain string, number, integer,
+  boolean or object stays bare: object keys cost much and fixed no
+  call. `null` beside one type is ignored; a value outside
+  `[A-Za-z0-9_.$-]` drops the hint, never the line.
+- **`mcp_call` takes `name` as a plain string, `mcp_describe` a `names`
+  list.** No enum, since the catalog lists the names; a name outside
+  the snapshot is refused, matched exactly. `mcp_describe` answers the
+  description, then the schema as minified JSON, since it stays in
+  history.
+- **`mcp_describe` answers one to ten names in order.** The count is
+  checked in code, not in the schema. One name answers bare and fails
+  the call when not offered. With several, each answer opens with its
+  name on its own line, a blank line apart, and a name not offered gets
+  its own refusal there, so the others still answer. An old row's
+  `name` stays in history and is never run again.
 - **History never names a function the `tools` array lacks.** In catalog
   mode the tool loop rewrites a call of an offered wire name to
   `mcp_call` before its row is written.
