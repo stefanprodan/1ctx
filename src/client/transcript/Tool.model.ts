@@ -59,6 +59,10 @@ export function shortArg(name: string, args: string): string {
     if (name === "skill_file" && typeof value.path === "string") {
       return value.path;
     }
+    // a row from before names holds one name, which the fallback shows
+    if (name === "mcp_describe" && Array.isArray(value.names)) {
+      return value.names.filter((n) => typeof n === "string").join(", ");
+    }
     const telling = Object.values(value).find(
       (item) => typeof item === "string",
     );

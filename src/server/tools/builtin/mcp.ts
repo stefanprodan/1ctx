@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { toolArguments } from "../../../shared/contracts/tool.ts";
+import { WIRE_PREFIX } from "../../../shared/mcp.ts";
 import { isRecord } from "../../../shared/words.ts";
 import { ToolError } from "../../lib/errors.ts";
 import {
@@ -35,18 +36,72 @@ function flat(servers: OfferedServer[]): OfferedMcpTool[] {
   return servers.flatMap((server) => server.tools);
 }
 
+// a name as the catalog lists it, or with its mcp__ left off: models that
+// skip mcp_describe drop the prefix, and only one offered tool can match
+function lookup(tools: OfferedMcpTool[], name: string) {
+  return (
+    tools.find((item) => item.wireName === name) ??
+    (name.startsWith(WIRE_PREFIX)
+      ? undefined
+      : tools.find((item) => item.wireName === `${WIRE_PREFIX}${name}`))
+  );
+}
+
+const notAvailable = (name: string) =>
+  `MCP tool ${name} is not available; use a name from the available MCP tools`;
+
 function named(servers: OfferedServer[], value: unknown): OfferedMcpTool {
   if (typeof value !== "string" || value === "") {
     throw new Error("name must be an available MCP tool");
   }
-  const tool = flat(servers).find((item) => item.wireName === value);
+  const tool = lookup(flat(servers), value);
   if (tool === undefined) {
-    throw new ToolError(
-      `MCP tool ${value} is not available; use a name from the available MCP tools`,
-      "MCP tool not available",
-    );
+    throw new ToolError(notAvailable(value), "MCP tool not available");
   }
   return tool;
+}
+
+// the schema carries no minItems or maxItems, as measured, so the count
+// is checked here
+export const MAX_DESCRIBE_NAMES = 10;
+
+function describedNames(value: unknown): string[] {
+  if (!Array.isArray(value) || !value.every((n) => typeof n === "string")) {
+    throw new Error("names must be a list of available MCP tool names");
+  }
+  if (value.length === 0 || value.length > MAX_DESCRIBE_NAMES) {
+    throw new ToolError(
+      `names must hold 1 to ${MAX_DESCRIBE_NAMES} tool names; this call has ${value.length}`,
+      "MCP describe names count",
+    );
+  }
+  return value;
+}
+
+// minified: the result stays in history, and indentation adds tokens
+// without meaning
+function described(tool: OfferedMcpTool): string {
+  return `${tool.description}\n\n${JSON.stringify(tool.wireInputSchema)}`;
+}
+
+// one name answers as it always has, and fails the call when it is not
+// offered; several each open with their name, a refused one in its own
+// line, so one bad name never costs the others a round
+export function describeTools(
+  servers: OfferedServer[],
+  value: unknown,
+): string {
+  const names = describedNames(value);
+  if (names.length === 1) return described(named(servers, names[0]));
+  const tools = flat(servers);
+  return names
+    .map((name) => {
+      const tool = lookup(tools, name);
+      return tool === undefined
+        ? `${name}\nError: ${notAvailable(name)}`
+        : `${tool.wireName}\n${described(tool)}`;
+    })
+    .join("\n\n");
 }
 
 function object(value: unknown): Record<string, unknown> {
@@ -169,25 +224,28 @@ export function makeMcpCatalogTools(servers: OfferedServer[]): Tool[] {
     {
       name: "mcp_describe",
       description:
-        "Describe one available MCP tool and return its input schema.",
+        "Describe one or more available MCP tools and return their input schemas.",
       parameters: {
         type: "object",
-        properties: { name },
-        required: ["name"],
+        properties: {
+          names: {
+            type: "array",
+            items: { type: "string" },
+            description: "Tool names from the available MCP tools above.",
+          },
+        },
+        required: ["names"],
         additionalProperties: false,
       },
+      // a history row from before names keeps its name and never runs
+      // again
       async run(args) {
-        const tool = named(servers, args.name);
-        // minified: the result stays in history, and indentation adds
-        // tokens without meaning
-        const schema = JSON.stringify(tool.wireInputSchema);
-        return `${tool.description}\n\n${schema}`;
+        return describeTools(servers, args.names);
       },
     },
     {
       name: "mcp_call",
-      description:
-        "Call one available MCP tool after reading its schema with mcp_describe.",
+      description: "Call one available MCP tool by name with its arguments.",
       parameters: {
         type: "object",
         properties: {

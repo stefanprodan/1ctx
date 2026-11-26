@@ -242,7 +242,7 @@ describe("the built-in catalog", () => {
   });
 
   test("a tool taking a skill or MCP tool name lists no names", () => {
-    for (const name of ["mcp_call", "mcp_describe", "skill", "skill_file"]) {
+    for (const name of ["mcp_call", "skill", "skill_file"]) {
       const tool = catalog.find((t) => t.name === name)!;
       const property = (
         tool.parameters as { properties: { name: Record<string, unknown> } }
@@ -252,6 +252,17 @@ describe("the built-in catalog", () => {
         description: expect.stringContaining(" above."),
       });
     }
+    const describeTool = catalog.find((t) => t.name === "mcp_describe")!;
+    expect(
+      (describeTool.parameters as { properties: Record<string, unknown> })
+        .properties,
+    ).toEqual({
+      names: {
+        type: "array",
+        items: { type: "string" },
+        description: expect.stringContaining(" above."),
+      },
+    });
   });
 
   test("says when a send carries each, and memory_edit's two texts", () => {
